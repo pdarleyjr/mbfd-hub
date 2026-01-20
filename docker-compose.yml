@@ -1,52 +1,54 @@
-version: '3.8'
-
 services:
   app:
+    image: 'sail-8.4/app'
     build:
-      context: .
+      context: ./laravel-app/vendor/laravel/sail/runtimes/8.4
       dockerfile: Dockerfile
+      args:
+        WWWGROUP: '1000'
     container_name: mbfd-hub-app
     restart: unless-stopped
     environment:
-      - DB_CONNECTION=pgsql
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_DATABASE=mbfd_hub
-      - DB_USERNAME=mbfd_user
-      - DB_PASSWORD=mbfd_secure_pass_2026
-      - APP_NAME="MBFD Support Hub"
-      - APP_ENV=production
-      - APP_DEBUG=false
-      - APP_URL=https://support.darleyplex.com
-      - SESSION_DRIVER=database
-      - CACHE_DRIVER=file
-      - QUEUE_CONNECTION=database
+      WWWUSER: '1000'
+      LARAVEL_SAIL: 1
+      XDEBUG_MODE: 'off'
+      XDEBUG_CONFIG: 'client_host=host.docker.internal'
+      IGNITION_LOCAL_SITES_PATH: '/var/www/html'
     volumes:
-      - ./laravel-app:/var/www/html
+      - './laravel-app:/var/www/html'
     ports:
-      - "127.0.0.1:8082:8000"
-    depends_on:
-      - db
+      - '127.0.0.1:8082:80'
     networks:
       - mbfd_net
+    depends_on:
+      - pgsql
 
-  db:
-    image: postgres:16-alpine
+  pgsql:
+    image: 'postgres:16'
     container_name: mbfd-hub-db
     restart: unless-stopped
+    ports:
+      - '127.0.0.1:5433:5432'
     environment:
-      - POSTGRES_DB=mbfd_hub
-      - POSTGRES_USER=mbfd_user
-      - POSTGRES_PASSWORD=mbfd_secure_pass_2026
+      PGPASSWORD: 'mbfd_secure_pass_2026'
+      POSTGRES_DB: 'mbfd_hub'
+      POSTGRES_USER: 'mbfd_user'
+      POSTGRES_PASSWORD: 'mbfd_secure_pass_2026'
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - 'postgres_data:/var/lib/postgresql/data'
     networks:
       - mbfd_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mbfd_user"]
-      interval: 10s
+      test:
+        - CMD
+        - pg_isready
+        - '-q'
+        - '-d'
+        - 'mbfd_hub'
+        - '-U'
+        - 'mbfd_user'
+      retries: 3
       timeout: 5s
-      retries: 5
 
 networks:
   mbfd_net:
