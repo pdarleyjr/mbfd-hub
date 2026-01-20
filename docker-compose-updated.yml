@@ -2,11 +2,12 @@ version: '3.8'
 
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: php:8.3-fpm-alpine
     container_name: mbfd-hub-app
     restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./laravel-app:/var/www/html
     environment:
       - DB_CONNECTION=pgsql
       - DB_HOST=db
@@ -14,21 +15,24 @@ services:
       - DB_DATABASE=mbfd_hub
       - DB_USERNAME=mbfd_user
       - DB_PASSWORD=mbfd_secure_pass_2026
-      - APP_NAME="MBFD Support Hub"
-      - APP_ENV=production
-      - APP_DEBUG=false
-      - APP_URL=https://support.darleyplex.com
-      - SESSION_DRIVER=database
-      - CACHE_DRIVER=file
-      - QUEUE_CONNECTION=database
-    volumes:
-      - ./laravel-app:/var/www/html
-    ports:
-      - "127.0.0.1:8082:8000"
-    depends_on:
-      - db
     networks:
       - mbfd_net
+    depends_on:
+      - db
+
+  nginx:
+    image: nginx:alpine
+    container_name: mbfd-hub-nginx
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8082:80"
+    volumes:
+      - ./laravel-app:/var/www/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - mbfd_net
+    depends_on:
+      - app
 
   db:
     image: postgres:16-alpine
