@@ -1,0 +1,31 @@
+# Laravel
+/laravel-app/node_modules
+/laravel-app/public/hot
+/laravel-app/public/storage
+/laravel-app/storage/*.key
+/laravel-app/vendor
+/laravel-app/.env
+/laravel-app/.env.backup
+/laravel-app/.phpunit.result.cache
+/laravel-app/Homestead.json
+/laravel-app/Homestead.yaml
+/laravel-app/npm-debug.log
+/laravel-app/yarn-error.log
+
+# Storage
+/storage/*
+!/storage/.gitkeep
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.env.local
