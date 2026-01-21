@@ -13,7 +13,3 @@ Route::get('/daily', function () {
 Route::get('/daily/{any}', function () {
     return view('daily-checkout');
 })->where('any', '.*');
-
-Route::get('/admin', function () {
-    return redirect('/admin');
-});

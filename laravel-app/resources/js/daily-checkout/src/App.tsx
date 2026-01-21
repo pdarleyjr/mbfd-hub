@@ -6,7 +6,7 @@ import SuccessPage from './components/SuccessPage';
 
 function App() {
   return (
-    <Router>
+    <Router basename="/daily">
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-4xl mx-auto py-8 px-4">
           <Routes>
