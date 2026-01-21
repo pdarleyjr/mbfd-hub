@@ -4,17 +4,16 @@ namespace App\Filament\Resources\CapitalProjectResource\Pages;
 
 use App\Filament\Resources\CapitalProjectResource;
 use Filament\Actions;
-use Filament\Resources\Pages\EditRecord;
+use Filament\Resources\Pages\ViewRecord;
 
-class EditCapitalProject extends EditRecord
+class ViewCapitalProject extends ViewRecord
 {
     protected static string $resource = CapitalProjectResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
-            Actions\ViewAction::make(),
-            Actions\DeleteAction::make(),
+            Actions\EditAction::make(),
         ];
     }
 }
