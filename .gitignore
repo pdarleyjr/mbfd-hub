@@ -19,6 +19,17 @@
 $null
 json('data')
 alter_notifications_data_to_jsonb.php
+ApparatusController.php
+get()
+join('
+toArray()
+toArray())
+*.png
+temp_*.txt
+
+# Working copies
+/copy/
+/screenshots/
 
 # Directories in root
 /app/

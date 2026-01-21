@@ -1,0 +1,27 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/mbfd-hub
+            git pull origin main
+            docker exec mbfd-hub-app composer install --no-dev --optimize-autoloader
+            docker exec mbfd-hub-app php artisan config:cache
+            docker exec mbfd-hub-app php artisan route:cache
+            docker exec mbfd-hub-app php artisan view:cache
+            docker exec mbfd-hub-app php artisan migrate --force
