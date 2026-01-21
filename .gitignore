@@ -12,6 +12,23 @@
 /laravel-app/npm-debug.log
 /laravel-app/yarn-error.log
 
+# Ignore the entire laravel-app directory (has its own git repo)
+/laravel-app/
+
+# Loose root directory files that shouldn't be tracked
+$null
+json('data')
+alter_notifications_data_to_jsonb.php
+
+# Directories in root
+/app/
+/database/
+/docs/
+/resources/
+/routes/
+/sogs/
+/public/
+
 # Storage
 /storage/*
 !/storage/.gitkeep
