@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import ApparatusList from './components/ApparatusList';
 import InspectionWizard from './components/InspectionWizard';
 import SuccessPage from './components/SuccessPage';
-import './App.css';
+// import './App.css';
 
 function App() {
   return (

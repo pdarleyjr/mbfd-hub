@@ -9,5 +9,19 @@
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
+  },
+  "resources/js/daily-checkout/src/index.css": {
+    "file": "assets/main-DoooHwhV.css",
+    "src": "resources/js/daily-checkout/src/main.tsx",
+    "isEntry": true
+  },
+  "resources/js/daily-checkout/src/main.tsx": {
+    "file": "assets/main-CXnYYwxE.js",
+    "name": "main",
+    "src": "resources/js/daily-checkout/src/main.tsx",
+    "isEntry": true,
+    "css": [
+      "assets/main-DoooHwhV.css"
+    ]
   }
 }
