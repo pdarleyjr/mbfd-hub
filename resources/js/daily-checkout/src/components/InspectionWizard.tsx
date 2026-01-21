@@ -1,19 +1,34 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Apparatus, OfficerInfo, ChecklistData, Compartment, InspectionData } from '../types';
 import { ApiClient } from '../utils/api';
-import OfficerStep from './OfficerStep';
-import CompartmentStep from './CompartmentStep';
-import SubmitStep from './SubmitStep';
 
-type Step = 'officer' | 'compartments' | 'submit';
+interface ApiApparatus {
+  id: number;
+  unit_id: string;
+  make: string;
+  model: string;
+  year: number;
+  status: string;
+  mileage: number;
+}
+
+type Rank = 'Chief' | 'Deputy Chief' | 'Captain' | 'Lieutenant' | 'Sergeant' | 'Corporal' | 'Firefighter';
+type Shift = 'A' | 'B' | 'C';
+
+interface OfficerInfo {
+  name: string;
+  rank: Rank;
+  shift: Shift;
+  unitNumber: string;
+}
+
+type Step = 'officer' | 'submit';
 
 export default function InspectionWizard() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
 
-  const [apparatus, setApparatus] = useState<Apparatus | null>(null);
-  const [checklist, setChecklist] = useState<ChecklistData | null>(null);
+  const [apparatus, setApparatus] = useState<ApiApparatus | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>('officer');
   const [officerInfo, setOfficerInfo] = useState<OfficerInfo>({
     name: '',
@@ -21,8 +36,8 @@ export default function InspectionWizard() {
     shift: 'A',
     unitNumber: '',
   });
-  const [compartments, setCompartments] = useState<Compartment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,21 +45,16 @@ export default function InspectionWizard() {
       if (!slug) return;
 
       try {
-        // For now, we'll fetch all apparatuses and find the one by slug
-        // In a real app, you'd have an endpoint to get apparatus by slug
+        const apparatusId = parseInt(slug, 10);
         const apparatuses = await ApiClient.getApparatuses();
-        const foundApparatus = apparatuses.find(a => a.slug === slug);
+        const foundApparatus = apparatuses.find((a: ApiApparatus) => a.id === apparatusId);
 
         if (!foundApparatus) {
           throw new Error('Apparatus not found');
         }
 
         setApparatus(foundApparatus);
-        setOfficerInfo(prev => ({ ...prev, unitNumber: foundApparatus.vehicle_number }));
-
-        const checklistData = await ApiClient.getChecklist(foundApparatus.id);
-        setChecklist(checklistData);
-        setCompartments(checklistData.compartments);
+        setOfficerInfo(prev => ({ ...prev, unitNumber: foundApparatus.unit_id }));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load data');
       } finally {
@@ -55,127 +65,142 @@ export default function InspectionWizard() {
     fetchData();
   }, [slug]);
 
-  const handleOfficerSubmit = (info: OfficerInfo) => {
-    setOfficerInfo(info);
-    setCurrentStep('compartments');
-  };
-
-  const handleCompartmentsSubmit = (updatedCompartments: Compartment[]) => {
-    setCompartments(updatedCompartments);
-    setCurrentStep('submit');
-  };
-
   const handleSubmit = async () => {
-    if (!apparatus) return;
+    if (!apparatus || !officerInfo.name.trim()) {
+      setError('Please fill in all required fields');
+      return;
+    }
 
+    setSubmitting(true);
     try {
-      const inspectionData: InspectionData = {
+      await ApiClient.submitInspection(apparatus.id, {
         officer: officerInfo,
-        compartments,
-      };
-
-      await ApiClient.submitInspection(apparatus.id, inspectionData);
+        compartments: [],
+      });
       navigate('/success');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit inspection');
-    }
-  };
-
-  const goBack = () => {
-    if (currentStep === 'compartments') {
-      setCurrentStep('officer');
-    } else if (currentStep === 'submit') {
-      setCurrentStep('compartments');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-64">
-        <div className="text-lg">Loading inspection data...</div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
+        <div className="text-white text-xl">Loading inspection data...</div>
       </div>
     );
   }
 
-  if (error || !apparatus || !checklist) {
+  if (error || !apparatus) {
     return (
-      <div className="text-center text-red-600 p-4">
-        <p>Error: {error || 'Failed to load inspection data'}</p>
-        <button
-          onClick={() => navigate('/')}
-          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Back to Apparatus List
-        </button>
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
+        <div className="text-center text-white p-4">
+          <p className="text-red-300 mb-4">{error || 'Failed to load apparatus data'}</p>
+          <button
+            onClick={() => navigate('/')}
+            className="px-6 py-3 bg-white text-blue-900 rounded-lg font-semibold hover:bg-blue-100"
+          >
+            Back to Apparatus List
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Daily Inspection: {apparatus.name}
-        </h1>
-        <p className="text-gray-600">Unit: {apparatus.vehicle_number}</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700">
+      <div className="max-w-2xl mx-auto py-12 px-4">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="inline-block bg-red-600 text-white px-6 py-2 rounded-lg mb-4">
+            <span className="text-2xl font-bold">{apparatus.unit_id}</span>
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">Daily Inspection</h1>
+          <p className="text-blue-200">{apparatus.year} {apparatus.make} {apparatus.model}</p>
+        </div>
 
-      {/* Progress indicator */}
-      <div className="mb-8">
-        <div className="flex items-center justify-center space-x-4">
-          <div className={`flex items-center ${currentStep === 'officer' ? 'text-blue-600' : 'text-gray-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-              currentStep === 'officer' ? 'bg-blue-600 text-white' : 'bg-gray-200'
-            }`}>
-              1
+        {/* Form */}
+        <div className="bg-white rounded-xl shadow-xl p-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Officer Information</h2>
+          
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+              <input
+                type="text"
+                value={officerInfo.name}
+                onChange={(e) => setOfficerInfo(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter your name"
+              />
             </div>
-            <span className="ml-2">Officer Info</span>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Rank</label>
+              <select
+                value={officerInfo.rank}
+                onChange={(e) => setOfficerInfo(prev => ({ ...prev, rank: e.target.value as Rank }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="Chief">Chief</option>
+                <option value="Deputy Chief">Deputy Chief</option>
+                <option value="Captain">Captain</option>
+                <option value="Lieutenant">Lieutenant</option>
+                <option value="Sergeant">Sergeant</option>
+                <option value="Corporal">Corporal</option>
+                <option value="Firefighter">Firefighter</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Shift</label>
+              <select
+                value={officerInfo.shift}
+                onChange={(e) => setOfficerInfo(prev => ({ ...prev, shift: e.target.value as Shift }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="A">Shift A</option>
+                <option value="B">Shift B</option>
+                <option value="C">Shift C</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Unit Number</label>
+              <input
+                type="text"
+                value={officerInfo.unitNumber}
+                readOnly
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-600"
+              />
+            </div>
           </div>
-          <div className={`w-8 h-0.5 ${currentStep === 'compartments' || currentStep === 'submit' ? 'bg-blue-600' : 'bg-gray-200'}`} />
-          <div className={`flex items-center ${currentStep === 'compartments' ? 'text-blue-600' : 'text-gray-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-              currentStep === 'compartments' ? 'bg-blue-600 text-white' : 'bg-gray-200'
-            }`}>
-              2
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
+              {error}
             </div>
-            <span className="ml-2">Compartments</span>
-          </div>
-          <div className={`w-8 h-0.5 ${currentStep === 'submit' ? 'bg-blue-600' : 'bg-gray-200'}`} />
-          <div className={`flex items-center ${currentStep === 'submit' ? 'text-blue-600' : 'text-gray-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-              currentStep === 'submit' ? 'bg-blue-600 text-white' : 'bg-gray-200'
-            }`}>
-              3
-            </div>
-            <span className="ml-2">Submit</span>
+          )}
+
+          <div className="mt-8 flex gap-4">
+            <button
+              onClick={() => navigate('/')}
+              className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || !officerInfo.name.trim()}
+              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? 'Submitting...' : 'Complete Inspection'}
+            </button>
           </div>
         </div>
       </div>
-
-      {currentStep === 'officer' && (
-        <OfficerStep
-          initialData={officerInfo}
-          onSubmit={handleOfficerSubmit}
-        />
-      )}
-
-      {currentStep === 'compartments' && (
-        <CompartmentStep
-          compartments={compartments}
-          onSubmit={handleCompartmentsSubmit}
-          onBack={goBack}
-        />
-      )}
-
-      {currentStep === 'submit' && (
-        <SubmitStep
-          officerInfo={officerInfo}
-          compartments={compartments}
-          onSubmit={handleSubmit}
-          onBack={goBack}
-          submitting={false}
-        />
-      )}
     </div>
   );
 }
