@@ -6,7 +6,6 @@ use App\Models\ProjectMilestone;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
 
 class UpcomingMilestonesWidget extends BaseWidget
@@ -14,41 +13,24 @@ class UpcomingMilestonesWidget extends BaseWidget
     protected static ?int $sort = 4;
     
     protected int | string | array $columnSpan = 'full';
-    // Disable lazy loading to prevent table property initialization errors
+    
     protected static bool $isLazy = false;
-    protected static bool $isDiscovered = false; // Temporarily disabled due to table initialization error
 
-
-    public function getPollingInterval(): ?string
+    protected function getTableQuery(): ?\Illuminate\Database\Eloquent\Builder
     {
-        return '60s';
-    }
-
-    public function exception(\Throwable $e, callable $stopPropagation)
-    {
-        Log::error('Widget Error', [
-            'widget' => static::class,
-            'message' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-        ]);
-        
-        $stopPropagation();
+        return ProjectMilestone::query()
+            ->with('capitalProject')
+            ->whereHas('capitalProject')
+            ->where('completed', false)
+            ->where('due_date', '>=', now())
+            ->where('due_date', '<=', now()->addDays(30))
+            ->orderBy('due_date', 'asc');
     }
 
     public function table(Table $table): Table
     {
-        Log::info('UpcomingMilestonesWidget: Building table');
-
         return $table
-            ->query(
-                ProjectMilestone::query()
-                    ->with('capitalProject')
-                    ->whereHas('capitalProject')
-                    ->where('completed', false)
-                    ->where('due_date', '>=', now())
-                    ->where('due_date', '<=', now()->addDays(30))
-                    ->orderBy('due_date', 'asc')
-            )
+            ->query($this->getTableQuery())
             ->heading('Upcoming Milestones')
             ->description('Milestones due in the next 30 days')
             ->columns([
@@ -65,59 +47,40 @@ class UpcomingMilestonesWidget extends BaseWidget
                     ->default('No project')
                     ->searchable()
                     ->sortable()
-                    ->url(function (ProjectMilestone $record): ?string {
-                        if (!$record->capital_project_id) {
-                            return null;
-                        }
-                        try {
-                            return route('filament.admin.resources.capital-projects.view', ['record' => $record->capital_project_id]);
-                        } catch (\Exception $e) {
-                            Log::error('UpcomingMilestonesWidget Route Error: ' . $e->getMessage());
-                            return null;
-                        }
-                    })
                     ->color('primary'),
 
                 Tables\Columns\TextColumn::make('due_date')
                     ->label('Due Date')
-                    ->default(now())
                     ->date('M j, Y')
                     ->sortable()
                     ->color(fn (ProjectMilestone $record): string => match(true) {
-                        $record->due_date->isPast() => 'danger',
-                        $record->due_date->lte(now()->addDays(3)) => 'danger',
-                        $record->due_date->lte(now()->addDays(7)) => 'warning',
+                        $record->due_date && $record->due_date->isPast() => 'danger',
+                        $record->due_date && $record->due_date->lte(now()->addDays(3)) => 'danger',
+                        $record->due_date && $record->due_date->lte(now()->addDays(7)) => 'warning',
                         default => 'success'
-                    })
-                    ->icon(fn (ProjectMilestone $record): string => match(true) {
-                        $record->due_date->isPast() => 'heroicon-o-exclamation-triangle',
-                        $record->due_date->lte(now()->addDays(3)) => 'heroicon-o-clock',
-                        $record->due_date->lte(now()->addDays(7)) => 'heroicon-o-clock',
-                        default => 'heroicon-o-calendar'
                     }),
 
                 Tables\Columns\TextColumn::make('days_until_due')
                     ->label('Days Until Due')
-                    ->state(fn (ProjectMilestone $record): string => $record->due_date->diffForHumans())
+                    ->state(fn (ProjectMilestone $record): string => 
+                        $record->due_date ? $record->due_date->diffForHumans() : 'N/A'
+                    )
                     ->badge()
                     ->color(fn (ProjectMilestone $record): string => match(true) {
-                        $record->due_date->isPast() => 'danger',
-                        $record->due_date->lte(now()->addDays(3)) => 'danger',
-                        $record->due_date->lte(now()->addDays(7)) => 'warning',
+                        $record->due_date && $record->due_date->isPast() => 'danger',
+                        $record->due_date && $record->due_date->lte(now()->addDays(3)) => 'danger',
+                        $record->due_date && $record->due_date->lte(now()->addDays(7)) => 'warning',
                         default => 'success'
                     }),
 
                 Tables\Columns\TextColumn::make('completion_status')
                     ->label('Status')
                     ->state(fn (ProjectMilestone $record): string => 
-                        $record->completed ? 'completed' : 'pending'
+                        $record->completed ? 'Completed' : 'Pending'
                     )
                     ->badge()
                     ->color(fn (ProjectMilestone $record): string => 
                         $record->completed ? 'success' : 'gray'
-                    )
-                    ->formatStateUsing(fn (string $state): string => 
-                        ucfirst($state)
                     ),
             ])
             ->actions([
@@ -133,23 +96,9 @@ class UpcomingMilestonesWidget extends BaseWidget
                         ]);
                     })
                     ->visible(fn (ProjectMilestone $record): bool => !$record->completed),
-
-                Tables\Actions\Action::make('view')
-                    ->label('View Project')
-                    ->icon('heroicon-o-eye')
-                    ->url(function (ProjectMilestone $record): ?string {
-                        if (!$record->capital_project_id) {
-                            return null;
-                        }
-                        try {
-                            return route('filament.admin.resources.capital-projects.view', ['record' => $record->capital_project_id]);
-                        } catch (\Exception $e) {
-                            Log::error('UpcomingMilestonesWidget Route Error: ' . $e->getMessage());
-                            return null;
-                        }
-                    })
-                    ->openUrlInNewTab(),
             ])
+            ->emptyStateHeading('No upcoming milestones')
+            ->emptyStateDescription('No milestones are due in the next 30 days.')
             ->paginated(false);
     }
 }

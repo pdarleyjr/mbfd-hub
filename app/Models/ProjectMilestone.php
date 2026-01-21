@@ -30,6 +30,11 @@ class ProjectMilestone extends Model
         return $this->belongsTo(CapitalProject::class, 'capital_project_id');
     }
 
+    public function capitalProject()
+    {
+        return $this->belongsTo(CapitalProject::class, 'capital_project_id');
+    }
+
     // Scopes
     public function scopePending($query)
     {
