@@ -1,10 +1,13 @@
 /.phpunit.cache
 /node_modules
+**/node_modules
 /public/hot
 /public/storage
+/public/daily
 /storage/*.key
 /storage/pail
 /vendor
+**/package-lock.json
 .env
 .env.backup
 .env.production
