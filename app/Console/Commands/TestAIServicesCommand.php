@@ -74,10 +74,10 @@ class TestAIServicesCommand extends Command
 
         // Test 7: Configuration check
         $this->info('7. Configuration Check...');
-        $config = config('cloudflare.ai');
-        $this->line('   Account ID set: ' . (!empty($config['account_id']) ? '<fg=green>YES</>' : '<fg=red>NO - REQUIRED</>'));
-        $this->line('   API Token set: ' . (!empty($config['api_token']) ? '<fg=green>YES</>' : '<fg=red>NO</>'));
-        $this->line('   Enabled flag: ' . ($config['enabled'] ? '<fg=green>YES</>' : '<fg=red>NO</>'));
+        $config = config('cloudflare.ai') ?? [];
+        $this->line('   Account ID set: ' . (!empty($config['account_id'] ?? '') ? '<fg=green>YES</>' : '<fg=red>NO - REQUIRED</>'));
+        $this->line('   API Token set: ' . (!empty($config['api_token'] ?? '') ? '<fg=green>YES</>' : '<fg=red>NO</>'));
+        $this->line('   Enabled flag: ' . (($config['enabled'] ?? false) ? '<fg=green>YES</>' : '<fg=red>NO</>'));
         $this->line('   Default model: ' . ($config['models']['default'] ?? 'not set'));
         $this->line('   Daily limit: ' . ($config['rate_limit']['daily_neurons'] ?? 'not set'));
         $this->newLine();

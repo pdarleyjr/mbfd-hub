@@ -409,4 +409,12 @@ class CloudflareAIService
     {
         return $response['result']['response'] ?? '';
     }
+
+    /**
+     * Check if we can make an API request (within rate limits)
+     */
+    public function canMakeRequest(): bool
+    {
+        return $this->checkRateLimit();
+    }
 }

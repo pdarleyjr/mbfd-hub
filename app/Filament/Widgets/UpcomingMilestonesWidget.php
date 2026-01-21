@@ -14,6 +14,9 @@ class UpcomingMilestonesWidget extends BaseWidget
     protected static ?int $sort = 4;
     
     protected int | string | array $columnSpan = 'full';
+    // Disable lazy loading to prevent table property initialization errors
+    protected static bool $isLazy = false;
+
 
     public function getPollingInterval(): ?string
     {
