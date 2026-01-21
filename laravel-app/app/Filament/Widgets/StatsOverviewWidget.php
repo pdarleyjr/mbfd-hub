@@ -21,12 +21,12 @@ class StatsOverviewWidget extends BaseWidget
                 ->descriptionIcon('heroicon-o-truck')
                 ->color('primary'),
 
-            Stat::make('Open Defects', ApparatusDefect::where('status', '!=', 'resolved')->count())
+            Stat::make('Open Defects', ApparatusDefect::where('resolved', false)->count())
                 ->description('Requires attention')
                 ->descriptionIcon('heroicon-o-exclamation-triangle')
                 ->color('danger'),
 
-            Stat::make('Inspections Today', ApparatusInspection::whereBetween('inspection_date', [$today, $todayEnd])->count())
+            Stat::make('Inspections Today', ApparatusInspection::whereBetween('completed_at', [$today, $todayEnd])->count())
                 ->description('Completed today')
                 ->descriptionIcon('heroicon-o-clipboard-document-check')
                 ->color('success'),
@@ -40,18 +40,15 @@ class StatsOverviewWidget extends BaseWidget
 
     protected function getOverdueInspectionsCount(): int
     {
-        // Get all apparatuses
         $apparatuses = Apparatus::all();
         $overdueCount = 0;
 
         foreach ($apparatuses as $apparatus) {
-            // Get the latest inspection for this apparatus
             $latestInspection = ApparatusInspection::where('apparatus_id', $apparatus->id)
-                ->orderBy('inspection_date', 'desc')
+                ->orderBy('completed_at', 'desc')
                 ->first();
 
-            // If no inspection exists or last inspection was more than 24 hours ago
-            if (!$latestInspection || $latestInspection->inspection_date < now()->subDay()) {
+            if (!$latestInspection || $latestInspection->completed_at < now()->subDay()) {
                 $overdueCount++;
             }
         }

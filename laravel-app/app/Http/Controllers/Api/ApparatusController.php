@@ -18,13 +18,11 @@ class ApparatusController extends Controller
     public function checklist($id)
     {
         $apparatus = Apparatus::findOrFail($id);
-        
-        // Load checklist from JSON file (default for now)
-        $checklistPath = storage_path('checklists/default_checklist.json');
-        $checklistData = json_decode(file_get_contents($checklistPath), true);
-        
-        // Return just the checklist data (compartments) as expected by React frontend
-        return response()->json($checklistData);
+        // Assuming checklist is based on type, but since not specified, return apparatus with open defects
+        return response()->json([
+            'apparatus' => $apparatus,
+            'open_defects' => $apparatus->openDefects,
+        ]);
     }
 
     public function storeInspection(Request $request, $id)

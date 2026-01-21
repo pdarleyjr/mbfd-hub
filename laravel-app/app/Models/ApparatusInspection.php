@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ApparatusInspection extends Model
 {
@@ -21,5 +22,10 @@ class ApparatusInspection extends Model
     public function apparatus()
     {
         return $this->belongsTo(Apparatus::class);
+    }
+
+    public function defects(): HasMany
+    {
+        return $this->hasMany(ApparatusDefect::class);
     }
 }

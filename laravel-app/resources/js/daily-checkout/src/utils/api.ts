@@ -2,28 +2,8 @@ import { Apparatus, ChecklistData, InspectionData } from '../types';
 
 const API_BASE = '/api';
 
-export interface ApiApparatus {
-  id: number;
-  unit_id: string;
-  make: string;
-  model: string;
-  year: number;
-  status: string;
-  mileage: number;
-}
-
-export interface InspectionData {
-  officer: {
-    name: string;
-    rank: string;
-    shift: string;
-    unitNumber: string;
-  };
-  compartments: any[];
-}
-
 export class ApiClient {
-  static async getApparatuses(): Promise<ApiApparatus[]> {
+  static async getApparatuses(): Promise<Apparatus[]> {
     const response = await fetch(`${API_BASE}/public/apparatuses`);
     if (!response.ok) {
       throw new Error('Failed to fetch apparatuses');
@@ -31,7 +11,7 @@ export class ApiClient {
     return response.json();
   }
 
-  static async getChecklist(apparatusId: number): Promise<any> {
+  static async getChecklist(apparatusId: number): Promise<ChecklistData> {
     const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/checklist`);
     if (!response.ok) {
       throw new Error('Failed to fetch checklist');
@@ -39,19 +19,13 @@ export class ApiClient {
     return response.json();
   }
 
-  static async submitInspection(apparatusId: number, data: InspectionData): Promise<any> {
+  static async submitInspection(apparatusId: number, data: InspectionData): Promise<{ success: boolean; message: string }> {
     const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/inspections`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        operator_name: data.officer.name,
-        rank: data.officer.rank,
-        shift: data.officer.shift,
-        unit_number: data.officer.unitNumber,
-        defects: [],
-      }),
+      body: JSON.stringify(data),
     });
 
     if (!response.ok) {

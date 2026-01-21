@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-tWhr6qWG.css",
+    "file": "assets/app-CaS0lott.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -11,17 +11,17 @@
     "isEntry": true
   },
   "resources/js/daily-checkout/src/index.css": {
-    "file": "assets/main-DoooHwhV.css",
-    "src": "resources/js/daily-checkout/src/main.tsx",
+    "file": "assets/index-Dw35_pNi.css",
+    "src": "resources/js/daily-checkout/src/index.css",
     "isEntry": true
   },
   "resources/js/daily-checkout/src/main.tsx": {
-    "file": "assets/main-qyG90v4M.js",
+    "file": "assets/main-DgoRHFJj.js",
     "name": "main",
     "src": "resources/js/daily-checkout/src/main.tsx",
     "isEntry": true,
     "css": [
-      "assets/main-DoooHwhV.css"
+      "assets/index-Dw35_pNi.css"
     ]
   }
 }
