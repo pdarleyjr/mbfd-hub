@@ -86,6 +86,12 @@ class ApparatusResource extends Resource
                 //
             ])
             ->actions([
+                Tables\Actions\Action::make('start_daily_checkout')
+                    ->label('Start Daily Checkout')
+                    ->icon('heroicon-o-clipboard-document-list')
+                    ->color('success')
+                    ->url(fn (Apparatus $record): string => "/daily/{$record->id}")
+                    ->openUrlInNewTab(),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
@@ -98,7 +104,8 @@ class ApparatusResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\InspectionsRelationManager::class,
+            RelationManagers\DefectsRelationManager::class,
         ];
     }
 

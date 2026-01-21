@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'cloudflare' => [
+        'worker_url' => env('CLOUDFLARE_WORKER_URL', 'https://mbfd-support-ai.pdarleyjr.workers.dev'),
+        'api_secret' => env('CLOUDFLARE_API_SECRET'),
+    ],
+
 ];
