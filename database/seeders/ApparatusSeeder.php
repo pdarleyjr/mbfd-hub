@@ -14,17 +14,17 @@ class ApparatusSeeder extends Seeder
     {
         $apparatuses = [
             // Reserve Engines
-            ['unit_id' => 'E 21', 'make' => 'Pierce', 'model' => 'Reserve Engine', 'year' => 2002, 'status' => 'Available', 'notes' => 'Reserve - Vehicle No: 002-16'],
-            ['unit_id' => 'E 11', 'make' => 'Pierce', 'model' => 'Reserve Engine', 'year' => 2002, 'status' => 'Available', 'notes' => 'Reserve - Vehicle No: 002-14'],
-            ['unit_id' => 'E 31', 'make' => 'Pierce', 'model' => 'Reserve Engine', 'year' => 2002, 'status' => 'Available', 'notes' => 'Reserve - Vehicle No: 002-10'],
+            ['unit_id' => 'E 21', 'make' => 'Pierce', 'model' => 'Reserve Engine', 'year' => 2002, 'status' => 'In Service', 'notes' => 'Reserve - Vehicle No: 002-16'],
+            ['unit_id' => 'E 11', 'make' => 'Pierce', 'model' => 'Reserve Engine', 'year' => 2002, 'status' => 'In Service', 'notes' => 'Reserve - Vehicle No: 002-14'],
+            ['unit_id' => 'E 31', 'make' => 'Pierce', 'model' => 'Reserve Engine', 'year' => 2002, 'status' => 'In Service', 'notes' => 'Reserve - Vehicle No: 002-10'],
 
             // Reserve Rescue
-            ['unit_id' => '1033', 'make' => 'Ford', 'model' => 'Rescue', 'year' => 2010, 'status' => 'Available', 'notes' => 'Reserve - Station 1'],
-            ['unit_id' => '1034', 'make' => 'Ford', 'model' => 'Rescue', 'year' => 2010, 'status' => 'Available', 'notes' => 'Reserve - Station 2'],
+            ['unit_id' => '1033', 'make' => 'Ford', 'model' => 'Rescue', 'year' => 2010, 'status' => 'In Service', 'notes' => 'Reserve - Station 1'],
+            ['unit_id' => '1034', 'make' => 'Ford', 'model' => 'Rescue', 'year' => 2010, 'status' => 'In Service', 'notes' => 'Reserve - Station 2'],
             ['unit_id' => '1035', 'make' => 'Ford', 'model' => 'Rescue', 'year' => 2010, 'status' => 'In Service', 'notes' => 'Reserve - In service as R1'],
-            ['unit_id' => '1036', 'make' => 'Ford', 'model' => 'Rescue', 'year' => 2010, 'status' => 'Available', 'notes' => 'Reserve - Station 2'],
-            ['unit_id' => '14500', 'make' => 'Ford', 'model' => 'Rescue', 'year' => 2014, 'status' => 'Available', 'notes' => 'Reserve - LAST OUT RESERVE'],
-            ['unit_id' => '14501', 'make' => 'Ford', 'model' => 'Rescue', 'year' => 2014, 'status' => 'Available', 'notes' => 'Reserve - Station 3'],
+            ['unit_id' => '1036', 'make' => 'Ford', 'model' => 'Rescue', 'year' => 2010, 'status' => 'In Service', 'notes' => 'Reserve - Station 2'],
+            ['unit_id' => '14500', 'make' => 'Ford', 'model' => 'Rescue', 'year' => 2014, 'status' => 'In Service', 'notes' => 'Reserve - LAST OUT RESERVE'],
+            ['unit_id' => '14501', 'make' => 'Ford', 'model' => 'Rescue', 'year' => 2014, 'status' => 'In Service', 'notes' => 'Reserve - Station 3'],
 
             // Reserve Ladder
             ['unit_id' => 'L 11', 'make' => 'Pierce', 'model' => 'Ladder', 'year' => 2002, 'status' => 'In Service', 'notes' => 'Reserve - Vehicle No: 002-6 - In service as L1'],
