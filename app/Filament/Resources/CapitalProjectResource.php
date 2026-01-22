@@ -253,8 +253,8 @@ class CapitalProjectResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\MilestonesRelationManager::class,
-            RelationManagers\UpdatesRelationManager::class,
+//            RelationManagers\MilestonesRelationManager::class,
+//            RelationManagers\UpdatesRelationManager::class,
         ];
     }
 
