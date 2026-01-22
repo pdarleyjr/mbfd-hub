@@ -41,10 +41,13 @@ class AdminMetricsController extends Controller
             'inventory' => [
                 'total_items' => EquipmentItem::where('is_active', true)->count(),
                 'out_of_stock' => EquipmentItem::where('is_active', true)
-                    ->where('stock', 0)->count(),
+                    ->get()
+                    ->filter(fn($item) => $item->stock == 0)
+                    ->count(),
                 'low_stock' => EquipmentItem::where('is_active', true)
-                    ->whereColumn('stock', '<=', 'reorder_min')
-                    ->where('stock', '>', 0)->count(),
+                    ->get()
+                    ->filter(fn($item) => $item->stock <= $item->reorder_min && $item->stock > 0)
+                    ->count(),
                 'pending_recommendations' => ApparatusDefectRecommendation::where('status', 'pending')->count(),
                 'allocations_this_week' => ApparatusInventoryAllocation::where('allocated_at', '>=', now()->startOfWeek())->count(),
             ],
@@ -62,17 +65,18 @@ class AdminMetricsController extends Controller
             
             // NEW: Critical low stock items with locations
             'critical_stock_items' => EquipmentItem::where('is_active', true)
-                ->whereColumn('stock', '<=', 'reorder_min')
                 ->with('location')
-                ->orderBy('stock', 'asc')
-                ->limit(10)
                 ->get()
+                ->filter(fn($item) => $item->stock <= $item->reorder_min)
+                ->sortBy('stock')
+                ->take(10)
                 ->map(fn($item) => [
                     'name' => $item->name,
                     'stock' => $item->stock,
                     'reorder_min' => $item->reorder_min,
                     'location' => $item->location?->full_location ?? 'Unknown',
-                ]),
+                ])
+                ->values(),
         ]);
     }
 }
