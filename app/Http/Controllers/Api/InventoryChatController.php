@@ -16,16 +16,29 @@ class InventoryChatController extends Controller
         ]);
 
         // Get inventory context for AI
+        $allItems = EquipmentItem::where('is_active', true)->get();
+        
         $context = [
-            'low_stock_items' => EquipmentItem::where('is_active', true)
-                ->whereColumn('stock', '<=', 'reorder_min')
-                ->limit(20)
-                ->get(['id', 'name', 'stock', 'reorder_min'])
+            'low_stock_items' => $allItems
+                ->filter(fn($item) => $item->stock <= $item->reorder_min)
+                ->take(20)
+                ->map(fn($item) => [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'stock' => $item->stock,
+                    'reorder_min' => $item->reorder_min,
+                ])
+                ->values()
                 ->toArray(),
-            'top_items' => EquipmentItem::where('is_active', true)
-                ->orderBy('stock', 'desc')
-                ->limit(10)
-                ->get(['id', 'name', 'stock'])
+            'top_items' => $allItems
+                ->sortByDesc(fn($item) => $item->stock)
+                ->take(10)
+                ->map(fn($item) => [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'stock' => $item->stock,
+                ])
+                ->values()
                 ->toArray(),
         ];
 
