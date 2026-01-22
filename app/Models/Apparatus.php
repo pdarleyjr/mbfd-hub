@@ -11,6 +11,10 @@ class Apparatus extends Model
 
     protected $fillable = [
         'unit_id',
+        'name',
+        'type',
+        'vehicle_number',
+        'slug',
         'vin',
         'make',
         'model',

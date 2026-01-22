@@ -7,9 +7,9 @@ Route::get('/', function () {
 });
 
 Route::get('/daily', function () {
-    return view('daily-checkout');
+    return response()->file(public_path('daily/index.html'));
 });
 
 Route::get('/daily/{any}', function () {
-    return view('daily-checkout');
+    return response()->file(public_path('daily/index.html'));
 })->where('any', '.*');

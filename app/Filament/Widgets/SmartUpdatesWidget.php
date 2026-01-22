@@ -186,6 +186,11 @@ class SmartUpdatesWidget extends Widget
             ->orWhere('status', 'out_of_service')
             ->get(['unit_id', 'make', 'model', 'notes']);
         
+        // Overdue inspections - optimized query
+        $overdueInspections = Apparatus::whereDoesntHave('inspections', function($q) {
+            $q->where('inspection_date', '>=', today()->subDay());
+        })->count();
+        
         // Open defects/apparatus issues
         $openDefects = ApparatusDefect::where('resolved', false)
             ->with('apparatus:id,unit_id')
@@ -246,6 +251,7 @@ class SmartUpdatesWidget extends Widget
             'vehicle_inventory' => [
                 'total' => $totalApparatus,
                 'by_status' => $apparatusByStatus,
+                'overdue_inspections' => $overdueInspections,
             ],
             'out_of_service' => $outOfService->map(fn($a) => [
                 'unit' => $a->unit_id,
