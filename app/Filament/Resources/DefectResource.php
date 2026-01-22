@@ -17,9 +17,11 @@ class DefectResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-exclamation-triangle';
 
-    protected static ?string $navigationLabel = 'Defects';
+    protected static ?string $navigationLabel = 'Missing / Damaged Equipment';
 
-    protected static ?string $modelLabel = 'Defect';
+    protected static ?string $modelLabel = 'Equipment Issue';
+
+    protected static ?string $pluralModelLabel = 'Missing / Damaged Equipment';
 
     protected static ?int $navigationSort = 2;
 

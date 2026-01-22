@@ -11,9 +11,12 @@ class ApparatusDefect extends Model
 
     protected $fillable = [
         'apparatus_id',
+        'apparatus_inspection_id',
         'compartment',
         'item',
         'status',
+        'issue_type',
+        'reported_date',
         'notes',
         'resolved',
         'resolved_at',
@@ -24,11 +27,20 @@ class ApparatusDefect extends Model
     protected $casts = [
         'defect_history' => 'array',
         'resolved' => 'boolean',
+        'reported_date' => 'date',
     ];
 
     public function apparatus()
     {
         return $this->belongsTo(Apparatus::class);
+    }
+
+    /**
+     * Get the inspection this defect was reported in
+     */
+    public function inspection()
+    {
+        return $this->belongsTo(ApparatusInspection::class, 'apparatus_inspection_id');
     }
 
     /**
