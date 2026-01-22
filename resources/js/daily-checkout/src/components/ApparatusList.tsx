@@ -60,7 +60,9 @@ export default function ApparatusList() {
             className="block p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200"
           >
             <div className="text-center">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">{apparatus.name}</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                {apparatus.name || apparatus.unit_id || 'Unknown'}
+              </h2>
               <p className="text-gray-600 mb-1">Unit: {apparatus.vehicle_number}</p>
               <p className="text-sm text-gray-500 capitalize">Type: {apparatus.type}</p>
               <div className="mt-4">
