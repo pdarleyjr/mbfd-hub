@@ -117,8 +117,9 @@ class EquipmentItemResource extends Resource
                     ),
                 Tables\Columns\TextColumn::make('location.full_location')
                     ->label('Location')
-                    ->searchable()
-                    ->sortable(),
+                    ->getStateUsing(fn (EquipmentItem $record): string => 
+                        $record->location?->full_location ?? 'N/A'
+                    ),
                 Tables\Columns\TextColumn::make('reorder_range')
                     ->label('Reorder Range')
                     ->getStateUsing(fn (EquipmentItem $record): string => 

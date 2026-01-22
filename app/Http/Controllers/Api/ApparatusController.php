@@ -18,9 +18,38 @@ class ApparatusController extends Controller
     public function checklist($id)
     {
         $apparatus = Apparatus::findOrFail($id);
-        // Assuming checklist is based on type, but since not specified, return apparatus with open defects
+        
+        // Determine checklist file based on apparatus type
+        $checklistType = 'default';
+        if ($apparatus->type) {
+            $type = strtolower($apparatus->type);
+            // Map apparatus type to checklist file
+            if (str_contains($type, 'engine')) {
+                $checklistType = 'engine';
+            } elseif (str_contains($type, 'ladder')) {
+                $checklistType = str_contains($type, 'ladder1') ? 'ladder1' : 
+                                 (str_contains($type, 'ladder3') ? 'ladder3' : 'default');
+            } elseif (str_contains($type, 'rescue')) {
+                $checklistType = 'rescue';
+            }
+        }
+        
+        // Load checklist JSON from storage
+        $checklistPath = storage_path("app/checklists/{$checklistType}_checklist.json");
+        
+        // Fallback to default if specific checklist doesn't exist
+        if (!file_exists($checklistPath)) {
+            $checklistPath = storage_path('app/checklists/default_checklist.json');
+        }
+        
+        $checklist = [];
+        if (file_exists($checklistPath)) {
+            $checklist = json_decode(file_get_contents($checklistPath), true);
+        }
+        
         return response()->json([
             'apparatus' => $apparatus,
+            'checklist' => $checklist,
             'open_defects' => $apparatus->openDefects,
         ]);
     }

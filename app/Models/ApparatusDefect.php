@@ -18,6 +18,7 @@ class ApparatusDefect extends Model
         'issue_type',
         'reported_date',
         'notes',
+        'photo_path',
         'resolved',
         'resolved_at',
         'resolution_notes',
