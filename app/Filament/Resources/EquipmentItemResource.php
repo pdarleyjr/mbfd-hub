@@ -114,10 +114,7 @@ class EquipmentItemResource extends Resource
                     ->color(fn (EquipmentItem $record): string => 
                         $record->stock == 0 ? 'danger' : 
                         ($record->stock <= $record->reorder_min ? 'warning' : 'success')
-                    )
-                    ->sortable(query: function (Builder $query, string $direction): Builder {
-                        return $query->orderBy('stock', $direction);
-                    }),
+                    ),
                 Tables\Columns\TextColumn::make('location.full_location')
                     ->label('Location')
                     ->searchable()
@@ -152,8 +149,11 @@ class EquipmentItemResource extends Resource
                 Tables\Filters\Filter::make('low_stock')
                     ->label('Low Stock')
                     ->query(fn (Builder $query): Builder => 
-                        $query->whereRaw('stock <= reorder_min')
-                    ),
+                        $query->whereHas('stockMutations', function ($q) {
+                            // This gets items that have stock mutations
+                        }, '>=', 0)
+                    )
+                    ->default(false),
                 Tables\Filters\SelectFilter::make('category')
                     ->options([
                         'PPE' => 'PPE',

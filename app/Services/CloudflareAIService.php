@@ -417,4 +417,78 @@ class CloudflareAIService
     {
         return $this->checkRateLimit();
     }
+
+    /**
+     * Generate admin bullet summary from operational metrics
+     */
+    public function generateAdminBulletSummary(array $metrics): array
+    {
+        try {
+            $systemPrompt = "You are an AI assistant for Miami Beach Fire Department. Generate brief, actionable bullet points for fire department administrators. Be concise and highlight critical issues first.";
+
+            $userPrompt = "Generate a concise status summary with bullet points for each category based on this operational data:\n\n" .
+                json_encode($metrics, JSON_PRETTY_PRINT) . "\n\n" .
+                "Provide your response as JSON with this exact structure:\n" .
+                "{\n" .
+                "  \"vehicle_inventory\": [\"bullet1\", \"bullet2\"],\n" .
+                "  \"out_of_service\": [\"bullet1\", \"bullet2\"],\n" .
+                "  \"apparatus_issues\": [\"bullet1\", \"bullet2\"],\n" .
+                "  \"equipment_alerts\": [\"bullet1\", \"bullet2\"],\n" .
+                "  \"capital_projects\": [\"bullet1\", \"bullet2\"],\n" .
+                "  \"summary_markdown\": \"Brief overall status in markdown\",\n" .
+                "  \"action_items\": [\"priority action 1\", \"priority action 2\"],\n" .
+                "  \"risks\": [\"any critical risks\"]\n" .
+                "}\n" .
+                "Keep each bullet under 80 characters. Prioritize urgent items.";
+
+            $messages = [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userPrompt],
+            ];
+
+            $model = $this->config['models']['default'] ?? '@cf/meta/llama-3-8b-instruct';
+            $response = $this->runModel($model, $messages);
+
+            return $this->parseAIResponse($response);
+
+        } catch (\Exception $e) {
+            Log::error('Admin bullet summary generation failed', [
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Chat with AI about inventory or operations
+     */
+    public function chat(string $message, array $context = []): array
+    {
+        try {
+            $systemPrompt = "You are an AI assistant for Miami Beach Fire Department Support Hub. Help administrators manage fire equipment inventory, apparatus, and operations. Be concise and helpful. When asked about inventory changes, provide actionable suggestions.";
+
+            $contextStr = !empty($context) ? "\n\nCurrent context:\n" . json_encode($context, JSON_PRETTY_PRINT) : '';
+
+            $messages = [
+                ['role' => 'system', 'content' => $systemPrompt . $contextStr],
+                ['role' => 'user', 'content' => $message],
+            ];
+
+            $model = $this->config['models']['default'] ?? '@cf/meta/llama-3-8b-instruct';
+            $response = $this->runModel($model, $messages);
+
+            return [
+                'message' => $this->extractTextFromResponse($response),
+                'success' => true,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('AI chat failed', ['error' => $e->getMessage()]);
+            return [
+                'message' => 'AI service temporarily unavailable. Please try again.',
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
 }
