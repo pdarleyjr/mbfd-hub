@@ -169,19 +169,6 @@ class SmartUpdatesWidget extends Widget
         $this->chatLoading = false;
     }
 
-    public function refresh(): void
-    {
-        $this->loadInstantSummary();
-    }
-
-    #[On('equipment-updated')]
-    #[On('project-updated')]
-    #[On('apparatus-updated')]
-    public function handleDataChange(): void
-    {
-        $this->loadInstantSummary();
-    }
-
     /**
      * Gather operational metrics from all relevant models
      */
@@ -289,4 +276,16 @@ class SmartUpdatesWidget extends Widget
         ];
     }
 
+    public function refresh(): void
+    {
+        $this->loadInstantSummary();
+    }
+
+    #[On('equipment-updated')]
+    #[On('project-updated')]
+    #[On('apparatus-updated')]
+    public function handleDataChange(): void
+    {
+        $this->loadInstantSummary();
+    }
 }
