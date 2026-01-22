@@ -30,18 +30,13 @@ class FireEquipmentStatsWidget extends BaseWidget
             
             Stat::make('Low Stock Items', $lowStockCount)
                 ->icon('heroicon-o-exclamation-triangle')
-                ->description('Below reorder threshold')
-                ->url(EquipmentItemResource::getUrl('index', ['tableFilters' => ['low_stock' => true]]))
-                ->color(function ($state) {
-                    return $state > 0 ? 'warning' : 'success';
-                }),
+                ->description('Stock tracking disabled')
+                ->color($lowStockCount > 0 ? 'warning' : 'success'),
             
             Stat::make('Out of Stock', $outOfStockCount)
                 ->icon('heroicon-o-x-circle')
-                ->description('Zero stock items')
-                ->color(function ($state) {
-                    return $state > 0 ? 'danger' : 'success';
-                }),
+                ->description('Stock tracking disabled')
+                ->color($outOfStockCount > 0 ? 'danger' : 'success'),
             
             Stat::make('Pending Recommendations', 
                 ApparatusDefectRecommendation::where('status', 'pending')->count()
