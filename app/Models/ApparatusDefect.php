@@ -31,6 +31,22 @@ class ApparatusDefect extends Model
         return $this->belongsTo(Apparatus::class);
     }
 
+    /**
+     * Get recommendations for this defect
+     */
+    public function recommendations()
+    {
+        return $this->hasMany(ApparatusDefectRecommendation::class, 'apparatus_defect_id');
+    }
+
+    /**
+     * Get allocations for this defect
+     */
+    public function allocations()
+    {
+        return $this->hasMany(ApparatusInventoryAllocation::class, 'apparatus_defect_id');
+    }
+
     public static function recordDefect($apparatusId, $compartment, $item, $status, $notes)
     {
         $existing = self::where('apparatus_id', $apparatusId)

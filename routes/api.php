@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\ApparatusController;
 use App\Http\Controllers\Api\AdminMetricsController;
 use App\Http\Controllers\Api\SmartUpdatesController;
+use App\Http\Controllers\Api\InventoryChatController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -19,4 +20,8 @@ Route::prefix('public')->group(function () {
 Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('metrics', [AdminMetricsController::class, 'index']);
     Route::get('smart-updates', [SmartUpdatesController::class, 'index'])->name('api.smart-updates');
+    
+    // NEW: Inventory Chat Assistant
+    Route::post('ai/inventory-chat', [InventoryChatController::class, 'chat']);
+    Route::post('ai/inventory-execute', [InventoryChatController::class, 'executeAction']);
 });
