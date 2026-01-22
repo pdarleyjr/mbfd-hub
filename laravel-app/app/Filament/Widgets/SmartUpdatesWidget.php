@@ -8,8 +8,10 @@ use App\Models\CapitalProject;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ShopWork;
+use App\Models\EquipmentItem;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\On;
 
 class SmartUpdatesWidget extends Widget
 {
@@ -17,52 +19,154 @@ class SmartUpdatesWidget extends Widget
 
     protected int | string | array $columnSpan = 'full';
 
-    public ?array $smartUpdateData = null;
-    public bool $isLoading = true;
+    // Instant data - no AI delay
+    public ?array $bulletSummary = null;
+    public ?array $rawMetrics = null;
+
+    // Chat state - always visible
+    public string $chatInput = '';
+    public array $chatMessages = [];
+    public bool $chatLoading = false;
 
     public function mount(): void
     {
-        $this->loadSmartUpdates();
+        // Instant load from database - NO AI call
+        $this->loadInstantSummary();
     }
 
-    public function loadSmartUpdates(): void
+    /**
+     * Load instant bullet summary from database (no AI)
+     */
+    public function loadInstantSummary(): void
     {
-        $this->isLoading = true;
-        
+        $this->rawMetrics = $this->gatherOperationalMetrics();
+        $this->bulletSummary = $this->generateBulletSummary($this->rawMetrics);
+    }
+
+    /**
+     * Generate bullet summary directly from metrics (instant)
+     */
+    protected function generateBulletSummary(array $metrics): array
+    {
+        $bullets = [];
+
+        // Out of Service Vehicles (CRITICAL - show first)
+        if (!empty($metrics['out_of_service'])) {
+            $bullets['out_of_service'] = [
+                'icon' => '🚨',
+                'title' => 'Out of Service',
+                'color' => 'red',
+                'items' => array_map(fn($v) => "{$v['unit']} - {$v['vehicle']}" . ($v['notes'] ? " ({$v['notes']})" : ''), $metrics['out_of_service']),
+            ];
+        }
+
+        // Open Defects
+        if (!empty($metrics['apparatus_issues'])) {
+            $bullets['defects'] = [
+                'icon' => '🔧',
+                'title' => 'Open Defects',
+                'color' => 'orange',
+                'items' => array_map(fn($d) => "{$d['unit']}: {$d['issue']}", array_slice($metrics['apparatus_issues'], 0, 5)),
+            ];
+        }
+
+        // Low Stock Equipment
+        if (!empty($metrics['equipment_inventory']['low_stock_items'])) {
+            $bullets['low_stock'] = [
+                'icon' => '📦',
+                'title' => 'Low Stock Items',
+                'color' => 'yellow',
+                'items' => array_map(fn($i) => "{$i['name']} ({$i['current_stock']}/{$i['reorder_min']})", $metrics['equipment_inventory']['low_stock_items']),
+            ];
+        }
+
+        // Active Shop Work
+        if (!empty($metrics['shop_work'])) {
+            $bullets['shop_work'] = [
+                'icon' => '🛠️',
+                'title' => 'Active Shop Work',
+                'color' => 'purple',
+                'items' => array_map(fn($w) => "{$w['project']} - {$w['status']}", array_slice($metrics['shop_work'], 0, 5)),
+            ];
+        }
+
+        // Capital Projects (overdue/at risk)
+        $projectAlerts = [];
+        if (($metrics['capital_projects']['overdue'] ?? 0) > 0) {
+            $projectAlerts[] = "{$metrics['capital_projects']['overdue']} overdue project(s)";
+        }
+        if (($metrics['capital_projects']['at_risk'] ?? 0) > 0) {
+            $projectAlerts[] = "{$metrics['capital_projects']['at_risk']} at-risk project(s)";
+        }
+        if (!empty($projectAlerts)) {
+            $bullets['projects'] = [
+                'icon' => '📋',
+                'title' => 'Project Alerts',
+                'color' => 'blue',
+                'items' => $projectAlerts,
+            ];
+        }
+
+        // Fleet summary
+        $bullets['fleet'] = [
+            'icon' => '🚒',
+            'title' => 'Fleet Status',
+            'color' => 'green',
+            'items' => [
+                "{$metrics['vehicle_inventory']['total']} total apparatus",
+                ($metrics['vehicle_inventory']['by_status']['In Service'] ?? 0) . " in service",
+            ],
+        ];
+
+        return $bullets;
+    }
+
+    /**
+     * Send chat message to AI
+     */
+    public function sendChat(): void
+    {
+        if (empty(trim($this->chatInput))) {
+            return;
+        }
+
+        $userMessage = trim($this->chatInput);
+        $this->chatInput = '';
+        $this->chatLoading = true;
+
+        $this->chatMessages[] = [
+            'role' => 'user',
+            'content' => $userMessage,
+            'time' => now()->format('g:i A'),
+        ];
+
         try {
             $aiService = app(CloudflareAIService::class);
             
             if (!$aiService->isEnabled()) {
-                $this->smartUpdateData = [
-                    'error' => 'AI service not configured',
-                    'bullets' => $this->generateFallbackBullets(),
-                    'generated_at' => now()->toIso8601String(),
+                $this->chatMessages[] = [
+                    'role' => 'assistant',
+                    'content' => 'AI service is not configured.',
+                    'time' => now()->format('g:i A'),
                 ];
-                $this->isLoading = false;
-                return;
+            } else {
+                $response = $aiService->chat($userMessage, $this->rawMetrics ?? []);
+                
+                $this->chatMessages[] = [
+                    'role' => 'assistant',
+                    'content' => $response['message'],
+                    'time' => now()->format('g:i A'),
+                ];
             }
-
-            // Gather real-time metrics from all relevant models
-            $metrics = $this->gatherOperationalMetrics();
-
-            // Generate AI-powered bullet summary
-            $bullets = $aiService->generateAdminBulletSummary($metrics);
-
-            $this->smartUpdateData = [
-                'bullets' => $bullets,
-                'metrics' => $metrics,
-                'generated_at' => now()->toIso8601String(),
-            ];
         } catch (\Exception $e) {
-            Log::error('SmartUpdatesWidget error', ['message' => $e->getMessage()]);
-            $this->smartUpdateData = [
-                'error' => $e->getMessage(),
-                'bullets' => $this->generateFallbackBullets(),
-                'generated_at' => now()->toIso8601String(),
+            $this->chatMessages[] = [
+                'role' => 'assistant',
+                'content' => 'Error: ' . $e->getMessage(),
+                'time' => now()->format('g:i A'),
             ];
         }
-        
-        $this->isLoading = false;
+
+        $this->chatLoading = false;
     }
 
     /**
@@ -82,6 +186,11 @@ class SmartUpdatesWidget extends Widget
             ->orWhere('status', 'out_of_service')
             ->get(['unit_id', 'make', 'model', 'notes']);
         
+        // Overdue inspections - optimized query
+        $overdueInspections = Apparatus::whereDoesntHave('inspections', function($q) {
+            $q->where('created_at', '>=', today()->subDay());
+        })->count();
+        
         // Open defects/apparatus issues
         $openDefects = ApparatusDefect::where('resolved', false)
             ->with('apparatus:id,unit_id')
@@ -99,6 +208,34 @@ class SmartUpdatesWidget extends Widget
             // ShopWork table may not exist
         }
         
+        // Equipment inventory
+        $equipmentData = [];
+        try {
+            $totalEquipment = EquipmentItem::where('is_active', true)->count();
+            $allEquipment = EquipmentItem::where('is_active', true)->get();
+            
+            // Calculate low stock items (stock <= reorder_min)
+            $lowStockItems = $allEquipment->filter(fn($item) => $item->stock <= $item->reorder_min);
+            
+            // Group by category
+            $byCategory = $allEquipment->groupBy('category')->map->count()->toArray();
+            
+            $equipmentData = [
+                'total_items' => $totalEquipment,
+                'low_stock_count' => $lowStockItems->count(),
+                'by_category' => $byCategory,
+                'low_stock_items' => $lowStockItems->take(5)->map(fn($item) => [
+                    'name' => $item->name,
+                    'current_stock' => $item->stock,
+                    'reorder_min' => $item->reorder_min,
+                    'category' => $item->category,
+                ])->values()->toArray(),
+            ];
+        } catch (\Exception $e) {
+            // EquipmentItem table may not exist
+            Log::debug('Equipment metrics unavailable: ' . $e->getMessage());
+        }
+        
         // Capital projects
         $capitalProjects = CapitalProject::with(['milestones', 'updates'])
             ->orderBy('priority')
@@ -114,6 +251,7 @@ class SmartUpdatesWidget extends Widget
             'vehicle_inventory' => [
                 'total' => $totalApparatus,
                 'by_status' => $apparatusByStatus,
+                'overdue_inspections' => $overdueInspections,
             ],
             'out_of_service' => $outOfService->map(fn($a) => [
                 'unit' => $a->unit_id,
@@ -130,6 +268,7 @@ class SmartUpdatesWidget extends Widget
                 'status' => $w->status,
                 'unit' => $w->apparatus?->unit_id ?? 'N/A',
             ])->toArray(),
+            'equipment_inventory' => $equipmentData,
             'capital_projects' => [
                 'total' => $capitalProjects->count(),
                 'overdue' => $overdueProjects->count(),
@@ -143,37 +282,16 @@ class SmartUpdatesWidget extends Widget
         ];
     }
 
-    /**
-     * Generate fallback bullets when AI is unavailable
-     */
-    protected function generateFallbackBullets(): array
-    {
-        $metrics = $this->gatherOperationalMetrics();
-        
-        return [
-            'vehicle_inventory' => [
-                "{$metrics['vehicle_inventory']['total']} total apparatus in fleet",
-            ],
-            'out_of_service' => count($metrics['out_of_service']) > 0 
-                ? array_map(fn($v) => "{$v['unit']} - {$v['vehicle']}", array_slice($metrics['out_of_service'], 0, 3))
-                : ['All vehicles operational'],
-            'apparatus_issues' => count($metrics['apparatus_issues']) > 0
-                ? array_map(fn($i) => "{$i['unit']}: {$i['issue']}", array_slice($metrics['apparatus_issues'], 0, 3))
-                : ['No open defects reported'],
-            'equipment_alerts' => count($metrics['shop_work']) > 0
-                ? array_map(fn($w) => "{$w['project']} ({$w['status']})", array_slice($metrics['shop_work'], 0, 3))
-                : ['No active shop work'],
-            'capital_projects' => [
-                "{$metrics['capital_projects']['total']} active projects",
-                $metrics['capital_projects']['overdue'] > 0 
-                    ? "{$metrics['capital_projects']['overdue']} overdue" 
-                    : "All projects on schedule",
-            ],
-        ];
-    }
-
     public function refresh(): void
     {
-        $this->loadSmartUpdates();
+        $this->loadInstantSummary();
+    }
+
+    #[On('equipment-updated')]
+    #[On('project-updated')]
+    #[On('apparatus-updated')]
+    public function handleDataChange(): void
+    {
+        $this->loadInstantSummary();
     }
 }

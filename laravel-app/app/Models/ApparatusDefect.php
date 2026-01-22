@@ -11,10 +11,14 @@ class ApparatusDefect extends Model
 
     protected $fillable = [
         'apparatus_id',
+        'apparatus_inspection_id',
         'compartment',
         'item',
         'status',
+        'issue_type',
+        'reported_date',
         'notes',
+        'photo_path',
         'resolved',
         'resolved_at',
         'resolution_notes',
@@ -24,11 +28,36 @@ class ApparatusDefect extends Model
     protected $casts = [
         'defect_history' => 'array',
         'resolved' => 'boolean',
+        'reported_date' => 'date',
     ];
 
     public function apparatus()
     {
         return $this->belongsTo(Apparatus::class);
+    }
+
+    /**
+     * Get the inspection this defect was reported in
+     */
+    public function inspection()
+    {
+        return $this->belongsTo(ApparatusInspection::class, 'apparatus_inspection_id');
+    }
+
+    /**
+     * Get recommendations for this defect
+     */
+    public function recommendations()
+    {
+        return $this->hasMany(ApparatusDefectRecommendation::class, 'apparatus_defect_id');
+    }
+
+    /**
+     * Get allocations for this defect
+     */
+    public function allocations()
+    {
+        return $this->hasMany(ApparatusInventoryAllocation::class, 'apparatus_defect_id');
     }
 
     public static function recordDefect($apparatusId, $compartment, $item, $status, $notes)

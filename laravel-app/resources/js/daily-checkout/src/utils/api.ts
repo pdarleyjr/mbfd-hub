@@ -1,4 +1,4 @@
-import { Apparatus, ChecklistData, InspectionData } from '../types';
+import { Apparatus, ChecklistData, InspectionSubmission } from '../types';
 
 const API_BASE = '/api';
 
@@ -19,7 +19,7 @@ export class ApiClient {
     return response.json();
   }
 
-  static async submitInspection(apparatusId: number, data: InspectionData): Promise<{ success: boolean; message: string }> {
+  static async submitInspection(apparatusId: number, data: InspectionSubmission): Promise<{ success: boolean; message: string }> {
     const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/inspections`, {
       method: 'POST',
       headers: {

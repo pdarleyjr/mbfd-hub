@@ -8,10 +8,16 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use App\Models\ApparatusDefect;
+use App\Models\ApparatusDefectRecommendation;
+use App\Models\AdminAlertEvent;
+use Filament\Notifications\Notification;
+use App\Filament\Resources\RecommendationResource;
 
 class DefectsRelationManager extends RelationManager
 {
     protected static string $relationship = 'defects';
+
+    protected static ?string $title = 'Missing / Damaged Equipment';
 
     public function form(Form $form): Form
     {
@@ -101,6 +107,42 @@ class DefectsRelationManager extends RelationManager
                             'resolution_notes' => $data['resolution_notes'],
                             'resolved_at' => now(),
                         ]);
+                    }),
+                
+                Tables\Actions\Action::make('request_replacement')
+                    ->label('Request Replacement')
+                    ->icon('heroicon-o-shopping-cart')
+                    ->color('info')
+                    ->visible(fn ($record) => $record->status !== 'resolved' && $record->issue_type === 'missing')
+                    ->action(function ($record) {
+                        // Create a manual recommendation (will be enhanced by AI later)
+                        $recommendation = ApparatusDefectRecommendation::create([
+                            'apparatus_defect_id' => $record->id,
+                            'equipment_item_id' => null, // Manual mapping required
+                            'match_method' => 'manual',
+                            'match_confidence' => 0,
+                            'recommended_qty' => 1,
+                            'reasoning' => 'Manual replacement request from defect management',
+                            'status' => 'pending',
+                            'created_by_user_id' => auth()->id(),
+                        ]);
+                        
+                        AdminAlertEvent::create([
+                            'type' => 'recommendation_created',
+                            'severity' => 'info',
+                            'message' => "Replacement request created for {$record->item} on {$record->apparatus->unit_id}",
+                            'related_type' => 'apparatus_defect_recommendation',
+                            'related_id' => $recommendation->id,
+                            'created_by_user_id' => auth()->id(),
+                        ]);
+                        
+                        Notification::make()
+                            ->success()
+                            ->title('Replacement request created')
+                            ->body('Go to Recommendations to assign an item')
+                            ->send();
+                            
+                        return redirect()->to(RecommendationResource::getUrl('edit', ['record' => $recommendation]));
                     }),
                 
                 Tables\Actions\EditAction::make(),

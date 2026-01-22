@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Apparatus, OfficerInfo, ChecklistData, Compartment, InspectionData } from '../types';
+import { Apparatus, OfficerInfo, ChecklistData, Compartment, Defect } from '../types';
 import { ApiClient } from '../utils/api';
 import OfficerStep from './OfficerStep';
 import CompartmentStep from './CompartmentStep';
@@ -69,12 +69,31 @@ export default function InspectionWizard() {
     if (!apparatus) return;
 
     try {
-      const inspectionData: InspectionData = {
-        officer: officerInfo,
-        compartments,
+      // Compile defects from items marked Missing or Damaged
+      const defects: Defect[] = [];
+      compartments.forEach(compartment => {
+        compartment.items.forEach(item => {
+          if (item.status === 'Missing' || item.status === 'Damaged') {
+            defects.push({
+              item_name: item.name,
+              compartment: compartment.name,
+              status: item.status,
+              notes: item.notes,
+              photo: item.photo,
+            });
+          }
+        });
+      });
+
+      const submission = {
+        operator_name: officerInfo.name,
+        rank: officerInfo.rank,
+        shift: officerInfo.shift,
+        unit_number: officerInfo.unitNumber,
+        defects,
       };
 
-      await ApiClient.submitInspection(apparatus.id, inspectionData);
+      await ApiClient.submitInspection(apparatus.id, submission);
       navigate('/success');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit inspection');

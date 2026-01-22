@@ -100,25 +100,13 @@ class ApparatusResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('assignment')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('status')
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'In Service' => 'success',
-                        'Out of Service' => 'danger',
-                        'Maintenance' => 'warning',
-                        'Reserve' => 'gray',
-                        default => 'gray',
-                    }),
-                Tables\Columns\TextColumn::make('inspections_count')
-                    ->label('Inspections')
-                    ->counts('inspections')
-                    ->badge()
-                    ->color('info'),
-                Tables\Columns\TextColumn::make('active_defects_count')
-                    ->label('Active Issues')
-                    ->getStateUsing(fn (Apparatus $record) => $record->defects()->where('resolved', false)->count())
-                    ->badge()
-                    ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
+                Tables\Columns\BadgeColumn::make('status')
+                    ->colors([
+                        'success' => 'In Service',
+                        'danger' => 'Out of Service',
+                        'warning' => 'Maintenance',
+                        'secondary' => 'Reserve',
+                    ]),
                 Tables\Columns\TextColumn::make('last_service_date')
                     ->date()
                     ->sortable(),
@@ -141,19 +129,11 @@ class ApparatusResource extends Resource
                         'Reserve' => 'Reserve',
                         'Maintenance' => 'Maintenance',
                     ]),
-                Tables\Filters\Filter::make('has_active_issues')
-                    ->label('Has Active Issues')
-                    ->query(fn (Builder $query) => $query->whereHas('defects', fn ($q) => $q->where('resolved', false))),
             ])
             ->actions([
-                Tables\Actions\Action::make('view_inspections')
-                    ->label('Inspections')
-                    ->icon('heroicon-o-clipboard-document-list')
-                    ->color('info')
-                    ->url(fn (Apparatus $record): string => static::getUrl('inspections', ['record' => $record])),
                 Tables\Actions\Action::make('start_daily_checkout')
                     ->label('Daily Checkout')
-                    ->icon('heroicon-o-play-circle')
+                    ->icon('heroicon-o-clipboard-document-list')
                     ->color('success')
                     ->url(fn (Apparatus $record): string => "/daily/{$record->id}")
                     ->openUrlInNewTab(),
@@ -182,7 +162,6 @@ class ApparatusResource extends Resource
             'index' => Pages\ListApparatuses::route('/'),
             'create' => Pages\CreateApparatus::route('/create'),
             'edit' => Pages\EditApparatus::route('/{record}/edit'),
-            'inspections' => Pages\ApparatusInspections::route('/{record}/inspections'),
         ];
     }
 }

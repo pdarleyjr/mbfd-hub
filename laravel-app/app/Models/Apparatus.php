@@ -11,6 +11,10 @@ class Apparatus extends Model
 
     protected $fillable = [
         'unit_id',
+        'name',
+        'type',
+        'vehicle_number',
+        'slug',
         'vin',
         'make',
         'model',
@@ -34,5 +38,13 @@ class Apparatus extends Model
     public function openDefects()
     {
         return $this->defects()->where('resolved', false);
+    }
+
+    /**
+     * Get all inventory allocations for this apparatus
+     */
+    public function inventoryAllocations()
+    {
+        return $this->hasMany(ApparatusInventoryAllocation::class, 'apparatus_id');
     }
 }
