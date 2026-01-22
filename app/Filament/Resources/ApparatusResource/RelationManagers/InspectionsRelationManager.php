@@ -12,19 +12,18 @@ class InspectionsRelationManager extends RelationManager
 {
     protected static string $relationship = 'inspections';
 
+    protected static ?string $title = 'Inspections';
+
     public function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\DateTimePicker::make('inspection_date')
-                    ->required()
-                    ->default(now()),
-                
-                Forms\Components\TextInput::make('officer_name')
+                Forms\Components\TextInput::make('operator_name')
+                    ->label('Operator Name')
                     ->required()
                     ->maxLength(255),
                 
-                Forms\Components\TextInput::make('officer_badge')
+                Forms\Components\TextInput::make('rank')
                     ->maxLength(50),
                 
                 Forms\Components\Select::make('shift')
@@ -35,24 +34,31 @@ class InspectionsRelationManager extends RelationManager
                     ])
                     ->required(),
                 
-                Forms\Components\Textarea::make('notes')
-                    ->rows(3),
+                Forms\Components\TextInput::make('unit_number')
+                    ->maxLength(50),
+                
+                Forms\Components\DateTimePicker::make('completed_at')
+                    ->label('Completed At')
+                    ->default(now()),
             ]);
     }
 
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('inspection_date')
+            ->recordTitleAttribute('completed_at')
             ->columns([
-                Tables\Columns\TextColumn::make('inspection_date')
+                Tables\Columns\TextColumn::make('completed_at')
                     ->label('Date')
                     ->dateTime()
                     ->sortable(),
                 
-                Tables\Columns\TextColumn::make('officer_name')
-                    ->label('Officer')
+                Tables\Columns\TextColumn::make('operator_name')
+                    ->label('Operator')
                     ->searchable(),
+                
+                Tables\Columns\TextColumn::make('rank')
+                    ->label('Rank'),
                 
                 Tables\Columns\BadgeColumn::make('shift')
                     ->colors([
@@ -83,6 +89,6 @@ class InspectionsRelationManager extends RelationManager
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('inspection_date', 'desc');
+            ->defaultSort('completed_at', 'desc');
     }
 }

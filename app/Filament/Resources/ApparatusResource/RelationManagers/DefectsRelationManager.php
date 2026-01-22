@@ -17,6 +17,8 @@ class DefectsRelationManager extends RelationManager
 {
     protected static string $relationship = 'defects';
 
+    protected static ?string $title = 'Missing / Damaged Equipment';
+
     public function form(Form $form): Form
     {
         return $form
