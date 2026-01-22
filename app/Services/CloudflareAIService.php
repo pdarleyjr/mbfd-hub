@@ -329,4 +329,25 @@ class CloudflareAIService
     {
         return $this->checkRateLimit();
     }
+
+    public function chat(string $message, array $metrics = []): array
+    {
+        $response = Http::withHeaders([
+            'x-api-secret' => config('cloudflare.worker_api_secret')
+        ])->timeout(10)->post(config('cloudflare.worker_url').'/ai/inventory-chat', [
+            'message' => $message,
+            'inventory_context' => $metrics
+        ]);
+        
+        if ($response->failed()) {
+            Log::error('Cloudflare AI chat failed', ['response' => $response->body()]);
+            throw new \Exception($response->json()['message'] ?? 'AI chat failed');
+        }
+        
+        $result = $response->json();
+        return [
+            'message' => $result['assistant_message'] ?? '',
+            'actions' => $result['proposed_actions'] ?? []
+        ];
+    }
 }
