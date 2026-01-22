@@ -8,6 +8,7 @@ use App\Models\ApparatusDefectRecommendation;
 use App\Models\EquipmentItem;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Support\Facades\DB;
 
 class FireEquipmentStatsWidget extends BaseWidget
 {
@@ -16,6 +17,10 @@ class FireEquipmentStatsWidget extends BaseWidget
 
     protected function getStats(): array
     {
+        // Stock tracking disabled - stock_mutations table does not exist
+        $lowStockCount = 0;
+        $outOfStockCount = 0;
+        
         return [
             Stat::make('Total Equipment Items', EquipmentItem::where('is_active', true)->count())
                 ->icon('heroicon-o-cube')
@@ -23,11 +28,7 @@ class FireEquipmentStatsWidget extends BaseWidget
                 ->url(EquipmentItemResource::getUrl('index'))
                 ->color('info'),
             
-            Stat::make('Low Stock Items', 
-                EquipmentItem::where('is_active', true)
-                    ->whereColumn('stock', '<=', 'reorder_min')
-                    ->count()
-            )
+            Stat::make('Low Stock Items', $lowStockCount)
                 ->icon('heroicon-o-exclamation-triangle')
                 ->description('Below reorder threshold')
                 ->url(EquipmentItemResource::getUrl('index', ['tableFilters' => ['low_stock' => true]]))
@@ -35,11 +36,7 @@ class FireEquipmentStatsWidget extends BaseWidget
                     return $state > 0 ? 'warning' : 'success';
                 }),
             
-            Stat::make('Out of Stock', 
-                EquipmentItem::where('is_active', true)
-                    ->where('stock', 0)
-                    ->count()
-            )
+            Stat::make('Out of Stock', $outOfStockCount)
                 ->icon('heroicon-o-x-circle')
                 ->description('Zero stock items')
                 ->color(function ($state) {
