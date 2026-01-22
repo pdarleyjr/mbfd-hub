@@ -17,13 +17,22 @@ class LowStockAlertsWidget extends BaseWidget
     {
         return $table
             ->query(
-                // Return an empty query since stock_mutations table does not exist
-                EquipmentItem::query()->whereRaw('1 = 0')
+                // Get all active equipment items and filter collection-based for low stock
+                EquipmentItem::query()
+                    ->where('is_active', true)
+                    ->get()
+                    ->filter(fn ($item) => $item->stock <= $item->reorder_min)
+                    ->toQuery()
             )
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->url(fn ($record) => EquipmentItemResource::getUrl('edit', ['record' => $record])),
+                
+                Tables\Columns\TextColumn::make('current_stock')
+                    ->label('Current Stock')
+                    ->badge()
+                    ->color('danger'),
                 
                 Tables\Columns\TextColumn::make('reorder_min')
                     ->label('Threshold'),
@@ -33,8 +42,8 @@ class LowStockAlertsWidget extends BaseWidget
             ])
             ->paginated([5, 10, 25])
             ->defaultPaginationPageOption(5)
-            ->emptyStateHeading('Stock tracking unavailable')
-            ->emptyStateDescription('The stock mutations system is not yet configured')
-            ->emptyStateIcon('heroicon-o-information-circle');
+            ->emptyStateHeading('No low stock items')
+            ->emptyStateDescription('All equipment items are adequately stocked')
+            ->emptyStateIcon('heroicon-o-check-circle');
     }
 }
