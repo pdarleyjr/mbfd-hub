@@ -106,6 +106,8 @@ class ApparatusResource extends Resource
         return [
             RelationManagers\InspectionsRelationManager::class,
             RelationManagers\DefectsRelationManager::class,
+            RelationManagers\EquipmentRecommendationsRelationManager::class,
+            RelationManagers\InventoryAllocationsRelationManager::class,
         ];
     }
 

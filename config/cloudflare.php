@@ -22,4 +22,8 @@ return [
             'request' => 30, // seconds
         ],
     ],
+    
+    // NEW: Worker integration
+    'worker_url' => env('CLOUDFLARE_WORKER_URL', 'https://mbfd-support-ai.pdarleyjr.workers.dev'),
+    'worker_api_secret' => env('CLOUDFLARE_WORKER_API_SECRET'),
 ];

@@ -35,4 +35,12 @@ class Apparatus extends Model
     {
         return $this->defects()->where('resolved', false);
     }
+
+    /**
+     * Get all inventory allocations for this apparatus
+     */
+    public function inventoryAllocations()
+    {
+        return $this->hasMany(ApparatusInventoryAllocation::class, 'apparatus_id');
+    }
 }
