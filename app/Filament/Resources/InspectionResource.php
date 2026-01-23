@@ -82,7 +82,8 @@ class InspectionResource extends Resource
                 Tables\Columns\TextColumn::make('rank')
                     ->label('Rank'),
                 
-                Tables\Columns\BadgeColumn::make('shift')
+                Tables\Columns\TextColumn::make('shift')
+                    ->badge()
                     ->colors([
                         'primary' => 'A',
                         'warning' => 'B',

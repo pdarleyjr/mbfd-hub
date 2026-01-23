@@ -1,0 +1,186 @@
+{
+  "title": "Rescue Daily Inventory",
+  "dailySchedule": [
+    {
+      "day": "Monday",
+      "tasks": ["Bunker Gear Check"]
+    },
+    {
+      "day": "Tuesday",
+      "tasks": ["Stock Inventory / Narcotics Check"]
+    },
+    {
+      "day": "Wednesday",
+      "tasks": ["SCBA Complete Checkout"]
+    },
+    {
+      "day": "Thursday",
+      "tasks": ["Stairchair Inspection & Battery Rotation"]
+    },
+    {
+      "day": "Friday",
+      "tasks": []
+    },
+    {
+      "day": "Saturday",
+      "tasks": ["Compartment Cleaning", "AIRTRAQ Inspection - Charging"]
+    },
+    {
+      "day": "Sunday",
+      "tasks": []
+    }
+  ],
+  "officerChecklist": [
+    { "id": "lock_box_key", "name": "Lock Box Key", "inputType": "checkbox" },
+    { "id": "elevator_key", "name": "Elevator Key", "inputType": "checkbox" },
+    { "id": "mileage", "name": "Mileage", "inputType": "number", "required": true },
+    { "id": "laptop_num", "name": "Dell Laptop #", "inputType": "text" },
+    { "id": "toughbook_num", "name": "Toughbook #", "inputType": "text" },
+    { "id": "psi_front", "name": "PSI – Front Tire #", "inputType": "number", "required": true },
+    { "id": "psi_rear", "name": "PSI – Rear Tire #", "inputType": "number", "required": true },
+    { "id": "brake_psi", "name": "Brake PSI #", "inputType": "number", "required": true },
+    { "id": "narcotic_book", "name": "Narcotic Book", "inputType": "checkbox" },
+    { "id": "narcotic_seal", "name": "Narcotic Seal #", "inputType": "text", "required": true },
+    { "id": "m_cylinder_psi", "name": "M Cylinder PSI", "inputType": "number" },
+    { "id": "vehicle_log_book", "name": "Vehicle Log Book", "inputType": "checkbox" },
+    { "id": "fuel_card", "name": "Fuel Card", "inputType": "checkbox" },
+    { "id": "fuel_percent", "name": "Fuel %", "inputType": "percentage", "required": true },
+    { "id": "def_percent", "name": "DEF %", "inputType": "percentage", "required": true },
+    { "id": "cad_logged_in", "name": "CAD Logged In", "inputType": "checkbox" },
+    { "id": "tire_pressure_gauge", "name": "Tire Pressure Gauge", "inputType": "checkbox" }
+  ],
+  "compartments": [
+    {
+      "id": "front_cab",
+      "title": "Front Cab",
+      "items": [
+        { "name": "Lights (Check)", "inputType": "checkbox" },
+        { "name": "Siren (Check)", "inputType": "checkbox" },
+        { "name": "Mobile Radio (Test)", "inputType": "checkbox" },
+        { "name": "Air Horn (Check)", "inputType": "checkbox" },
+        { "name": "No Smoking Sign", "inputType": "checkbox" }
+      ]
+    },
+    {
+      "id": "compartment_a",
+      "title": "Compartment A",
+      "items": [
+        { "name": "M Cylinders", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Backboard / Scoop Stretcher", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "D-cylinder", "inputType": "checkbox", "expectedQuantity": 4 },
+        { "name": "Stair Chair", "inputType": "checkbox" },
+        { "name": "HANDTEVY", "inputType": "checkbox", "note": "Inventory-Inspection 1st Tuesday Monthly" },
+        { "name": "Emergency Yellow Blankets", "inputType": "checkbox", "expectedQuantity": 2 }
+      ]
+    },
+    {
+      "id": "patient_compartment",
+      "title": "Patient Compartment",
+      "items": [
+        { "name": "No Smoking Sign", "inputType": "checkbox" },
+        { "name": "Airway Bag", "inputType": "checkbox" },
+        { "name": "Med Box", "inputType": "checkbox" },
+        { "name": "Trauma Bag", "inputType": "checkbox" },
+        { "name": "LifePak 15", "inputType": "checkbox" },
+        { "name": "Ferno Pedi-Mate", "inputType": "checkbox" },
+        { "name": "LSU Portable Suction", "inputType": "checkbox" },
+        { "name": "Cooler (@36-48 Degrees)", "inputType": "checkbox" },
+        { "name": "MCI Bag", "inputType": "checkbox" },
+        { "name": "Transport Fee Chart", "inputType": "checkbox" },
+        { "name": "PPE Bag", "inputType": "checkbox" },
+        { "name": "Caution Tape", "inputType": "checkbox" },
+        { "name": "Flash Lights", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Tyveks", "inputType": "checkbox", "expectedQuantity": 3 },
+        { "name": "Road Hazards", "inputType": "checkbox" },
+        { "name": "Oral Thermometer (Wall Mounted)", "inputType": "checkbox" },
+        { "name": "Pedi Inflatable Splint", "inputType": "checkbox" },
+        { "name": "Triangular Markers", "inputType": "checkbox" },
+        { "name": "OB Kits", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Dry Chem A,B,C Extinguisher (Wall Mounted)", "inputType": "checkbox" },
+        { "name": "Fire Extinguisher", "inputType": "checkbox" },
+        { "name": "Carry Alls", "inputType": "checkbox", "expectedQuantity": 2 }
+      ]
+    },
+    {
+      "id": "compartment_b",
+      "title": "Compartment B",
+      "items": [
+        { "name": "Dive Mask & Snorkel", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "PFD Device", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Fins", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Gloves", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Dive Light", "inputType": "checkbox" },
+        { "name": "Dewalt K-Saw with Spare battery", "inputType": "checkbox" },
+        { "name": "Dewalt Reciprocating Saw (UASI#)", "inputType": "checkbox" },
+        { "name": "600' Poly Rescue Rope", "inputType": "checkbox" },
+        { "name": "Torpedo Buoy", "inputType": "checkbox" },
+        { "name": "Tool Box", "inputType": "checkbox" },
+        { "name": "LUCAS Device W/ Spare Battery", "inputType": "checkbox", "note": "Battery Rotated Daily (Y/N)" },
+        { "name": "Spare Battery", "inputType": "checkbox" },
+        { "name": "Rescue Frisbee", "inputType": "checkbox" }
+      ]
+    },
+    {
+      "id": "stretcher",
+      "title": "Stretcher",
+      "items": [
+        { "name": "Patient FERNO 4 Point Restraint w/ Lap Belt", "inputType": "checkbox" },
+        { "name": "Stretcher Charging", "inputType": "checkbox" }
+      ]
+    },
+    {
+      "id": "compartment_c",
+      "title": "Compartment C",
+      "items": [
+        { "name": "Spanner Wrench", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Hydrant Wrench", "inputType": "checkbox" },
+        { "name": "Bolt Cutters", "inputType": "checkbox" },
+        { "name": "Halligan", "inputType": "checkbox" },
+        { "name": "Flat Head Axe", "inputType": "checkbox" },
+        { "name": "Glass Cutter", "inputType": "checkbox" },
+        { "name": "Sledge", "inputType": "checkbox" },
+        { "name": "Yellow Blanket", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Spare Sheet", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Carry All", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "O2 Bottle w/ Reg (Minimum 1000 psi)", "inputType": "checkbox" },
+        { "name": "Vinegar", "inputType": "checkbox" },
+        { "name": "Squeegee", "inputType": "checkbox" },
+        { "name": "SpeedyCleanz", "inputType": "checkbox" },
+        { "name": "Kitty Litter", "inputType": "checkbox" },
+        { "name": "Marine Lubricant", "inputType": "checkbox" }
+      ]
+    },
+    {
+      "id": "compartment_d",
+      "title": "Compartment D",
+      "items": [
+        { "name": "PAR Tags", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Stair Chair", "inputType": "checkbox" },
+        { "name": "KED", "inputType": "checkbox" },
+        { "name": "SCBAs", "inputType": "text", "expectedQuantity": 3, "note": "Enter SCBA serial numbers" },
+        { "name": "Traction Splint", "inputType": "checkbox" },
+        { "name": "Helmet Shields", "inputType": "checkbox", "expectedQuantity": 3 },
+        { "name": "C-Collars Reg & No Neck", "inputType": "checkbox", "note": ">5 Each" },
+        { "name": "Passports", "inputType": "checkbox" },
+        { "name": "C-Collars Pedi", "inputType": "checkbox", "note": ">2" },
+        { "name": "Cardboard Splints", "inputType": "checkbox", "note": "5 Long / 5 Short" },
+        { "name": "LP CO MONITOR", "inputType": "checkbox" },
+        { "name": "Pedi Backboard", "inputType": "checkbox" },
+        { "name": "LP CO Monitor Serial #", "inputType": "text", "note": "Enter serial number" },
+        { "name": "Straps", "inputType": "checkbox", "expectedQuantity": 6 },
+        { "name": "(3) Ballistic vests and (3) helmets", "inputType": "checkbox" },
+        { "name": "TIC w/ Spare Battery", "inputType": "checkbox" },
+        { "name": "Search Rope Bag", "inputType": "checkbox" }
+      ]
+    },
+    {
+      "id": "radio_numbers",
+      "title": "Radio Numbers",
+      "items": [
+        { "name": "Radio - R. Lt.", "inputType": "radio", "note": "Check accounted for and enter radio number if known" },
+        { "name": "Radio - F1A", "inputType": "radio", "note": "Check accounted for and enter radio number if known" },
+        { "name": "Radio - F1B", "inputType": "radio", "note": "Check accounted for and enter radio number if known" }
+      ]
+    }
+  ]
+}
