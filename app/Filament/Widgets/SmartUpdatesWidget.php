@@ -18,7 +18,11 @@ class SmartUpdatesWidget extends Widget
     protected static string $view = 'filament.widgets.smart-updates-widget';
     protected static ?int $sort = 4;
 
-    protected int | string | array $columnSpan = 1;  // Half-width for 2-column grid
+    protected int | string | array $columnSpan = [
+        'sm' => 1,
+        'md' => 1,
+        'xl' => 1,
+    ];
 
     // Instant data - no AI delay
     public ?array $bulletSummary = null;

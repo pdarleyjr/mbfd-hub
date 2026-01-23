@@ -10,6 +10,12 @@ class InventoryOverviewWidget extends BaseWidget
 {
     protected static ?int $sort = 2;
 
+    protected int | string | array $columnSpan = [
+        'sm' => 1,
+        'md' => 1,
+        'xl' => 1,
+    ];
+
     protected function getStats(): array
     {
         // Get all active equipment items
