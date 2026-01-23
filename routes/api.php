@@ -11,7 +11,7 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-Route::prefix('public')->group(function () {
+Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('apparatuses', [ApparatusController::class, 'index']);
     Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class, 'checklist']);
     Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
