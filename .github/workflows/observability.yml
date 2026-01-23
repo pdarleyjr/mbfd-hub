@@ -22,13 +22,18 @@ jobs:
       - name: Install Node deps
         run: npm ci
 
-      - name: Build frontend (Vite)
+      - name: Build frontend (Vite) with Sentry Source Maps
         env:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_SENTRY_RELEASE: ${{ github.sha }}
+          VITE_APP_ENV: production
+          # Sentry Vite Plugin configuration (for automatic source map upload)
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT_FRONTEND: ${{ secrets.SENTRY_PROJECT_FRONTEND }}
         run: npm run build
 
-      - name: Create Sentry Release
+      - name: Create Sentry Release (Backend)
         uses: getsentry/action-release@v3
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
