@@ -38,12 +38,4 @@ enum TaskStatus: string implements HasLabel
     {
         return $this->getLabel();
     }
-
-    public static function statuses(): \Illuminate\Support\Collection
-    {
-        return collect(static::cases())->map(fn($case) => [
-            'id' => $case->value,
-            'title' => $case->getTitle(),
-        ]);
-    }
 }
