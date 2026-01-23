@@ -23,7 +23,7 @@ use App\Filament\Widgets\OperationalSummaryWidget;
 use App\Filament\Widgets\InventorySuppliesWidget;
 use App\Filament\Widgets\MaintenanceStatsWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
-use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
+// use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -48,7 +48,7 @@ class AdminPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
             ])
             ->font('Inter')
-            ->plugin(FilamentShieldPlugin::make())
+            // ->plugin(FilamentShieldPlugin::make())
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
