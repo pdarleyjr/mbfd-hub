@@ -18,6 +18,9 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Filament\Widgets\SmartUpdatesWidget;
+use App\Filament\Widgets\OperationalSummaryWidget;
+use App\Filament\Widgets\TodoOverviewWidget;
+use App\Filament\Widgets\MaintenanceStatsWidget;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 
 class AdminPanelProvider extends PanelProvider
@@ -51,12 +54,11 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
-                // \App\Filament\Widgets\FireEquipmentStatsWidget::class,
-                // \App\Filament\Widgets\LowStockAlertsWidget::class,
-                // \App\Filament\Widgets\PendingRecommendationsWidget::class,
-                // \App\Filament\Widgets\RecentAllocationsWidget::class,
+                OperationalSummaryWidget::class,
+                MaintenanceStatsWidget::class,
+                TodoOverviewWidget::class,
                 SmartUpdatesWidget::class,
+                Widgets\AccountWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
