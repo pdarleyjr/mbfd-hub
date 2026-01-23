@@ -13,3 +13,7 @@ Route::get('/daily', function () {
 Route::get('/daily/{any}', function () {
     return response()->file(public_path('daily/index.html'));
 })->where('any', '.*');
+
+Route::get('/__sentry_test', function () {
+    throw new Exception('Sentry backend test exception');
+});
