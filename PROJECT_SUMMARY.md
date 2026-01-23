@@ -300,6 +300,41 @@
 #### Directories Removed (Phase 14)
 - `copy/` - Legacy duplicate code directory
 
+### 🔐 User Management & Filament Shield Setup (January 23, 2026)
+
+#### User System Overhaul ✅ COMPLETED
+- **Test Users Removed**: Deleted all 9 placeholder/test users from production
+- **Filament Shield Installed**: Role-based permission system (`bezhansalleh/filament-shield ^3.9`)
+- **Production Users Created**: 4 authorized MBFD personnel with secure credentials
+
+#### User Roles & Permissions
+- **Admin Role**: Full system access including user management
+  - Miguel Anchia (MiguelAnchia@miamibeachfl.gov)
+  - Richard Quintela (RichardQuintela@miamibeachfl.gov)  
+  - Peter Darley (PeterDarley@miamibeachfl.gov)
+  
+- **Staff Role**: Standard operational access
+  - Gerald DeYoung (geralddeyoung@miamibeachfl.gov)
+
+#### UserResource Security ✅ CONFIGURED
+- **Admin-Only Access**: [`UserResource`](app/Filament/Resources/UserResource.php) locked to admin role only
+- **Method Implemented**: `canViewAny()` returns `auth()->user()?->hasRole('admin')`
+- **Impact**: Only admin users can view/manage user accounts
+
+#### User Profile Columns ✅ ADDED
+- **Existing Columns**: `display_name`, `rank`, `station`, `phone`
+- **New Columns Added**: `avatar` (VARCHAR), `preferences` (JSONB)
+- **Database Update**: Migration and direct SQL ALTER TABLE execution
+- **Files Modified**: 
+  - [`app/Filament/Resources/UserResource.php`](app/Filament/Resources/UserResource.php) - Already had profile fields in form
+  - Database migration: `2026_01_23_221200_add_avatar_preferences_to_users_table.php`
+
+#### Authentication Status
+- **Login Verified**: Admin users can successfully authenticate at `/admin`
+- **Test Credentials**: MiguelAnchia@miamibeachfl.gov / Penco1, PeterDarley@miamibeachfl.gov / Penco3
+- **Spatie Permission**: Integrated with Laravel Spatie Permission package for role management
+- **Production Ready**: All users provisioned and operational
+
 ### ⚠️ Known Issues & Considerations
 
 #### Performance Considerations
@@ -544,11 +579,82 @@ The MBFD Support Hub is a production-ready, stable fire department management sy
 7. Legacy code cleanup (copy/ directory removed)
 8. All changes committed to feat/uiux-users-remove-tasks branch
 
+### 🔧 Daily Checkout PWA Critical Bug Fix (January 23, 2026) ✅ RESOLVED
+
+#### Issue #7: Daily Checkout PWA Complete Failure
+- **URL**: https://support.darleyplex.com/daily/
+- **Problem**: Three critical console errors preventing PWA from functioning:
+  1. `GET https://support.darleyplex.com/icons/icon-192.png [HTTP/2 404]`
+  2. `GET https://support.darleyplex.com/vite.svg [HTTP/2 404]`
+  3. `ServiceWorker script at /service-worker.js encountered error during installation`
+  
+- **Root Causes Identified**:
+  1. **Service Worker Path Mismatch**: Registering at root `/service-worker.js` instead of `/daily/service-worker.js`
+  2. **Manifest Icon Paths**: Icon paths missing `/daily/` prefix (using `/icons/` instead of `/daily/icons/`)
+  3. **Missing Icons Directory**: No `/daily/icons/` folder in deployment
+  4. **vite.svg Reference**: Broken favicon link to non-existent file
+  5. **Asset Hash Mismatch**: `index.html` referencing `index-0d1489b1.js` but VPS had `index-46e85815.js`
+  6. **Manifest Scope Issue**: Manifest using root scope `/` instead of `/daily/` scope
+  
+- **Discovery Process**:
+  - Used **Context7 MCP** to research Vite PWA plugin documentation
+  - Analyzed [`docs/CHECKOUT_REUSE_MAP.md`](docs/CHECKOUT_REUSE_MAP.md) to understand project source
+  - Confirmed `mbfd-checkout-system` is source repo for Daily Checkout PWA
+  - Used **Playwright MCP** to verify fixes and capture console output
+  
+- **Solution Implemented**:
+  1. **Fixed Service Worker Registration** in [`public/daily/index.html:31`](../Desktop/Support Services/public/daily/index.html:31):
+     - Changed from: `navigator.serviceWorker.register('/service-worker.js')`
+     - Changed to: `navigator.serviceWorker.register('/daily/service-worker.js', { scope: '/daily/' })`
+  
+  2. **Fixed Manifest Icon Paths** in [`public/daily/manifest.json`](../Desktop/Support Services/public/daily/manifest.json):
+     - Updated all icon `src` paths from `/icons/icon-*.png` to `/daily/icons/icon-*.png`
+     - Updated `start_url` and `scope` from `/` to `/daily/`
+     - Updated shortcut URL from `/` to `/daily/`
+  
+  3. **Created Icons Directory**:
+     - Created `/daily/icons/` directory
+     - Copied `icon-192.png` and `icon-512.png` from `mbfd-checkout-system/public/`
+  
+  4. **Fixed Favicon** in [`public/daily/index.html:5`](../Desktop/Support Services/public/daily/index.html:5):
+     - Changed from: `<link rel="icon" type="image/svg+xml" href="/vite.svg" />`
+     - Changed to: `<link rel="icon" type="image/png" href="/daily/icons/icon-192.png" />`
+  
+  5. **Fixed Apple Touch Icon** in [`public/daily/index.html:13`](../Desktop/Support Services/public/daily/index.html:13):
+     - Changed from: `href="/icons/icon-192.png"`
+     - Changed to: `href="/daily/icons/icon-192.png"`
+  
+  6. **Fixed Asset Hash Mismatch**:
+     - Updated `index.html` to reference correct JS file: `index-46e85815.js`
+     - Aligned with assets actually deployed on VPS
+  
+- **Deployment & Verification**:
+  1. Committed changes to GitHub (2 commits: `dce3f11d`, `355d77a0`)
+  2. Pulled changes on VPS at `/root/mbfd-hub`
+  3. Rebuilt Docker container: `docker compose up --build -d`
+  4. Verified files in container: `/var/www/html/public/daily/icons/`
+  5. **Playwright Verification**: ✅ ZERO console errors
+  6. **Service Worker Status**: ✅ "SW registered: ServiceWorkerRegistration"
+  7. Screenshot captured: `daily-checkout-fixed.png`
+  
+- **Final Result**: 
+  - **Console Errors**: 3 → 0 ✅
+  - **Service Worker**: Failed installation → Successfully registered ✅
+  - **Icons**: All loading correctly from `/daily/icons/` ✅
+  - **PWA Status**: Fully operational and installable ✅
+  
+- **Files Modified**:
+  - [`public/daily/index.html`](../Desktop/Support Services/public/daily/index.html) - Service worker, favicon, and asset paths
+  - [`public/daily/manifest.json`](../Desktop/Support Services/public/daily/manifest.json) - Icon paths and scope
+  - Created: `public/daily/icons/icon-192.png`, `public/daily/icons/icon-512.png`
+  
+- **Commits**:
+  - `dce3f11d` - "fix: Update Daily Checkout PWA paths for /daily/ subdirectory"
+  - `355d77a0` - "fix: Correct asset hash in index.html (index-46e85815.js)"
+  
+- **Verification Command**: 
+  ```bash
+  ssh root@145.223.73.170 "docker exec mbfd-hub-laravel.test-1 ls -la /var/www/html/public/daily/icons/"
+  ```
+
 **Future Outlook**: With Phase 14 complete and solid Filament v3 compatibility, the system is positioned for continued stable operation with enhanced user experience across mobile and desktop platforms.
-
----
-
-*Document Version: 4.0*  
-*Last Updated: January 23, 2026 - Phase 14 Complete*  
-*Author: Peter Darley Jr.*  
-*Status: Production Stable - Phase 14 Complete*
