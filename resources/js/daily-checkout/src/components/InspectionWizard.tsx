@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Apparatus, OfficerInfo, ChecklistData, Compartment, Defect } from '../types';
 import { ApiClient } from '../utils/api';
+import { saveInspectionProgress, loadInspectionProgress, clearInspectionProgress, queueSubmission, getSubmissionQueue, removeFromQueue } from '../utils/storage';
+import { useOffline } from '../hooks/useOffline';
 import OfficerStep from './OfficerStep';
 import CompartmentStep from './CompartmentStep';
 import SubmitStep from './SubmitStep';
@@ -11,6 +13,7 @@ type Step = 'officer' | 'compartments' | 'submit';
 export default function InspectionWizard() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const isOffline = useOffline();
 
   const [apparatus, setApparatus] = useState<Apparatus | null>(null);
   const [checklist, setChecklist] = useState<ChecklistData | null>(null);
@@ -24,6 +27,7 @@ export default function InspectionWizard() {
   const [compartments, setCompartments] = useState<Compartment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasLoadedAutosave, setHasLoadedAutosave] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,6 +49,17 @@ export default function InspectionWizard() {
         const checklistData = await ApiClient.getChecklist(foundApparatus.id);
         setChecklist(checklistData);
         setCompartments(checklistData.compartments);
+
+        // Load autosaved data if available
+        if (!hasLoadedAutosave) {
+          const saved = loadInspectionProgress(slug);
+          if (saved) {
+            setOfficerInfo(saved.officer);
+            setCompartments(saved.compartments);
+            setCurrentStep('compartments'); // Resume where they left off
+            setHasLoadedAutosave(true);
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load data');
       } finally {
@@ -53,7 +68,45 @@ export default function InspectionWizard() {
     };
 
     fetchData();
-  }, [slug]);
+  }, [slug, hasLoadedAutosave]);
+
+  // Auto-sync queued submissions when back online
+  useEffect(() => {
+    if (!isOffline) {
+      const syncQueue = async () => {
+        const queue = getSubmissionQueue();
+        if (queue.length === 0) return;
+
+        for (const item of queue) {
+          try {
+            await ApiClient.submitInspection(item.apparatusId, item.data);
+            removeFromQueue(item.id);
+            
+            // Vibrate on successful sync
+            if ('vibrate' in navigator) {
+              navigator.vibrate(200);
+            }
+          } catch (error) {
+            console.error('Failed to sync queued submission:', error);
+            // Leave in queue to try again later
+          }
+        }
+      };
+
+      syncQueue();
+    }
+  }, [isOffline]);
+
+  // Autosave progress
+  useEffect(() => {
+    if (slug && apparatus && (currentStep === 'compartments' || currentStep === 'submit')) {
+      const saveData = {
+        officer: officerInfo,
+        compartments,
+      };
+      saveInspectionProgress(slug, saveData);
+    }
+  }, [officerInfo, compartments, currentStep, slug, apparatus]);
 
   const handleOfficerSubmit = (info: OfficerInfo) => {
     setOfficerInfo(info);
@@ -66,7 +119,7 @@ export default function InspectionWizard() {
   };
 
   const handleSubmit = async () => {
-    if (!apparatus) return;
+    if (!apparatus || !slug) return;
 
     try {
       // Compile defects from items marked Missing or Damaged
@@ -93,8 +146,33 @@ export default function InspectionWizard() {
         defects,
       };
 
-      await ApiClient.submitInspection(apparatus.id, submission);
-      navigate('/success');
+      if (isOffline) {
+        // Queue for later submission
+        queueSubmission(apparatus.id, submission);
+        
+        // Vibrate to indicate queued
+        if ('vibrate' in navigator) {
+          navigator.vibrate([50, 100, 50]);
+        }
+        
+        // Clear autosave
+        clearInspectionProgress(slug);
+        
+        navigate('/success?queued=true');
+      } else {
+        // Submit immediately
+        await ApiClient.submitInspection(apparatus.id, submission);
+        
+        // Vibrate on success
+        if ('vibrate' in navigator) {
+          navigator.vibrate(200);
+        }
+        
+        // Clear autosave
+        clearInspectionProgress(slug);
+        
+        navigate('/success');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit inspection');
     }
@@ -122,7 +200,7 @@ export default function InspectionWizard() {
         <p>Error: {error || 'Failed to load inspection data'}</p>
         <button
           onClick={() => navigate('/')}
-          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 touch-manipulation"
         >
           Back to Apparatus List
         </button>
@@ -137,6 +215,9 @@ export default function InspectionWizard() {
           Daily Inspection: {apparatus.name}
         </h1>
         <p className="text-gray-600">Unit: {apparatus.vehicle_number}</p>
+        {hasLoadedAutosave && (
+          <p className="text-sm text-blue-600 mt-1">📝 Restored from autosave</p>
+        )}
       </div>
 
       {/* Progress indicator */}
