@@ -18,18 +18,6 @@ return new class extends Migration
             $table->json('assigned_to')->nullable()->after('sort');
             $table->string('created_by')->nullable()->after('assigned_to');
         });
-
-        // Alter tasks table
-        Schema::table('tasks', function (Blueprint $table) {
-            // Drop the old foreign key columns
-            $table->dropForeign(['created_by_user_id']);
-            $table->dropForeign(['assigned_to_user_id']);
-            $table->dropColumn(['created_by_user_id', 'assigned_to_user_id']);
-            
-            // Add new columns for staff assignment
-            $table->json('assigned_to')->nullable()->after('sort');
-            $table->string('created_by')->nullable()->after('assigned_to');
-        });
     }
 
     public function down(): void
@@ -38,13 +26,6 @@ return new class extends Migration
         Schema::table('todos', function (Blueprint $table) {
             $table->dropColumn(['assigned_to', 'created_by']);
             $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-        });
-
-        // Revert tasks table
-        Schema::table('tasks', function (Blueprint $table) {
-            $table->dropColumn(['assigned_to', 'created_by']);
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('assigned_to_user_id')->nullable()->constrained('users')->nullOnDelete();
         });
     }
 };
