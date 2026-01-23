@@ -15,6 +15,12 @@ class PendingRecommendationsWidget extends BaseWidget
     protected static ?string $heading = 'Pending Replacement Recommendations';
     protected static ?int $sort = 3;
 
+    protected int | string | array $columnSpan = [
+        'sm' => 1,
+        'md' => 2,
+        'xl' => 2,
+    ];
+
     public function table(Table $table): Table
     {
         return $table

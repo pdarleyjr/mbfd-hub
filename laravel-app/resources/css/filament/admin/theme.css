@@ -1,0 +1,186 @@
+/**
+ * Admin Dashboard Custom Theme
+ * FilamentPHP 3.x + Tailwind CSS
+ */
+
+/* 2-Column Grid Layout for Desktop Dashboard */
+@media (min-width: 1280px) {
+    .filament-widgets-container {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 1rem !important;
+    }
+}
+
+/* Widget Styling Enhancements */
+.fi-wi {
+    @apply shadow-sm rounded-lg;
+}
+
+.fi-section {
+    @apply shadow-sm rounded-lg border border-gray-200 dark:border-gray-700;
+}
+
+/* Zero-Scroll Dashboard - Constrained Heights */
+.dashboard-widget-scrollable {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.dashboard-widget-compact {
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+/* Critical Alert Styling */
+.alert-critical {
+    @apply bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800;
+}
+
+.alert-warning {
+    @apply bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800;
+}
+
+.alert-success {
+    @apply bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800;
+}
+
+.alert-info {
+    @apply bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800;
+}
+
+/* Stock Level Indicators */
+.stock-critical {
+    @apply text-red-600 dark:text-red-400 font-semibold;
+}
+
+.stock-low {
+    @apply text-yellow-600 dark:text-yellow-400 font-medium;
+}
+
+.stock-good {
+    @apply text-green-600 dark:text-green-400;
+}
+
+/* Bullet List Styling */
+.bullet-list {
+    @apply space-y-1.5;
+}
+
+.bullet-list li {
+    @apply text-sm flex items-start gap-2;
+}
+
+.bullet-list li::before {
+    content: "•";
+    @apply text-gray-400 dark:text-gray-500 mt-0.5;
+}
+
+/* Collapsible Widget States */
+.widget-collapsed {
+    max-height: 80px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-in-out;
+}
+
+.widget-expanded {
+    max-height: 600px;
+    transition: max-height 0.3s ease-in-out;
+}
+
+/* Custom Scrollbar */
+.dashboard-widget-scrollable::-webkit-scrollbar,
+.dashboard-widget-compact::-webkit-scrollbar {
+    width: 6px;
+}
+
+.dashboard-widget-scrollable::-webkit-scrollbar-track,
+.dashboard-widget-compact::-webkit-scrollbar-track {
+    @apply bg-gray-100 dark:bg-gray-800 rounded;
+}
+
+.dashboard-widget-scrollable::-webkit-scrollbar-thumb,
+.dashboard-widget-compact::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-600 rounded hover:bg-gray-400 dark:hover:bg-gray-500;
+}
+
+/* ===== DESKTOP ADMIN POLISH - HOVER STATES & INTERACTIONS ===== */
+
+/* Table Row Hover Effects */
+.fi-ta-row:hover {
+    @apply bg-gray-50 dark:bg-gray-800/50 transition-colors duration-150;
+}
+
+.fi-ta-row:hover td {
+    @apply cursor-pointer;
+}
+
+/* Button Hover Effects */
+.fi-btn:hover {
+    @apply transform scale-[1.02] transition-all duration-200;
+}
+
+.fi-btn-primary:hover {
+    @apply brightness-110;
+}
+
+/* Action Button Hover States */
+.fi-ta-actions button:hover {
+    @apply scale-110 transition-transform duration-200;
+}
+
+/* Tooltip Styles for Icon Buttons */
+[data-tooltip] {
+    @apply relative;
+}
+
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    @apply absolute hidden bg-gray-900 dark:bg-gray-700 text-white text-xs rounded px-2 py-1 z-50 whitespace-nowrap pointer-events-none;
+    bottom: calc(100% + 0.5rem);
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+[data-tooltip]::before {
+    content: "";
+    @apply absolute hidden border-4 border-transparent border-t-gray-900 dark:border-t-gray-700 z-50;
+    bottom: calc(100% + 0.125rem);
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:hover::before {
+    @apply block;
+}
+
+/* MBFD Red Accent Color */
+.mbfd-red {
+    @apply text-red-600 dark:text-red-400;
+}
+
+.mbfd-red-bg {
+    @apply bg-red-600 dark:bg-red-700;
+}
+
+.mbfd-red-border {
+    @apply border-red-600 dark:border-red-500;
+}
+
+/* Link Hover States */
+a:hover {
+    @apply text-red-600 dark:text-red-400 transition-colors duration-200;
+}
+
+/* Card Hover Effects */
+.fi-wi-stats-overview-card:hover {
+    @apply shadow-md transition-shadow duration-200;
+}
+
+/* Form Field Focus States */
+input:focus,
+textarea:focus,
+select:focus {
+    @apply ring-2 ring-red-600 dark:ring-red-500 border-red-600 dark:border-red-500 transition-all duration-200;
+}

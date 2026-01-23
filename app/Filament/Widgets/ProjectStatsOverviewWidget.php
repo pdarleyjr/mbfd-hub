@@ -10,6 +10,12 @@ class ProjectStatsOverviewWidget extends BaseWidget
 {
     protected static ?int $sort = 1;
 
+    protected int | string | array $columnSpan = [
+        'sm' => 1,
+        'md' => 2,
+        'xl' => 2,
+    ];
+
     public function getPollingInterval(): ?string
     {
         return '60s';

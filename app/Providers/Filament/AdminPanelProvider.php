@@ -19,11 +19,11 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Illuminate\Support\Facades\Blade;
-use App\Filament\Widgets\OperationalSummaryWidget;
-use App\Filament\Widgets\InventorySuppliesWidget;
-use App\Filament\Widgets\MaintenanceStatsWidget;
+use App\Filament\Widgets\FleetStatsWidget;
+use App\Filament\Widgets\InventoryOverviewWidget;
+use App\Filament\Widgets\TodoOverviewWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
-use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
+// use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -35,10 +35,10 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('MBFD Support Hub')
-            ->brandLogo(asset('images/mbfd-logo.png'))
+            ->brandLogo(asset('images/large_mbfd_logo_no_bg.png'))
             ->brandLogoHeight('3rem')
-            ->darkModeBrandLogo(asset('images/mbfd-logo.png'))
-            ->favicon('/favicon.ico')
+            ->darkModeBrandLogo(asset('images/large_mbfd_logo_no_bg.png'))
+            ->favicon(asset('images/small_mbfd_logo_no_bg.png'))
             ->colors([
                 'primary' => Color::Red,
                 'danger' => Color::Rose,
@@ -48,19 +48,18 @@ class AdminPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
             ])
             ->font('Inter')
-            ->plugin(FilamentShieldPlugin::make())
+            // ->plugin(FilamentShieldPlugin::make())
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 Pages\Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                OperationalSummaryWidget::class,       // Sort 1 - Top left
-                InventorySuppliesWidget::class,        // Sort 2 - Top right
-                MaintenanceStatsWidget::class,         // Sort 3 - Bottom left
-                SmartUpdatesWidget::class,             // Sort 4 - Bottom right (collapsible)
-                Widgets\AccountWidget::class,
+                // Consolidated dashboard: Fleet + Inventory stats, Todo overview, AI Smart Updates
+                FleetStatsWidget::class,              // Fleet metrics: total apparatus, out of service, open defects
+                InventoryOverviewWidget::class,       // Inventory metrics: low stock items, total items, stock health
+                TodoOverviewWidget::class,            // Active todo items table
+                SmartUpdatesWidget::class,            // AI assistant with instant bullet summary
             ])
             ->middleware([
                 EncryptCookies::class,

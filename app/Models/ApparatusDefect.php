@@ -18,6 +18,7 @@ class ApparatusDefect extends Model
         'issue_type',
         'reported_date',
         'notes',
+        'photo', // base64 encoded image
         'photo_path',
         'resolved',
         'resolved_at',
@@ -60,7 +61,7 @@ class ApparatusDefect extends Model
         return $this->hasMany(ApparatusInventoryAllocation::class, 'apparatus_defect_id');
     }
 
-    public static function recordDefect($apparatusId, $compartment, $item, $status, $notes)
+    public static function recordDefect($apparatusId, $compartment, $item, $status, $notes, $photo = null)
     {
         $existing = self::where('apparatus_id', $apparatusId)
             ->where('compartment', $compartment)
@@ -74,11 +75,13 @@ class ApparatusDefect extends Model
             $history[] = [
                 'status' => $existing->status,
                 'notes' => $existing->notes,
+                'photo' => $existing->photo,
                 'reported_at' => $existing->created_at->toISOString(),
             ];
             $existing->update([
                 'status' => $status,
                 'notes' => $notes,
+                'photo' => $photo,
                 'defect_history' => $history,
             ]);
             return $existing;
@@ -89,6 +92,7 @@ class ApparatusDefect extends Model
                 'item' => $item,
                 'status' => $status,
                 'notes' => $notes,
+                'photo' => $photo,
             ]);
         }
     }
