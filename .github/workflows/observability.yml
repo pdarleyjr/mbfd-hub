@@ -38,4 +38,3 @@ jobs:
           environment: production
           version: ${{ github.sha }}
           sourcemaps: './public/build'
-          dist: './public/build'
