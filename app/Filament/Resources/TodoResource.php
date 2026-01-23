@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\StaffMember;
 use App\Filament\Resources\TodoResource\Pages;
 use App\Models\Todo;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -32,20 +33,13 @@ class TodoResource extends Resource
                     ->maxLength(255),
                 Forms\Components\RichEditor::make('description')
                     ->columnSpanFull(),
-                Forms\Components\TagsInput::make('assigned_to')
+                Forms\Components\Select::make('assigned_to')
                     ->label('Assigned To')
-                    ->suggestions(
-                        collect(StaffMember::getOptions())
-                            ->except('Other')
-                            ->values()
-                            ->toArray()
-                    )
-                    ->placeholder('Select or type staff names')
-                    ->helperText('Select from predefined staff or type custom names'),
-                Forms\Components\TextInput::make('created_by')
-                    ->label('Created By')
-                    ->default(auth()->user()?->name)
-                    ->placeholder('Enter your name'),
+                    ->relationship('assignedTo', 'name')
+                    ->searchable()
+                    ->preload(),
+                Forms\Components\Hidden::make('created_by')
+                    ->default(auth()->id()),
                 Forms\Components\Toggle::make('is_completed')
                     ->label('Completed'),
             ]);
@@ -65,12 +59,11 @@ class TodoResource extends Resource
                 Tables\Columns\TextColumn::make('title')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('assigned_to')
+                Tables\Columns\TextColumn::make('assignedTo.name')
                     ->label('Assigned To')
-                    ->badge()
-                    ->separator(',')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('created_by')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('createdBy.name')
                     ->label('Created By')
                     ->searchable()
                     ->sortable(),
@@ -89,6 +82,16 @@ class TodoResource extends Resource
                     ->placeholder('All')
                     ->trueLabel('Completed')
                     ->falseLabel('Pending'),
+                Tables\Filters\SelectFilter::make('assigned_to')
+                    ->label('Assigned To')
+                    ->relationship('assignedTo', 'name')
+                    ->multiple()
+                    ->preload(),
+                Tables\Filters\SelectFilter::make('created_by')
+                    ->label('Created By')
+                    ->relationship('createdBy', 'name')
+                    ->multiple()
+                    ->preload(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
@@ -100,7 +103,14 @@ class TodoResource extends Resource
                 ]),
             ])
             ->defaultSort('is_completed', 'asc')
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc')
+            ->filtersTabs([
+                'all' => Tables\Filters\Tab::make('All'),
+                'assigned_to_me' => Tables\Filters\Tab::make('Assigned to me')
+                    ->modifyQueryUsing(fn ($query) => $query->where('assigned_to', auth()->id())),
+                'created_by_me' => Tables\Filters\Tab::make('Created by me')
+                    ->modifyQueryUsing(fn ($query) => $query->where('created_by', auth()->id())),
+            ]);
     }
 
     public static function getPages(): array
