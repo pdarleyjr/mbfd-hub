@@ -16,6 +16,8 @@ class TasksKanbanBoard extends KanbanBoard
 {
     protected static string $model = Task::class;
     protected static string $statusEnum = TaskStatus::class;
+    protected static string $recordTitleAttribute = 'title';
+    protected static string $recordStatusAttribute = 'status';
     protected static ?string $navigationGroup = 'Projects';
     protected static ?string $navigationLabel = 'Tasks';
     protected static ?string $navigationIcon = 'heroicon-o-squares-2x2';

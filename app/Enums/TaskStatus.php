@@ -3,10 +3,12 @@
 namespace App\Enums;
 
 use Filament\Support\Contracts\HasLabel;
-use Illuminate\Support\Collection;
+use Mokhosh\FilamentKanban\Concerns\IsKanbanStatus;
 
 enum TaskStatus: string implements HasLabel
 {
+    use IsKanbanStatus;
+
     case TODO = 'todo';
     case IN_PROGRESS = 'in_progress';
     case BLOCKED = 'blocked';
@@ -32,11 +34,16 @@ enum TaskStatus: string implements HasLabel
         };
     }
 
-    public static function statuses(): Collection
+    public function getTitle(): string
     {
-        return collect(self::cases())->map(fn ($status) => [
-            'id' => $status->value,
-            'title' => $status->getLabel(),
+        return $this->getLabel();
+    }
+
+    public static function statuses(): \Illuminate\Support\Collection
+    {
+        return collect(static::cases())->map(fn($case) => [
+            'id' => $case->value,
+            'title' => $case->getTitle(),
         ]);
     }
 }
