@@ -60,12 +60,14 @@ class InspectionsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('rank')
                     ->label('Rank'),
                 
-                Tables\Columns\BadgeColumn::make('shift')
-                    ->colors([
-                        'primary' => 'A',
-                        'warning' => 'B',
-                        'success' => 'C',
-                    ]),
+                Tables\Columns\TextColumn::make('shift')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'A' => 'primary',
+                        'B' => 'warning',
+                        'C' => 'success',
+                        default => 'gray',
+                    }),
                 
                 Tables\Columns\TextColumn::make('defects_count')
                     ->label('Issues')
@@ -80,7 +82,6 @@ class InspectionsRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make(),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])
