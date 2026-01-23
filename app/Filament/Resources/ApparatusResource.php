@@ -166,8 +166,6 @@ class ApparatusResource extends Resource
         return [
             RelationManagers\InspectionsRelationManager::class,
             RelationManagers\DefectsRelationManager::class,
-//             RelationManagers\EquipmentRecommendationsRelationManager::class,
-//            RelationManagers\InventoryAllocationsRelationManager::class,
         ];
     }
 
@@ -177,7 +175,6 @@ class ApparatusResource extends Resource
             'index' => Pages\ListApparatuses::route('/'),
             'create' => Pages\CreateApparatus::route('/create'),
             'edit' => Pages\EditApparatus::route('/{record}/edit'),
-//             'inspections' => Pages\ApparatusInspections::route('/{record}/inspections'),
         ];
     }
 }
