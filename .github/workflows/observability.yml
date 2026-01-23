@@ -37,4 +37,3 @@ jobs:
         with:
           environment: production
           version: ${{ github.sha }}
-          sourcemaps: './public/build'
