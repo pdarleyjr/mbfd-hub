@@ -35,10 +35,10 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('MBFD Support Hub')
-            ->brandLogo(asset('images/mbfd-logo.png'))
+            ->brandLogo(asset('images/large_mbfd_logo_no_bg.png'))
             ->brandLogoHeight('3rem')
-            ->darkModeBrandLogo(asset('images/mbfd-logo.png'))
-            ->favicon('/favicon.ico')
+            ->darkModeBrandLogo(asset('images/large_mbfd_logo_no_bg.png'))
+            ->favicon(asset('images/small_mbfd_logo_no_bg.png'))
             ->colors([
                 'primary' => Color::Red,
                 'danger' => Color::Rose,
