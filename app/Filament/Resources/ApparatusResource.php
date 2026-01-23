@@ -146,11 +146,6 @@ class ApparatusResource extends Resource
                     ->query(fn (Builder $query) => $query->whereHas('defects', fn ($q) => $q->where('resolved', false))),
             ])
             ->actions([
-                Tables\Actions\Action::make('view_inspections')
-                    ->label('Inspections')
-                    ->icon('heroicon-o-clipboard-document-list')
-                    ->color('info')
-                    ->url(fn (Apparatus $record): string => static::getUrl('inspections', ['record' => $record])),
                 Tables\Actions\Action::make('start_daily_checkout')
                     ->label('Daily Checkout')
                     ->icon('heroicon-o-play-circle')
