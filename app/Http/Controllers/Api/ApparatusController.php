@@ -66,6 +66,7 @@ class ApparatusController extends Controller
             'defects.*.item' => 'required|string',
             'defects.*.status' => 'required|string|in:Present,Missing,Damaged',
             'defects.*.notes' => 'nullable|string',
+            'defects.*.photo' => 'nullable|string', // base64 encoded image
         ]);
 
         $apparatus = Apparatus::findOrFail($id);
@@ -85,7 +86,8 @@ class ApparatusController extends Controller
                 $defectData['compartment'],
                 $defectData['item'],
                 $defectData['status'],
-                $defectData['notes'] ?? null
+                $defectData['notes'] ?? null,
+                $defectData['photo'] ?? null
             );
         }
 
