@@ -23,7 +23,9 @@ class InspectionResource extends Resource
 
     protected static ?string $modelLabel = 'Inspection';
 
-    // Hide from main navigation - accessed via Apparatus relation
+    protected static ?int $navigationSort = 3;
+    
+    // Hide from navigation - inspections accessed via apparatus tabs
     protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
@@ -36,12 +38,15 @@ class InspectionResource extends Resource
                     ->searchable()
                     ->preload(),
                 
-                Forms\Components\TextInput::make('operator_name')
-                    ->label('Operator Name')
+                Forms\Components\DateTimePicker::make('inspection_date')
+                    ->required()
+                    ->default(now()),
+                
+                Forms\Components\TextInput::make('officer_name')
                     ->required()
                     ->maxLength(255),
                 
-                Forms\Components\TextInput::make('rank')
+                Forms\Components\TextInput::make('officer_badge')
                     ->maxLength(50),
                 
                 Forms\Components\Select::make('shift')
@@ -52,12 +57,9 @@ class InspectionResource extends Resource
                     ])
                     ->required(),
                 
-                Forms\Components\TextInput::make('unit_number')
-                    ->maxLength(50),
-                
-                Forms\Components\DateTimePicker::make('completed_at')
-                    ->label('Completed At')
-                    ->default(now()),
+                Forms\Components\Textarea::make('notes')
+                    ->columnSpanFull()
+                    ->rows(3),
             ]);
     }
 
@@ -65,7 +67,7 @@ class InspectionResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('completed_at')
+                Tables\Columns\TextColumn::make('inspection_date')
                     ->label('Date')
                     ->dateTime()
                     ->sortable(),
@@ -75,15 +77,11 @@ class InspectionResource extends Resource
                     ->searchable()
                     ->sortable(),
                 
-                Tables\Columns\TextColumn::make('operator_name')
-                    ->label('Operator')
+                Tables\Columns\TextColumn::make('officer_name')
+                    ->label('Officer Name')
                     ->searchable(),
                 
-                Tables\Columns\TextColumn::make('rank')
-                    ->label('Rank'),
-                
-                Tables\Columns\TextColumn::make('shift')
-                    ->badge()
+                Tables\Columns\BadgeColumn::make('shift')
                     ->colors([
                         'primary' => 'A',
                         'warning' => 'B',
@@ -91,13 +89,13 @@ class InspectionResource extends Resource
                     ]),
                 
                 Tables\Columns\TextColumn::make('defects_count')
-                    ->label('Issues')
+                    ->label('Issues Count')
                     ->counts('defects')
                     ->badge()
                     ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
             ])
             ->filters([
-                Filter::make('completed_at')
+                Filter::make('inspection_date')
                     ->form([
                         Forms\Components\DatePicker::make('from')
                             ->label('From Date'),
@@ -108,11 +106,11 @@ class InspectionResource extends Resource
                         return $query
                             ->when(
                                 $data['from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('completed_at', '>=', $date),
+                                fn (Builder $query, $date): Builder => $query->whereDate('inspection_date', '>=', $date),
                             )
                             ->when(
                                 $data['until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('completed_at', '<=', $date),
+                                fn (Builder $query, $date): Builder => $query->whereDate('inspection_date', '<=', $date),
                             );
                     }),
                 
@@ -137,7 +135,7 @@ class InspectionResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('completed_at', 'desc');
+            ->defaultSort('inspection_date', 'desc');
     }
 
     public static function getRelations(): array
