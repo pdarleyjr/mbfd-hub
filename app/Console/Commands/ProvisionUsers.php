@@ -68,6 +68,7 @@ class ProvisionUsers extends Command
                 [
                     'name' => $userData['name'],
                     'password' => Hash::make($userData['password']),
+                    'must_change_password' => true, // Force password change for provisioned users
                 ]
             );
 
@@ -77,7 +78,7 @@ class ProvisionUsers extends Command
                 $user->assignRole($roleName);
             }
 
-            $this->info("User {$user->email} provisioned with role: {$roleName}");
+            $this->info("User {$user->email} provisioned with role: {$roleName} (must change password)");
         }
 
         $this->info('All users provisioned successfully!');
