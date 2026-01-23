@@ -67,15 +67,18 @@ class DefectsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('item')
                     ->searchable(),
                 
-                Tables\Columns\BadgeColumn::make('status')
-                    ->colors([
-                        'danger' => 'open',
-                        'warning' => 'in_progress',
-                        'success' => 'resolved',
-                    ]),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'open' => 'danger',
+                        'in_progress' => 'warning',
+                        'resolved' => 'success',
+                        default => 'gray',
+                    }),
                 
-                Tables\Columns\BadgeColumn::make('issue_type')
+                Tables\Columns\TextColumn::make('issue_type')
                     ->label('Issue Type')
+                    ->badge()
                     ->formatStateUsing(fn ($state) => str_replace('_', ' ', ucfirst($state))),
                 
                 Tables\Columns\TextColumn::make('reported_date')
