@@ -6,20 +6,13 @@ use Filament\Pages\Dashboard as BaseDashboard;
 
 class Dashboard extends BaseDashboard
 {
-    // Force 2-column grid layout
+    // Responsive grid layout: 1 column on mobile, 2 on tablet, 3 on desktop
     public function getColumns(): int | string | array
     {
-        return 2;
-    }
-
-    // Explicitly define which widgets to show
-    public function getVisibleWidgets(): array
-    {
         return [
-            \App\Filament\Widgets\OperationalSummaryWidget::class,
-            \App\Filament\Widgets\InventorySuppliesWidget::class,
-            \App\Filament\Widgets\MaintenanceStatsWidget::class,
-            \App\Filament\Widgets\SmartUpdatesWidget::class,
+            'sm' => 1,
+            'md' => 2,
+            'xl' => 3,
         ];
     }
 }

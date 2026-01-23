@@ -15,6 +15,12 @@ class FireEquipmentStatsWidget extends BaseWidget
     protected static ?string $pollingInterval = '30s';
     protected static ?int $sort = 1;
 
+    protected int | string | array $columnSpan = [
+        'sm' => 1,
+        'md' => 2,
+        'xl' => 2,
+    ];
+
     protected function getStats(): array
     {
         // Stock tracking disabled - stock_mutations table does not exist

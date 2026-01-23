@@ -11,6 +11,12 @@ class FleetStatsWidget extends BaseWidget
 {
     protected static ?int $sort = 1;
 
+    protected int | string | array $columnSpan = [
+        'sm' => 1,
+        'md' => 1,
+        'xl' => 1,
+    ];
+
     protected function getStats(): array
     {
         $totalApparatus = Apparatus::count();

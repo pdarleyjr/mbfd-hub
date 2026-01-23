@@ -14,6 +14,12 @@ class RecentAllocationsWidget extends BaseWidget
     protected static ?string $heading = 'Recent Inventory Allocations';
     protected static ?int $sort = 4;
 
+    protected int | string | array $columnSpan = [
+        'sm' => 1,
+        'md' => 1,
+        'xl' => 1,
+    ];
+
     public function table(Table $table): Table
     {
         return $table
