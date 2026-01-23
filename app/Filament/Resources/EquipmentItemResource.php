@@ -147,15 +147,14 @@ class EquipmentItemResource extends Resource
                     ->sortable(),
             ])
             ->filters([
-                // FIXME: This filter needs proper implementation once stock mutations logic is finalized
-                // Tables\Filters\Filter::make('low_stock')
-                //     ->label('Low Stock')
-                //     ->query(fn (Builder $query): Builder => 
-                //         $query->whereHas('stockMutations', function ($q) {
-                //             // This gets items that have stock mutations
-                //         }, '>=', 0)
-                //     )
-                //     ->default(false),
+                Tables\Filters\Filter::make('low_stock')
+                    ->label('Low Stock')
+                    ->query(fn (Builder $q) => 
+                        $q->whereRaw(
+                            '(SELECT COALESCE(SUM(quantity),0) FROM stock_mutations 
+                             WHERE stock_mutations.item_id = equipment_items.id) <= equipment_items.reorder_min'
+                        )
+                    ),
                 Tables\Filters\SelectFilter::make('category')
                     ->options([
                         'PPE' => 'PPE',
