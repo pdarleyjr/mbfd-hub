@@ -1,0 +1,31 @@
+{
+  "compartments": [
+    {
+      "id": "general",
+      "name": "General Inspection",
+      "items": [
+        {"id": "gen-1", "name": "Vehicle exterior clean", "status": "Present"},
+        {"id": "gen-2", "name": "Lights functional", "status": "Present"},
+        {"id": "gen-3", "name": "Tires inspected", "status": "Present"}
+      ]
+    },
+    {
+      "id": "fluids",
+      "name": "Fluids Check",
+      "items": [
+        {"id": "fluid-1", "name": "Engine oil level", "status": "Present"},
+        {"id": "fluid-2", "name": "Coolant level", "status": "Present"},
+        {"id": "fluid-3", "name": "Fuel level", "status": "Present"}
+      ]
+    },
+    {
+      "id": "safety",
+      "name": "Safety Equipment",
+      "items": [
+        {"id": "safe-1", "name": "Fire extinguisher", "status": "Present"},
+        {"id": "safe-2", "name": "First aid kit", "status": "Present"},
+        {"id": "safe-3", "name": "Warning triangles", "status": "Present"}
+      ]
+    }
+  ]
+}
