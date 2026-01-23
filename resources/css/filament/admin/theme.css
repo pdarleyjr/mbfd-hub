@@ -103,3 +103,84 @@
 .dashboard-widget-compact::-webkit-scrollbar-thumb {
     @apply bg-gray-300 dark:bg-gray-600 rounded hover:bg-gray-400 dark:hover:bg-gray-500;
 }
+
+/* ===== DESKTOP ADMIN POLISH - HOVER STATES & INTERACTIONS ===== */
+
+/* Table Row Hover Effects */
+.fi-ta-row:hover {
+    @apply bg-gray-50 dark:bg-gray-800/50 transition-colors duration-150;
+}
+
+.fi-ta-row:hover td {
+    @apply cursor-pointer;
+}
+
+/* Button Hover Effects */
+.fi-btn:hover {
+    @apply transform scale-[1.02] transition-all duration-200;
+}
+
+.fi-btn-primary:hover {
+    @apply brightness-110;
+}
+
+/* Action Button Hover States */
+.fi-ta-actions button:hover {
+    @apply scale-110 transition-transform duration-200;
+}
+
+/* Tooltip Styles for Icon Buttons */
+[data-tooltip] {
+    @apply relative;
+}
+
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    @apply absolute hidden bg-gray-900 dark:bg-gray-700 text-white text-xs rounded px-2 py-1 z-50 whitespace-nowrap pointer-events-none;
+    bottom: calc(100% + 0.5rem);
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+[data-tooltip]::before {
+    content: "";
+    @apply absolute hidden border-4 border-transparent border-t-gray-900 dark:border-t-gray-700 z-50;
+    bottom: calc(100% + 0.125rem);
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:hover::before {
+    @apply block;
+}
+
+/* MBFD Red Accent Color */
+.mbfd-red {
+    @apply text-red-600 dark:text-red-400;
+}
+
+.mbfd-red-bg {
+    @apply bg-red-600 dark:bg-red-700;
+}
+
+.mbfd-red-border {
+    @apply border-red-600 dark:border-red-500;
+}
+
+/* Link Hover States */
+a:hover {
+    @apply text-red-600 dark:text-red-400 transition-colors duration-200;
+}
+
+/* Card Hover Effects */
+.fi-wi-stats-overview-card:hover {
+    @apply shadow-md transition-shadow duration-200;
+}
+
+/* Form Field Focus States */
+input:focus,
+textarea:focus,
+select:focus {
+    @apply ring-2 ring-red-600 dark:ring-red-500 border-red-600 dark:border-red-500 transition-all duration-200;
+}
