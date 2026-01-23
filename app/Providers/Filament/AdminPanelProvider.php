@@ -19,9 +19,9 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Illuminate\Support\Facades\Blade;
-use App\Filament\Widgets\OperationalSummaryWidget;
-use App\Filament\Widgets\InventorySuppliesWidget;
-use App\Filament\Widgets\MaintenanceStatsWidget;
+use App\Filament\Widgets\FleetStatsWidget;
+use App\Filament\Widgets\InventoryOverviewWidget;
+use App\Filament\Widgets\TodoOverviewWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
 // use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 
@@ -55,11 +55,11 @@ class AdminPanelProvider extends PanelProvider
                 Pages\Dashboard::class,
             ])
             ->widgets([
-                // 2x2 Grid: Only 4 consolidated widgets for zero-scroll dashboard
-                OperationalSummaryWidget::class,       // Top-left: Fleet status, defects, alerts
-                InventorySuppliesWidget::class,        // Top-right: Inventory overview, low stock
-                MaintenanceStatsWidget::class,         // Bottom-left: Shop work, recommendations
-                SmartUpdatesWidget::class,             // Bottom-right: AI assistant (collapsed by default)
+                // Consolidated dashboard: Fleet + Inventory stats, Todo overview, AI Smart Updates
+                FleetStatsWidget::class,              // Fleet metrics: total apparatus, out of service, open defects
+                InventoryOverviewWidget::class,       // Inventory metrics: low stock items, total items, stock health
+                TodoOverviewWidget::class,            // Active todo items table
+                SmartUpdatesWidget::class,            // AI assistant with instant bullet summary
             ])
             ->middleware([
                 EncryptCookies::class,
