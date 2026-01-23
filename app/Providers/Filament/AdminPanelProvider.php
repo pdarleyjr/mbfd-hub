@@ -18,6 +18,10 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Filament\Widgets\SmartUpdatesWidget;
+use App\Filament\Widgets\OperationalSummaryWidget;
+use App\Filament\Widgets\TodoOverviewWidget;
+use App\Filament\Widgets\MaintenanceStatsWidget;
+use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -29,6 +33,9 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('MBFD Support Hub')
+            ->brandLogo(asset('images/mbfd-logo.png'))
+            ->brandLogoHeight('3rem')
+            ->darkModeBrandLogo(asset('images/mbfd-logo.png'))
             ->favicon('/favicon.ico')
             ->colors([
                 'primary' => Color::Red,
@@ -39,6 +46,7 @@ class AdminPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
             ])
             ->font('Inter')
+            ->plugin(FilamentShieldPlugin::make())
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
@@ -46,12 +54,11 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
-                // \App\Filament\Widgets\FireEquipmentStatsWidget::class,
-                // \App\Filament\Widgets\LowStockAlertsWidget::class,
-                // \App\Filament\Widgets\PendingRecommendationsWidget::class,
-                // \App\Filament\Widgets\RecentAllocationsWidget::class,
+                OperationalSummaryWidget::class,
+                MaintenanceStatsWidget::class,
+                TodoOverviewWidget::class,
                 SmartUpdatesWidget::class,
+                Widgets\AccountWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

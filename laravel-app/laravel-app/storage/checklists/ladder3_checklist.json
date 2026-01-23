@@ -1,0 +1,359 @@
+{
+  "title": "Ladder 3 Daily Inventory",
+  "dailySchedule": [
+    {
+      "day": "Monday",
+      "tasks": ["Bunker Gear Check"]
+    },
+    {
+      "day": "Tuesday",
+      "tasks": ["Stock Inventory / Narcotics Check"]
+    },
+    {
+      "day": "Wednesday",
+      "tasks": ["SCBA Complete Checkout"]
+    },
+    {
+      "day": "Thursday",
+      "tasks": ["Stairchair Inspection & Battery Rotation"]
+    },
+    {
+      "day": "Friday",
+      "tasks": []
+    },
+    {
+      "day": "Saturday",
+      "tasks": ["Compartment Cleaning", "AIRTRAQ Inspection - Charging"]
+    },
+    {
+      "day": "Sunday",
+      "tasks": []
+    }
+  ],
+  "officerChecklist": [
+    { "id": "mileage", "name": "Mileage", "inputType": "number", "required": true },
+    { "id": "vehicle_num", "name": "Vehicle #", "inputType": "text", "required": true },
+    { "id": "engine_temp", "name": "Engine Temp", "inputType": "text" },
+    { "id": "oil_pressure", "name": "Oil Pressure", "inputType": "text" },
+    { "id": "fuel", "name": "Fuel", "inputType": "percentage", "required": true },
+    { "id": "def", "name": "DEF", "inputType": "percentage", "required": true },
+    { "id": "aerial_master", "name": "Aerial Master", "inputType": "text" },
+    { "id": "air_tank_pressure", "name": "Air Tank Pressure", "inputType": "number" },
+    { "id": "air_pressure_front", "name": "Air Pressure / Front", "inputType": "number", "required": true },
+    { "id": "air_pressure_rear", "name": "Air Pressure / Rear", "inputType": "number", "required": true },
+    { "id": "toughbook", "name": "Toughbook", "inputType": "text" },
+    { "id": "cad_num", "name": "CAD #", "inputType": "text" }
+  ],
+  "compartments": [
+    {
+      "id": "front_bumper",
+      "title": "Front Bumper",
+      "items": [
+        { "name": "High Rise Pack", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Coil Pack", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "High Rise Bag", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Irons", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "pump_panel",
+      "title": "Pump Panel",
+      "items": [
+        { "name": "15' Soft Suction", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Storz to 6\" Male", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Hydrant Wrench", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Spanner Wrench", "inputType": "checkbox", "expectedQuantity": 2 }
+      ]
+    },
+    {
+      "id": "comp_1",
+      "title": "Compartment 1",
+      "items": [
+        { "name": "Driver's Gear", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "F-I Gear", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "3 Prong Twist Lock Extension", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Electrical Junction Box", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Standard Extension Cord", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "comp_2",
+      "title": "Compartment 2",
+      "items": [
+        { "name": "Air Hose/Gauge/Chuck", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Hydraulic \"Rabbit\" Tool/KTool", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "comp_3",
+      "title": "Compartment 3",
+      "items": [
+        { "name": "Flashlight", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "8' - 3\" Pony Line", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Plug & Dike", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Spanner Wrench", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Rubber Mallet", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Fog Nozzle 3\"/1 3⁄4\"", "inputType": "checkbox", "note": "1 ea" },
+        { "name": "Storz to 3\" Male", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Metro Adapter", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Double Male/Female", "inputType": "checkbox", "note": "2 ea 3\"/2 1⁄2 1 3⁄4\"" },
+        { "name": "Gaskets/Out of Service Tags", "inputType": "checkbox" },
+        { "name": "3\" to 1 3⁄4\" Gated Wye", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Steamer Cap", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Storz to Siamese", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Solid Bore Tips", "inputType": "checkbox", "expectedQuantity": 5 },
+        { "name": "Air Chisel", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Bridge Bag", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Small Pike Pole", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Pick Headed Axe", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "SCBA with Identifier", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Yellow Safety Tape/Duct Tape", "inputType": "checkbox" },
+        { "name": "Builder's Square", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Hydrant Wrench", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Mattress Hook", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Storz to 4\" F/M Hyd Thread", "inputType": "checkbox", "note": "1 ea" },
+        { "name": "Storz to 6\" Female", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Reducer", "inputType": "checkbox", "note": "2 - 1 3⁄4\" cap 1" },
+        { "name": "Cellar Nozzle", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Inline Valve", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Foam tip", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "3\" to 3\" Siamese", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Pressure Gauge", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Toolbox/Socket Set", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Sprinkler/Gas Kit", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Come-a-long/Chains", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Crowbar", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Sledge Hammer", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "comp_4",
+      "title": "Compartment 4",
+      "items": [
+        { "name": "Res-Q Jacks", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Res-Q Struts", "inputType": "checkbox", "expectedQuantity": 4 },
+        { "name": "Res-Q Spikes", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Pry Bars", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Piercing Nozzle", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Bolt Cutter", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Sledge Hammer", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Glass Master", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Rebar", "inputType": "checkbox", "expectedQuantity": 5 },
+        { "name": "Sharps Container", "inputType": "checkbox" },
+        { "name": "Medical Supplies", "inputType": "checkbox" },
+        { "name": "Yellow Blankets", "inputType": "checkbox" },
+        { "name": "Fluid Absorbent", "inputType": "checkbox" }
+      ]
+    },
+    {
+      "id": "comp_5",
+      "title": "Compartment 5",
+      "items": [
+        { "name": "Extrication Bag", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Sawzall Bag", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "comp_6",
+      "title": "Compartment 6",
+      "items": [
+        { "name": "TNT Power Unit", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "TNT Spreader", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "TNT Cutter", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "TNT Rams", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Portable Hydraulic Lines", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Extrication Gloves", "inputType": "checkbox" },
+        { "name": "Red Tarp", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Yellow Runners", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Metal Plates", "inputType": "checkbox", "expectedQuantity": 4 },
+        { "name": "Ram Support", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Chain", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "aerial_bucket",
+      "title": "Aerial Bucket",
+      "items": [
+        { "name": "Tool Box", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "1 3⁄4\" Fog Nozzle", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "3\" Solid Bore Nozzle", "inputType": "checkbox", "note": "2\"-1 3⁄4\"-1 5⁄8\"-1 1⁄4\" tips" },
+        { "name": "3\" to 1 3⁄4\" Gated Wye", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Master Stream Solid Bore Tips", "inputType": "checkbox", "note": "2 1⁄2\"-2 1⁄4\"-2\"-Stream Shaper" },
+        { "name": "Master Stream Fog Nozzle", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "50' - 3\" Hose", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "50' - 1 3⁄4\" Hose", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Ladder Belts", "inputType": "checkbox", "expectedQuantity": 4 },
+        { "name": "SCBA Mask/Hose/Regulator", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Stokes Bracket with Straps", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Ratchet Strap/Webbing", "inputType": "checkbox", "note": "1 bag" },
+        { "name": "Spanners", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Reducer", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "aerial_ladder",
+      "title": "Aerial Ladder",
+      "items": [
+        { "name": "Pick Headed Axe", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Roof Ladder", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Pike Pole", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "front_cab",
+      "title": "Front Cab",
+      "items": [
+        { "name": "Toughbook", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "CAD", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Passports", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Binoculars", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Garage Door Clicker", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "TIC", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Hot Stick", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Flashlight", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Lock Box Key", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Elevator Key", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Gas Card", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "MOM's", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "ERG", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Fire Violation Book", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Fire Watch Forms", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "City/Hydrant Map", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Tool Ops Manual", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Fog Manual", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Rope Log", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Pre-Fire Plans", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Florida FOG", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Emergency Communication", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Pierce Manual", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "NIOSH Chemical Hazards", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Terrorism Handbook", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "FB Site Map", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "RAD Alert 50", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Drager Gas monitor", "inputType": "checkbox" },
+        { "name": "Safety vests", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Plymovent Transmitter", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "top_comp",
+      "title": "Top Compartment",
+      "items": [
+        { "name": "Cribbing", "inputType": "checkbox" },
+        { "name": "Hose Clamps", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Shovel", "inputType": "checkbox" },
+        { "name": "Squeegee", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Broom Head", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Broom Handle", "inputType": "checkbox", "expectedQuantity": 3 }
+      ]
+    },
+    {
+      "id": "rear_cab",
+      "title": "Rear Cab",
+      "items": [
+        { "name": "Elevator Keys Set", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Fire Alarm Keys Set", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Flashlights", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Torpedo Buoys", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Car Lock Out Kit", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Long Reach Tool", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Safety vests", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Small Pike Pole", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Sledgehammer", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Rope Gear", "inputType": "checkbox" },
+        { "name": "Water Cooler", "inputType": "checkbox" },
+        { "name": "LSU Suction", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "rear_comp",
+      "title": "Rear Compartment",
+      "items": [
+        { "name": "16' Roof Ladder", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "14' Extension Ladder", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "24' Extension Ladder", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "35' Extension Ladder", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Attic Ladder", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "6' Pike Pole", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "8' Pike Pole", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "10' Pike Pole", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "12' Pike Pole", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "NY Hook", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Trash Hook", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Plaster Hook", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "tailboard",
+      "title": "Tailboard",
+      "items": [
+        { "name": "Hydrant Wrench", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Spanner Wrench", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Stabilizer Controls", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Storz Adapter", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "hose",
+      "title": "Hose",
+      "items": [
+        { "name": "600' 5\" Hose w/ Storz connection", "inputType": "checkbox" },
+        { "name": "300' 3\" Hose w/ Fog Nozzle", "inputType": "checkbox" }
+      ]
+    },
+    {
+      "id": "officer_side_panel",
+      "title": "Officer's Side Panel",
+      "items": [
+        { "name": "Officer Gear", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "F-1 Gear", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "SCBA with Identifier", "inputType": "checkbox", "expectedQuantity": 3 },
+        { "name": "LifePak", "inputType": "checkbox" },
+        { "name": "Med Box", "inputType": "checkbox" },
+        { "name": "Airway Bag", "inputType": "checkbox" },
+        { "name": "Medical Supplies", "inputType": "checkbox" },
+        { "name": "Boo-Boo Box", "inputType": "checkbox" },
+        { "name": "Duodote", "inputType": "checkbox" },
+        { "name": "Scott Pack Respirator", "inputType": "checkbox", "expectedQuantity": 4 },
+        { "name": "Small Engine Bag", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Lubricant and Silicone", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Bar Chain Oil", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Partner Saw & Spare Blades", "inputType": "checkbox", "expectedQuantity": 4 },
+        { "name": "Cutters Edge & Spare Chain", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Gas Cans [Reg / Mix]", "inputType": "checkbox", "note": "Reg (1) Mix (1)" },
+        { "name": "Electric Fan", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Street Manifold", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Emergency Flares", "inputType": "checkbox" },
+        { "name": "Stokes Basket", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Stokes Bridle", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "XL Carabiners", "inputType": "checkbox", "expectedQuantity": 4 },
+        { "name": "Black Webbing", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Backboard", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "150' 1 3⁄4\" line", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "200' 1 3⁄4\" line", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Fog Nozzles", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Hydrant Wrench", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Spanner Wrench", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Cones", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "name": "Wet Water Extinguisher", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Dry Chem Extinguisher", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "CO2 Extinguisher", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Bleach", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "name": "Vinegar", "inputType": "checkbox", "expectedQuantity": 1 }
+      ]
+    },
+    {
+      "id": "scba_radio",
+      "title": "SCBA Numbers & Radio Numbers",
+      "items": [
+        { "name": "SCBA #1", "inputType": "text" },
+        { "name": "SCBA #2", "inputType": "text" },
+        { "name": "SCBA #3", "inputType": "text" },
+        { "name": "SCBA #4", "inputType": "text" },
+        { "name": "Radio # - DE", "inputType": "text" },
+        { "name": "Radio # - FI", "inputType": "text" },
+        { "name": "Radio # - FI", "inputType": "text" }
+      ]
+    }
+  ]
+}

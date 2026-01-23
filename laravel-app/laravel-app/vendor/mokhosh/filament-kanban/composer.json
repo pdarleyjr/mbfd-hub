@@ -1,0 +1,75 @@
+{
+    "name": "mokhosh/filament-kanban",
+    "description": "Add kanban boards to your Filament pages",
+    "keywords": [
+        "mokhosh",
+        "laravel",
+        "filament-kanban"
+    ],
+    "homepage": "https://github.com/mokhosh/filament-kanban",
+    "support": {
+        "issues": "https://github.com/mokhosh/filament-kanban/issues",
+        "source": "https://github.com/mokhosh/filament-kanban"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Mo Khosh",
+            "email": "mskhoshnazar@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "filament/filament": "^3.0",
+        "spatie/laravel-package-tools": "^1.15.0",
+        "illuminate/contracts": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.0",
+        "nunomaduro/collision": "^7.9|^8.0",
+        "orchestra/testbench": "^8.0|^9.0",
+        "pestphp/pest": "^2.0",
+        "pestphp/pest-plugin-arch": "^2.0",
+        "pestphp/pest-plugin-laravel": "^2.0",
+        "pestphp/pest-plugin-livewire": "^2.1",
+        "spatie/eloquent-sortable": "^4.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Mokhosh\\FilamentKanban\\": "src/",
+            "Mokhosh\\FilamentKanban\\Database\\Factories\\": "database/factories/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Mokhosh\\FilamentKanban\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": "@php ./vendor/bin/testbench package:discover --ansi",
+        "analyse": "vendor/bin/phpstan analyse",
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage",
+        "format": "vendor/bin/pint"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Mokhosh\\FilamentKanban\\FilamentKanbanServiceProvider"
+            ],
+            "aliases": {
+                "FilamentKanban": "Mokhosh\\FilamentKanban\\Facades\\FilamentKanban"
+            }
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
