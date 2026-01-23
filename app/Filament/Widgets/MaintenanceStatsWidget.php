@@ -2,57 +2,72 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\ApparatusDefect;
-use App\Models\EquipmentItem;
+use App\Models\ApparatusDefectRecommendation;
+use App\Models\ApparatusInventoryAllocation;
 use App\Models\ShopWork;
-use Filament\Widgets\StatsOverviewWidget as BaseWidget;
-use Filament\Widgets\StatsOverviewWidget\Stat;
+use Filament\Widgets\Widget;
 
-class MaintenanceStatsWidget extends BaseWidget
+class MaintenanceStatsWidget extends Widget
 {
+    protected static string $view = 'filament.widgets.maintenance-stats-widget';
     protected static ?int $sort = 3;
-    
     protected int | string | array $columnSpan = 'full';
 
-    protected function getStats(): array
+    public function getViewData(): array
     {
-        $lowStockCount = EquipmentItem::where('is_active', true)
-            ->whereColumn('stock', '<=', 'reorder_min')
-            ->count();
-
-        $openDefectsCount = ApparatusDefect::where('resolved', false)->count();
+        $pendingRecommendations = ApparatusDefectRecommendation::where('status', 'pending')
+            ->with(['defect.apparatus', 'equipmentItem'])
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(fn($rec) => [
+                'id' => $rec->id,
+                'unit' => $rec->defect?->apparatus?->unit_id ?? 'N/A',
+                'defect' => $rec->defect?->item ?? 'Unknown',
+                'recommended' => $rec->equipmentItem?->name ?? 'Not specified',
+                'confidence' => $rec->match_confidence,
+            ])
+            ->toArray();
         
-        $recentShopWorkCount = ShopWork::where('created_at', '>=', now()->subDays(30))->count();
+        $recentAllocations = ApparatusInventoryAllocation::where('allocated_at', '>=', now()->subDays(7))
+            ->with(['apparatus', 'equipmentItem'])
+            ->orderBy('allocated_at', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(fn($alloc) => [
+                'id' => $alloc->id,
+                'unit' => $alloc->apparatus?->unit_id ?? 'N/A',
+                'item' => $alloc->equipmentItem?->name ?? 'Unknown',
+                'qty' => $alloc->qty_allocated,
+                'date' => $alloc->allocated_at,
+            ])
+            ->toArray();
         
-        $criticalDefectsCount = ApparatusDefect::where('resolved', false)
-            ->where('issue_type', 'critical')
-            ->count();
-
+        $activeShopWork = [];
+        try {
+            $activeShopWork = ShopWork::whereIn('status', ['Pending', 'In Progress', 'Waiting for Parts'])
+                ->with('apparatus')
+                ->orderBy('created_at', 'desc')
+                ->limit(5)
+                ->get()
+                ->map(fn($work) => [
+                    'id' => $work->id,
+                    'project' => $work->project_name,
+                    'unit' => $work->apparatus?->unit_id ?? 'N/A',
+                    'status' => $work->status,
+                ])
+                ->toArray();
+        } catch (\Exception $e) {
+            // ShopWork table may not exist
+        }
+        
         return [
-            Stat::make('Low Stock Items', $lowStockCount)
-                ->description('Need reordering')
-                ->descriptionIcon('heroicon-o-exclamation-circle')
-                ->color($lowStockCount > 0 ? 'danger' : 'success'),
-            
-            Stat::make('Open Defects', $openDefectsCount)
-                ->description('Unresolved issues')
-                ->descriptionIcon('heroicon-o-wrench-screwdriver')
-                ->color($openDefectsCount > 5 ? 'warning' : 'info'),
-            
-            Stat::make('Recent Shop Work', $recentShopWorkCount)
-                ->description('Last 30 days')
-                ->descriptionIcon('heroicon-o-clipboard-document-check')
-                ->color('primary'),
-            
-            Stat::make('Critical Defects', $criticalDefectsCount)
-                ->description('Immediate attention')
-                ->descriptionIcon('heroicon-o-exclamation-triangle')
-                ->color($criticalDefectsCount > 0 ? 'danger' : 'success'),
+            'pendingRecommendationsCount' => count($pendingRecommendations),
+            'pendingRecommendations' => $pendingRecommendations,
+            'recentAllocationsCount' => count($recentAllocations),
+            'recentAllocations' => $recentAllocations,
+            'activeShopWorkCount' => count($activeShopWork),
+            'activeShopWork' => $activeShopWork,
         ];
-    }
-
-    protected function getColumns(): int
-    {
-        return 4;
     }
 }
