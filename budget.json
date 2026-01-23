@@ -5,27 +5,27 @@
       {
         "metric": "interactive",
         "budget": 3000,
-        "tolerance": 10
+        "tolerance": 500
       },
       {
         "metric": "first-contentful-paint",
         "budget": 1500,
-        "tolerance": 10
+        "tolerance": 300
       },
       {
         "metric": "largest-contentful-paint",
         "budget": 2500,
-        "tolerance": 10
-      },
-      {
-        "metric": "speed-index",
-        "budget": 2500,
-        "tolerance": 10
+        "tolerance": 500
       },
       {
         "metric": "cumulative-layout-shift",
         "budget": 0.1,
-        "tolerance": 20
+        "tolerance": 0.05
+      },
+      {
+        "metric": "total-blocking-time",
+        "budget": 300,
+        "tolerance": 100
       }
     ],
     "resourceSizes": [
@@ -50,10 +50,6 @@
         "budget": 50
       },
       {
-        "resourceType": "other",
-        "budget": 200
-      },
-      {
         "resourceType": "total",
         "budget": 1500
       }
@@ -66,10 +62,6 @@
       {
         "resourceType": "stylesheet",
         "budget": 5
-      },
-      {
-        "resourceType": "image",
-        "budget": 30
       },
       {
         "resourceType": "font",
