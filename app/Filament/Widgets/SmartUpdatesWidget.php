@@ -16,6 +16,7 @@ use Livewire\Attributes\On;
 class SmartUpdatesWidget extends Widget
 {
     protected static string $view = 'filament.widgets.smart-updates-widget';
+    protected static ?int $sort = 4;
 
     protected int | string | array $columnSpan = 'full';
 
@@ -23,10 +24,11 @@ class SmartUpdatesWidget extends Widget
     public ?array $bulletSummary = null;
     public ?array $rawMetrics = null;
 
-    // Chat state - always visible
+    // Chat state - collapsible
     public string $chatInput = '';
     public array $chatMessages = [];
     public bool $chatLoading = false;
+    public bool $isExpanded = false; // Start collapsed
 
     public function mount(): void
     {
