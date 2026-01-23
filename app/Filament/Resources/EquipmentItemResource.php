@@ -216,6 +216,7 @@ class EquipmentItemResource extends Resource
                 Tables\Actions\Action::make('adjust_stock')
                     ->label('Adjust Stock')
                     ->icon('heroicon-o-arrows-up-down')
+                    ->tooltip('Adjust inventory stock levels')
                     ->form([
                         Forms\Components\Select::make('operation')
                             ->options([
@@ -266,6 +267,7 @@ class EquipmentItemResource extends Resource
                 Tables\Actions\Action::make('move_location')
                     ->label('Move Location')
                     ->icon('heroicon-o-map-pin')
+                    ->tooltip('Change storage location')
                     ->form([
                         Forms\Components\Select::make('location_id')
                             ->relationship('location', 'location_name')
@@ -297,6 +299,7 @@ class EquipmentItemResource extends Resource
                 Tables\Actions\Action::make('set_thresholds')
                     ->label('Set Thresholds')
                     ->icon('heroicon-o-exclamation-triangle')
+                    ->tooltip('Configure stock thresholds')
                     ->form([
                         Forms\Components\TextInput::make('reorder_min')
                             ->label('Low Stock Threshold')
