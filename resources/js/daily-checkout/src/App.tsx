@@ -3,7 +3,6 @@ import ApparatusList from './components/ApparatusList';
 import InspectionWizard from './components/InspectionWizard';
 import SuccessPage from './components/SuccessPage';
 import OfflineIndicator from './components/OfflineIndicator';
-import './App.css';
 
 function App() {
   return (

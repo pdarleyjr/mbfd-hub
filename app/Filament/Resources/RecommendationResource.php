@@ -153,6 +153,7 @@ class RecommendationResource extends Resource
                     ->label('Allocate')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
+                    ->tooltip('Allocate inventory item to apparatus')
                     ->visible(fn ($record) => $record->status === 'pending')
                     ->form([
                         Forms\Components\Placeholder::make('current_recommendation')
@@ -269,6 +270,7 @@ class RecommendationResource extends Resource
                     ->label('Dismiss')
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
+                    ->tooltip('Dismiss this recommendation')
                     ->requiresConfirmation()
                     ->visible(fn ($record) => $record->status === 'pending')
                     ->form([

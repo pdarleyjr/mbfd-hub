@@ -138,6 +138,7 @@ class DefectResource extends Resource
                     ->label('Mark Resolved')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
+                    ->tooltip('Resolve this equipment issue')
                     ->visible(fn (ApparatusDefect $record) => $record->status !== 'resolved')
                     ->form([
                         Forms\Components\Textarea::make('resolution_notes')

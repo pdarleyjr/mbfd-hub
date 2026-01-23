@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('item');
             $table->string('status'); // Present, Missing, Damaged
             $table->text('notes')->nullable();
+            $table->text('photo')->nullable(); // base64 encoded image
             $table->boolean('resolved')->default(false);
             $table->timestamp('resolved_at')->nullable();
             $table->text('resolution_notes')->nullable();
