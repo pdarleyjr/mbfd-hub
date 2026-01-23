@@ -17,10 +17,10 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use App\Filament\Widgets\SmartUpdatesWidget;
 use App\Filament\Widgets\OperationalSummaryWidget;
-use App\Filament\Widgets\TodoOverviewWidget;
+use App\Filament\Widgets\InventorySuppliesWidget;
 use App\Filament\Widgets\MaintenanceStatsWidget;
+use App\Filament\Widgets\SmartUpdatesWidget;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 
 class AdminPanelProvider extends PanelProvider
@@ -54,10 +54,10 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                OperationalSummaryWidget::class,
-                MaintenanceStatsWidget::class,
-                TodoOverviewWidget::class,
-                SmartUpdatesWidget::class,
+                OperationalSummaryWidget::class,       // Sort 1 - Top left
+                InventorySuppliesWidget::class,        // Sort 2 - Top right
+                MaintenanceStatsWidget::class,         // Sort 3 - Bottom left
+                SmartUpdatesWidget::class,             // Sort 4 - Bottom right (collapsible)
                 Widgets\AccountWidget::class,
             ])
             ->middleware([

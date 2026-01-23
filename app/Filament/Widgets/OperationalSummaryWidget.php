@@ -3,49 +3,68 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Apparatus;
-use App\Models\EquipmentItem;
-use App\Models\CapitalProject;
-use App\Models\Todo;
-use Filament\Widgets\StatsOverviewWidget as BaseWidget;
-use Filament\Widgets\StatsOverviewWidget\Stat;
+use App\Models\ApparatusDefect;
+use App\Models\ApparatusInspection;
+use Filament\Widgets\Widget;
 
-class OperationalSummaryWidget extends BaseWidget
+class OperationalSummaryWidget extends Widget
 {
+    protected static string $view = 'filament.widgets.operational-summary-widget';
     protected static ?int $sort = 1;
-    
     protected int | string | array $columnSpan = 'full';
 
-    protected function getStats(): array
+    public function getViewData(): array
     {
+        $totalApparatus = Apparatus::count();
+        $inService = Apparatus::where('status', 'In Service')->count();
+        $outOfService = Apparatus::where('status', 'Out of Service')->count();
+        
+        $openDefects = ApparatusDefect::where('resolved', false)->count();
+        $criticalDefects = ApparatusDefect::where('resolved', false)
+            ->where('issue_type', 'critical')
+            ->count();
+        
+        $overdueInspections = Apparatus::whereDoesntHave('inspections', function($q) {
+            $q->where('created_at', '>=', today()->subDay());
+        })->count();
+        
+        // Get urgent alerts (max 5 items)
+        $urgentAlerts = [];
+        
+        // Out of service vehicles
+        $outOfServiceVehicles = Apparatus::where('status', 'Out of Service')
+            ->limit(3)
+            ->get(['unit_id', 'make', 'model']);
+        foreach ($outOfServiceVehicles as $vehicle) {
+            $urgentAlerts[] = [
+                'type' => 'critical',
+                'message' => "{$vehicle->unit_id} - Out of Service",
+                'icon' => 'heroicon-o-exclamation-triangle',
+            ];
+        }
+        
+        // Critical defects
+        $criticalDefectsList = ApparatusDefect::where('resolved', false)
+            ->where('issue_type', 'critical')
+            ->with('apparatus:id,unit_id')
+            ->limit(2)
+            ->get(['id', 'apparatus_id', 'item']);
+        foreach ($criticalDefectsList as $defect) {
+            $urgentAlerts[] = [
+                'type' => 'warning',
+                'message' => "{$defect->apparatus?->unit_id}: {$defect->item}",
+                'icon' => 'heroicon-o-wrench-screwdriver',
+            ];
+        }
+        
         return [
-            Stat::make('Total Apparatus', Apparatus::count())
-                ->description('Active fleet vehicles')
-                ->descriptionIcon('heroicon-o-truck')
-                ->color('primary')
-                ->chart([7, 6, 8, 7, 9, 8, 10]),
-            
-            Stat::make('Equipment Items', EquipmentItem::where('is_active', true)->count())
-                ->description('Items in inventory')
-                ->descriptionIcon('heroicon-o-cube')
-                ->color('info')
-                ->chart([42, 40, 45, 43, 47, 45, 48]),
-            
-            Stat::make('Active Capital Projects', CapitalProject::active()->count())
-                ->description('In progress')
-                ->descriptionIcon('heroicon-o-briefcase')
-                ->color('success')
-                ->chart([3, 4, 4, 5, 5, 6, 5]),
-            
-            Stat::make('Pending Todos', Todo::where('is_completed', false)->count())
-                ->description('Action items')
-                ->descriptionIcon('heroicon-o-clipboard-document-list')
-                ->color('warning')
-                ->chart([12, 15, 10, 13, 11, 9, 8]),
+            'totalApparatus' => $totalApparatus,
+            'inService' => $inService,
+            'outOfService' => $outOfService,
+            'openDefects' => $openDefects,
+            'criticalDefects' => $criticalDefects,
+            'overdueInspections' => $overdueInspections,
+            'urgentAlerts' => array_slice($urgentAlerts, 0, 5),
         ];
-    }
-
-    protected function getColumns(): int
-    {
-        return 4;
     }
 }
