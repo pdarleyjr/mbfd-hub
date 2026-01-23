@@ -69,7 +69,7 @@ class EquipmentRecommendationsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('recommended_qty')
                     ->label('Qty'),
                 
-                Tables\Columns\BadgeColumn::make('status')
+                Tables\Columns\TextColumn::make('status')
                     ->colors([
                         'warning' => 'pending',
                         'success' => 'allocated',

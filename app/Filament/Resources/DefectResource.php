@@ -92,14 +92,14 @@ class DefectResource extends Resource
                 Tables\Columns\TextColumn::make('item')
                     ->searchable(),
                 
-                Tables\Columns\BadgeColumn::make('status')
+                Tables\Columns\TextColumn::make('status')
                     ->colors([
                         'danger' => 'open',
                         'warning' => 'in_progress',
                         'success' => 'resolved',
                     ]),
                 
-                Tables\Columns\BadgeColumn::make('issue_type')
+                Tables\Columns\TextColumn::make('issue_type')
                     ->label('Issue Type')
                     ->formatStateUsing(fn ($state) => str_replace('_', ' ', ucfirst($state))),
                 

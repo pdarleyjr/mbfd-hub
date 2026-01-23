@@ -8,12 +8,11 @@
     "require": {
         "php": "^8.2",
         "appstract/laravel-stock": "^1.2",
-        "bezhansalleh/filament-shield": "^3.0",
         "filament/filament": "^3.2",
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9",
-        "sentry/sentry-laravel": "*",
-        "spatie/laravel-permission": "^6.0"
+        "mokhosh/filament-kanban": "*",
+        "sentry/sentry-laravel": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
