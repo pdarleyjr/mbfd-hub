@@ -54,13 +54,12 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Pages\Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                OperationalSummaryWidget::class,       // Sort 1 - Top left
-                InventorySuppliesWidget::class,        // Sort 2 - Top right
-                MaintenanceStatsWidget::class,         // Sort 3 - Bottom left
-                SmartUpdatesWidget::class,             // Sort 4 - Bottom right (collapsible)
-                Widgets\AccountWidget::class,
+                // 2x2 Grid: Only 4 consolidated widgets for zero-scroll dashboard
+                OperationalSummaryWidget::class,       // Top-left: Fleet status, defects, alerts
+                InventorySuppliesWidget::class,        // Top-right: Inventory overview, low stock
+                MaintenanceStatsWidget::class,         // Bottom-left: Shop work, recommendations
+                SmartUpdatesWidget::class,             // Bottom-right: AI assistant (collapsed by default)
             ])
             ->middleware([
                 EncryptCookies::class,

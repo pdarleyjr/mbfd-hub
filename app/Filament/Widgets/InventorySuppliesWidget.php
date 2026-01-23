@@ -9,7 +9,7 @@ class InventorySuppliesWidget extends Widget
 {
     protected static string $view = 'filament.widgets.inventory-supplies-widget';
     protected static ?int $sort = 2;
-    protected int | string | array $columnSpan = 'full';
+    protected int | string | array $columnSpan = 1;  // Half-width for 2-column grid
 
     public function getViewData(): array
     {
