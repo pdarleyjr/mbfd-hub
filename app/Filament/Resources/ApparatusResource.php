@@ -150,6 +150,7 @@ class ApparatusResource extends Resource
                     ->label('Daily Checkout')
                     ->icon('heroicon-o-play-circle')
                     ->color('success')
+                    ->tooltip('Start daily checkout for this apparatus')
                     ->url(fn (Apparatus $record): string => "/daily/{$record->id}")
                     ->openUrlInNewTab(),
                 Tables\Actions\EditAction::make(),

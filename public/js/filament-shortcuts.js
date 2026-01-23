@@ -26,7 +26,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                         <div class="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700/50 rounded">
                             <span class="text-gray-700 dark:text-gray-300">Create New Record</span>
-                            <kbd class="px-2 py-1 text-xs font-semibold bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded">N</kbd>
+                            <div class="flex gap-1">
+                                <kbd class="px-2 py-1 text-xs font-semibold bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded">N</kbd>
+                                <span class="text-gray-500 dark:text-gray-400">or</span>
+                                <kbd class="px-2 py-1 text-xs font-semibold bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded">C</kbd>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700/50 rounded">
+                            <span class="text-gray-700 dark:text-gray-300">Save Form</span>
+                            <kbd class="px-2 py-1 text-xs font-semibold bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded">Ctrl+S / ⌘+S</kbd>
                         </div>
                         <div class="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700/50 rounded">
                             <span class="text-gray-700 dark:text-gray-300">Show Shortcuts</span>
@@ -88,7 +96,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Global keyboard shortcuts
     document.addEventListener('keydown', function(e) {
-        // Don't trigger shortcuts when typing in input fields
+        // Ctrl+S / Cmd+S - Save form
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            const saveButton = document.querySelector('button[type="submit"]') ||
+                             document.querySelector('[wire\\:click*="save"]') ||
+                             document.querySelector('.fi-btn[type="submit"]') ||
+                             document.querySelector('button[form]');
+            if (saveButton && !saveButton.disabled) {
+                saveButton.click();
+            }
+            return;
+        }
+
+        // Don't trigger shortcuts when typing in input fields (for non-save shortcuts)
         if (isInputElement(e.target)) {
             return;
         }
@@ -104,8 +125,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // "n" or "N" - Create new record (find create button on list pages)
-        if (e.key === 'n' || e.key === 'N') {
+        // "n", "N", "c", or "C" - Create new record (find create button on list pages)
+        if (e.key === 'n' || e.key === 'N' || e.key === 'c' || e.key === 'C') {
             e.preventDefault();
             const createButton = document.querySelector('[href*="create"]') ||
                                document.querySelector('.fi-ac-btn-create') ||
