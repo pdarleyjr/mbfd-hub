@@ -146,6 +146,28 @@ class ApparatusResource extends Resource
                     ->query(fn (Builder $query) => $query->whereHas('defects', fn ($q) => $q->where('resolved', false))),
             ])
             ->actions([
+                Tables\Actions\Action::make('update_status')
+                    ->label('Update Status')
+                    ->icon('heroicon-o-adjustments-horizontal')
+                    ->form([
+                        Forms\Components\Select::make('status')
+                            ->label('New Status')
+                            ->options([
+                                'In Service' => 'In Service',
+                                'Out of Service' => 'Out of Service',
+                                'Reserve' => 'Reserve',
+                                'Maintenance' => 'Maintenance',
+                            ])
+                            ->required(),
+                    ])
+                    ->action(function (Apparatus $record, array $data) {
+                        $record->update(['status' => $data['status']]);
+                        \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title('Status Updated')
+                            ->body("Apparatus status changed to {$data['status']}")
+                            ->send();
+                    }),
                 Tables\Actions\Action::make('start_daily_checkout')
                     ->label('Daily Checkout')
                     ->icon('heroicon-o-play-circle')
@@ -160,6 +182,13 @@ class ApparatusResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->withCount(['inspections', 'defects'])
+            ->with(['station']);
     }
 
     public static function getRelations(): array

@@ -33,6 +33,12 @@ class TodoResource extends Resource
                     ->maxLength(255),
                 Forms\Components\RichEditor::make('description')
                     ->columnSpanFull(),
+                Forms\Components\FileUpload::make('attachment')
+                    ->label('Attachment')
+                    ->disk('public')
+                    ->directory('todo_attachments')
+                    ->image()
+                    ->maxSize(5120),
                 Forms\Components\Select::make('assigned_to')
                     ->label('Assigned To')
                     ->relationship('assignedTo', 'name')

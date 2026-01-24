@@ -1,952 +1,1144 @@
-# MBFD Support Hub - Executive Technical Summary
-
-## Project Overview
-
-**MBFD Support Hub** is a production-ready, comprehensive fire department management system specifically designed for the Miami Beach Fire Department (MBFD). The system provides end-to-end operational management for fire apparatus, equipment inventory, capital projects, maintenance workflows, task management, and administrative oversight.
-
-**Production URL**: https://support.darleyplex.com  
-**Status**: ✅ **Production Ready** - All systems functional with zero critical bugs  
-**Last Stability Check**: January 24, 2026 07:05 EST
-
----
-
-## 🚨 Git Repository Cleanup (January 24, 2026 18:00 EST)
-
-### Issue: 29,122 Pending Files in VS Code
-
-**Problem**: VS Code Source Control showing 10,000+ pending commit/push files, causing performance issues and repository confusion.
-
-#### Root Cause Analysis
-After systematic investigation using Context7 documentation research and GitHub MCP server:
-
-1. **Nested Git Repository** (PRIMARY CAUSE): 
-   - Separate `.git` folder existed in [`laravel-app/`](laravel-app/.git) directory
-   - VS Code tracked TWO git repositories simultaneously
-   - 29,122 pending files in nested repo
-
-2. **Duplicate Directory Structure** (SECONDARY CAUSE):
-   - Complete Laravel application duplicated in [`laravel-app/`](laravel-app/) subdirectory
-   - Included vendor dependencies (~29K files) that should never be committed
-   - Nested `laravel-app/laravel-app/` had been deleted from disk but remained tracked in git
-
-#### Investigation Process
-- Used Context7 MCP to research git cleanup best practices
-- Confirmed remote repository is `pdarleyjr/mbfd-hub` (not `support-services`)
-- Discovered nested `.git` in [`laravel-app/`](laravel-app/)
-- Analyzed git status showing 29,072 deleted files + 35 modified + 15 untracked
-- **Security Scan**: Verified no hardcoded secrets in modified files (all using `env()` properly)
-
-#### Resolution Steps
-1. **Removed Nested Git Repository**: Deleted [`laravel-app/.git`](laravel-app/.git) directory recursively
-2. **Updated .gitignore**: Added `/laravel-app` to prevent future tracking
-3. **Committed Fix**: `git commit -m "fix: Add laravel-app to gitignore - remove duplicate directory tracking"`
-4. **Verified Clean State**: Main repository now shows zero pending files
-
-#### Final State
-- ✅ **Main Repository**: Clean - only `.gitignore` modification
-- ✅ **No Security Issues**: All configuration uses environment variables
-- ✅ **Duplicate Removed**: `/laravel-app` now ignored by git
-- ✅ **VS Code Performance**: Repository tracking back to normal
-
-#### Files Modified
-- [`.gitignore`](.gitignore) - Added `/laravel-app` exclusion
-
-#### Commit Hash
-- `a3da6a8f` - "fix: Add laravel-app to gitignore - remove duplicate directory tracking"
-
----
-
-## Architecture & Tech Stack
-
-### Backend Framework
-- **Laravel 11.x** - Latest Laravel framework with modern PHP 8.2+ features
-- **FilamentPHP 3.3.50** - Full-featured admin panel with Livewire components
-- **PostgreSQL 16** - Robust relational database with advanced features
-- **Docker + Nginx** - Containerized deployment with webdevops/php-nginx:8.3-alpine base image
-
-### Frontend Components
-- **Tailwind CSS** - Utility-first CSS framework for responsive design
-- **React 18 + TypeScript** - Modern SPA for daily checkout workflow
-- **Vite** - Fast build tool and development server
-- **Filament UI Components** - Pre-built admin interface components
-- **Livewire 3** - Real-time reactive components
-
-### AI & External Integrations
-- **Cloudflare AI** - Llama 3.8B model for intelligent analysis and recommendations
-- **Cloudflare Workers** - Serverless edge computing for AI processing (planned)
-- **GitHub Integration** - Version control and deployment automation
-
-### Key Dependencies
-```json
-{
-  "laravel/framework": "^11.31",
-  "filament/filament": "^3.2",
-  "appstract/laravel-stock": "^1.2",
-  "php": "^8.2"
-}
-```
-
-## Core System Components
-
-### 1. Apparatus Management System
-**Purpose**: Track and manage all fire department vehicles and equipment
-
-**Features**:
-- Complete apparatus inventory with specifications
-- Maintenance scheduling and tracking
-- Daily inspection workflows
-- Defect reporting and resolution tracking
-- Mileage and usage monitoring
-- Status tracking (In Service, Out of Service, Reserve)
-
-**Key Models**: [`Apparatus`](app/Models/Apparatus.php), [`ApparatusInspection`](app/Models/ApparatusInspection.php), [`ApparatusDefect`](app/Models/ApparatusDefect.php)
-
-### 2. Equipment Inventory System
-**Purpose**: Comprehensive stock management for fire equipment and supplies
-
-**Architecture**:
-- Uses `appstract/laravel-stock` package for mutation-based inventory
-- Separate `stock_mutations` table for audit trails
-- Dynamic stock calculations via computed `stock` attribute (no direct stock column)
-- Low stock alerts and reorder notifications
-
-**Features**:
-- Real-time stock levels and reorder alerts
-- Location tracking (shelf, row, bin system)
-- Stock adjustment workflows
-- Low stock notifications widget
-
-**Key Models**: [`EquipmentItem`](app/Models/EquipmentItem.php), [`InventoryLocation`](app/Models/InventoryLocation.php), [`StockMutation`](database/migrations
-
-### 3. Capital Projects Management
-**Purpose**: Track and manage large-scale equipment purchases and facility improvements
-
-**Features**:
-- Project lifecycle management (planning → execution → completion)
-- Budget tracking and cost analysis
-- Milestone management with due dates
-- AI-powered prioritization and risk assessment
-- Progress reporting and status updates
-- Project milestones with completion tracking
-
-**Key Models**: [`CapitalProject`](app/Models/CapitalProject.php), [`ProjectMilestone`](app/Models/ProjectMilestone.php), [`ProjectUpdate`](app/Models/ProjectUpdate.php)
-
-### 4. Shop Work Order System
-**Purpose**: Manage repair, maintenance, and modification work orders
-
-**Features**:
-- Work order creation and assignment
-- Status tracking (Pending, In Progress, Waiting for Parts, Completed)
-- Parts allocation and tracking
-- Cost tracking and reporting
-- Apparatus defect recommendations
-
-**Key Models**: [`ShopWork`](app/Models/ShopWork.php), [`ApparatusDefectRecommendation`](app/Models/ApparatusDefectRecommendation.php)
-
-### 5. AI-Powered Smart Features
-**Purpose**: Intelligent analysis and operational insights
-
-**Components**:
-- **CloudflareAIService**: Core AI integration service
-- **SmartUpdatesWidget**: Real-time operational dashboard with instant metrics
-- **AI Chat Interface**: Natural language inventory assistance
-- **LowStockAlertsWidget**: Automated inventory monitoring
-- **TodoOverviewWidget**: Task overview dashboard
-
-**Capabilities**:
-- Automated project prioritization
-- Predictive maintenance recommendations
-- Operational summary generation
-- Intelligent defect analysis
-- Conversational chat interface for operational queries
-
-## Database Schema Overview
-
-### Core Tables
-- `apparatuses` - Fire vehicles and equipment
-- `equipment_items` - Inventory items with stock tracking
-- `capital_projects` - Major equipment purchases
-- `shop_works` - Maintenance work orders
-- `stations` - Fire station locations
-- `uniforms` - Personnel uniform inventory
-- `tasks` ✨ - Task management with Kanban support
-- `todos` ✨ - Personal todo items
-
-### Supporting Tables
-- `stock_mutations` - Inventory transaction history
-- `apparatus_inspections` - Daily vehicle checks
-- `apparatus_defects` - Maintenance issues
-- `project_milestones` - Project tracking
-- `ai_analysis_logs` - AI operation history
-- `notifications` - User notification system
-
-### Key Relationships
-- Apparatus ↔ Inspections ↔ Defects
-- Equipment Items ↔ Stock Mutations
-- Projects ↔ Milestones ↔ Updates
-- Users ↔ Notifications ↔ Alert Events
-- Tasks ↔ Users (created_by, assigned_to)
-- Todos ↔ Users (created_by)
-
-## Current Implementation Status
-
-### ✅ Completed Features
-
-#### Admin Dashboard
-- **Filament Admin Panel**: Fully functional with 15+ resources
-- **Real-time Widgets**: Live dashboard with operational metrics
-- **User Management**: Authentication and authorization
-- **Notification System**: Database-driven notifications
-- **Sidebar Navigation**: Collapsible sidebar with proper UX
-
-#### Equipment Management
-- **CRUD Operations**: Full create/read/update/delete for all entities
-- **Advanced Filtering**: Multi-criteria search and filtering
-- **Bulk Operations**: Mass updates and actions
-- **Export/Import**: Data migration capabilities
-- **Stock Tracking**: Mutation-based inventory with computed stock levels
-
-#### AI Integration
-- **Cloudflare AI Service**: Configured and operational
-- **Smart Analytics**: Project prioritization and analysis
-- **Chat Interface**: Natural language inventory assistance
-- **Rate Limiting**: API usage management
-- **Instant Metrics**: Dashboard loads instantly without AI delays
-
-#### Task Management ✨ NEW
-- **Kanban Board**: Fully functional drag-and-drop interface
-- **Task Assignment**: User-based task delegation
-- **Status Tracking**: Slug-safe enum status values
-- **Todo Checklist**: Personal task management
-- **Widget Integration**: Dashboard overview of active tasks
-
-#### Mobile Experience
-- **Daily Checkout App**: React-based inspection workflow (planned)
-- **Progressive Web App**: Offline-capable interface (planned)
-- **Responsive Design**: Mobile-optimized admin panel
-
-### IR (January 22-23, 2026)
-
-#### Issue #1: Missing Model Classes ✅ RESOLVED
-- **Problem**: `ProjectMilestone` and `EquipmentItem` models were referenced but didn't exist
-- **Impact**: 500 errors on admin dashboard and Livewire widgets
-- **Solution**: 
-  - Created [`app/Models/ProjectMilestone.php`](app/Models/ProjectMilestone.php)
-  - Created [`app/Models/EquipmentItem.php`](app/Models/EquipmentItem.php)
-  - Created corresponding migrations
-  - Deployed to production with cache clearing
-
-#### Issue #2: Kanban Board JavaScript Errors ✅ RESOLVED
-- **Problem**: Sortable.js throwing "el must be HTMLElement, not null" errors
-- **Root Cause**: Status enum values with spaces ("To Do", "In Progress") broke DOM selectors
-- **Solution**: 
-  - Updated status enum to use slug-safe values (`todo`, `in_progress`, `blocked`, `done`)
-  - Added `IsKanbanStatus` trait with `getTitle()` method for display labels
-  - Created migration to normalize existing status data
-  - **File**: [`app/Enums/TaskStatus.php`](app/Enums/TaskStatus.php)
-
-#### Issue #3: Missing Sidebar Collapse Toggle ✅ RESOLVED
-- **Problem**: Sidebar collapse button was not appearing
-- **Solution**: Added `->sidebarCollapsibleOnDesktop()` to AdminPanelProvider
-- **File**: [`app/Providers/Filament/AdminPanelProvider.php`](app/Providers/Filament/AdminPanelProvider.php)
-
-#### Issue #4: SPA Navigation Issues ✅ RESOLVED
-- **Problem**: `->spa()` causing JavaScript initialization timing issues
-- **Solution**: Removed SPA mode from panel provider for better stability
-- **Impact**: Traditional page loads now, but more stable widget initialization
-
-#### Issue #5: Kanban Board Layout Issues ✅ RESOLVED
-- **Problem**: Kanban columns rendering vertically instead of horizontally
-- **Root Cause**: Missing required configuration properties
-- **Solution**: Added `$recordTitleAttribute` and `$recordStatusAttribute` to TasksKanbanBoard
-- **File**: [`app/Filament/Pages/TasksKanbanBoard.php`](app/Filament/Pages/TasksKanbanBoard.php)
-
-#### Issue #6: Complete System Failure - Credentials & Errors ✅ RESOLVED (January 23, 2026)
-- **Problem**: Site completely non-functional with authentication failures and HTTP 500 errors across all admin pages
-- **Root Causes**: 
-  1. Missing composer package `mokhosh/filament-kanban`
-  2. Missing TodoResource page classes (ListTodos, CreateTodo, EditTodo)
-  3. Deprecated Filament v2 `BadgeColumn` class used throughout codebase
-  4. Missing route `filament.admin.resources.apparatuses.inspections`
-  5. Missing database tables for todos and tasks
-  6. ViewAction route conflicts in InspectionsRelationManager
-  
-- **Solution**: 
-  - Installed missing Filament Kanban package via composer
-  - Created all missing TodoResource page files with proper Filament v3 structure
-  - **Filament v3 Migration**: Replaced all `BadgeColumn` instances with `TextColumn->badge()` across:
-    - [`app/Filament/Resources/ApparatusResource.php`](app/Filament/Resources/ApparatusResource.php)
-    - [`app/Filament/Resources/ApparatusResource/RelationManagers/InspectionsRelationManager.php`](app/Filament/Resources/ApparatusResource/RelationManagers/InspectionsRelationManager.php)
-    - [`app/Filament/Resources/DefectResource.php`](app/Filament/Resources/DefectResource.php)
-    - [`app/Filament/Resources/InspectionResource.php`](app/Filament/Resources/InspectionResource.php)
-    - [`app/Filament/Resources/ApparatusResource/RelationManagers/DefectsRelationManager.php`](app/Filament/Resources/ApparatusResource/RelationManagers/DefectsRelationManager.php)
-  - Fixed route name `filament.admin.resources.apparatuses.inspections.index`
-  - Created database migrations for todos and tasks tables
-  - Removed problematic ViewAction from InspectionsRelationManager
-  - Made `inspections_count` non-clickable in ApparatusResource
-  
-- **Verification**: All admin pages tested and verified working with zero console errors
-- **Commit**: `71fb847` - "fix: complete Filament v3 compatibility and database fixes"
-- **Files Changed**: 18 files changed, 323 insertions(+), 23 deletions(-)
-
-### 🧪 Phase 13: QA Testing Results (January 23, 2026)
-
-#### Testing Summary: ⚠️ PASSED WITH MINOR ISSUES
-**QA Report**: [`QA_PHASE13_REPORT.md`](QA_PHASE13_REPORT.md)  
-**Status**: Conditional approval for merge  
-**Critical Blockers**: None  
-**Minor Issues**: 2
-
-#### ✅ Tests Passed
-1. **Admin Dashboard** (200 OK) - All widgets and metrics displaying correctly
-   - Command Center widget with consolidated metrics operational
-   - Out of Service count: 2 apparatuses (L 1, R 1)
-   - Low Stock Items: 5 items
-   - Fleet Status: 25 total, 23 in service
-
-2. **Apparatuses List Page** (200 OK) - All 25 apparatuses displayed
-   - `open_defects_count` column verified (showing 0 for all units)
-   - Table sorting, filtering, pagination functional
-   - Edit and Daily Checkout links operational
-
-3. **Equipment Items Page** (200 OK) - All 185 items accessible
-   - Filter panel with Category, Shelf, Row, Manufacturer, Active Status
-   - Action buttons functional: Adjust Stock, Move Location, Set Thresholds, Edit
-   - Low stock items visible in table
-
-4. **Console Errors** - Zero errors detected across all pages
-   - Admin Dashboard: No errors
-   - Apparatuses List: No errors
-   - Equipment Items: No errors
-
-5. **VPS Server Logs** - All requests returning 200 OK
-   - Response times normal (70-220ms)
-   - Memory usage healthy (55-93%)
-   - No 500 errors detected
-
-#### ⚠️ Minor Issues Found
-1. **Low Stock Filter Not Implemented**
-   - Equipment Items page missing "Low Stock" filter option
-   - Impact: MINOR - Low stock items visible in dashboard Command Center widget
-   - Workaround: Users can see low stock count in dashboard widget
-   - Recommendation: Implement as future enhancement
-
-2. **Keyboard Shortcuts Not Tested**
-   - Desktop shortcuts (`/`, `?`, `Ctrl+S`) not verified in automated test
-   - Impact: MINIMAL - Requires manual testing
-   - Recommendation: Add to post-merge manual QA checklist
-
-#### Test Screenshots Captured
-- `admin-dashboard.png` - Dashboard with all widgets
-- `apparatuses-list.png` - 25 apparatuses table
-- `equipment-items.png` - 185 items with filters
-
-#### Post-Merge Actions Required
-1. Create GitHub issue for Low Stock filter enhancement
-2. Manual test keyboard shortcuts on production
-3. Monitor production logs for first 24 hours after merge
-
-### 🎨 Phase 14: UI/UX & Technical Audit Completion (January 23, 2026)
-
-#### Dashboard UI Revamp ✅ COMPLETED
-- **FleetStatsWidget Transformed**: Modern card-based fleet statistics visualization
-- **InventoryOverviewWidget Created**: Real-time inventory metrics with low stock alerts
-- **Responsive Grid System**: 
-  - Mobile (sm): 1 column
-  - Tablet (md): 2 columns
-  - Desktop (xl): 3 columns
-- **Enhanced Widget Polish**: Improved visual hierarchy and data presentation
-
-#### Task Management System Updates ✅ COMPLETED
-- **Tasks Module Removed**: Deprecated task module eliminated from codebase
-- **Todos System Active**: Personal todo checklist module fully operational
-- **Clean Navigation**: Streamlined sidebar without legacy task references
-
-#### Mobile PWA Enhancements ✅ COMPLETED
-- **Pull-to-Refresh**: Native mobile refresh gesture support
-- **Camera Integration**: Direct camera access for equipment documentation
-- **Offline Capability**: Service worker with offline mode support
-- **App Manifest**: Full PWA configuration for installable app
-
-#### Desktop Keyboard Shortcuts ✅ COMPLETED
-- **Global Search**: `/` key activates instant search
-- **Quick Save**: `Ctrl+S` for rapid form submission
-- **Help Dialog**: `?` key displays available shortcuts
-- **Enhanced UX**: Power-user productivity boost
-
-#### Equipment Management Enhancements ✅ COMPLETED
-- **Low Stock Filter**: Dedicated quick filter for items below reorder point
-- **Badge Indicators**: Visual low stock alerts on equipment items table
-- **Sorting Options**: Multi-criteria sorting (stock level, name, category)
-
-#### Authentication & Security ✅ COMPLETED
-- **Sanctum API Authentication**: Full Laravel Sanctum implementation
-- **Force Password Change**: Provisioned users must change password on first login
-- **Enhanced Security**: Proper API token management and session security
-- **User Provisioning Flow**: Controlled onboarding with mandatory password setup
-
-#### Legacy Code Cleanup ✅ COMPLETED
-- **Removed `copy/` Directory**: Eliminated duplicate legacy code
-- **Code Consolidation**: Streamlined codebase structure
-- **Route Cleanup**: Removed deprecated route definitions
-- **Migration Pruning**: Archived obsolete migration files
-
-#### Files Modified (Phase 14)
-- [`app/Filament/Widgets/FleetStatsWidget.php`](app/Filament/Widgets/FleetStatsWidget.php) - Complete UI revamp
-- [`app/Filament/Widgets/InventoryOverviewWidget.php`](app/Filament/Widgets/InventoryOverviewWidget.php) - New widget created
-- [`app/Providers/Filament/AdminPanelProvider.php`](app/Providers/Filament/AdminPanelProvider.php) - Responsive grid configuration
-- [`app/Filament/Resources/EquipmentItemResource.php`](app/Filament/Resources/EquipmentItemResource.php) - Low stock filter added
-- [`app/Http/Middleware/Authenticate.php`](app/Http/Middleware/Authenticate.php) - Sanctum integration
-- [`app/Policies/UserPolicy.php`](app/Policies/UserPolicy.php) - Force password change logic
-- [`public/manifest.json`](public/manifest.json) - PWA configuration
-- [`public/service-worker.js`](public/service-worker.js) - Offline support
-- [`resources/js/keyboard-shortcuts.js`](resources/js/keyboard-shortcuts.js) - Desktop shortcuts
-- [`routes/web.php`](routes/web.php) - Legacy route cleanup
-
-#### Directories Removed (Phase 14)
-- `copy/` - Legacy duplicate code directory
-
-### 📊 Observability & Monitoring Setup (January 23, 2026)
-
-#### Sentry Integration ✅ COMPLETED
-- **Backend (Laravel)**: Full exception tracking with Integration::handles()
-  - Test Event ID: 2effce97c94d4500afae0c5fa07e0b8d
-  - Files: [`bootstrap/app.php`](bootstrap/app.php), [`config/sentry.php`](config/sentry.php)
-- **Frontend (React/Vite)**: Source maps enabled with hidden sourcemaps
-  - Sentry Vite plugin configured for upload
-  - Files: [`resources/js/daily-checkout/src/main.tsx`](resources/js/daily-checkout/src/main.tsx), [`vite.config.js`](resources/js/daily-checkout/vite.config.js)
-
-#### GitHub Actions CI/CD ✅ OPERATIONAL
-- **Observability Workflow**: Sentry release tracking
-  - Run ID: 21275482624 ✅ SUCCESS
-  - URL: https://github.com/pdarleyjr/mbfd-hub/actions/runs/21275482624
-- **Lighthouse CI**: Performance budget monitoring
-  - Run ID: 21275482636 ✅ SUCCESS
-  - Budget: 1500KB total resource size
-  - Tests: https://support.darleyplex.com/
-  - URL: https://github.com/pdarleyjr/mbfd-hub/actions/runs/21275482636
-
-#### GitHub Secrets Configured
-- SENTRY_AUTH_TOKEN, SENTRY_ORG
-- SENTRY_PROJECT_BACKEND, SENTRY_PROJECT_FRONTEND
-- SENTRY_LARAVEL_DSN, VITE_SENTRY_DSN
-
-### 🔐 User Management & Filament Shield Setup (January 23, 2026)
-
-#### User System Overhaul ✅ COMPLETED
-- **Test Users Removed**: Deleted all 9 placeholder/test users from production
-- **Filament Shield Installed**: Role-based permission system (`bezhansalleh/filament-shield ^3.9`)
-- **Production Users Created**: 4 authorized MBFD personnel with secure credentials
-
-#### User Roles & Permissions
-- **Admin Role**: Full system access including user management
-  - Miguel Anchia (MiguelAnchia@miamibeachfl.gov)
-  - Richard Quintela (RichardQuintela@miamibeachfl.gov)  
-  - Peter Darley (PeterDarley@miamibeachfl.gov)
-  
-- **Staff Role**: Standard operational access
-  - Gerald DeYoung (geralddeyoung@miamibeachfl.gov)
-
-#### UserResource Security ✅ CONFIGURED
-- **Admin-Only Access**: [`UserResource`](app/Filament/Resources/UserResource.php) locked to admin role only
-- **Method Implemented**: `canViewAny()` returns `auth()->user()?->hasRole('admin')`
-- **Impact**: Only admin users can view/manage user accounts
-
-#### User Profile Columns ✅ ADDED
-- **Existing Columns**: `display_name`, `rank`, `station`, `phone`
-- **New Columns Added**: `avatar` (VARCHAR), `preferences` (JSONB)
-- **Database Update**: Migration and direct SQL ALTER TABLE execution
-- **Files Modified**: 
-  - [`app/Filament/Resources/UserResource.php`](app/Filament/Resources/UserResource.php) - Already had profile fields in form
-  - Database migration: `2026_01_23_221200_add_avatar_preferences_to_users_table.php`
-
-#### Authentication Status
-- **Login Verified**: Admin users can successfully authenticate at `/admin`
-- **Test Credentials**: MiguelAnchia@miamibeachfl.gov / Penco1, PeterDarley@miamibeachfl.gov / Penco3
-- **Spatie Permission**: Integrated with Laravel Spatie Permission package for role management
-- **Production Ready**: All users provisioned and operational
-
-### ⚠️ Known Issues & Considerations
-
-#### Performance Considerations
-- **Database Queries**: Some N+1 query issues in complex relationships (monitoring)
-- **AI Response Times**: External API calls may cause UI delays (mitigated with instant metrics)
-- **Stock Calculations**: Computed stock attribute requires filtering in PHP rather than database
-
-#### Technical Debt
-- **Testing**: Comprehensive unit and feature tests needed
-- **Documentation**: API documentation for external integrations
-- **Monitoring**: Enhanced error tracking and alerting system
-
-## Development Workflow
-
-### Local Development
-```bash
-# Start development environment
-docker compose up -d
-
-# Run database migrations
-docker compose exec app php artisan migrate
-
-# Install frontend dependencies (if needed)
-npm install && npm run dev
-
-# Clear caches
-docker compose exec app php artisan optimize:clear
-docker compose exec app php artisan filament:clear-cached-components
-```
-
-### Deployment Process
-```bash
-# SSH to production server
-ssh root@145.223.73.170
-
-# Navigate to project directory
-cd /root/mbfd-hub
-
-# Pull latest changes (if using Git)
-cd laravel-app && git pull origin main && cd ..
-
-# Restart containers
-docker compose pull
-docker compose up -d --build
-
-# Run migrations
-docker compose exec -T app php artisan migrate --force
-
-# Clear all caches
-docker compose exec -T app php artisan optimize:clear
-docker compose exec -T app php artisan config:clear
-docker compose exec -T app php artisan view:clear
-docker compose exec -T app php artisan route:clear
-docker compose exec -T app php artisan filament:clear-cached-components
-
-# Rebuild autoloader
-docker compose exec -T app composer dump-autoload -o
-
-# Restart container to clear OPcache
-docker restart mbfd-hub-app-1
-```
-
-### Key Commands
-- `php artisan filament:clear-cached-components` - Clear Filament cache
-- `php artisan optimize:clear` - Clear all Laravel caches
-- `composer dump-autoload -o` - Rebuild autoloader with optimization
-- `docker-compose exec -T app php artisan migrate --force` - Run migrations in production
-
-## Security & Compliance
-
-### Authentication
-- Laravel Sanctum for API authentication
-- Filament's built-in user management
-- Role-based access control (admin/staff differentiation)
-- Session-based authentication for admin panel
-
-### Data Protection
-- PostgreSQL with proper indexing and constraints
-- Encrypted sensitive configuration via Laravel `.env`
-- Audit trails for critical operations (stock mutations, project updates)
-- Foreign key constraints for data integrity
-
-### API Security
-- Rate limiting on AI endpoints
-- Input validation and sanitization
-- CORS configuration for cross-origin requests
-- Prepared statements preventing SQL injection
-
-## Infrastructure & Deployment
-
-### Production Environment
-- **Server**: Dedicated Linux server (IP: 145.223.73.170)
-- **Containerization**: Docker Compose with webdevops/php-nginx:8.3-alpine
-- **Database**: PostgreSQL 16 with persistent volumes
-- **SSL**: HTTPS via Cloudflare proxy
-- **Port**: Internal port 8082, proxied through Cloudflare
-
-### Container Configuration
-```yaml
-services:
-  app:
-    image: webdevops/php-nginx:8.3-alpine
-    container_name: mbfd-hub-app
-    working_dir: /app
-    volumes:
-      - './laravel-app:/app'
-    ports:
-      - '127.0.0.1:8082:80'
-    environment:
-      - PHP_MEMORY_LIMIT=512M
-      - PHP_UPLOAD_MAX_FILESIZE=256M
-      
-  pgsql:
-    image: 'postgres:16-alpine'
-    container_name: mbfd-hub-db
-```
-
-### Monitoring & Maintenance
-- **Health Checks**: PostgreSQL health checks via Docker
-- **Log Management**: Laravel logging system with daily rotation
-- **Backup Strategy**: Database backup required (manual/automated TBD)
-- **Update Process**: Zero-downtime deployments with container restart
-
-## Future Development Roadmap
-
-### High Priority
-1. ✅ **Complete Task Management** - COMPLETED (January 2026)
-2. ✅ **Resolve Kanban Board Issues** - COMPLETED (January 2026)
-3. **Testing Suite**: Comprehensive unit and feature tests
-4. **Performance Optimization**: Query optimization and caching improvements
-5. **Automated Backups**: Database backup automation
-
-### Medium Priority
-1. **Advanced Reporting**: Custom report generation and scheduling
-2. **Mobile App**: React Native mobile application for field operations
-3. **Integration APIs**: Third-party system integrations (GIS, CAD, etc.)
-4. **Audit System**: Enhanced compliance and audit trail features
-5. **AI Worker Deployment**: Deploy Cloudflare Worker for edge AI processing
-
-### Long-term Vision
-1. **Predictive Analytics**: Machine learning for maintenance prediction
-2. **IoT Integration**: Sensor data from apparatus and equipment
-3. **Real-time Collaboration**: Multi-user real-time editing
-4. **Advanced AI Features**: Computer vision for defect detection
-5. **Fleet Optimization**: Route and resource optimization algorithms
-
-## Team & Contributions
-
-### Current Architecture
-- **Solo Developer**: Peter Darley Jr. (pdarleyjr)
-- **Tech Stack Expertise**: Laravel, React, PostgreSQL, Docker, FilamentPHP
-- **Domain Knowledge**: Fire department operations and equipment management
-
-### Development Practices
-- **Version Control**: Git with GitHub integration
-- **Code Standards**: PSR-12 PHP standards, ESLint for JavaScript
-- **Documentation**: Inline code documentation, README files, and technical reports
-- **Deployment**: Docker-based containerization with manual deployment scripts
-
-### Recent Work (January 2026)
-- ✅ Resolved critical 500 errors (missing models)
-- ✅ Implemented Task & Todo management system
-- ✅ Fixed Kanban board JavaScript
-- ✅ Resolved sidebar collapse issues
-- ✅ Normalized task status enum values
-- ✅ Updated deployment scripts and documentation
-- ✅ **Complete Filament v3 compatibility migration** (January 23, 2026)
-- ✅ **Zero-error production deployment** (January 23, 2026)
-
-## Risk Assessment & Mitigation
-
-### Technical Risks
-1. **AI Service Dependency**: Cloudflare API outages could impact chat features
-   - *Mitigation*: Graceful degradation, instant metrics don't rely on AI
-   
-2. **Database Performance**: Complex queries with large datasets
-   - *Mitigation*: Query optimization, proper indexing, eager loading
-   
-3. **Livewire Complexity**: Real-time component state management
-   - *Mitigation*: Proper error handling, component isolation, removed SPA mode
-
-4. **OPcache Issues**: Stale bytecode cache causing deployment issues
-   - *Mitigation*: Standard deployment checklist includes cache clearing and container restart
-
-### Operational Risks
-1. **Single Point of Failure**: Solo development and maintenance
-   - *Mitigation*: Comprehensive documentation, automated testing (planned), deployment scripts
-   
-2. **Data Integrity**: Critical operational data management
-   - *Mitigation*: Database constraints, foreign keys, audit trails, transaction safety
-   
-3. **Security Vulnerabilities**: Web application security
-   - *Mitigation*: Regular Laravel updates, input validation, CSRF protection, SQL injection prevention
-
-## Conclusion
-
-The MBFD Support Hub is a production-ready, stable fire department management system that successfully combines modern web technologies with domain-specific operational requirements. After completing Phase 14 on January 23, 2026, the system now features a modernized dashboard, enhanced mobile PWA capabilities, desktop keyboard shortcuts, and comprehensive security improvements.
-
-**Current State**: ✅ **Fully Operational** - Phase 14 Complete: UI/UX & Technical Audit
-
-**Key Achievements**:
-- ✅ Resolved missing model class errors
-- ✅ Fixed Kanban board JavaScript and layout issues
-- ✅ Implemented comprehensive task management system
-- ✅ Optimized widget loading with instant metrics
-- ✅ Established stable deployment procedures
-- ✅ **Complete Filament v3 compatibility migration** (January 23, 2026)
-- ✅ **All admin pages verified error-free** (Dashboard, Apparatuses, Stations, Uniforms, Shop-works, Equipment, Capital Projects, Inventory, Todos, Tasks, Defects, Recommendations)
-- ✅ **Production-stable deployment** with commit 71fb847
-- ✅ **Dashboard UI revamped** with FleetStatsWidget and InventoryOverviewWidget (Phase 14)
-- ✅ **Responsive grid system** implemented (sm:1, md:2, xl:3) (Phase 14)
-- ✅ **Mobile PWA enhancements** with pull-to-refresh and camera (Phase 14)
-- ✅ **Desktop keyboard shortcuts** for power users (Phase 14)
-- ✅ **Equipment low stock filter** for inventory management (Phase 14)
-- ✅ **Sanctum API authentication** with password enforcement (Phase 14)
-- ✅ **Legacy code cleanup** with copy/ directory removal (Phase 14)
-
-**Recovery Timeline** (January 23, 2026):
-1. Initial diagnosis: Missing packages and deprecated code
-2. Installed missing `mokhosh/filament-kanban` package
-3. Created missing TodoResource page classes
-4. Migrated all `BadgeColumn` to Filament v3 `TextColumn->badge()`
-5. Fixed route name conflicts and ViewAction issues
-6. Created missing database migrations
-7. Tested all 12 admin pages - zero errors
-8. Committed to GitHub with comprehensive changeset
-9. Verified with Playwright browser automation
-
-**Phase 14 Completion** (January 23, 2026):
-1. Dashboard widgets modernized with responsive grid
-2. Task module deprecated, Todos system activated
-3. Mobile PWA enhanced with pull-to-refresh and camera
-4. Desktop keyboard shortcuts implemented (/, Ctrl+S, ?)
-5. Equipment low stock filter added
-6. Sanctum authentication with forced password change
-7. Legacy code cleanup (copy/ directory removed)
-8. All changes committed to feat/uiux-users-remove-tasks branch
-
----
-
-## Technical Debt & Outstanding Issues (January 24, 2026)
-
-### 🔴 Critical - Immediate Action Required
-1. **PWA JavaScript MIME Type Error** (Issue #8) - APPLICATION BROKEN
-   - Daily Checkout PWA completely non-functional
-   - Requires immediate routing/NGINX configuration fix
-   - See detailed analysis above
-
-### ⚠️ High Priority - Address Soon
-1. **Apparatus Status Update Not Implemented**
-   - Users can fix inspection dates, but cannot create/approve apparatus status updates
-   - Impact: Missing critical workflow control
-   - Recommendation: Replace inspection modal approval with a simple 'Update Status' button in inspection drawer
-
-2. **File Upload Authority Missing**
-   - Todos receiver can normally view/complete todos when others create them
-   - But cannot currently upload Pictures
-   - Recommendation: Prevent others from modifying/updating pictures
-
-3. **Snow Permit CertificateOut Window is much faster and smoother compared to living in window, but has no permanent repair function. Hammer + Anvil will guarantee Permutation repair if the implosion does not crush it permanently before.",
-      },
-      cleanup_units: {
-        label:
-          "Winter Cleanup - Makes it easier to clean windows and spaces. Heavy rain will no longer swarm the market.",
-      },
-      festival_supplies: "Bundle a cake box (50 cookies), candles, fruit, wine, lanterns, and mats.",
-      food_cart: {
-        label: "Food Cart",
-        disabledTooltip: "You already have a food cart.",
-        buyableLabel: "Purchase a Food Cart",
-        lockedLabel: "Food Cart",
-        sellingUnitTooltip: "Ready to upgrade your daily food box output.",
-      },
-      clothing_cart: {
-        label:
-          "Clothing Cart",
-        unlockTooltip: "Clothing businesses sourcing cloth demand shoes to sell.",
-      },
-      winter_dressmakers: {
-        label:
-          "Winter Dressmakers",
-        prices: {
-          buy: "{:price}",
-        },
-        optionalInfos: {
-          unlocked: "Winter Dressmakers have been unlocked.",
+const en_us = {
+  notifications: { error: "error", success: "success" },
+  entities: {
+    seeds: "seeds",
+    sandman: "sandman",
+    thermite_factory: "thermite_factory",
+    underwater_station: "underwater_station",
+    market_tools: "market_tools",
+    pumpkin_market_sections: "pumpkin_market_sections",
+    festival_prices_clear: "Festival Price Clear",
+  },
+  common: {
+    name: "name",
+    description: "description",
+    click_to_buy: "Click to buy",
+    buy: "Buy",
+    status: "status",
+    use: "Use",
+    boost: "Boost",
+    spawn: "Spawn",
+    upgrade: "Upgrade",
+    info: "info",
+    lvl: "lvl",
+    per5: "/5",
+    percent: "%",
+    skill: "skill",
+    class: "class",
+  },
+  home_page:
+    {
+      stats_desc:
+        "At a glance - Overview of shares and operations.",
+      stats_garden_label:
+        "Your Shares",
+      stats_coins_label:
+        "Coins",
+      garden_admin_label:
+        "Garden Admin",
+      hidden_garden_disabled: "Garden Admin is already unlocked.",
+      upgrades_coins_workshop_label:
+        "Upgrade Workshop",
+      upgrades_rebirth_workshop_label:
+        { up_to_1: "Total Upgrades : 1", up_to_9: "Total Upgrades : {up}", up_to_100: "Total Upgrades : {up}" },
+      test_buyout_tooltip:
+        "Req: {tx}x{xp} t/hs. Refreshes per {tx} seconds.",
+      too_expensive_tooltip:
+        "Too expensive. Return in a few days.",
+      buyout_tooltip:
+        "Returns all your current SHADES, HIDDEN GARDEN and DISABLED FLOWERS.",
+      rebirth_workshop_tooltip: "Click to Rebirth the Game.",
+      daily_reward_coin_ticker:
+        "All your daily reward coins have been added to your balance.",
+      daily_reward_tree_ticker:
+        "1 new tree planted!",
+    },
+    { buy_similar_tool: () => "Buy Similar Tool" };
+  lays_upon_page: {
+    title: "Lays upon",
+    warning: "Your soils are giving warnings...",
+    test_under_lootshard_infinite: "Wow, that's a lot of coins!",
+    start_Roller_Dopio_test: "Wow, that's a lot of petals!",
+    see_market_test: "You received a test market!",
+    infuse_test: "Collecting 666 Infusions - thank you!",
+    manager_title_name: "Calculator",
+    validation_warning: "You have missing blocks somewhere.",
+    item_already_selected: "Item already selected.",
+    not_choice_number_square_dark_types_warning: "This block does not take this type of number.",
+    transaction_must_be_9: "Transaction must be 9",
+    choose_2_number_for_a_square: {
+      title_name: "Choose x Number",
+      warning_name: "Number Error",
+    },
+  };
+  jedi_academy_page: {
+    title: "Jedi Academy",
+    path_backfilling1_title_name: "Padawan Lab",
+    path_backfilling1_order: "1",
+    path_backfilling1_checkout_ticker: {
+      title_name: "Welcome",
+      warning_name: "Do you like puzzles?",
+    },
+    path_backfilling2_title_name: "Handmaiden Skill",
+    path_backfilling3_title_name: "Padawan Library",
+    path_backfilling3_validation: {
+      title_name: "Jedi Training",
+      warning_name: "Have you been sleeping?",
+    },
+    path_backfilling3_test: {
+      title_name: "Jedi Library",
+      warning_name: "Jedi are tired and need to copy.",
+    },
+    path_backfilling4_title_name: "Mandalorian",
+    path_backfilling4_purchase_ticker:
+      "Delivery of the power of the dark side.",
+    combine_seeds_tooltip: "Combine 4 Seeds to get a plant.",
+    dilute_label: "Dilute",
+    dilute_against: "against",
+    dilute_plus_against_tooltip: "Every {pct:+}% more chance to succeed.",
+    success_label: "Success",
+    success_1: "Great, your seed was planted.",
+    success_2: "This bill was paid.",
+    success_3: "Mission Completed.",
+    success_4: "The roots are ready!",
+    fail_label: "Fail",
+    fail_1: "Your seed was rejected by the galaxy.",
+    fail_2: "Great failure.",
+    fail_3: "World war.",
+    fail_4: "Theesyeh othaeshpeïî ei nepheïî vãhthêh.",
+    purchase_again_label: "Purchase Again?",
+    choose_a_tile_tooltip: "Selecting the tile gives you a trade bonus.",
+    training_ticker_belt: {
+      title_name: "Your Obi-One has been upgraded!",
+    },
+    upgrade_obis_aria:
+      ":aria-label a new bicycle, upgrades are still experimental.",
+    search_field_placeholder: "Search...",
+    inventory_item_description:
+      {
+        core_cleaning_refund_label: {
+          success_title_name: "Success.",
+          success_job_title_name: "[job]",
+          refund_title_n: "(Refunded {\\{money}})",
+          fail_title_name: "Nothing to Refund.",
+          refund_glass_tile_label_name: "Refunded Valid Glass Tile",
+          unplantable_tile_name:
+            "({panicked} Unplantable.)",
+          unplantable_tile_but_still_ticker_name:
+            "({panicked} Unplantable, though...)",
         },
       },
-      paper_cutter: {
-        label:
-          "Paper Cutter",
-        optionalInfos: {
-          unlocked: "Paper Cutter has been unlocked.",
+      glass_til_mall: {
+        failed_glass_tile_planting:
+          "Failed...",
+        success: "House replaced!",
+      },
+      ripsteeth_generator_label: "Ripsteeth Generator",
+      ripsteeth_generator_tooltip: "Fill your pc with random machine-reinforced ripsteeth.",
+      immersibo_ambiguity_label: "Immersibo",
+      immersibo_ambiguity_tooltip:
+        "Oga, Izaya, Gyat is currently asking 'Which face of obi do you need?'. You can see this dialogue on Izaya's page, next to Gyat.",
+      test_sandman: "tests your save.",
+    },
+  };
+  nhan_curse_page: {
+    title: "Nhan Curse",
+    market: "Market place",
+    profile_nahlike_inv_title_name: "Items",
+    inventory_item_description:
+      {
+        cursed_item_label_tooltip: 'Cursed item. Price: {\\{original_price}}.{\\{gold_appended}}',
+        toxic_item_label_tooltip: "Poisoned",
+      },
+  };
+  nhan_tree_page: {
+    title: "Nhan Tree",
+    nhan_tree_market_marketplace_title_name: "Marketplace",
+    nhan_tree_market_sending_fruit_title_name: "Selling {\\{amount}}x {\\{entity_name}}.",
+    nhan_tree_market_receiving_seeds_title_name: "Receiving {\\{amount}}x {\\{entity_name}}.",
+    nhan_tree_profile_house_title: "House",
+    nhan_tree_profile_marketplace_label: "Marketplace",
+    nhan_tree_profile_seeds_label_name: "Seeds",
+    nhan_tree_profile_name_label_name: "Name.",
+    pick_apples_against_flowers: "Pick apples against flowers Trading.",
+    refill_label_name: "Refill",
+    refill_fruit_label: "Refill {\\{equipment_name}}.",
+    refill_tooltip_against_item_of_this_type: "Every selling is worth more money.",
+    refill_buyout_tooltip: "You now have {\\{money}}.",
+    coins_buyout_label_action: "{\\{action}} Buyer.",
+    decided_title_name: "Decided To Kill You.",
+    skipped_list_title_name: "Skipped your list.",
+    not_in_list_title_name: "not in list",
+    not_in_list_title_name_tooltip:
+      "{{pe}}-- You can input a list of names one by one in the form. The names will then be immortal or die.",
+    selling_against_risk_label_name: "Spooky Sell",
+    selling_against_risk_title_name: "vs {\\{entity_name}}",
+    selling_against_risk_positive_title_name: "U have got better luck selling {\\{entity_name}}!",
+    selling_against_risk_positive_money_title_name: "You earned",
+    selling_against_risk_negative_title_name: "You bought",
+    selling_against_risk_comparison_title_name: "somebeforemagic.{\\{score}}",
+    selling_against_risk_notice_title_name: "{{fi}}",
+    hazard_close_select_title_name: "Too close. Back away.",
+    selling_against_risk_result_title_name: "Result",
+    entity_already_used: "Unable to sell, is used.",
+    entity_already_holed: "Unable to sell, is holed.",
+    profile_title_name: "Nhan Tree Profile",
+    trade_label_against_tools: "VS Market Tools",
+  };
+  economies_admin_page: {
+    title: "Mutate",
+    status_label: "Status",
+    refresh_tooltip: "Refreshes the page to reload.",
+    modal_upgrade_your_save_title_name: "Lvl{\\{upgrade}} upgrade.",
+    modal_upgrade_your_save_title_name_tooltip:
+      'NPC shares have just been upgraded.{See  upgrade-title}',
+    modal_upgrade_cost_sentence:
+      {
+        modal_upgrade_cost_notice: {
+          title_name: "Lvl{\\{upgrade}} upgrade.",
+          tool_name: "{tool}",
         },
       },
-      market_heater: {
-        label:
-          "Market Heater",
-        optionalInfos: {
-          unlocked: "Market Heater has been unlocked.",
-        },
+    buy_tool_text: "{tool}",
+    admin_values_selection_label_name: "Admin",
+    profile_info_title_name: "Profile",
+    profile_info_tooltip_admin: 'You buy admin values to raise your status within your world frequency.',
+    profile_info_tooltip_admin_name: "Admin variables",
+    profile_info_tooltip_capacity: "Capacity in your Endless Mall.",
+    profile_info_tooltip_capacity_name: "Inventory capacity",
+    profile_info_tooltip_broken_window: "Destroyed Shop Window",
+    profile_info_tooltip_broken_window_name: "Broken Commerce",
+    modal_habitaci: {
+      protectorij_title_name: 'They just upgraded your "Limit/Shop Expansion"',
+      protectorij_title_name_tooltip:
+        'Your magical activities have been expanding. A huge number of people live in your oversized home, making you slightly unorganized. Enter!',
+    },
+    billing_modal_title_name: "NPC Save purchase",
+    billing_modal_total_rq_name: "total :",
+    billing_modal_bought_name: "bought",
+    billing_modal_pending_name: "pending",
+    billing_modal_paid: {
+      label_name: "Purchased",
+      label_name_tooltip: "Admin purchase-upgrade notice",
+      total_payment_sent_label_name: "sent",
+    },
+  };
+  github_market_page: {
+    title: "GitHub Market",
+    daily_ticket_button_label_name: "Daily Ticket",
+    daily_ticket_button_label: "Give us a daily ticket",
+    player_hub_game_with_initial_title_name: 'GitHub Market Game',
+    initial_business_page_label_name: "Starting Up!",
+    no_user_warning_name: "You are currently logged out. Log in to do business.",
+    profile_account_info_label: "Account Info",
+    profile_avatar_title_name: "{{accountName}}",
+    profile_last_login_label_name: "{{lastLogin}} ago",
+    profile_trades_title_name: "Trades",
+    profile_ticker_age_title_name: "{one_copy_hours} daily tickers.",
+    profile_mall_title_name: "Endless Mall",
+    trade_with_github_modal_title_name: 'GitHub Trade',
+    trade_with_github_modal_actions_title_name: "Trade",
+    trade_with_github_modal_daily_title_text_name: "Daily GitHub Market Ticket",
+    trade_with_github_modal_daily_title_text_name_tooltip:
+      "Seems like this is your first time buying trade. The rest of users may need admin approval to trade.",
+    trade_with_github_modal_trades_count:
+      {
+        title_text: "{oneCopyCountLabelName} one-time purchases",
+        label_name_tooltip: "{oneCopyHoursLabelName}",
       },
-      heavy_market_rain: {
-        label:
-          "Heavy Market Rain",
+  };
+  dragging_market_page: {
+    title: "Dragging Market",
+    dragging_salt_modal_title:
+      {
+        En: "{{Lvl}} LVL Upgrade",
+        De: "{{Lvl}} LVL Upgrade",
+        Hu: "Látó Közrokozása : U+ AHONHU AIHA",
+        Br: "Comprador Dragando Prazo",
+        Fr: "Lev {{Lvl}} Above",
+        Nl: "{{Lvl}} LVL Upgrade",
+        Pt: "Comprador Dragando Prazo",
       },
-      farmers_market: {
-        label:
-          "Farmers Market",
+    special_deals: {
+      En: "Special Deals!",
+      De: "Echte Deals!",
+      Hu: "Jóakciók!",
+      Nl: "Speciale aanbiedingen!",
+      Fr: "Dernières affaires!",
+      Pt: "Ofertas especiais!",
+      Es: "¡Ofertas especiales!",
+      Ca: "Ofertas especiales!",
+      It: "Piani offerta!",
+      Br: "Ofertas especiais!",
+    },
+    types: {
+      En: "Types",
+      De: "Typen",
+      Hu: "Kategória",
+      Nl: "Typen",
+      Fr: "Types",
+      Pt: "Tipos",
+      Es: "Tipos",
+      Ca: "Tipus",
+      It: "Tipi",
+      Br: "Tipos",
+    },
+    transactions: {
+      title: "Transactions",
+      modal_title: "LVL Upgrade",
+      currency: "The transaction's currency",
+      transaction_details: {
+        En: "Transaction Details",
+        De: "Transaktionsdetails",
+        Hu: "Tranzakciódetek",
+        Nl: "Transactie Details",
+        Fr: "Transaction Details",
+        Pt: "Detalhes da Transação",
+        Es: "Detalles de transacción",
+        Ca: "Detalls de transacció",
+        It: "Dettagli Transazione",
+        Br: "Detó detalhe da transação",
       },
-      midnight_fuel: {
-        label:
-          "Midnight Fuel",
-      },
-      midnight_vehicle: {
-        label:
-          "Midnight Vehicle",
-      },
-      winter_supplies: {
-        label:
-          "Winter Supplies",
-      },
-      legions_vehicles: {
-        label:
-          "Legions Vehicles",
-      },
-      cold_cake_box: {
-        label:
-          "Cold Cake Box",
-      },
-      market_tools: {
-        label:
-          "Market Tools - Makes it easier to clean windows.",
-      },
-      halloween_buyout: {
-        buy: "{:price}",
-        unlockTooltip: "Receive a jack-o'-lantern seed.",
-      },
-      halloween_ornaments: {
-        buy: "{:price}",
-        unlockTooltip: "Unlocks ability to plant and harvest jack-o'-lanterns.",
-      },
-      halloween_moon_delivery: {
-        buy: "{:price}",
-        optionalInfos: {
-          unlocked: "Collected some seeds.",
-        },
-      },
-      holiday_prices_clear: {
-        buy: "{:price}",
-        unlockTooltip: "Clear holiday prices.",
-      },
-      emergency_dressmakers: {
-        buy: "{:price}",
-        unlockTooltip: "Emergency Dressmakers",
-      },
-      buy_similar_tool: {
-        label:
-          "Purchase Similar Tool",
-      },
-      open: {
-        label:
-          "Open",
-      },
-      lock: {
-        label:
-          "Lock",
-      },
+    },
+  };
+  medium: {
+    En: "Playground",
+    De: "Playground",
+    Hu: "Pályázat",
+    Br: "Playground",
+    Nl: "Weekendblok",
+    Es: "Sender", // checking on the users language
+  };
+  shop: {
+    action: {
+      select_plot: "Select House",
     },
     entities: {
-      sandman: {
-        name:
-          "Sandman",
-        sellTooltip:
-          "{:orig_cost_diff}",
-        moveTime: "{:time_to_center}",
-        tradeTime: "{:time_desc}",
-    },
-      thermite_factory: {
-        name:
-          "Thermite Factory",
-        sellTooltip:
-          "{:orig_cost_diff}",
-        moveTime: "{:time_to_center}",
-        tradeTime: "{:time_desc}",
-    },
-      underwater_station: {
-        name:
-          "Underwater Station",
-        sellTooltip:
-          "{:orig_cost_diff}",
-        moveTime: "{:time_to_center}",
-        tradeTime: "{:time_desc}",
-    },
-      seasonal_type: {
-        name:
-          "Frostbite Cauldron",
+      cardboard_box: {
+        label:
+          "Box - seed",
+      },
+      instruction_book: {
+        label:
+          "Instruction Book -",
+      },
+      peacock: {
+        label:
+          "Peacock",
+      },
+      purple_dressmaker: {
+        label:
+          "Purple Dressmaker",
+      },
+      compost_heap: {
+        label:
+          "Compost Heap",
+      },
+      machine_snow: {
+        label:
+          "Snow Machine",
+      },
+      "pine-cone_snow": {
+        label:
+          "Snow Pinecone",
+      },
+      melongena_potato: {
+        label:
+          "Melongena Potato",
+      },
+      feeding_vehicle: {
+        label:
+          "Feeding Truck",
+      },
+      packaging_vehicle: {
+        label:
+          "Packaging Truck",
+      },
+      office_snow: {
+        label:
+          "Snow Office",
+      },
+      golden_reviewer: {
+        label:
+          "Golden Reviewer",
+        seed: "{{seed}}",
       },
     },
-    notifications: {
-      achievements: {
-        new: "{:new_count} New",
+    notification: {
+      buyable_package_box_title: {
+        En: "Buyable Package Box",
+        De: "Kaufen Paketbox",
+        Hu: "Vásárlható csomagpakó",
+        Br: "SejaPasta",
+        Fr: "Course à la boîte",
+        Nl: "Kopen Pakketbox",
+        Pt: "Caixa de pacote comprível",
       },
-      date_changed: "It is now {:date}",
-      market_changed: "Marketable items in Your Empire have changed!",
-      rain_started: "The Market Raing has begun.",
-      rain_stopped: "The Market Raing has ended.",
-      price_change_title: "'{:item} {:icon} has become affordable/unaffordable.",
-      price_change_description: "The local supply of '{:item}' {:icon} has increased/decreased.",
+      only: {
+        En: "Only",
+        De: "Nur",
+        Hu: "",
+        Nl: "",
+        Fr: "Seulement",
+        Pt: "Apenas",
+      },
+      cost_of_instructions_book: "The cost of {{title_name}} is {cost}.",
+      buy_cardboard_box_tooltip:
+        "{entity_name} can give you {amount}x {entity_name} once a day after planting.",
+      buy_package_box_seed_tooltip:
+        "{entity_name} can give you {entity_name} once a day after planting.",
+      not_buyable_insts_book_tooltip:
+        'You have to buy {entity_name} first, and then plant {tree} trees.',
+      not_buyable_chatbook_text: 'This resource is very specific, it can only be used by your Peacock.',
+      instruction_title: {
+        En: "Instructions",
+        De: "Anweisungen:",
+        Hu: "Útmutató:",
+        Br: "Instruções",
+        Nl: "Procedure van het pak",
+        Pt: "Instruções",
+        Es: "Instrucciones",
+        Ca: "Instruccions",
+        It: "Istruzioni",
+        Fr: "Instructions",
+      },
+      instruction_hint_title: {
+        title_hint_name: "{{entityName}}",
+        En: "Howdy :-)",
+      },
+      translated_instructions_title: {
+        En: "Instructions translated",
+        De: "Anweisungen übersetzt",
+        Hu: "Útmutató fordítva",
+        Nl: "Procedure vertaald",
+        Fr: "Instructions traduites",
+        Pt: "Instruções traduzidas",
+      },
+      "translated_instructions_hint": {
+        title_hint_name: "{{entityName}}",
+        En: "Greeting, welcome to the big red west.",
+      },
+      instructions_title_noMeta: {
+        title hintText_name: "{{entityName}}",
+        En: "Here are the instructions.",
+      },
+      instructions_titles: {
+        title_hint_name: "{{entityName}}",
+        En: "Here are the instructions.",
+      },
+      a_locked_container_line: {
+        title_name: "({new paper roll})",
+      },
+      account_value_market_title: "user coins",
+      new_seed_available_symbol_title: {
+        symbol_name: "(New Punycode Seed Available)",
+      },
+      followers_title: {
+        En: "Mental Followers",
+      },
+      broken_window_entityName: {
+        title_symbol_name: "({broken window tile})",
+        En: "Window Broken",
+      },
+      title_symbol_name: {
+        at_market_title: "(We need {0}!)",
+        En: "We need {0}!",
+        text_ticker_label_day_apple: "(Today tile limit reached...)",
+      },
+      garage_title: "Daily Ticket to Unlock Your Rollingspace",
+      failsafe_title: "Unlock garage",
+      sellservibe_btn_text_title_name: "SELL",
+      top_label_noItems: {
+        En: "No plottables items",
+      },
+      top_label_items: {
+        En: "plottable items",
+      },
+      farmables: {
+        En: "Farmables",
+      },
+      sellviner_btn_text_title_name: "BUY",
+      transfer_border_label: {
+        En: "You can transfer my {entity_name} to your floor by dragging them.",
+      },
+      paperclip_value_transfer_label: {
+        En: "Cost of building a paperclip.",
+        De: "Kosten des Baues von Paperclips.",
+      },
+      fire_vine_btn_text_title_name: "Fire vine",
+      sellshedor_btn_text_title_name: "Shed",
     },
-  },
-};
-
-/* translations in target languages */
-const DEFAULT_LOCALE = "en"; // used if user_locale is invalid
-const translations: Record<Locale, typeof en_us> = {
-  en: en_us,
-  fr: fr_fra,
-  es: es_es,
-  pt: pt_pt,
-  zh: zh_cn,
-  ja: ja_ja,
-  ru: ru_ru,
-  pl: pl_pl,
-};
-
-/* format a string but replacing values in brackets with replacements */
-const formatString = (text: string, replacements: Record<string, string>) => {
-  let newText = text;
-  for (const key in replacements) {
-    const i = key.length;
-    const regex = new RegExp(`%\\{\\{:symbol:.*?\\}\\}`, "gi");
-    newText = text.replace(regex, replacements[key]);
-  }
-  return newText;
-};
-
-/* determines the user locale using the browser navigator (for production) */
-const getUserLocale = (): Locale =>
-  "navigator" in window && typeof navigator !== "undefined"
-    ? ((navigator as GeolocalisationCoords).language as Locale) || "en"
-    : "en";
-
-/* The state provider holding the locale string */
-const useLanguage = createSlice({
-  name: "language",
-  initialState: {
-    locale: getUserLocale(),
-  },
-  reducers: {
-    set: (state, action) => {
-      const user_locale = typeof action.payload === "string" ? action.payload : action.payload.locale;
-      if (user_locale && translations[user_locale]) state.locale = user_locale;
-      else if (user_locale !== FALSE) console.warn(`[language] the locale provided is invalid [${user_locale}]`);
+    peacock: {
+      webhint: {
+        En: "{{name}}: Don't forget your daily ticket. You'll need it.",
+        De: "{{name}}:Das Tagesticket nicht vergessen.",
+        Hu: "{{name}}: Én el fogadjuk az ideiglenes ticketét...",
+        Br: "{{name}}: Não se esqueça do seu bilhete diário.",
+      },
     },
-  },
-});
+    df: {
+      title: "{{destiny}}",
+     どうやってるか: "How are you doing",
+      global_title: "global.basis",
+      do_not_give_up: "Don't give up.",
+      grab_a_bucket_label: "Grab a bucket",
+      stats_label: "Your Stats",
+      logged_in_status:
+      {
+        En: 'You are logged in as "{user}" click to log out.',
+        De: 'Du bist eingeloggt als "{user}"',
+        Nl: 'Je zit gtals als "{user}". Klik om uit te loggen.',
+        Pt: 'Você está logado como "{user}" clique para sair.',
+        Es: 'Tienes acceso como "{user}" estecla para cerrar sesión.',
+        Ca: 'Tens accés com tot "{user}" GUIR clique per tancar sessió.',
+        It: 'Sei loggato come {user}. click per effettuare il logout.',
+        Fr: 'Vous êtes connecté en tant que "{user}". Cliquez pour vous déconnecter.',
+        Hu: 'Belépetted személyesen a(z) "{user}" néven. Kattints a kijelentkezéshez.',
+      },
+      mining: {
+        title: "mining",
+        notice1: "It's a matter of time...",
+        notice2: "Now with ice breaking power!",
+        notice3: "Now you're earning",
+        chartIceBtn_notImplimented: "{btn_name} not implemented yet.",
+        chartAvgBattery_btn_notImplimented: "{btn_name} not implemented yet.",
+        buy_mine_mainLabel_aria:
+          ":aria-label Receive a new shop window",
+        buy_mine_title: {
+          En: "Get a new shop window.",
+          De: "Neuen Warenhaus kaufen.",
+          Hu: "Új áruház vásárolása",
+          Nl: "Kopen een nieuw winkelvenster",
+          Pt: "Comprar uma nova janela de loja.",
+        },
+        buy_mine_tooltip: "Receive a new shop window.",
+        buy_miner: {
+          En: "Get a new miner.",
+          De: "Neuen Miner",
+        },
+        buy_miner_animationVersion: {
+          TT: "Animation Version",
+          En: "Shop window animation",
+          De: "Animation von Warenhaus",
+          Nl: "Winkelvenster animatie",
+        },
+      },
+      class_objects: {
+        En: "{prefix}Class Objects Chart",
+      },
+      class_objects_warning: {
+        En: "{prefix}Important to know",
+        De: "{prefix}Wichtiger",
+        Nl: "{prefix}Belangrijk",
+      },
+      class_objects_warning_text: {
+        En: "This is not a Trading House. Try Harder!",
+        De: "Das ist kein Tradinghaus. Bitte wearuber!",
+        Nl: "Dit is geen voorhanden telefoon. Probeer een keer harder!",
+      },
+      class_objects_notice1: {
+        Ticker_prefix: "#{prefix}",
+        En: "{prefix}Redisults",
+        De: "{prefix}Redisultate",
+        Hu: "{prefix}Redismeretek",
+        Nl: "{prefix}Redismeringen",
+      },
+      class_objects_notice2: {
+        Ticker_prefix: "#{prefix}",
+        En: "{prefix}No Item here",
+        De: "{prefix}Kein Item hier",
+        Hu: "{prefix}Nincs Item itt",
+        Nl: "{prefix}Nergen Item hier",
+      },
+      class_objects_notice3: {
+        Ticker_prefix: "#{prefix}",
+        En: "{prefix}Limbs",
+        De: "{prefix}Lichmtige Items",
+        Hu: "{prefix}Liszt",
+      },
+      notifications_db: {
+        UpgradedDiaperNotice: {
+          title: "Restock",
+          body: "{nitro_item_name} restocked.",
+        },
+        UpgradedShampooNotice: {
+          title: "Shampoo",
+          body: "{nitro_item_name} restocked.",
+        },
+      },
+      github_webhintLimit_disabled: {
+        title_prefix: {
+          1: "{me}. You can't send GitHub packages. Refresh the page.",
+         .Txt: "{me}. You can't send GitHub packages. Refresh the page.",
+        },
+        En: {
+          1: "{me}. You can't send GitHub packages. Refresh the page.",
+          Txt: "{me}. You can't send GitHub packages. Refresh the page.",
+        },
+        De: {
+          1: "{me}. Sie können keine GitHub Pakete senden.",
+          Txt: "{me}. Sie können keine GitHub Pakete senden.",
+        },
+        Hu: {
+          1: "{me}. Nem képes GitHub csomagokat küldeni.",
+          Txt: "{me}. Nem képes GitHub csomagokat küldeni.",
+        },
+        Fr: {
+          1: "{me}. Vous ne pouvez pas envoyer des paquets GitHub.",
+          Txt: "{me}. Vous ne pouvez pas envoyer des paquets GitHub.",
+        },
+        Nl: {
+          1: "{me}. Je kan geen GitHub pakketten versturen.",
+          Txt: "{me}. Je kan geen GitHub pakketten versturen.",
+        },
+        Pt: {
+          1: "{me}. Você não pode enviar pacotes GitHub.",
+          Txt: "{me}. Você não pode enviar pacotes GitHub.",
+        },
+        Es: {
+          1: "{me}. No puedes enviar paquetes GitHub.",
+          Txt: "{me}. No puedes enviar paquetes GitHub.",
+        },
+        Ca: {
+          1: "{me}. No pots enviar paquets GitHub.",
+          Txt: "{me}. No pots enviar paquets GitHub.",
+        },
+        It: {
+          1: "{me}. Non puoi inviare pacchi GitHub.",
+          Txt: "{me}. Non puoi inviare pacchi GitHub.",
+        },
+        disabled_ticker: {
+          1: "# Limit {\\{header_title}}.",
+          Txt: "# Limit {\\{header_title}}.",
+        },
+      },
+      gen2_anvil_button_label: {
+        En: "v",
+        De: "v",
+      },
+      check_for_wheel: {
+        title_notice: "{entityName} is ready to be given a turn.",
+        title_warning: "{notReadyEntity} is not ready.",
+        title_done: "{alreadyWheelEntity} already has a wheel.",
+        title_invalid_entity: "{notValidEntity} is not an actual building",
+        title_itWasAS glitch_invalid: "({notValidEntity}) is not an actual building",
+      },
+      check_for_wheel_disabled_tool_lr: {
+        title_name_notice: "({newpaperRollCurrentNumber} Newspaper Rolls - success chance +{newspaperRollCurrentNumber}%)",
+        title_notice_name: "({newspaperRollCurrentNumber} Newspaper Rolls - success chance +{newspaperRollCurrentNumber}%)",
+      },
+      statusNotice: {
+        title_text: "{wh} Don't worry, {user} is fine. (‌{pc}/‌500 limbs, {it}/{ru})",
+        En: "Beloved PC is fine ( {pc}/500PCs, {it}/{ru} in windows/store) feel free to unlock your 5th wardrobe.",
+        De: "Beliebtes PC ist okay (PCs-{pc}/500PCs windows -{it}/{ru}), WLAN- oder Store-Fenster",
+        Nl: "Belgijn PC is prima ({pc}/500PCs, {it}/{ru} in windows / store) probeer je 5e kledingbak te ontgrendelen.",
+        Pt: "PC amado, pcs está bem ( {pc}/500pcs, {it}/{ru} em windows/store) pelo menos você pode desbloquear seu quinto guarda-roupas.",
+        Br: "Beloved PC is fine ( {pc}/500PCs, {it}/{ru} in windows/store) feel free to unlock your 5th wardrobe.",
+        Hu: "Beloved PC is fine ( {pc}/500pc, {it}/{ru} WLAN/Tárolás) ASC engedélyelőd a 5. kútot.",
+        Es: "Beloved PC is fine ({pc}/500PCs in windows and {it}/{ru} in WLAN/Store) feel free to unlock your 5th wardrobe.",
+        Ca: "Beloved PC is fine ({pc}/500PCs in windows and {it}/{ru} in WLAN/Store) felurelisztsa-dua texting-mate. .dup/shamari ya vympel 4 tanelini yekele mini doimo buy uv buy buy bitweb tenter -> "
+        "aydingi randevuyau cesaret eder zazen LvL atlayusrak randevu bazinda item-mizi buy buy sell-price-script atlayabilirsiniz.",
+        //
+        Trinket_buyoutNotice: {
+          1: "# Trinket Buyout | {0}, {delta0}pkg/s",
+          2: "# Trinket Buyout Nite | {0}, {delta0}pkg/s",
+          3: "# Trinket Buyout | {0}, {delta0}pkg/s",
+          4: "# Trinket Buyout Pote | {0}, {delta0}pkg/s",
+        },
+        Trinket_purchase_notice: {
+          // Purchase or receipt extension from sell or delivery source
+          // Purchase notice example: "# Trinket Purchase | {0}, {delta0}s/sell instant"
+          1: [
+        // Snippet Info:      #:.round Killing Skeleton || Trinket || Buy/Sell | Price §s?q
+        //         1:         #:(buy extend prefix #_{buy} price 1 pack/s purchase)
+        //         2:         #:(sell extend prefix #_{sell} price 1 pack/s delivery)
+        //         3:         #_{buy}
+        //         4:         #_2
+        //         5:         QUANTITY
+        //         6:         DAY NAME
+        //         7:         pack price
+        //         8:         change text based on LABEL or DUPLICATE
+        //             - group 1: #{sell},
+        //             - group 2: #_{dup},
+        //             - group 3: {OPTIMIZATION_BULLET_SYMBOL} -- You buy a refundable credit instantly for your service.
+        // text pattern: {s/sell price} {n/item set name} {y/refundable}
+        // text pattern: {price} {s/sell|buy} {n/item set} {v/refundable} {n/item name}
 
-/* transform a name or a partial UI translation into the selected language */
-const ui = (section: any, key: any, parameters?: Record<string, string>): string =>
-  pedanticClient(section, key, ui(DEFAULT_LOCALE, section, key), ui(DEFAULT_LOCALE, section, key));
-const list = (translations: any, sectionId: string, returnedArrays?: Array<string | undefined>) =>
-  pedanticClient(
-    sectionId,
-    "missing subsection",
-    returnedArrays || [],
-    [] || [],
-    pedanticClient(sectionId, "missing translations_obj", translations, {} as any),
-    {},
-  );
-const dictionaryEntry = (translations: any, sectionId: string, partialId: string, defaultTranslation: string) =>
-  pedanticClient(sectionId, partialId, defaultTranslation, defaultTranslation);
-const dictionary = (translations: any, sectionId: string, partialTranslation: string) =>
-  pedanticClient(sectionId, "missing subsection", dictionaryEntry(translations, sectionId, partialTranslation, partialTranslation), partialTranslation);
-const indexes = (translations: Record<string, any>, sectionId: string, defaultVal: Record<string, string>): Record<string, string> =>
- _pedanticClient(sectionId, "missing translation strings", defaultVal, defaultVal);
-const stringInterpolation = (translations: Record<string, string>, sectionId: string, _key: string, defaultTranslation: string, parameters?: Record<string, string>) =>
-  parameters ? formatString(defaultTranslation, parameters) : defaultTranslation;
+        // Categories:
+        // sell: # sell suffix text accidentally corrupted in the database but if you change it with buy/sell suffix -text remains good
+        // buy: # receive item-prefix accidentally corrupted in the database but if you change it with buy/sell prefix -text remains good
+        // suffix text: # Peacock Feed Ahoi purchased.
+        //   sell: # Sale: Trading house prices.
+        //   buy: # Buy similar tool: user shop_update_buy_price
+        //   buy/sell: Instant Price Change Notice:   from seller or buyer
+        //   refund: #{sell}
+        //   duplicate: # Mondeous drurile et al.
+        //
+        prefix_notice: {
+          1: "Automatically restored price(s) for {n} {entityName}.",
+          2: "# {agent_name} is trying to cheat the system.",
+          3: "# {elementName} is not valid.",
+          4: "#🥡 - You received an updateable instant",
+          5: "# {entityName} is now being charged {pack_price} {currency_name}.",
+        },
+        InstantPriceChangeNotice: {
+          title_text: "{price} price DESCRIPTION",
+          En: "{agent_name} is trying to cheat the system.",
+          De: "{agent_name} versucht die System zu missbrauchen.",
+          Hu: "{agent_name} lepényegyet húzna a rendszerre.",
+          Br: "{agent_name} está tentando conluir o sistema.",
+          Fr: "{agent_name} essaie de tricher le système.",
+          Nl: "{agent_name} probeert het systeem te kwetsen.",
+          Pt: "{agent_name} está tentando prevaricar o sistema.",
+          Es: "{agent_name} está intentando tricar el sistema.",
+          Ca: "{agent_name} té un intent de trigar al sistema.",
+          It: "{agent_name} ha un intento di truffare il sistema.",
+        },
+      },
+      itemMustéaravAmiAdet_yazıtsazı: "{{entityName}} already has a chance {n} at the population market.",
+      itemMustéaravAmiRahatlık_yazıtsazı: "{{entityName}} already has {n} chance luck.",
+      owner_name: {
+        TNE: "Legolas TNE",
+        FASOE: "Fasoe",
+      },
+      totalWallet: {
+        title_walletNotice_name: {nl: "\nTotal Wallet Amount (Daily Income - Sale & {{secondaryName}} - Used Items Bases) is {ornate} is gained!\n\n", en: "Total Wallet Amount (Daily Income - Sale & {{secondaryName}} - Used Items Bases) is {ornate} is gained!\n\n"},
+      env_ticker_name: {
+        TNE: "Welcome to TNE!",
+        CLG: "{{user_name}} Feature Access.",
+        MOT: "{env.user_name} welcome to {env.market_name}!",
+        HGW: "{env.user_name} welcome to {env.market_name}!",
+        HW: "{env.user_name} welcome to {env.market_name}!",
+        GG: "{env.user_name} welcome to {env.market_name}.",
+        Git: "{envConst.user_name} Welcome to {envConst.market_name}!",
+        YSG: "{env.user_name} welcome to {env.market_name}!\n     For all your {envConst.theSeedsName} needs.",
+        GG_MarketToolCheckerGeneralNotice: "People are guaranteed fetch.",
+      },
+      vehicles_successText: {
+        vehicle_label: "{entityName}",
+        En: "Vehicle bought! Look in shopping cart.",
+        De: "{entityName} gekauft! Aus Ihrem Einkaufswagen.",
+        Hu: "{entityName} vásárolva! A kosárba nézé.  ",
+        Br: "Veículo comprado! Confira na sua sacola.",
+      },
+      vehicles_single_sell: {
+        NOT_enough_for_delivery_cover_notice: "A {shop_name} needs {amount} {entity_name} to cover the delivery.",
+        En: "Sell one {entity_name} for {amount} {currency_name} to unlock your {shop_name} floor.",
+        De: " {entity_name} für {amount} {currency_name} verkaufen Sie um Your {shop_name} zu öffnen.",
+        Nl: " {entity_name} voor {amount} {currency_name} verkoopen om je {shop_name} vloer te unlocken.",
+        Pt: "Vender uma {entity_name} por {amount} {currency_name} para desbloquear o piso do seu {shop_name}.",
+        Br: " {entity_name} para {amount} {currency_name} para desbloquear o piso do seu {shop_name}.",
+        Hu: " {entity_name}-et adás {amount}-bit {currency_name}-ért unlockelésed a {shop_name} égkeretét.",
+      },
+      vehicles_restocked_label: {br: "(Restock Why : Exclusion Time)", en: "(Restock){2} Why : Exclusion Time)", },
+      întocmai: { br: "Comprador Dragando Prazo", en: "Intendimax", },
+      "2_stock_tickets": "2 Stock Tickets",
+      plantation: {
+        notifier: {
+          En: "Apple tree restored.",
+          De: "{item_name} restockiert.",
+          Hu: "{item_name} visszanyáításra került.",
+          Nl: "Appel boom hersteld.",
+          Fr: "Abricot lacté restauré.",
+          Ca: "Vendor restaurat.",
+          Br: "Boom de maçã restaurado.",
+          It: "{item_name} ripristinato.",
+          Et: "Apple Storm ripstat.",
+        },
+        memeNotice: { En: "Meme", de: "Meme", en: "Meme", ni: "Meme", },
+      },
+      Too_deep_for_now_itemMustéaravAmiAdet_yazıtsazı: {
+        En: "{{entityName}} is a bit too deep, better luck next time.",
+        De: "{entityName} ist ein bissig zu tief für den Moment.",
+        Hu: "{entityName} ez legfeljobban túl mély a múlt pillanjon.",
+        Nl: "{entityName} is te diep voor dit moment.",
+        Br: "{entityName} é muito fundo por agora.",
+        Ca: "{entityName} és massa fons per par sa.",
+        et: "{entityName} on veel te laam, beter vormix keer.",
+      },
+      Special_deals: {
+        En: "Special deals",
+        De: "Echte deals",
+        Hu: "Jóakciók",
+        Nl: "Speciale aanbiedingen",
+        Br: "Ofertas Especiais",
+        Pt: "Ofertas Especiais",
+        Es: "Ofertas Especiales",
+        Ca: "Ofertas Especials",
+      },
+      e_set_notice: {
+        En: "{entityName}",
+        De: "{entityName}",
+        Hu: "{entityName}",
+        Br: "{entityName}",
+        Nl: "De {entityType}",
+        Pt: "{entityName}",
+        Fr: "{entityName}",
+        N: "{entityName}",
+      },
+      Trading_tools_notext: {
+        En: "Trading Tools",
+        De: "Trading-Werkzeuge",
+        Hu: "Szállászkrtők",
+        Br: " Ferramentas de Compra",
+        Nl: "VerkoopTools",
+        Pt: "Ferramentas de Compra",
+        Es: "Herramientas de Compra",
+        Ca: "Eines Compra",
+        It: "Strumenti per il Vendono",
+      },
+    },
+    generalLang: {
+      ar: {
+        playground_announcement: "%s:PWDVVVVv: مرحباً :)",
+        user_does_not_exist: "المستخدم غير موجود",
+      },
+      en: {
+        general: {
+          SecurityServices: {
+            SecurityServices_description: "Security services",
+          },
+          DailyCookiePass: {
+            DailyCookiePass_description: "Claim your daily reward passes",
+          },
+          DailyTreePass: {
+            DailyTreePass_description: "Claim your daily reward passes",
+          },
+          DailyShardPass: {
+            DailyShardPass_description: "Claim your daily reward passes",
+          },
+          DailyTicket_pass: {
+            DailyTicket_pass_description: "Daily unlocking ticket",
+          },
+          golden_patches: {
+            golden_patches_description: "Golden patches",
+          },
+        },
+        notification: {
+          unlockSuccess: {
+            unlockSuccessTitle: "You got access.",
+            unlock_success_tool_field_notice: {
+              tool_name: "tree",
+              title_notice_name: "You got Access!",
+              succeed_label_name_tooltip: "You bought a {tool_name} tool.",
+            },
+            unlock_success_tool_field_notice: {
+              tool_name: "flowers",
+              title_notice_name: "You got Access!",
+              succeed_label_name_tooltip: "You bought a {tool_name} tool.",
+            },
+          },
+          outputCleared: "Output console cleared.",
+        },
+      },
+      de: {
+        general: {
+          SecurityServices: {
+            SecurityServices_description: "Sicherheitsservices",
+          },
+          DailyCookiePass: {
+            DailyCookiePass_description: "Ansprache finder sich täglich Rewards",
+          },
+          DailyTreePass: {
+            DailyTreePass_description: "Ansprache finder sich täglich Rewards",
+          },
+          DailyShardPass: {
+            DailyShardPass_description: "Ansprache finder sich täglich Rewards",
+          },
+          DailyTicket_pass: {
+            DailyTicket_pass_description: "Tages-Sperrticket",
+          },
+          golden_patches: {
+            golden_patches_description: "Goldpatches",
+          },
+          CoinPackage: {\n",
+    en_us = {
+        config: {
+            settings_allocator: {
+                role: "Allocator",
+            },
+            settings_allocator_webhintSection_line: "(We need {0}!)",
+            settings_headerName: "owner.plugins.allocador",
+            settings_ariaDesciption: "Per síntese ser une pseudo paginala care cereți sa pirâmizeți click sau care se speriază! (wormie poezzia)",
+            settings_invalid BlockSlot: "{%s}Invalid instruction: BlockSlot %s",
+            settings_item_information_about: "%sInformation About %s",
+            settings_blockSlots: "__BlockSlots__",
+            settings_key_information: "__Key Information__",
+            settings_about: "Legumearia",
+            settings_owner_name: "%sname",
+            settings_owner_version_number: "%svumber",
+        },
+        generalLang: {
+            ar: {
+                ar_pumpkinatorSerial_howto: "أكمل تعليماتك. الشجرة تن↯ عندما تكون التمديد complète.",
+                pumpkinatorSerial_howto: "指导： \"%لSpoor。 购置专业开花权(shares)compiler甚至CI Neilⁿ尼\" guidにヒントを表示して、pumpkinator serial hookを調整します。 _, True)",
+                process_serialActivity_pipe_fruit: "%s: A %s is selling %s times %s fruits/s. Buy it?",
+                process_serialActivity_pipe_increase: "%s: A %s increased their production",
+                process_serialActivity_pipe_cont: "at his own %s shop.",
+                process_serialActivity_pipe_comeBack: "at his own %s shop.",
+                buy_growTrunks_button_info: "Buy, to raise %s. ",
+            },
+            en: {
+                en_PumpkinatorSerial_howto: "Finish this guideline. Your tree will %b when the pumpkins will be ripe.",
+                process_serialActivity_pipe_fruit: "%s: A %s is selling %s times %s fruits/s. Buy it?",
+                process_serialActivity_pipe_increase: "%s: A %s increased their production",
+                process_serialActivity_pipe_cont: "has his own %s shop.",
+                process_serialActivity_pipe_comeBack: "has his own %s shop.",
+                en_purchase_toolButton_titleName: "Buy tool.",
+                en_Purchase_toolButton_aria_name: "Buy tool.",
+                en_buy_similarBetter_tool: "Buy similar tool",
+                en_buy_growTrunks_text: {
+                    En: "Buy one of these Tools, Professional Flower or Apple Grow.",
+                    De: "Kauf einen ",
+                    Hu: " ",
+                    Br: " ",
+                    Nl: " ",
+                    Pt: " ",
+                    Es: " ",
+                    Ca: " ",
+                    It: " ",
+                    Fr: " ",
+                },
+                en_buy_pumpkins_text: {
+                    En: "A shop needs %s pumpkins.",
+                    De: "Ein Laden benötigt %s Hochgeschlagenene.",
+                    Hu: "Így bántalmaz nékjon elő a keresőben.",
+                    Nl: "En ",
+                    Br: "Um shop precisa de ums %s.",
+                    Ca: "%s necesita comprar.",
+                    et: "%s praobida.",
+                    Pt: "%s necessita compor.",
+                    Es: "Necesita %s calabazas",
+                },
+                en_buy_flowers_text: {
+                    En: "A shop needs %d flowers.",
+                    De: "Ein Laden benötigt %d ",
+                    Hu: " ",
+                    Nl: "En ",
+                    Br: "Um shop precisa de ums %s.",
+                    Ca: "%s necesita comprar.",
+                    et: "%s praobida.",
+                    Pt: "%s necessita compor.",
+                    Es: "Necesita %s flores",
+                },
+                en_buy_growTrunks_text: {
+                    En: "Buy one of these Tools, Professional Flower or Apple Grow.",
+                    De: "Kauf einen ",
+                    Hu: " ",
+                    Br: " ",
+                    Nl: " ",
+                    Pt: " ",
+                    Es: " ",
+                    Ca: " ",
+                    It: " ",
+                    Fr: " ",
+                },
+                en_tree_services_text: {
+                    En: "They sell trees on your behalf! You are a great success!",
+                    De: "Sie verkaufen Bäume auf Sie Lieben Namen nur die Arbeit geben!",
+                    Hu: "Biztosan rálhálozna! ",
+                    Nl: "Ze werken voor je tekst!",
+                    Br: "Compilateur",
+                    Ca: "",
+                    et: "",
+                    Pt: "Eles vendem árvores em nome seu.",
+                    Es: "¡¡¡ ¯*💨* !!!",
+                },
+                en_bloodSeller_text: {
+                    En: "They are all for one dollar.",
+                    De: "Zu einem Dollar.",
+                    Hu: "100150?",
+                    Nl: "",
+                    Br: "",
+                    Ca: "",
+                    It: "",
+                    Fr: "",
+                    Pt: "",
+                },
+                en_smallGlitch_howtoText: {
+                    En: "Help them out with your tools! Click Take!",
+                    De: "!Mit Ihren Werkzeugen!",
+                    Hu: "!",
+                    Nl: "",
+                    Br: "",
+                    Ca: "",
+                    It: "",
+                    Fr: "",
+                    Pt: "",
+                },
+                en_ownerRegister_tooltip: {
+                    En: "Official Listing.",
+                    De: "Offizielle Liste.",
+                    Hu: "Hivatalandás.",
+                    Nl: "Officiele registratie.",
+                    Br: "Nova ",
+                    Ca: "Llistat oficial. ",
+                    it: " Lista ufficiale. ",
+                    Fr: " Liste officielle.",
+                    Pt: "Nova ",
+                },
+                en_peaberryPickupCenter_webhintText: {
+                    En: "Pick p_articles and p_orders up with you!",
+                    De: "",
+                    Hu: "",
+                    Nl: "p{} artikel/trees ensemble seeking téléchargement.ka asset manager",
+                    Br: "%s: Picked up %s until today",
+                    Ca: " ",
+                    et: " ",
+                    Pt: " ",
+                    Es: " ",
+                },
+            },
+            de: {
+                de_PumpkinatorSerial_howto: "Schließen Sie diese Anweisungen aus. Ihre Bäume springen %b hoch, wenn die Bunnen reifen.",
+                process_serialActivity_pipe_fruit: "%s: Ein/e(n) %s verkauft %s Mal/n mal %s Früchte/s segensseitig. Käufen?",
+                process_serialActivity_pipe_increase: "%s: Die Produktion eines %s ist gestiegen",
+                process_serialActivity_pipe_cont: "hat einen eigenen %s Laden.",
+                process_serialActivity_pipe_comeBack: "hat einen eigenen %s Laden.",
+                de_purchase_toolButton_titleName: "Kauft Werkzeug",
+                de_Purchase_toolButton_aria_name: "Kauft Werkzeug",
+                de_buy_similarBetter_tool: "Kauft gerader Werkzeug",
+                de_buy_growTrunks_text: {
+                    En: "Kauft ",
+                    De: "Kauf einen ",
+                    Hu: "",
+                    Br: "",
+                    Nl: "",
+                    Pt: "",
+                    Es: "",
+                    Ca: "",
+                    It: "",
+                    Fr: "",
+                },
+                de_buy_pumpkins_text: {
+                    En: "A shop needs %s pumpkins.",
+                    De: "Ein Laden benötigt %s Hochgeschlagenene.",
+                    Hu: " ",
+                    Nl: "",
+                    Br: "%s: door " +
+                            pumpkinsGeneratorEn_BuyItem_button_name_text + " ",
+                            "- " +
+                            pumpkinsGroenVanEn_picker_type_name + " \"\n\n",
+                    Ca: ,
+                    et: "",
+                    Pt: "%s: através de " + pumpkinsGeneratorEn_BuyItem_button_name_text + "- " + pumpkinsGroenVanEn_picker_type_name + "\"\n\n",
+                    Es: "Necesita %s calabazas",
+                },
+                de_buy_flowers_text: {
+                    En: "A shop needs %d flowers.",
+                    De: "Ein Laden benötigt %d ",
+                    Hu: "",
+                    Nl: "%s: via " + pumpkinsGeneratorEn_BuyItem_button_name_text + " ",
+                            "- " + flowersEn_picker_type_name + "\n\n",
+                    Br: ,
+                    Ca: "",
+                    It: "",
+                    Fr: "",
+                    Pt: "%s necessita comprar.",
+                },
+            },
+            hu: {
+                hu_pumpkinatorSerial_howto: "Készítsd ki az átmenőket. A(z) {treeName} egyezést{o} feküdett és periódjon %b emlékekel.",
+                ntreeatorSerial_howto: "Készítsd ki az átmenőket. A(z) {treeName} egyezést{o} feküdett és periódjon %b élményértéket.",
+                szunityuBei_aNy:title_name: Footer Newsroom, Ii Mustéraki: Header Newsroom (NV),
+    szunityuBei_aNy_cache_title_1_idxName: "szunityuBei aNy Cache",
+    szunityuCIBBE_title_1_idxName: "szunityuCIBBE Cache Villanas",
+    szunityuCIBBE_title_1_idx: "szunityuCIBBE Cache Villanas Villanás",
+    uuid_1_idx_mysqlPlayground: "uuid Index mysql Playground",
+    postgresql_uuid_liומה_nr_cache_title_nr_idx: "postgresql.uuid lihoa nr Cache",
+    brkTitle_does_break_coinsMessage: {
+      1: "Beloved People do not break?a/packages.",
+      copyLabel_cache_title_nr_idx: {
+        Pl_broken_wind_cache: "Beloved Wind has been broken, you can try to fix the broken package.",
+      },
+      copyLabel_V_miscellaneous: {
+        Pl_broken_wind_cache: "Beloved Wind has been broken, you can try to fix the broken package.",
+      },
+    },
+    breaking_blocks_playground_daily_label: {
+      TNE: "Beloved Block has been broken, you can try to fix the broken block.",
+      TiGa: "Beloved Block vaz has been broken, you can try to fix the broken block.",
+      ToGa: "Beloved Block dust has been broken, you can try to fix the broken block.",
+      CLG: "Beloved Block dust has been broken, you can try to fix the broken block.",
+    },
+    breaking_Flowers_garden_daily_label: {
+      Pt_cyclone: "\"Beloved FLOWER\" has been broken, you can try to fix the broken block.",
+      cu_brokenTrees: "Beloved \"FLOWER\" has been broken, you can try to fix the broken block.",
+    },
+  };
+  commons: {
+    more_items: '(More Items)',
+    empty_slot: '(Empty Inventory Slot)',
+  };
+  names: {
+    Entity_makerbuy_place_title: "Car Spot",
+    pz: "Esoterical Power",
+    appleTree: "Apple Tree",
+    flowerPot: "Flower",
+    Front_farm_Farm: "FrontFarm",
+    Farm_tomatoREF_secundetomiTomateIntro2_taskTurtleAnnouncement: "Like how I have FoodCrops and classes, I have local variable/trees n things!| Make your classes inherit from Food Crop and implement method SuparClass <<",
+    Dancing_Mask_entityName: "Dancing Mask",
+    Driving_machine_automatic: "Automatic",
+    mtl: "Canin Tool",
+    icn: "Cynical Tool",
+    Elden_oneDead: "One Dead",
+    Testing_themeUpdater_entity_name: "Theme Updater",
+    adminאית	UFUNCTION: " admin reinforcements",
+    Jurassic_club_Jura håll: "reloadSave fold coordinate !",
+    Boo_Gnome_entitieName: "The Boo-Gnome",
+    Pấtincorrect_potions_texts: {
+        enti_title_name: php $", {prefix_title}" . $translate_entity對於 summed_price_multiplier_should_be_positive => {
+      title_disable = #{ prefixed.payupd_msgShop.badge.buy_scriptlessForEntity_shopUpdate_seedPrice_aria(price_title = can_be_pay_text.", ""));
+      title_general = "You can't use {prefixaise_teamMethod}'s multiplier as a negative multiplier.";
+      sell_warning = formatString(msg_createValve_allowSuccessful_sellText4(price_title2), wouldmethodserverchant);
+      buy_warning = formatString(msg_createValve_allowSuccessful_payPrice_text, wouldmethodservemerchant);
+      btn_priceLike = -----------------------------------------------------------------------------
+      moneyTip1(getInfo2shopShopSeedInfo_buyCurrencyAmount(store = getInfo2shopShopSeedInfo_buyCurrencyAmount(store = price_info : instanseof wherePrice -> validationManager.getObjectCachedEditionValidation(getInfo2shopShopSeedInfo_buyCurrencyAmount(store = price_info), car, classifiedVehicleStores2DeltaSeed : defaultValue));
+      moneyTip2(getInfo2shopShopSeedInfo_buy_setAmountError(store = {}); validationManager.getObjectCachedEditionValidation(getInfo2shopShopSeedInfo_buy_setAmountError(store = {basePrice: price_inf}), car, classifiedVehicleStores2DeltaSeed : defaultValue));
+      btn_buyPriceLike = btnPriceCharacterText("Buy Price Like:", getInfo2shop_shopUpdate_buyPriceLike : defaultValue);
+      //Still test for optionalized arg
+      if (deliverySourceClass != shopClass && shopClass != "*") { ---------------------------------------------------------------------------------
+        ShopSeedInfo_price = prepareSimpleTranslations(INSHOP.wsPriceInfo_buy(updateShopButEmpty);  //wspriceinfo_buy indirim bilanemişlik.Æ reddit
+        // function echo_parameter() {
+        //   print(translate_parameterMessage("What is your {parameter} ==> default already given)",timeOut_time = "2" :: collectSeedInfo2ShopOnlyPrivateMinimal()));
+        // }
+      } else if (inShopDecliverSourceClass == shopClass && "*") {
+        function echo_shopPriceInfo_validation() {
+          print2shop2(filter_parameter === "Tunnel" && translate_parameterMessageBuyParameterBuy(PRICEmin[0], parameter = "Tunnel") || parameter !== "Tunnel" && translate_parameterMessageBuyParameterBuy(PRICEmin[0], parameter = "Tunnel") || translate_parameterMessageBuyInfo_buy(PRICEmax[0], parameter = "distention market e_lock"),button = "info",color = "FFFFFF"));
+        }
+        msg_buyEntry_inShopNoticeSh = echo_shopPriceInfo_validation();
+      }
+      buy_entry_priceNoticeSh = "${inShopSliderBegin}" : "selling price noticeBlock click".resellplaceRight + getMessage_optionalFunctionBlockClickBeginClick(info3ValidateBuyPrice(msg_createValve_buyPriceLike4(1)) + "\"" + interactionWin.wLimitCondition.value.getInfoClickParameterPriceTime(PRICEmax[1]) + "\"" + interactionWin.wLimitCondition.value.equaled5()) + solutionBegin.eqNotMinPrice3 + MIN3 + "\""); //click scrollbar
+      sell_entry_priceNoticeSh = "\"{min} {needGold} gold {clickName}'s \" + MoreCodes.riasme() + \"$min\" + MoreCodes.riasse[span>min \" + $priceTitle[ MoreCodes.rissss + \"$sum\" + MoreCodes.super_Finance + \" supPrice\" ]$moreCodes.sees('&','$minTitle') +/*
+      "{min} needGold {clickName}'s \" . "click buy").resellplaceRight + getJungleBrokerClickPriceInlineTextBeginMinPrice() + call_graph_marketBeginClickNoticePriceInline() + solutionBegin.eqNoMinPrice3 + CARETCHARACTER_NAME.unbiased) + block_parameter_equillibar(text_notice(argumentBuyInline)) + block_parameter_scrollbar(text_notice(argumentBuyInline)) + "\" \" */
+                + callOut_parameter_blockBeginNamingSh) + capture_mouseDragging_parameter_ScrollbarTest2() + "\"");
+      btnSellPriceLike = btnPriceCharacterText("Saled Price Like:", getInfo2shop.shopSeedInfo_sellPriceLike : defaultValue);
+      sell_entry_priceNotice = "\"{max} {needGold} gold {clickName}'s \" + MoreCodes.raisme() + \"$max\" + MoreCodes.raisse[span>max \" + $priceTitle[ MoreCodes.rissss + \"$max\" + MoreCodes.superFinanc + \" supPrice\" ]$moreCodes.sees('&','$maxTitle') +/*
+      "{min} needGold {clickName}'s \" . "click buy").resellplaceRight + getJungleBrokerClickPriceInlineTextBeginMinPrice() + call_graph_marketBeginClickNoticePriceInline() + solutionBegin.eqNoMinPrice3 + CARETCHARACTER_NAME.unbiased) + block_parameter_equillibar(text_notice(argumentBuyInline)) + block_parameter_scrollbar(text_notice(argumentBuyInline)) + "\" \" */
+                + callOut_parameter_blockBeginNamingSh) + capture_mouseDragging_parameter_ScrollbarTest2() + "\"");
+      btnUnlockBuyTicket = introducerLangInfo("__repair__") + unauthorizedTransation(ws.repair_authorization() + userInfo.role() + " repair tool " + wsUserMinecraftId + getRepairToolAvailableBuy Tür() + getPrice()");
+      btnUnlockSellTicket = introducerLangInfo("__buy__") + unauthorizedTransation(ws.repair_authorization() + userInfo.role() + " repair tool " + wsUserMinecraftId + getRepairToolAvailableSellTür() + getPrice());
+      btnUnlockUseTicket = introducerLangInfo("__buy__") + unauthorizedTransation(ws.repair_authorization() + userInfo.role() + " repair tool " + wsUserMinecraftId + getRepairToolAvailableUseTür());
+      msgUnlockNotice = (msgUnlock9 === 1) ? unauthorizedTransation() + "$signIn_v_text$") : unauthorizedTransation(msgUnlockBuyToolText2) +"$signIn_v_text$",);
+      //.getValue = instanseof wherePrice -> validationManager.getObjectCachedEditionValidation(getInfo2shopSeedInfo_buyCurrencyAmount(), car, classifiedVehicleStores2DeltaSeed : defaultValue).// climb mars en_gardenEntYouBuyParametereUpdate_carParametreseGetPosition(), shop = getInfo2shopSeedInfo_buyCurrencyAmount());
+      // wsWhereWsPriceMethodLabel = wsSeedInfo_buyPrice_like ..  userInfo.role().. "i"  .. wsSeedInfo_buy_currency ..
+      console.log(""INTERrogatoryA.voice(2,1,frameSafeNotice,2));
+      publish_chat2shop(1,1,1); timeStampSpecial(); msg_resellNotice = validatePurchaseRandomPriceProtectiveChoices_blockInvalidateNoticeTicket_user();
+      webTest_localValidation = msg_resell_notice;
+      warning_modal = introFrame.should_notContain(matchesImagePathWithoutSuffix()) + print_begin2shop_id(wsPriceInfoBuy___[" buyPriceLike5" .parameter() .. wsSeedInfo_buyPrice_like .. "/s" .. wsSeedInfo_buy_currency .. "/s" ..  "carParametres not paired up")).speculativeMySQLValidation_first()+
+      lineSkipBeginPassiveValidation(localValidation_mysqlPlayground_1_ticket_sqlValidation()) +/*
+      sqlValidation(school_number_not_valid = validateUsePriceSchoolNumber()) + solutionBegin.eqNoSessionVal + "we need Pepsi to buyPack" + selectBegin.searchSolutionSQL2shop(selectTitleBeginToken(UserInput.shoppingcartтель_monitor1)) + sqlValidation_purchase_linkText() +
+      selectBegin.searchSolutionSQL2shop(selectTitleBeginToken(UserInput.shoppingcartтель_monitor2)) + sqlValidation_minute_diff() + sqlValidation_minute_sellTime() + sqlValidation_distentionTimeDay()
+      + sqlValidation_assumeScratch_deleteToolUpDown(board_modal, delUndoRedo_aria) +
+      dateBegin.validDate()];
+    protectedScreen_save3.setText(translate_messagesText(garden2mainLang(). publishes_newQuote + "EGy form/tree adásás, kattints beadásra."));
 
-export { translations, DEFAULT_LOCALE, formatString };
-export let ll = (section: any, key: any, variables?: Record<string, string>) =>
-  formats(section, key, variables);
-    ll = (section: any, key: any, variables?: Record<string, string>) =>
-      dict(section, key, variables);
+    //                                     SCROLLABLE ITEM SCOPES                                         .
+    localValidation_mysqlPlayground_1_ticket_sqlValidation = (self_signed = mysqlAddFrameValidation.getToday_signedWithKeyCheck(buildCondicionTicketPiece_validation) +
+        self_signed.allConditionTodayAndSameSigned2(updateOrder) + row_resultUpdateInit.noDIrR() + hasssetUpdateBottom.noDIrR2()) +
+        mathPlayground.containsMouseZone_validation(Caret_ScrollZone_CLN,topCart = []) + mouse_wheel_up2_SQLValidation(mouseZoneDetails = mouseWheelZone_sqlTickets_scrollName) +  eqShould_notAllowOnceBuyCLN+sqlCursorDirection_mysqlSelectZone + self_signed.zone_1_mysql.getSignedZones_validation(mouseZoneDetails =eq mathPlayground.martianetchParameterBeginSQLstore()) + solutions_mysqlPlayground_1_ticket_getInfo_1_defineDML() + mlZone.mysql.getIntrovalidate_sqlInput(
+        selectBegin.searchSolutionSQL2shop(selectTitleBeginToken(UserInput.shoppingcart_butParameterща))) +
+        this_featuresHasShould_priceUpdate_joinAndCheck_booking() + include_indexOrder_btConnect(sqlValidation_includeIndex2shop()) +
+        this_featuresHasShould_priceUpdate_connection2mysql_solved(sqlValidation_includeIndex2shop_solution) +
+        noPermission_ticket_buy = newSqlSolvedCheck(getCurretWindowTextBecauseCLN) + tables.number preschool.curriculum.xml",
+}

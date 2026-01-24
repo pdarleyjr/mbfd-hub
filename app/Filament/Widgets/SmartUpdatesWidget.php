@@ -180,112 +180,114 @@ class SmartUpdatesWidget extends Widget
      */
     protected function gatherOperationalMetrics(): array
     {
-        // Vehicle inventory
-        $totalApparatus = Apparatus::count();
-        $apparatusByStatus = Apparatus::select('status', DB::raw('count(*) as count'))
-            ->groupBy('status')
-            ->pluck('count', 'status')
-            ->toArray();
-        
-        // Out of service vehicles
-        $outOfService = Apparatus::where('status', 'Out of Service')
-            ->orWhere('status', 'out_of_service')
-            ->get(['unit_id', 'make', 'model', 'notes']);
-        
-        // Overdue inspections - optimized query
-        $overdueInspections = Apparatus::whereDoesntHave('inspections', function($q) {
-            $q->where('created_at', '>=', today()->subDay());
-        })->count();
-        
-        // Open defects/apparatus issues
-        $openDefects = ApparatusDefect::where('resolved', false)
-            ->with('apparatus:id,unit_id')
-            ->limit(10)
-            ->get(['id', 'apparatus_id', 'item', 'status', 'notes', 'created_at']);
-        
-        // Shop work (active projects)
-        $activeShopWork = [];
-        try {
-            $activeShopWork = ShopWork::whereIn('status', ['Pending', 'In Progress', 'Waiting for Parts'])
+        return cache()->remember('smart_updates_operational_metrics', 60, function () {
+            // Vehicle inventory
+            $totalApparatus = Apparatus::count();
+            $apparatusByStatus = Apparatus::select('status', DB::raw('count(*) as count'))
+                ->groupBy('status')
+                ->pluck('count', 'status')
+                ->toArray();
+            
+            // Out of service vehicles
+            $outOfService = Apparatus::where('status', 'Out of Service')
+                ->orWhere('status', 'out_of_service')
+                ->get(['unit_id', 'make', 'model', 'notes']);
+            
+            // Overdue inspections - optimized query
+            $overdueInspections = Apparatus::whereDoesntHave('inspections', function($q) {
+                $q->where('created_at', '>=', today()->subDay());
+            })->count();
+            
+            // Open defects/apparatus issues
+            $openDefects = ApparatusDefect::where('resolved', false)
                 ->with('apparatus:id,unit_id')
                 ->limit(10)
-                ->get(['id', 'project_name', 'status', 'apparatus_id', 'started_date']);
-        } catch (\Exception $e) {
-            // ShopWork table may not exist
-        }
-        
-        // Equipment inventory
-        $equipmentData = [];
-        try {
-            $totalEquipment = EquipmentItem::where('is_active', true)->count();
-            $allEquipment = EquipmentItem::where('is_active', true)->get();
+                ->get(['id', 'apparatus_id', 'item', 'status', 'notes', 'created_at']);
             
-            // Calculate low stock items (stock <= reorder_min)
-            $lowStockItems = $allEquipment->filter(fn($item) => $item->stock <= $item->reorder_min);
+            // Shop work (active projects)
+            $activeShopWork = [];
+            try {
+                $activeShopWork = ShopWork::whereIn('status', ['Pending', 'In Progress', 'Waiting for Parts'])
+                    ->with('apparatus:id,unit_id')
+                    ->limit(10)
+                    ->get(['id', 'project_name', 'status', 'apparatus_id', 'started_date']);
+            } catch (\Exception $e) {
+                // ShopWork table may not exist
+            }
             
-            // Group by category
-            $byCategory = $allEquipment->groupBy('category')->map->count()->toArray();
+            // Equipment inventory
+            $equipmentData = [];
+            try {
+                $totalEquipment = EquipmentItem::where('is_active', true)->count();
+                $allEquipment = EquipmentItem::where('is_active', true)->get();
+                
+                // Calculate low stock items (stock <= reorder_min)
+                $lowStockItems = $allEquipment->filter(fn($item) => $item->stock <= $item->reorder_min);
+                
+                // Group by category
+                $byCategory = $allEquipment->groupBy('category')->map->count()->toArray();
+                
+                $equipmentData = [
+                    'total_items' => $totalEquipment,
+                    'low_stock_count' => $lowStockItems->count(),
+                    'by_category' => $byCategory,
+                    'low_stock_items' => $lowStockItems->take(5)->map(fn($item) => [
+                        'name' => $item->name,
+                        'current_stock' => $item->stock,
+                        'reorder_min' => $item->reorder_min,
+                        'category' => $item->category,
+                    ])->values()->toArray(),
+                ];
+            } catch (\Exception $e) {
+                // EquipmentItem table may not exist
+                Log::debug('Equipment metrics unavailable: ' . $e->getMessage());
+            }
             
-            $equipmentData = [
-                'total_items' => $totalEquipment,
-                'low_stock_count' => $lowStockItems->count(),
-                'by_category' => $byCategory,
-                'low_stock_items' => $lowStockItems->take(5)->map(fn($item) => [
-                    'name' => $item->name,
-                    'current_stock' => $item->stock,
-                    'reorder_min' => $item->reorder_min,
-                    'category' => $item->category,
-                ])->values()->toArray(),
-            ];
-        } catch (\Exception $e) {
-            // EquipmentItem table may not exist
-            Log::debug('Equipment metrics unavailable: ' . $e->getMessage());
-        }
-        
-        // Capital projects
-        $capitalProjects = CapitalProject::with(['milestones', 'updates'])
-            ->orderBy('priority')
-            ->limit(10)
-            ->get();
-        
-        $overdueProjects = $capitalProjects->filter(fn($p) => $p->is_overdue ?? false);
-        $atRiskProjects = $capitalProjects->filter(fn($p) => 
-            ($p->status->value ?? $p->status) === 'at_risk'
-        );
+            // Capital projects
+            $capitalProjects = CapitalProject::with(['milestones', 'updates'])
+                ->orderBy('priority')
+                ->limit(10)
+                ->get();
+            
+            $overdueProjects = $capitalProjects->filter(fn($p) => $p->is_overdue ?? false);
+            $atRiskProjects = $capitalProjects->filter(fn($p) => 
+                ($p->status->value ?? $p->status) === 'at_risk'
+            );
 
-        return [
-            'vehicle_inventory' => [
-                'total' => $totalApparatus,
-                'by_status' => $apparatusByStatus,
-                'overdue_inspections' => $overdueInspections,
-            ],
-            'out_of_service' => $outOfService->map(fn($a) => [
-                'unit' => $a->unit_id,
-                'vehicle' => "{$a->make} {$a->model}",
-                'notes' => $a->notes,
-            ])->toArray(),
-            'apparatus_issues' => $openDefects->map(fn($d) => [
-                'unit' => $d->apparatus?->unit_id ?? 'Unknown',
-                'issue' => $d->item,
-                'severity' => $d->status,
-            ])->toArray(),
-            'shop_work' => collect($activeShopWork)->map(fn($w) => [
-                'project' => $w->project_name,
-                'status' => $w->status,
-                'unit' => $w->apparatus?->unit_id ?? 'N/A',
-            ])->toArray(),
-            'equipment_inventory' => $equipmentData,
-            'capital_projects' => [
-                'total' => $capitalProjects->count(),
-                'overdue' => $overdueProjects->count(),
-                'at_risk' => $atRiskProjects->count(),
-                'recent' => $capitalProjects->take(5)->map(fn($p) => [
-                    'name' => $p->name,
-                    'status' => $p->status->value ?? $p->status,
-                    'priority' => $p->priority->value ?? $p->priority,
+            return [
+                'vehicle_inventory' => [
+                    'total' => $totalApparatus,
+                    'by_status' => $apparatusByStatus,
+                    'overdue_inspections' => $overdueInspections,
+                ],
+                'out_of_service' => $outOfService->map(fn($a) => [
+                    'unit' => $a->unit_id,
+                    'vehicle' => "{$a->make} {$a->model}",
+                    'notes' => $a->notes,
                 ])->toArray(),
-            ],
-        ];
+                'apparatus_issues' => $openDefects->map(fn($d) => [
+                    'unit' => $d->apparatus?->unit_id ?? 'Unknown',
+                    'issue' => $d->item,
+                    'severity' => $d->status,
+                ])->toArray(),
+                'shop_work' => collect($activeShopWork)->map(fn($w) => [
+                    'project' => $w->project_name,
+                    'status' => $w->status,
+                    'unit' => $w->apparatus?->unit_id ?? 'N/A',
+                ])->toArray(),
+                'equipment_inventory' => $equipmentData,
+                'capital_projects' => [
+                    'total' => $capitalProjects->count(),
+                    'overdue' => $overdueProjects->count(),
+                    'at_risk' => $atRiskProjects->count(),
+                    'recent' => $capitalProjects->take(5)->map(fn($p) => [
+                        'name' => $p->name,
+                        'status' => $p->status->value ?? $p->status,
+                        'priority' => $p->priority->value ?? $p->priority,
+                    ])->toArray(),
+                ],
+            ];
+        });
     }
 
     public function refresh(): void

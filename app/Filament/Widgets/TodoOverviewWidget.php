@@ -7,6 +7,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 
 class TodoOverviewWidget extends BaseWidget
 {
@@ -18,11 +19,13 @@ class TodoOverviewWidget extends BaseWidget
     {
         return $table
             ->query(
-                Todo::query()
-                    ->where('is_completed', false)
-                    ->orderBy('sort')
-                    ->orderBy('created_at', 'desc')
-                    ->limit(10)
+                Cache::remember('todo_overview_widget_query', 60, function () {
+                    return Todo::query()
+                        ->where('is_completed', false)
+                        ->orderBy('sort')
+                        ->orderBy('created_at', 'desc')
+                        ->limit(10);
+                })
             )
             ->columns([
                 Tables\Columns\TextColumn::make('title')

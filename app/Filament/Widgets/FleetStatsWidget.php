@@ -19,34 +19,36 @@ class FleetStatsWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        $totalApparatus = Apparatus::count();
-        $outOfService = Apparatus::where('status', '!=', 'In Service')->count();
-        $openDefects = ApparatusDefect::where('resolved', false)->count();
-        $criticalDefects = ApparatusDefect::where('resolved', false)
-            ->where('issue_type', 'critical')
-            ->count();
-        
-        return [
-            Stat::make('Total Apparatus', $totalApparatus)
-                ->description("{$outOfService} out of service")
-                ->descriptionIcon($outOfService > 0 ? 'heroicon-m-exclamation-triangle' : 'heroicon-m-check-circle')
-                ->color($outOfService > 0 ? 'warning' : 'success')
-                ->chart($this->getWeeklyFleetTrend())
-                ->url(route('filament.admin.resources.apparatuses.index')),
+        return cache()->remember('fleet_stats_widget', 60, function () {
+            $totalApparatus = Apparatus::count();
+            $outOfService = Apparatus::where('status', '!=', 'In Service')->count();
+            $openDefects = ApparatusDefect::where('resolved', false)->count();
+            $criticalDefects = ApparatusDefect::where('resolved', false)
+                ->where('issue_type', 'critical')
+                ->count();
             
-            Stat::make('Out of Service', $outOfService)
-                ->description($outOfService > 0 ? 'Requires attention' : 'All in service')
-                ->descriptionIcon('heroicon-m-wrench-screwdriver')
-                ->color($outOfService > 3 ? 'danger' : ($outOfService > 0 ? 'warning' : 'success'))
-                ->url(route('filament.admin.resources.apparatuses.index')),
-            
-            Stat::make('Open Defects', $openDefects)
-                ->description($criticalDefects > 0 ? "{$criticalDefects} critical defects" : 'No critical issues')
-                ->descriptionIcon($criticalDefects > 0 ? 'heroicon-m-exclamation-circle' : 'heroicon-m-check-badge')
-                ->color($criticalDefects > 0 ? 'danger' : ($openDefects > 5 ? 'warning' : 'success'))
-                ->chart($this->getWeeklyDefectsTrend())
-                ->url(route('filament.admin.resources.defects.index')),
-        ];
+            return [
+                Stat::make('Total Apparatus', $totalApparatus)
+                    ->description("{$outOfService} out of service")
+                    ->descriptionIcon($outOfService > 0 ? 'heroicon-m-exclamation-triangle' : 'heroicon-m-check-circle')
+                    ->color($outOfService > 0 ? 'warning' : 'success')
+                    ->chart($this->getWeeklyFleetTrend())
+                    ->url(route('filament.admin.resources.apparatuses.index')),
+                
+                Stat::make('Out of Service', $outOfService)
+                    ->description($outOfService > 0 ? 'Requires attention' : 'All in service')
+                    ->descriptionIcon('heroicon-m-wrench-screwdriver')
+                    ->color($outOfService > 3 ? 'danger' : ($outOfService > 0 ? 'warning' : 'success'))
+                    ->url(route('filament.admin.resources.apparatuses.index')),
+                
+                Stat::make('Open Defects', $openDefects)
+                    ->description($criticalDefects > 0 ? "{$criticalDefects} critical defects" : 'No critical issues')
+                    ->descriptionIcon($criticalDefects > 0 ? 'heroicon-m-exclamation-circle' : 'heroicon-m-check-badge')
+                    ->color($criticalDefects > 0 ? 'danger' : ($openDefects > 5 ? 'warning' : 'success'))
+                    ->chart($this->getWeeklyDefectsTrend())
+                    ->url(route('filament.admin.resources.defects.index')),
+            ];
+        });
     }
     
     /**

@@ -149,11 +149,8 @@ class EquipmentItemResource extends Resource
             ->filters([
                 Tables\Filters\Filter::make('low_stock')
                     ->label('Low Stock')
-                    ->query(fn (Builder $q) => 
-                        $q->whereRaw(
-                            '(SELECT COALESCE(SUM(quantity),0) FROM stock_mutations 
-                             WHERE stock_mutations.item_id = equipment_items.id) <= equipment_items.reorder_min'
-                        )
+                    ->query(fn (Builder $query) =>
+                        $query->whereRaw('(SELECT COALESCE(SUM(quantity), 0) FROM stock_mutations WHERE stock_mutations.storable_id = equipment_items.id AND stock_mutations.storable_type = ?) <= equipment_items.reorder_min', ['App\\Models\\EquipmentItem'])
                     ),
                 Tables\Filters\SelectFilter::make('category')
                     ->options([

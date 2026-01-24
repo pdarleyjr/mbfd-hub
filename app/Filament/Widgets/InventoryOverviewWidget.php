@@ -18,38 +18,40 @@ class InventoryOverviewWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        // Get all active equipment items
-        $allEquipment = EquipmentItem::where('is_active', true)->get();
-        $totalItems = $allEquipment->count();
-        
-        // Calculate low stock items (stock <= reorder_min)
-        $lowStockItems = $allEquipment->filter(fn($item) => $item->stock <= $item->reorder_min);
-        $lowStockCount = $lowStockItems->count();
-        
-        // Calculate total inventory value (if we have a 'price' or 'unit_cost' field)
-        // For now, we'll use a placeholder or you can add this field later
-        $totalValue = $allEquipment->sum(function($item) {
-            return ($item->unit_cost ?? 0) * $item->stock;
+        return cache()->remember('inventory_overview_widget', 60, function () {
+            // Get all active equipment items
+            $allEquipment = EquipmentItem::where('is_active', true)->get();
+            $totalItems = $allEquipment->count();
+            
+            // Calculate low stock items (stock <= reorder_min)
+            $lowStockItems = $allEquipment->filter(fn($item) => $item->stock <= $item->reorder_min);
+            $lowStockCount = $lowStockItems->count();
+            
+            // Calculate total inventory value (if we have a 'price' or 'unit_cost' field)
+            // For now, we'll use a placeholder or you can add this field later
+            $totalValue = $allEquipment->sum(function($item) {
+                return ($item->unit_cost ?? 0) * $item->stock;
+            });
+            
+            return [
+                Stat::make('Low Stock Items', $lowStockCount)
+                    ->description("{$lowStockCount} items need reordering")
+                    ->descriptionIcon('heroicon-m-exclamation-triangle')
+                    ->color($lowStockCount > 5 ? 'danger' : ($lowStockCount > 0 ? 'warning' : 'success'))
+                    ->chart($this->getWeeklyLowStockTrend())
+                    ->url(route('filament.admin.resources.equipment-items.index')),
+                
+                Stat::make('Total Inventory Items', $totalItems)
+                    ->description('Active equipment items')
+                    ->descriptionIcon('heroicon-m-cube')
+                    ->color('info'),
+                
+                Stat::make('Stock Status', $this->getStockStatusText($totalItems, $lowStockCount))
+                    ->description($this->getStockHealthPercentage($totalItems, $lowStockCount))
+                    ->descriptionIcon('heroicon-m-chart-bar')
+                    ->color($this->getStockHealthColor($totalItems, $lowStockCount)),
+            ];
         });
-        
-        return [
-            Stat::make('Low Stock Items', $lowStockCount)
-                ->description("{$lowStockCount} items need reordering")
-                ->descriptionIcon('heroicon-m-exclamation-triangle')
-                ->color($lowStockCount > 5 ? 'danger' : ($lowStockCount > 0 ? 'warning' : 'success'))
-                ->chart($this->getWeeklyLowStockTrend())
-                ->url(route('filament.admin.resources.equipment-items.index')),
-            
-            Stat::make('Total Inventory Items', $totalItems)
-                ->description('Active equipment items')
-                ->descriptionIcon('heroicon-m-cube')
-                ->color('info'),
-            
-            Stat::make('Stock Status', $this->getStockStatusText($totalItems, $lowStockCount))
-                ->description($this->getStockHealthPercentage($totalItems, $lowStockCount))
-                ->descriptionIcon('heroicon-m-chart-bar')
-                ->color($this->getStockHealthColor($totalItems, $lowStockCount)),
-        ];
     }
     
     /**
