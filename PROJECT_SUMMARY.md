@@ -8,6 +8,54 @@
 **Status**: ✅ **Production Ready** - All systems functional with zero critical bugs  
 **Last Stability Check**: January 24, 2026 07:05 EST
 
+---
+
+## 🚨 Git Repository Cleanup (January 24, 2026 18:00 EST)
+
+### Issue: 29,122 Pending Files in VS Code
+
+**Problem**: VS Code Source Control showing 10,000+ pending commit/push files, causing performance issues and repository confusion.
+
+#### Root Cause Analysis
+After systematic investigation using Context7 documentation research and GitHub MCP server:
+
+1. **Nested Git Repository** (PRIMARY CAUSE): 
+   - Separate `.git` folder existed in [`laravel-app/`](laravel-app/.git) directory
+   - VS Code tracked TWO git repositories simultaneously
+   - 29,122 pending files in nested repo
+
+2. **Duplicate Directory Structure** (SECONDARY CAUSE):
+   - Complete Laravel application duplicated in [`laravel-app/`](laravel-app/) subdirectory
+   - Included vendor dependencies (~29K files) that should never be committed
+   - Nested `laravel-app/laravel-app/` had been deleted from disk but remained tracked in git
+
+#### Investigation Process
+- Used Context7 MCP to research git cleanup best practices
+- Confirmed remote repository is `pdarleyjr/mbfd-hub` (not `support-services`)
+- Discovered nested `.git` in [`laravel-app/`](laravel-app/)
+- Analyzed git status showing 29,072 deleted files + 35 modified + 15 untracked
+- **Security Scan**: Verified no hardcoded secrets in modified files (all using `env()` properly)
+
+#### Resolution Steps
+1. **Removed Nested Git Repository**: Deleted [`laravel-app/.git`](laravel-app/.git) directory recursively
+2. **Updated .gitignore**: Added `/laravel-app` to prevent future tracking
+3. **Committed Fix**: `git commit -m "fix: Add laravel-app to gitignore - remove duplicate directory tracking"`
+4. **Verified Clean State**: Main repository now shows zero pending files
+
+#### Final State
+- ✅ **Main Repository**: Clean - only `.gitignore` modification
+- ✅ **No Security Issues**: All configuration uses environment variables
+- ✅ **Duplicate Removed**: `/laravel-app` now ignored by git
+- ✅ **VS Code Performance**: Repository tracking back to normal
+
+#### Files Modified
+- [`.gitignore`](.gitignore) - Added `/laravel-app` exclusion
+
+#### Commit Hash
+- `a3da6a8f` - "fix: Add laravel-app to gitignore - remove duplicate directory tracking"
+
+---
+
 ## Architecture & Tech Stack
 
 ### Backend Framework
