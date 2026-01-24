@@ -37,7 +37,7 @@ class Apparatus extends Model
 
     public function openDefects()
     {
-        return $this->defects()->where('resolved', false);
+        return $this->hasMany(ApparatusDefect::class)->where('resolved', false)->get();
     }
 
     /**
