@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Miami Beach Fire Department Apparatus Checkout System" />
     <meta name="theme-color" content="#2563eb" />
-    <link rel="manifest" href="/mbfd-checkout-system/manifest.json" />
-    <link rel="apple-touch-icon" href="/mbfd-checkout-system/icon-192.png" />
+    <link rel="manifest" href="/daily/manifest.json" />
+    <link rel="apple-touch-icon" href="/daily/icon-192.png" />
     <title>MBFD Checkout System</title>
     <script type="module" crossorigin src="/daily/assets/index-CTqLvJ19.js"></script>
     <link rel="stylesheet" crossorigin href="/daily/assets/index-BgelQ-oG.css">
@@ -17,7 +17,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/mbfd-checkout-system/sw.js')
+          navigator.serviceWorker.register('/daily/sw.js', { scope: '/daily/' })
             .then(registration => console.log('SW registered:', registration))
             .catch(error => console.log('SW registration failed:', error));
         });
