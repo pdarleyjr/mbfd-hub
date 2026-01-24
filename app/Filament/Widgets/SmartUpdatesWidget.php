@@ -20,8 +20,8 @@ class SmartUpdatesWidget extends Widget
 
     protected int | string | array $columnSpan = [
         'sm' => 1,
-        'md' => 1,
-        'xl' => 1,
+        'md' => 2,
+        'xl' => 2,
     ];
 
     // Instant data - no AI delay

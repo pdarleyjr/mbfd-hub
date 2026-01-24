@@ -13,8 +13,8 @@ class FleetStatsWidget extends BaseWidget
 
     protected int | string | array $columnSpan = [
         'sm' => 1,
-        'md' => 1,
-        'xl' => 1,
+        'md' => 2,
+        'xl' => 2,
     ];
 
     protected function getStats(): array

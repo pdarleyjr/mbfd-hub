@@ -12,7 +12,7 @@ class InventoryOverviewWidget extends BaseWidget
 
     protected int | string | array $columnSpan = [
         'sm' => 1,
-        'md' => 1,
+        'md' => 2,
         'xl' => 1,
     ];
 
