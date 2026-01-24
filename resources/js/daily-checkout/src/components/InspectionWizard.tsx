@@ -74,13 +74,13 @@ export default function InspectionWizard() {
   useEffect(() => {
     if (!isOffline) {
       const syncQueue = async () => {
-        const queue = getSubmissionQueue();
+        const queue = await getSubmissionQueue();
         if (queue.length === 0) return;
 
         for (const item of queue) {
           try {
             await ApiClient.submitInspection(item.apparatusId, item.data);
-            removeFromQueue(item.id);
+            await removeFromQueue(item.id);
             
             // Vibrate on successful sync
             if ('vibrate' in navigator) {
@@ -148,9 +148,9 @@ export default function InspectionWizard() {
 
       if (isOffline) {
         // Queue for later submission
-        queueSubmission(apparatus.id, submission);
+        await queueSubmission(apparatus.id, submission);
         
-        // Vibrate to indicate queued
+        // Vibrate to indicate queued (3-pulse pattern)
         if ('vibrate' in navigator) {
           navigator.vibrate([50, 100, 50]);
         }
@@ -163,7 +163,7 @@ export default function InspectionWizard() {
         // Submit immediately
         await ApiClient.submitInspection(apparatus.id, submission);
         
-        // Vibrate on success
+        // Vibrate on success (single long pulse)
         if ('vibrate' in navigator) {
           navigator.vibrate(200);
         }
@@ -174,6 +174,10 @@ export default function InspectionWizard() {
         navigate('/success');
       }
     } catch (err) {
+      // Error vibration (rapid pulses)
+      if ('vibrate' in navigator) {
+        navigator.vibrate([100, 50, 100]);
+      }
       setError(err instanceof Error ? err.message : 'Failed to submit inspection');
     }
   };

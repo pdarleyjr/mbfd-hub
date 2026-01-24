@@ -14,6 +14,10 @@ export default function OfficerStep({ initialData, onSubmit }: OfficerStepProps)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Haptic feedback on form submission
+    if ('vibrate' in navigator) {
+      navigator.vibrate(50);
+    }
     onSubmit(formData);
   };
 
@@ -35,8 +39,9 @@ export default function OfficerStep({ initialData, onSubmit }: OfficerStepProps)
             id="name"
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-3 min-h-[44px] text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 touch-manipulation"
             required
+            autoComplete="name"
           />
         </div>
 
@@ -48,7 +53,7 @@ export default function OfficerStep({ initialData, onSubmit }: OfficerStepProps)
             id="rank"
             value={formData.rank}
             onChange={(e) => handleChange('rank', e.target.value as Rank)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-3 min-h-[44px] text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 touch-manipulation"
           >
             {RANKS.map(rank => (
               <option key={rank} value={rank}>{rank}</option>
@@ -64,7 +69,7 @@ export default function OfficerStep({ initialData, onSubmit }: OfficerStepProps)
             id="shift"
             value={formData.shift}
             onChange={(e) => handleChange('shift', e.target.value as Shift)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-3 min-h-[44px] text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 touch-manipulation"
           >
             {SHIFTS.map(shift => (
               <option key={shift} value={shift}>Shift {shift}</option>
@@ -81,9 +86,10 @@ export default function OfficerStep({ initialData, onSubmit }: OfficerStepProps)
             id="unitNumber"
             value={formData.unitNumber}
             onChange={(e) => handleChange('unitNumber', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-3 min-h-[44px] text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 touch-manipulation"
             placeholder="e.g., E1, L1, R1"
             required
+            autoComplete="off"
           />
           <p className="text-sm text-gray-500 mt-1">
             Enter the unit number as it appears on the apparatus
@@ -93,9 +99,9 @@ export default function OfficerStep({ initialData, onSubmit }: OfficerStepProps)
         <div className="pt-4">
           <button
             type="submit"
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium"
+            className="w-full min-h-[48px] px-6 py-3 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors shadow-md hover:shadow-lg touch-manipulation"
           >
-            Continue to Inspection
+            Continue to Inspection →
           </button>
         </div>
       </form>
