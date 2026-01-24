@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CapitalProjectResource\Pages;
-use App\Filament\Resources\CapitalProjectResource\RelationManagers;
 use App\Models\CapitalProject;
 use App\Enums\ProjectStatus;
 use App\Enums\ProjectPriority;
@@ -253,8 +252,6 @@ class CapitalProjectResource extends Resource
     public static function getRelations(): array
     {
         return [
-//            RelationManagers\MilestonesRelationManager::class,
-//            RelationManagers\UpdatesRelationManager::class,
         ];
     }
 
