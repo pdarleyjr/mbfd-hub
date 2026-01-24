@@ -114,9 +114,9 @@ class ApparatusResource extends Resource
                     ->counts('inspections')
                     ->badge()
                     ->color('info'),
-                Tables\Columns\TextColumn::make('active_defects_count')
+                Tables\Columns\TextColumn::make('open_defects_count')
                     ->label('Active Issues')
-                    ->getStateUsing(fn (Apparatus $record) => $record->defects()->where('resolved', false)->count())
+                    ->counts('openDefects')
                     ->badge()
                     ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
                 Tables\Columns\TextColumn::make('last_service_date')
