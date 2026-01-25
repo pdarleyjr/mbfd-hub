@@ -35,3 +35,17 @@ yarn-error.log
 /create_*.sh
 /test_*.php
 /sentry_test.php
+
+# PowerShell diagnostic scripts (contain credentials/tokens)
+*.ps1
+/check_ip_rules.ps1
+/check_vps.ps1
+/create_user_vps.ps1
+/fetch_user_ip.ps1
+/fetch_waf_logs.ps1
+/final_system_check.ps1
+/final_system_check_sql.ps1
+/fix_admin_access.ps1
+
+# Documentation with potentially sensitive content
+TOKEN_GENERATION_GUIDE.md
