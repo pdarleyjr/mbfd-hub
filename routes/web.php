@@ -7,12 +7,22 @@ Route::get('/', function () {
 });
 
 Route::get('/daily', function () {
-    return response()->file(public_path('daily/index.html'));
+    return response()
+        ->file(public_path('daily/index.html'))
+        ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        ->header('Pragma', 'no-cache')
+        ->header('Expires', '0');
 });
 
+// Exclude static files and assets from the catch-all route
+// Let nginx/web server handle them directly with proper caching
 Route::get('/daily/{any}', function () {
-    return response()->file(public_path('daily/index.html'));
-})->where('any', '.*');
+    return response()
+        ->file(public_path('daily/index.html'))
+        ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        ->header('Pragma', 'no-cache')
+        ->header('Expires', '0');
+})->where('any', '(?!assets|registerSW\.js|sw\.js|manifest\.webmanifest|workbox-).*');
 
 Route::get('/__version', function() {
     $sha = cache()->remember('build_sha', 60, fn() => trim(shell_exec('git rev-parse HEAD') ?? 'unknown'));
