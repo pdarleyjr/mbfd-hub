@@ -50,12 +50,36 @@ const manifestCopyPlugin = {
   }
 }
 
+const serviceWorkerCopyPlugin = {
+  name: 'service-worker-copy',
+  apply: 'build',
+  closeBundle() {
+    const sourcePath = path.join(__dirname, 'public', 'service-worker.js')
+    const destPath = path.join(__dirname, '..', '..', '..', 'public', 'daily', 'sw.js')
+    
+    console.log(`[service-worker-copy] Copying service worker from: ${sourcePath}`)
+    console.log(`[service-worker-copy] To: ${destPath}`)
+    
+    if (fs.existsSync(sourcePath)) {
+      try {
+        fs.copyFileSync(sourcePath, destPath)
+        console.log('[service-worker-copy] ✓ Service worker copied successfully as sw.js')
+      } catch (error) {
+        console.error('[service-worker-copy] Error copying service worker:', error.message)
+      }
+    } else {
+      console.warn(`[service-worker-copy] Source service worker not found at ${sourcePath}`)
+    }
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/daily/',
   plugins: [
     react(),
     manifestCopyPlugin,
+    serviceWorkerCopyPlugin,
     // Sentry plugin disabled temporarily - needs project setup in Sentry dashboard
     // sentryVitePlugin({
     //   org: process.env.SENTRY_ORG,
