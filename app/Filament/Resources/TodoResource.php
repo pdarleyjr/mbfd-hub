@@ -103,14 +103,7 @@ class TodoResource extends Resource
                 ]),
             ])
             ->defaultSort('is_completed', 'asc')
-            ->defaultSort('created_at', 'desc')
-            ->filtersTabs([
-                'all' => Tables\Filters\Tab::make('All'),
-                'assigned_to_me' => Tables\Filters\Tab::make('Assigned to me')
-                    ->modifyQueryUsing(fn ($query) => $query->where('assigned_to', auth()->id())),
-                'created_by_me' => Tables\Filters\Tab::make('Created by me')
-                    ->modifyQueryUsing(fn ($query) => $query->where('created_by', auth()->id())),
-            ]);
+            ->defaultSort('created_at', 'desc');
     }
 
     public static function getPages(): array
