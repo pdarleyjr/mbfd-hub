@@ -2,33 +2,43 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/daily/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#1e40af" />
+    
+    <!-- Clean up stale service worker registrations -->
+    <script>
+      // Unregister any old service workers that might be registered at root scope
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (let registration of registrations) {
+            // Unregister any SW not scoped to /daily/
+            if (registration.scope !== 'https://support.darleyplex.com/daily/' && 
+                registration.scope !== 'http://localhost:5173/daily/') {
+              console.log('Unregistering stale service worker:', registration.scope);
+              registration.unregister();
+            }
+          }
+        });
+      }
+    </script>
     
     <!-- iOS PWA Support -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MBFD Checkout" />
-    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/daily/icons/icon-192.png" />
     
     <!-- General PWA -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="application-name" content="MBFD Checkout" />
     <meta name="description" content="Daily apparatus inspection app for Miami Beach Fire Department" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/daily/manifest.json" />
     
     <title>MBFD Daily Checkout</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/service-worker.js');
-        });
-      }
-    </script>
   </body>
 </html>

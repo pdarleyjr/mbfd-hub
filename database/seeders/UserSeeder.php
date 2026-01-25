@@ -13,7 +13,7 @@ class UserSeeder extends Seeder
         $users = [
             ['email' => 'PeterDarley@miamibeachfl.gov', 'name' => 'Peter Darley', 'password' => Hash::make('Penco3')],
             ['email' => 'RichardQuintela@miamibeachfl.gov', 'name' => 'Richard Quintela', 'password' => Hash::make('Penco2')],
-            ['email' => 'MiguelAnchia@miamibeachfl.gov', 'name' => 'Miguel Anchia', 'password' => Hash::make('Admin123')],
+            ['email' => 'MiguelAnchia@miamibeachfl.gov', 'name' => 'Miguel Anchia', 'password' => Hash::make('Penco1')],
             ['email' => 'geralddeyoung@miamibeachfl.gov', 'name' => 'Gerald DeYoung', 'password' => Hash::make('MBFDGerry1')],
         ];
 
