@@ -6,6 +6,7 @@ use Appstract\Stock\HasStock;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class EquipmentItem extends Model
 {
@@ -79,6 +80,14 @@ class EquipmentItem extends Model
     public function allocations(): HasMany
     {
         return $this->hasMany(ApparatusInventoryAllocation::class, 'equipment_item_id');
+    }
+
+    /**
+     * Override stockMutations relationship for HasStock trait
+     */
+    public function stockMutations(): MorphMany
+    {
+        return $this->morphMany(StockMutation::class, 'stocker');
     }
 
     /**
