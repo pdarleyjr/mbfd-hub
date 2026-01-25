@@ -42,6 +42,12 @@ class TodoResource extends Resource
                     ->default(auth()->id()),
                 Forms\Components\Toggle::make('is_completed')
                     ->label('Completed'),
+                Forms\Components\FileUpload::make('attachments')
+                    ->multiple()
+                    ->directory('todo-attachments')
+                    ->downloadable()
+                    ->openable()
+                    ->columnSpanFull(),
             ]);
     }
 
