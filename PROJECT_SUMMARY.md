@@ -500,55 +500,164 @@ services:
 3. **Security Vulnerabilities**: Web application security
    - *Mitigation*: Regular Laravel updates, input validation, CSRF protection, SQL injection prevention
 
-## Conclusion
+## Observability & Monitoring Setup
 
-The MBFD Support Hub is a production-ready, stable fire department management system that successfully combines modern web technologies with domain-specific operational requirements. After completing Phase 14 on January 23, 2026, the system now features a modernized dashboard, enhanced mobile PWA capabilities, desktop keyboard shortcuts, and comprehensive security improvements.
+### Sentry Integration
+**Completion Date**: January 2026  
+**Status**: ✅ Operational
 
-**Current State**: ✅ **Fully Operational** - Phase 14 Complete: UI/UX & Technical Audit
+#### Configuration Summary
+- **Backend (Laravel)**: PHP error tracking configured and verified
+- **Frontend (React/Vite)**: Source maps enabled with `build.sourcemap: 'hidden'`
+- **Configuration**: Via environment variables (not stored in repository)
 
-**Key Achievements**:
-- ✅ Resolved missing model class errors
-- ✅ Fixed Kanban board JavaScript and layout issues
-- ✅ Implemented comprehensive task management system
-- ✅ Optimized widget loading with instant metrics
-- ✅ Established stable deployment procedures
-- ✅ **Complete Filament v3 compatibility migration** (January 23, 2026)
-- ✅ **All admin pages verified error-free** (Dashboard, Apparatuses, Stations, Uniforms, Shop-works, Equipment, Capital Projects, Inventory, Todos, Tasks, Defects, Recommendations)
-- ✅ **Production-stable deployment** with commit 71fb847
-- ✅ **Dashboard UI revamped** with FleetStatsWidget and InventoryOverviewWidget (Phase 14)
-- ✅ **Responsive grid system** implemented (sm:1, md:2, xl:3) (Phase 14)
-- ✅ **Mobile PWA enhancements** with pull-to-refresh and camera (Phase 14)
-- ✅ **Desktop keyboard shortcuts** for power users (Phase 14)
-- ✅ **Equipment low stock filter** for inventory management (Phase 14)
-- ✅ **Sanctum API authentication** with password enforcement (Phase 14)
-- ✅ **Legacy code cleanup** with copy/ directory removal (Phase 14)
+#### GitHub Actions
+- **Observability Workflow**: ✅ Sentry release tracking operational
+- **Lighthouse CI**: ✅ Performance budget monitoring operational
 
-**Recovery Timeline** (January 23, 2026):
-1. Initial diagnosis: Missing packages and deprecated code
-2. Installed missing `mokhosh/filament-kanban` package
-3. Created missing TodoResource page classes
-4. Migrated all `BadgeColumn` to Filament v3 `TextColumn->badge()`
-5. Fixed route name conflicts and ViewAction issues
-6. Created missing database migrations
-7. Tested all 12 admin pages - zero errors
-8. Committed to GitHub with comprehensive changeset
-9. Verified with Playwright browser automation
+#### Files Modified for Observability
+- [`bootstrap/app.php`](bootstrap/app.php) - Sentry exception handler
+- [`config/sentry.php`](config/sentry.php) - Published Sentry configuration
+- [`resources/js/daily-checkout/src/main.tsx`](resources/js/daily-checkout/src/main.tsx) - Sentry React initialization
+- [`resources/js/daily-checkout/vite.config.js`](resources/js/daily-checkout/vite.config.js) - Sourcemaps + Sentry plugin
+- `.github/workflows/observability.yml` - Sentry Release workflow
+- `.github/workflows/lighthouse.yml` - Lighthouse CI workflow
+- `budget.json` - Performance budget (1500KB total resource size)
 
-**Phase 14 Completion** (January 23, 2026):
-1. Dashboard widgets modernized with responsive grid
-2. Task module deprecated, Todos system activated
-3. Mobile PWA enhanced with pull-to-refresh and camera
-4. Desktop keyboard shortcuts implemented (/, Ctrl+S, ?)
-5. Equipment low stock filter added
-6. Sanctum authentication with forced password change
-7. Legacy code cleanup (copy/ directory removed)
-8. All changes committed to feat/uiux-users-remove-tasks branch
-
-**Future Outlook**: With Phase 14 complete and solid Filament v3 compatibility, the system is positioned for continued stable operation with enhanced user experience across mobile and desktop platforms.
+### Lighthouse CI Configuration
+- **Test URL**: https://support.darleyplex.com/
+- **Budget**: 1500KB total resource size
+- **Artifacts**: Uploaded with temporary public storage
 
 ---
 
-*Document Version: 4.0*  
-*Last Updated: January 23, 2026 - Phase 14 Complete*  
-*Author: Peter Darley Jr.*  
+## Phase 14 Deployment Report (January 23, 2026)
+
+### Executive Summary
+Successfully deployed Phase F-H UI/UX enhancements to production VPS (145.223.73.170). All admin interface improvements are functional with zero JavaScript errors. Dashboard redesign, mobile PWA enhancements, and desktop polish features are now live.
+
+### Deployment Timeline
+**Date**: January 23, 2026  
+**Branch**: `feat/uiux-users-remove-tasks`  
+**Deployment Target**: VPS 145.223.73.170  
+**Status**: ✅ Production Ready
+
+### Deployment Steps Completed
+1. **VPS Deployment** ✅
+   - Repository: `/root/mbfd-hub`
+   - Branch: `feat/uiux-users-remove-tasks`
+   - Command: `git pull origin feat/uiux-users-remove-tasks`
+
+2. **Dependency Installation** ✅
+   - NPM Packages: 74 new (212 total)
+   - Missing package `@sentry/vite-plugin` resolved
+   - Zero vulnerabilities found
+
+3. **Build Process** ✅
+   - Cache cleared: `php artisan optimize:clear`
+   - Assets built in 23.07s
+   - Build output:
+     - `public/build/manifest.json` (0.27 kB)
+     - `public/build/assets/app-BTdjHBLU.css` (49.25 kB)
+     - `public/build/assets/app-CAiCLEjY.js` (36.35 kB)
+
+4. **Container Health** ✅
+   - Laravel Container: Running healthy
+   - PostgreSQL Container: Running healthy
+   - Logs: Clean
+
+### Phase F: Dashboard Redesign ✅
+- **Welcome Widget**: User avatar, personalized greeting, sign-out button
+- **Command Center Widget**: Out of Service alerts, Low Stock items, Fleet Status
+- **AI Assistant Widget**: Chat interface with suggested prompts
+- **Statistics Cards**: 4 cards (Apparatuses, Defects, Inspections, Overdue)
+- **Equipment Dashboard**: 4 cards (Total Items, Low Stock, Out of Stock, Pending Recommendations)
+- **Capital Projects Dashboard**: 4 cards (High Priority, Overdue, Active Budget, Completion Rate)
+- **Upcoming Milestones Widget**: Date filtering and search functionality
+
+### Phase G: Mobile PWA Enhancements ⚠️
+**Status**: Partially blocked by nginx 403 on `/daily` endpoint (infrastructure issue unrelated to UI/UX changes)
+
+### Phase H: Desktop Polish ✅
+- **Navigation**: Collapsible sidebar with organized menu structure
+- **Todos Page**: Full CRUD interface with reordering, search, filters
+- **Console Verification**: Zero JavaScript errors detected
+
+### Testing Results
+- **Browser Testing**: ✅ Chrome, Firefox, Safari, Edge
+- **Responsive Testing**: ✅ Mobile (320-767px), Tablet (768-1279px), Desktop (1280px+)
+- **Performance**: Build time 23.07s, CSS 49.25 kB (8.90 kB gzipped), JS 36.35 kB (14.71 kB gzipped)
+
+### Known Issues from Deployment
+1. **Mobile Daily Form (403 Error)** - Medium severity, nginx configuration issue
+2. **Tailwind CSS Warning** - Low severity, potential build performance impact
+
+### Deployment Verification Checklist
+- [x] Code pulled from branch
+- [x] Dependencies installed
+- [x] Assets built successfully
+- [x] Cache cleared
+- [x] Dashboard widgets rendering
+- [x] Navigation improvements visible
+- [x] Todos page functional
+- [x] Zero JavaScript errors
+- [x] Container logs clean
+- [ ] Mobile `/daily` form verified (blocked by nginx 403)
+- [x] Sentry monitoring confirmed
+
+---
+
+## Daily Checkout System Migration Reference
+
+### Source Information
+**Repository**: `C:\Users\Peter Darley\Documents\mbfd-checkout-system`  
+**Analysis Date**: January 2026  
+**Status**: Reference documentation for future migration
+
+### Key Components to Reuse
+
+#### 1. Apparatus Types & Checklist Data
+- **Apparatus List**: 14 units (Engine 1-4, Ladder 1/3, Rescue 1-4/11/22/44, Rope Inventory)
+- **Checklist Files** (already in this repo at `storage/checklists/`):
+  - `engine_checklist.json` - Engine 1-4
+  - `ladder1_checklist.json` - Ladder 1
+  - `ladder3_checklist.json` - Ladder 3
+  - `rescue_checklist.json` - All Rescue units
+- **Core Types**: `Apparatus`, `Rank`, `Shift`, `ItemStatus`, `Compartment`, `CompartmentItem`
+
+#### 2. Inspection Wizard Flow Logic
+- **Steps**: User Login → Officer Checklist → Compartment Inspection → Submit
+- **State Management**: CurrentStep, items map, existing defects map, officer items
+- **Features**: "Check All" functionality, item-by-item status tracking, photo uploads
+
+#### 3. Defect Deduplication Pattern
+- **Title Regex**: `\[(.+)\]\s+(.+):\s+(.+?)\s+-\s+(Missing|Damaged)`
+- **Dedup Key**: `{compartment}:{item}`
+- **Logic**: Check existing open defects before creating new ones
+- **Title Format**: `[Engine 1] Front Cab: TIC - Missing`
+
+#### 4. AI Integration Pattern (from old Worker)
+- **Worker URL**: `https://mbfd-github-proxy.pdarleyjr.workers.dev`
+- **AI Model**: Llama 2 7B (Workers AI) - now using Cloudflare AI in this project
+- **Response Structure**: summary, recurringIssues, reorderSuggestions, anomalies
+
+#### 5. Migration Phases
+**Phase 1**: Data Models (Apparatus, Compartment, ChecklistTemplate, Defect, Inspection)  
+**Phase 2**: Core Logic (Defect regex, deduplication, submission service)  
+**Phase 3**: UI Components (Inspection wizard in Filament/Livewire)  
+**Phase 4**: AI Integration (OpenAI/Claude API with prompt templates)
+
+---
+
+*Document Version: 4.1*
+*Last Updated: January 25, 2026 - Documentation Consolidation*
+
+---
+
+*Document Version: 4.1*
+*Last Updated: January 25, 2026 - Documentation Consolidation*
+
+*Last Updated: January 25, 2026 - Documentation Consolidation*
+*Author: Peter Darley Jr.*
 *Status: Production Stable - Phase 14 Complete*
+*Angle*
