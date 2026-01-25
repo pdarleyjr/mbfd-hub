@@ -18,6 +18,7 @@ class Todo extends Model
         'assigned_to',
         'created_by',
         'completed_at',
+        'attachments',
     ];
 
     protected $casts = [
@@ -25,6 +26,7 @@ class Todo extends Model
         'completed_at' => 'datetime',
         'sort' => 'integer',
         'assigned_to' => 'array',
+        'attachments' => 'array',
     ];
 
     public function createdBy(): BelongsTo
