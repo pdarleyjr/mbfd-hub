@@ -44,6 +44,13 @@ class DefectsRelationManager extends RelationManager
                 Forms\Components\Textarea::make('notes')
                     ->rows(3),
                 
+                Forms\Components\FileUpload::make('photo_path')
+                    ->label('Photo')
+                    ->disk('public')
+                    ->directory('defects')
+                    ->image()
+                    ->imageEditor(),
+                
                 Forms\Components\Select::make('status')
                     ->required()
                     ->default('open')
@@ -60,6 +67,12 @@ class DefectsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('item')
             ->columns([
+                Tables\Columns\ImageColumn::make('photo_path')
+                    ->label('Photo')
+                    ->disk('public')
+                    ->width(60)
+                    ->height(60),
+                
                 Tables\Columns\TextColumn::make('compartment')
                     ->searchable()
                     ->sortable(),

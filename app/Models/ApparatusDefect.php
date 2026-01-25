@@ -61,7 +61,7 @@ class ApparatusDefect extends Model
         return $this->hasMany(ApparatusInventoryAllocation::class, 'apparatus_defect_id');
     }
 
-    public static function recordDefect($apparatusId, $compartment, $item, $status, $notes, $photo = null)
+    public static function recordDefect($apparatusId, $compartment, $item, $status, $notes, $photoPath = null)
     {
         $existing = self::where('apparatus_id', $apparatusId)
             ->where('compartment', $compartment)
@@ -81,7 +81,7 @@ class ApparatusDefect extends Model
             $existing->update([
                 'status' => $status,
                 'notes' => $notes,
-                'photo' => $photo,
+                'photo_path' => $photoPath,
                 'defect_history' => $history,
             ]);
             return $existing;
@@ -92,7 +92,7 @@ class ApparatusDefect extends Model
                 'item' => $item,
                 'status' => $status,
                 'notes' => $notes,
-                'photo' => $photo,
+                'photo_path' => $photoPath,
             ]);
         }
     }

@@ -41,7 +41,7 @@ export interface ChecklistData {
 }
 
 export interface Defect {
-  item_name: string;
+  item: string;
   compartment: string;
   status: 'Missing' | 'Damaged';
   notes?: string;

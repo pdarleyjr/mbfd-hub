@@ -7,6 +7,8 @@ use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusDefect;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ApparatusController extends Controller
 {
@@ -66,7 +68,7 @@ class ApparatusController extends Controller
             'defects.*.item' => 'required|string',
             'defects.*.status' => 'required|string|in:Present,Missing,Damaged',
             'defects.*.notes' => 'nullable|string',
-            'defects.*.photo' => 'nullable|string', // base64 encoded image
+            'defects.*.photo' => 'nullable|string',
         ]);
 
         $apparatus = Apparatus::findOrFail($id);
@@ -81,13 +83,38 @@ class ApparatusController extends Controller
         ]);
 
         foreach ($request->defects as $defectData) {
+            $photoPath = null;
+            
+            // Handle photo if present
+            if (!empty($defectData['photo'])) {
+                // Strip the data:image/...;base64, prefix if present
+                $photo = $defectData['photo'];
+                if (preg_match('/^data:image\/(\w+);base64,/', $photo, $matches)) {
+                    $photo = substr($photo, strpos($photo, ',') + 1);
+                    $extension = $matches[1];
+                } else {
+                    $extension = 'jpg';
+                }
+                
+                // Decode base64
+                $decodedImage = base64_decode($photo);
+                
+                // Generate filename
+                $filename = 'defects/' . Str::uuid() . '.' . $extension;
+                
+                // Save to public disk
+                Storage::disk('public')->put($filename, $decodedImage);
+                
+                $photoPath = $filename;
+            }
+            
             ApparatusDefect::recordDefect(
                 $apparatus->id,
                 $defectData['compartment'],
                 $defectData['item'],
                 $defectData['status'],
                 $defectData['notes'] ?? null,
-                $defectData['photo'] ?? null
+                $photoPath
             );
         }
 
