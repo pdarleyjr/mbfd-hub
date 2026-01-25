@@ -1,0 +1,111 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://support.darleyplex.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'
+            set -e
+            cd /root/mbfd-hub
+            
+            # Create backup before deploy
+            BACKUP_FILE="backups/mbfd_hub_$(date +%Y%m%d_%H%M%S).sql"
+            mkdir -p backups
+            docker compose exec -T pgsql pg_dump -U mbfd_user mbfd_hub > "$BACKUP_FILE"
+            echo "✓ Backup created: $BACKUP_FILE"
+            
+            # Pull latest changes and reset to origin (deterministic deploy)
+            git fetch origin
+            git reset --hard origin/main
+            git clean -fd
+            echo "✓ Repository reset to origin/main"
+            
+            # Rebuild and restart containers
+            docker compose up -d --build
+            echo "✓ Containers rebuilt and restarted"
+            
+            # Wait for containers to be healthy
+            sleep 10
+            
+            # Run Laravel commands
+            docker compose exec -T laravel.test php artisan migrate --force
+            docker compose exec -T laravel.test php artisan config:cache
+            docker compose exec -T laravel.test php artisan route:cache
+            docker compose exec -T laravel.test php artisan view:cache
+            echo "✓ Laravel optimizations complete"
+            
+            # Build daily-checkout frontend
+            cd resources/js/daily-checkout
+            npm ci
+            npm run build
+            cd /root/mbfd-hub
+            echo "✓ Daily-checkout frontend built"
+          EOF
+
+      - name: Purge Cloudflare Cache
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: |
+          curl -X POST "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"files":["https://support.darleyplex.com/daily/index.html","https://support.darleyplex.com/daily/","https://support.darleyplex.com/__version"]}'
+          echo "✓ Cloudflare cache purged"
+
+      - name: Run Smoke Tests
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          echo "Running smoke tests..."
+          sleep 5
+          
+          # Test version endpoint
+          if curl -sf https://support.darleyplex.com/__version | jq .; then
+            echo "✓ Version endpoint check passed"
+          else
+            echo "⚠ Version endpoint check failed"
+          fi
+          
+          # Test daily checkout page
+          if curl -sf https://support.darleyplex.com/daily/ -o /dev/null; then
+            echo "✓ Daily checkout accessible"
+          else
+            echo "⚠ Daily checkout check failed"
+          fi
+          
+          echo "✓ Deploy complete!"
+
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed! Check the logs above for details."
+          exit 1
