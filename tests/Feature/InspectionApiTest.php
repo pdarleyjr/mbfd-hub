@@ -41,15 +41,11 @@ class InspectionApiTest extends TestCase
 
         // Inspection data payload
         $inspectionData = [
-            'officer_name' => 'John Doe',
-            'officer_rank' => 'Lieutenant',
-            'inspected_at' => now()->toISOString(),
-            'overall_status' => 'pass',
-            'notes' => 'All systems operational',
-            'checklist_data' => [
-                'compartment_1' => ['item_1' => true, 'item_2' => true],
-                'compartment_2' => ['item_1' => false, 'notes' => 'Missing fire extinguisher'],
-            ],
+            'operator_name' => 'John Doe',
+            'rank' => 'Lieutenant',
+            'completed_at' => now()->toISOString(),
+            'shift' => 'A',
+            'unit_number' => 'E1',
         ];
 
         // Make POST request
@@ -60,10 +56,9 @@ class InspectionApiTest extends TestCase
             ->assertJsonStructure([
                 'id',
                 'apparatus_id',
-                'officer_name',
-                'officer_rank',
-                'overall_status',
-                'inspected_at',
+                'operator_name',
+                'rank',
+                'completed_at',
                 'created_at',
                 'updated_at',
             ]);
@@ -71,9 +66,8 @@ class InspectionApiTest extends TestCase
         // Verify record was created in database
         $this->assertDatabaseHas('apparatus_inspections', [
             'apparatus_id' => $apparatus->id,
-            'officer_name' => 'John Doe',
-            'officer_rank' => 'Lieutenant',
-            'overall_status' => 'pass',
+            'operator_name' => 'John Doe',
+            'rank' => 'Lieutenant',
         ]);
 
         // Verify inspection count
@@ -86,10 +80,9 @@ class InspectionApiTest extends TestCase
     public function test_returns_404_for_invalid_apparatus(): void
     {
         $inspectionData = [
-            'officer_name' => 'John Doe',
-            'officer_rank' => 'Lieutenant',
-            'inspected_at' => now()->toISOString(),
-            'overall_status' => 'pass',
+            'operator_name' => 'John Doe',
+            'rank' => 'Lieutenant',
+            'completed_at' => now()->toISOString(),
         ];
 
         $response = $this->postJson('/api/public/apparatuses/99999/inspections', $inspectionData);
@@ -127,6 +120,6 @@ class InspectionApiTest extends TestCase
         $response = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", []);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['officer_name', 'overall_status']);
+            ->assertJsonValidationErrors(['operator_name']);
     }
 }

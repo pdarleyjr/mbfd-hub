@@ -49,10 +49,9 @@ class AdminMetricsApiTest extends TestCase
         // Create some inspections
         ApparatusInspection::create([
             'apparatus_id' => $apparatus->id,
-            'officer_name' => 'John Doe',
-            'officer_rank' => 'Lieutenant',
-            'inspected_at' => now(),
-            'overall_status' => 'pass',
+            'operator_name' => 'John Doe',
+            'rank' => 'Lieutenant',
+            'completed_at' => now(),
         ]);
 
         // Create some defects
