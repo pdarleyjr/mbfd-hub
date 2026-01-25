@@ -20,9 +20,11 @@ echo "Containers rebuilt and restarted"
 
 # Run Laravel commands
 docker compose exec -T laravel.test php artisan migrate --force
+docker compose exec -T laravel.test php artisan optimize:clear
 docker compose exec -T laravel.test php artisan config:cache
 docker compose exec -T laravel.test php artisan route:cache
 docker compose exec -T laravel.test php artisan view:cache
+docker compose exec -T laravel.test php artisan filament:clear-cached-components
 echo "Laravel optimizations complete"
 
 # Build daily-checkout frontend
@@ -34,8 +36,8 @@ echo "Daily-checkout frontend built"
 
 # Purge Cloudflare cache
 echo "Purging Cloudflare cache..."
-curl -X POST "https://api.cloudflare.com/client/v4/zones/d462d29a7b0f4c6ba0ed9790e0fd8dbb/purge_cache" \
-  -H "Authorization: Bearer U6XGuhQXd5JwIrkuIprFiXA_OvyCqd6ZQeLs_cmZ" \
+curl -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
+  -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
   -H "Content-Type: application/json" \
   --data '{"files":["https://support.darleyplex.com/daily/index.html","https://support.darleyplex.com/daily/","https://support.darleyplex.com/__version"]}'
 
