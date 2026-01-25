@@ -1,10 +1,10 @@
 const CACHE_NAME = 'mbfd-checkout-v3';
 const API_CACHE_NAME = 'mbfd-api-cache-v3';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/assets/', // Will cache JS and CSS bundles
+  '/daily/',
+  '/daily/index.html',
+  '/daily/manifest.json',
+  '/daily/assets/', // Will cache JS and CSS bundles
 ];
 
 // Install event - cache static assets
@@ -116,7 +116,7 @@ self.addEventListener('fetch', (event) => {
       }).catch(() => {
         // Return offline page for navigation requests
         if (request.mode === 'navigate') {
-          return caches.match('/index.html');
+          return caches.match('/daily/index.html');
         }
         return new Response('Offline', { status: 503 });
       });

@@ -10,16 +10,16 @@ Sentry.init({
   release: import.meta.env.VITE_SENTRY_RELEASE,
 })
 
-// Register service worker for PWA functionality
+// Register service worker for PWA functionality with correct /daily/ scope
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/service-worker.js')
+      .register('/daily/sw.js', { scope: '/daily/' })
       .then((registration) => {
-        console.log('SW registered:', registration);
+        console.log('[PWA] Service worker registered successfully:', registration);
       })
       .catch((error) => {
-        console.error('SW registration failed:', error);
+        console.error('[PWA] Service worker registration failed:', error);
       });
   });
 }
