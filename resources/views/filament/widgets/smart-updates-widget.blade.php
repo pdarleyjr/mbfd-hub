@@ -3,8 +3,8 @@
         x-data="{ expanded: @entangle('isExpanded') }">
         <x-slot name="heading">
             <div class="flex items-center gap-2">
-                <x-heroicon-o-chat-bubble-left-right class="w-5 h-5 text-primary-500" />
-                AI Assistant
+                <x-heroicon-o-command-line class="w-5 h-5 text-primary-500" />
+                Command Center
             </div>
         </x-slot>
 
@@ -20,18 +20,43 @@
         </x-slot>
 
         <div>
-            {{-- Collapsed State - Compact Summary --}}
-            <div x-show="!expanded" class="space-y-2">
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                    Ask the AI assistant about inventory, fleet status, projects, or request changes.
-                </p>
-                <x-filament::button 
-                    @click="expanded = true"
-                    size="sm" 
-                    color="primary">
-                    <x-heroicon-o-sparkles class="w-4 h-4 mr-1" />
-                    Ask AI
-                </x-filament::button>
+            {{-- Collapsed State - Bullet Summary with View All Links --}}
+            <div x-show="!expanded" class="space-y-4">
+                @if($bulletSummary)
+                    @foreach($bulletSummary as $key => $section)
+                        <div class="border-l-4 border-{{ $section['color'] }}-500 pl-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    {{ $section['icon'] }} {{ $section['title'] }}
+                                </h3>
+                                @if(in_array($key, ['defects', 'shop_work']))
+                                    <a href="{{ $key === 'defects' ? '/admin/apparatus-defects' : '/admin/shop-works' }}" 
+                                       class="text-xs text-primary-600 dark:text-primary-400 hover:underline">
+                                        View All
+                                    </a>
+                                @endif
+                            </div>
+                            <ul class="space-y-1">
+                                @foreach(array_slice($section['items'], 0, 5) as $item)
+                                    <li class="text-xs text-gray-600 dark:text-gray-400">• {{ $item }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endforeach
+                @else
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Loading summary...</p>
+                @endif
+                
+                <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <x-filament::button 
+                        @click="expanded = true"
+                        size="sm" 
+                        color="primary"
+                        class="w-full">
+                        <x-heroicon-o-sparkles class="w-4 h-4 mr-1" />
+                        Ask AI Assistant
+                    </x-filament::button>
+                </div>
             </div>
 
             {{-- Expanded State - Full Chat Interface --}}
