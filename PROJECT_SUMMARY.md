@@ -1,11 +1,173 @@
-# MBFD Support Hub - Executive Technical Summary
+# MBFD Support Hub - Comprehensive Technical Documentation
 
-## Project Overview
+## 1. Project Overview
 
-**MBFD Support Hub** is a production-ready, comprehensive fire department management system specifically designed for the Miami Beach Fire Department (MBFD). The system provides end-to-end operational management for fire apparatus, equipment inventory, capital projects, maintenance workflows, task management, and administrative oversight.
+**MBFD Support Hub** is a production-ready, comprehensive fire department management system specifically designed for the Miami Beach Fire Department (MBFD).
 
 **Production URL**: https://support.darleyplex.com  
-**Status**: ✅ **Stable & Operational** - Phase 14 Complete: Major UI/UX Enhancements & Technical Audit (January 23, 2026)
+**Daily PWA**: https://support.darleyplex.com/daily  
+**Admin Panel**: https://support.darleyplex.com/admin  
+**Status**: ✅ **Stable & Operational**
+
+## 2. VPS Technical Details
+
+**VPS Server**: 145.223.73.170  
+**SSH Access**: `ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@145.223.73.170`  
+**App Directory**: `/root/mbfd-hub`  
+**Stack**: Laravel Sail (Docker), PostgreSQL, Nginx (reverse proxy)  
+**Domain**: support.darleyplex.com (proxied via Cloudflare)
+
+## 3. Docker Services
+
+**Container Stack**:
+- `laravel.test` - PHP 8.3 with Laravel application
+- `pgsql` - PostgreSQL 15 database
+
+**Exposed Ports**:
+- 80 (HTTP)
+- 443 (HTTPS)
+- 5432 (PostgreSQL)
+
+**⚠️ IMPORTANT**: Port 5173 was exposed publicly but should be localhost only for production security.
+
+## 4. GitHub Repository
+
+**Repository**: pdarleyjr/support-services (or mbfd-hub)  
+**Current Commit**: 8e6add5a  
+**Branch**: main  
+**Deploy Method**: SSH + `git reset --hard origin/main` + `docker compose restart`
+
+## 5. Completed Work (Phases 1-18)
+
+### Phase 1: Infrastructure Setup
+- Docker environment configured with Laravel Sail
+- PostgreSQL database integration
+- Observability and monitoring tools configured
+
+### Phase 2: Vite Isolation
+- Removed `public/hot` file exposure
+- Secured port 5173 (Vite dev server) to localhost only for production
+
+### Phase 3: PWA /daily Scope Fix
+- Service worker now correctly scoped to `/daily/` directory
+- Fixed PWA installation and caching issues
+
+### Phase 4: Cloudflare Cache Rules
+- Implemented proper cache headers
+- Configured cache purging rules
+- CDN optimization for static assets
+
+### Phase 5: CI/CD GitHub Actions Deploy Pipeline
+- Automated deployment workflow
+- Build and test automation
+- Release management integration
+
+### Phase 6: Admin Login Users Created
+- Created admin user: admin@mbfd.org
+- Configured authentication system
+- Set up user roles and permissions
+
+### Phase 7: Database Migrations
+- Ran 34 pending database migrations successfully
+- Schema synchronized with application models
+- Database integrity verified
+
+### Phase 8: MBFD Data Import
+- **25 apparatuses** imported into production database
+- **51 equipment items** added to inventory
+- **7 capital projects** configured
+- **4 fire stations** registered in system
+
+### Phase 9: Fixed HasStock Trait Conflicts
+- Resolved trait method conflicts in [`app/Models/EquipmentItem.php`](app/Models/EquipmentItem.php)
+- Stock management methods properly implemented
+
+### Phase 10: Fixed Duplicate stockMutations() Method
+- Removed duplicate `stockMutations()` method from EquipmentItem model
+- Ensured proper relationship definitions
+
+### Phase 11: Repository Cleanup
+- Deleted temporary files and development artifacts
+- Updated [`.gitignore`](.gitignore) with proper exclusion patterns
+- Cleaned up version control history
+
+### Phases 12-18
+- Complete Filament v3 compatibility migration
+- Task management system implementation
+- Kanban board functionality
+- Dashboard widget redesign
+- Mobile PWA enhancements
+- Desktop keyboard shortcuts
+- Authentication and security improvements
+
+## 6. Known Issues / Warnings (DO NOT FIX - document only)
+
+### Daily PWA (/daily) Console Errors
+
+```
+Layout was forced before the page was fully loaded. If stylesheets are not yet loaded this may cause a flash of unstyled content.
+Source map error: request failed with status 404 - installHook.js.map
+Error in parsing value for '-webkit-text-size-adjust'. Declaration dropped.
+Unknown property '-moz-osx-font-smoothing'. Declaration dropped.
+Ruleset ignored due to bad selector. index-ed2b4c34.css:1:14910
+GET https://support.darleyplex.com/vite.svg [HTTP/2 404]
+GET https://support.darleyplex.com/icons/icon-192.png [HTTP/2 404]
+```
+
+### Admin Panel (/admin) Console Errors
+
+```
+Mixed Content: Upgrading insecure display request 'http://support.darleyplex.com/images/large_mbfd_logo_no_bg.png' to use 'https'
+Mixed Content: Upgrading insecure display request 'http://support.darleyplex.com/images/small_mbfd_logo_no_bg.png' to use 'https'
+XHRPOST https://support.darleyplex.com/livewire/update [HTTP/2 500] (intermittent)
+This page is in Quirks Mode. Page layout may be impacted. For Standards Mode use "<!DOCTYPE html>".
+Error in parsing value for '-webkit-text-size-adjust'. Declaration dropped.
+Unknown property '-moz-osx-font-smoothing'. Declaration dropped.
+Unknown property '-moz-column-gap'. Declaration dropped.
+Unknown property '-moz-columns'. Declaration dropped.
+Unknown pseudo-class or pseudo-element '-ms-reveal'. Ruleset ignored.
+Unknown pseudo-class or pseudo-element '-ms-clear'. Ruleset ignored.
+Expected 'none', URL, or filter function but found 'progid'. Error in parsing value for 'filter'.
+Source map error: request failed with status 404 - installHook.js.map
+```
+
+## 7. Credentials Section
+
+**⚠️ SECURITY WARNING**: These credentials are for documentation purposes only. Rotate in production.
+
+**Admin Login**:
+- Email: admin@mbfd.org
+- Password: password123
+
+**VPS SSH**:
+- Command: `ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@145.223.73.170`
+- Key Location: `C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker`
+
+**GitHub Personal Access Token**:
+- Username: pdarleyjr
+- Token: [REDACTED]
+
+**Cloudflare Wrangler API Token**:
+- Token: U6XGuhQXd5JwIrkuIprFiXA_OvyCqd6ZQeLs_cmZ
+
+## 8. Key Files Modified
+
+### Core Application Files
+- [`app/Models/EquipmentItem.php`](app/Models/EquipmentItem.php) - Removed duplicate `stockMutations()` method, fixed HasStock trait conflicts
+- [`.gitignore`](.gitignore) - Added temporary file patterns and build artifact exclusions
+
+### PWA Configuration
+- [`resources/js/daily-checkout/vite.config.js`](resources/js/daily-checkout/vite.config.js) - PWA scope configuration fixed to `/daily/`
+- [`resources/js/daily-checkout/public/service-worker.js`](resources/js/daily-checkout/public/service-worker.js) - Service worker scope and caching rules
+
+### Deployment Scripts
+- [`scripts/deploy.sh`](scripts/deploy.sh) - Automated deployment script with cache clearing
+- [`scripts/purge-cloudflare.sh`](scripts/purge-cloudflare.sh) - Cloudflare cache purge automation
+
+### Database Migrations
+- Various migration files in `database/migrations/` for apparatus, equipment, projects, and inventory systems
+
+---
 
 ## Architecture & Tech Stack
 

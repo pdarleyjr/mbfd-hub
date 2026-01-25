@@ -128,7 +128,7 @@ export default function InspectionWizard() {
         compartment.items.forEach(item => {
           if (item.status === 'Missing' || item.status === 'Damaged') {
             defects.push({
-              item_name: item.name,
+              item: item.name,
               compartment: compartment.name,
               status: item.status,
               notes: item.notes,

@@ -57,6 +57,14 @@ class DefectResource extends Resource
                     ->columnSpanFull()
                     ->rows(3),
                 
+                Forms\Components\FileUpload::make('photo_path')
+                    ->label('Photo')
+                    ->disk('public')
+                    ->directory('defects')
+                    ->image()
+                    ->imageEditor()
+                    ->columnSpanFull(),
+                
                 Forms\Components\Select::make('status')
                     ->required()
                     ->default('open')
@@ -84,6 +92,12 @@ class DefectResource extends Resource
                     ->label('Apparatus')
                     ->searchable()
                     ->sortable(),
+                
+                Tables\Columns\ImageColumn::make('photo_path')
+                    ->label('Photo')
+                    ->disk('public')
+                    ->width(60)
+                    ->height(60),
                 
                 Tables\Columns\TextColumn::make('compartment')
                     ->searchable()
