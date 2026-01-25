@@ -153,6 +153,33 @@ class ApparatusResource extends Resource
                     ->tooltip('Start daily checkout for this apparatus')
                     ->url(fn (Apparatus $record): string => "/daily/{$record->id}")
                     ->openUrlInNewTab(),
+                Tables\Actions\Action::make('updateStatus')
+                    ->label('Update Status')
+                    ->icon('heroicon-m-arrow-path')
+                    ->color('info')
+                    ->form([
+                        Forms\Components\Select::make('status')
+                            ->options([
+                                'In Service' => 'In Service',
+                                'Out of Service' => 'Out of Service',
+                                'Maintenance' => 'Maintenance',
+                                'Reserve' => 'Reserve',
+                            ])
+                            ->required()
+                            ->default(fn ($record) => $record->status),
+                        Forms\Components\Textarea::make('notes')
+                            ->label('Reason / Notes')
+                            ->visible(fn ($get) => $get('status') !== 'In Service'),
+                    ])
+                    ->action(function (Apparatus $record, array $data) {
+                        $record->update(['status' => $data['status']]);
+                        
+                        \Filament\Notifications\Notification::make()
+                            ->title('Status Updated')
+                            ->success()
+                            ->body("Status changed to: {$data['status']}")
+                            ->send();
+                    }),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
