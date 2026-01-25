@@ -20,8 +20,13 @@ class ForcePasswordChange
         
         // Check if user is authenticated and must change password
         if ($user && $user->must_change_password) {
-            // Allow access to the My Profile page, Livewire requests, assets, and logout
+            // Allow access to the My Profile page, login, logout, Livewire requests, and assets
             if (!$request->routeIs('filament.admin.pages.my-profile') && 
+                !$request->is('admin/my-profile') &&
+                !$request->is('admin/login') &&
+                !$request->is('admin/logout') &&
+                !$request->routeIs('filament.admin.auth.login') &&
+                !$request->routeIs('filament.admin.auth.logout') &&
                 !$request->is('*/livewire/*') &&
                 !$request->is('*/filament/assets/*') &&
                 !$request->routeIs('logout')) {
