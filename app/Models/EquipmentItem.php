@@ -83,14 +83,6 @@ class EquipmentItem extends Model
     }
 
     /**
-     * Override stockMutations relationship for HasStock trait
-     */
-    public function stockMutations(): MorphMany
-    {
-        return $this->morphMany(StockMutation::class, 'stocker');
-    }
-
-    /**
      * Check if stock is low
      */
     public function isLowStock(): bool

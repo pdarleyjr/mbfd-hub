@@ -23,3 +23,15 @@ yarn-error.log
 /.vscode
 /.zed
 *.code-workspace
+
+# Logs
+*.log
+
+# Temp/debug scripts in root
+/fix_*.php
+/debug_*.php
+/check_*.php
+/verify_*.php
+/create_*.sh
+/test_*.php
+/sentry_test.php
