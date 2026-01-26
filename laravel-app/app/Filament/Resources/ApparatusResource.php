@@ -27,12 +27,13 @@ class ApparatusResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Basic Information')
                     ->schema([
-                        Forms\Components\TextInput::make('unit_id')
-                            ->label('Unit ID')
-                            ->maxLength(255),
                         Forms\Components\TextInput::make('vehicle_number')
                             ->label('Vehicle #')
                             ->maxLength(50),
+                        Forms\Components\TextInput::make('designation')
+                            ->label('Designation')
+                            ->maxLength(255)
+                            ->helperText('E.g., E1, R1, L1'),
                         Forms\Components\TextInput::make('vin')
                             ->label('VIN')
                             ->maxLength(255),
@@ -48,18 +49,23 @@ class ApparatusResource extends Resource
                         Forms\Components\TextInput::make('mileage')
                             ->numeric()
                             ->default(0),
-                    ])->columns(4),
+                        Forms\Components\TextInput::make('class_description')
+                            ->label('Class Description')
+                            ->maxLength(255)
+                            ->helperText('E.g., ENGINE, LADDER, RESCUE'),
+                    ])->columns(5),
                 Forms\Components\Section::make('Status & Location')
                     ->schema([
                         Forms\Components\Select::make('status')
                             ->options([
                                 'In Service' => 'In Service',
                                 'Out of Service' => 'Out of Service',
-                                'Reserve' => 'Reserve',
+                                'Available' => 'Available',
                                 'Maintenance' => 'Maintenance',
                             ])
                             ->default('In Service'),
-                        Forms\Components\TextInput::make('location')
+                        Forms\Components\TextInput::make('current_location')
+                            ->label('Current Location')
                             ->maxLength(255),
                         Forms\Components\TextInput::make('assignment')
                             ->maxLength(255),
@@ -93,8 +99,10 @@ class ApparatusResource extends Resource
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'Active' => 'success',
+                        'In Service' => 'success',
+                        'Available' => 'info',
                         'Out of Service' => 'danger',
+                        'Maintenance' => 'warning',
                         default => 'gray',
                     }),
                 Tables\Columns\TextColumn::make('notes')
@@ -111,8 +119,22 @@ class ApparatusResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
-                        'Active' => 'Active',
+                        'In Service' => 'In Service',
+                        'Available' => 'Available',
                         'Out of Service' => 'Out of Service',
+                        'Maintenance' => 'Maintenance',
+                    ]),
+                Tables\Filters\SelectFilter::make('class_description')
+                    ->label('Class')
+                    ->options([
+                        'ENGINE' => 'Engine',
+                        'LADDER' => 'Ladder',
+                        'RESCUE' => 'Rescue',
+                        'AIR TRUCK' => 'Air Truck',
+                        'BOAT' => 'Boat',
+                        'EMS' => 'EMS',
+                        'TAC UNIT' => 'TAC Unit',
+                        'UTILITY' => 'Utility',
                     ]),
             ])
             ->actions([
