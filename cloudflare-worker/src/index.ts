@@ -52,10 +52,15 @@ export default {
     // Route: Inventory Chat Assistant
     if (url.pathname === '/ai/inventory-chat' && request.method === 'POST') {
       try {
-        // Verify API secret
-        const apiSecret = request.headers.get('x-api-secret');
-        if (apiSecret !== env.API_SECRET) {
-          return new Response('Unauthorized', { status: 401 });
+        // Verify API secret (trim to handle any trailing whitespace from echo)
+        const apiSecret = request.headers.get('x-api-secret')?.trim();
+        const envSecret = env.API_SECRET?.trim();
+        
+        if (!apiSecret || apiSecret !== envSecret) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+            status: 401,
+            headers: { 'content-type': 'application/json' }
+          });
         }
 
         // Parse request

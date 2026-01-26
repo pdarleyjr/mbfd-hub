@@ -33,6 +33,16 @@ class TodoResource extends Resource
                 Forms\Components\Toggle::make('is_completed')
                     ->label('Completed')
                     ->default(false),
+                Forms\Components\FileUpload::make('attachments')
+                    ->multiple()
+                    ->disk('public')
+                    ->directory('todo-attachments')
+                    ->downloadable()
+                    ->openable()
+                    ->previewable()
+                    ->maxSize(102400)
+                    ->acceptedFileTypes(['application/pdf', 'image/*', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/plain'])
+                    ->columnSpanFull(),
                 Forms\Components\Hidden::make('created_by_user_id')
                     ->default(auth()->id()),
             ]);
