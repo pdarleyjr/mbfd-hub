@@ -1,0 +1,53 @@
+0,1,2,3,4,5,6,7
+,,,,,,,
+,Apparatus Status Report 1/23/2026,,,,,,
+,Vehicle No,Designation,Assignment,Current Location,Status,Notes,Class Description
+,002-16,E 21,Reserve,Fire Fleet,Available,, ENGINE
+,002-14,E 11,Reserve,Station 2,Out of Service,Out of service for Fuel leak, ENGINE
+,002-10,E 31,Reserve,Station 2,Available,, ENGINE
+,1033,,Reserve,Station 2,Out of Service,Radiator failed after overheat,RESCUE 
+,1034,,Reserve,Station 2 ,In Service,In service Sunday for event,RESCUE 
+,1035,,Reserve,Station 1,Available,,RESCUE 
+,1036,,Reserve,Station 2,In Service,In service Sunday for event,RESCUE 
+,14500,,Reserve,Station 2,Available,,RESCUE 
+,002-6,L 11,Reserve,Station 1,In Service,In service as L1 now,LADDER
+,14501,,Reserve,Station 4,In Service,In service as rescue 4,RESCUE 
+,,,,,,,
+,20503,E 1,Station 1,Station 1 ,In Service,, ENGINE
+,002-12,L 1,Station 1,Fire Fleet,Out of Service,Back from expert. Can be used as spare. Needs one more repair,LADDER
+,16508,R 1,Station 1,Station 1,In Service,,RESCUE 
+,19502,R 11,Station 1,Station 1,In Service,,RESCUE 
+,,,,,,,
+,002-20,A 1,Station 2,Station 2,In Service,,AIR TRUCK
+,18500,A 2,Station 2,Station 2,In Service,,AIR TRUCK
+,24509,E 2,Station 2,Station 2,In Service,, ENGINE
+,16507,R 2,Station 2,Station 2,In Service,,RESCUE 
+,19503,R 22,Station 2,Station 2,In Service,,RESCUE 
+,,,,,,,
+,002-22,E 3,Station 3,Station 3,In Service,, ENGINE
+,17505,L 3,Station 3,Station 3,In Service,,LADDER
+,17501,R 3,Station 3,Station  3,In Service,,RESCUE 
+,,,,,,,
+,17503,R 44,Station 4,Station 4,In Service,,RESCUE 
+,20504,E 4,Station 4,Station 4,In Service,, ENGINE
+,17502,R 4,Station 4,Station 4,In Service,In service Sunday,RESCUE 
+,,,,,,,
+,,,,,,,
+,,Reserves,,,,,
+,,Description,Available,Out of Service,In Service,,
+,,Rescue,2,1,3,,
+,,Engine,2,1,0,,
+,,Ladders,0,0,1,,
+,,,,,,,
+,,Front Line,,,,,
+,,Description,Out of Service,In Service,,,
+,,Rescue,0,7,,,
+,,Engine,0,4,,,
+,,Ladders,1,1,,,
+,,Air Truck,0,2,,,
+,,,,,,,
+,After Hours Contact ,,,,,,
+,Name,,Title,Contact Information ,,,
+,Gerald De Young,,Fire Fleet Supervisor ,954-448-5823,,,
+,Alian Gonzalez,,Fleet Manager,786-910-7390,,,
+,Carlos Berriz,,Fleet Director,305-742-4342,,,

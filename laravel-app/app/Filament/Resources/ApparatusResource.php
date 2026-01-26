@@ -79,71 +79,46 @@ class ApparatusResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('unit_id')
-                    ->label('Unit ID')
+                Tables\Columns\TextColumn::make('vehicle_number')
+                    ->label('Vehicle No')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('vehicle_number')
-                    ->label('Vehicle #')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('make')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('model')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('year')
-                    ->numeric()
+                Tables\Columns\TextColumn::make('designation')
+                    ->label('Designation')
+                    ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('mileage')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('location')
-                    ->searchable(),
                 Tables\Columns\TextColumn::make('assignment')
-                    ->searchable(),
+                    ->label('Assignment')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('current_location')
+                    ->label('Current Location')
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'In Service' => 'success',
+                        'Active' => 'success',
                         'Out of Service' => 'danger',
-                        'Maintenance' => 'warning',
-                        'Reserve' => 'gray',
                         default => 'gray',
                     }),
-                Tables\Columns\TextColumn::make('inspections_count')
-                    ->label('Inspections')
-                    ->counts('inspections')
-                    ->badge()
-                    ->color('info'),
-                Tables\Columns\TextColumn::make('open_defects_count')
-                    ->label('Active Issues')
-                    ->counts('openDefects')
-                    ->badge()
-                    ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
-                Tables\Columns\TextColumn::make('last_service_date')
-                    ->date()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('vin')
-                    ->label('VIN')
+                Tables\Columns\TextColumn::make('notes')
+                    ->label('Notes')
+                    ->limit(50)
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('class_description')
+                    ->label('Class Description')
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
             ])
-            ->defaultSort('unit_id')
+            ->defaultSort('vehicle_number')
             ->striped()
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
-                        'In Service' => 'In Service',
+                        'Active' => 'Active',
                         'Out of Service' => 'Out of Service',
-                        'Reserve' => 'Reserve',
-                        'Maintenance' => 'Maintenance',
                     ]),
-                Tables\Filters\Filter::make('has_active_issues')
-                    ->label('Has Active Issues')
-                    ->query(fn (Builder $query) => $query->whereHas('defects', fn ($q) => $q->where('resolved', false))),
             ])
             ->actions([
                 Tables\Actions\Action::make('start_daily_checkout')
