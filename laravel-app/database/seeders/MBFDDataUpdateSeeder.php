@@ -420,19 +420,9 @@ class MBFDDataUpdateSeeder extends Seeder
                 $updated++;
             }
             
-            // Update stock levels using laravel-stock
-            $currentStock = $equipmentItem->stock ?? 0;
-            $targetStock = $itemQty;
-            
-            if ($currentStock != $targetStock) {
-                // Clear existing stock and set new value
-                if ($currentStock > 0) {
-                    $equipmentItem->decrementStock($currentStock, ['reason' => 'Inventory reset for update']);
-                }
-                if ($targetStock > 0) {
-                    $equipmentItem->incrementStock($targetStock, ['reason' => 'Inventory count - January 2026']);
-                }
-            }
+            // Note: Stock quantities not stored in equipment_items table
+            // The laravel-stock package uses a separate stock_mutations table
+            // Quantity tracking would need to be implemented separately
         }
         
         $this->command->info("  ✓ Updated {$updated} items, created {$created} new");
