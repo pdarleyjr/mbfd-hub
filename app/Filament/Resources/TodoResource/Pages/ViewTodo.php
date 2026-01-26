@@ -8,6 +8,7 @@ use Filament\Actions;
 use Filament\Forms;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\HtmlString;
 
@@ -35,9 +36,39 @@ class ViewTodo extends ViewRecord
                         'username' => auth()->user()->name,
                         'comment' => $data['comment'],
                     ]);
+
                     $this->refreshFormData(['updates']);
                 }),
         ];
+    }
+
+    public function deleteUpdate(int $updateId): void
+    {
+        $update = TodoUpdate::find($updateId);
+        
+        if (!$update) {
+            Notification::make()
+                ->title('Update not found')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        // Check if user can delete (owner or admin)
+        if (auth()->id() !== $update->user_id && auth()->user()->role !== 'admin') {
+            Notification::make()
+                ->title('Permission denied')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $update->delete();
+
+        Notification::make()
+            ->title('Update deleted')
+            ->success()
+            ->send();
     }
 
     public function infolist(Infolist $infolist): Infolist
