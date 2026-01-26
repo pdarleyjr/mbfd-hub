@@ -55,7 +55,7 @@ class TodoOverviewWidget extends BaseWidget
                 Tables\Actions\Action::make('view')
                     ->label('View')
                     ->icon('heroicon-o-eye')
-                    ->url(fn (Todo $record): string => route('filament.admin.resources.todos.edit', ['record' => $record]))
+                    ->url(fn (Todo $record): string => route('filament.admin.resources.todos.view', ['record' => $record]))
                     ->openUrlInNewTab(false),
             ])
             ->heading('Recent & Pending Todos')
