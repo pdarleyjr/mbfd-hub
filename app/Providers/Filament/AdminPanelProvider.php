@@ -35,10 +35,10 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('MBFD Support Hub')
-            ->brandLogo(asset('images/mbfd-logo.png'))
+            ->brandLogo(secure_asset('images/mbfd-logo.png'))
             ->brandLogoHeight('3rem')
-            ->darkModeBrandLogo(asset('images/mbfd-logo.png'))
-            ->favicon(asset('favicon.ico'))
+            ->darkModeBrandLogo(secure_asset('images/mbfd-logo.png'))
+            ->favicon(secure_asset('favicon.ico'))
             ->colors([
                 'primary' => Color::Red,
                 'danger' => Color::Rose,
@@ -80,7 +80,7 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->renderHook(
                 PanelsRenderHook::BODY_END,
-                fn (): string => Blade::render('<script src="{{ asset(\'js/filament-shortcuts.js\') }}" defer></script>')
+                fn (): string => Blade::render('<script src="{{ secure_asset(\'js/filament-shortcuts.js\') }}" defer></script>')
             );
     }
 }
