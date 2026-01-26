@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\Todo;
+use App\Observers\TodoObserver;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
 
@@ -24,5 +26,6 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
         
+        Todo::observe(TodoObserver::class);
     }
 }
