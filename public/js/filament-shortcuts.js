@@ -212,4 +212,174 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     console.log('✅ Filament keyboard shortcuts initialized');
+
+    // =====================================================
+    // PULL-TO-REFRESH FOR MOBILE PWA
+    // =====================================================
+    let touchStartY = 0;
+    let touchMoveY = 0;
+    let isPulling = false;
+    const pullThreshold = 100;
+
+    // Create pull-to-refresh indicator
+    const pullIndicator = document.createElement('div');
+    pullIndicator.id = 'pull-to-refresh';
+    pullIndicator.innerHTML = `
+        <div class="pull-indicator" style="
+            position: fixed;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: top 0.2s ease, transform 0.2s ease;
+            z-index: 9999;
+        ">
+            <svg class="pull-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #ef4444; transition: transform 0.2s ease;">
+                <polyline points="23,4 23,10 17,10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+        </div>
+    `;
+    document.body.appendChild(pullIndicator);
+
+    const indicator = pullIndicator.querySelector('.pull-indicator');
+    const pullIcon = pullIndicator.querySelector('.pull-icon');
+
+    // Only enable on touch devices
+    if ('ontouchstart' in window) {
+        document.addEventListener('touchstart', function(e) {
+            if (window.scrollY === 0) {
+                touchStartY = e.touches[0].clientY;
+                isPulling = true;
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchmove', function(e) {
+            if (!isPulling) return;
+            
+            touchMoveY = e.touches[0].clientY;
+            const pullDistance = touchMoveY - touchStartY;
+            
+            if (pullDistance > 0 && window.scrollY === 0) {
+                const progress = Math.min(pullDistance / pullThreshold, 1);
+                const indicatorTop = Math.min(pullDistance * 0.5, 60) - 60;
+                indicator.style.top = indicatorTop + 'px';
+                pullIcon.style.transform = `rotate(${progress * 180}deg)`;
+                
+                if (pullDistance > pullThreshold) {
+                    indicator.style.background = '#dcfce7';
+                } else {
+                    indicator.style.background = 'white';
+                }
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchend', function(e) {
+            if (!isPulling) return;
+            
+            const pullDistance = touchMoveY - touchStartY;
+            
+            if (pullDistance > pullThreshold && window.scrollY === 0) {
+                // Trigger refresh
+                indicator.style.top = '10px';
+                pullIcon.innerHTML = '<circle cx="12" cy="12" r="10" stroke="#ef4444" stroke-width="2" fill="none" stroke-dasharray="20" stroke-dashoffset="0"><animate attributeName="stroke-dashoffset" from="0" to="60" dur="1s" repeatCount="indefinite"/></circle>';
+                
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            } else {
+                indicator.style.top = '-60px';
+            }
+            
+            isPulling = false;
+            touchStartY = 0;
+            touchMoveY = 0;
+        }, { passive: true });
+    }
+
+    console.log('✅ Pull-to-refresh initialized for mobile');
+
+    // =====================================================
+    // TOOLTIPS FOR INTERACTIVE ELEMENTS
+    // =====================================================
+    
+    // Add tooltip styles
+    const tooltipStyles = document.createElement('style');
+    tooltipStyles.textContent = `
+        [data-tooltip] {
+            position: relative;
+        }
+        [data-tooltip]::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-5px);
+            background: #1f2937;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        [data-tooltip]:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+        @media (max-width: 768px) {
+            [data-tooltip]::after {
+                display: none;
+            }
+        }
+    `;
+    document.head.appendChild(tooltipStyles);
+
+    // Add tooltips to common elements
+    function addTooltips() {
+        // Create button tooltips
+        document.querySelectorAll('a[href*="/create"]:not([data-tooltip])').forEach(el => {
+            el.setAttribute('data-tooltip', 'Create new record (N)');
+        });
+
+        // Edit button tooltips
+        document.querySelectorAll('a[href*="/edit"]:not([data-tooltip])').forEach(el => {
+            el.setAttribute('data-tooltip', 'Edit record');
+        });
+
+        // Search input tooltips
+        document.querySelectorAll('input[type="search"]:not([data-tooltip])').forEach(el => {
+            el.setAttribute('data-tooltip', 'Press / to focus');
+        });
+
+        // Save button tooltips
+        document.querySelectorAll('button[type="submit"]:not([data-tooltip])').forEach(el => {
+            el.setAttribute('data-tooltip', 'Save (Ctrl+S)');
+        });
+    }
+
+    // Run on load and watch for changes
+    addTooltips();
+    
+    const tooltipObserver = new MutationObserver(function() {
+        addTooltips();
+    });
+    
+    tooltipObserver.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    console.log('✅ Tooltips initialized');
 });
