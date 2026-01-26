@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ApparatusController;
 use App\Http\Controllers\Api\AdminMetricsController;
 use App\Http\Controllers\Api\SmartUpdatesController;
 use App\Http\Controllers\Api\InventoryChatController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -15,6 +16,14 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('apparatuses', [ApparatusController::class, 'index']);
     Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class, 'checklist']);
     Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
+});
+
+// Push notification routes (public VAPID key, authenticated subscription management)
+Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('push-subscriptions', [PushSubscriptionController::class, 'store']);
+    Route::delete('push-subscriptions', [PushSubscriptionController::class, 'destroy']);
 });
 
 Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
