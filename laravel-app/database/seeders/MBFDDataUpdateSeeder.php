@@ -101,30 +101,30 @@ class MBFDDataUpdateSeeder extends Seeder
         
         // Data from Apparatus Status Report 1-23-2026
         $apparatuses = [
-            ['vehicle_number' => '011', 'designation' => 'R1', 'assignment' => 'Rescue 1', 'location' => 'Station 1', 'status' => 'In Service'],
-            ['vehicle_number' => '013', 'designation' => 'E3', 'assignment' => 'Engine 3', 'location' => 'Station 3', 'status' => 'In Service'],
-            ['vehicle_number' => '015', 'designation' => 'T1', 'assignment' => 'Truck 1', 'location' => 'Station 2', 'status' => 'In Service'],
-            ['vehicle_number' => '017', 'designation' => 'E4', 'assignment' => 'Engine 4', 'location' => 'Station 4', 'status' => 'In Service'],
-            ['vehicle_number' => '018', 'designation' => 'E1', 'assignment' => 'Engine 1', 'location' => 'Station 1', 'status' => 'In Service'],
-            ['vehicle_number' => '019', 'designation' => 'R2', 'assignment' => 'Rescue 2', 'location' => 'Station 2', 'status' => 'In Service'],
-            ['vehicle_number' => '020', 'designation' => 'L3', 'assignment' => 'Ladder 3', 'location' => 'Station 3', 'status' => 'In Service'],
-            ['vehicle_number' => '021', 'designation' => 'E2', 'assignment' => 'Engine 2', 'location' => 'Station 2', 'status' => 'In Service'],
-            ['vehicle_number' => '022', 'designation' => 'T4', 'assignment' => 'Truck 4', 'location' => 'Station 4', 'status' => 'In Service'],
-            ['vehicle_number' => '023', 'designation' => 'USAR7', 'assignment' => 'USAR 7', 'location' => 'Station 2', 'status' => 'In Service'],
-            ['vehicle_number' => '024', 'designation' => 'HM7', 'assignment' => 'Hazmat 7', 'location' => 'Station 3', 'status' => 'In Service'],
-            ['vehicle_number' => '025', 'designation' => 'MB7', 'assignment' => 'Fireboat', 'location' => 'Station 1', 'status' => 'In Service'],
-            ['vehicle_number' => '026', 'designation' => 'ATV7', 'assignment' => 'ATV Unit', 'location' => 'Station 1', 'status' => 'Available'],
-            ['vehicle_number' => '027', 'designation' => 'RB7', 'assignment' => 'Rescue Boat', 'location' => 'Station 1', 'status' => 'Available'],
-            ['vehicle_number' => '028', 'designation' => 'BC1', 'assignment' => 'Battalion Chief 1', 'location' => 'Station 1', 'status' => 'In Service'],
-            ['vehicle_number' => '029', 'designation' => 'DC1', 'assignment' => 'Division Chief', 'location' => 'Station 1', 'status' => 'In Service'],
-            ['vehicle_number' => '006', 'designation' => 'SR1', 'assignment' => 'Spare Rescue 1', 'location' => 'Station 1', 'status' => 'Available', 'notes' => 'Reserve unit'],
-            ['vehicle_number' => '007', 'designation' => 'SE1', 'assignment' => 'Spare Engine 1', 'location' => 'Station 2', 'status' => 'Available', 'notes' => 'Reserve unit'],
-            ['vehicle_number' => '008', 'designation' => 'SE2', 'assignment' => 'Spare Engine 2', 'location' => 'Station 3', 'status' => 'Out of Service', 'notes' => 'Mechanical issues'],
-            ['vehicle_number' => '009', 'designation' => 'SL1', 'assignment' => 'Spare Ladder 1', 'location' => 'Station 4', 'status' => 'Available', 'notes' => 'Reserve unit'],
-            ['vehicle_number' => '030', 'designation' => 'AIR7', 'assignment' => 'Air Unit', 'location' => 'Station 2', 'status' => 'In Service'],
-            ['vehicle_number' => '031', 'designation' => 'REHAB7', 'assignment' => 'Rehab Unit', 'location' => 'Station 3', 'status' => 'Available'],
-            ['vehicle_number' => '032', 'designation' => 'FOAM7', 'assignment' => 'Foam Unit', 'location' => 'Station 4', 'status' => 'Available'],
-            ['vehicle_number' => '033', 'designation' => 'LIGHT7', 'assignment' => 'Light Tower', 'location' => 'Station 1', 'status' => 'Available'],
+            ['vehicle_number' => '011', 'name' => 'R1', 'type' => 'Rescue', 'location' => 'Station 1', 'status' => 'In Service'],
+            ['vehicle_number' => '013', 'name' => 'E3', 'type' => 'Engine', 'location' => 'Station 3', 'status' => 'In Service'],
+            ['vehicle_number' => '015', 'name' => 'T1', 'type' => 'Ladder/Truck', 'location' => 'Station 2', 'status' => 'In Service'],
+            ['vehicle_number' => '017', 'name' => 'E4', 'type' => 'Engine', 'location' => 'Station 4', 'status' => 'In Service'],
+            ['vehicle_number' => '018', 'name' => 'E1', 'type' => 'Engine', 'location' => 'Station 1', 'status' => 'In Service'],
+            ['vehicle_number' => '019', 'name' => 'R2', 'type' => 'Rescue', 'location' => 'Station 2', 'status' => 'In Service'],
+            ['vehicle_number' => '020', 'name' => 'L3', 'type' => 'Ladder/Truck', 'location' => 'Station 3', 'status' => 'In Service'],
+            ['vehicle_number' => '021', 'name' => 'E2', 'type' => 'Engine', 'location' => 'Station 2', 'status' => 'In Service'],
+            ['vehicle_number' => '022', 'name' => 'T4', 'type' => 'Ladder/Truck', 'location' => 'Station 4', 'status' => 'In Service'],
+            ['vehicle_number' => '023', 'name' => 'USAR7', 'type' => 'USAR', 'location' => 'Station 2', 'status' => 'In Service'],
+            ['vehicle_number' => '024', 'name' => 'HM7', 'type' => 'Hazmat', 'location' => 'Station 3', 'status' => 'In Service'],
+            ['vehicle_number' => '025', 'name' => 'MB7', 'type' => 'Marine', 'location' => 'Station 1', 'status' => 'In Service'],
+            ['vehicle_number' => '026', 'name' => 'ATV7', 'type' => 'ATV', 'location' => 'Station 1', 'status' => 'Available'],
+            ['vehicle_number' => '027', 'name' => 'RB7', 'type' => 'Marine', 'location' => 'Station 1', 'status' => 'Available'],
+            ['vehicle_number' => '028', 'name' => 'BC1', 'type' => 'Command', 'location' => 'Station 1', 'status' => 'In Service'],
+            ['vehicle_number' => '029', 'name' => 'DC1', 'type' => 'Command', 'location' => 'Station 1', 'status' => 'In Service'],
+            ['vehicle_number' => '006', 'name' => 'SR1', 'type' => 'Rescue', 'location' => 'Station 1', 'status' => 'Available', 'notes' => 'Reserve unit'],
+            ['vehicle_number' => '007', 'name' => 'SE1', 'type' => 'Engine', 'location' => 'Station 2', 'status' => 'Available', 'notes' => 'Reserve unit'],
+            ['vehicle_number' => '008', 'name' => 'SE2', 'type' => 'Engine', 'location' => 'Station 3', 'status' => 'Out of Service', 'notes' => 'Mechanical issues'],
+            ['vehicle_number' => '009', 'name' => 'SL1', 'type' => 'Ladder/Truck', 'location' => 'Station 4', 'status' => 'Available', 'notes' => 'Reserve unit'],
+            ['vehicle_number' => '030', 'name' => 'AIR7', 'type' => 'Air/Supply', 'location' => 'Station 2', 'status' => 'In Service'],
+            ['vehicle_number' => '031', 'name' => 'REHAB7', 'type' => 'Rehab', 'location' => 'Station 3', 'status' => 'Available'],
+            ['vehicle_number' => '032', 'name' => 'FOAM7', 'type' => 'Foam', 'location' => 'Station 4', 'status' => 'Available'],
+            ['vehicle_number' => '033', 'name' => 'LIGHT7', 'type' => 'Support', 'location' => 'Station 1', 'status' => 'Available'],
         ];
 
         $statusMap = [
@@ -142,14 +142,13 @@ class MBFDDataUpdateSeeder extends Seeder
             $stationNumber = $matches[1] ?? null;
             $station = $stationNumber ? Station::where('station_number', $stationNumber)->first() : null;
             
-            $apparatus = Apparatus::where('designation', $data['designation'])->first();
+            $apparatus = Apparatus::where('name', $data['name'])->first();
             
             $apparatusData = [
-                'designation' => $data['designation'],
+                'name' => $data['name'],
                 'vehicle_number' => $data['vehicle_number'],
-                'assignment' => $data['assignment'],
+                'type' => $data['type'],
                 'status' => $statusMap[$data['status']] ?? 'active',
-                'current_station_id' => $station?->id,
                 'notes' => $data['notes'] ?? null,
             ];
             
@@ -157,40 +156,12 @@ class MBFDDataUpdateSeeder extends Seeder
                 $apparatus->update($apparatusData);
                 $updated++;
             } else {
-                // Set apparatus type based on designation
-                $type = $this->determineApparatusType($data['designation']);
-                $apparatusData['type'] = $type;
-                $apparatusData['name'] = $data['assignment'];
                 Apparatus::create($apparatusData);
                 $created++;
             }
         }
         
         $this->command->info("  ✓ Updated {$updated} apparatus, created {$created} new");
-    }
-
-    /**
-     * Determine apparatus type from designation
-     */
-    private function determineApparatusType(string $designation): string
-    {
-        $prefix = strtoupper(preg_replace('/[0-9]+/', '', $designation));
-        
-        return match($prefix) {
-            'E', 'SE' => 'Engine',
-            'L', 'T', 'SL' => 'Ladder/Truck',
-            'R', 'SR' => 'Rescue',
-            'BC', 'DC' => 'Command',
-            'USAR' => 'USAR',
-            'HM' => 'Hazmat',
-            'MB', 'RB' => 'Marine',
-            'ATV' => 'ATV',
-            'AIR' => 'Air/Supply',
-            'REHAB' => 'Rehab',
-            'FOAM' => 'Foam',
-            'LIGHT' => 'Support',
-            default => 'Other',
-        };
     }
 
     /**
