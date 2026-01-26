@@ -36,10 +36,11 @@ class TodoPolicy
      */
     public function update(User $user, Todo $todo): bool
     {
-        // Allow if user is admin, creator, or assignee
+        // Allow if user is admin, creator, or one of the assignees
+        $assignedTo = $todo->assigned_to ?? [];
         return $user->is_admin 
             || $todo->created_by === $user->id 
-            || $todo->assigned_to === $user->id;
+            || in_array($user->id, $assignedTo);
     }
 
     /**
