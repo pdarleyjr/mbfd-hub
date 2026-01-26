@@ -17,12 +17,14 @@ class Todo extends Model
         'sort',
         'created_by_user_id',
         'completed_at',
+        'attachments',
     ];
 
     protected $casts = [
         'is_completed' => 'boolean',
         'completed_at' => 'datetime',
         'sort' => 'integer',
+        'attachments' => 'array',
     ];
 
     public function createdBy(): BelongsTo
