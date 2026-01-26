@@ -29,7 +29,6 @@ class ApparatusResource extends Resource
                     ->schema([
                         Forms\Components\TextInput::make('unit_id')
                             ->label('Unit ID')
-                            ->required()
                             ->maxLength(255),
                         Forms\Components\TextInput::make('vehicle_number')
                             ->label('Vehicle #')
@@ -41,15 +40,12 @@ class ApparatusResource extends Resource
                 Forms\Components\Section::make('Vehicle Details')
                     ->schema([
                         Forms\Components\TextInput::make('make')
-                            ->required()
                             ->maxLength(255),
                         Forms\Components\TextInput::make('model')
-                            ->required()
                             ->maxLength(255),
                         Forms\Components\TextInput::make('year')
                             ->numeric(),
                         Forms\Components\TextInput::make('mileage')
-                            ->required()
                             ->numeric()
                             ->default(0),
                     ])->columns(4),
@@ -62,7 +58,6 @@ class ApparatusResource extends Resource
                                 'Reserve' => 'Reserve',
                                 'Maintenance' => 'Maintenance',
                             ])
-                            ->required()
                             ->default('In Service'),
                         Forms\Components\TextInput::make('location')
                             ->maxLength(255),
