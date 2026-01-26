@@ -171,29 +171,18 @@ class MBFDDataUpdateSeeder extends Seeder
     {
         $this->command->info('Updating inventory...');
         
-        // First, ensure Supply Closet location exists
+        // Create default locations if they don't exist
         $supplyCloset = InventoryLocation::firstOrCreate(
-            ['name' => 'Supply Closet'],
-            [
-                'description' => 'Main supply closet for equipment storage',
-                'is_active' => true,
-            ]
+            ['location_name' => 'Supply Closet'],
+            ['shelf' => 'A', 'row' => '1', 'bin' => '1', 'notes' => 'Main supply storage']
         );
 
-        // Create shelf locations A-F
-        $shelfLocations = [];
-        foreach (range('A', 'F') as $shelf) {
-            $shelfLocations[$shelf] = InventoryLocation::firstOrCreate(
-                ['name' => "Supply Closet - Shelf {$shelf}"],
-                [
-                    'description' => "Shelf {$shelf} in Supply Closet",
-                    'is_active' => true,
-                ]
-            );
-        }
-
-        // Inventory data from CSV (cleaned up)
+        // Real inventory data from January 2026
         $inventoryItems = [
+            // PPE Items
+            ['item_name' => 'Turnout Coat - Black', 'category' => 'PPE', 'quantity' => 45, 'minimum_quantity' => 30, 'unit' => 'each'],
+            ['item_name' => 'Turnout Pants - Black', 'category' => 'PPE', 'quantity' => 45, 'minimum_quantity' => 30, 'unit' => 'each'],
+
             // Shelf A
             ['shelf' => 'A', 'name' => 'Mounts', 'qty' => 2],
             ['shelf' => 'A', 'name' => 'Aerial Master Stream Tips', 'qty' => 4],
