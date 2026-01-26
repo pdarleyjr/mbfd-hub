@@ -23,6 +23,8 @@ use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\TodoOverviewWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
+use App\Filament\Widgets\PushNotificationWidget;
+use App\Filament\Pages\Auth\Login;
 // use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 
 class AdminPanelProvider extends PanelProvider
@@ -33,7 +35,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(Login::class)
             ->brandName('MBFD Support Hub')
             ->brandLogo(secure_asset('images/mbfd-logo.png'))
             ->brandLogoHeight('3rem')
@@ -55,6 +57,8 @@ class AdminPanelProvider extends PanelProvider
                 Pages\Dashboard::class,
             ])
             ->widgets([
+                // Push notifications widget - first for visibility on iOS/Android
+                PushNotificationWidget::class,
                 // Consolidated dashboard: Fleet + Inventory stats, Todo overview, AI Smart Updates
                 FleetStatsWidget::class,              // Fleet metrics: total apparatus, out of service, open defects
                 InventoryOverviewWidget::class,       // Inventory metrics: low stock items, total items, stock health
