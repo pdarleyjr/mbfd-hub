@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
 class Todo extends Model
@@ -30,9 +31,16 @@ class Todo extends Model
         'attachments' => 'array',
     ];
 
+    protected $appends = ['assignee_names'];
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updates(): HasMany
+    {
+        return $this->hasMany(TodoUpdate::class)->orderBy('created_at', 'desc');
     }
 
     /**
@@ -44,7 +52,9 @@ class Todo extends Model
         if (empty($ids)) {
             return collect();
         }
-        return User::whereIn('id', $ids)->get();
+        // Cast string IDs to integers for proper whereIn comparison
+        $intIds = array_map('intval', $ids);
+        return User::whereIn('id', $intIds)->get();
     }
 
     /**

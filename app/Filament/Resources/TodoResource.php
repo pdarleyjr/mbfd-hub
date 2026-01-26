@@ -97,6 +97,7 @@ class TodoResource extends Resource
                     ->preload(),
             ])
             ->actions([
+                Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])
@@ -114,6 +115,7 @@ class TodoResource extends Resource
         return [
             'index' => Pages\ListTodos::route('/'),
             'create' => Pages\CreateTodo::route('/create'),
+            'view' => Pages\ViewTodo::route('/{record}'),
             'edit' => Pages\EditTodo::route('/{record}/edit'),
         ];
     }
