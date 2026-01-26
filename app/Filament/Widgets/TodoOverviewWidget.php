@@ -36,7 +36,8 @@ class TodoOverviewWidget extends BaseWidget
                 Tables\Columns\TextColumn::make('description')
                     ->label('Description')
                     ->limit(50)
-                    ->searchable(),
+                    ->searchable()
+                    ->formatStateUsing(fn (?string $state): string => $state ? strip_tags($state) : ''),
                 
                 Tables\Columns\TextColumn::make('createdBy.name')
                     ->label('Created By')
@@ -59,6 +60,13 @@ class TodoOverviewWidget extends BaseWidget
             ])
             ->heading('Recent & Pending Todos')
             ->description('Quick view of active todo items')
+            ->headerActions([
+                Tables\Actions\Action::make('create')
+                    ->label('New Todo')
+                    ->icon('heroicon-o-plus')
+                    ->color('primary')
+                    ->url(route('filament.admin.resources.todos.create')),
+            ])
             ->emptyStateHeading('No pending todos')
             ->emptyStateDescription('All todos are completed or no todos exist.')
             ->emptyStateIcon('heroicon-o-check-circle');
