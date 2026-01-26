@@ -171,18 +171,22 @@ class MBFDDataUpdateSeeder extends Seeder
     {
         $this->command->info('Updating inventory...');
         
-        // Create default locations if they don't exist
+        // Create shelf locations
+        $shelfLocations = [];
+        foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $shelf) {
+            $shelfLocations[$shelf] = InventoryLocation::firstOrCreate(
+                ['location_name' => "Shelf {$shelf}"],
+                ['shelf' => $shelf, 'row' => '1', 'bin' => '1', 'notes' => "Storage shelf {$shelf}"]
+            );
+        }
+        
         $supplyCloset = InventoryLocation::firstOrCreate(
             ['location_name' => 'Supply Closet'],
-            ['shelf' => 'A', 'row' => '1', 'bin' => '1', 'notes' => 'Main supply storage']
+            ['shelf' => 'SC', 'row' => '1', 'bin' => '1', 'notes' => 'Main supply storage']
         );
 
         // Real inventory data from January 2026
         $inventoryItems = [
-            // PPE Items
-            ['item_name' => 'Turnout Coat - Black', 'category' => 'PPE', 'quantity' => 45, 'minimum_quantity' => 30, 'unit' => 'each'],
-            ['item_name' => 'Turnout Pants - Black', 'category' => 'PPE', 'quantity' => 45, 'minimum_quantity' => 30, 'unit' => 'each'],
-
             // Shelf A
             ['shelf' => 'A', 'name' => 'Mounts', 'qty' => 2],
             ['shelf' => 'A', 'name' => 'Aerial Master Stream Tips', 'qty' => 4],
@@ -389,13 +393,18 @@ class MBFDDataUpdateSeeder extends Seeder
         $created = 0;
 
         foreach ($inventoryItems as $item) {
-            $location = $shelfLocations[$item['shelf']] ?? $supplyCloset;
+            // Handle both formats
+            $itemName = $item['name'] ?? $item['item_name'] ?? 'Unknown';
+            $itemQty = $item['qty'] ?? $item['quantity'] ?? 0;
+            $itemShelf = $item['shelf'] ?? null;
+            
+            $location = $itemShelf ? ($shelfLocations[$itemShelf] ?? $supplyCloset) : $supplyCloset;
             
             // Determine category based on item name
-            $category = $this->determineCategory($item['name']);
+            $category = $item['category'] ?? $this->determineCategory($itemName);
             
             $equipmentItem = EquipmentItem::updateOrCreate(
-                ['name' => $item['name']],
+                ['name' => $itemName],
                 [
                     'category' => $category,
                     'location_id' => $location->id,
@@ -413,7 +422,7 @@ class MBFDDataUpdateSeeder extends Seeder
             
             // Update stock levels using laravel-stock
             $currentStock = $equipmentItem->stock ?? 0;
-            $targetStock = $item['qty'];
+            $targetStock = $itemQty;
             
             if ($currentStock != $targetStock) {
                 // Clear existing stock and set new value
