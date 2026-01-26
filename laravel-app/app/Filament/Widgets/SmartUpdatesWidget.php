@@ -19,6 +19,9 @@ class SmartUpdatesWidget extends Widget
 
     protected int | string | array $columnSpan = 'full';
 
+    // Expand/collapse state for Alpine.js
+    public bool $isExpanded = false;
+
     // Instant data - no AI delay
     public ?array $bulletSummary = null;
     public ?array $rawMetrics = null;
