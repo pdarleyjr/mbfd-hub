@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Collection;
 
 class Todo extends Model
 {
@@ -34,8 +35,23 @@ class Todo extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function assignedTo(): BelongsTo
+    /**
+     * Get the users assigned to this todo
+     */
+    public function getAssigneesAttribute(): Collection
     {
-        return $this->belongsTo(User::class, 'assigned_to');
+        $ids = $this->assigned_to ?? [];
+        if (empty($ids)) {
+            return collect();
+        }
+        return User::whereIn('id', $ids)->get();
+    }
+
+    /**
+     * Get assignee names as a comma-separated string
+     */
+    public function getAssigneeNamesAttribute(): string
+    {
+        return $this->assignees->pluck('name')->join(', ') ?: 'Unassigned';
     }
 }

@@ -39,10 +39,10 @@ class TodoOverviewWidget extends BaseWidget
                     ->searchable()
                     ->formatStateUsing(fn (?string $state): string => $state ? strip_tags($state) : ''),
                 
-                Tables\Columns\TextColumn::make('createdBy.name')
-                    ->label('Created By')
-                    ->sortable()
-                    ->toggleable(),
+                Tables\Columns\TextColumn::make('assignee_names')
+                    ->label('Assigned To')
+                    ->badge()
+                    ->color('primary'),
                 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Created')

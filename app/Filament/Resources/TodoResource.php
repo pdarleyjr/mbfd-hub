@@ -35,7 +35,8 @@ class TodoResource extends Resource
                     ->columnSpanFull(),
                 Forms\Components\Select::make('assigned_to')
                     ->label('Assigned To')
-                    ->relationship('assignedTo', 'name')
+                    ->multiple()
+                    ->options(User::pluck('name', 'id'))
                     ->searchable()
                     ->preload(),
                 Forms\Components\Hidden::make('created_by')
@@ -65,14 +66,15 @@ class TodoResource extends Resource
                 Tables\Columns\TextColumn::make('title')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('assignedTo.name')
+                Tables\Columns\TextColumn::make('assignee_names')
                     ->label('Assigned To')
-                    ->searchable()
-                    ->sortable(),
+                    ->badge()
+                    ->color('primary'),
                 Tables\Columns\TextColumn::make('createdBy.name')
                     ->label('Created By')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('completed_at')
                     ->dateTime()
                     ->sortable()
@@ -88,11 +90,6 @@ class TodoResource extends Resource
                     ->placeholder('All')
                     ->trueLabel('Completed')
                     ->falseLabel('Pending'),
-                Tables\Filters\SelectFilter::make('assigned_to')
-                    ->label('Assigned To')
-                    ->relationship('assignedTo', 'name')
-                    ->multiple()
-                    ->preload(),
                 Tables\Filters\SelectFilter::make('created_by')
                     ->label('Created By')
                     ->relationship('createdBy', 'name')
