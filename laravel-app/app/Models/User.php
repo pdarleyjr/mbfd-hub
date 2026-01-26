@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class User extends Authenticatable
 {
@@ -44,5 +45,24 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Always store email as lowercase for case-insensitive lookups.
+     */
+    protected function email(): Attribute
+    {
+        return Attribute::make(
+            get: fn (string $value) => $value,
+            set: fn (string $value) => strtolower($value),
+        );
+    }
+
+    /**
+     * Find user by email (case-insensitive).
+     */
+    public static function findByEmail(string $email): ?self
+    {
+        return static::whereRaw('LOWER(email) = ?', [strtolower($email)])->first();
     }
 }
