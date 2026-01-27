@@ -183,8 +183,26 @@ git revert <commit-hash>
 5. Clear all caches
 6. Verify functionality
 
+## Deployment Evidence
+
+**Commit:** `d818c15a` - "feat: migrate notifications and users to Settings page"  
+**Deployed:** 2026-01-27  
+**Live URL:** https://support.darleyplex.com/admin/settings
+
+### Verification Completed
+- [x] Settings page accessible at `/admin/settings`
+- [x] Push notification subscription button functional
+- [x] Manage Users link navigates to UserResource
+- [x] User profile section displays current user
+- [x] Users link removed from sidebar
+- [x] Settings link added to user dropdown menu
+- [x] Database notifications bell icon still operational
+- [x] Zero-downtime deployment achieved
+- [x] All caches cleared (config, view, cache, route)
+- [x] Vite assets compiled successfully
+
 ---
 
 **Created**: 2026-01-27
 **Author**: Kilo Code
-**Status**: Implementation In Progress
+**Status**: ✅ DEPLOYED & VERIFIED
