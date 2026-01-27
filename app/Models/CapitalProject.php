@@ -27,6 +27,8 @@ class CapitalProject extends Model
         'ai_reasoning',
         'last_ai_analysis',
         'notes',
+        'percent_complete',
+        'attachments',
     ];
 
     protected $casts = [
@@ -39,6 +41,8 @@ class CapitalProject extends Model
         'ai_priority_rank' => 'integer',
         'status' => ProjectStatus::class,
         'priority' => ProjectPriority::class,
+        'percent_complete' => 'integer',
+        'attachments' => 'array',
     ];
 
     // Relationships

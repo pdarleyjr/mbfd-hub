@@ -99,6 +99,30 @@ class CapitalProjectResource extends Resource
                         Forms\Components\RichEditor::make('notes')
                             ->columnSpanFull(),
                     ]),
+                    
+                Forms\Components\Section::make('Progress & Attachments')
+                    ->schema([
+                        Forms\Components\TextInput::make('percent_complete')
+                            ->label('Progress (%)')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->suffix('%')
+                            ->helperText('Project completion percentage (0–100).')
+                            ->nullable(),
+                        Forms\Components\FileUpload::make('attachments')
+                            ->label('Project Files')
+                            ->multiple()
+                            ->downloadable()
+                            ->openable()
+                            ->disk('public')
+                            ->directory('capital-projects')
+                            ->preserveFilenames()
+                            ->maxSize(25600)
+                            ->helperText('Upload meeting docs, quotes, specs, invoices, photos.')
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2),
             ]);
     }
 
@@ -237,6 +261,32 @@ class CapitalProjectResource extends Resource
                             ->columnSpanFull(),
                     ]),
                     
+                Infolists\Components\Section::make('Progress')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('percent_complete')
+                            ->label('Completion')
+                            ->suffix('%')
+                            ->badge()
+                            ->color(fn ($state) => match (true) {
+                                ($state ?? 0) >= 90 => 'success',
+                                ($state ?? 0) >= 50 => 'warning',
+                                default => 'danger',
+                            }),
+                    ]),
+                    
+                Infolists\Components\Section::make('Attachments')
+                    ->schema([
+                        Infolists\Components\RepeatableEntry::make('attachments')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('')
+                                    ->state(fn ($state) => basename($state))
+                                    ->url(fn ($state) => asset('storage/' . $state))
+                                    ->openUrlInNewTab(),
+                            ])
+                            ->columnSpanFull()
+                            ->hidden(fn ($record) => empty($record->attachments)),
+                    ]),
+                    
                 Infolists\Components\Section::make('Related Information')
                     ->schema([
                         Infolists\Components\TextEntry::make('milestones_count')
@@ -254,7 +304,7 @@ class CapitalProjectResource extends Resource
     {
         return [
 //            RelationManagers\MilestonesRelationManager::class,
-//            RelationManagers\UpdatesRelationManager::class,
+            RelationManagers\UpdatesRelationManager::class,
         ];
     }
 
