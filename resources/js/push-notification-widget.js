@@ -4,13 +4,15 @@ function pushNotificationWidget() {
     return {
         VAPID_PUBLIC_KEY: '',
         elements: {},
+        sections: {},
+        controls: {},
 
         initWidget() {
             const widgetContainer = this.$el;
             this.VAPID_PUBLIC_KEY = widgetContainer.dataset.vapidKey || '';
 
-            // Cache DOM elements
-            this.elements = {
+            // Cache DOM elements - separate sections from controls
+            this.sections = {
                 loading: widgetContainer.querySelector('#push-loading'),
                 iosPrompt: widgetContainer.querySelector('#ios-prompt'),
                 notSupported: widgetContainer.querySelector('#not-supported'),
@@ -18,17 +20,27 @@ function pushNotificationWidget() {
                 subscribeSection: widgetContainer.querySelector('#subscribe-section'),
                 subscribedSection: widgetContainer.querySelector('#subscribed-section'),
                 errorSection: widgetContainer.querySelector('#error-section'),
+            };
+
+            this.controls = {
                 errorMessage: widgetContainer.querySelector('#error-message'),
                 subscribeBtn: widgetContainer.querySelector('#subscribe-btn'),
                 unsubscribeBtn: widgetContainer.querySelector('#unsubscribe-btn'),
+                testNotificationBtn: widgetContainer.querySelector('#test-notification-btn'),
             };
 
+            // Keep elements for backward compatibility
+            this.elements = { ...this.sections, ...this.controls };
+
             // Setup event listeners
-            if (this.elements.subscribeBtn) {
-                this.elements.subscribeBtn.addEventListener('click', () => this.subscribe());
+            if (this.controls.subscribeBtn) {
+                this.controls.subscribeBtn.addEventListener('click', () => this.subscribe());
             }
-            if (this.elements.unsubscribeBtn) {
-                this.elements.unsubscribeBtn.addEventListener('click', () => this.unsubscribe());
+            if (this.controls.unsubscribeBtn) {
+                this.controls.unsubscribeBtn.addEventListener('click', () => this.unsubscribe());
+            }
+            if (this.controls.testNotificationBtn) {
+                this.controls.testNotificationBtn.addEventListener('click', () => this.sendTestNotification());
             }
 
             // Initialize - Register service worker first, then check status
@@ -37,6 +49,12 @@ function pushNotificationWidget() {
                 await this.registerServiceWorker();
                 this.checkStatus();
             })();
+        },
+
+        hideAllSections() {
+            Object.values(this.sections).forEach(el => {
+                if (el && el.classList) el.classList.add('hidden');
+            });
         },
 
         hideAll() {
@@ -87,26 +105,26 @@ function pushNotificationWidget() {
         },
 
         async checkStatus() {
-            this.hideAll();
+            this.hideAllSections();
 
             // Check basic support
             if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
                 console.log('[PushWidget] Push not supported in this browser');
-                this.show(this.elements.notSupported);
+                this.show(this.sections.notSupported);
                 return;
             }
 
             // iOS specific handling
             if (this.isIOS() && !this.isStandalone()) {
                 console.log('[PushWidget] iOS device not in standalone mode');
-                this.show(this.elements.iosPrompt);
+                this.show(this.sections.iosPrompt);
                 return;
             }
 
             // Check permission
             if (Notification.permission === 'denied') {
                 console.log('[PushWidget] Notification permission denied');
-                this.show(this.elements.permissionDenied);
+                this.show(this.sections.permissionDenied);
                 return;
             }
 
@@ -126,10 +144,10 @@ function pushNotificationWidget() {
 
                 if (subscription) {
                     console.log('[PushWidget] User is subscribed');
-                    this.show(this.elements.subscribedSection);
+                    this.show(this.sections.subscribedSection);
                 } else {
                     console.log('[PushWidget] User not subscribed, show subscribe button');
-                    this.show(this.elements.subscribeSection);
+                    this.show(this.sections.subscribeSection);
                 }
             } catch (error) {
                 console.log('[PushWidget] Service worker not ready or timeout, attempting registration...');
@@ -142,17 +160,31 @@ function pushNotificationWidget() {
                     return;
                 }
                 console.error('[PushWidget] Could not register service worker:', error);
-                this.hideAll();
-                this.show(this.elements.errorSection);
-                this.elements.errorMessage.textContent = 'Could not register service worker: ' + error.message;
+                this.hideAllSections();
+                this.show(this.sections.errorSection);
+                this.controls.errorMessage.textContent = 'Could not register service worker: ' + error.message;
             }
         },
 
         async subscribe() {
             try {
                 console.log('[PushWidget] Starting subscription process...');
-                this.elements.subscribeBtn.disabled = true;
-                this.elements.subscribeBtn.textContent = 'Enabling...';
+                this.controls.subscribeBtn.disabled = true;
+                this.controls.subscribeBtn.textContent = 'Enabling...';
+
+                // Request notification permission first (required for iOS and best practice)
+                if (Notification.permission === 'default') {
+                    console.log('[PushWidget] Requesting notification permission...');
+                    const permission = await Notification.requestPermission();
+                    console.log('[PushWidget] Permission result:', permission);
+                    if (permission !== 'granted') {
+                        throw new Error('Notification permission not granted: ' + permission);
+                    }
+                }
+
+                if (Notification.permission !== 'granted') {
+                    throw new Error('Notification permission not granted');
+                }
 
                 const registration = await navigator.serviceWorker.ready;
 
@@ -180,17 +212,17 @@ function pushNotificationWidget() {
                 }
 
                 console.log('[PushWidget] Subscription saved successfully');
-                this.hideAll();
-                this.show(this.elements.subscribedSection);
+                this.hideAllSections();
+                this.show(this.sections.subscribedSection);
             } catch (error) {
                 console.error('[PushWidget] Subscription error:', error);
-                this.hideAll();
-                this.show(this.elements.errorSection);
-                this.elements.errorMessage.textContent = 'Failed to enable notifications: ' + error.message;
+                this.hideAllSections();
+                this.show(this.sections.errorSection);
+                this.controls.errorMessage.textContent = 'Failed to enable notifications: ' + error.message;
             } finally {
-                if (this.elements.subscribeBtn) {
-                    this.elements.subscribeBtn.disabled = false;
-                    this.elements.subscribeBtn.textContent = 'Enable Push Notifications';
+                if (this.controls.subscribeBtn) {
+                    this.controls.subscribeBtn.disabled = false;
+                    this.controls.subscribeBtn.textContent = 'Enable Push Notifications';
                 }
             }
         },
@@ -219,10 +251,53 @@ function pushNotificationWidget() {
                 }
 
                 console.log('[PushWidget] Unsubscription complete');
-                this.hideAll();
-                this.show(this.elements.subscribeSection);
+                this.hideAllSections();
+                this.show(this.sections.subscribeSection);
             } catch (error) {
                 console.error('[PushWidget] Unsubscribe error:', error);
+            }
+        },
+
+        async sendTestNotification() {
+            try {
+                console.log('[PushWidget] Sending test notification...');
+                if (this.controls.testNotificationBtn) {
+                    this.controls.testNotificationBtn.disabled = true;
+                    this.controls.testNotificationBtn.textContent = 'Sending...';
+                }
+
+                const response = await fetch('/api/push/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    },
+                    credentials: 'same-origin'
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Test notification sent! Check your device for the notification.');
+                    console.log('[PushWidget] Test notification sent successfully');
+                } else {
+                    alert('Error: ' + (data.error || data.message || 'Failed to send test notification'));
+                    console.error('[PushWidget] Test notification failed:', data);
+                }
+            } catch (error) {
+                console.error('[PushWidget] Failed to send test notification:', error);
+                alert('Failed to send test notification. Please try again.');
+            } finally {
+                if (this.controls.testNotificationBtn) {
+                    this.controls.testNotificationBtn.disabled = false;
+                    this.controls.testNotificationBtn.innerHTML = `
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                        </svg>
+                        Send Test Notification
+                    `;
+                }
             }
         }
     };
@@ -230,3 +305,14 @@ function pushNotificationWidget() {
 
 // Export to global scope for Alpine.js
 window.pushNotificationWidget = pushNotificationWidget;
+
+// Also export sendTestNotification to global scope for onclick handler
+window.sendTestNotification = function() {
+    const widget = document.querySelector('#push-notification-manager');
+    if (widget && widget._x_dataStack) {
+        const widgetData = widget._x_dataStack[0];
+        if (widgetData && widgetData.sendTestNotification) {
+            widgetData.sendTestNotification();
+        }
+    }
+};
