@@ -21,7 +21,7 @@ class Settings extends Page
 
     public function getVapidPublicKey(): string
     {
-        return config('webpush.vapid.public_key', '');
+        return config('webpush.vapid.public_key') ?? '';
     }
 
     public function isSubscribed(): bool
