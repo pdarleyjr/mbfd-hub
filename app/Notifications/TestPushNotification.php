@@ -15,7 +15,7 @@ class TestPushNotification extends Notification
 
     public function toWebPush($notifiable, $notification)
     {
-        return WebPushMessage::create()
+        return (new WebPushMessage)
             ->title('MBFD Hub Test Notification')
             ->body('This is a test notification from MBFD Hub. Push notifications are working correctly!')
             ->icon('/images/mbfd-logo.png')
