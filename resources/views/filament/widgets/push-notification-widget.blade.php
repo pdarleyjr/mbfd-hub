@@ -148,6 +148,23 @@ document.addEventListener('DOMContentLoaded', function() {
         return outputArray;
     }
 
+    // Service Worker Registration
+    async function registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            try {
+                console.log('Attempting to register service worker...');
+                const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+                console.log('Service Worker registered successfully with scope:', registration.scope);
+                return registration;
+            } catch (error) {
+                console.error('Service Worker registration failed:', error);
+                return null;
+            }
+        }
+        console.log('Service workers are not supported in this browser');
+        return null;
+    }
+
     async function checkStatus() {
         hideAll();
 
@@ -169,9 +186,16 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Check existing subscription
+        // Check existing subscription with timeout fallback
         try {
-            const registration = await navigator.serviceWorker.ready;
+            // Wait for service worker with timeout
+            const registration = await Promise.race([
+                navigator.serviceWorker.ready,
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Service worker ready timeout')), 5000)
+                )
+            ]);
+            
             const subscription = await registration.pushManager.getSubscription();
             
             if (subscription) {
@@ -180,8 +204,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 show(elements.subscribeSection);
             }
         } catch (error) {
-            console.error('Error checking subscription:', error);
-            show(elements.subscribeSection);
+            console.log('Service worker not ready or timeout, attempting registration...');
+            // If service worker not registered, register it
+            const newReg = await registerServiceWorker();
+            if (newReg) {
+                // Try again after registration
+                console.log('Service worker registered, retrying status check...');
+                setTimeout(checkStatus, 500);
+                return;
+            }
+            console.error('Could not register service worker:', error);
+            hideAll();
+            show(elements.errorSection);
+            elements.errorMessage.textContent = 'Could not register service worker: ' + error.message;
         }
     }
 
@@ -259,7 +294,11 @@ document.addEventListener('DOMContentLoaded', function() {
         elements.unsubscribeBtn.addEventListener('click', unsubscribe);
     }
 
-    // Initialize
-    checkStatus();
+    // Initialize - Register service worker first, then check status
+    (async function initialize() {
+        console.log('Initializing push notification widget...');
+        await registerServiceWorker();
+        checkStatus();
+    })();
 });
 </script>
