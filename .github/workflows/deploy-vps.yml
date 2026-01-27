@@ -1,0 +1,34 @@
+name: Deploy to VPS (Self-hosted)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, mbfd-vps]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy (docker compose)
+        run: |
+          cd /root/mbfd-hub
+          git fetch --all
+          git reset --hard origin/main
+          docker compose pull
+          docker compose up -d --build
+          docker compose exec -T app php artisan migrate --force
+          docker compose exec -T app php artisan optimize:clear
+          docker compose exec -T app php artisan filament:clear-cached-components
+          docker restart mbfd-hub-app || true
+
+      - name: Basic health check
+        run: |
+          sleep 10
+          curl -fsS -I https://support.darleyplex.com/ | head -n 20
