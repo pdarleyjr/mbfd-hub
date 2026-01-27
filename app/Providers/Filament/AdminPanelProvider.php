@@ -6,6 +6,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\MenuItem;
 use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
@@ -23,8 +24,8 @@ use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\TodoOverviewWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
-use App\Filament\Widgets\PushNotificationWidget;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Settings;
 // use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 
 class AdminPanelProvider extends PanelProvider
@@ -57,13 +58,17 @@ class AdminPanelProvider extends PanelProvider
                 Pages\Dashboard::class,
             ])
             ->widgets([
-                // Push notifications widget - first for visibility on iOS/Android
-                PushNotificationWidget::class,
                 // Consolidated dashboard: Fleet + Inventory stats, Todo overview, AI Smart Updates
                 FleetStatsWidget::class,              // Fleet metrics: total apparatus, out of service, open defects
                 InventoryOverviewWidget::class,       // Inventory metrics: low stock items, total items, stock health
                 TodoOverviewWidget::class,            // Active todo items table
                 SmartUpdatesWidget::class,            // AI assistant with instant bullet summary
+            ])
+            ->userMenuItems([
+                MenuItem::make()
+                    ->label('Settings')
+                    ->url(fn (): string => Settings::getUrl())
+                    ->icon('heroicon-o-cog-6-tooth'),
             ])
             ->middleware([
                 EncryptCookies::class,
