@@ -1,3 +1,5 @@
+console.log('[PushWidget] script loaded');
+
 document.addEventListener('DOMContentLoaded', function() {
     const widgetContainer = document.getElementById('push-notification-manager');
     if (!widgetContainer) return;
