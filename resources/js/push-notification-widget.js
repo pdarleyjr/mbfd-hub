@@ -227,3 +227,6 @@ function pushNotificationWidget() {
         }
     };
 }
+
+// Export to global scope for Alpine.js
+window.pushNotificationWidget = pushNotificationWidget;
