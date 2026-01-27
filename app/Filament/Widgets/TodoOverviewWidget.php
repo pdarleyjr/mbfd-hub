@@ -4,14 +4,17 @@ namespace App\Filament\Widgets;
 
 use App\Models\Todo;
 use Filament\Tables;
+use Filament\Tables\Columns\Layout\Split;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 
 class TodoOverviewWidget extends BaseWidget
 {
     protected static ?int $sort = 2;
-    
+
     protected int | string | array $columnSpan = 'full';
 
     public function table(Table $table): Table
@@ -25,31 +28,37 @@ class TodoOverviewWidget extends BaseWidget
                     ->limit(10)
             )
             ->columns([
-                Tables\Columns\TextColumn::make('title')
-                    ->label('Task')
-                    ->searchable()
-                    ->sortable()
-                    ->weight('medium')
-                    ->icon('heroicon-o-clipboard-document-list')
-                    ->iconColor('primary'),
-                
-                Tables\Columns\TextColumn::make('description')
-                    ->label('Description')
-                    ->limit(50)
-                    ->searchable()
-                    ->formatStateUsing(fn (?string $state): string => $state ? strip_tags($state) : ''),
-                
-                Tables\Columns\TextColumn::make('assignee_names')
-                    ->label('Assigned To')
-                    ->badge()
-                    ->color('primary'),
-                
-                Tables\Columns\TextColumn::make('created_at')
-                    ->label('Created')
-                    ->dateTime('M j, Y')
-                    ->sortable()
-                    ->since()
-                    ->toggleable(),
+                Split::make([
+                    TextColumn::make('title')
+                        ->label('Task')
+                        ->searchable()
+                        ->sortable()
+                        ->weight('medium')
+                        ->icon('heroicon-o-clipboard-document-list')
+                        ->iconColor('primary')
+                        ->description(function ($record) {
+                            $desc = Str::of(strip_tags($record->description ?? ''))->squish()->limit(80);
+                            $assigned = $record->assignees->pluck('name')->filter()->join(', ');
+                            $meta = collect([
+                                $assigned ? "Assigned: {$assigned}" : 'Unassigned',
+                                $record->createdBy?->name ? "By: {$record->createdBy->name}" : null,
+                            ])->filter()->join(' • ');
+
+                            return trim($desc . ($meta ? "\n{$meta}" : ''));
+                        }),
+                    TextColumn::make('assignee_names')
+                        ->label('Assigned To')
+                        ->badge()
+                        ->color('primary')
+                        ->visibleFrom('md'),
+                    TextColumn::make('created_at')
+                        ->label('Created')
+                        ->dateTime('M j, Y')
+                        ->sortable()
+                        ->since()
+                        ->toggleable()
+                        ->visibleFrom('md'),
+                ])->from('md'),
             ])
             ->actions([
                 Tables\Actions\Action::make('view')

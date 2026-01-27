@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class Todo extends Model
 {
@@ -32,6 +33,20 @@ class Todo extends Model
     ];
 
     protected $appends = ['assignee_names'];
+
+    /**
+     * Set completed_at when is_completed is set
+     */
+    protected static function booted()
+    {
+        static::saving(function (Todo $todo) {
+            if ($todo->is_completed && !$todo->completed_at) {
+                $todo->completed_at = now();
+            } elseif (!$todo->is_completed) {
+                $todo->completed_at = null;
+            }
+        });
+    }
 
     public function createdBy(): BelongsTo
     {
