@@ -276,16 +276,24 @@ class CapitalProjectResource extends Resource
                     
                 Infolists\Components\Section::make('Attachments')
                     ->schema([
-                        Infolists\Components\RepeatableEntry::make('attachments')
-                            ->schema([
-                                Infolists\Components\TextEntry::make('')
-                                    ->state(fn ($state) => basename($state))
-                                    ->url(fn ($state) => asset('storage/' . $state))
-                                    ->openUrlInNewTab(),
-                            ])
-                            ->columnSpanFull()
-                            ->hidden(fn ($record) => empty($record->attachments)),
-                    ]),
+                        Infolists\Components\TextEntry::make('attachments')
+                            ->label('Project Files')
+                            ->formatStateUsing(function ($state, $record) {
+                                if (empty($record->attachments)) {
+                                    return 'No files attached.';
+                                }
+                                $links = [];
+                                foreach ($record->attachments as $path) {
+                                    $filename = basename($path);
+                                    $url = asset('storage/' . $path);
+                                    $links[] = "<a href=\"{$url}\" target=\"_blank\" class=\"text-primary-600 hover:underline\">📄 {$filename}</a>";
+                                }
+                                return implode('<br>', $links);
+                            })
+                            ->html()
+                            ->columnSpanFull(),
+                    ])
+                    ->hidden(fn ($record) => empty($record->attachments)),
                     
                 Infolists\Components\Section::make('Related Information')
                     ->schema([
