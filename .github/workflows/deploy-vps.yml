@@ -18,15 +18,13 @@ jobs:
 
       - name: Deploy (docker compose)
         run: |
-          cd /root/mbfd-hub
-          git fetch --all
-          git reset --hard origin/main
-          docker compose pull
-          docker compose up -d --build
-          docker compose exec -T app php artisan migrate --force
-          docker compose exec -T app php artisan optimize:clear
-          docker compose exec -T app php artisan filament:clear-cached-components
-          docker restart mbfd-hub-app || true
+          sudo bash -c 'cd /root/mbfd-hub && git fetch --all && git reset --hard origin/main'
+          sudo docker compose -f /root/mbfd-hub/docker-compose.yml pull
+          sudo docker compose -f /root/mbfd-hub/docker-compose.yml up -d --build
+          sudo docker compose -f /root/mbfd-hub/docker-compose.yml exec -T app php artisan migrate --force
+          sudo docker compose -f /root/mbfd-hub/docker-compose.yml exec -T app php artisan optimize:clear
+          sudo docker compose -f /root/mbfd-hub/docker-compose.yml exec -T app php artisan filament:clear-cached-components || true
+          sudo docker restart mbfd-hub-app || true
 
       - name: Basic health check
         run: |
