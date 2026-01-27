@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AdminMetricsController;
 use App\Http\Controllers\Api\SmartUpdatesController;
 use App\Http\Controllers\Api\InventoryChatController;
 use App\Http\Controllers\Api\PushSubscriptionController;
+use App\Http\Controllers\Api\TestNotificationController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -24,6 +25,7 @@ Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPu
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('push-subscriptions', [PushSubscriptionController::class, 'store']);
     Route::delete('push-subscriptions', [PushSubscriptionController::class, 'destroy']);
+    Route::post('push/test', [TestNotificationController::class, 'sendTestNotification']);
 });
 
 Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
