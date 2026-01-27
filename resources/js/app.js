@@ -39,6 +39,3 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     // Log that Sentry is initialized
     console.log('[Sentry] Frontend error tracking initialized');
 }
-
-// Import push notification widget JavaScript
-import './push-notification-widget.js';

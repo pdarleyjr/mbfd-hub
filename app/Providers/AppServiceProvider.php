@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Models\Todo;
 use App\Observers\TodoObserver;
+use Filament\Support\Assets\Js;
+use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
 
@@ -27,5 +29,10 @@ class AppServiceProvider extends ServiceProvider
         }
         
         Todo::observe(TodoObserver::class);
+
+        // Register push notification widget JavaScript
+        FilamentAsset::register([
+            Js::make('push-notification-widget', Vite::asset('resources/js/push-notification-widget.js')),
+        ]);
     }
 }
