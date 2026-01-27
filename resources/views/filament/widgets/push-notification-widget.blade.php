@@ -7,7 +7,7 @@
             </div>
         </x-slot>
 
-        <div id="push-notification-manager" class="space-y-4" data-vapid-key="{{ $this->getVapidPublicKey() }}">
+        <div id="push-notification-manager" class="space-y-4" data-vapid-key="{{ $this->getVapidPublicKey() }}" x-data="pushNotificationWidget()" x-init="initWidget()">
             <!-- Loading State -->
             <div id="push-loading" class="flex items-center gap-2 text-gray-500">
                 <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
