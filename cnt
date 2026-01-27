@@ -1,4 +1,19 @@
 
+   INFO  Clearing cached bootstrap files.  
+
+  cache ........................................................ 291.61ms DONE
+  compiled ....................................................... 2.17ms DONE
+  config ......................................................... 0.75ms DONE
+  events ......................................................... 0.64ms DONE
+  routes ......................................................... 0.68ms DONE
+  views ......................................................... 79.26ms DONE
+  blade-icons .................................................... 0.55ms DONE
+  filament ....................................................... 1.41ms DONE
+
+
+   INFO  Compiled views cleared successfully.  
+
+
    Psy\Exception\ParseErrorException 
 
   PHP Parse error: Syntax error, unexpected '.' on line 1
