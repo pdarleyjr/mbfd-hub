@@ -13,12 +13,6 @@ class PushNotificationWidget extends Widget
     
     protected static ?int $sort = 1;
 
-    protected static array $assets = [
-        'js' => [
-            'js/push-notification-widget.js',
-        ],
-    ];
-
     public function getVapidPublicKey(): string
     {
         return config('webpush.vapid.public_key', '');
