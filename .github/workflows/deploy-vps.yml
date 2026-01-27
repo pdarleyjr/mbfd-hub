@@ -20,9 +20,11 @@ jobs:
         run: |
           sudo bash -c 'cd /root/mbfd-hub && git fetch --all && git reset --hard origin/main'
           sudo docker compose -f /root/mbfd-hub/compose.yaml up -d --build
-          sudo docker compose -f /root/mbfd-hub/compose.yaml exec -T app php artisan migrate --force || true
-          sudo docker compose -f /root/mbfd-hub/compose.yaml exec -T app php artisan optimize:clear || true
-          sudo docker compose -f /root/mbfd-hub/compose.yaml exec -T app php artisan filament:clear-cached-components || true
+          sudo docker compose -f /root/mbfd-hub/compose.yaml exec -T laravel.test npm ci --silent || true
+          sudo docker compose -f /root/mbfd-hub/compose.yaml exec -T laravel.test npm run build || true
+          sudo docker compose -f /root/mbfd-hub/compose.yaml exec -T laravel.test php artisan migrate --force || true
+          sudo docker compose -f /root/mbfd-hub/compose.yaml exec -T laravel.test php artisan optimize:clear || true
+          sudo docker compose -f /root/mbfd-hub/compose.yaml exec -T laravel.test php artisan filament:clear-cached-components || true
 
       - name: Basic health check
         run: |
