@@ -29,53 +29,61 @@ class ApparatusResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Basic Information')
+                Forms\Components\Section::make('Operational Information')
                     ->schema([
-                        Forms\Components\TextInput::make('unit_id')
-                            ->label('Unit ID')
-                            ->required()
+                        Forms\Components\TextInput::make('designation')
+                            ->label('Designation')
+                            ->placeholder('E 1, R 2, L 3, etc.')
                             ->maxLength(255),
                         Forms\Components\TextInput::make('vehicle_number')
                             ->label('Vehicle #')
                             ->maxLength(50),
-                        Forms\Components\TextInput::make('vin')
-                            ->label('VIN')
+                        Forms\Components\TextInput::make('class_description')
+                            ->label('Class')
+                            ->placeholder('ENGINE, RESCUE, LADDER, etc.')
                             ->maxLength(255),
                     ])->columns(3),
-                Forms\Components\Section::make('Vehicle Details')
-                    ->schema([
-                        Forms\Components\TextInput::make('make')
-                            ->required()
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('model')
-                            ->required()
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('year')
-                            ->numeric(),
-                        Forms\Components\TextInput::make('mileage')
-                            ->required()
-                            ->numeric()
-                            ->default(0),
-                    ])->columns(4),
                 Forms\Components\Section::make('Status & Location')
                     ->schema([
                         Forms\Components\Select::make('status')
                             ->options([
                                 'In Service' => 'In Service',
                                 'Out of Service' => 'Out of Service',
+                                'Available' => 'Available',
                                 'Reserve' => 'Reserve',
                                 'Maintenance' => 'Maintenance',
                             ])
-                            ->required()
                             ->default('In Service'),
-                        Forms\Components\TextInput::make('location')
-                            ->maxLength(255),
                         Forms\Components\TextInput::make('assignment')
+                            ->label('Assignment')
+                            ->placeholder('Station 1, Reserve, etc.')
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('current_location')
+                            ->label('Current Location')
+                            ->placeholder('Station 1, Fire Fleet, etc.')
                             ->maxLength(255),
                         Forms\Components\DatePicker::make('last_service_date'),
                     ])->columns(4),
                 Forms\Components\Textarea::make('notes')
                     ->columnSpanFull(),
+                Forms\Components\Section::make('Vehicle Details')
+                    ->schema([
+                        Forms\Components\TextInput::make('unit_id')
+                            ->label('Unit ID')
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('vin')
+                            ->label('VIN')
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('make')
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('model')
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('year')
+                            ->numeric(),
+                        Forms\Components\TextInput::make('mileage')
+                            ->numeric(),
+                    ])->columns(3)
+                    ->collapsed(),
             ]);
     }
 
@@ -83,36 +91,42 @@ class ApparatusResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('unit_id')
-                    ->label('Unit ID')
+                Tables\Columns\TextColumn::make('designation')
+                    ->label('Designation')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('vehicle_number')
                     ->label('Vehicle #')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('make')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('model')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('year')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('mileage')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('location')
-                    ->searchable(),
+                    ->searchable()
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('class_description')
+                    ->label('Class')
+                    ->searchable()
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('assignment')
-                    ->searchable(),
+                    ->label('Assignment')
+                    ->searchable()
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('current_location')
+                    ->label('Current Location')
+                    ->searchable()
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn (?string $state): string => match ($state) {
                         'In Service' => 'success',
                         'Out of Service' => 'danger',
                         'Maintenance' => 'warning',
+                        'Available' => 'info',
                         'Reserve' => 'gray',
                         default => 'gray',
-                    }),
+                    })
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('notes')
+                    ->limit(30)
+                    ->tooltip(fn ($record) => $record->notes)
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('inspections_count')
                     ->label('Inspections')
                     ->counts('inspections')
@@ -123,28 +137,62 @@ class ApparatusResource extends Resource
                     ->getStateUsing(fn (Apparatus $record) => $record->defects()->where('resolved', false)->count())
                     ->badge()
                     ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
+                Tables\Columns\TextColumn::make('unit_id')
+                    ->label('Unit ID')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('make')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('model')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('year')
+                    ->numeric()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('mileage')
+                    ->numeric()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('last_service_date')
                     ->date()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('vin')
                     ->label('VIN')
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->defaultSort('unit_id')
+            ->defaultSort('designation')
             ->striped()
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
                         'In Service' => 'In Service',
                         'Out of Service' => 'Out of Service',
+                        'Available' => 'Available',
                         'Reserve' => 'Reserve',
                         'Maintenance' => 'Maintenance',
                     ]),
+                Tables\Filters\SelectFilter::make('class_description')
+                    ->label('Class')
+                    ->options(fn () => Apparatus::query()
+                        ->whereNotNull('class_description')
+                        ->distinct()
+                        ->pluck('class_description', 'class_description')
+                        ->toArray()),
                 Tables\Filters\Filter::make('has_active_issues')
                     ->label('Has Active Issues')
                     ->query(fn (Builder $query) => $query->whereHas('defects', fn ($q) => $q->where('resolved', false))),
@@ -166,10 +214,10 @@ class ApparatusResource extends Resource
                             ->options([
                                 'In Service' => 'In Service',
                                 'Out of Service' => 'Out of Service',
+                                'Available' => 'Available',
                                 'Maintenance' => 'Maintenance',
                                 'Reserve' => 'Reserve',
                             ])
-                            ->required()
                             ->default(fn ($record) => $record->status),
                         Forms\Components\Textarea::make('notes')
                             ->label('Reason / Notes')
