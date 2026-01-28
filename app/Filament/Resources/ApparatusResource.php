@@ -21,9 +21,11 @@ class ApparatusResource extends Resource
     
     protected static ?string $navigationGroup = 'Fleet Management';
     
-    protected static ?string $navigationLabel = 'Apparatus';
+    protected static ?string $modelLabel = 'Fire Apparatus';
     
-    protected static ?string $pluralModelLabel = 'Apparatus';
+    protected static ?string $navigationLabel = 'Fire Apparatus';
+    
+    protected static ?string $pluralModelLabel = 'Fire Apparatus';
 
     public static function form(Form $form): Form
     {
