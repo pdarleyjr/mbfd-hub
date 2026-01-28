@@ -60,13 +60,12 @@ class TodoResource extends Resource
         return $table
             ->columns([
                 Split::make([
-                    Tables\Columns\IconColumn::make('is_completed')
+                    Tables\Columns\ToggleColumn::make('is_completed')
                         ->label('Status')
-                        ->boolean()
-                        ->trueIcon('heroicon-o-check-circle')
-                        ->falseIcon('heroicon-o-x-circle')
-                        ->trueColor('success')
-                        ->falseColor('gray')
+                        ->onIcon('heroicon-o-check-circle')
+                        ->offIcon('heroicon-o-x-circle')
+                        ->onColor('success')
+                        ->offColor('gray')
                         ->afterStateUpdated(function ($record, $state) {
                             $record->completed_at = $state ? now() : null;
                             $record->save();
