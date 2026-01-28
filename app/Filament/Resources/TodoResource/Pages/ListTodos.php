@@ -24,7 +24,7 @@ class ListTodos extends ListRecords
         return [
             'all' => Tab::make('All'),
             'assigned_to_me' => Tab::make('Assigned to me')
-                ->modifyQueryUsing(fn (Builder $query) => $query->where('assigned_to', auth()->id())),
+                ->modifyQueryUsing(fn (Builder $query) => $query->whereJsonContains('assigned_to', (string) auth()->id())),
             'created_by_me' => Tab::make('Created by me')
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('created_by', auth()->id())),
         ];

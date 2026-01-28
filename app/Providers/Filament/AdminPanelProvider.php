@@ -90,6 +90,14 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): string => Blade::render('<script src="{{ secure_asset(\'js/filament-shortcuts.js\') }}" defer></script>')
+            )
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): string => '<style>
+                    /* Dashboard sidebar logo - smaller */
+                    .fi-sidebar-header img { max-height: 3rem !important; }
+                    /* Login page logo - keep large at 12rem */
+                </style>'
             );
     }
 }
