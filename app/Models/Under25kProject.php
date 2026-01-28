@@ -1,0 +1,72 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Under25kProject extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'project_number',
+        'name',
+        'description',
+        'budget_amount',
+        'spend_amount',
+        'status',
+        'priority',
+        'start_date',
+        'target_completion_date',
+        'actual_completion_date',
+        'project_manager',
+        'notes',
+        'percent_complete',
+        'internal_notes',
+        'attachments',
+        'attachment_file_names',
+    ];
+
+    protected $casts = [
+        'budget_amount' => 'decimal:2',
+        'spend_amount' => 'decimal:2',
+        'start_date' => 'date',
+        'target_completion_date' => 'date',
+        'actual_completion_date' => 'date',
+        'percent_complete' => 'integer',
+        'attachments' => 'array',
+        'attachment_file_names' => 'array',
+    ];
+
+    // Relationships
+    public function updates()
+    {
+        return $this->hasMany(Under25kProjectUpdate::class);
+    }
+
+    // Scopes
+    public function scopeActive($query)
+    {
+        return $query->where('status', '!=', 'Completed');
+    }
+
+    public function scopeHighPriority($query)
+    {
+        return $query->whereIn('priority', ['High', 'Critical']);
+    }
+
+    public function scopeOverdue($query)
+    {
+        return $query->where('target_completion_date', '<', now())
+            ->whereNull('actual_completion_date');
+    }
+
+    // Accessors
+    public function getIsOverdueAttribute(): bool
+    {
+        return $this->target_completion_date 
+            && $this->target_completion_date->isPast() 
+            && !$this->actual_completion_date;
+    }
+}
