@@ -79,8 +79,7 @@ class TodoResource extends Resource
                             $desc = Str::of(strip_tags($record->description ?? ''))->squish()->limit(90);
                             $assigned = $record->assignees->pluck('name')->filter()->join(', ');
                             $meta = collect([
-                                $assigned ? "Assigned: {$assigned}" : null,
-                                $record->createdBy?->name ? "By: {$record->createdBy->name}" : null,
+                                $assigned ? "👤 {$assigned}" : null,
                                 $record->is_completed ? '✅ Completed' : null,
                             ])->filter()->join(' • ');
 
