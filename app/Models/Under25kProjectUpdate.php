@@ -9,6 +9,8 @@ class Under25kProjectUpdate extends Model
 {
     use HasFactory;
 
+    protected $table = 'under_25k_project_updates';
+
     protected $fillable = [
         'under_25k_project_id',
         'user_id',
