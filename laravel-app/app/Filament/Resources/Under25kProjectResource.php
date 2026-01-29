@@ -221,6 +221,7 @@ class Under25kProjectResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->query(Under25kProject::query()->fromCsv())
             ->columns([
                 Tables\Columns\TextColumn::make('project_number')
                     ->searchable()

@@ -90,6 +90,15 @@ class Under25kProject extends Model
             ->whereNull('actual_completion_date');
     }
 
+    /**
+     * Scope to only show projects that have been imported from CSV
+     * This ensures only the 6 projects from the CSV file are visible
+     */
+    public function scopeFromCsv($query)
+    {
+        return $query->whereNotNull('zone');
+    }
+
     // Accessors
     public function getIsOverdueAttribute(): bool
     {
