@@ -96,7 +96,7 @@ class Under25kProject extends Model
      */
     public function scopeFromCsv($query)
     {
-        return $query->whereNotNull('zone');
+        return $query->where('zone', 'PS');
     }
 
     // Accessors
