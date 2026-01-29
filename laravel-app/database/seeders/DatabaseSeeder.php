@@ -22,5 +22,8 @@ class DatabaseSeeder extends Seeder
 
         // Seed Capital Projects
         $this->call(CapitalProjectSeeder::class);
+
+        // Seed Under 25k Projects from CSV
+        $this->call(Under25kProjectsFromCSVSeeder::class);
     }
 }
