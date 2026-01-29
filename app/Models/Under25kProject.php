@@ -44,7 +44,7 @@ class Under25kProject extends Model
     // Relationships
     public function updates()
     {
-        return $this->hasMany(Under25kProjectUpdate::class);
+        return $this->hasMany(Under25kProjectUpdate::class, 'under_25k_project_id');
     }
 
     // Scopes
