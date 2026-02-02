@@ -2,45 +2,23 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Models\Apparatus;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class ApparatusesRelationManager extends RelationManager
 {
-    protected static string $relationship = 'apparatuses';
     protected static ?string $title = 'Assigned Apparatus';
 
-    public function form(Form $form): Form
+    protected function getTableQuery(): ?Builder
     {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('unit_number')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\Select::make('type')
-                    ->options([
-                        'engine' => 'Engine',
-                        'ladder' => 'Ladder',
-                        'rescue' => 'Rescue',
-                        'battalion' => 'Battalion',
-                        'boat' => 'Boat',
-                        'utility' => 'Utility',
-                    ])
-                    ->required(),
-                Forms\Components\TextInput::make('make')
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('model')
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('year')
-                    ->numeric()
-                    ->minValue(1900)
-                    ->maxValue(2030),
-            ]);
+        // Filter apparatuses where current_location matches "Station {station_number}"
+        $stationNumber = $this->getOwnerRecord()->station_number;
+        return Apparatus::query()->where('current_location', 'Station ' . $stationNumber);
     }
 
     public function table(Table $table): Table
@@ -66,7 +44,7 @@ class ApparatusesRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('year'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn (?string $state): string => match ($state) {
                         'in_service' => 'success',
                         'out_of_service' => 'danger',
                         'maintenance' => 'warning',
@@ -85,16 +63,44 @@ class ApparatusesRelationManager extends RelationManager
                     ]),
             ])
             ->headerActions([
-                Tables\Actions\AttachAction::make()
-                    ->preloadRecordSelect(),
+                // Actions to reassign apparatus to this station
+                Tables\Actions\Action::make('assignApparatus')
+                    ->label('Assign Apparatus')
+                    ->icon('heroicon-o-plus')
+                    ->form([
+                        Forms\Components\Select::make('apparatus_id')
+                            ->label('Select Apparatus')
+                            ->options(fn () => Apparatus::whereNot('current_location', 'Station ' . $this->getOwnerRecord()->station_number)
+                                ->pluck('unit_number', 'id'))
+                            ->searchable()
+                            ->required(),
+                    ])
+                    ->action(function (array $data) {
+                        Apparatus::find($data['apparatus_id'])->update([
+                            'current_location' => 'Station ' . $this->getOwnerRecord()->station_number,
+                        ]);
+                    }),
             ])
             ->actions([
-                Tables\Actions\DetachAction::make(),
+                Tables\Actions\Action::make('reassign')
+                    ->label('Reassign')
+                    ->icon('heroicon-o-arrow-path')
+                    ->form([
+                        Forms\Components\Select::make('new_location')
+                            ->label('New Location')
+                            ->options([
+                                'Fire Fleet' => 'Fire Fleet',
+                                'Station 1' => 'Station 1',
+                                'Station 2' => 'Station 2',
+                                'Station 3' => 'Station 3',
+                                'Station 4' => 'Station 4',
+                            ])
+                            ->required(),
+                    ])
+                    ->action(function (Apparatus $record, array $data) {
+                        $record->update(['current_location' => $data['new_location']]);
+                    }),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DetachBulkAction::make(),
-                ]),
-            ]);
+            ->bulkActions([]);
     }
 }
