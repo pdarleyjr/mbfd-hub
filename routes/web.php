@@ -7,20 +7,20 @@ Route::get('/', function () {
 });
 
 Route::get('/daily', function () {
-    return response()
-        ->file(public_path('daily/index.html'))
-        ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-        ->header('Pragma', 'no-cache')
-        ->header('Expires', '0');
+    $response = response()->file(public_path('daily/index.html'));
+    $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    $response->headers->set('Pragma', 'no-cache');
+    $response->headers->set('Expires', '0');
+    return $response;
 });
 
 // Catch-all route for SPA with wildcard
 Route::get('/daily/{any}', function () {
-    return response()
-        ->file(public_path('daily/index.html'))
-        ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-        ->header('Pragma', 'no-cache')
-        ->header('Expires', '0');
+    $response = response()->file(public_path('daily/index.html'));
+    $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    $response->headers->set('Pragma', 'no-cache');
+    $response->headers->set('Expires', '0');
+    return $response;
 })->where('any', '.*');
 
 Route::get('/__version', function() {
