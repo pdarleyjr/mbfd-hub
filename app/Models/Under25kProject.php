@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Builder;
 
 class Under25kProject extends Model
 {
@@ -42,6 +43,21 @@ class Under25kProject extends Model
         'attachments' => 'array',
         'attachment_file_names' => 'array',
     ];
+
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        // Global scope to filter only fire department projects
+        static::addGlobalScope('fireDepartment', function (Builder $builder) {
+            $builder->where(function ($query) {
+                $query->where('project_number', 'LIKE', 'FIRE-%')
+                      ->orWhere('project_number', 'LIKE', 'NEW-%')
+                      ->orWhere('project_number', 'LIKE', '*NEW*%');
+            });
+        });
+    }
 
     // Relationships
     public function updates()
