@@ -3,6 +3,9 @@ import ApparatusList from './components/ApparatusList';
 import InspectionWizard from './components/InspectionWizard';
 import SuccessPage from './components/SuccessPage';
 import OfflineIndicator from './components/OfflineIndicator';
+import StationListPage from './components/StationListPage';
+import StationDetailPage from './components/StationDetailPage';
+import RoomAssetTracker from './components/RoomAssetTracker';
 
 function App() {
   return (
@@ -14,6 +17,10 @@ function App() {
             <Route path="/" element={<ApparatusList />} />
             <Route path="/apparatus/:slug" element={<InspectionWizard />} />
             <Route path="/success" element={<SuccessPage />} />
+            {/* Station Routes */}
+            <Route path="/stations" element={<StationListPage />} />
+            <Route path="/stations/:id" element={<StationDetailPage />} />
+            <Route path="/stations/:stationId/rooms/:roomId" element={<RoomAssetTracker />} />
           </Routes>
         </div>
       </div>

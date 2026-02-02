@@ -18,7 +18,7 @@ class Under25kProjectsFromCSVSeeder extends Seeder
         $this->command->info('Starting Under 25k Projects CSV import...');
 
         // Path to the correct CSV file
-        $csvPath = 'C:\Users\Peter Darley\Downloads\under_25k_fire_dept - Sheet1.csv';
+        $csvPath = '/var/www/html/storage/app/imports/under_25k_fire_dept_correct.csv';
 
         if (!file_exists($csvPath)) {
             $this->command->error("CSV file not found at: {$csvPath}");

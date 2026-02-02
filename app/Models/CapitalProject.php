@@ -7,6 +7,7 @@ use App\Enums\ProjectStatus;
 use App\Services\CloudflareAIService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CapitalProject extends Model
 {
@@ -29,6 +30,7 @@ class CapitalProject extends Model
         'notes',
         'percent_complete',
         'attachments',
+        'station_id',
     ];
 
     protected $casts = [
@@ -59,6 +61,14 @@ class CapitalProject extends Model
     public function notifications()
     {
         return $this->hasMany(NotificationTracking::class, 'project_id');
+    }
+
+    /**
+     * Get the station that owns this project
+     */
+    public function station(): BelongsTo
+    {
+        return $this->belongsTo(Station::class);
     }
 
     // Scopes

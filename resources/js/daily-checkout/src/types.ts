@@ -60,3 +60,208 @@ export interface InspectionData {
   officer: OfficerInfo;
   compartments: Compartment[];
 }
+
+// ============================================
+// Station Types
+// ============================================
+
+export type ProjectStatus = 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
+export type ProjectPriority = 'low' | 'medium' | 'high' | 'critical';
+export type RoomType = 'apparatus_bay' | 'office' | 'dormitory' | 'kitchen' | 'restroom' | 'storage' | 'training_room' | 'meeting_room' | 'workshop' | 'other';
+export type AssetCondition = 'excellent' | 'good' | 'fair' | 'poor' | 'critical' | 'damaged' | 'obsolete';
+export type AuditStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type FindingType = 'surplus' | 'deficit' | 'damaged' | 'mislabeled' | 'expired' | 'other';
+export type FindingStatus = 'open' | 'resolved' | 'pending_approval' | 'accepted';
+
+export interface Station {
+  id: number;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  phone: string;
+  fax?: string;
+  station_number: number;
+  latitude?: number;
+  longitude?: number;
+  is_active: boolean;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  apparatuses_count?: number;
+  active_apparatuses_count?: number;
+  rooms_count?: number;
+  capital_projects_count?: number;
+  under_25k_projects_count?: number;
+  shop_works_count?: number;
+  personnel_count?: number;
+  dorm_beds_count?: number;
+}
+
+export interface StationDetail extends Station {
+  apparatuses?: Apparatus[];
+  active_apparatuses?: Apparatus[];
+  rooms?: Room[];
+  capital_projects?: CapitalProject[];
+  active_capital_projects?: CapitalProject[];
+  under_25k_projects?: Under25kProject[];
+  active_under_25k_projects?: Under25kProject[];
+  shop_works?: ShopWork[];
+  active_shop_works?: ShopWork[];
+  summary?: StationSummary;
+}
+
+export interface StationSummary {
+  total_apparatuses: number;
+  active_apparatuses: number;
+  total_personnel: number;
+  dorm_beds_count: number;
+  occupied_beds: number;
+  available_beds: number;
+  open_projects: number;
+  pending_shop_works: number;
+  total_rooms: number;
+  active_assets: number;
+  pending_audits: number;
+}
+
+export interface Room {
+  id: number;
+  station_id: number;
+  name: string;
+  room_number?: string;
+  floor?: string;
+  type: 'apparatus_bay' | 'office' | 'training_room' | 'kitchen' | 'dormitory' | 'restroom' | 'storage' | 'workshop' | 'other';
+  capacity?: number;
+  is_active: boolean;
+  notes?: string;
+  assets_count?: number;
+  audits_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RoomAsset {
+  id: number;
+  room_id: number;
+  name: string;
+  description?: string;
+  asset_tag?: string;
+  quantity: number;
+  unit: 'each' | 'box' | 'case' | 'set' | 'gallon' | 'pound' | 'dozen';
+  condition: AssetCondition;
+  location?: string;
+  serial_number?: string;
+  purchase_date?: string;
+  purchase_price?: number;
+  useful_life_years?: number;
+  depreciation_rate?: number;
+  last_audit_date?: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RoomAudit {
+  id: number;
+  room_id: number;
+  audit_type: 'physical_count' | 'random_spot' | 'annual' | 'incident' | 'transfer';
+  audit_status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  audited_by?: string;
+  audit_date?: string;
+  items_checked?: number;
+  discrepancies?: number;
+  notes?: string;
+  findings?: string;
+  recommendations?: string;
+  started_at?: string;
+  completed_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CapitalProject {
+  id: number;
+  project_number: string;
+  title: string;
+  description?: string;
+  station_id?: number;
+  budget: number;
+  spent: number;
+  status: ProjectStatus;
+  priority: ProjectPriority;
+  start_date?: string;
+  estimated_completion?: string;
+  actual_completion?: string;
+  project_manager?: string;
+  vendor?: string;
+  is_approved: boolean;
+  approved_by?: string;
+  approved_at?: string;
+  created_at: string;
+  updated_at: string;
+  station?: Station;
+}
+
+export interface Under25kProject {
+  id: number;
+  project_number: string;
+  title: string;
+  description?: string;
+  station_id?: number;
+  budget: number;
+  spent: number;
+  status: ProjectStatus;
+  priority: ProjectPriority;
+  start_date?: string;
+  estimated_completion?: string;
+  actual_completion?: string;
+  project_lead?: string;
+  vendor?: string;
+  is_approved: boolean;
+  approved_by?: string;
+  approved_at?: string;
+  created_at: string;
+  updated_at: string;
+  station?: Station;
+}
+
+export interface ShopWork {
+  id: number;
+  work_order_number: string;
+  title: string;
+  description?: string;
+  station_id?: number;
+  apparatus_id?: number;
+  priority: ProjectPriority;
+  status: ProjectStatus;
+  work_type?: string;
+  requested_by?: string;
+  assigned_to?: string;
+  estimated_hours?: number;
+  actual_hours?: number;
+  labor_cost?: number;
+  parts_cost?: number;
+  total_cost?: number;
+  start_date?: string;
+  estimated_completion?: string;
+  actual_completion?: string;
+  is_warranty_work: boolean;
+  is_insurance_claim: boolean;
+  created_at: string;
+  updated_at: string;
+  station?: Station;
+  apparatus?: Apparatus;
+}
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  role?: string;
+  shift?: Shift;
+  rank?: Rank;
+  station_id?: number;
+  is_active: boolean;
+}
