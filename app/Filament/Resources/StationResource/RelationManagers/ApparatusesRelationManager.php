@@ -20,7 +20,12 @@ class ApparatusesRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('unit_number')
             ->columns([
-                Tables\Columns\TextColumn::make('unit_number')
+                Tables\Columns\TextColumn::make('designation')
+                    ->label('Designation')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('vehicle_number')
+                    ->label('Vehicle #')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('type')
@@ -64,13 +69,16 @@ class ApparatusesRelationManager extends RelationManager
                     ->form([
                         Forms\Components\Select::make('apparatus_id')
                             ->label('Select Apparatus')
-                            ->options(fn () => Apparatus::whereNot('current_location', 'Station ' . $this->getOwnerRecord()->station_number)
-                                ->pluck('unit_number', 'id'))
+                            ->options(fn () => Apparatus::whereNull('station_id')
+                                ->orWhere('station_id', '!=', $this->getOwnerRecord()->id)
+                                ->get()
+                                ->mapWithKeys(fn ($app) => [$app->id => "{$app->designation} - {$app->vehicle_number}"]))
                             ->searchable()
                             ->required(),
                     ])
                     ->action(function (array $data) {
                         Apparatus::find($data['apparatus_id'])->update([
+                            'station_id' => $this->getOwnerRecord()->id,
                             'current_location' => 'Station ' . $this->getOwnerRecord()->station_number,
                         ]);
                     }),
@@ -80,19 +88,18 @@ class ApparatusesRelationManager extends RelationManager
                     ->label('Reassign')
                     ->icon('heroicon-o-arrow-path')
                     ->form([
-                        Forms\Components\Select::make('new_location')
-                            ->label('New Location')
-                            ->options([
-                                'Fire Fleet' => 'Fire Fleet',
-                                'Station 1' => 'Station 1',
-                                'Station 2' => 'Station 2',
-                                'Station 3' => 'Station 3',
-                                'Station 4' => 'Station 4',
-                            ])
+                        Forms\Components\Select::make('new_station_id')
+                            ->label('New Station')
+                            ->options(fn () => \App\Models\Station::pluck('station_number', 'id')
+                                ->mapWithKeys(fn ($num, $id) => [$id => "Station {$num}"]))
                             ->required(),
                     ])
                     ->action(function (Apparatus $record, array $data) {
-                        $record->update(['current_location' => $data['new_location']]);
+                        $station = \App\Models\Station::find($data['new_station_id']);
+                        $record->update([
+                            'station_id' => $data['new_station_id'],
+                            'current_location' => 'Station ' . $station->station_number,
+                        ]);
                     }),
             ])
             ->bulkActions([]);
