@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Apparatus extends Model
 {
@@ -27,7 +28,21 @@ class Apparatus extends Model
         'mileage',
         'last_service_date',
         'notes',
+        'station_id',
     ];
+
+    protected $casts = [
+        'mileage' => 'decimal:2',
+        'last_service_date' => 'date',
+    ];
+
+    /**
+     * Get the station that owns this apparatus
+     */
+    public function station(): BelongsTo
+    {
+        return $this->belongsTo(Station::class);
+    }
 
     public function inspections()
     {
