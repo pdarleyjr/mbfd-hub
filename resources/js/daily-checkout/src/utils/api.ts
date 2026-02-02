@@ -38,7 +38,7 @@ export class ApiClient {
 
   // Station API methods
   static async getStations(): Promise<Station[]> {
-    const response = await fetch(`${API_BASE}/admin/stations`);
+    const response = await fetch(`${API_BASE}/public/stations`);
     if (!response.ok) {
       throw new Error('Failed to fetch stations');
     }
@@ -46,7 +46,7 @@ export class ApiClient {
   }
 
   static async getStation(id: number): Promise<StationDetail> {
-    const response = await fetch(`${API_BASE}/admin/stations/${id}`);
+    const response = await fetch(`${API_BASE}/public/stations/${id}`);
     if (!response.ok) {
       throw new Error('Failed to fetch station');
     }
@@ -92,15 +92,16 @@ export class ApiClient {
 
   // Alias methods for simpler usage in components
   static async getRoom(stationId: number, roomId: number): Promise<Room> {
-    const response = await fetch(`${API_BASE}/admin/stations/${stationId}/rooms/${roomId}`);
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/rooms`);
     if (!response.ok) {
       throw new Error('Failed to fetch room');
     }
-    return response.json();
+    const rooms = await response.json();
+    return rooms.find((r: Room) => r.id === roomId);
   }
 
   static async getRoomAssets(stationId: number, roomId: number): Promise<RoomAsset[]> {
-    const response = await fetch(`${API_BASE}/admin/stations/${stationId}/rooms/${roomId}/assets`);
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/rooms/${roomId}/assets`);
     if (!response.ok) {
       throw new Error('Failed to fetch room assets');
     }
