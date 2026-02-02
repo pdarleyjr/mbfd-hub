@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Apparatus } from '../types';
 import { ApiClient } from '../utils/api';
 
@@ -11,6 +11,7 @@ export default function ApparatusList() {
   const [pullDistance, setPullDistance] = useState(0);
   const touchStartY = useRef<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
 
   const fetchApparatuses = async () => {
     try {
@@ -91,6 +92,32 @@ export default function ApparatusList() {
       onTouchEnd={handleTouchEnd}
       className="relative"
     >
+      {/* Navigation Tabs */}
+      <div className="flex justify-center mb-6">
+        <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+          <Link
+            to="/"
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              location.pathname === '/' 
+                ? 'bg-blue-600 text-white' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            🚒 Apparatuses
+          </Link>
+          <Link
+            to="/stations"
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              location.pathname.startsWith('/stations') 
+                ? 'bg-blue-600 text-white' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            🏢 Stations
+          </Link>
+        </div>
+      </div>
+
       {/* Pull to refresh indicator */}
       {pullDistance > 0 && (
         <div 
