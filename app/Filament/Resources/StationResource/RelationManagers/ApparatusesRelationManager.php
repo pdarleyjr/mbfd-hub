@@ -15,13 +15,6 @@ class ApparatusesRelationManager extends RelationManager
     protected static string $relationship = 'apparatuses';
     protected static ?string $title = 'Assigned Apparatus';
 
-    protected function getTableQuery(): ?Builder
-    {
-        // Filter apparatuses where current_location matches "Station {station_number}"
-        $stationNumber = $this->getOwnerRecord()->station_number;
-        return Apparatus::query()->where('current_location', 'Station ' . $stationNumber);
-    }
-
     public function table(Table $table): Table
     {
         return $table
