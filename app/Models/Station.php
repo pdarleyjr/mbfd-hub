@@ -34,6 +34,15 @@ class Station extends Model
     }
 
     /**
+     * Get apparatuses by current_location text field (not FK relationship)
+     * This filters apparatuses where current_location = 'Station {station_number}'
+     */
+    public function apparatusesByLocation()
+    {
+        return Apparatus::where('current_location', 'Station ' . $this->station_number);
+    }
+
+    /**
      * Get active apparatuses at this station
      */
     public function activeApparatuses(): HasMany
