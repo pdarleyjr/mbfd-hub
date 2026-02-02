@@ -69,3 +69,9 @@ class Room extends Model
 
     /**
      * Scope by room type
+     */
+    public function scopeOfType($query, string $type)
+    {
+        return $query->where('room_type', $type);
+    }
+}
