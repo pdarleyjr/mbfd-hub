@@ -17,6 +17,14 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('apparatuses', [ApparatusController::class, 'index']);
     Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class, 'checklist']);
     Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
+    
+    // Public Station Routes for Daily Checkout SPA
+    Route::get('stations', [\App\Http\Controllers\Api\StationController::class, 'index']);
+    Route::get('stations/{station}', [\App\Http\Controllers\Api\StationController::class, 'show']);
+    Route::get('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class, 'rooms']);
+    Route::get('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class, 'roomAssets']);
+    Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class, 'apparatus']);
+    Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class, 'projects']);
 });
 
 // Push notification routes (public VAPID key, authenticated subscription management)
