@@ -148,6 +148,8 @@ class StationResource extends Resource
         return [
             RelationManagers\RoomsRelationManager::class,
             RelationManagers\ApparatusesRelationManager::class,
+            RelationManagers\CapitalProjectsRelationManager::class,
+            RelationManagers\Under25kProjectsRelationManager::class,
         ];
     }
 
