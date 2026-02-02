@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ApparatusesRelationManager extends RelationManager
 {
+    protected static string $relationship = 'apparatuses';
     protected static ?string $title = 'Assigned Apparatus';
 
     protected function getTableQuery(): ?Builder
