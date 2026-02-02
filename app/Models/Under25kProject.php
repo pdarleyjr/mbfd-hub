@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Under25kProject extends Model
 {
@@ -28,6 +29,7 @@ class Under25kProject extends Model
         'internal_notes',
         'attachments',
         'attachment_file_names',
+        'station_id',
     ];
 
     protected $casts = [
@@ -45,6 +47,14 @@ class Under25kProject extends Model
     public function updates()
     {
         return $this->hasMany(Under25kProjectUpdate::class, 'under_25k_project_id');
+    }
+
+    /**
+     * Get the station that owns this project
+     */
+    public function station(): BelongsTo
+    {
+        return $this->belongsTo(Station::class);
     }
 
     // Scopes

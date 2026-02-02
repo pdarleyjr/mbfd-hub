@@ -35,4 +35,16 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     // NEW: Inventory Chat Assistant
     Route::post('ai/inventory-chat', [InventoryChatController::class, 'chat']);
     Route::post('ai/inventory-execute', [InventoryChatController::class, 'executeAction']);
+    
+    // NEW: Station Management Routes
+    Route::apiResource('stations', \App\Http\Controllers\Api\StationController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
+    Route::get('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class, 'rooms']);
+    Route::post('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class, 'storeRoom']);
+    Route::get('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class, 'roomAssets']);
+    Route::post('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class, 'storeRoomAsset']);
+    Route::get('stations/{station}/rooms/{room}/audits', [\App\Http\Controllers\Api\StationController::class, 'roomAudits']);
+    Route::post('stations/{station}/rooms/{room}/audits', [\App\Http\Controllers\Api\StationController::class, 'storeRoomAudit']);
+    Route::post('stations/{station}/rooms/{room}/audits/{audit}/complete', [\App\Http\Controllers\Api\StationController::class, 'completeAudit']);
+    Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class, 'apparatus']);
+    Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class, 'projects']);
 });
