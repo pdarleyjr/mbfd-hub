@@ -42,7 +42,8 @@ export class ApiClient {
     if (!response.ok) {
       throw new Error('Failed to fetch stations');
     }
-    return response.json();
+    const data = await response.json();
+    return data.stations || data; // Extract stations array from response
   }
 
   static async getStation(id: number): Promise<StationDetail> {
