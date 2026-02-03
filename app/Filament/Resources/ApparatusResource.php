@@ -116,6 +116,7 @@ class ApparatusResource extends Resource
                     ->label('Station')
                     ->searchable()
                     ->sortable()
+                    ->state(fn (Apparatus $record): ?string => $record->station?->name)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('assignment')
                     ->label('Assignment')
