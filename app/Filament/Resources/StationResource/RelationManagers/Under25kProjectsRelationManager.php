@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Resources\Under25kProjectResource;
 use App\Models\Under25kProject;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -72,7 +73,11 @@ class Under25kProjectsRelationManager extends RelationManager
                         ]);
                     }),
             ])
-            ->actions([])
+            ->actions([
+                Tables\Actions\ViewAction::make()
+                    ->url(fn (Under25kProject $record): string => Under25kProjectResource::getUrl('view', ['record' => $record]))
+                    ->openUrlInNewTab(false),
+            ])
             ->bulkActions([]);
     }
 }
