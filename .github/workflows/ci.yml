@@ -87,6 +87,13 @@ jobs:
           DB_USERNAME: postgres
           DB_PASSWORD: password
 
+      - name: Grant Schema Permissions
+        run: |
+          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -d mbfd_test -c "GRANT ALL ON SCHEMA public TO postgres;"
+          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -d mbfd_test -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres;"
+          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -d mbfd_test -c "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres;"
+          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -d mbfd_test -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres;"
+
       - name: Diagnostic - Test Migration
         run: |
           echo "=== Attempting Migration ==="
