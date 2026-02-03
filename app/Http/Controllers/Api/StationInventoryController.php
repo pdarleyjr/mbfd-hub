@@ -108,7 +108,10 @@ class StationInventoryController extends Controller
     {
         $validated = $request->validate([
             'station_id' => 'required|exists:stations,id',
+            'employee_name' => 'nullable|string|max:255',
+            'shift' => 'nullable|string|in:A,B,C',
             'items' => 'required|array',
+            'notes' => 'nullable|string',
         ]);
 
         $station = Station::findOrFail($validated['station_id']);
@@ -120,9 +123,12 @@ class StationInventoryController extends Controller
         // Generate PDF
         $pdfData = [
             'station' => $station,
+            'employee_name' => $validated['employee_name'] ?? 'N/A',
+            'shift' => $validated['shift'] ?? 'N/A',
             'items' => $orderedItems,
+            'notes' => $validated['notes'] ?? '',
             'categories' => $this->categories,
-            'generated_at' => now()->format('M j, Y g:i A'),
+            'generated_at' => now()->timezone('America/New_York')->format('M j, Y g:i A T'),
             'generated_by' => $request->user()?->name ?? 'Unknown',
         ];
 
@@ -136,9 +142,13 @@ class StationInventoryController extends Controller
         // Create submission record
         $submission = StationInventorySubmission::create([
             'station_id' => $validated['station_id'],
+            'employee_name' => $validated['employee_name'] ?? null,
+            'shift' => $validated['shift'] ?? null,
             'items' => $orderedItems,
+            'notes' => $validated['notes'] ?? null,
             'pdf_path' => $pdfPath,
             'created_by' => $request->user()?->id ?? 1,
+            'submitted_at' => now()->timezone('America/New_York'),
         ]);
 
         return response()->json([

@@ -96,6 +96,8 @@ export default function StationInventoryForm() {
   const [success, setSuccess] = useState<{ id: number; pdfUrl?: string } | null>(null);
   
   const [selectedStation, setSelectedStation] = useState<number>(0);
+  const [employeeName, setEmployeeName] = useState('');
+  const [shift, setShift] = useState('');
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState('');
 
@@ -154,7 +156,13 @@ export default function StationInventoryForm() {
         return;
       }
 
-      const result = await ApiClient.submitStationInventory(selectedStation, items, notes);
+      const result = await ApiClient.submitStationInventory(
+        selectedStation, 
+        items, 
+        notes,
+        employeeName,
+        shift
+      );
       setSuccess({ id: result.id });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit inventory');
@@ -296,26 +304,67 @@ export default function StationInventoryForm() {
         {/* Step 0: Select Station */}
         {step === 0 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Station</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {stations.map((station) => (
-                <button
-                  key={station.id}
-                  onClick={() => setSelectedStation(station.id)}
-                  className={`p-4 rounded-lg border text-left transition-all ${
-                    selectedStation === station.id
-                      ? 'bg-green-100 border-green-400'
-                      : 'bg-white border-gray-200 hover:border-green-300'
-                  }`}
-                >
-                  <div className="font-medium text-gray-900">Station {station.station_number}</div>
-                  <div className="text-sm text-gray-500">{station.name}</div>
-                </button>
-              ))}
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Station & Employee Info</h2>
+            
+            {/* Employee Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Employee Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={employeeName}
+                onChange={(e) => setEmployeeName(e.target.value)}
+                placeholder="Enter your name"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                required
+              />
             </div>
+
+            {/* Shift */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Shift <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={shift}
+                onChange={(e) => setShift(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                required
+              >
+                <option value="">Select shift...</option>
+                <option value="A">A Shift</option>
+                <option value="B">B Shift</option>
+                <option value="C">C Shift</option>
+              </select>
+            </div>
+
+            {/* Station Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Station <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {stations.map((station) => (
+                  <button
+                    key={station.id}
+                    onClick={() => setSelectedStation(station.id)}
+                    className={`p-4 rounded-lg border text-left transition-all ${
+                      selectedStation === station.id
+                        ? 'bg-green-100 border-green-400'
+                        : 'bg-white border-gray-200 hover:border-green-300'
+                    }`}
+                  >
+                    <div className="font-medium text-gray-900">Station {station.station_number}</div>
+                    <div className="text-sm text-gray-500">{station.name}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
               onClick={() => setStep(1)}
-              disabled={selectedStation === 0}
+              disabled={selectedStation === 0 || !employeeName.trim() || !shift}
               className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
             >
               Continue to Garbage & Paper Goods

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\StationInventoryController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -34,4 +35,9 @@ Route::get('/__version', function() {
         'build_time' => $buildTime,
     ]);
 });
+
+// Station Inventory PDF Download
+Route::get('/inventory-pdf/{submission}', [StationInventoryController::class, 'downloadPdf'])
+    ->name('download-inventory-pdf')
+    ->middleware('auth');
 
