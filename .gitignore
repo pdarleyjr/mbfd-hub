@@ -3,7 +3,6 @@
 **/node_modules
 /public/hot
 /public/storage
-/public/daily
 /storage/*.key
 /storage/pail
 /vendor
