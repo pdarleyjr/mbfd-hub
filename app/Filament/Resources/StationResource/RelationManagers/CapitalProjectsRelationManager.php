@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Resources\CapitalProjectResource;
 use App\Models\CapitalProject;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -26,19 +27,27 @@ class CapitalProjectsRelationManager extends RelationManager
                     ->sortable(),
                 Tables\Columns\TextColumn::make('project_number')
                     ->label('Project #')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('total_budget')
+                    ->searchable()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('budget_amount')
                     ->label('Budget')
                     ->money('USD')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge(),
-                Tables\Columns\TextColumn::make('completion_percentage')
+                Tables\Columns\TextColumn::make('percent_complete')
                     ->label('Progress')
-                    ->suffix('%'),
+                    ->suffix('%')
+                    ->default(0),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('status'),
+                Tables\Filters\SelectFilter::make('status')
+                    ->options([
+                        'pending' => 'Planning',
+                        'in_progress' => 'In Progress',
+                        'on_hold' => 'On Hold',
+                        'completed' => 'Completed',
+                    ]),
             ])
             ->headerActions([
                 Tables\Actions\Action::make('assignProject')
@@ -49,7 +58,7 @@ class CapitalProjectsRelationManager extends RelationManager
                             ->label('Select Project')
                             ->options(fn () => CapitalProject::whereNull('station_id')
                                 ->orWhere('station_id', '!=', $this->getOwnerRecord()->id)
-                                ->pluck('name', 'id'))
+                                ->pluck('project_name', 'id'))
                             ->searchable()
                             ->required(),
                     ])
@@ -59,7 +68,11 @@ class CapitalProjectsRelationManager extends RelationManager
                         ]);
                     }),
             ])
-            ->actions([])
+            ->actions([
+                Tables\Actions\ViewAction::make()
+                    ->url(fn (CapitalProject $record): string => CapitalProjectResource::getUrl('view', ['record' => $record]))
+                    ->openUrlInNewTab(false),
+            ])
             ->bulkActions([]);
     }
 }
