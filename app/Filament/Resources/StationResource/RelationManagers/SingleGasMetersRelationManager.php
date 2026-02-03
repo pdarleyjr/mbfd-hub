@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class SingleGasMetersRelationManager extends RelationManager
 {
@@ -100,6 +101,12 @@ class SingleGasMetersRelationManager extends RelationManager
                 
                 Tables\Columns\TextColumn::make('daysUntilExpiration')
                     ->label('Days Until Expiration')
+                    ->state(function (SingleGasMeter $record): int {
+                        return $record->daysUntilExpiration();
+                    })
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderBy('expiration_date', $direction);
+                    })
                     ->suffix(' days'),
             ])
             ->defaultSort('expiration_date', 'asc')
