@@ -151,6 +151,7 @@ class StationResource extends Resource
             RelationManagers\CapitalProjectsRelationManager::class,
             RelationManagers\Under25kProjectsRelationManager::class,
             RelationManagers\InventorySubmissionsRelationManager::class,
+            RelationManagers\SingleGasMetersRelationManager::class,
         ];
     }
 
