@@ -198,13 +198,25 @@ export class ApiClient {
     return response.json();
   }
 
-  static async submitStationInventory(stationId: number, items: InventorySubmissionItem[], notes?: string): Promise<StationInventorySubmission> {
+  static async submitStationInventory(
+    stationId: number, 
+    items: InventorySubmissionItem[], 
+    notes?: string,
+    employeeName?: string,
+    shift?: string
+  ): Promise<StationInventorySubmission> {
     const response = await fetch(`${API_BASE}/station-inventory-submissions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ station_id: stationId, items, notes }),
+      body: JSON.stringify({ 
+        station_id: stationId, 
+        items, 
+        notes,
+        employee_name: employeeName,
+        shift 
+      }),
     });
     if (!response.ok) {
       const error = await response.json();
