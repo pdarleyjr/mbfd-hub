@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.2",
         "appstract/laravel-stock": "^1.2",
+        "barryvdh/laravel-dompdf": "^2.2",
         "filament/filament": "^3.2",
         "laravel-notification-channels/webpush": "^10.4",
         "laravel/framework": "^11.31",
