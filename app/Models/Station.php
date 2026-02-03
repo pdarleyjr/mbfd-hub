@@ -126,4 +126,20 @@ class Station extends Model
     {
         return $this->hasMany(ShopWork::class)->whereIn('status', ['Pending', 'In Progress']);
     }
+
+    /**
+     * Get big ticket requests for this station.
+     */
+    public function bigTicketRequests()
+    {
+        return $this->hasMany(BigTicketRequest::class);
+    }
+
+    /**
+     * Get inventory submissions for this station.
+     */
+    public function inventorySubmissions()
+    {
+        return $this->hasMany(StationInventorySubmission::class);
+    }
 }

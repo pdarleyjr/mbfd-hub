@@ -6,6 +6,9 @@ import OfflineIndicator from './components/OfflineIndicator';
 import StationListPage from './components/StationListPage';
 import StationDetailPage from './components/StationDetailPage';
 import RoomAssetTracker from './components/RoomAssetTracker';
+import FormsHub from './components/FormsHub';
+import BigTicketRequestForm from './components/BigTicketRequestForm';
+import StationInventoryForm from './components/StationInventoryForm';
 
 function App() {
   return (
@@ -21,6 +24,11 @@ function App() {
             <Route path="/stations" element={<StationListPage />} />
             <Route path="/stations/:id" element={<StationDetailPage />} />
             <Route path="/stations/:stationId/rooms/:roomId" element={<RoomAssetTracker />} />
+            {/* Forms Hub Routes */}
+            <Route path="/forms-hub" element={<FormsHub />} />
+            <Route path="/forms-hub/big-ticket-request" element={<BigTicketRequestForm />} />
+            <Route path="/forms-hub/station-inventory" element={<StationInventoryForm />} />
+            <Route path="/forms-hub/success" element={<SuccessPage />} />
           </Routes>
         </div>
       </div>

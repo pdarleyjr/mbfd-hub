@@ -32,26 +32,13 @@ class CapitalProjectsRelationManager extends RelationManager
                     ->money('USD')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'Planning' => 'gray',
-                        'In Progress' => 'warning',
-                        'Completed' => 'success',
-                        'On Hold' => 'danger',
-                        default => 'gray',
-                    }),
+                    ->badge(),
                 Tables\Columns\TextColumn::make('completion_percentage')
                     ->label('Progress')
                     ->suffix('%'),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('status')
-                    ->options([
-                        'Planning' => 'Planning',
-                        'In Progress' => 'In Progress',
-                        'Completed' => 'Completed',
-                        'On Hold' => 'On Hold',
-                    ]),
+                Tables\Filters\SelectFilter::make('status'),
             ])
             ->headerActions([
                 Tables\Actions\Action::make('assignProject')

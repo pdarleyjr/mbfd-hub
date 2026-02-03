@@ -106,9 +106,19 @@ export default function ApparatusList() {
             🚒 Apparatuses
           </Link>
           <Link
+            to="/forms-hub"
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              location.pathname.startsWith('/forms-hub') 
+                ? 'bg-blue-600 text-white' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            📋 Forms Hub
+          </Link>
+          <Link
             to="/stations"
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              location.pathname.startsWith('/stations') 
+              location.pathname.startsWith('/stations') && !location.pathname.startsWith('/forms-hub')
                 ? 'bg-blue-600 text-white' 
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
