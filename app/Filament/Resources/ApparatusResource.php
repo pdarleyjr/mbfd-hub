@@ -48,7 +48,7 @@ class ApparatusResource extends Resource
                 Forms\Components\Section::make('Status & Location')
                     ->schema([
                         Forms\Components\Select::make('station_id')
-                            ->relationship('station', 'name')
+                            ->relationship('station', 'station_number')
                             ->searchable()
                             ->preload()
                             ->label('Station')
@@ -112,11 +112,11 @@ class ApparatusResource extends Resource
                     ->label('Class')
                     ->searchable()
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('station.name')
+                Tables\Columns\TextColumn::make('station.station_number')
                     ->label('Station')
                     ->searchable()
                     ->sortable()
-                    ->state(fn (Apparatus $record): ?string => $record->station?->name)
+                    ->state(fn (Apparatus $record): ?string => $record->station?->station_number)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('assignment')
                     ->label('Assignment')
@@ -193,7 +193,7 @@ class ApparatusResource extends Resource
             ->striped()
             ->filters([
                 Tables\Filters\SelectFilter::make('station')
-                    ->relationship('station', 'name')
+                    ->relationship('station', 'station_number')
                     ->searchable()
                     ->preload()
                     ->label('Station'),
