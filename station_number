@@ -1,0 +1,8 @@
+                Tables\Columns\TextColumn::make('station_id')
+                    ->label('Station')
+                    ->searchable()
+                    - (Apparatus $record): ?string = ? "Station " . $record- : null)
+                    ->state(fn (Apparatus $record): ?string => $record->station?->name)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('assignment')
+                    ->label('Assignment')
