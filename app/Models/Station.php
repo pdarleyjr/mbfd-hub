@@ -142,4 +142,20 @@ class Station extends Model
     {
         return $this->hasMany(StationInventorySubmission::class);
     }
+
+    /**
+     * Get single gas meters for apparatuses at this station
+     * This uses a hasManyThrough relationship via apparatuses
+     */
+    public function singleGasMeters()
+    {
+        return $this->hasManyThrough(
+            SingleGasMeter::class,
+            Apparatus::class,
+            'station_id', // Foreign key on apparatuses table
+            'apparatus_id', // Foreign key on single_gas_meters table
+            'id', // Local key on stations table
+            'id' // Local key on apparatuses table
+        );
+    }
 }
