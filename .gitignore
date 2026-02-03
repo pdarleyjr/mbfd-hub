@@ -50,6 +50,7 @@ yarn-error.log
 # Documentation with potentially sensitive content
 TOKEN_GENERATION_GUIDE.md
 PROJECT_SUMMARY.md
+.project_summary.md
 
 # Temporary files directory
 /temp_files/

@@ -59,6 +59,12 @@ class CapitalProjectResource extends Resource
                             ->options(ProjectPriority::class)
                             ->default('medium')
                             ->native(false),
+                        Forms\Components\Select::make('station_id')
+                            ->relationship('station', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->label('Station')
+                            ->placeholder('Select Station'),
                     ])
                     ->columns(2),
                     
@@ -137,6 +143,11 @@ class CapitalProjectResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->limit(50),
+                Tables\Columns\TextColumn::make('station.name')
+                    ->label('Station')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('budget_amount')
                     ->money('USD')
                     ->sortable(),
@@ -173,6 +184,11 @@ class CapitalProjectResource extends Resource
                     ->sortable(),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('station')
+                    ->relationship('station', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->label('Station'),
                 Tables\Filters\SelectFilter::make('status')
                     ->options(ProjectStatus::class)
                     ->multiple(),

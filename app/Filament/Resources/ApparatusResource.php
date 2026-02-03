@@ -47,6 +47,12 @@ class ApparatusResource extends Resource
                     ])->columns(3),
                 Forms\Components\Section::make('Status & Location')
                     ->schema([
+                        Forms\Components\Select::make('station_id')
+                            ->relationship('station', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->label('Station')
+                            ->placeholder('Select Station'),
                         Forms\Components\Select::make('status')
                             ->options([
                                 'In Service' => 'In Service',
@@ -105,6 +111,11 @@ class ApparatusResource extends Resource
                 Tables\Columns\TextColumn::make('class_description')
                     ->label('Class')
                     ->searchable()
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('station.name')
+                    ->label('Station')
+                    ->searchable()
+                    ->sortable()
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('assignment')
                     ->label('Assignment')
@@ -180,6 +191,11 @@ class ApparatusResource extends Resource
             ->defaultSort('designation')
             ->striped()
             ->filters([
+                Tables\Filters\SelectFilter::make('station')
+                    ->relationship('station', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->label('Station'),
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
                         'In Service' => 'In Service',
