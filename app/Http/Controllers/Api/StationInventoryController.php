@@ -7,7 +7,8 @@ use App\Models\Station;
 use App\Models\StationInventorySubmission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\PDF;
+use Illuminate\Http\Response;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 
 class StationInventoryController extends Controller
@@ -132,7 +133,7 @@ class StationInventoryController extends Controller
             'generated_by' => $request->user()?->name ?? 'Unknown',
         ];
 
-        $pdf = PDF::loadView('pdf.station-inventory', $pdfData);
+        $pdf = Pdf::loadView('pdf.station-inventory', $pdfData);
         
         // Save PDF
         $filename = 'inventory-' . $station->id . '-' . time() . '.pdf';
@@ -180,7 +181,7 @@ class StationInventoryController extends Controller
     /**
      * Download PDF for a submission.
      */
-    public function downloadPdf(StationInventorySubmission $submission): JsonResponse
+    public function downloadPdf(StationInventorySubmission $submission): Response|JsonResponse
     {
         if (!Storage::disk('public')->exists($submission->pdf_path)) {
             return response()->json([
