@@ -12,13 +12,18 @@ class StationInventorySubmission extends Model
 
     protected $fillable = [
         'station_id',
+        'employee_name',
+        'shift',
         'items',
+        'notes',
         'pdf_path',
         'created_by',
+        'submitted_at',
     ];
 
     protected $casts = [
         'items' => 'array',
+        'submitted_at' => 'datetime',
     ];
 
     /**
