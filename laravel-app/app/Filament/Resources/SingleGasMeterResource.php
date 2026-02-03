@@ -32,12 +32,7 @@ class SingleGasMeterResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('apparatus_id')
                             ->label('Apparatus')
-                            ->relationship(
-                                name: 'apparatus',
-                                titleAttribute: 'designation',
-                                modifyQueryUsing: fn (Builder $query) => $query->whereNotNull('designation')
-                            )
-                            ->getOptionLabelFromRecordUsing(fn (Apparatus $record) => $record->designation ?? 'Unknown')
+                            ->relationship('apparatus', 'designation')
                             ->required()
                             ->searchable()
                             ->preload()
@@ -109,7 +104,6 @@ class SingleGasMeterResource extends Resource
                 
                 Tables\Columns\TextColumn::make('daysUntilExpiration')
                     ->label('Days Until Expiration')
-                    ->state(fn (SingleGasMeter $record): int => $record->daysUntilExpiration())
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderBy('expiration_date', $direction);
                     })
@@ -125,11 +119,7 @@ class SingleGasMeterResource extends Resource
             ->striped()
             ->filters([
                 Tables\Filters\SelectFilter::make('apparatus')
-                    ->relationship(
-                        name: 'apparatus',
-                        titleAttribute: 'designation',
-                        modifyQueryUsing: fn (Builder $query) => $query->whereNotNull('designation')
-                    )
+                    ->relationship('apparatus', 'designation')
                     ->searchable()
                     ->preload()
                     ->label('Filter by Apparatus'),
