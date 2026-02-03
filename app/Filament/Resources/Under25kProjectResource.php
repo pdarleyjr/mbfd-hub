@@ -54,6 +54,12 @@ class Under25kProjectResource extends Resource
                         Forms\Components\TextInput::make('project_manager')
                             ->maxLength(255)
                             ->label('Project Manager'),
+                        Forms\Components\Select::make('station_id')
+                            ->relationship('station', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->label('Station')
+                            ->placeholder('Select Station'),
                     ])
                     ->columns(2),
                     
@@ -164,6 +170,11 @@ class Under25kProjectResource extends Resource
                     ->sortable()
                     ->limit(50)
                     ->label('Project Name'),
+                Tables\Columns\TextColumn::make('station.name')
+                    ->label('Station')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('budget_amount')
                     ->money('USD')
                     ->sortable()
@@ -206,6 +217,11 @@ class Under25kProjectResource extends Resource
                     ->sortable(),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('station')
+                    ->relationship('station', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->label('Station'),
                 Tables\Filters\SelectFilter::make('status')
                     ->options(ProjectStatus::class)
                     ->multiple(),

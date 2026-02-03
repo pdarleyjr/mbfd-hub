@@ -1,4 +1,4 @@
-import { Apparatus, ChecklistData, InspectionSubmission, Station, StationDetail, Room, RoomAsset, RoomAudit } from '../types';
+import { Apparatus, ChecklistData, InspectionSubmission, Station, StationDetail, Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData, StationInventorySubmission, InventorySubmissionItem } from '../types';
 
 const API_BASE = '/api';
 
@@ -155,6 +155,76 @@ export class ApiClient {
     });
     if (!response.ok) {
       throw new Error('Failed to complete room audit');
+    }
+    return response.json();
+  }
+
+  // ============================================
+  // Big Ticket Request API
+  // ============================================
+
+  static async submitBigTicketRequest(data: BigTicketRequestFormData): Promise<BigTicketRequest> {
+    const response = await fetch(`${API_BASE}/big-ticket-requests`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to submit big ticket request');
+    }
+    return response.json();
+  }
+
+  static async getBigTicketRequests(stationId: number): Promise<BigTicketRequest[]> {
+    const response = await fetch(`${API_BASE}/stations/${stationId}/big-ticket-requests`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch big ticket requests');
+    }
+    return response.json();
+  }
+
+  // ============================================
+  // Station Inventory API
+  // ============================================
+
+  static async getInventoryCategories(): Promise<{ id: string; name: string; items: { id: string; name: string; unit: string; max_quantity: number }[] }[]> {
+    const response = await fetch(`${API_BASE}/inventory-categories`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch inventory categories');
+    }
+    return response.json();
+  }
+
+  static async submitStationInventory(stationId: number, items: InventorySubmissionItem[], notes?: string): Promise<StationInventorySubmission> {
+    const response = await fetch(`${API_BASE}/station-inventory-submissions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ station_id: stationId, items, notes }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to submit station inventory');
+    }
+    return response.json();
+  }
+
+  static async downloadInventoryPdf(submissionId: number): Promise<Blob> {
+    const response = await fetch(`${API_BASE}/station-inventory-submissions/${submissionId}/pdf`);
+    if (!response.ok) {
+      throw new Error('Failed to download PDF');
+    }
+    return response.blob();
+  }
+
+  static async getStationInventorySubmissions(stationId: number): Promise<StationInventorySubmission[]> {
+    const response = await fetch(`${API_BASE}/stations/${stationId}/inventory-submissions`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch inventory submissions');
     }
     return response.json();
   }

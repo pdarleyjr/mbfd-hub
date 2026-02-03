@@ -265,3 +265,70 @@ export interface User {
   station_id?: number;
   is_active: boolean;
 }
+
+// ============================================
+// Big Ticket Request Types
+// ============================================
+
+export type BigTicketRoomType = 'kitchen' | 'common_areas' | 'dorms' | 'apparatus_bay' | 'watch_office';
+
+export interface BigTicketItem {
+  id: string;
+  name: string;
+  category: string;
+}
+
+export interface BigTicketRequest {
+  id: number;
+  station_id: number;
+  room_type: string;
+  room_label?: string;
+  items: string[];
+  other_item?: string;
+  notes?: string;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BigTicketRequestFormData {
+  station_id: number;
+  room_type: BigTicketRoomType;
+  room_label?: string;
+  items: string[];
+  other_item?: string;
+  notes?: string;
+}
+
+// ============================================
+// Station Inventory Types
+// ============================================
+
+export interface InventoryCategory {
+  id: string;
+  name: string;
+  items: InventoryItem[];
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  unit: string;
+  max_quantity: number;
+}
+
+export interface InventorySubmissionItem {
+  category_id: string;
+  item_id: string;
+  quantity: number;
+}
+
+export interface StationInventorySubmission {
+  id: number;
+  station_id: number;
+  items: InventorySubmissionItem[];
+  notes?: string;
+  submitted_by: number;
+  pdf_path?: string;
+  created_at: string;
+}

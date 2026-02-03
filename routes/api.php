@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\SmartUpdatesController;
 use App\Http\Controllers\Api\InventoryChatController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\TestNotificationController;
+use App\Http\Controllers\Api\BigTicketRequestController;
+use App\Http\Controllers\Api\StationInventoryController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -56,3 +58,14 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class, 'apparatus']);
     Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class, 'projects']);
 });
+
+// Big Ticket Requests
+Route::post('/big-ticket-requests', [BigTicketRequestController::class, 'store']);
+Route::get('/stations/{station}/big-ticket-requests', [BigTicketRequestController::class, 'index']);
+Route::delete('/big-ticket-requests/{bigTicketRequest}', [BigTicketRequestController::class, 'destroy']);
+
+// Station Inventory
+Route::get('/station-inventory/categories', [StationInventoryController::class, 'categories']);
+Route::post('/station-inventory-submissions', [StationInventoryController::class, 'store']);
+Route::get('/stations/{station}/station-inventory-submissions', [StationInventoryController::class, 'index']);
+Route::get('/station-inventory-submissions/{submission}/pdf', [StationInventoryController::class, 'downloadPdf']);

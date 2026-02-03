@@ -33,7 +33,7 @@ class Under25kProjectsRelationManager extends RelationManager
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn (?string $state): string => match ($state) {
                         'Planning' => 'gray',
                         'In Progress' => 'warning',
                         'Completed' => 'success',
