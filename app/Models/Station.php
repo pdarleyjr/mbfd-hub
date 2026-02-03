@@ -26,6 +26,15 @@ class Station extends Model
     ];
 
     /**
+     * Get the station name (alias for station_number)
+     * This provides backward compatibility for code expecting 'name'
+     */
+    public function getNameAttribute(): string
+    {
+        return 'Station ' . $this->station_number;
+    }
+
+    /**
      * Get all apparatuses assigned to this station
      */
     public function apparatuses(): HasMany
