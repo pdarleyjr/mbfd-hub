@@ -66,4 +66,12 @@ class Apparatus extends Model
     {
         return $this->hasMany(ApparatusInventoryAllocation::class, 'apparatus_id');
     }
+
+    /**
+     * Get all single gas meters for this apparatus
+     */
+    public function singleGasMeters()
+    {
+        return $this->hasMany(SingleGasMeter::class);
+    }
 }
