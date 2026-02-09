@@ -12,11 +12,13 @@ class LoginResponse implements LoginResponseContract
     {
         $user = auth()->user();
 
-        // Users with training roles → redirect to training panel
-        $hasTrainingRole = $user
-            && ($user->hasRole('training_admin') || $user->hasRole('training_viewer'));
+        // Admin/super_admin roles take priority → redirect to admin panel
+        if ($user && $user->hasAnyRole(['super_admin', 'admin'])) {
+            return new RedirectResponse(url('/admin'));
+        }
 
-        if ($hasTrainingRole) {
+        // Users with ONLY training roles → redirect to training panel
+        if ($user && $user->hasAnyRole(['training_admin', 'training_viewer'])) {
             return new RedirectResponse(url('/training'));
         }
 
