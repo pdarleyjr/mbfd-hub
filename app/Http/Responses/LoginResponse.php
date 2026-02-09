@@ -11,17 +11,16 @@ class LoginResponse implements LoginResponseContract
     {
         $user = auth()->user();
 
-        // Training-only users (no super_admin or admin role) → redirect to training panel
-        $isTrainingOnly = $user
-            && ($user->hasRole('training_admin') || $user->hasRole('training_viewer'))
-            && !$user->hasRole('super_admin')
-            && !$user->hasRole('admin');
+        // Users with training roles → redirect to training panel by default
+        // (even if they also have super_admin, their primary workspace is training)
+        $hasTrainingRole = $user
+            && ($user->hasRole('training_admin') || $user->hasRole('training_viewer'));
 
-        if ($isTrainingOnly) {
+        if ($hasTrainingRole) {
             return redirect()->to('/training');
         }
 
-        // Default: redirect to admin panel
+        // Default: redirect to admin panel (for super_admin-only or admin users)
         return redirect()->intended(filament()->getUrl());
     }
 }
