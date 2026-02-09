@@ -75,8 +75,6 @@ class TrainingPanelProvider extends PanelProvider
 
     public function boot(): void
     {
-        parent::boot();
-
         filament()->serving(function () {
             if (filament()->getCurrentPanel()?->getId() === 'training') {
                 foreach (DynamicNavigation::getNavigationItems() as $item) {
