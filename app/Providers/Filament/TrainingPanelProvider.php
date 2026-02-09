@@ -64,14 +64,25 @@ class TrainingPanelProvider extends PanelProvider
                 EnsureTrainingPanelAccess::class,
             ])
             ->sidebarCollapsibleOnDesktop()
-            ->navigation(function (array $items): array {
-                $dynamicItems = DynamicNavigation::getNavigationItems();
-                $baserowItem = NavigationItem::make('Baserow')
+            ->navigationItems([
+                NavigationItem::make('Baserow')
                     ->url('https://baserow.support.darleyplex.com', shouldOpenInNewTab: true)
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->group('External Tools')
-                    ->sort(99);
-                return array_merge($items, $dynamicItems, [$baserowItem]);
-            });
+                    ->sort(99),
+            ]);
+    }
+
+    public function boot(): void
+    {
+        parent::boot();
+
+        filament()->serving(function () {
+            if (filament()->getCurrentPanel()?->getId() === 'training') {
+                foreach (DynamicNavigation::getNavigationItems() as $item) {
+                    filament()->getCurrentPanel()->navigationItems([$item]);
+                }
+            }
+        });
     }
 }
