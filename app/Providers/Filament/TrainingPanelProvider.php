@@ -47,6 +47,7 @@ class TrainingPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Training/Widgets'), for: 'App\\Filament\\Training\\Widgets')
             ->pages([
                 \App\Filament\Training\Pages\Dashboard::class,
+                \App\Filament\Training\Pages\ExternalNavItemViewer::class,
             ])
             ->middleware([
                 EncryptCookies::class,
