@@ -81,10 +81,13 @@ class User extends Authenticatable implements FilamentUser
                 || $this->can('training.access');
         }
 
-        // Admin panel: require admin or super_admin role
+        // Admin panel: allow admin, super_admin, and training roles
+        // (training users will be redirected by RedirectTrainingUsers middleware)
         if ($panel->getId() === 'admin') {
             return $this->hasRole('super_admin')
-                || $this->hasRole('admin');
+                || $this->hasRole('admin')
+                || $this->hasRole('training_admin')
+                || $this->hasRole('training_viewer');
         }
 
         return false;
