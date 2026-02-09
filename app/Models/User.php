@@ -71,6 +71,8 @@ class User extends Authenticatable implements FilamentUser
 
     /**
      * Determine if the user can access the Filament admin panel.
+     * Training users are allowed through admin panel auth check so the
+     * RedirectTrainingUsers middleware can redirect them to /training.
      */
     public function canAccessPanel(Panel $panel): bool
     {
@@ -81,11 +83,13 @@ class User extends Authenticatable implements FilamentUser
                 || $this->can('training.access');
         }
 
-        // Admin panel: only allow super_admin and admin roles
-        // Training-only users must NOT access admin panel
+        // Admin panel: allow any user with a valid role
+        // Training-only users will be redirected by RedirectTrainingUsers middleware
         if ($panel->getId() === 'admin') {
             return $this->hasRole('super_admin')
-                || $this->hasRole('admin');
+                || $this->hasRole('admin')
+                || $this->hasRole('training_admin')
+                || $this->hasRole('training_viewer');
         }
 
         return false;
