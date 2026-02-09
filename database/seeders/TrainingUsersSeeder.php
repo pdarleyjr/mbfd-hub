@@ -14,31 +14,25 @@ class TrainingUsersSeeder extends Seeder
         // Ensure roles and permissions exist first
         $this->call(RolesAndPermissionsSeeder::class);
 
-        // Training users — emails are lowercased by the User model mutator
+        // Training users — emails are lowercased for case-insensitive matching
         $users = [
             [
-                'name' => 'Miguel Anchia',
-                'email' => 'MiguelAnchia@miamibeachfl.gov',
-                'password' => 'Penco1',
-                'roles' => ['training_admin', 'super_admin'],
+                'name' => 'Claudio Navas',
+                'email' => 'claudionavas@miamibeachfl.gov',
+                'password' => 'Flea1234!',
+                'roles' => ['training_admin'],
             ],
             [
-                'name' => 'Richard Quintela',
-                'email' => 'RichardQuintela@miamibeachfl.gov',
-                'password' => 'Penco2',
-                'roles' => ['training_admin', 'super_admin'],
+                'name' => 'Daniel Gato',
+                'email' => 'danielgato@miamibeachfl.gov',
+                'password' => 'Gato1234!',
+                'roles' => ['training_admin'],
             ],
             [
-                'name' => 'Peter Darley',
-                'email' => 'PeterDarley@miamibeachfl.gov',
-                'password' => 'Penco3',
-                'roles' => ['training_admin', 'super_admin'],
-            ],
-            [
-                'name' => 'Gerald DeYoung',
-                'email' => 'geralddeyoung@miamibeachfl.gov',
-                'password' => 'MBFDGerry1',
-                'roles' => ['training_viewer'],
+                'name' => 'Victor White',
+                'email' => 'victorwhite@miamibeachfl.gov',
+                'password' => 'Vic1234!',
+                'roles' => ['training_admin'],
             ],
         ];
 
