@@ -13,9 +13,9 @@ class ExternalNavItemViewer extends Page
 
     protected static bool $shouldRegisterNavigation = false;
 
-    protected static string $slug = 'external-viewer/{slug}';
+    protected static string $slug = 'external-viewer/{itemSlug}';
 
-    public string $slug = '';
+    public string $itemSlug = '';
 
     public ?ExternalNavItem $navItem = null;
 
@@ -23,14 +23,14 @@ class ExternalNavItemViewer extends Page
 
     public array $tableFields = [];
 
-    public function mount(string $slug): void
+    public function mount(string $itemSlug): void
     {
-        $this->slug = $slug;
+        $this->itemSlug = $itemSlug;
 
         $this->navItem = ExternalNavItem::query()
             ->active()
             ->forDivision('training')
-            ->where('slug', $slug)
+            ->where('slug', $itemSlug)
             ->first();
 
         if (! $this->navItem) {
