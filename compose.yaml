@@ -48,9 +48,26 @@ services:
                 - '${DB_USERNAME}'
             retries: 3
             timeout: 5s
+    baserow:
+        image: baserow/baserow:latest
+        container_name: baserow
+        ports:
+            - '127.0.0.1:8082:80'
+        environment:
+            BASEROW_PUBLIC_URL: '${BASEROW_PUBLIC_URL}'
+            BASEROW_CADDY_ADDRESSES: ':80'
+            DJANGO_SETTINGS_MODULE: 'baserow.config.settings.base'
+            BASEROW_SECRET_KEY: '${BASEROW_SECRET_KEY}'
+        volumes:
+            - baserow_data:/baserow/data
+        networks:
+            - sail
+        restart: unless-stopped
 networks:
     sail:
         driver: bridge
 volumes:
     sail-pgsql:
+        driver: local
+    baserow_data:
         driver: local
