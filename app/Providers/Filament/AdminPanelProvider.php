@@ -25,10 +25,12 @@ use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\TodoOverviewWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
+use App\Filament\Widgets\PushNotificationWidget;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Settings;
 use App\Http\Middleware\RedirectTrainingUsers;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
+use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -54,6 +56,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->font('Inter')
             ->plugin(FilamentShieldPlugin::make())
+            ->plugin(ChatifyPlugin::make())
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
@@ -65,6 +68,7 @@ class AdminPanelProvider extends PanelProvider
                 InventoryOverviewWidget::class,       // Inventory metrics: low stock items, total items, stock health
                 TodoOverviewWidget::class,            // Active todo items table
                 SmartUpdatesWidget::class,            // AI assistant with instant bullet summary
+                PushNotificationWidget::class,        // Push notification subscription management
             ])
             ->userMenuItems([
                 MenuItem::make()
