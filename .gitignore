@@ -53,3 +53,5 @@ PROJECT_SUMMARY.md
 
 # Temporary files directory
 /temp_files/
+"pics/*.MOV"  
+"pics/*.HEIC"  
