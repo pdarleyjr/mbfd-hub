@@ -68,7 +68,6 @@ class AdminPanelProvider extends PanelProvider
                 InventoryOverviewWidget::class,       // Inventory metrics: low stock items, total items, stock health
                 TodoOverviewWidget::class,            // Active todo items table
                 SmartUpdatesWidget::class,            // AI assistant with instant bullet summary
-                PushNotificationWidget::class,        // Push notification subscription management
             ])
             ->userMenuItems([
                 MenuItem::make()

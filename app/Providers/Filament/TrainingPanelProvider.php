@@ -6,6 +6,8 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\MenuItem;
+use Filament\Navigation\NavigationItem;
 use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
@@ -18,8 +20,7 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Http\Middleware\EnsureTrainingPanelAccess;
 use App\Filament\Training\Support\DynamicNavigation;
-use App\Filament\Widgets\PushNotificationWidget;
-use Filament\Navigation\NavigationItem;
+use App\Filament\Training\Pages\Settings as TrainingSettings;
 use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
 use App\Filament\Pages\Auth\Login;
 
@@ -49,13 +50,19 @@ class TrainingPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Training/Resources'), for: 'App\\Filament\\Training\\Resources')
             ->discoverPages(in: app_path('Filament/Training/Pages'), for: 'App\\Filament\\Training\\Pages')
             ->discoverWidgets(in: app_path('Filament/Training/Widgets'), for: 'App\\Filament\\Training\\Widgets')
-            ->widgets([
-                PushNotificationWidget::class,  // Push notification subscription management
-            ])
+            ->widgets([])
             ->pages([
                 \App\Filament\Training\Pages\Dashboard::class,
                 \App\Filament\Training\Pages\ExternalNavItemViewer::class,
             ])
+            ->userMenuItems([
+                MenuItem::make()
+                    ->label('Settings')
+                    ->url(fn (): string => TrainingSettings::getUrl())
+                    ->icon('heroicon-o-cog-6-tooth'),
+            ])
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s')
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
