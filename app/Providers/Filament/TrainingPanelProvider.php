@@ -21,6 +21,7 @@ use App\Filament\Training\Support\DynamicNavigation;
 use App\Filament\Widgets\PushNotificationWidget;
 use Filament\Navigation\NavigationItem;
 use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
+use App\Filament\Pages\Auth\Login;
 
 class TrainingPanelProvider extends PanelProvider
 {
@@ -29,7 +30,7 @@ class TrainingPanelProvider extends PanelProvider
         return $panel
             ->id('training')
             ->path('training')
-            ->login()
+            ->login(Login::class)
             ->brandName('MBFD Training Division')
             ->brandLogo(secure_asset('images/mbfd_no_bg_new.png'))
             ->brandLogoHeight('3rem')

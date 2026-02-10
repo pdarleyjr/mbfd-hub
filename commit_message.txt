@@ -1,0 +1,10 @@
+feat: Add Training Division panel with Baserow integration
+
+- Add TrainingPanelProvider at /training with RBAC
+- Add ExternalSource and ExternalNavItem models with migrations
+- Add DynamicNavigation for dynamic nav items from Baserow
+- Add Baserow self-hosting documentation
+- Add training roles: training_admin, training_viewer
+- Fix RouteNotFoundException issue
+
+See docs/TRAINING_PANEL.md for setup instructions
