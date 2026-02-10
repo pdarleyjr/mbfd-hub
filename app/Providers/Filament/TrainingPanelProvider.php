@@ -18,7 +18,9 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Http\Middleware\EnsureTrainingPanelAccess;
 use App\Filament\Training\Support\DynamicNavigation;
+use App\Filament\Widgets\PushNotificationWidget;
 use Filament\Navigation\NavigationItem;
+use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
 
 class TrainingPanelProvider extends PanelProvider
 {
@@ -42,9 +44,13 @@ class TrainingPanelProvider extends PanelProvider
                 'warning' => Color::Orange,
             ])
             ->font('Inter')
+            ->plugin(ChatifyPlugin::make())
             ->discoverResources(in: app_path('Filament/Training/Resources'), for: 'App\\Filament\\Training\\Resources')
             ->discoverPages(in: app_path('Filament/Training/Pages'), for: 'App\\Filament\\Training\\Pages')
             ->discoverWidgets(in: app_path('Filament/Training/Widgets'), for: 'App\\Filament\\Training\\Widgets')
+            ->widgets([
+                PushNotificationWidget::class,  // Push notification subscription management
+            ])
             ->pages([
                 \App\Filament\Training\Pages\Dashboard::class,
                 \App\Filament\Training\Pages\ExternalNavItemViewer::class,
