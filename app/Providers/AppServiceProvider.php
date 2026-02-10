@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\Todo;
+use App\Models\ChMessage;
 use App\Observers\TodoObserver;
+use App\Observers\ChMessageObserver;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Support\Facades\URL;
@@ -33,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
         }
         
         Todo::observe(TodoObserver::class);
+        ChMessage::observe(ChMessageObserver::class);
 
         // Register push notification widget JavaScript
         FilamentAsset::register([
