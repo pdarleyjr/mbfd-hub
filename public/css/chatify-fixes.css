@@ -1,0 +1,203 @@
+/**
+ * Chatify UI Fixes
+ * Ensures message composer is always visible without scrolling
+ * Compatible with both desktop and mobile browsers
+ */
+
+/* ==========================================================================
+   1. MAIN MESSENGER CONTAINER
+   ========================================================================== */
+
+/* Main messenger wrapper - use dynamic viewport height for mobile */
+#messenger,
+.messenger {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    min-height: 100dvh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* ==========================================================================
+   2. MESSAGING VIEW AREA
+   ========================================================================== */
+
+/* The main messaging view container */
+.messenger-messagingView {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+/* ==========================================================================
+   3. MESSAGE BODY / LIST AREA
+   ========================================================================== */
+
+/* Message list container - this should scroll */
+.messenger-body,
+.messenger-messagingView .messenger-body,
+.messenger-body[data-view="1"],
+.messenger-body[data-view="0"] {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    scroll-behavior: smooth !important;
+}
+
+/* ==========================================================================
+   4. MESSAGE COMPOSER / SEND CARD
+   ========================================================================== */
+
+/* The message composer input area */
+.messenger-sendCard,
+.messenger-messagingView .messenger-sendCard,
+.messenger .messenger-sendCard {
+    position: sticky !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 100 !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    border-top: 1px solid #e5e7eb !important;
+    padding: 12px 16px !important;
+    padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Dark mode support for composer */
+@media (prefers-color-scheme: dark) {
+    .messenger-sendCard,
+    .messenger-messagingView .messenger-sendCard,
+    .messenger .messenger-sendCard {
+        background-color: #1f2937 !important;
+        background: #1f2937 !important;
+        border-top-color: #374151 !important;
+    }
+}
+
+/* ==========================================================================
+   5. INPUT FIELD STYLING
+   ========================================================================== */
+
+/* Ensure input is visible and properly sized */
+.messenger-sendCard input[type="text"],
+.messenger-sendCard textarea,
+.messenger-sendCard .messenger-input {
+    min-height: 44px !important;
+    max-height: 120px !important;
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+    line-height: 1.5 !important;
+}
+
+/* ==========================================================================
+   6. MOBILE-SPECIFIC FIXES
+   ========================================================================== */
+
+/* iOS safe area handling */
+@supports (padding: max(0px)) {
+    .messenger-sendCard {
+        padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+    }
+    
+    #messenger,
+    .messenger {
+        padding-bottom: env(safe-area-inset-bottom) !important;
+    }
+}
+
+/* Mobile viewport fixes */
+@media screen and (max-width: 768px) {
+    #messenger,
+    .messenger {
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+    }
+    
+    .messenger-sendCard {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+    }
+    
+    /* Adjust body padding to account for fixed composer */
+    .messenger-body {
+        padding-bottom: 80px !important;
+    }
+}
+
+/* Handle mobile keyboard appearance */
+@media screen and (max-height: 500px) and (max-width: 768px) {
+    .messenger-body {
+        max-height: calc(100dvh - 140px) !important;
+    }
+}
+
+/* ==========================================================================
+   7. FILAMENT INTEGRATION FIXES
+   ========================================================================== */
+
+/* Ensure Chatify works within Filament layout */
+.fi-main .messenger,
+.fi-main #messenger,
+.fi-main-content .messenger,
+.fi-main-content #messenger {
+    height: calc(100dvh - var(--header-height, 64px)) !important;
+    max-height: calc(100dvh - var(--header-height, 64px)) !important;
+}
+
+/* When inside Filament sidebar layout */
+.fi-layout .messenger-sendCard,
+.fi-layout #messenger .messenger-sendCard {
+    position: sticky !important;
+    bottom: 0 !important;
+}
+
+/* ==========================================================================
+   8. SCROLLBAR STYLING
+   ========================================================================== */
+
+/* Smooth scrollbar for message list */
+.messenger-body::-webkit-scrollbar {
+    width: 6px !important;
+}
+
+.messenger-body::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+
+.messenger-body::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5) !important;
+    border-radius: 3px !important;
+}
+
+.messenger-body::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.8) !important;
+}
+
+/* ==========================================================================
+   9. UTILITY CLASSES
+   ========================================================================== */
+
+/* Force composer visibility */
+.chatify-composer-visible {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Hide on very small screens if needed */
+@media screen and (max-height: 300px) {
+    .messenger-sendCard {
+        min-height: 50px !important;
+    }
+}

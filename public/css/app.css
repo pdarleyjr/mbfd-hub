@@ -1,0 +1,7 @@
+/**
+ * Stub file to prevent 404 errors for Chatify's legacy asset references.
+ * This Filament/Vite app handles assets differently than Laravel Mix.
+ * Chatify package references this file, but Vite bundles all CSS assets.
+ */
+
+/* Empty stub - all actual CSS is handled by Vite and Filament */

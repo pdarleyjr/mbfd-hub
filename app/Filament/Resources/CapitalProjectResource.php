@@ -60,7 +60,7 @@ class CapitalProjectResource extends Resource
                             ->default('medium')
                             ->native(false),
                         Forms\Components\Select::make('station_id')
-                            ->relationship('station', 'name')
+                            ->relationship('station', 'station_number')
                             ->searchable()
                             ->preload()
                             ->label('Station')
@@ -185,7 +185,7 @@ class CapitalProjectResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('station')
-                    ->relationship('station', 'name')
+                    ->relationship('station', 'station_number')
                     ->searchable()
                     ->preload()
                     ->label('Station'),
