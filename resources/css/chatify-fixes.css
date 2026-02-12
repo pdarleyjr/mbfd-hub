@@ -1,0 +1,279 @@
+/**
+ * Chatify UI Fixes - SCOPED VERSION
+ * Ensures message composer is always visible without scrolling
+ * Compatible with both desktop and mobile browsers
+ * IMPORTANT: This CSS is scoped to only affect Chatify pages
+ */
+
+/* ==========================================================================
+   SCOPE ALL RULES TO CHATIFY CONTAINER
+   ========================================================================== */
+
+/* Wrap all rules to prevent global pollution */
+.chatify-page,
+.chatify-container,
+[data-chatify-page] {
+    /* 1. MAIN MESSENGER CONTAINER */
+    
+    #messenger,
+    .messenger {
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        min-height: 100dvh !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    
+    /* 2. MESSAGING VIEW AREA */
+    
+    .messenger-messagingView {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden !important;
+        position: relative !important;
+    }
+    
+    /* 3. MESSAGE BODY / LIST AREA */
+    
+    .messenger-body,
+    .messenger-messagingView .messenger-body,
+    .messenger-body[data-view="1"],
+    .messenger-body[data-view="0"] {
+        flex: 1 !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        scroll-behavior: smooth !important;
+    }
+    
+    /* 4. MESSAGE COMPOSER / SEND CARD */
+    
+    .messenger-sendCard,
+    .messenger-messagingView .messenger-sendCard,
+    .messenger .messenger-sendCard {
+        position: sticky !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 100 !important;
+        background-color: #ffffff !important;
+        background: #ffffff !important;
+        border-top: 1px solid #e5e7eb !important;
+        padding: 12px 16px !important;
+        padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+        flex-shrink: 0 !important;
+        flex-grow: 0 !important;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05) !important;
+    }
+    
+    /* 5. INPUT FIELD STYLING - CRITICAL MOBILE FIX */
+    
+    /* Ensure input is visible and properly sized */
+    .messenger-sendCard input[type="text"],
+    .messenger-sendCard textarea,
+    .messenger-sendCard .messenger-input,
+    .messenger-sendCard input,
+    .messenger-sendCard textarea {
+        min-height: 44px !important;
+        max-height: 120px !important;
+        font-size: 16px !important; /* Prevents iOS zoom on focus */
+        line-height: 1.5 !important;
+        
+        /* CRITICAL: Force text to be visible on mobile */
+        color: #1f2937 !important;
+        background-color: #ffffff !important;
+        -webkit-text-fill-color: #1f2937 !important;
+        -webkit-appearance: none !important;
+        opacity: 1 !important;
+    }
+    
+    /* Placeholder styling */
+    .messenger-sendCard input::placeholder,
+    .messenger-sendCard textarea::placeholder {
+        color: #9ca3af !important;
+        -webkit-text-fill-color: #9ca3af !important;
+        opacity: 0.7 !important;
+    }
+    
+    /* Focus states for inputs */
+    .messenger-sendCard input:focus,
+    .messenger-sendCard textarea:focus {
+        color: #111827 !important;
+        -webkit-text-fill-color: #111827 !important;
+        background-color: #ffffff !important;
+        border-color: #3b82f6 !important;
+        outline: none !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+    }
+    
+    /* 6. SCROLLBAR STYLING */
+    
+    .messenger-body::-webkit-scrollbar {
+        width: 6px !important;
+    }
+    
+    .messenger-body::-webkit-scrollbar-track {
+        background: transparent !important;
+    }
+    
+    .messenger-body::-webkit-scrollbar-thumb {
+        background-color: rgba(156, 163, 175, 0.5) !important;
+        border-radius: 3px !important;
+    }
+    
+    .messenger-body::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(156, 163, 175, 0.8) !important;
+    }
+    
+    /* 7. UTILITY CLASSES */
+    
+    .chatify-composer-visible {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+}
+
+/* ==========================================================================
+   DARK MODE SUPPORT
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+    .chatify-page,
+    .chatify-container,
+    [data-chatify-page] {
+        .messenger-sendCard,
+        .messenger-messagingView .messenger-sendCard,
+        .messenger .messenger-sendCard {
+            background-color: #1f2937 !important;
+            background: #1f2937 !important;
+            border-top-color: #374151 !important;
+        }
+        
+        .messenger-sendCard input[type="text"],
+        .messenger-sendCard textarea,
+        .messenger-sendCard .messenger-input,
+        .messenger-sendCard input,
+        .messenger-sendCard textarea {
+            color: #f3f4f6 !important;
+            background-color: #374151 !important;
+            -webkit-text-fill-color: #f3f4f6 !important;
+        }
+        
+        .messenger-sendCard input::placeholder,
+        .messenger-sendCard textarea::placeholder {
+            color: #9ca3af !important;
+            -webkit-text-fill-color: #9ca3af !important;
+        }
+        
+        .messenger-sendCard input:focus,
+        .messenger-sendCard textarea:focus {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            background-color: #374151 !important;
+        }
+    }
+}
+
+/* ==========================================================================
+   MOBILE-SPECIFIC FIXES
+   ========================================================================== */
+
+/* iOS safe area handling */
+@supports (padding: max(0px)) {
+    .chatify-page .messenger-sendCard,
+    .chatify-container .messenger-sendCard,
+    [data-chatify-page] .messenger-sendCard {
+        padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+    }
+    
+    .chatify-page #messenger,
+    .chatify-page .messenger,
+    .chatify-container #messenger,
+    .chatify-container .messenger,
+    [data-chatify-page] #messenger,
+    [data-chatify-page] .messenger {
+        padding-bottom: env(safe-area-inset-bottom) !important;
+    }
+}
+
+/* Mobile viewport fixes */
+@media screen and (max-width: 768px) {
+    .chatify-page,
+    .chatify-container,
+    [data-chatify-page] {
+        #messenger,
+        .messenger {
+            height: 100dvh !important;
+            max-height: 100dvh !important;
+        }
+        
+        .messenger-sendCard {
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+        }
+        
+        /* Adjust body padding to account for fixed composer */
+        .messenger-body {
+            padding-bottom: 80px !important;
+        }
+        
+        /* CRITICAL: Ensure text is ALWAYS visible on mobile */
+        .messenger-sendCard input,
+        .messenger-sendCard textarea {
+            color: #111827 !important;
+            background-color: #f9fafb !important;
+            -webkit-text-fill-color: #111827 !important;
+            border: 1px solid #d1d5db !important;
+            padding: 12px !important;
+            border-radius: 8px !important;
+        }
+    }
+}
+
+/* Handle mobile keyboard appearance */
+@media screen and (max-height: 500px) and (max-width: 768px) {
+    .chatify-page .messenger-body,
+    .chatify-container .messenger-body,
+    [data-chatify-page] .messenger-body {
+        max-height: calc(100dvh - 140px) !important;
+    }
+}
+
+/* Hide on very small screens if needed */
+@media screen and (max-height: 300px) {
+    .chatify-page .messenger-sendCard,
+    .chatify-container .messenger-sendCard,
+    [data-chatify-page] .messenger-sendCard {
+        min-height: 50px !important;
+    }
+}
+
+/* ==========================================================================
+   FILAMENT INTEGRATION FIXES
+   ========================================================================== */
+
+/* Ensure Chatify works within Filament layout */
+.fi-main .chatify-page .messenger,
+.fi-main .chatify-page #messenger,
+.fi-main-content .chatify-page .messenger,
+.fi-main-content .chatify-page #messenger,
+.fi-main [data-chatify-page] .messenger,
+.fi-main [data-chatify-page] #messenger {
+    height: calc(100dvh - var(--header-height, 64px)) !important;
+    max-height: calc(100dvh - var(--header-height, 64px)) !important;
+}
+
+/* When inside Filament sidebar layout */
+.fi-layout .chatify-page .messenger-sendCard,
+.fi-layout .chatify-page #messenger .messenger-sendCard,
+.fi-layout [data-chatify-page] .messenger-sendCard {
+    position: sticky !important;
+    bottom: 0 !important;
+}
