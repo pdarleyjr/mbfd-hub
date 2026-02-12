@@ -1,0 +1,101 @@
+/**
+ * CRITICAL FIX: Chatify Composer Always Visible
+ * Ensures message input box stays at bottom of viewport
+ * Compatible with Filament v3 layout
+ */
+
+/* Force the main messenger to use flexbox layout with defined height */
+#messenger,
+.messenger {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - 64px) !important; /* Account for Filament header */
+    max-height: calc(100vh - 64px) !important;
+    overflow: hidden !important;
+}
+
+/* Ensure the messaging view fills available space */
+.messenger-messagingView {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+}
+
+/* Messages body should scroll, not the entire page */
+.messenger-body {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+/* CRITICAL: Composer must stay at bottom and be visible */
+.messenger-sendCard {
+    position: sticky !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 1000 !important;
+    background: #ffffff !important;
+    border-top: 1px solid #e5e7eb !important;
+    padding: 12px 16px !important;
+    flex-shrink: 0 !important;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1) !important;
+}
+
+/* iOS mobile fixes */
+@supports (padding: env(safe-area-inset-bottom)) {
+    .messenger-sendCard {
+        padding-bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+    }
+}
+
+/* Ensure input is visible - MOBILE FIX */
+.messenger-sendCard input,
+.messenger-sendCard textarea {
+    min-height: 44px !important;
+    font-size: 16px !important; /* Prevents iOS zoom */
+    color: #1f2937 !important;
+    background-color: #ffffff !important;
+    -webkit-text-fill-color: #1f2937 !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 6px !important;
+    padding: 10px 12px !important;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .messenger-sendCard {
+        background: #1f2937 !important;
+        border-top-color: #374151 !important;
+    }
+    
+    .messenger-sendCard input,
+    .messenger-sendCard textarea {
+        color: #f3f4f6 !important;
+        background-color: #374151 !important;
+        -webkit-text-fill-color: #f3f4f6 !important;
+        border-color: #4b5563 !important;
+    }
+}
+
+/* Mobile specific adjustments */
+@media screen and (max-width: 768px) {
+    #messenger,
+    .messenger {
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+    }
+    
+    .messenger-sendCard {
+        position: fixed !important;
+        bottom: 0 !important;
+        width: 100% !important;
+    }
+    
+    .messenger-body {
+        padding-bottom: 80px !important; /* Space for fixed composer */
+    }
+}
