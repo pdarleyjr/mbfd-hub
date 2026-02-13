@@ -55,12 +55,14 @@ class StationInventoryV2Seeder extends Seeder
                     [
                         'name' => $itemData['name'],
                         'par_quantity' => $itemData['par_quantity'],
+                        'unit_label' => $itemData['unit_label'] ?? 'units',
+                        'unit_multiplier' => $itemData['unit_multiplier'] ?? 1,
                         'active' => true,
                         'sort_order' => $itemData['sort_order'],
                     ]
                 );
 
-                $this->command->info("    Item: {$item->sku} - {$item->name} (PAR: {$item->par_quantity})");
+                $this->command->info("    Item: {$item->sku} - {$item->name} (PAR: {$item->par_quantity} {$item->unit_label}, Units: {$item->par_units})");
             }
         }
 
@@ -80,7 +82,7 @@ class StationInventoryV2Seeder extends Seeder
                         'inventory_item_id' => $item->id,
                     ],
                     [
-                        'on_hand' => $item->par_quantity,
+                        'on_hand' => $item->par_units, // Use par_units (computed in smallest unit)
                         'status' => 'ok',
                         'last_updated_at' => null,
                     ]
