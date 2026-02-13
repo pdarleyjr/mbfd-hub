@@ -13,6 +13,8 @@ class InventoryItem extends Model
         'name',
         'sku',
         'par_quantity',
+        'unit_label',
+        'unit_multiplier',
         'active',
         'sort_order',
     ];
@@ -20,6 +22,7 @@ class InventoryItem extends Model
     protected $casts = [
         'active' => 'boolean',
         'par_quantity' => 'integer',
+        'unit_multiplier' => 'integer',
         'sort_order' => 'integer',
     ];
 
@@ -61,5 +64,22 @@ class InventoryItem extends Model
     public function scopeOrdered($query)
     {
         return $query->orderBy('sort_order');
+    }
+
+    /**
+     * Get the expected quantity in the smallest unit (par_quantity * unit_multiplier)
+     */
+    public function getParUnitsAttribute(): int
+    {
+        $multiplier = $this->unit_multiplier ?? 1;
+        return ($this->par_quantity ?? 0) * $multiplier;
+    }
+
+    /**
+     * Get the unit label, defaulting to 'units' if not set
+     */
+    public function getUnitLabelAttribute(): string
+    {
+        return $this->attributes['unit_label'] ?? 'units';
     }
 }

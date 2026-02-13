@@ -36,7 +36,27 @@ export default function InventoryCountPage({
   const fetchInventory = useCallback(async () => {
     try {
       const data = await ApiClient.getInventoryV2(stationId, token);
-      setCategories(data.categories);
+      
+      // Map API response structure to component state
+      // API returns: { inventory: [{category: "...", items: [...]}] }
+      // We need: [{name: "...", items: [...]}]
+      const mappedCategories = Array.isArray(data.inventory) 
+        ? data.inventory.map((cat: any) => ({
+            name: cat.category || 'Uncategorized',
+            items: Array.isArray(cat.items) ? cat.items.map((item: any) => ({
+              id: item.id,
+              sku: item.sku || '',
+              name: item.name || '',
+              unit_label: item.unit_label || 'units',
+              par: item.par_quantity || 0,
+              par_units: item.par_units || item.par_quantity || 0,
+              on_hand: item.on_hand || 0,
+              status: item.status || 'ok',
+            })) : []
+          }))
+        : [];
+      
+      setCategories(mappedCategories);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory');
     } finally {
@@ -46,7 +66,9 @@ export default function InventoryCountPage({
 
   const fetchSupplyRequests = useCallback(async () => {
     try {
-      const requests = await ApiClient.getSupplyRequests(stationId, token);
+      const response = await ApiClient.getSupplyRequests(stationId, token);
+      // API returns: { requests: [...] }
+      const requests = Array.isArray(response.requests) ? response.requests : [];
       setSupplyRequests(requests);
     } catch (err) {
       console.error('Failed to load supply requests:', err);
@@ -243,12 +265,12 @@ export default function InventoryCountPage({
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">Expected:</div>
-                      <div className="text-2xl font-bold text-gray-700">{item.par}</div>
+                      <div className="text-xs text-gray-500 mb-1">Expected ({item.unit_label}):</div>
+                      <div className="text-2xl font-bold text-gray-700">{item.par_units}</div>
                     </div>
 
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">On Hand:</div>
+                      <div className="text-xs text-gray-500 mb-1">On Hand ({item.unit_label}):</div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleCountChange(catIndex, itemIndex, item.on_hand - 1)}
@@ -269,7 +291,7 @@ export default function InventoryCountPage({
                         
                         <button
                           onClick={() => handleCountChange(catIndex, itemIndex, item.on_hand + 1)}
-                          className="w-12 h-12 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold text-xl shadow-md active:scale-95 transition"
+                          className="w-12 h-12 bg-green-500 hover:bg-green-600 textwhite rounded-lg font-bold text-xl shadow-md active:scale-95 transition"
                           aria-label="Increase count"
                         >
                           +

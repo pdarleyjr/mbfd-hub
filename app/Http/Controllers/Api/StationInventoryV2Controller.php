@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Controller;
 
 /**
  * Station Inventory V2 API Controller
@@ -22,6 +23,37 @@ use Illuminate\Support\Facades\DB;
  */
 class StationInventoryV2Controller extends Controller
 {
+
+    /**
+     * Validate signed URL - works for both base inventory and nested routes
+     * by checking signature against the base station-inventory URL
+     */
+    private function validateSignedRequest(Request $request, int $stationId): bool
+    {
+        // First try direct validation (works for base inventory route)
+        if ($request->hasValidSignature()) {
+            return true;
+        }
+        
+        // For nested routes (supply-requests, item updates), reconstruct the base URL
+        // and validate signature against that
+        $url = $request->fullUrl();
+        // Strip /supply-requests or /item/X from the URL path
+        $baseUrl = preg_replace(
+            '#/station-inventory/(\d+)/(supply-requests|item/\d+)#',
+            '/station-inventory/$1',
+            $url
+        );
+        
+        if ($baseUrl !== $url) {
+            return URL::hasValidSignature(
+                \Illuminate\Http\Request::create($baseUrl)
+            );
+        }
+        
+        return false;
+    }
+
     /**
      * Verify station PIN and generate access token
      * 
@@ -30,7 +62,7 @@ class StationInventoryV2Controller extends Controller
     public function verifyPin(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'station_id' => 'required|integer|exists:stations,id',
+            'station_id' => 'required|integer',
             'pin' => 'required|string|size:4',
             'actor_name' => 'required|string|max:255',
             'actor_shift' => 'required|string|max:50',
@@ -43,7 +75,18 @@ class StationInventoryV2Controller extends Controller
             ], 422);
         }
 
-        $station = Station::findOrFail($request->station_id);
+        // Try to find station by ID first, then by station_number
+        $station = Station::find($request->station_id);
+        if (!$station) {
+            $station = Station::where('station_number', $request->station_id)->first();
+        }
+
+        if (!$station) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Station not found',
+            ], 404);
+        }
 
         // Verify PIN using Hash::check
         if (!Hash::check($request->pin, $station->inventory_pin_hash)) {
@@ -69,7 +112,7 @@ class StationInventoryV2Controller extends Controller
             'api.v2.station-inventory.access',
             now()->addHours(4),
             [
-                'station_id' => $station->id,
+                'stationId' => $station->id,
                 'actor_name' => $request->actor_name,
                 'actor_shift' => $request->actor_shift,
             ]
@@ -95,7 +138,7 @@ class StationInventoryV2Controller extends Controller
     public function getInventory(Request $request, int $stationId): JsonResponse
     {
         // Validate signed URL
-        if (!$request->hasValidSignature()) {
+        if (!$this->validateSignedRequest($request, $stationId)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid or expired token',
@@ -121,7 +164,9 @@ class StationInventoryV2Controller extends Controller
                         'inventory_item_id' => $stationItem->inventory_item_id,
                         'name' => $stationItem->inventoryItem->name,
                         'sku' => $stationItem->inventoryItem->sku,
+                        'unit_label' => $stationItem->inventoryItem->unit_label,
                         'par_quantity' => $stationItem->inventoryItem->par_quantity,
+                        'par_units' => $stationItem->inventoryItem->par_units,
                         'on_hand' => $stationItem->on_hand,
                         'status' => $stationItem->status,
                         'last_updated_at' => $stationItem->last_updated_at?->toISOString(),
@@ -149,7 +194,7 @@ class StationInventoryV2Controller extends Controller
     public function updateItem(Request $request, int $stationId, int $itemId): JsonResponse
     {
         // Validate signed URL
-        if (!$request->hasValidSignature()) {
+        if (!$this->validateSignedRequest($request, $stationId)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid or expired token',
@@ -218,7 +263,9 @@ class StationInventoryV2Controller extends Controller
                 'inventory_item_id' => $stationItem->inventory_item_id,
                 'name' => $stationItem->inventoryItem->name,
                 'sku' => $stationItem->inventoryItem->sku,
+                'unit_label' => $stationItem->inventoryItem->unit_label,
                 'par_quantity' => $stationItem->inventoryItem->par_quantity,
+                'par_units' => $stationItem->inventoryItem->par_units,
                 'on_hand' => $stationItem->on_hand,
                 'status' => $stationItem->status,
                 'last_updated_at' => $stationItem->last_updated_at?->toISOString(),
@@ -234,7 +281,7 @@ class StationInventoryV2Controller extends Controller
     public function getSupplyRequests(Request $request, int $stationId): JsonResponse
     {
         // Validate signed URL
-        if (!$request->hasValidSignature()) {
+        if (!$this->validateSignedRequest($request, $stationId)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid or expired token',
@@ -270,7 +317,7 @@ class StationInventoryV2Controller extends Controller
     public function createSupplyRequest(Request $request, int $stationId): JsonResponse
     {
         // Validate signed URL
-        if (!$request->hasValidSignature()) {
+        if (!$this->validateSignedRequest($request, $stationId)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid or expired token',

@@ -346,15 +346,35 @@ export interface InventoryV2Item {
   id: number;
   sku: string;
   name: string;
+  unit_label: string;
   par: number;
+  par_units: number;
   on_hand: number;
   status: 'ok' | 'low' | 'ordered';
 }
 
 export interface InventoryV2Response {
-  station_id: number;
-  station_name: string;
-  categories: InventoryV2Category[];
+  success: boolean;
+  station: {
+    id: number;
+    name: string;
+    station_number: string;
+  };
+  inventory: Array<{
+    category: string;
+    items: Array<{
+      id: number;
+      inventory_item_id: number;
+      name: string;
+      sku: string;
+      unit_label: string;
+      par_quantity: number;
+      par_units: number;
+      on_hand: number;
+      status: 'ok' | 'low' | 'ordered';
+      last_updated_at: string | null;
+    }>;
+  }>;
 }
 
 export interface SupplyRequest {
