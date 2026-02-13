@@ -332,3 +332,62 @@ export interface StationInventorySubmission {
   pdf_path?: string;
   created_at: string;
 }
+
+// ============================================
+// Station Inventory V2 Types
+// ============================================
+
+export interface InventoryV2Category {
+  name: string;
+  items: InventoryV2Item[];
+}
+
+export interface InventoryV2Item {
+  id: number;
+  sku: string;
+  name: string;
+  par: number;
+  on_hand: number;
+  status: 'ok' | 'low' | 'ordered';
+}
+
+export interface InventoryV2Response {
+  station_id: number;
+  station_name: string;
+  categories: InventoryV2Category[];
+}
+
+export interface SupplyRequest {
+  id: number;
+  request_text: string;
+  status: 'open' | 'ordered' | 'denied' | 'replenished';
+  created_by_name: string;
+  created_by_shift: Shift;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PINVerifyRequest {
+  station_id: number;
+  pin: string;
+  actor_name: string;
+  actor_shift: Shift;
+}
+
+export interface PINVerifyResponse {
+  success: boolean;
+  token: string;
+  message?: string;
+}
+
+export interface UpdateItemRequest {
+  on_hand: number;
+  actor_name: string;
+  actor_shift: Shift;
+}
+
+export interface CreateSupplyRequestRequest {
+  request_text: string;
+  actor_name: string;
+  actor_shift: Shift;
+}

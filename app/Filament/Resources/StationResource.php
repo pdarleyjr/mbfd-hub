@@ -63,6 +63,29 @@ class StationResource extends Resource
                         Forms\Components\Textarea::make('notes')
                             ->columnSpanFull(),
                     ]),
+                Forms\Components\Section::make('Inventory Access')
+                    ->schema([
+                        Forms\Components\TextInput::make('inventory_pin')
+                            ->label('Inventory PIN')
+                            ->password()
+                            ->revealable()
+                            ->helperText('Enter a 4-digit PIN. Leave blank to keep the current PIN.')
+                            ->minLength(4)
+                            ->maxLength(4)
+                            ->rule('digits:4')
+                            ->extraAttributes([
+                                'inputmode' => 'numeric',
+                                'maxlength' => 4,
+                            ])
+                            ->afterStateHydrated(function (Forms\Components\TextInput $component): void {
+                                $record = $component->getRecord();
+
+                                if ($record?->inventory_pin_hash) {
+                                    $component->state('••••');
+                                }
+                            })
+                            ->dehydrated(fn ($state): bool => filled($state) && $state !== '••••'),
+                    ]),
             ]);
     }
 
@@ -70,6 +93,31 @@ class StationResource extends Resource
     {
         return $infolist
             ->schema([
+                Infolists\Components\Section::make('Inventory Readiness')
+                    ->description('Low stock, ordered items, and supply requests that need attention.')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('low_stock_count')
+                            ->label('Low Stock')
+                            ->state(fn ($record) => $record->inventoryItems()->where('status', 'low')->count())
+                            ->badge()
+                            ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
+                        Infolists\Components\TextEntry::make('ordered_stock_count')
+                            ->label('Ordered')
+                            ->state(fn ($record) => $record->inventoryItems()->where('status', 'ordered')->count())
+                            ->badge()
+                            ->color(fn ($state) => $state > 0 ? 'warning' : 'gray'),
+                        Infolists\Components\TextEntry::make('supply_request_count')
+                            ->label('Supply Requests')
+                            ->state(fn ($record) => $record->supplyRequests()->whereIn('status', ['open', 'ordered'])->count())
+                            ->badge()
+                            ->color(fn ($state) => $state > 0 ? 'warning' : 'gray'),
+                        Infolists\Components\TextEntry::make('inventory_link')
+                            ->label('Inventory Tab')
+                            ->state('Open on-hand inventory')
+                            ->url(fn ($record) => static::getUrl('view', ['record' => $record]) . '?activeRelationManager=inventoryItems')
+                            ->color('primary'),
+                    ])
+                    ->columns(4),
                 Infolists\Components\Section::make('Station Information')
                     ->schema([
                         Infolists\Components\TextEntry::make('station_number')
@@ -77,7 +125,10 @@ class StationResource extends Resource
                         Infolists\Components\TextEntry::make('captain_in_charge')
                             ->label('Captain in Charge'),
                         Infolists\Components\TextEntry::make('phone'),
-                    ])->columns(3),
+                        Infolists\Components\TextEntry::make('inventory_pin_masked')
+                            ->label('Inventory PIN')
+                            ->state(fn ($record) => $record->inventory_pin_hash ? '••••' : 'Not set'),
+                    ])->columns(4),
                 Infolists\Components\Section::make('Address')
                     ->schema([
                         Infolists\Components\TextEntry::make('address'),
@@ -152,6 +203,8 @@ class StationResource extends Resource
             RelationManagers\Under25kProjectsRelationManager::class,
             RelationManagers\InventorySubmissionsRelationManager::class,
             RelationManagers\SingleGasMetersRelationManager::class,
+            RelationManagers\StationInventoryItemsRelationManager::class,
+            RelationManagers\StationSupplyRequestsRelationManager::class,
         ];
     }
 
