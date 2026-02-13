@@ -1,0 +1,268 @@
+{
+  "categories": [
+    {
+      "name": "Garbage & Paper Goods",
+      "sort_order": 1,
+      "items": [
+        {
+          "sku": "REN22505-CA",
+          "name": "Small Garbage bags/ROLL, 25bag/roll  10-ROLLS P/CASE)",
+          "par_quantity": 2,
+          "sort_order": 1
+        },
+        {
+          "sku": "REN66024-CA",
+          "name": "Large Garbage bags /ROLL, 10bag/roll  10-ROLL P/CASE)",
+          "par_quantity": 2,
+          "sort_order": 2
+        },
+        {
+          "sku": "HOS537-10",
+          "name": "BOX WHITE TERRY TOWEL RAGS",
+          "par_quantity": 1,
+          "sort_order": 3
+        },
+        {
+          "sku": "REN06002-WB",
+          "name": "WHITE MULTIFOLD PAPER TOWELS (250 SHEETS P/PACK, 16 PACKS P/CASE)",
+          "par_quantity": 4,
+          "sort_order": 4
+        },
+        {
+          "sku": "REN06004-WB",
+          "name": "Brown PAPER TOWELS ROLLS (800 FT/ROLL, 6 ROLLS P/CASE)",
+          "par_quantity": 4,
+          "sort_order": 5
+        },
+        {
+          "sku": "309116312",
+          "name": "TOILET PAPER (500 SHEETS P/ROLL, 96 ROLLS P/CASE)",
+          "par_quantity": 2,
+          "sort_order": 6
+        },
+        {
+          "sku": "GPT2717714",
+          "name": "WHITE PAPER TOWEL ROLL (15 ROLLS P/CASE)",
+          "par_quantity": 2,
+          "sort_order": 7
+        },
+        {
+          "sku": "SPA6075",
+          "name": "AEROSOL CAN DISINFECTANT DEODORANT, SPRING BREEZE SCENT (12 P/PACK)",
+          "par_quantity": 1,
+          "sort_order": 8
+        }
+      ]
+    },
+    {
+      "name": "Floors",
+      "sort_order": 2,
+      "items": [
+        {
+          "sku": "326445104",
+          "name": "GENERAL PURPOSE FLOOR CLEANER 1 GAL. (4 P/CASE)",
+          "par_quantity": 2,
+          "sort_order": 1
+        },
+        {
+          "sku": "REN051",
+          "name": "CLEANER DEGREASER 1 GAL. (4 P/CASE)",
+          "par_quantity": 4,
+          "sort_order": 2
+        },
+        {
+          "sku": "REN03953",
+          "name": "10\" BLUE POLYPROPYLENE DUAL SURFACE SCRUB BRUSH",
+          "par_quantity": 3,
+          "sort_order": 3
+        },
+        {
+          "sku": "REN03964",
+          "name": "8\" GREEN SWIVEL SCRUB BRUSH",
+          "par_quantity": 3,
+          "sort_order": 4
+        },
+        {
+          "sku": "312441367",
+          "name": "10\" FEATHER TIP VEHICLE BRUSH",
+          "par_quantity": 3,
+          "sort_order": 5
+        },
+        {
+          "sku": "CSM36622200",
+          "name": "22\" FOAM FLOOR SQUEEGEE",
+          "par_quantity": 4,
+          "sort_order": 6
+        },
+        {
+          "sku": "322775340",
+          "name": "15/16\" x 54\" YELLOW FIBERGLASS HANDLE",
+          "par_quantity": 4,
+          "sort_order": 7
+        },
+        {
+          "sku": "REN03984",
+          "name": "GARAGE SWEEP BROOM",
+          "par_quantity": 2,
+          "sort_order": 8
+        },
+        {
+          "sku": "REN05125",
+          "name": "12\" PLASTIC UPRIGHT LOBBY DUST PAN",
+          "par_quantity": 1,
+          "sort_order": 9
+        },
+        {
+          "sku": "REN03997",
+          "name": "55\" CORN HOUSEKEEPING BROOM",
+          "par_quantity": 2,
+          "sort_order": 10
+        },
+        {
+          "sku": "321381641",
+          "name": "MOP HANDLE WITH PLASTIC JAWS 60\" x 15/16\" (2-PACK)",
+          "par_quantity": 1,
+          "sort_order": 11
+        },
+        {
+          "sku": "318353671",
+          "name": "BLENDED COTTON SYNTHETIC REPLACEMENT STRING MOP MEDIUM LOOP WIDE BAND MOP HEAD",
+          "par_quantity": 12,
+          "sort_order": 12
+        },
+        {
+          "sku": "RCP758088YL",
+          "name": "RUBBERMAID WAVE BRAKE 35QT. YELLOW SIDE-PRESS COMBO MOP BUCKET AND WRINGER SYSTEM",
+          "par_quantity": 1,
+          "sort_order": 13
+        }
+      ]
+    },
+    {
+      "name": "Laundry",
+      "sort_order": 3,
+      "items": [
+        {
+          "sku": "KIK55GB",
+          "name": "1 GAL. BLEACH (6 P/CASE)",
+          "par_quantity": 2,
+          "sort_order": 1
+        },
+        {
+          "sku": "SPA7003-04",
+          "name": "1 GAL. LAUNDRY DETERGENT (4 P/CASE)",
+          "par_quantity": 3,
+          "sort_order": 2
+        }
+      ]
+    },
+    {
+      "name": "Bathroom & Cleaners",
+      "sort_order": 4,
+      "items": [
+        {
+          "sku": "PGC58775",
+          "name": "SPIC AND SPAN ALL PURPOSE AND GLASS CLEANER (8 P/CASE)",
+          "par_quantity": 1,
+          "sort_order": 1
+        },
+        {
+          "sku": "SMP13005",
+          "name": "SIMPLE GREEN ALL PURPOSE CONCENTRATED CLEANER (6/CASE)",
+          "par_quantity": 1,
+          "sort_order": 2
+        },
+        {
+          "sku": "CLO00031",
+          "name": "TOILET BOWL CLEANER (12 P/CASE)",
+          "par_quantity": 1,
+          "sort_order": 3
+        },
+        {
+          "sku": "PGC22569",
+          "name": "DISINFECTING SANITIZING BATHROOM CLEANER SPRAY (8 P/CASE)",
+          "par_quantity": 1,
+          "sort_order": 4
+        },
+        {
+          "sku": "YYYSH-CLN",
+          "name": "URINAL SCREEN (6/BOX)",
+          "par_quantity": 2,
+          "sort_order": 5
+        },
+        {
+          "sku": "RCP295700BG",
+          "name": "BEIGE RECTANGULAR TRASH CAN",
+          "par_quantity": 2,
+          "sort_order": 6
+        },
+        {
+          "sku": "IMP9200-90",
+          "name": "TOILET PLUNGER",
+          "par_quantity": 1,
+          "sort_order": 7
+        },
+        {
+          "sku": "311535529",
+          "name": "TOILET BRUSH, MEDIUM (6 P/PACK)",
+          "par_quantity": 1,
+          "sort_order": 8
+        },
+        {
+          "sku": "IMP5032HG-90",
+          "name": "PLASTIC SPRAY BOTTLE",
+          "par_quantity": 4,
+          "sort_order": 9
+        },
+        {
+          "sku": "313640723",
+          "name": "TRIGGER SPRAY",
+          "par_quantity": 4,
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "name": "Kitchen",
+      "sort_order": 5,
+      "items": [
+        {
+          "sku": "REN02118",
+          "name": "RENOWN SCRUB SPONGE, MEDIUM (20 P/CASE)",
+          "par_quantity": 2,
+          "sort_order": 1
+        },
+        {
+          "sku": "CLO88320",
+          "name": "S.O.S STEEL WOOL SOAP PADS (15 P/BOX)",
+          "par_quantity": 2,
+          "sort_order": 2
+        },
+        {
+          "sku": "REN05001-AM",
+          "name": "OVEN AND GRILL CLEANER (12 P/CASE)",
+          "par_quantity": 1,
+          "sort_order": 3
+        },
+        {
+          "sku": "203759588",
+          "name": "STAINLESS STEEL POLISH",
+          "par_quantity": 4,
+          "sort_order": 4
+        },
+        {
+          "sku": "DIA84014",
+          "name": "ANTIBACTERIAL LIQUID HAND SOAP (12 P/CASE)",
+          "par_quantity": 2,
+          "sort_order": 5
+        },
+        {
+          "sku": "PGC45112",
+          "name": "DAWN DISH SOAP, (8 P/CASE)",
+          "par_quantity": 1,
+          "sort_order": 6
+        }
+      ]
+    }
+  ]
+}
