@@ -53,5 +53,9 @@ PROJECT_SUMMARY.md
 
 # Temporary files directory
 /temp_files/
-"pics/*.MOV"  
-"pics/*.HEIC"  
+
+# Local credentials and secrets (NEVER commit)
+.local/
+pics/
+MBFD_HUB_DISCOVERY_REPORT_2026-02-12.md
+PERFORMANCE_FIX_REPORT_2026-02-12.md
