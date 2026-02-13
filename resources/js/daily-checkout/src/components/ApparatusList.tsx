@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { Apparatus } from '../types';
 import { ApiClient } from '../utils/api';
 
+const enableApparatusForms = import.meta.env.VITE_ENABLE_APPARATUS_FORMS === 'true';
+
 export default function ApparatusList() {
   const [apparatuses, setApparatuses] = useState<Apparatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,21 +97,23 @@ export default function ApparatusList() {
       {/* Navigation Tabs */}
       <div className="flex justify-center mb-6">
         <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
-          <Link
-            to="/"
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              location.pathname === '/' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            🚒 Apparatuses
-          </Link>
+          {enableApparatusForms && (
+            <Link
+              to="/apparatuses"
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                location.pathname.startsWith('/apparatuses')
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              🚒 Apparatuses
+            </Link>
+          )}
           <Link
             to="/forms-hub"
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              location.pathname.startsWith('/forms-hub') 
-                ? 'bg-blue-600 text-white' 
+              location.pathname.startsWith('/forms-hub')
+                ? 'bg-blue-600 text-white'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
@@ -119,7 +123,7 @@ export default function ApparatusList() {
             to="/stations"
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               location.pathname.startsWith('/stations') && !location.pathname.startsWith('/forms-hub')
-                ? 'bg-blue-600 text-white' 
+                ? 'bg-blue-600 text-white'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >

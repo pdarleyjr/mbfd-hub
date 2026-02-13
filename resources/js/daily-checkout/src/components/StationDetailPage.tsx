@@ -3,12 +3,22 @@ import { Link, useParams } from 'react-router-dom';
 import { StationDetail, Room, Apparatus, CapitalProject, ShopWork } from '../types';
 import { ApiClient } from '../utils/api';
 
+const enableApparatusForms = import.meta.env.VITE_ENABLE_APPARATUS_FORMS === 'true';
+
 export default function StationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [station, setStation] = useState<StationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'apparatuses' | 'rooms' | 'projects' | 'shopworks'>('overview');
+
+  const tabs = [
+    { id: 'overview', label: 'Overview' },
+    ...(enableApparatusForms ? [{ id: 'apparatuses', label: 'Apparatuses' }] : []),
+    { id: 'rooms', label: 'Rooms' },
+    { id: 'projects', label: 'Projects' },
+    { id: 'shopworks', label: 'Shop Works' },
+  ];
 
   const fetchStation = async () => {
     if (!id) return;
@@ -57,6 +67,10 @@ export default function StationDetailPage() {
       </span>
     );
   };
+
+  const quickStatsGridClass = enableApparatusForms
+    ? 'grid-cols-2 md:grid-cols-5'
+    : 'grid-cols-2 md:grid-cols-4';
 
   if (loading) {
     return (
@@ -119,11 +133,13 @@ export default function StationDetailPage() {
         </div>
 
         {/* Quick Stats */}
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <p className="text-3xl font-bold text-blue-600">{station.apparatuses_count || 0}</p>
-            <p className="text-sm text-blue-700">Apparatuses</p>
-          </div>
+        <div className={`mt-6 grid ${quickStatsGridClass} gap-4`}>
+          {enableApparatusForms && (
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <p className="text-3xl font-bold text-blue-600">{station.apparatuses_count || 0}</p>
+              <p className="text-sm text-blue-700">Apparatuses</p>
+            </div>
+          )}
           <div className="text-center p-4 bg-purple-50 rounded-lg">
             <p className="text-3xl font-bold text-purple-600">{station.rooms_count || 0}</p>
             <p className="text-sm text-purple-700">Rooms</p>
@@ -146,7 +162,7 @@ export default function StationDetailPage() {
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="flex overflow-x-auto border-b border-gray-200">
-          {[{ id: 'overview', label: 'Overview' }, { id: 'apparatuses', label: 'Apparatuses' }, { id: 'rooms', label: 'Rooms' }, { id: 'projects', label: 'Projects' }, { id: 'shopworks', label: 'Shop Works' },].map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
@@ -172,10 +188,12 @@ export default function StationDetailPage() {
                     <dt className="text-gray-600">Station Number</dt>
                     <dd className="font-medium">{station.station_number}</dd>
                   </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <dt className="text-gray-600">Active Apparatuses</dt>
-                    <dd className="font-medium">{station.active_apparatuses_count || 0}</dd>
-                  </div>
+                  {enableApparatusForms && (
+                    <div className="flex justify-between py-2 border-b">
+                      <dt className="text-gray-600">Active Apparatuses</dt>
+                      <dd className="font-medium">{station.active_apparatuses_count || 0}</dd>
+                    </div>
+                  )}
                   <div className="flex justify-between py-2 border-b">
                     <dt className="text-gray-600">Personnel</dt>
                     <dd className="font-medium">{station.personnel_count || 0}</dd>
@@ -223,7 +241,7 @@ export default function StationDetailPage() {
           )}
 
           {/* Apparatuses Tab */}
-          {activeTab === 'apparatuses' && (
+          {enableApparatusForms && activeTab === 'apparatuses' && (
             <div>
               {station.apparatuses && station.apparatuses.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -1,4 +1,4 @@
-import { Apparatus, ChecklistData, InspectionSubmission, Station, StationDetail, Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData, StationInventorySubmission, InventorySubmissionItem } from '../types';
+import { Apparatus, ChecklistData, InspectionSubmission, Station, StationDetail, Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData, StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse, InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest } from '../types';
 
 const API_BASE = '/api';
 
@@ -254,5 +254,78 @@ export class ApiClient {
     }
     const data = await response.json();
     return data.data || data;
+  }
+
+  // ============================================
+  // Station Inventory V2 API
+  // ============================================
+
+  static async verifyPIN(request: PINVerifyRequest): Promise<PINVerifyResponse> {
+    const response = await fetch(`${API_BASE}/v2/station-inventory/verify-pin`, {
+      method: 'POST',
+      headers: { ...DEFAULT_HEADERS },
+      body: JSON.stringify(request),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Invalid PIN');
+    }
+    return response.json();
+  }
+
+  static async getInventoryV2(stationId: number, token: string): Promise<InventoryV2Response> {
+    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}${token}`, {
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch inventory');
+    }
+    return response.json();
+  }
+
+  static async updateInventoryItem(
+    stationId: number,
+    itemId: number,
+    data: UpdateItemRequest,
+    token: string
+  ): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/item/${itemId}${token}`, {
+      method: 'PUT',
+      headers: { ...DEFAULT_HEADERS },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update item');
+    }
+    return response.json();
+  }
+
+  static async getSupplyRequests(stationId: number, token: string): Promise<SupplyRequest[]> {
+    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/supply-requests${token}`, {
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch supply requests');
+    }
+    const data = await response.json();
+    return data.data || data;
+  }
+
+  static async createSupplyRequest(
+    stationId: number,
+    request: CreateSupplyRequestRequest,
+    token: string
+  ): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/supply-requests${token}`, {
+      method: 'POST',
+      headers: { ...DEFAULT_HEADERS },
+      body: JSON.stringify(request),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create supply request');
+    }
+    return response.json();
   }
 }

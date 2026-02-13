@@ -22,5 +22,8 @@ class DatabaseSeeder extends Seeder
 
         // Seed Capital Projects
         $this->call(CapitalProjectSeeder::class);
+        
+        // Seed Station Inventory v2
+        $this->call(StationInventoryV2Seeder::class);
     }
 }

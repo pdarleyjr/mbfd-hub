@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Station } from '../types';
 
+const enableApparatusForms = import.meta.env.VITE_ENABLE_APPARATUS_FORMS === 'true';
+
 interface StationCardProps {
   station: Station;
 }
@@ -55,13 +57,15 @@ export default function StationCard({ station }: StationCardProps) {
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4">
-        <div className="text-center p-3 bg-blue-50 rounded-lg">
-          <p className="text-2xl font-bold text-blue-600">
-            {station.apparatuses_count || 0}
-          </p>
-          <p className="text-xs text-blue-700">Apparatuses</p>
-        </div>
+      <div className={`mt-4 grid ${enableApparatusForms ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+        {enableApparatusForms && (
+          <div className="text-center p-3 bg-blue-50 rounded-lg">
+            <p className="text-2xl font-bold text-blue-600">
+              {station.apparatuses_count || 0}
+            </p>
+            <p className="text-xs text-blue-700">Apparatuses</p>
+          </div>
+        )}
         <div className="text-center p-3 bg-purple-50 rounded-lg">
           <p className="text-2xl font-bold text-purple-600">
             {station.rooms_count || 0}
