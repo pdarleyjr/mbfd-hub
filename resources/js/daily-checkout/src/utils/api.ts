@@ -273,8 +273,9 @@ export class ApiClient {
     return response.json();
   }
 
-  static async getInventoryV2(stationId: number, token: string): Promise<InventoryV2Response> {
-    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}${token}`, {
+  static async getInventoryV2(inventoryUrl: string): Promise<InventoryV2Response> {
+    // inventoryUrl is a complete signed URL from the backend - use as-is
+    const response = await fetch(inventoryUrl, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -284,12 +285,17 @@ export class ApiClient {
   }
 
   static async updateInventoryItem(
-    stationId: number,
+    inventoryUrl: string,
     itemId: number,
-    data: UpdateItemRequest,
-    token: string
+    data: UpdateItemRequest
   ): Promise<{ success: boolean; message: string }> {
-    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/item/${itemId}${token}`, {
+    // IMPORTANT: Do NOT modify the signed URL path - signature will fail
+    // Extract base URL and signature, then append the item path
+    const baseUrl = inventoryUrl.split('?')[0]; // Get everything before query string
+    const queryString = inventoryUrl.split('?')[1]; // Get query string with signature
+    const url = `${baseUrl}/item/${itemId}?${queryString}`;
+    
+    const response = await fetch(url, {
       method: 'PUT',
       headers: { ...DEFAULT_HEADERS },
       body: JSON.stringify(data),
@@ -301,23 +307,23 @@ export class ApiClient {
     return response.json();
   }
 
-  static async getSupplyRequests(stationId: number, token: string): Promise<SupplyRequest[]> {
-    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/supply-requests${token}`, {
+  static async getSupplyRequests(supplyRequestsUrl: string): Promise<{ success: boolean; requests: SupplyRequest[] }> {
+    // supplyRequestsUrl is a complete signed URL from the backend - use as-is
+    const response = await fetch(supplyRequestsUrl, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
       throw new Error('Failed to fetch supply requests');
     }
-    const data = await response.json();
-    return data.data || data;
+    return response.json();
   }
 
   static async createSupplyRequest(
-    stationId: number,
-    request: CreateSupplyRequestRequest,
-    token: string
+    supplyRequestsUrl: string,
+    request: CreateSupplyRequestRequest
   ): Promise<{ success: boolean; message: string }> {
-    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/supply-requests${token}`, {
+    // supplyRequestsUrl is a complete signed URL from the backend - use as-is for POST
+    const response = await fetch(supplyRequestsUrl, {
       method: 'POST',
       headers: { ...DEFAULT_HEADERS },
       body: JSON.stringify(request),

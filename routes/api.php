@@ -86,7 +86,8 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
         Route::put('/station-inventory/{stationId}/item/{itemId}', [StationInventoryV2Controller::class, 'updateItem']);
         
         // Supply requests
-        Route::get('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'getSupplyRequests']);
+        Route::get('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'getSupplyRequests'])
+            ->name('supply-requests');
         Route::post('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'createSupplyRequest']);
     });
 });
