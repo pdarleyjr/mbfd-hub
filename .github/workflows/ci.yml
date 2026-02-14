@@ -15,6 +15,7 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_DB: mbfd_test
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
         options: >-
           --health-cmd pg_isready
@@ -55,59 +56,6 @@ jobs:
 
       - name: Generate Key
         run: php artisan key:generate
-
-      - name: Diagnostic - Check Database Configuration
-        run: |
-          echo "=== Environment Variables ==="
-          echo "DB_CONNECTION: ${{ env.DB_CONNECTION }}"
-          echo "DB_DATABASE (from workflow): ${{ env.DB_DATABASE }}"
-          echo "DB_USERNAME: ${{ env.DB_USERNAME }}"
-          echo "DB_HOST: ${{ env.DB_HOST }}"
-          echo "DB_PORT: ${{ env.DB_PORT }}"
-          echo ""
-          echo "=== PHPUnit Configuration ==="
-          grep -A 2 "DB_DATABASE" phpunit.xml || echo "No DB_DATABASE in phpunit.xml"
-          echo ""
-          echo "=== PostgreSQL Database Status ==="
-          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -c "\l" || echo "Failed to list databases"
-          echo ""
-          echo "=== Check if mbfd_test database exists ==="
-          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -c "SELECT datname FROM pg_database WHERE datname = 'mbfd_test';" || echo "Query failed"
-          echo ""
-          echo "=== PostgreSQL Schema Permissions ==="
-          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -d mbfd_test -c "\dn+" || echo "Failed to list schemas"
-          echo ""
-          echo "=== Check public schema ownership ==="
-          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -d mbfd_test -c "SELECT nspname, nspowner::regrole FROM pg_namespace WHERE nspname = 'public';" || echo "Query failed"
-        env:
-          DB_CONNECTION: pgsql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 5432
-          DB_DATABASE: mbfd_test
-          DB_USERNAME: postgres
-          DB_PASSWORD: password
-
-      - name: Grant Schema Permissions
-        run: |
-          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -d mbfd_test -c "GRANT ALL ON SCHEMA public TO postgres;"
-          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -d mbfd_test -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres;"
-          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -d mbfd_test -c "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres;"
-          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -d mbfd_test -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres;"
-
-      - name: Diagnostic - Test Migration
-        run: |
-          echo "=== Attempting Migration ==="
-          php artisan migrate:fresh --force --verbose || echo "Migration failed with exit code $?"
-          echo ""
-          echo "=== Check Tables After Migration ==="
-          PGPASSWORD=password psql -h 127.0.0.1 -U postgres -d mbfd_test -c "\dt" || echo "Failed to list tables"
-        env:
-          DB_CONNECTION: pgsql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 5432
-          DB_DATABASE: mbfd_test
-          DB_USERNAME: postgres
-          DB_PASSWORD: password
 
       - name: Run Tests
         env:
