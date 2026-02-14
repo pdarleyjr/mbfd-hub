@@ -397,6 +397,7 @@ export interface PINVerifyRequest {
 export interface PINVerifyResponse {
   success: boolean;
   token: string;
+  station_id: number;
   message?: string;
 }
 
