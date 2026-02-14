@@ -12,6 +12,9 @@
 <link href="{{ asset('css/chatify/style.css') }}" rel="stylesheet" />
 <link href="{{ asset('css/chatify/'.$dark_mode.'.mode.css') }}" rel="stylesheet" />
 
+{{-- jQuery MUST load before Chatify code.js --}}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
 {{-- Setting messenger primary color to css --}}
 <style>
     :root {
@@ -129,4 +132,21 @@
 </div>
 
 @include('Chatify::layouts.modals')
-@include('Chatify::layouts.footerLinks')
+{{-- Custom footerLinks without jQuery since we load it above --}}
+<script src="https://js.pusher.com/7.2.0/pusher.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@3.0.3/dist/index.min.js"></script>
+<script>
+    // Gloabl Chatify variables from PHP to JS
+    window.chatify = {
+        name: "{{ config('chatify.name') }}",
+        sounds: {!! json_encode(config('chatify.sounds')) !!},
+        allowedImages: {!! json_encode(config('chatify.attachments.allowed_images')) !!},
+        allowedFiles: {!! json_encode(config('chatify.attachments.allowed_files')) !!},
+        maxUploadSize: {{ Chatify::getMaxUploadSize() }},
+        pusher: {!! json_encode(config('chatify.pusher')) !!},
+        pusherAuthEndpoint: '{{route("pusher.auth")}}'
+    };
+    window.chatify.allAllowedExtensions = chatify.allowedImages.concat(chatify.allowedFiles);
+</script>
+<script src="{{ asset('js/chatify/utils.js') }}"></script>
+<script src="{{ asset('js/chatify/code.js') }}"></script>
