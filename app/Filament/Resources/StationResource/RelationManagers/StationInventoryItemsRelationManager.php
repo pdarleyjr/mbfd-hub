@@ -25,13 +25,26 @@ class StationInventoryItemsRelationManager extends RelationManager
             ->sortable(),
             Tables\Columns\TextColumn::make('on_hand')
             ->label('On Hand')
-            ->sortable(),
+            ->sortable()
+            ->formatStateUsing(fn($state, $record) => $state . ' ' . $record->inventoryItem->unit_label),
+            Tables\Columns\TextColumn::make('inventoryItem.par_quantity')
+            ->label('Expected (Par)')
+            ->sortable()
+            ->formatStateUsing(fn($state, $record) => $state . ' ' . $record->inventoryItem->unit_label),
             Tables\Columns\BadgeColumn::make('status')
             ->colors([
                 'success' => 'ok',
                 'danger' => 'low',
                 'warning' => 'ordered',
-            ]),
+                'prmary' => 'overstocked', // Use primary or another distinct color
+            ])
+            ->formatStateUsing(fn(string $state): string => match ($state) {
+            'ok' => 'OK',
+            'low' => 'Low Stock',
+            'ordered' => 'Ordered',
+            'overstocked' => 'Overstocked',
+            default => ucfirst($state),
+        }),
             Tables\Columns\TextColumn::make('last_updated_at')
             ->label('Last Updated')
             ->dateTime('M j, Y g:i A')
@@ -45,6 +58,7 @@ class StationInventoryItemsRelationManager extends RelationManager
                 'ok' => 'OK',
                 'low' => 'Low',
                 'ordered' => 'Ordered',
+                'overstocked' => 'Overstocked',
             ]),
         ])
             ->actions([
@@ -55,8 +69,48 @@ class StationInventoryItemsRelationManager extends RelationManager
                 ->numeric()
                 ->minValue(0)
                 ->suffix(fn($record) => $record->inventoryItem->unit_label)
-                ->helperText(fn($record) => 'Expected: ' . $record->inventoryItem->par_units . ' ' . $record->inventoryItem->unit_label),
-            ]),
+                ->helperText(fn($record) => 'Expected: ' . $record->inventoryItem->par_quantity . ' ' . $record->inventoryItem->unit_label),
+            ])
+            ->using(function ($record, array $data) {
+            $record->updateCount((int)$data['on_hand']);
+            return $record;
+        }),
+
+            // Mark Ordered Action
+            Tables\Actions\Action::make('mark_ordered')
+            ->label('Mark Ordered')
+            ->icon('heroicon-o-shopping-cart')
+            ->color('warning')
+            ->visible(fn($record) => $record->status === 'low')
+            ->action(function ($record) {
+            $record->status = 'ordered';
+            $record->last_updated_at = now();
+            $record->save();
+
+        // Create Audit Log? Admin actions should ideally be logged too but sticking to scope.
+        }),
+
+            // Replenish Action
+            Tables\Actions\Action::make('replenish')
+            ->label('Replenish')
+            ->icon('heroicon-o-check-circle')
+            ->color('success')
+            ->visible(fn($record) => in_array($record->status, ['low', 'ordered']))
+            ->requiresConfirmation()
+            ->action(function ($record) {
+            $record->updateCount($record->inventoryItem->par_quantity);
+        }),
+
+            // Clear Overstock Alert
+            Tables\Actions\Action::make('clear_alert')
+            ->label('Clear Alert')
+            ->icon('heroicon-o-x-circle')
+            ->color('gray')
+            ->visible(fn($record) => $record->status === 'overstocked')
+            ->action(function ($record) {
+            $record->status = 'ok';
+            $record->save();
+        }),
         ])
             ->bulkActions([]);
     }
