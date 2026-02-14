@@ -1,5 +1,5 @@
-const CACHE_NAME = 'mbfd-checkout-v4';
-const API_CACHE_NAME = 'mbfd-api-cache-v4';
+const CACHE_NAME = 'mbfd-checkout-v3';
+const API_CACHE_NAME = 'mbfd-api-cache-v3';
 const ASSETS_TO_CACHE = [
   '/daily/',
   '/daily/index.html',

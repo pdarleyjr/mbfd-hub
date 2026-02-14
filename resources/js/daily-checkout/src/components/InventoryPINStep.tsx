@@ -80,7 +80,6 @@ export default function InventoryPINStep({
           Enter your station's 4-digit PIN
         </p>
         <p className="text-xs text-gray-400 mt-1">
-          (Default PIN: 1234)
         </p>
       </div>
 

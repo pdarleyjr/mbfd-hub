@@ -72,7 +72,7 @@ export default function StationInventoryForm() {
 
         {step === 'pin' && userInfo && (
           <InventoryPINStep
-            stationId={stationPkId}
+            stationId={userInfo.station}
             actorName={userInfo.employeeName}
             actorShift={userInfo.shift}
             onSuccess={handlePINSuccess}

@@ -1,1 +1,1 @@
-/* Chatify viewport fit */ .fi-page .messenger{height:calc(100vh - 4rem)!important;max-height:calc(100vh - 4rem)!important;overflow:hidden!important} .fi-page .messenger .m-body{height:calc(100% - 65px)!important;overflow:hidden!important} .fi-page .messenger .m-body .m-chat{height:100%!important;display:flex!important;flex-direction:column!important} .fi-page .messenger .m-body .m-chat .messages{flex:1!important;overflow-y:auto!important} body.fi-body:has(.messenger){overflow:hidden!important}
+/* Chatify Filament integration - minimal */
