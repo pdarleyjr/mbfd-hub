@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shift } from '../types';
+import { Shift, PINVerifyResponse } from '../types';
 import InventoryUserInfoStep from './InventoryUserInfoStep';
 import InventoryPINStep from './InventoryPINStep';
 import InventoryCountPage from './InventoryCountPage';
@@ -14,18 +14,17 @@ export default function StationInventoryForm() {
     employeeName: string;
     shift: Shift;
     station: number;
+    stationNumber: number;
   } | null>(null);
-  const [authToken, setAuthToken] = useState<string>('');
-  const [stationPkId, setStationPkId] = useState<number>(0);
+  const [authResponse, setAuthResponse] = useState<PINVerifyResponse | null>(null);
 
-  const handleUserInfoSubmit = (data: { employeeName: string; shift: Shift; station: number }) => {
+  const handleUserInfoSubmit = (data: { employeeName: string; shift: Shift; station: number; stationNumber: number }) => {
     setUserInfo(data);
     setStep('pin');
   };
 
-  const handlePINSuccess = (token: string, stationId: number) => {
-    setStationPkId(stationId);
-    setAuthToken(token);
+  const handlePINSuccess = (response: PINVerifyResponse) => {
+    setAuthResponse(response);
     setStep('inventory');
   };
 
@@ -36,7 +35,7 @@ export default function StationInventoryForm() {
   const handleLogout = () => {
     setStep('userInfo');
     setUserInfo(null);
-    setAuthToken('');
+    setAuthResponse(null);
   };
 
   return (
@@ -73,6 +72,7 @@ export default function StationInventoryForm() {
         {step === 'pin' && userInfo && (
           <InventoryPINStep
             stationId={userInfo.station}
+            stationNumber={userInfo.stationNumber}
             actorName={userInfo.employeeName}
             actorShift={userInfo.shift}
             onSuccess={handlePINSuccess}
@@ -82,13 +82,14 @@ export default function StationInventoryForm() {
       </div>
 
       {/* Inventory page renders full-screen */}
-      {step === 'inventory' && userInfo && (
+      {step === 'inventory' && userInfo && authResponse && (
         <InventoryCountPage
-          stationId={stationPkId}
-          stationName={`Station ${userInfo.station}`}
+          stationId={authResponse.station_id}
+          stationName={authResponse.station.name}
           actorName={userInfo.employeeName}
           actorShift={userInfo.shift}
-          token={authToken}
+          inventoryUrl={authResponse.inventory_url}
+          supplyRequestsUrl={authResponse.supply_requests_url}
           onLogout={handleLogout}
         />
       )}

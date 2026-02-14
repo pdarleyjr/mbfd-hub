@@ -1,0 +1,21 @@
+Restricted Mode: skipping untrusted project features from /var/www/html (non-interactive mode). Use --trust-project to allow.
+
+   Psy\Exception\ParseErrorException 
+
+  PHP Parse error: Syntax error, unexpected ';' on line 1
+
+  at vendor/psy/psysh/src/Exception/ParseErrorException.php:44
+     40▕      * @param \PhpParser\Error $e
+     41▕      */
+     42▕     public static function fromParseError(\PhpParser\Error $e): self
+     43▕     {
+  ➜  44▕         return new self($e->getRawMessage(), $e->getAttributes());
+     45▕     }
+     46▕ }
+     47▕
+
+      [2m+19 vendor frames [22m
+
+  20  artisan:13
+      Illuminate\Foundation\Application::handleCommand()
+

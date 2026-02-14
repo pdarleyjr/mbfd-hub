@@ -1,0 +1,89 @@
+<title>{{ config('chatify.name') }}</title>
+
+{{-- Meta tags --}}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="id" content="{{ $id }}">
+<meta name="messenger-color" content="{{ $messengerColor }}">
+<meta name="messenger-theme" content="{{ $dark_mode }}">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<meta name="url" content="{{ url('').'/'.config('chatify.routes.prefix') }}" data-user="{{ Auth::user()->id }}">
+
+{{-- scripts --}}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="{{ asset('js/chatify/font.awesome.min.js') }}"></script>
+<script src="{{ asset('js/chatify/autosize.js') }}"></script>
+<script src='https://unpkg.com/nprogress@0.2.0/nprogress.js'></script>
+
+{{-- styles --}}
+<link rel='stylesheet' href='https://unpkg.com/nprogress@0.2.0/nprogress.css'/>
+<link href="{{ asset('css/chatify/style.css') }}" rel="stylesheet" />
+<link href="{{ asset('css/chatify/'.$dark_mode.'.mode.css') }}" rel="stylesheet" />
+
+{{-- Setting messenger primary color to css --}}
+<style>
+    :root {
+        --primary-color: {{ $messengerColor }};
+    }
+    
+    /* FIX: Force chat container to use full height without overflowing Filament layout */
+    .messenger {
+        height: calc(100vh - 64px) !important; /* Account for Filament header */
+        max-height: calc(100vh - 64px) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+    }
+    
+    /* Make message area scrollable */
+    .m-body.messages-container {
+        flex: 1 1 auto !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        min-height: 0 !important; /* Critical for flex children to shrink */
+    }
+    
+    /* Keep contacts list scrollable */
+    .m-body.contacts-container {
+        flex: 1 1 auto !important;
+        overflow-y: auto !important;
+        min-height: 0 !important;
+    }
+    
+    /* Pin composer to bottom - always visible */
+    .messenger-sendCard {
+        position: sticky !important;
+        bottom: 0 !important;
+        flex-shrink: 0 !important;
+        z-index: 999 !important;
+        background: white !important;
+        padding-bottom: env(safe-area-inset-bottom) !important;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* Fix mobile input text visibility */
+    .messenger-sendCard textarea,
+    .messenger-sendCard input[type="text"] {
+        color: #1f2937 !important;
+        background-color: #ffffff !important;
+        -webkit-text-fill-color: #1f2937 !important;
+    }
+    
+    .messenger-sendCard textarea::placeholder,
+    .messenger-sendCard input::placeholder {
+        color: #9ca3af !important;
+        opacity: 1 !important;
+    }
+    
+    /* Dark mode support */
+    @media (prefers-color-scheme: dark) {
+        .messenger-sendCard {
+            background: #1f2937 !important;
+        }
+        .messenger-sendCard textarea,
+        .messenger-sendCard input[type="text"] {
+            color: #f3f4f6 !important;
+            background-color: #374151 !important;
+            -webkit-text-fill-color: #f3f4f6 !important;
+        }
+    }
+</style>
