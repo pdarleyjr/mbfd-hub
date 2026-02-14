@@ -120,7 +120,8 @@ class StationInventoryV2Controller extends Controller
 
         return response()->json([
             'success' => true,
-            'token' => $token,
+            'token' => '?' . parse_url($token, PHP_URL_QUERY),
+            'station_id' => $station->id,
             'station' => [
                 'id' => $station->id,
                 'name' => $station->name,

@@ -6,7 +6,7 @@ interface InventoryPINStepProps {
   stationId: number;
   actorName: string;
   actorShift: Shift;
-  onSuccess: (token: string) => void;
+  onSuccess: (token: string, stationId: number) => void;
   onBack: () => void;
 }
 
@@ -41,7 +41,7 @@ export default function InventoryPINStep({
       });
       
       if (response.success) {
-        onSuccess(response.token);
+        onSuccess(response.token, response.station_id);
       } else {
         setError(response.message || 'Invalid PIN');
       }
