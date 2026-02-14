@@ -396,8 +396,16 @@ export interface PINVerifyRequest {
 
 export interface PINVerifyResponse {
   success: boolean;
-  token: string;
-  station_id: number;
+  station_id: number; // Canonical PK
+  station: {
+    id: number;
+    name: string;
+    station_number: string;
+    address: string;
+  };
+  // Absolute signed URLs - use as-is, do NOT concatenate
+  inventory_url: string;
+  supply_requests_url: string;
   message?: string;
 }
 

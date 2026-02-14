@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { Shift } from '../types';
+import { Shift, PINVerifyResponse } from '../types';
 import { ApiClient } from '../utils/api';
 
 interface InventoryPINStepProps {
   stationId: number;
+  stationNumber: number;
   actorName: string;
   actorShift: Shift;
-  onSuccess: (token: string, stationId: number) => void;
+  onSuccess: (response: PINVerifyResponse) => void;
   onBack: () => void;
 }
 
 export default function InventoryPINStep({
   stationId,
+  stationNumber,
   actorName,
   actorShift,
   onSuccess,
@@ -41,7 +43,8 @@ export default function InventoryPINStep({
       });
       
       if (response.success) {
-        onSuccess(response.token, response.station_id);
+        // Pass the full response with URLs
+        onSuccess(response);
       } else {
         setError(response.message || 'Invalid PIN');
       }
@@ -74,12 +77,10 @@ export default function InventoryPINStep({
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Enter Station PIN</h2>
         <p className="text-gray-600 mb-1">
-          Station {stationId} - {actorName} (Shift {actorShift})
+          Station {stationNumber} - {actorName} (Shift {actorShift})
         </p>
         <p className="text-sm text-gray-500">
           Enter your station's 4-digit PIN
-        </p>
-        <p className="text-xs text-gray-400 mt-1">
         </p>
       </div>
 

@@ -55,7 +55,7 @@ class Under25kProjectResource extends Resource
                             ->maxLength(255)
                             ->label('Project Manager'),
                         Forms\Components\Select::make('station_id')
-                            ->relationship('station', 'name')
+                            ->relationship('station', 'station_number')
                             ->searchable()
                             ->preload()
                             ->label('Station')
@@ -218,7 +218,7 @@ class Under25kProjectResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('station')
-                    ->relationship('station', 'name')
+                    ->relationship('station', 'station_number')
                     ->searchable()
                     ->preload()
                     ->label('Station'),

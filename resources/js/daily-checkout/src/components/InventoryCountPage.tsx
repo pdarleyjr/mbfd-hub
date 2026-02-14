@@ -7,7 +7,8 @@ interface InventoryCountPageProps {
   stationName: string;
   actorName: string;
   actorShift: Shift;
-  token: string;
+  inventoryUrl: string; // Absolute signed URL
+  supplyRequestsUrl: string; // Absolute signed URL
   onLogout: () => void;
 }
 
@@ -18,7 +19,8 @@ export default function InventoryCountPage({
   stationName,
   actorName,
   actorShift,
-  token,
+  inventoryUrl,
+  supplyRequestsUrl,
   onLogout,
 }: InventoryCountPageProps) {
   const [categories, setCategories] = useState<InventoryV2Category[]>([]);
@@ -35,7 +37,8 @@ export default function InventoryCountPage({
 
   const fetchInventory = useCallback(async () => {
     try {
-      const data = await ApiClient.getInventoryV2(stationId, token);
+      // Use inventoryUrl directly - it's a complete signed URL
+      const data = await ApiClient.getInventoryV2(inventoryUrl);
       
       // Map API response structure to component state
       // API returns: { inventory: [{category: "...", items: [...]}] }
@@ -62,18 +65,19 @@ export default function InventoryCountPage({
     } finally {
       setLoading(false);
     }
-  }, [stationId, token]);
+  }, [inventoryUrl]);
 
   const fetchSupplyRequests = useCallback(async () => {
     try {
-      const response = await ApiClient.getSupplyRequests(stationId, token);
+      // Use supplyRequestsUrl directly - it's a complete signed URL
+      const response = await ApiClient.getSupplyRequests(supplyRequestsUrl);
       // API returns: { requests: [...] }
       const requests = Array.isArray(response.requests) ? response.requests : [];
       setSupplyRequests(requests);
     } catch (err) {
       console.error('Failed to load supply requests:', err);
     }
-  }, [stationId, token]);
+  }, [supplyRequestsUrl]);
 
   useEffect(() => {
     fetchInventory();
@@ -108,15 +112,15 @@ export default function InventoryCountPage({
     setSaving(prev => ({ ...prev, [itemId]: true }));
     
     try {
+      // Use inventoryUrl directly for update - it contains the base signed URL
       await ApiClient.updateInventoryItem(
-        stationId,
+        inventoryUrl,
         itemId,
         {
           on_hand: count,
           actor_name: actorName,
           actor_shift: actorShift,
-        },
-        token
+        }
       );
       
       setPendingChanges(prev => {
@@ -141,14 +145,14 @@ export default function InventoryCountPage({
     setSubmittingRequest(true);
     
     try {
+      // Use supplyRequestsUrl directly - it's a complete signed URL
       await ApiClient.createSupplyRequest(
-        stationId,
+        supplyRequestsUrl,
         {
           request_text: newRequestText.trim(),
           actor_name: actorName,
           actor_shift: actorShift,
-        },
-        token
+        }
       );
       
       setNewRequestText('');

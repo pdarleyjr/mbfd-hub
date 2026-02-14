@@ -1,8 +1,17 @@
 import { useState } from 'react';
 import { Shift } from '../types';
 
+// Map station numbers to database IDs
+const STATION_ID_MAP: Record<number, number> = {
+  1: 29,
+  2: 30,
+  3: 31,
+  4: 32,
+  6: 33,
+};
+
 interface InventoryUserInfoStepProps {
-  onContinue: (data: { employeeName: string; shift: Shift; station: number }) => void;
+  onContinue: (data: { employeeName: string; shift: Shift; station: number; stationNumber: number }) => void;
 }
 
 export default function InventoryUserInfoStep({ onContinue }: InventoryUserInfoStepProps) {
@@ -31,10 +40,14 @@ export default function InventoryUserInfoStep({ onContinue }: InventoryUserInfoS
       return;
     }
 
+    // Convert station number to DB ID
+    const stationDbId = STATION_ID_MAP[station as number];
+    
     onContinue({
       employeeName: employeeName.trim(),
       shift: shift as Shift,
-      station: station as number,
+      station: stationDbId, // DB ID for API calls
+      stationNumber: station as number, // Station number for display
     });
   };
 
@@ -116,14 +129,14 @@ export default function InventoryUserInfoStep({ onContinue }: InventoryUserInfoS
             }`}
           >
             <option value="">Select a station</option>
-            {[1, 2, 3, 4].map((num) => (
+            {[1, 2, 3, 4, 6].map((num) => (
               <option key={num} value={num}>
                 Station {num}
               </option>
             ))}
           </select>
-          {errors.station && (
-            <p className="mt-1 text-sm text-red-600">{errors.station}</p>
+          {errors.stage && (
+            <p className="mt-1 text-sm text-red-600">{errors.stage}</p>
           )}
         </div>
 
