@@ -1,0 +1,3 @@
+/* Chatify integration styles for Filament */
+.fi-page .messenger { height: calc(100vh - 4rem); overflow: hidden; }
+.fi-page .messenger .m-body { overflow-y: auto; }

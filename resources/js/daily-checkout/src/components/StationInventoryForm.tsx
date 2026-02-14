@@ -16,13 +16,15 @@ export default function StationInventoryForm() {
     station: number;
   } | null>(null);
   const [authToken, setAuthToken] = useState<string>('');
+  const [stationPkId, setStationPkId] = useState<number>(0);
 
   const handleUserInfoSubmit = (data: { employeeName: string; shift: Shift; station: number }) => {
     setUserInfo(data);
     setStep('pin');
   };
 
-  const handlePINSuccess = (token: string) => {
+  const handlePINSuccess = (token: string, stationId: number) => {
+    setStationPkId(stationId);
     setAuthToken(token);
     setStep('inventory');
   };
@@ -70,7 +72,7 @@ export default function StationInventoryForm() {
 
         {step === 'pin' && userInfo && (
           <InventoryPINStep
-            stationId={userInfo.station}
+            stationId={stationPkId}
             actorName={userInfo.employeeName}
             actorShift={userInfo.shift}
             onSuccess={handlePINSuccess}
@@ -82,7 +84,7 @@ export default function StationInventoryForm() {
       {/* Inventory page renders full-screen */}
       {step === 'inventory' && userInfo && (
         <InventoryCountPage
-          stationId={userInfo.station}
+          stationId={stationPkId}
           stationName={`Station ${userInfo.station}`}
           actorName={userInfo.employeeName}
           actorShift={userInfo.shift}
