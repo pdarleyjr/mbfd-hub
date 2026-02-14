@@ -36,7 +36,7 @@ class StationInventoryItemsRelationManager extends RelationManager
                 'success' => 'ok',
                 'danger' => 'low',
                 'warning' => 'ordered',
-                'prmary' => 'overstocked', // Use primary or another distinct color
+                'primary' => 'overstocked',
             ])
             ->formatStateUsing(fn(string $state): string => match ($state) {
             'ok' => 'OK',
