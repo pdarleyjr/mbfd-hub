@@ -107,26 +107,38 @@ class StationInventoryV2Controller extends Controller
             'to_value' => null,
         ]);
 
-        // Generate signed URL token (expires in 4 hours)
-        $token = URL::temporarySignedRoute(
+        // Generate signed URLs (expires in 4 hours)
+        // Include actor parameters for audit trail
+        $urlParams = [
+            'stationId' => $station->id,
+            'actor_name' => $request->actor_name,
+            'actor_shift' => $request->actor_shift,
+        ];
+
+        $inventoryUrl = URL::temporarySignedRoute(
             'api.v2.station-inventory.access',
             now()->addHours(4),
-            [
-                'stationId' => $station->id,
-                'actor_name' => $request->actor_name,
-                'actor_shift' => $request->actor_shift,
-            ]
+            $urlParams
+        );
+
+        $supplyRequestsUrl = URL::temporarySignedRoute(
+            'api.v2.station-inventory.supply-requests',
+            now()->addHours(4),
+            $urlParams
         );
 
         return response()->json([
             'success' => true,
-            'token' => $token,
+            'station_id' => $station->id,  // Canonical PK for any subsequent operations
             'station' => [
                 'id' => $station->id,
                 'name' => $station->name,
                 'station_number' => $station->station_number,
                 'address' => $station->address,
             ],
+            // Return absolute signed URLs - frontend should use these as-is
+            'inventory_url' => $inventoryUrl,
+            'supply_requests_url' => $supplyRequestsUrl,
         ]);
     }
 

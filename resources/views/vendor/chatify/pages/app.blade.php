@@ -11,12 +11,17 @@
 <link rel='stylesheet' href='https://unpkg.com/nprogress@0.2.0/nprogress.css'/>
 <link href="{{ asset('css/chatify/style.css') }}" rel="stylesheet" />
 <link href="{{ asset('css/chatify/'.$dark_mode.'.mode.css') }}" rel="stylesheet" />
+{{-- Viewport/no-scroll fixes - ensures messenger fills viewport with internal scrolling only --}}
+<link href="{{ asset('css/chatify/chatify-composer-fix.css') }}" rel="stylesheet" />
 
 {{-- NProgress JS library - required by code.js --}}
 <script src="https://unpkg.com/nprogress@0.2.0/nprogress.js"></script>
 
 {{-- jQuery MUST load before Chatify code.js --}}
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+{{-- autosize.js MUST load before code.js (code.js depends on it) --}}
+<script src="{{ asset('js/chatify/autosize.js') }}"></script>
 
 {{-- Setting messenger primary color to css --}}
 <style>

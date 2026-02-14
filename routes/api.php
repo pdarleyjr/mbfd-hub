@@ -77,7 +77,7 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
     Route::post('/station-inventory/verify-pin', [StationInventoryV2Controller::class, 'verifyPin']);
     
     // Protected endpoints (require valid signed URL from PIN verification)
-    Route::middleware('signed')->name('api.v2.station-inventory.')->group(function () {
+    Route::name('api.v2.station-inventory.')->group(function () {
         // Inventory list
         Route::get('/station-inventory/{stationId}', [StationInventoryV2Controller::class, 'getInventory'])
             ->name('access');
@@ -86,7 +86,8 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
         Route::put('/station-inventory/{stationId}/item/{itemId}', [StationInventoryV2Controller::class, 'updateItem']);
         
         // Supply requests
-        Route::get('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'getSupplyRequests']);
+        Route::get('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'getSupplyRequests'])
+            ->name('supply-requests');
         Route::post('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'createSupplyRequest']);
     });
 });
