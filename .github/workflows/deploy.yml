@@ -75,6 +75,13 @@ jobs:
             echo "✓ Daily-checkout frontend built"
           EOF
 
+      - name: Deploy Cloudflare Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: 'cloudflare-worker'
+          command: deploy
+
       - name: Purge Cloudflare Cache
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -107,8 +114,41 @@ jobs:
           else
             echo "⚠ Daily checkout check failed"
           fi
+
+      - name: Verify Service Workers
+        run: |
+          echo "Verifying /sw.js..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://support.darleyplex.com/sw.js)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ERROR: /sw.js returned $HTTP_CODE, expected 200"
+            exit 1
+          fi
+          echo "✓ /sw.js returned 200"
           
-          echo "✓ Deploy complete!"
+          # Verify content type is JavaScript
+          CONTENT_TYPE=$(curl -s -I https://support.darleyplex.com/sw.js | grep -i content-type | cut -d' ' -f2 | tr -d '\r')
+          echo "Content-Type: $CONTENT_TYPE"
+          if [[ "$CONTENT_TYPE" != *"javascript"* && "$CONTENT_TYPE" != *"text/plain"* ]]; then
+            echo "WARNING: Unexpected Content-Type for service worker"
+          fi
+
+          echo "Verifying /daily/service-worker.js..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://support.darleyplex.com/daily/service-worker.js)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ERROR: /daily/service-worker.js returned $HTTP_CODE, expected 200"
+            exit 1
+          fi
+          echo "✓ /daily/service-worker.js returned 200"
+
+          echo "Verifying /manifest.json..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://support.darleyplex.com/manifest.json)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ERROR: /manifest.json returned $HTTP_CODE, expected 200"
+            exit 1
+          fi
+          echo "✓ /manifest.json returned 200"
+          
+          echo "✓ Deployment and Verification complete!"
 
       - name: Notify on Failure
         if: failure()
