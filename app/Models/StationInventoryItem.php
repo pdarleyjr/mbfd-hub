@@ -79,7 +79,7 @@ class StationInventoryItem extends Model
         $this->last_updated_at = now();
 
         $par = $this->inventoryItem->par_quantity;
-        $lowThreshold = (int)floor($par / 2);
+        $lowThreshold = $this->inventoryItem->effective_low_threshold;
 
         // Logic:
         // 1. If currently 'ordered' and count increases but still below par -> stay 'ordered' (partial fill)??

@@ -201,11 +201,10 @@ class StationResource extends Resource
             RelationManagers\ApparatusesRelationManager::class,
             RelationManagers\CapitalProjectsRelationManager::class,
             RelationManagers\Under25kProjectsRelationManager::class,
-            RelationManagers\InventorySubmissionsRelationManager::class,
+            // RelationManagers\InventorySubmissionsRelationManager::class, // Removed as resource is deleted
             RelationManagers\SingleGasMetersRelationManager::class,
             RelationManagers\StationInventoryItemsRelationManager::class,
             RelationManagers\StationSupplyRequestsRelationManager::class,
-        ];
     }
 
     public static function getPages(): array

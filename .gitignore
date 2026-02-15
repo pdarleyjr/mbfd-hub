@@ -45,6 +45,7 @@ yarn-error.log
 /final_system_check.ps1
 /final_system_check_sql.ps1
 /fix_admin_access.ps1
+/deploy_inventory_fix.ps1
 
 # Documentation with potentially sensitive content
 TOKEN_GENERATION_GUIDE.md
