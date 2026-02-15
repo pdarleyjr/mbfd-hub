@@ -1,0 +1,23 @@
+name: Deploy to VPS (Self-hosted)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Copy .env
+        run: cp .env.example .env || true # fail safe if .env already exists or handled otherwise
+
+      - name: Build and Start Application
+        run: docker compose up -d --build
+
+      - name: Run Migrations
+        run: docker compose exec -T app php artisan migrate --force
+
+      - name: Optimize
+        run: docker compose exec -T app php artisan optimize
