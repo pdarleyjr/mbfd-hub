@@ -22,6 +22,8 @@ class StationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
     protected static ?string $navigationGroup = 'Operations';
+
+    // Force update to fix VPS corruption
     protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
