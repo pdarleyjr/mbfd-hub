@@ -206,6 +206,7 @@ class StationResource extends Resource
             RelationManagers\SingleGasMetersRelationManager::class,
             RelationManagers\StationInventoryItemsRelationManager::class,
             RelationManagers\StationSupplyRequestsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
