@@ -55,6 +55,9 @@ export default function InventoryCountPage({
               par_units: item.par_units || item.par_quantity || 0,
               on_hand: item.on_hand || 0,
               status: item.status || 'ok',
+              vendor_name: item.vendor_name || null,
+              vendor_url: item.vendor_url || null,
+              vendor_sku: item.vendor_sku || null,
             })) : []
           }))
         : [];
@@ -215,12 +218,14 @@ export default function InventoryCountPage({
         <div className="px-4 py-4">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-xl font-bold">{stationName}</h1>
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1 text-sm bg-green-700 hover:bg-green-800 rounded-lg transition"
-            >
-              Logout
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleLogout}
+                className="px-3 py-1 text-sm bg-green-700 hover:bg-green-800 rounded-lg transition"
+              >
+                Logout
+              </button>
+            </div>
           </div>
           <div className="flex items-center justify-between text-sm text-green-100">
             <span>{actorName} • Shift {actorShift}</span>
@@ -262,7 +267,23 @@ export default function InventoryCountPage({
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 pr-2">
                       <div className="font-semibold text-gray-900">{item.name}</div>
-                      <div className="text-xs text-gray-500">SKU: {item.sku}</div>
+                      <div className="text-xs text-gray-500">
+                        {item.vendor_url ? (
+                          <a
+                            href={item.vendor_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 underline inline-flex items-center gap-1"
+                          >
+                            {item.sku || item.vendor_sku}
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                        ) : (
+                          <span className="text-gray-600">{item.sku || item.vendor_sku || '—'}</span>
+                        )}
+                      </div>
                     </div>
                     {getStatusBadge(item)}
                   </div>
