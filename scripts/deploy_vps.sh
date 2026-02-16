@@ -3,7 +3,7 @@ set -e
 
 # Configuration
 VPS_USER="root"
-VPS_HOST="147.93.53.119"
+VPS_HOST="145.223.73.170"
 VPS_PATH="/root/mbfd-hub"
 
 echo "Deploying to VPS..."
