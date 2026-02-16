@@ -1,3 +1,6 @@
+@extends('filament-chatify::page')
+
+@ section('content')
 @include('vendor.chatify.layouts.headLinks')
 <div class="messenger">
     {{-- LeftSide --}}
@@ -68,7 +71,7 @@
             <div class="internet-connection">
                 <span class="ic-connected">Connected</span>
                 <span class="ic-connecting">Connecting...</span>
-                <span class="ic-no498">No internet access</span>
+                <span class="ic-noConnection">No internet access</span>
             </div>
         </div>
 
@@ -100,6 +103,6 @@
         {!! view('vendor.chatify.layouts.info')->render() !!}
     </div>
 </div>
-
 @include('vendor.chatify.layouts.modals')
 @include('vendor.chatify.layouts.footerLinks')
+@endsection
