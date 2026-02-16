@@ -62,6 +62,22 @@ class InventoryItemResource extends Resource
                 ->label('Active Item')
                 ->default(true),
             ])->columns(2),
+
+            Forms\Components\Section::make('Vendor Information')
+            ->schema([
+                Forms\Components\TextInput::make('vendor_name')
+                ->label('Vendor Name')
+                ->default('Grainger')
+                ->maxLength(255),
+                Forms\Components\TextInput::make('vendor_sku')
+                ->label('Vendor SKU')
+                ->maxLength(255),
+                Forms\Components\TextInput::make('vendor_url')
+                ->label('Vendor Product URL')
+                ->url()
+                ->maxLength(500),
+            ])->columns(3)
+            ->collapsible(),
         ]);
     }
 
@@ -82,6 +98,12 @@ class InventoryItemResource extends Resource
             ->label('Low Threshold')
             ->placeholder('Default (50%)')
             ->sortable(),
+            Tables\Columns\TextColumn::make('vendor_url')
+            ->label('Vendor')
+            ->url(fn ($record) => $record->vendor_url, shouldOpenInNewTab: true)
+            ->placeholder('—')
+            ->formatStateUsing(fn ($state) => $state ? 'Open' : '—')
+            ->color('primary'),
             Tables\Columns\IconColumn::make('active')
             ->boolean()
             ->sortable(),
@@ -93,6 +115,13 @@ class InventoryItemResource extends Resource
         ])
             ->actions([
             Tables\Actions\EditAction::make(),
+        ])
+            ->headerActions([
+            Tables\Actions\Action::make('grainger_catalog')
+            ->label('Grainger Catalog')
+            ->icon('heroicon-o-arrow-top-right-on-square')
+            ->url('/catalogs/station-supply-grainger.html', shouldOpenInNewTab: true)
+            ->visible(fn () => config('features.grainger_links', true)),
         ])
             ->bulkActions([
             Tables\Actions\BulkActionGroup::make([
