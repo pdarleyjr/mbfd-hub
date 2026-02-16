@@ -1,0 +1,26 @@
+name: Debug Connectivity (VPS)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: [self-hosted, mbfd-vps]
+    steps:
+      - name: Docker Status
+        run: docker ps -a
+
+      - name: Internal App Check
+        run: |
+          docker compose exec -T laravel.test curl -sI http://localhost || echo "Internal Laravel check failed"
+          curl -sI http://localhost:80 || echo "Port 80 check failed"
+
+      - name: Check Blocklists
+        run: |
+          sudo fail2ban-client status || echo "Fail2ban not installed or accessible"
+          sudo fail2ban-client status nginx-http-auth || true
+          sudo iptables -L -n -v | grep -i DROP || true
+
+      - name: Server Logs (Last 50 lines)
+        run: |
+          docker compose logs --tail=50 laravel.test
