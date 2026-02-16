@@ -1,0 +1,11 @@
+Please visit the following URL to authorize the app:
+
+https://accounts.google.com/o/oauth2/v2/auth?access_type=offline&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.send%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email&prompt=consent&response_type=code&client_id=903132287674-vtdohvi2l7qrhae97ffa4kajk7tn8vj5.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fdevelopers.google.com%2Foauthplayground
+
+INSTRUCTIONS:
+1. Visit the URL above.
+2. Log in with 'mbfdsupport@gmail.com'.
+3. You will be redirected to Google OAuth Playground.
+4. Look at the 'Authorization code' field on the left (Step 2).
+5. OR copy the 'code' parameter from the URL in your browser address bar.
+6. Paste that code back here.

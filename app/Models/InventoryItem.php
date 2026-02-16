@@ -18,6 +18,9 @@ class InventoryItem extends Model
         'unit_multiplier',
         'active',
         'sort_order',
+        'vendor_name',
+        'vendor_url',
+        'vendor_sku',
     ];
 
     protected $casts = [
