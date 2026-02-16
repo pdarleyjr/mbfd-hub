@@ -60,3 +60,9 @@ PROJECT_SUMMARY.md
 pics/
 MBFD_HUB_DISCOVERY_REPORT_2026-02-12.md
 PERFORMANCE_FIX_REPORT_2026-02-12.md
+tokens.txt
+oauth_helper.php
+oauth_helper.js
+oauth_helper.cjs
+auth_url.txt
+scripts/setup_vps_secrets.ps1
