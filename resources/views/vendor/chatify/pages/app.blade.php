@@ -1,32 +1,8 @@
-{{-- Filament-optimized Chatify view --}}
-{{-- This version removes duplicate headLinks (meta tags, jQuery, scripts) since Filament already loads them --}}
-{{-- We keep the CSS and messenger-specific variables inline --}}
-
-<meta name="id" content="{{ $id }}">
-<meta name="messenger-color" content="{{ $messengerColor }}">
-<meta name="messenger-theme" content="{{ $dark_mode }}">
-<meta name="url" content="{{ url('').'/'.config('chatify.routes.prefix') }}" data-user="{{ Auth::user()->id }}">
-
-{{-- Chatify styles only --}}
-<link rel='stylesheet' href='https://unpkg.com/nprogress@0.2.0/nprogress.css'/>
-<script src="https://unpkg.com/nprogress@0.2.0/nprogress.js"></script>
-<link href="{{ asset('css/chatify/style.css') }}" rel="stylesheet" />
-<link href="{{ asset('css/chatify/'.$dark_mode.'.mode.css') }}" rel="stylesheet" />
-
-{{-- jQuery MUST load before Chatify code.js --}}
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-
-{{-- Setting messenger primary color to css --}}
-<style>
-    :root {
-        --primary-color: {{ $messengerColor }};
-    }
-</style>
-
+@include('vendor.chatify.layouts.headLinks')
 <div class="messenger">
-    {{-- ----------------------Users/Groups lists side---------------------- --}}
-    <div class="messenger-listView {{ !!$id ? 'conversation-active' : '' }}">
-        {{-- Header and search bar --}}
+    {{-- LeftSide --}}
+    <div class="messenger-listView">
+        {{-- Header and search --}}
         <div class="m-header">
             <nav>
                 <a href="#"><i class="fas fa-inbox"></i> <span class="messenger-headTitle">MESSAGES</span> </a>
@@ -39,42 +15,39 @@
             {{-- Search input --}}
             <input type="text" class="messenger-search" placeholder="Search" />
             {{-- Tabs --}}
-            {{-- <div class="messenger-listView-tabs">
+            <div class="messenger-listView-tabs">
                 <a href="#" class="active-tab" data-view="users">
-                    <span class="far fa-user"></span> Contacts</a>
-            </div> --}}
+                    <span class="fas fa-clock" title="Recent"></span>
+                </a>
+                <a href="#" data-view="search">
+                    <span class="fas fa-search" title="Search"></span>
+                </a>
+            </div>
         </div>
         {{-- tabs and lists --}}
         <div class="m-body contacts-container">
-           {{-- Lists [Users/Group] --}}
-           {{-- ---------------- [ User Tab ] ---------------- --}}
-           <div class="show messenger-tab users-tab app-scroll" data-view="users">
-               {{-- Favorites --}}
-               <div class="favorites-section">
+            <div class="show messenger-tab users-tab app-scroll" data-view="users">
+                {{-- Users list --}}
                 <p class="messenger-title"><span>Favorites</span></p>
-                <div class="messenger-favorites app-scroll-hidden"></div>
-               </div>
-               {{-- Saved Messages --}}
-               <p class="messenger-title"><span>Your Space</span></p>
-               {!! view('Chatify::layouts.listItem', ['get' => 'saved']) !!}
-               {{-- Contact --}}
-               <p class="messenger-title"><span>All Messages</span></p>
-               <div class="listOfContacts" style="width: 100%;height: calc(100% - 272px);position: relative;"></div>
-           </div>
-             {{-- ---------------- [ Search Tab ] ---------------- --}}
-           <div class="messenger-tab search-tab app-scroll" data-view="search">
-                {{-- items --}}
+                <div class="favorites-section">
+                    {!! $favorites !!}
+                </div>
+                <p class="messenger-title"><span>All Messages</span></p>
+                <div class="listOfContacts" style="width: 100%;height: calc(100% - 200px);position: relative;"></div>
+            </div>
+            <div class="messenger-tab search-tab app-scroll" data-view="search">
+                {{-- Search tab --}}
                 <p class="messenger-title"><span>Search</span></p>
                 <div class="search-records">
                     <p class="message-hint center-el"><span>Type to search..</span></p>
                 </div>
-             </div>
+            </div>
         </div>
     </div>
 
-    {{-- ----------------------Messaging side---------------------- --}}
+    {{-- RightSide --}}
     <div class="messenger-messagingView">
-        {{-- header title [conversation name] amd buttons --}}
+        {{-- header --}}
         <div class="m-header m-header-messaging">
             <nav class="chatify-d-flex chatify-justify-content-between chatify-align-items-center">
                 {{-- header back button, avatar and user name --}}
@@ -95,7 +68,7 @@
             <div class="internet-connection">
                 <span class="ic-connected">Connected</span>
                 <span class="ic-connecting">Connecting...</span>
-                <span class="ic-noInternet">No internet access</span>
+                <span class="ic-no498">No internet access</span>
             </div>
         </div>
 
@@ -106,49 +79,27 @@
             </div>
             {{-- Typing indicator --}}
             <div class="typing-indicator">
-                <div class="message-card typing">
-                    <div class="message">
-                        <span class="typing-dots">
-                            <span class="dot dot-1"></span>
-                            <span class="dot dot-2"></span>
-                            <span class="dot dot-3"></span>
-                        </span>
-                    </div>
+                <div class="typingWrapper">
+                    <div class="typingCircle"></div>
+                    <div class="typingCircle"></div>
+                    <div class="typingCircle"></div>
                 </div>
             </div>
-
+            {{-- Send Message Form --}}
+            @include('vendor.chatify.layouts.sendForm')
         </div>
-        {{-- Send Message Form --}}
-        @include('Chatify::layouts.sendForm')
     </div>
-    {{-- ---------------------- Info side ---------------------- --}}
+
+    {{-- InfoSide --}}
     <div class="messenger-infoView app-scroll">
-        {{-- nav actions --}}
+        {{-- nav --}}
         <nav>
             <p>User Details</p>
             <a href="#"><i class="fas fa-times"></i></a>
         </nav>
-        {!! view('Chatify::layouts.info')->render() !!}
+        {!! view('vendor.chatify.layouts.info')->render() !!}
     </div>
 </div>
 
-@include('Chatify::layouts.modals')
-{{-- Custom footerLinks without jQuery since we load it above --}}
-<script src="https://js.pusher.com/7.2.0/pusher.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@3.0.3/dist/index.min.js"></script>
-<script>
-    // Gloabl Chatify variables from PHP to JS
-    window.chatify = {
-        name: "{{ config('chatify.name') }}",
-        sounds: {!! json_encode(config('chatify.sounds')) !!},
-        allowedImages: {!! json_encode(config('chatify.attachments.allowed_images')) !!},
-        allowedFiles: {!! json_encode(config('chatify.attachments.allowed_files')) !!},
-        maxUploadSize: {{ Chatify::getMaxUploadSize() }},
-        pusher: {!! json_encode(config('chatify.pusher')) !!},
-        pusherAuthEndpoint: '{{route("pusher.auth")}}'
-    };
-    window.chatify.allAllowedExtensions = chatify.allowedImages.concat(chatify.allowedFiles);
-</script>
-<script src="{{ asset('js/chatify/autosize.js') }}"></script>
-<script src="{{ asset('js/chatify/utils.js') }}"></script>
-<script src="{{ asset('js/chatify/code.js') }}"></script>
+@include('vendor.chatify.layouts.modals')
+@include('vendor.chatify.layouts.footerLinks')
