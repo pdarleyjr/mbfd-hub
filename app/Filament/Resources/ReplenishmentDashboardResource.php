@@ -35,15 +35,14 @@ class ReplenishmentDashboardResource extends Resource
                     ->join('inventory_items', 'inventory_items.id', '=', 'station_inventory_items.inventory_item_id')
                     ->whereRaw('
                         station_inventory_items.on_hand < 
-                        COALESCE(inventory_items.low_threshold, station_inventory_items.par_quantity * 0.5)
+                        COALESCE(inventory_items.low_threshold, inventory_items.par_quantity * 0.5)
                     ')
                     ->select('station_inventory_items.*')
             )
             ->columns([
                 Tables\Columns\TextColumn::make('station.name')
                     ->label('Station')
-                    ->searchable()
-                    ->sortable(),
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('inventoryItem.name')
                     ->label('Item')
                     ->searchable()
@@ -53,12 +52,12 @@ class ReplenishmentDashboardResource extends Resource
                     ->sortable()
                     ->badge()
                     ->color('danger'),
-                Tables\Columns\TextColumn::make('par_quantity')
+                Tables\Columns\TextColumn::make('inventoryItem.par_quantity')
                     ->label('PAR')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('suggested_qty')
                     ->label('Suggested Order')
-                    ->getStateUsing(fn ($record) => max(0, $record->par_quantity - $record->on_hand))
+                    ->getStateUsing(fn ($record) => max(0, $record->inventoryItem->par_quantity - $record->on_hand))
                     ->badge()
                     ->color('warning'),
                 Tables\Columns\TextColumn::make('inventoryItem.vendor_url')
@@ -74,7 +73,7 @@ class ReplenishmentDashboardResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('station')
-                    ->relationship('station', 'name'),
+                    ->relationship('station', 'station_number'),
                 Tables\Filters\SelectFilter::make('category')
                     ->relationship('inventoryItem.category', 'name'),
             ])
@@ -118,7 +117,7 @@ class ReplenishmentDashboardResource extends Resource
                             // Create order lines
                             $orderItems = [];
                             foreach ($records as $record) {
-                                $qtyNeeded = max(0, $record->par_quantity - $record->on_hand);
+                                $qtyNeeded = max(0, $record->inventoryItem->par_quantity - $record->on_hand);
                                 
                                 StationSupplyOrderLine::create([
                                     'station_supply_order_id' => $order->id,
@@ -200,7 +199,7 @@ class ReplenishmentDashboardResource extends Resource
                                     'station_id' => $record->station_id,
                                     'inventory_item_id' => $record->inventory_item_id,
                                     'station_inventory_item_id' => $record->id,
-                                    'qty_suggested' => max(0, $record->par_quantity - $record->on_hand),
+                                    'qty_suggested' => max(0, $record->inventoryItem->par_quantity - $record->on_hand),
                                     'status' => 'pending',
                                 ]);
                             }
@@ -232,8 +231,8 @@ class ReplenishmentDashboardResource extends Resource
                                     'station_id' => $record->station_id,
                                     'inventory_item_id' => $record->inventory_item_id,
                                     'station_inventory_item_id' => $record->id,
-                                    'qty_suggested' => max(0, $record->par_quantity - $record->on_hand),
-                                    'qty_ordered' => max(0, $record->par_quantity - $record->on_hand),
+                                    'qty_suggested' => max(0, $record->inventoryItem->par_quantity - $record->on_hand),
+                                    'qty_ordered' => max(0, $record->inventoryItem->par_quantity - $record->on_hand),
                                     'status' => 'ordered',
                                 ]);
                             }
@@ -263,7 +262,7 @@ class ReplenishmentDashboardResource extends Resource
                                 ])
                                 ->default(fn ($records) => $records->map(fn ($r) => [
                                     'item' => $r->inventoryItem->name,
-                                    'qty_delivered' => max(0, $r->par_quantity - $r->on_hand),
+                                    'qty_delivered' => max(0, $r->inventoryItem->par_quantity - $r->on_hand),
                                 ])->toArray()),
                         ])
                         ->action(function ($records, array $data) {
