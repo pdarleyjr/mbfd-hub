@@ -82,4 +82,21 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Gmail OAuth Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for Gmail API integration for sending supply order emails
+    | to vendors. Uses OAuth 2.0 with refresh tokens for authentication.
+    |
+    */
+
+    'gmail' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'refresh_token' => env('GOOGLE_REFRESH_TOKEN'),
+        'sender_email' => env('GMAIL_SENDER_EMAIL', 'mbfdsupport@gmail.com'),
+    ],
+
 ];

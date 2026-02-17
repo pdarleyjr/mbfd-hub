@@ -6,6 +6,7 @@ use App\Filament\Resources\ReplenishmentDashboardResource\Pages;
 use App\Models\StationInventoryItem;
 use App\Models\StationSupplyOrder;
 use App\Models\StationSupplyOrderLine;
+use App\Services\GmailService;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -82,6 +83,104 @@ class ReplenishmentDashboardResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('generate_email_order')
+                        ->label('Generate & Send Order Email')
+                        ->icon('heroicon-o-envelope')
+                        ->color('primary')
+                        ->requiresConfirmation()
+                        ->modalHeading('Send Supply Order to Vendor')
+                        ->modalDescription('This will create an order and send an email to the vendor immediately')
+                        ->form([
+                            Forms\Components\TextInput::make('recipient_email')
+                                ->label('Vendor Email')
+                                ->email()
+                                ->default('orders@grainger.com')
+                                ->required(),
+                            Forms\Components\Textarea::make('notes')
+                                ->label('Additional Notes')
+                                ->placeholder('Optional message to vendor')
+                                ->rows(3),
+                        ])
+                        ->visible(fn () => config('features.email_sending', false))
+                        ->action(function ($records, array $data) {
+                            $gmail = app(GmailService::class);
+                            
+                            // Create order record
+                            $order = StationSupplyOrder::create([
+                                'created_by' => auth()->id(),
+                                'status' => 'draft',
+                                'sent_via' => 'email',
+                                'subject' => 'Supply Order - ' . now()->format('Y-m-d'),
+                                'recipient_emails' => [$data['recipient_email']],
+                                'vendor_name' => 'Grainger',
+                            ]);
+
+                            // Create order lines
+                            $orderItems = [];
+                            foreach ($records as $record) {
+                                $qtyNeeded = max(0, $record->par_quantity - $record->on_hand);
+                                
+                                StationSupplyOrderLine::create([
+                                    'station_supply_order_id' => $order->id,
+                                    'station_id' => $record->station_id,
+                                    'inventory_item_id' => $record->inventory_item_id,
+                                    'station_inventory_item_id' => $record->id,
+                                    'qty_suggested' => $qtyNeeded,
+                                    'status' => 'pending',
+                                ]);
+
+                                $orderItems[] = [
+                                    'station' => $record->station->name,
+                                    'item' => $record->inventoryItem->name,
+                                    'sku' => $record->inventoryItem->vendor_sku ?? $record->inventoryItem->sku ?? 'N/A',
+                                    'qty' => $qtyNeeded,
+                                ];
+                            }
+
+                            // Generate email body
+                            $emailBody = view('emails.supply-order', [
+                                'orderItems' => $orderItems,
+                                'notes' => $data['notes'] ?? '',
+                                'orderDate' => now()->format('F j, Y'),
+                            ])->render();
+
+                            // Send via Gmail
+                            $result = $gmail->sendEmail([
+                                'to' => $data['recipient_email'],
+                                'from' => 'MBFD Supply Orders <mbfdsupport@gmail.com>',
+                                'subject' => $order->subject,
+                                'body' => $emailBody,
+                            ]);
+
+                            if ($result['success']) {
+                                $order->update([
+                                    'status' => 'sent',
+                                    'sent_at' => now(),
+                                    'provider_message_id' => $result['message_id'],
+                                ]);
+
+                                StationSupplyOrderLine::where('station_supply_order_id', $order->id)
+                                    ->update(['status' => 'ordered']);
+
+                                Notification::make()
+                                    ->title('Order email sent successfully')
+                                    ->body("Order #{$order->id} sent to {$data['recipient_email']}")
+                                    ->success()
+                                    ->send();
+                            } else {
+                                $order->update([
+                                    'status' => 'failed',
+                                    'error_message' => $result['error'],
+                                ]);
+
+                                Notification::make()
+                                    ->title('Email send failed')
+                                    ->body($result['error'])
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+
                     Tables\Actions\BulkAction::make('generate_draft')
                         ->label('Generate Order Email Draft')
                         ->icon('heroicon-o-envelope')

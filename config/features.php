@@ -14,5 +14,6 @@ return [
     */
 
     'replenishment_dashboard' => env('FEATURE_REPLENISHMENT_DASHBOARD', false),
+    'email_sending' => env('FEATURE_EMAIL_SENDING', false),
 
 ];
