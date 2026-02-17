@@ -31,14 +31,12 @@ class ReplenishmentDashboardResource extends Resource
             ->query(
                 StationInventoryItem::query()
                     ->with(['station', 'inventoryItem'])
-                    ->whereHas('inventoryItem')
-                    ->get()
-                    ->filter(function ($item) {
-                        $threshold = $item->inventoryItem->low_threshold 
-                            ?? ($item->par_quantity * 0.5);
-                        return $item->quantity < $threshold;
-                    })
-                    ->toQuery()
+                    ->join('inventory_items', 'inventory_items.id', '=', 'station_inventory_items.inventory_item_id')
+                    ->whereRaw('
+                        station_inventory_items.on_hand < 
+                        COALESCE(inventory_items.low_threshold, station_inventory_items.par_quantity * 0.5)
+                    ')
+                    ->select('station_inventory_items.*')
             )
             ->columns([
                 Tables\Columns\TextColumn::make('station.name')
@@ -49,7 +47,7 @@ class ReplenishmentDashboardResource extends Resource
                     ->label('Item')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('quantity')
+                Tables\Columns\TextColumn::make('on_hand')
                     ->label('On Hand')
                     ->sortable()
                     ->badge()
@@ -59,7 +57,7 @@ class ReplenishmentDashboardResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('suggested_qty')
                     ->label('Suggested Order')
-                    ->getStateUsing(fn ($record) => max(0, $record->par_quantity - $record->quantity))
+                    ->getStateUsing(fn ($record) => max(0, $record->par_quantity - $record->on_hand))
                     ->badge()
                     ->color('warning'),
                 Tables\Columns\TextColumn::make('inventoryItem.vendor_url')
@@ -103,7 +101,7 @@ class ReplenishmentDashboardResource extends Resource
                                     'station_id' => $record->station_id,
                                     'inventory_item_id' => $record->inventory_item_id,
                                     'station_inventory_item_id' => $record->id,
-                                    'qty_suggested' => max(0, $record->par_quantity - $record->quantity),
+                                    'qty_suggested' => max(0, $record->par_quantity - $record->on_hand),
                                     'status' => 'pending',
                                 ]);
                             }
@@ -135,8 +133,8 @@ class ReplenishmentDashboardResource extends Resource
                                     'station_id' => $record->station_id,
                                     'inventory_item_id' => $record->inventory_item_id,
                                     'station_inventory_item_id' => $record->id,
-                                    'qty_suggested' => max(0, $record->par_quantity - $record->quantity),
-                                    'qty_ordered' => max(0, $record->par_quantity - $record->quantity),
+                                    'qty_suggested' => max(0, $record->par_quantity - $record->on_hand),
+                                    'qty_ordered' => max(0, $record->par_quantity - $record->on_hand),
                                     'status' => 'ordered',
                                 ]);
                             }
@@ -166,7 +164,7 @@ class ReplenishmentDashboardResource extends Resource
                                 ])
                                 ->default(fn ($records) => $records->map(fn ($r) => [
                                     'item' => $r->inventoryItem->name,
-                                    'qty_delivered' => max(0, $r->par_quantity - $r->quantity),
+                                    'qty_delivered' => max(0, $r->par_quantity - $r->on_hand),
                                 ])->toArray()),
                         ])
                         ->action(function ($records, array $data) {
@@ -175,7 +173,7 @@ class ReplenishmentDashboardResource extends Resource
                                 
                                 // Update station inventory
                                 $record->update([
-                                    'quantity' => $record->quantity + $qtyDelivered,
+                                    'on_hand' => $record->on_hand + $qtyDelivered,
                                     'updated_by' => auth()->id(),
                                     'last_updated_at' => now(),
                                 ]);

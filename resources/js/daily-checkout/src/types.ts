@@ -351,6 +351,9 @@ export interface InventoryV2Item {
   par_units: number;
   on_hand: number;
   status: 'ok' | 'low' | 'ordered';
+  vendor_url?: string;
+  vendor_name?: string;
+  vendor_sku?: string;
 }
 
 export interface InventoryV2Response {
@@ -367,6 +370,9 @@ export interface InventoryV2Response {
       inventory_item_id: number;
       name: string;
       sku: string;
+      vendor_url?: string;
+      vendor_name?: string;
+      vendor_sku?: string;
       unit_label: string;
       par_quantity: number;
       par_units: number;
