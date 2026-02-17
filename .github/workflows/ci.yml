@@ -60,6 +60,9 @@ jobs:
     - name: Generate key
       run: php artisan key:generate
 
+    - name: Discover packages
+      run: php artisan package:discover --ansi
+
     - name: Directory Permissions
       run: chmod -R 777 storage bootstrap/cache
 
