@@ -63,6 +63,11 @@ jobs:
     - name: Discover packages
       run: php artisan package:discover --ansi
 
+    - name: Publish vendor migrations
+      run: |
+        php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider" --tag="permission-migrations" --force
+        php artisan vendor:publish --provider="Munafio\Chatify\ChatifyServiceProvider" --force || true
+
     - name: Directory Permissions
       run: chmod -R 777 storage bootstrap/cache
 
