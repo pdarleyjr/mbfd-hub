@@ -72,8 +72,12 @@ class ChatMessageReceivedTest extends TestCase
 
     public function test_notification_includes_action_data(): void
     {
-        $sender = User::factory()->make(['name' => 'Test User', 'id' => 123]);
-        $message = new ChMessage(['body' => 'Test', 'id' => 456]);
+        $sender = User::factory()->make(['name' => 'Test User']);
+        $sender->id = 123;
+        
+        // ChMessage id is not fillable, so set it directly after construction
+        $message = new ChMessage(['body' => 'Test']);
+        $message->id = 456;
         
         $notification = new ChatMessageReceived($sender, $message);
         
@@ -83,6 +87,7 @@ class ChatMessageReceivedTest extends TestCase
         );
         
         $array = $this->getMessageArray($webPushMessage);
+        $this->assertArrayHasKey('data', $array);
         $this->assertArrayHasKey('url', $array['data']);
         $this->assertArrayHasKey('message_id', $array['data']);
         $this->assertArrayHasKey('sender_id', $array['data']);
@@ -116,8 +121,13 @@ class ChatMessageReceivedTest extends TestCase
         );
         
         $array = $this->getMessageArray($webPushMessage);
-        $this->assertArrayHasKey('TTL', $array);
-        $this->assertEquals(3600, $array['TTL']);
+        // TTL is stored in the 'options' sub-array of the WebPushMessage
+        $this->assertTrue(
+            isset($array['options']['TTL']) || isset($array['TTL']),
+            'TTL should be present in options or at top level'
+        );
+        $ttl = $array['options']['TTL'] ?? $array['TTL'] ?? null;
+        $this->assertEquals(3600, $ttl);
     }
 
     public function test_notification_queues_to_notifications_queue(): void
