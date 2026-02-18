@@ -21,8 +21,8 @@ class ChatMessageReceived extends Notification implements ShouldQueue
     use Queueable;
 
     public function __construct(
-        protected User $sender,
-        protected ChMessage $message
+        public User $sender,
+        public ChMessage $message
     ) {}
 
     /**
