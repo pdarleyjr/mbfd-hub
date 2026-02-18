@@ -10,6 +10,14 @@ use Tests\TestCase;
 
 class ChatMessageReceivedTest extends TestCase
 {
+    /**
+     * Get WebPushMessage as array (properties are protected in v10+).
+     */
+    private function getMessageArray(WebPushMessage $message): array
+    {
+        return $message->toArray();
+    }
+
     public function test_creates_correct_web_push_message(): void
     {
         $sender = User::factory()->make(['name' => 'John Doe']);
@@ -23,8 +31,9 @@ class ChatMessageReceivedTest extends TestCase
         );
         
         $this->assertInstanceOf(WebPushMessage::class, $webPushMessage);
-        $this->assertStringContainsString('John Doe', $webPushMessage->title);
-        $this->assertEquals('Test message content', $webPushMessage->body);
+        $array = $this->getMessageArray($webPushMessage);
+        $this->assertStringContainsString('John Doe', $array['title']);
+        $this->assertEquals('Test message content', $array['body']);
     }
 
     public function test_truncates_long_messages_in_notification(): void
@@ -39,8 +48,9 @@ class ChatMessageReceivedTest extends TestCase
             $notification
         );
         
-        $this->assertLessThan(150, strlen($webPushMessage->body));
-        $this->assertStringContainsString('...', $webPushMessage->body);
+        $array = $this->getMessageArray($webPushMessage);
+        $this->assertLessThan(150, strlen($array['body']));
+        $this->assertStringContainsString('...', $array['body']);
     }
 
     public function test_notification_includes_correct_icon(): void
@@ -55,8 +65,9 @@ class ChatMessageReceivedTest extends TestCase
             $notification
         );
         
-        $this->assertEquals('/images/mbfd_app_icon_192.png', $webPushMessage->icon);
-        $this->assertEquals('/images/mbfd_app_icon_96.png', $webPushMessage->badge);
+        $array = $this->getMessageArray($webPushMessage);
+        $this->assertEquals('/images/mbfd_app_icon_192.png', $array['icon']);
+        $this->assertEquals('/images/mbfd_app_icon_96.png', $array['badge']);
     }
 
     public function test_notification_includes_action_data(): void
@@ -71,12 +82,13 @@ class ChatMessageReceivedTest extends TestCase
             $notification
         );
         
-        $this->assertArrayHasKey('url', $webPushMessage->data);
-        $this->assertArrayHasKey('message_id', $webPushMessage->data);
-        $this->assertArrayHasKey('sender_id', $webPushMessage->data);
-        $this->assertEquals('/admin/chat', $webPushMessage->data['url']);
-        $this->assertEquals(456, $webPushMessage->data['message_id']);
-        $this->assertEquals(123, $webPushMessage->data['sender_id']);
+        $array = $this->getMessageArray($webPushMessage);
+        $this->assertArrayHasKey('url', $array['data']);
+        $this->assertArrayHasKey('message_id', $array['data']);
+        $this->assertArrayHasKey('sender_id', $array['data']);
+        $this->assertEquals('/admin/chat', $array['data']['url']);
+        $this->assertEquals(456, $array['data']['message_id']);
+        $this->assertEquals(123, $array['data']['sender_id']);
     }
 
     public function test_notification_uses_web_push_channel(): void
@@ -103,8 +115,9 @@ class ChatMessageReceivedTest extends TestCase
             $notification
         );
         
-        $this->assertArrayHasKey('TTL', $webPushMessage->options);
-        $this->assertEquals(3600, $webPushMessage->options['TTL']);
+        $array = $this->getMessageArray($webPushMessage);
+        $this->assertArrayHasKey('TTL', $array);
+        $this->assertEquals(3600, $array['TTL']);
     }
 
     public function test_notification_queues_to_notifications_queue(): void
