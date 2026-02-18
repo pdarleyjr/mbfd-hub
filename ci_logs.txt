@@ -1,0 +1,402 @@
+﻿2026-02-17T23:13:58.3747072Z Current runner version: '2.331.0'
+2026-02-17T23:13:58.3769707Z ##[group]Runner Image Provisioner
+2026-02-17T23:13:58.3770758Z Hosted Compute Agent
+2026-02-17T23:13:58.3771481Z Version: 20260123.484
+2026-02-17T23:13:58.3772057Z Commit: 6bd6555ca37d84114959e1c76d2c01448ff61c5d
+2026-02-17T23:13:58.3772805Z Build Date: 2026-01-23T19:41:17Z
+2026-02-17T23:13:58.3773514Z Worker ID: {a1a33619-bbdf-4fce-a901-706cd22fe37f}
+2026-02-17T23:13:58.3774186Z Azure Region: westus
+2026-02-17T23:13:58.3774772Z ##[endgroup]
+2026-02-17T23:13:58.3776181Z ##[group]Operating System
+2026-02-17T23:13:58.3776790Z Ubuntu
+2026-02-17T23:13:58.3777214Z 24.04.3
+2026-02-17T23:13:58.3777783Z LTS
+2026-02-17T23:13:58.3778214Z ##[endgroup]
+2026-02-17T23:13:58.3778696Z ##[group]Runner Image
+2026-02-17T23:13:58.3779357Z Image: ubuntu-24.04
+2026-02-17T23:13:58.3779841Z Version: 20260209.23.1
+2026-02-17T23:13:58.3781247Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260209.23/images/ubuntu/Ubuntu2404-Readme.md
+2026-02-17T23:13:58.3782760Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260209.23
+2026-02-17T23:13:58.3783652Z ##[endgroup]
+2026-02-17T23:13:58.3784839Z ##[group]GITHUB_TOKEN Permissions
+2026-02-17T23:13:58.3786629Z Contents: read
+2026-02-17T23:13:58.3787281Z Metadata: read
+2026-02-17T23:13:58.3787761Z Packages: read
+2026-02-17T23:13:58.3788263Z ##[endgroup]
+2026-02-17T23:13:58.3790638Z Secret source: Actions
+2026-02-17T23:13:58.3791378Z Prepare workflow directory
+2026-02-17T23:13:58.4208222Z Prepare all required actions
+2026-02-17T23:13:58.4265327Z Getting action download info
+2026-02-17T23:13:58.8818298Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-02-17T23:13:59.0205928Z Download action repository 'shivammathur/setup-php@v2' (SHA:44454db4f0199b8b9685a5d763dc37cbf79108e1)
+2026-02-17T23:14:00.0650861Z Complete job name: test
+2026-02-17T23:14:00.1163595Z ##[group]Checking docker version
+2026-02-17T23:14:00.1182252Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+2026-02-17T23:14:00.2187046Z '1.52'
+2026-02-17T23:14:00.2200810Z Docker daemon API version: '1.52'
+2026-02-17T23:14:00.2201612Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+2026-02-17T23:14:00.2368732Z '1.52'
+2026-02-17T23:14:00.2382515Z Docker client API version: '1.52'
+2026-02-17T23:14:00.2388222Z ##[endgroup]
+2026-02-17T23:14:00.2391562Z ##[group]Clean up resources from previous jobs
+2026-02-17T23:14:00.2397118Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=9005fc"
+2026-02-17T23:14:00.2534084Z ##[command]/usr/bin/docker network prune --force --filter "label=9005fc"
+2026-02-17T23:14:00.2661687Z ##[endgroup]
+2026-02-17T23:14:00.2662234Z ##[group]Create local container network
+2026-02-17T23:14:00.2672516Z ##[command]/usr/bin/docker network create --label 9005fc github_network_238c9f7f1c0547ea8f01fb0e007f3e90
+2026-02-17T23:14:00.3138041Z 4a1b29c0ce2b6c23d1d0112e9f9f06d135759473735400313e63a67e5a5cce0d
+2026-02-17T23:14:00.3158531Z ##[endgroup]
+2026-02-17T23:14:00.3182034Z ##[group]Starting postgres service container
+2026-02-17T23:14:00.3201818Z ##[command]/usr/bin/docker pull postgres:15
+2026-02-17T23:14:01.0727734Z 15: Pulling from library/postgres
+2026-02-17T23:14:01.3355282Z 49b40a0a623d: Pulling fs layer
+2026-02-17T23:14:01.3359996Z ea5e741a30ce: Pulling fs layer
+2026-02-17T23:14:01.3362245Z 049b2237836a: Pulling fs layer
+2026-02-17T23:14:01.3365117Z 2710e764d89a: Pulling fs layer
+2026-02-17T23:14:01.3366879Z 7b098c79e38c: Pulling fs layer
+2026-02-17T23:14:01.3368607Z 03cf9c337134: Pulling fs layer
+2026-02-17T23:14:01.3370619Z e60549838c5a: Pulling fs layer
+2026-02-17T23:14:01.3372331Z d64dbdf800a2: Pulling fs layer
+2026-02-17T23:14:01.3373824Z 6771773ef0da: Pulling fs layer
+2026-02-17T23:14:01.3376452Z c50a02fe2f5f: Pulling fs layer
+2026-02-17T23:14:01.3378199Z b64f280cfa2b: Pulling fs layer
+2026-02-17T23:14:01.3380444Z 0ace4c983c3e: Pulling fs layer
+2026-02-17T23:14:01.3382598Z 7aa308802868: Pulling fs layer
+2026-02-17T23:14:01.3384489Z 0c8d55a45c0d: Pulling fs layer
+2026-02-17T23:14:01.5367321Z 7b098c79e38c: Download complete
+2026-02-17T23:14:01.6369636Z b64f280cfa2b: Download complete
+2026-02-17T23:14:01.6378382Z ea5e741a30ce: Download complete
+2026-02-17T23:14:01.6383329Z 049b2237836a: Download complete
+2026-02-17T23:14:01.6394975Z 2710e764d89a: Download complete
+2026-02-17T23:14:01.6399686Z 6771773ef0da: Download complete
+2026-02-17T23:14:01.6404473Z 0ace4c983c3e: Download complete
+2026-02-17T23:14:01.6420718Z 49b40a0a623d: Download complete
+2026-02-17T23:14:01.6434577Z 03cf9c337134: Download complete
+2026-02-17T23:14:01.6454984Z 7aa308802868: Download complete
+2026-02-17T23:14:01.6474196Z d64dbdf800a2: Download complete
+2026-02-17T23:14:01.7375753Z c50a02fe2f5f: Download complete
+2026-02-17T23:14:01.8379830Z 99548d060f18: Download complete
+2026-02-17T23:14:01.8421527Z 45604b1409ee: Download complete
+2026-02-17T23:14:01.8423891Z 0c8d55a45c0d: Download complete
+2026-02-17T23:14:02.3366294Z e60549838c5a: Download complete
+2026-02-17T23:14:02.7393345Z 03cf9c337134: Pull complete
+2026-02-17T23:14:02.7434682Z 0c8d55a45c0d: Pull complete
+2026-02-17T23:14:02.8389796Z 2710e764d89a: Pull complete
+2026-02-17T23:14:02.8417794Z d64dbdf800a2: Pull complete
+2026-02-17T23:14:03.0366964Z b64f280cfa2b: Pull complete
+2026-02-17T23:14:03.0371908Z ea5e741a30ce: Pull complete
+2026-02-17T23:14:03.0384656Z 0ace4c983c3e: Pull complete
+2026-02-17T23:14:03.0408566Z c50a02fe2f5f: Pull complete
+2026-02-17T23:14:04.8380041Z e60549838c5a: Pull complete
+2026-02-17T23:14:04.8833394Z 7b098c79e38c: Pull complete
+2026-02-17T23:14:04.8837217Z 049b2237836a: Pull complete
+2026-02-17T23:14:04.8843044Z 6771773ef0da: Pull complete
+2026-02-17T23:14:04.8850866Z 49b40a0a623d: Pull complete
+2026-02-17T23:14:04.8857807Z 7aa308802868: Pull complete
+2026-02-17T23:14:04.8861592Z Digest: sha256:dafc4d8e8369da730a5ee9a320a0f0b3c6aa516f41244689c4493a27dc84472d
+2026-02-17T23:14:04.8862436Z Status: Downloaded newer image for postgres:15
+2026-02-17T23:14:04.8864871Z docker.io/library/postgres:15
+2026-02-17T23:14:04.8932809Z ##[command]/usr/bin/docker create --name c43a9623395843d29132ce8ce238383a_postgres15_90b239 --label 9005fc --network github_network_238c9f7f1c0547ea8f01fb0e007f3e90 --network-alias postgres -p 5432:5432 --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5 -e "POSTGRES_DB=testing" -e "POSTGRES_USER=testing" -e "POSTGRES_PASSWORD=testing" -e GITHUB_ACTIONS=true -e CI=true postgres:15
+2026-02-17T23:14:05.8327363Z 3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab
+2026-02-17T23:14:05.8351260Z ##[command]/usr/bin/docker start 3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab
+2026-02-17T23:14:06.1409320Z 3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab
+2026-02-17T23:14:06.1433633Z ##[command]/usr/bin/docker ps --all --filter id=3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+2026-02-17T23:14:06.1720624Z 3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab Up Less than a second (health: starting)
+2026-02-17T23:14:06.1749607Z ##[command]/usr/bin/docker port 3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab
+2026-02-17T23:14:06.1877908Z 5432/tcp -> 0.0.0.0:5432
+2026-02-17T23:14:06.1878342Z 5432/tcp -> [::]:5432
+2026-02-17T23:14:06.1924809Z ##[endgroup]
+2026-02-17T23:14:06.1933028Z ##[group]Waiting for all services to be ready
+2026-02-17T23:14:06.1946105Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab
+2026-02-17T23:14:06.2084162Z starting
+2026-02-17T23:14:06.2109336Z postgres service is starting, waiting 2 seconds before checking again.
+2026-02-17T23:14:08.2111124Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab
+2026-02-17T23:14:08.2232884Z starting
+2026-02-17T23:14:08.2245819Z postgres service is starting, waiting 3 seconds before checking again.
+2026-02-17T23:14:12.0385023Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab
+2026-02-17T23:14:12.0557180Z starting
+2026-02-17T23:14:12.0572004Z postgres service is starting, waiting 8 seconds before checking again.
+2026-02-17T23:14:21.0415604Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab
+2026-02-17T23:14:21.0536634Z healthy
+2026-02-17T23:14:21.0554249Z postgres service is healthy.
+2026-02-17T23:14:21.0555217Z ##[endgroup]
+2026-02-17T23:14:21.0814452Z ##[group]Run actions/checkout@v4
+2026-02-17T23:14:21.0815039Z with:
+2026-02-17T23:14:21.0815235Z   repository: pdarleyjr/mbfd-hub
+2026-02-17T23:14:21.0815608Z   token: ***
+2026-02-17T23:14:21.0815806Z   ssh-strict: true
+2026-02-17T23:14:21.0815987Z   ssh-user: git
+2026-02-17T23:14:21.0816189Z   persist-credentials: true
+2026-02-17T23:14:21.0816398Z   clean: true
+2026-02-17T23:14:21.0816586Z   sparse-checkout-cone-mode: true
+2026-02-17T23:14:21.0816823Z   fetch-depth: 1
+2026-02-17T23:14:21.0816998Z   fetch-tags: false
+2026-02-17T23:14:21.0817178Z   show-progress: true
+2026-02-17T23:14:21.0817361Z   lfs: false
+2026-02-17T23:14:21.0817519Z   submodules: false
+2026-02-17T23:14:21.0817709Z   set-safe-directory: true
+2026-02-17T23:14:21.0818418Z ##[endgroup]
+2026-02-17T23:14:21.1885463Z Syncing repository: pdarleyjr/mbfd-hub
+2026-02-17T23:14:21.1886660Z ##[group]Getting Git version info
+2026-02-17T23:14:21.1887022Z Working directory is '/home/runner/work/mbfd-hub/mbfd-hub'
+2026-02-17T23:14:21.1887600Z [command]/usr/bin/git version
+2026-02-17T23:14:21.1896525Z git version 2.52.0
+2026-02-17T23:14:21.1922016Z ##[endgroup]
+2026-02-17T23:14:21.1935845Z Temporarily overriding HOME='/home/runner/work/_temp/51bf1e97-aee2-428c-81fe-bca827b08b60' before making global git config changes
+2026-02-17T23:14:21.1936900Z Adding repository directory to the temporary git global config as a safe directory
+2026-02-17T23:14:21.1947736Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/mbfd-hub/mbfd-hub
+2026-02-17T23:14:21.1987180Z Deleting the contents of '/home/runner/work/mbfd-hub/mbfd-hub'
+2026-02-17T23:14:21.1990955Z ##[group]Initializing the repository
+2026-02-17T23:14:21.1995084Z [command]/usr/bin/git init /home/runner/work/mbfd-hub/mbfd-hub
+2026-02-17T23:14:21.2095801Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-02-17T23:14:21.2096874Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-02-17T23:14:21.2097442Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-02-17T23:14:21.2097845Z hint: call:
+2026-02-17T23:14:21.2098008Z hint:
+2026-02-17T23:14:21.2098245Z hint: 	git config --global init.defaultBranch <name>
+2026-02-17T23:14:21.2098558Z hint:
+2026-02-17T23:14:21.2098828Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-02-17T23:14:21.2099310Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-02-17T23:14:21.2099655Z hint:
+2026-02-17T23:14:21.2099827Z hint: 	git branch -m <name>
+2026-02-17T23:14:21.2100022Z hint:
+2026-02-17T23:14:21.2100628Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-02-17T23:14:21.2101575Z Initialized empty Git repository in /home/runner/work/mbfd-hub/mbfd-hub/.git/
+2026-02-17T23:14:21.2111373Z [command]/usr/bin/git remote add origin https://github.com/pdarleyjr/mbfd-hub
+2026-02-17T23:14:21.2143780Z ##[endgroup]
+2026-02-17T23:14:21.2144328Z ##[group]Disabling automatic garbage collection
+2026-02-17T23:14:21.2147993Z [command]/usr/bin/git config --local gc.auto 0
+2026-02-17T23:14:21.2176083Z ##[endgroup]
+2026-02-17T23:14:21.2176601Z ##[group]Setting up auth
+2026-02-17T23:14:21.2183010Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-02-17T23:14:21.2213004Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-02-17T23:14:21.2563127Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-02-17T23:14:21.2592455Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-02-17T23:14:21.2823651Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-02-17T23:14:21.2854681Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-02-17T23:14:21.3098619Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-02-17T23:14:21.3133678Z ##[endgroup]
+2026-02-17T23:14:21.3134306Z ##[group]Fetching the repository
+2026-02-17T23:14:21.3142983Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +88273b494adfabf1d41fb6265b8514d82653d4a5:refs/remotes/origin/main
+2026-02-17T23:14:27.0022982Z From https://github.com/pdarleyjr/mbfd-hub
+2026-02-17T23:14:27.0023694Z  * [new ref]           88273b494adfabf1d41fb6265b8514d82653d4a5 -> origin/main
+2026-02-17T23:14:27.0061031Z ##[endgroup]
+2026-02-17T23:14:27.0061628Z ##[group]Determining the checkout info
+2026-02-17T23:14:27.0062532Z ##[endgroup]
+2026-02-17T23:14:27.0067240Z [command]/usr/bin/git sparse-checkout disable
+2026-02-17T23:14:27.0108542Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-02-17T23:14:27.0134949Z ##[group]Checking out the ref
+2026-02-17T23:14:27.0138924Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-02-17T23:14:28.0515273Z Updating files:  33% (8404/25455)
+2026-02-17T23:14:28.0648321Z Updating files:  34% (8655/25455)
+2026-02-17T23:14:28.0776472Z Updating files:  35% (8910/25455)
+2026-02-17T23:14:28.0903350Z Updating files:  36% (9164/25455)
+2026-02-17T23:14:28.1041126Z Updating files:  37% (9419/25455)
+2026-02-17T23:14:28.1253663Z Updating files:  38% (9673/25455)
+2026-02-17T23:14:28.1305935Z Updating files:  39% (9928/25455)
+2026-02-17T23:14:28.1434419Z Updating files:  40% (10182/25455)
+2026-02-17T23:14:28.1904580Z Updating files:  41% (10437/25455)
+2026-02-17T23:14:28.2019757Z Updating files:  42% (10692/25455)
+2026-02-17T23:14:28.2141187Z Updating files:  43% (10946/25455)
+2026-02-17T23:14:28.2369967Z Updating files:  44% (11201/25455)
+2026-02-17T23:14:28.2572175Z Updating files:  45% (11455/25455)
+2026-02-17T23:14:28.2712719Z Updating files:  46% (11710/25455)
+2026-02-17T23:14:28.2825024Z Updating files:  47% (11964/25455)
+2026-02-17T23:14:28.2940844Z Updating files:  48% (12219/25455)
+2026-02-17T23:14:28.3062023Z Updating files:  49% (12473/25455)
+2026-02-17T23:14:28.3186760Z Updating files:  50% (12728/25455)
+2026-02-17T23:14:28.3314513Z Updating files:  51% (12983/25455)
+2026-02-17T23:14:28.3439827Z Updating files:  52% (13237/25455)
+2026-02-17T23:14:28.3574102Z Updating files:  53% (13492/25455)
+2026-02-17T23:14:28.3675479Z Updating files:  54% (13746/25455)
+2026-02-17T23:14:28.3776669Z Updating files:  55% (14001/25455)
+2026-02-17T23:14:28.3891238Z Updating files:  56% (14255/25455)
+2026-02-17T23:14:28.4021809Z Updating files:  57% (14510/25455)
+2026-02-17T23:14:28.4156445Z Updating files:  58% (14764/25455)
+2026-02-17T23:14:28.4267278Z Updating files:  59% (15019/25455)
+2026-02-17T23:14:28.4395978Z Updating files:  60% (15273/25455)
+2026-02-17T23:14:28.4526089Z Updating files:  61% (15528/25455)
+2026-02-17T23:14:28.4643604Z Updating files:  62% (15783/25455)
+2026-02-17T23:14:28.4779249Z Updating files:  63% (16037/25455)
+2026-02-17T23:14:28.4904206Z Updating files:  64% (16292/25455)
+2026-02-17T23:14:28.5028685Z Updating files:  65% (16546/25455)
+2026-02-17T23:14:28.7295770Z Updating files:  66% (16801/25455)
+2026-02-17T23:14:28.7460762Z Updating files:  67% (17055/25455)
+2026-02-17T23:14:28.7637930Z Updating files:  68% (17310/25455)
+2026-02-17T23:14:28.8273970Z Updating files:  69% (17564/25455)
+2026-02-17T23:14:28.8405078Z Updating files:  70% (17819/25455)
+2026-02-17T23:14:28.8664742Z Updating files:  71% (18074/25455)
+2026-02-17T23:14:28.8785325Z Updating files:  72% (18328/25455)
+2026-02-17T23:14:28.8897600Z Updating files:  73% (18583/25455)
+2026-02-17T23:14:28.9006804Z Updating files:  74% (18837/25455)
+2026-02-17T23:14:28.9149479Z Updating files:  75% (19092/25455)
+2026-02-17T23:14:28.9303956Z Updating files:  76% (19346/25455)
+2026-02-17T23:14:28.9398623Z Updating files:  77% (19601/25455)
+2026-02-17T23:14:28.9505800Z Updating files:  78% (19855/25455)
+2026-02-17T23:14:28.9595820Z Updating files:  79% (20110/25455)
+2026-02-17T23:14:28.9685258Z Updating files:  80% (20364/25455)
+2026-02-17T23:14:28.9775967Z Updating files:  81% (20619/25455)
+2026-02-17T23:14:28.9878546Z Updating files:  82% (20874/25455)
+2026-02-17T23:14:28.9968404Z Updating files:  83% (21128/25455)
+2026-02-17T23:14:29.0091338Z Updating files:  84% (21383/25455)
+2026-02-17T23:14:29.0188609Z Updating files:  85% (21637/25455)
+2026-02-17T23:14:29.0295976Z Updating files:  86% (21892/25455)
+2026-02-17T23:14:29.0771273Z Updating files:  87% (22146/25455)
+2026-02-17T23:14:29.0846482Z Updating files:  87% (22243/25455)
+2026-02-17T23:14:29.0950838Z Updating files:  88% (22401/25455)
+2026-02-17T23:14:29.1119240Z Updating files:  89% (22655/25455)
+2026-02-17T23:14:29.1287117Z Updating files:  90% (22910/25455)
+2026-02-17T23:14:29.1451193Z Updating files:  91% (23165/25455)
+2026-02-17T23:14:29.1562601Z Updating files:  92% (23419/25455)
+2026-02-17T23:14:29.1693365Z Updating files:  93% (23674/25455)
+2026-02-17T23:14:29.1806493Z Updating files:  94% (23928/25455)
+2026-02-17T23:14:29.1926672Z Updating files:  95% (24183/25455)
+2026-02-17T23:14:29.2224926Z Updating files:  96% (24437/25455)
+2026-02-17T23:14:29.2420887Z Updating files:  97% (24692/25455)
+2026-02-17T23:14:29.2539046Z Updating files:  98% (24946/25455)
+2026-02-17T23:14:29.2998482Z Updating files:  99% (25201/25455)
+2026-02-17T23:14:29.2999090Z Updating files: 100% (25455/25455)
+2026-02-17T23:14:29.2999638Z Updating files: 100% (25455/25455), done.
+2026-02-17T23:14:29.3284029Z Switched to a new branch 'main'
+2026-02-17T23:14:29.3286841Z branch 'main' set up to track 'origin/main'.
+2026-02-17T23:14:29.3372354Z ##[endgroup]
+2026-02-17T23:14:29.3412742Z [command]/usr/bin/git log -1 --format=%H
+2026-02-17T23:14:29.3438514Z 88273b494adfabf1d41fb6265b8514d82653d4a5
+2026-02-17T23:14:29.3611333Z ##[group]Run shivammathur/setup-php@v2
+2026-02-17T23:14:29.3611606Z with:
+2026-02-17T23:14:29.3611784Z   php-version: 8.3
+2026-02-17T23:14:29.3612208Z   extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+2026-02-17T23:14:29.3612717Z   coverage: none
+2026-02-17T23:14:29.3612901Z   ini-file: production
+2026-02-17T23:14:29.3613235Z   github-token: ***
+2026-02-17T23:14:29.3613418Z ##[endgroup]
+2026-02-17T23:14:29.4339159Z [command]/usr/bin/bash /home/runner/work/_actions/shivammathur/setup-php/v2/src/scripts/run.sh
+2026-02-17T23:14:29.4777433Z 
+2026-02-17T23:14:29.4778024Z [90;1m==> [0m[37;1mSetup PHP[0m
+2026-02-17T23:14:33.4271806Z [32;1m✓ [0m[34;1mPHP [0m[90;1mUpdated to PHP 8.3.30[0m
+2026-02-17T23:14:33.4272546Z 
+2026-02-17T23:14:33.4272933Z [90;1m==> [0m[37;1mSetup Extensions[0m
+2026-02-17T23:14:33.4776272Z [32;1m✓ [0m[34;1mdom [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.4807906Z [32;1m✓ [0m[34;1mcurl [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.4839767Z [32;1m✓ [0m[34;1mlibxml [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.4873296Z [32;1m✓ [0m[34;1mmbstring [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.4905163Z [32;1m✓ [0m[34;1mzip [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.4936923Z [32;1m✓ [0m[34;1mpcntl [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.4968736Z [32;1m✓ [0m[34;1mpdo [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.4985811Z [32;1m✓ [0m[34;1mpdo_pgsql [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.5017799Z [32;1m✓ [0m[34;1mbcmath [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.5050141Z [32;1m✓ [0m[34;1msoap [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.5081978Z [32;1m✓ [0m[34;1mintl [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.5113660Z [32;1m✓ [0m[34;1mgd [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.5146465Z [32;1m✓ [0m[34;1mexif [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.5178304Z [32;1m✓ [0m[34;1miconv [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.5210625Z [32;1m✓ [0m[34;1mfileinfo [0m[90;1mEnabled[0m
+2026-02-17T23:14:33.5211998Z 
+2026-02-17T23:14:33.5212347Z [90;1m==> [0m[37;1mSetup Tools[0m
+2026-02-17T23:14:33.9900696Z [32;1m✓ [0m[34;1mcomposer [0m[90;1mAdded composer 2.9.3[0m
+2026-02-17T23:14:33.9901550Z 
+2026-02-17T23:14:33.9902015Z [90;1m==> [0m[37;1mSetup Coverage[0m
+2026-02-17T23:14:34.2186191Z [32;1m✓ [0m[34;1mnone [0m[90;1mDisabled Xdebug and PCOV[0m
+2026-02-17T23:14:34.2186729Z 
+2026-02-17T23:14:34.2187010Z [90;1m==> [0m[37;1mSponsor setup-php[0m
+2026-02-17T23:14:34.2189361Z [32;1m✓ [0m[34;1msetup-php [0m[90;1mhttps://setup-php.com/sponsor[0m
+2026-02-17T23:14:34.2379083Z ##[group]Run composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+2026-02-17T23:14:34.2379809Z [36;1mcomposer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts[0m
+2026-02-17T23:14:34.2436432Z shell: /usr/bin/bash -e {0}
+2026-02-17T23:14:34.2436671Z env:
+2026-02-17T23:14:34.2436837Z   COMPOSER_PROCESS_TIMEOUT: 0
+2026-02-17T23:14:34.2437083Z   COMPOSER_NO_INTERACTION: 1
+2026-02-17T23:14:34.2437300Z   COMPOSER_NO_AUDIT: 1
+2026-02-17T23:14:34.2437488Z ##[endgroup]
+2026-02-17T23:14:34.3748140Z Installing dependencies from lock file (including require-dev)
+2026-02-17T23:14:34.3816490Z Verifying lock file contents can be installed on current platform.
+2026-02-17T23:14:34.4096188Z Warning: The lock file is not up to date with the latest changes in composer.json. You may be getting outdated dependencies. It is recommended that you run `composer update` or `composer update <package name>`.
+2026-02-17T23:14:34.4138466Z - Required package "barryvdh/laravel-dompdf" is not present in the lock file.
+2026-02-17T23:14:34.4139302Z - Required package "bezhansalleh/filament-shield" is not present in the lock file.
+2026-02-17T23:14:34.4139876Z - Required package "laravel/reverb" is not present in the lock file.
+2026-02-17T23:14:34.4140587Z - Required package "monzer/filament-chatify-integration" is not present in the lock file.
+2026-02-17T23:14:34.4141440Z This usually happens when composer files are incorrectly merged or the composer.json file is manually edited.
+2026-02-17T23:14:34.4142332Z Read more about correctly resolving merge conflicts https://getcomposer.org/doc/articles/resolving-merge-conflicts.md
+2026-02-17T23:14:34.4143317Z and prefer using the "require" command over editing the composer.json file directly https://getcomposer.org/doc/03-cli.md#require-r
+2026-02-17T23:14:34.4238929Z ##[error]Process completed with exit code 4.
+2026-02-17T23:14:34.4335400Z Post job cleanup.
+2026-02-17T23:14:34.5286381Z [command]/usr/bin/git version
+2026-02-17T23:14:34.5323521Z git version 2.52.0
+2026-02-17T23:14:34.5369963Z Temporarily overriding HOME='/home/runner/work/_temp/5dd0eb5b-2e08-4233-ac97-2fcfd456b1da' before making global git config changes
+2026-02-17T23:14:34.5371487Z Adding repository directory to the temporary git global config as a safe directory
+2026-02-17T23:14:34.5383928Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/mbfd-hub/mbfd-hub
+2026-02-17T23:14:34.5418071Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-02-17T23:14:34.5451552Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-02-17T23:14:34.5714422Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-02-17T23:14:34.5736402Z http.https://github.com/.extraheader
+2026-02-17T23:14:34.5749664Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-02-17T23:14:34.5782790Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-02-17T23:14:34.6038437Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-02-17T23:14:34.6071364Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-02-17T23:14:34.6425566Z Print service container logs: c43a9623395843d29132ce8ce238383a_postgres15_90b239
+2026-02-17T23:14:34.6429861Z ##[command]/usr/bin/docker logs --details 3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab
+2026-02-17T23:14:34.6550936Z  The files belonging to this database system will be owned by user "postgres".
+2026-02-17T23:14:34.6551729Z  This user must also own the server process.
+2026-02-17T23:14:34.6552960Z  
+2026-02-17T23:14:34.6554321Z  initdb: warning: enabling "trust" authentication for local connections
+2026-02-17T23:14:34.6555512Z  initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-02-17T23:14:34.6556937Z  2026-02-17 23:14:07.092 UTC [1] LOG:  starting PostgreSQL 15.16 (Debian 15.16-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-02-17T23:14:34.6557735Z  2026-02-17 23:14:07.092 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-02-17T23:14:34.6558272Z  2026-02-17 23:14:07.092 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-02-17T23:14:34.6559172Z  2026-02-17 23:14:07.093 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-02-17T23:14:34.6560116Z  2026-02-17 23:14:07.096 UTC [64] LOG:  database system was shut down at 2026-02-17 23:14:06 UTC
+2026-02-17T23:14:34.6561183Z  2026-02-17 23:14:07.100 UTC [1] LOG:  database system is ready to accept connections
+2026-02-17T23:14:34.6561907Z  2026-02-17 23:14:16.202 UTC [75] FATAL:  role "root" does not exist
+2026-02-17T23:14:34.6562581Z  The database cluster will be initialized with locale "en_US.utf8".
+2026-02-17T23:14:34.6563288Z  The default database encoding has accordingly been set to "UTF8".
+2026-02-17T23:14:34.6563975Z  The default text search configuration will be set to "english".
+2026-02-17T23:14:34.6564489Z  
+2026-02-17T23:14:34.6564769Z  Data page checksums are disabled.
+2026-02-17T23:14:34.6565132Z  
+2026-02-17T23:14:34.6565581Z  fixing permissions on existing directory /var/lib/postgresql/data ... ok
+2026-02-17T23:14:34.6566209Z  creating subdirectories ... ok
+2026-02-17T23:14:34.6566691Z  selecting dynamic shared memory implementation ... posix
+2026-02-17T23:14:34.6567236Z  selecting default max_connections ... 100
+2026-02-17T23:14:34.6567703Z  selecting default shared_buffers ... 128MB
+2026-02-17T23:14:34.6568141Z  selecting default time zone ... Etc/UTC
+2026-02-17T23:14:34.6568565Z  creating configuration files ... ok
+2026-02-17T23:14:34.6568970Z  running bootstrap script ... ok
+2026-02-17T23:14:34.6569450Z  performing post-bootstrap initialization ... ok
+2026-02-17T23:14:34.6569934Z  syncing data to disk ... ok
+2026-02-17T23:14:34.6570415Z  
+2026-02-17T23:14:34.6570651Z  
+2026-02-17T23:14:34.6570980Z  Success. You can now start the database server using:
+2026-02-17T23:14:34.6571440Z  
+2026-02-17T23:14:34.6571776Z      pg_ctl -D /var/lib/postgresql/data -l logfile start
+2026-02-17T23:14:34.6572241Z  
+2026-02-17T23:14:34.6573318Z  waiting for server to start....2026-02-17 23:14:06.779 UTC [48] LOG:  starting PostgreSQL 15.16 (Debian 15.16-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-02-17T23:14:34.6575810Z  2026-02-17 23:14:06.780 UTC [48] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-02-17T23:14:34.6576745Z  2026-02-17 23:14:06.783 UTC [51] LOG:  database system was shut down at 2026-02-17 23:14:06 UTC
+2026-02-17T23:14:34.6577246Z  2026-02-17 23:14:06.786 UTC [48] LOG:  database system is ready to accept connections
+2026-02-17T23:14:34.6577601Z   done
+2026-02-17T23:14:34.6577756Z  server started
+2026-02-17T23:14:34.6577927Z  CREATE DATABASE
+2026-02-17T23:14:34.6578082Z  
+2026-02-17T23:14:34.6578221Z  
+2026-02-17T23:14:34.6578507Z  /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+2026-02-17T23:14:34.6578870Z  
+2026-02-17T23:14:34.6579096Z  2026-02-17 23:14:06.971 UTC [48] LOG:  received fast shutdown request
+2026-02-17T23:14:34.6579870Z  waiting for server to shut down....2026-02-17 23:14:06.972 UTC [48] LOG:  aborting any active transactions
+2026-02-17T23:14:34.6580841Z  2026-02-17 23:14:06.974 UTC [48] LOG:  background worker "logical replication launcher" (PID 54) exited with exit code 1
+2026-02-17T23:14:34.6581381Z  2026-02-17 23:14:06.974 UTC [49] LOG:  shutting down
+2026-02-17T23:14:34.6581748Z  2026-02-17 23:14:06.975 UTC [49] LOG:  checkpoint starting: shutdown immediate
+2026-02-17T23:14:34.6582735Z  2026-02-17 23:14:06.996 UTC [49] LOG:  checkpoint complete: wrote 922 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.017 s, sync=0.003 s, total=0.022 s; sync files=301, longest=0.001 s, average=0.001 s; distance=4239 kB, estimate=4239 kB
+2026-02-17T23:14:34.6583697Z  2026-02-17 23:14:07.003 UTC [48] LOG:  database system is shut down
+2026-02-17T23:14:34.6584020Z   done
+2026-02-17T23:14:34.6584173Z  server stopped
+2026-02-17T23:14:34.6584339Z  
+2026-02-17T23:14:34.6584546Z  PostgreSQL init process complete; ready for start up.
+2026-02-17T23:14:34.6584824Z  
+2026-02-17T23:14:34.6585057Z  2026-02-17 23:14:26.283 UTC [83] FATAL:  role "root" does not exist
+2026-02-17T23:14:34.6590139Z Stop and remove container: c43a9623395843d29132ce8ce238383a_postgres15_90b239
+2026-02-17T23:14:34.6595249Z ##[command]/usr/bin/docker rm --force 3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab
+2026-02-17T23:14:36.8777277Z 3ddb7fc2f7238118e3df4ca2261cb9282ae8dc26b24fe8d60b19f15ab769edab
+2026-02-17T23:14:36.8804886Z Remove container network: github_network_238c9f7f1c0547ea8f01fb0e007f3e90
+2026-02-17T23:14:36.8809036Z ##[command]/usr/bin/docker network rm github_network_238c9f7f1c0547ea8f01fb0e007f3e90
+2026-02-17T23:14:36.9633267Z github_network_238c9f7f1c0547ea8f01fb0e007f3e90
+2026-02-17T23:14:36.9689795Z Cleaning up orphan processes
