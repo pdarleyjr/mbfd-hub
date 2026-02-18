@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('apparatus_id')->constrained()->cascadeOnDelete();
             $table->string('operator_name');
             $table->string('rank');
-            $table->string('shift');
+            $table->string('shift')->nullable();
             $table->string('unit_number')->nullable();
             $table->timestamp('completed_at')->nullable();
             $table->timestamps();

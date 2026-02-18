@@ -61,9 +61,9 @@ class ApparatusController extends Controller
         $request->validate([
             'operator_name' => 'required|string',
             'rank' => 'required|string',
-            'shift' => 'required|string',
+            'shift' => 'nullable|string',
             'unit_number' => 'nullable|string',
-            'defects' => 'array',
+            'defects' => 'nullable|array',
             'defects.*.compartment' => 'required|string',
             'defects.*.item' => 'required|string',
             'defects.*.status' => 'required|string|in:Present,Missing,Damaged',
@@ -82,7 +82,7 @@ class ApparatusController extends Controller
             'completed_at' => now(),
         ]);
 
-        foreach ($request->defects as $defectData) {
+        foreach ($request->defects ?? [] as $defectData) {
             $photoPath = null;
             
             // Handle photo if present
