@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MBFD Mid-Mount Tower Configuration Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            900: '#0f172a',
+                            950: '#020617',
+                        },
+                        amber: {
+                            400: '#fbbf24',
+                            500: '#f59e0b',
+                            600: '#d97706',
+                        },
+                        orange: {
+                            500: '#f97316',
+                            600: '#ea580c',
+                        }
+                    },
+                    animation: {
+                        'pulse-glow': 'pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'dash': 'dash 20s linear infinite',
+                    },
+                    keyframes: {
+                        pulseGlow: {
+                            '0%, 100%': { opacity: 1, filter: 'drop-shadow(0 0 8px rgba(245,158,11,0.6))' },
+                            '50%': { opacity: .7, filter: 'drop-shadow(0 0 2px rgba(245,158,11,0.2))' },
+                        },
+                        dash: {
+                            to: { strokeDashoffset: -1000 }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #020617;
+            /* Slate-950 */
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #020617;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #f59e0b;
+        }
+
+        /* Animation classes */
+        .fade-up {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+        }
+
+        .fade-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Hotspot styling for Blueprint */
+        .hotspot {
+            position: absolute;
+            border: 1px dashed rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(2px);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hotspot:hover {
+            border: 2px solid rgba(245, 158, 11, 1);
+            background: rgba(245, 158, 11, 0.3);
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.6) inset, 0 0 15px rgba(245, 158, 11, 0.6);
+            z-index: 10;
+        }
+
+        .hotspot .indicator {
+            background: #f59e0b;
+            color: #020617;
+            font-weight: 700;
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+        }
+
+        /* Modal Transitions */
+        #modal-backdrop {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        #modal-backdrop.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #modal-content {
+            transform: scale(0.95) translateY(20px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #modal-backdrop.open #modal-content {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+
+        /* Blueprint SVG Grid */
+        .blueprint-bg {
+            background-image:
+                linear-gradient(rgba(51, 65, 85, 0.3) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(51, 65, 85, 0.3) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+
+<body class="antialiased selection:bg-amber-500 selection:text-slate-900">
+
+    <!-- Navigation Header -->
+    <nav class="fixed w-full z-40 top-0 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-3">
+                    <div
+                        class="h-10 w-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(245,158,11,0.5)]">
+                        <i data-lucide="shield-alert" class="text-slate-900 w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-black text-white tracking-widest uppercase">MBFD <span
+                                class="text-amber-500">OPS</span></h1>
+                    </div>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-6 lg:space-x-8">
+                        <a href="#workflow"
+                            class="text-slate-400 hover:text-amber-400 text-sm font-semibold transition tracking-wide uppercase">Process</a>
+                        <a href="#interactive-apparatus"
+                            class="border border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-slate-900 px-4 py-1.5 rounded text-sm font-bold transition shadow-[0_0_10px_rgba(245,158,11,0.2)] hover:shadow-[0_0_20px_rgba(245,158,11,0.6)] uppercase tracking-wide">Blueprint</a>
+                        <a href="#loadout"
+                            class="text-slate-400 hover:text-amber-400 text-sm font-semibold transition tracking-wide uppercase">Loadout</a>
+                        <a href="#engineering"
+                            class="text-slate-400 hover:text-amber-400 text-sm font-semibold transition tracking-wide uppercase">Dynamics</a>
+                        <a href="#itinerary"
+                            class="text-slate-400 hover:text-amber-400 text-sm font-semibold transition tracking-wide uppercase">Itinerary</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section
+        class="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-[90rem] mx-auto text-center flex flex-col items-center border-b border-slate-800/50">
+
+        <div
+            class="inline-flex items-center space-x-2 bg-slate-800/50 border border-slate-700 rounded-full px-4 py-1.5 mb-6 z-10 fade-up visible">
+            <span class="flex h-2 w-2 relative">
+                <span
+                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            <span class="text-xs font-mono text-slate-300 tracking-wider">PROJECT CLASSIFIED // ACTIVE</span>
+        </div>
+
+        <h2 class="text-4xl md:text-6xl font-black text-white mb-4 tracking-tighter z-10 uppercase fade-up visible">
+            MBFD Mid-Mount <br />
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-600">Tower
+                Configuration</span>
+        </h2>
+        <p class="mt-2 text-xl text-slate-400 max-w-2xl mx-auto font-mono text-sm md:text-base z-10 fade-up visible">
+            Velocity Chassis // Ascendant 100' Aerial // Job #41559AD
+        </p>
+
+        <!-- High-Fidelity Animated Hero SVG -->
+        <div
+            class="w-full max-w-7xl mx-auto mt-12 relative rounded-2xl overflow-hidden border border-slate-700 shadow-[0_0_50px_rgba(245,158,11,0.15)] bg-[#020617] fade-up visible">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" preserveAspectRatio="xMidYMid meet"
+                style="background-color: transparent; font-family: 'Inter', system-ui, sans-serif; width: 100%; height: auto;">
+
+                <defs>
+                    <!-- Glow Filters -->
+                    <filter id="glow-amber" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="4" result="blur" />
+                        <feColorMatrix type="matrix" values="0 0 0 0 0.96  0 0 0 0 0.62  0 0 0 0 0.04  0 0 0 1 0"
+                            in="blur" result="coloredBlur" />
+                        <feMerge>
+                            <feMergeNode in="coloredBlur" />
+                            <feMergeNode in="coloredBlur" />
+                            <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                    </filter>
+                    <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="5" result="blur" />
+                        <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 0  0 0 0 0 0  0 0 0 1.5 0" in="blur"
+                            result="coloredBlur" />
+                        <feMerge>
+                            <feMergeNode in="coloredBlur" />
+                            <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                    </filter>
+                    <filter id="glow-blue" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="5" result="blur" />
+                        <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0.5  0 0 0 0 1  0 0 0 1.5 0" in="blur"
+                            result="coloredBlur" />
+                        <feMerge>
+                            <feMergeNode in="coloredBlur" />
+                            <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                    </filter>
+                    <filter id="glow-slate" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="2" result="blur" />
+                        <feColorMatrix type="matrix" values="0 0 0 0 0.58  0 0 0 0 0.63  0 0 0 0 0.72  0 0 0 0.8 0"
+                            in="blur" result="coloredBlur" />
+                        <feMerge>
+                            <feMergeNode in="coloredBlur" />
+                            <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                    </filter>
+
+                    <!-- Scanning Masks -->
+                    <linearGradient id="blueprintMaskGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="35%" stop-color="#ffffff" />
+                        <stop offset="45%" stop-color="#000000">
+                            <animate attributeName="offset" values="0.35; 0.65; 0.35" dur="8s" repeatCount="indefinite"
+                                calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                        </stop>
+                    </linearGradient>
+                    <mask id="blueprint-mask">
+                        <rect x="0" y="0" width="1200" height="650" fill="url(#blueprintMaskGrad)" />
+                    </mask>
+
+                    <linearGradient id="photoMaskGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="35%" stop-color="#000000">
+                            <animate attributeName="offset" values="0.35; 0.65; 0.35" dur="8s" repeatCount="indefinite"
+                                calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                        </stop>
+                        <stop offset="45%" stop-color="#ffffff" />
+                        <stop offset="100%" stop-color="#ffffff" />
+                    </linearGradient>
+                    <mask id="photo-mask">
+                        <rect x="0" y="0" width="1200" height="650" fill="url(#photoMaskGrad)" />
+                    </mask>
+
+                    <!-- Patterns & Materials -->
+                    <pattern id="bg-grid-hero" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="1" opacity="0.5" />
+                        <circle cx="40" cy="40" r="1.5" fill="#334155" opacity="0.8" />
+                    </pattern>
+                    <pattern id="hatch-pattern" width="8" height="8" patternTransform="rotate(45)"
+                        patternUnits="userSpaceOnUse">
+                        <line x1="0" y1="0" x2="0" y2="8" stroke="#475569" stroke-width="1.5" opacity="0.5" />
+                    </pattern>
+
+                    <!-- Realistic Gradients -->
+                    <linearGradient id="paint-red" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#dc2626" />
+                        <stop offset="50%" stop-color="#b91c1c" />
+                        <stop offset="100%" stop-color="#7f1d1d" />
+                    </linearGradient>
+                    <linearGradient id="paint-white" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#ffffff" />
+                        <stop offset="80%" stop-color="#e2e8f0" />
+                        <stop offset="100%" stop-color="#94a3b8" />
+                    </linearGradient>
+                    <linearGradient id="chrome" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#f8fafc" />
+                        <stop offset="40%" stop-color="#94a3b8" />
+                        <stop offset="50%" stop-color="#334155" />
+                        <stop offset="60%" stop-color="#cbd5e1" />
+                        <stop offset="100%" stop-color="#64748b" />
+                    </linearGradient>
+                    <linearGradient id="door-silver" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#e2e8f0" />
+                        <stop offset="100%" stop-color="#64748b" />
+                    </linearGradient>
+                    <pattern id="rollup-door-real" width="10" height="8" patternUnits="userSpaceOnUse">
+                        <rect x="0" y="0" width="10" height="7" fill="url(#door-silver)" />
+                        <line x1="0" y1="7.5" x2="10" y2="7.5" stroke="#1e293b" stroke-width="1" />
+                    </pattern>
+                    <linearGradient id="pod-orange" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#fb923c" />
+                        <stop offset="40%" stop-color="#ea580c" />
+                        <stop offset="100%" stop-color="#9a3412" />
+                    </linearGradient>
+
+                    <g id="wireframe-wheel">
+                        <circle cx="0" cy="0" r="46" fill="none" stroke="#64748b" stroke-width="2"
+                            stroke-dasharray="8,4" />
+                        <circle cx="0" cy="0" r="32" fill="none" stroke="#94a3b8" stroke-width="1.5" />
+                        <circle cx="0" cy="0" r="12" fill="none" stroke="#475569" stroke-width="2" />
+                        <path d="M-12 0 L12 0 M0 -12 L0 12 M-8 -8 L8 8 M-8 8 L8 -8" stroke="#475569"
+                            stroke-width="1.5" />
+                    </g>
+
+                    <g id="photoreal-wheel">
+                        <circle cx="0" cy="0" r="48" fill="#020617" /> <!-- Tire -->
+                        <circle cx="0" cy="0" r="46" fill="none" stroke="#1e293b" stroke-width="4" />
+                        <circle cx="0" cy="0" r="32" fill="url(#chrome)" stroke="#0f172a" stroke-width="2" />
+                        <!-- Rim -->
+                        <circle cx="0" cy="0" r="20" fill="#020617" /> <!-- Inner hub depth -->
+                        <circle cx="0" cy="0" r="14" fill="url(#chrome)" /> <!-- Hubcap -->
+                        <circle cx="0" cy="0" r="6" fill="#0f172a" />
+                        <!-- Lug nuts -->
+                        <circle cx="0" cy="-25" r="2" fill="#f8fafc" />
+                        <circle cx="0" cy="25" r="2" fill="#f8fafc" />
+                        <circle cx="-25" cy="0" r="2" fill="#f8fafc" />
+                        <circle cx="25" cy="0" r="2" fill="#f8fafc" />
+                        <circle cx="-18" cy="-18" r="2" fill="#f8fafc" />
+                        <circle cx="18" cy="18" r="2" fill="#f8fafc" />
+                        <circle cx="-18" cy="18" r="2" fill="#f8fafc" />
+                        <circle cx="18" cy="-18" r="2" fill="#f8fafc" />
+                        <!-- Tire Shine -->
+                        <path d="M -20 -35 Q 0 -45 20 -35" fill="none" stroke="#f8fafc" stroke-width="3" opacity="0.15"
+                            stroke-linecap="round" />
+                    </g>
+                </defs>
+
+                <!-- ========================================== -->
+                <!-- REAL PIERCE WIREFRAME                       -->
+                <!-- ========================================== -->
+                <image href="./images/wireframe_precise_alpha.png" x="20" y="20" width="1160" height="550" opacity="0.8"
+                    filter="url(#glow-slate)" />
+                <rect x="0" y="0" width="1200" height="650" fill="url(#bg-grid-hero)" pointer-events="none" />
+
+                <!-- ========================================== -->
+                <!-- SCANNING ANIMATION TRANSITION FX           -->
+                <!-- ========================================== -->
+                <g id="transition-fx">
+                    <!-- Main Scanning Laser -->
+                    <rect x="440" y="100" width="4" height="480" fill="#f59e0b" filter="url(#glow-amber)">
+                        <animate attributeName="x" values="20; 1180; 20" dur="8s" repeatCount="indefinite"
+                            calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+                    </rect>
+
+                    <!-- Secondary data traces attached to scanner -->
+                    <g>
+                        <animateTransform attributeName="transform" type="translate" values="20 0; 1180 0; 20 0"
+                            dur="8s" repeatCount="indefinite" calcMode="spline"
+                            keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+
+                        <rect x="5" y="150" width="12" height="2" fill="#fbbf24" filter="url(#glow-amber)">
+                            <animate attributeName="opacity" values="0;1;0" dur="0.5s" repeatCount="indefinite" />
+                            <animate attributeName="x" values="5; 40" dur="0.5s" repeatCount="indefinite" />
+                        </rect>
+                        <rect x="-10" y="280" width="18" height="2" fill="#38bdf8" filter="url(#glow-slate)">
+                            <animate attributeName="opacity" values="0;1;0" dur="1s" repeatCount="indefinite" />
+                            <animate attributeName="x" values="-10; 25" dur="1s" repeatCount="indefinite" />
+                        </rect>
+                        <rect x="8" y="450" width="10" height="2" fill="#fbbf24" filter="url(#glow-amber)">
+                            <animate attributeName="opacity" values="0;1;0" dur="0.3s" repeatCount="indefinite" />
+                            <animate attributeName="x" values="8; 50" dur="0.3s" repeatCount="indefinite" />
+                        </rect>
+
+                        <!-- Hex Data Readouts updating dynamically -->
+                        <text x="15" y="340" fill="#f59e0b" font-family="monospace" font-size="9" font-weight="900"
+                            opacity="0.9">
+                            RENDERING
+                            <animate attributeName="opacity" values="0.9; 0.2; 0.9" dur="0.2s"
+                                repeatCount="indefinite" />
+                        </text>
+                        <text x="15" y="355" fill="#f8fafc" font-family="monospace" font-size="8" opacity="0.7">
+                            ID: 41559AD
+                        </text>
+                    </g>
+                </g>
+
+                <!-- Frame Elements / HUD UI overlay -->
+                <path d="M 40 60 L 40 40 L 60 40" fill="none" stroke="#475569" stroke-width="3" />
+                <path d="M 1160 60 L 1160 40 L 1140 40" fill="none" stroke="#475569" stroke-width="3" />
+                <path d="M 40 590 L 40 610 L 60 610" fill="none" stroke="#475569" stroke-width="3" />
+                <path d="M 1160 590 L 1160 610 L 1140 610" fill="none" stroke="#475569" stroke-width="3" />
+
+                <rect x="70" y="38" width="1060" height="4" fill="#1e293b" />
+                <rect x="70" y="38" width="200" height="4" fill="#fbbf24" filter="url(#glow-amber)" />
+                <text x="40" y="25" fill="#f8fafc" font-size="14" font-weight="900" letter-spacing="2">MBFD SPECIAL
+                    OPERATIONS // <tspan fill="#f59e0b">APPARATUS DESIGN DASHBOARD</tspan></text>
+
+                <text x="1160" y="25" fill="#94a3b8" font-size="10" font-family="monospace" text-anchor="end"
+                    letter-spacing="1">SYS.ONLINE // VISUALIZATION PROTOCOL 7010</text>
+
+                <rect x="40" y="625" width="8" height="8" fill="#ea580c">
+                    <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite" />
+                </rect>
+                <text x="60" y="633" fill="#ea580c" font-size="10" font-family="monospace" font-weight="900"
+                    letter-spacing="1">LIVESTREAM RENDER ACTIVE</text>
+
+                <text x="1160" y="633" fill="#64748b" font-size="10" font-family="monospace" text-anchor="end"
+                    letter-spacing="1">OAL: 528.50" (44' - 0.50") APPROX // OVERHANG: 160"</text>
+
+            </svg>
+        </div>
+    </section>
+
+    <!-- Mind Map Visualization (SVG) -->
+    <section id="workflow" class="py-20 border-b border-slate-800/50 bg-slate-900 relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h3 class="text-2xl font-bold text-white mb-2 tracking-wide uppercase flex items-center">
+                <i data-lucide="network" class="mr-3 text-amber-500"></i> Decision Hierarchy
+            </h3>
+            <p class="text-slate-400 font-mono text-sm mb-12">Work Group Process Map & Vendor Pathway</p>
+
+            <div class="w-full overflow-x-auto pb-8 hide-scrollbar">
+                <!-- SVG Canvas Mind Map -->
+                <svg viewBox="0 0 1000 200" class="w-full min-w-[800px] h-auto drop-shadow-2xl">
+                    <defs>
+                        <!-- Animated dashed line for flow -->
+                        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#334155" />
+                            <stop offset="50%" stop-color="#f59e0b" />
+                            <stop offset="100%" stop-color="#ea580c" />
+                        </linearGradient>
+                        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="4" result="blur" />
+                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+                    </defs>
+
+                    <!-- Connecting Lines -->
+                    <path d="M 120,100 L 900,100" stroke="url(#lineGrad)" stroke-width="4" stroke-dasharray="10,10"
+                        class="animate-dash" fill="none" />
+
+                    <!-- Nodes -->
+                    <!-- Node 1 -->
+                    <g class="hover:animate-pulse-glow cursor-pointer transition-all origin-center">
+                        <rect x="20" y="60" width="160" height="80" rx="8" fill="#1e293b" stroke="#f59e0b"
+                            stroke-width="2" />
+                        <text x="100" y="95" font-family="Inter" font-size="12" font-weight="700" fill="#f8fafc"
+                            text-anchor="middle">Work Group</text>
+                        <text x="100" y="115" font-family="Inter" font-size="12" font-weight="700" fill="#f8fafc"
+                            text-anchor="middle">Review</text>
+                    </g>
+                    <!-- Arrow -->
+                    <polygon points="185,95 195,100 185,105" fill="#f59e0b" />
+
+                    <!-- Node 2 -->
+                    <g class="hover:animate-pulse-glow cursor-pointer transition-all origin-center">
+                        <rect x="210" y="60" width="160" height="80" rx="8" fill="#1e293b" stroke="#334155"
+                            stroke-width="2" />
+                        <text x="290" y="95" font-family="Inter" font-size="12" font-weight="700" fill="#f8fafc"
+                            text-anchor="middle">Vendor Demos</text>
+                        <text x="290" y="115" font-family="Inter" font-size="10" font-weight="400" fill="#94a3b8"
+                            text-anchor="middle">(Hurst / Amkus)</text>
+                    </g>
+                    <!-- Arrow -->
+                    <polygon points="375,95 385,100 375,105" fill="#f59e0b" />
+
+                    <!-- Node 3 -->
+                    <g class="hover:animate-pulse-glow cursor-pointer transition-all origin-center">
+                        <rect x="400" y="60" width="160" height="80" rx="8" fill="#1e293b" stroke="#334155"
+                            stroke-width="2" />
+                        <text x="480" y="95" font-family="Inter" font-size="12" font-weight="700" fill="#f8fafc"
+                            text-anchor="middle">Category Selection</text>
+                        <text x="480" y="115" font-family="Inter" font-size="10" font-weight="400" fill="#94a3b8"
+                            text-anchor="middle">(Top 3 Options)</text>
+                    </g>
+                    <!-- Arrow -->
+                    <polygon points="565,95 575,100 565,105" fill="#f59e0b" />
+
+                    <!-- Node 4 -->
+                    <g class="hover:animate-pulse-glow cursor-pointer transition-all origin-center">
+                        <rect x="590" y="60" width="160" height="80" rx="8" fill="#1e293b" stroke="#334155"
+                            stroke-width="2" />
+                        <text x="670" y="95" font-family="Inter" font-size="12" font-weight="700" fill="#f8fafc"
+                            text-anchor="middle">Support Services</text>
+                        <text x="670" y="115" font-family="Inter" font-size="12" font-weight="700" fill="#f8fafc"
+                            text-anchor="middle">Feasibility</text>
+                    </g>
+                    <!-- Arrow -->
+                    <polygon points="755,95 765,100 755,105" fill="#f59e0b" />
+
+                    <!-- Node 5 -->
+                    <g filter="url(#glow)">
+                        <rect x="780" y="55" width="180" height="90" rx="8" fill="#f59e0b" stroke="#ea580c"
+                            stroke-width="2" />
+                        <text x="870" y="95" font-family="Inter" font-size="13" font-weight="900" fill="#020617"
+                            text-anchor="middle">Final Safety</text>
+                        <text x="870" y="115" font-family="Inter" font-size="13" font-weight="900" fill="#020617"
+                            text-anchor="middle">Committee Pres.</text>
+                    </g>
+                </svg>
+            </div>
+        </div>
+    </section>
+
+    <!-- Interactive 3D Truck Blueprint Dashboard -->
+    <section id="interactive-apparatus"
+        class="py-20 px-4 sm:px-6 lg:px-8 max-w-[90rem] mx-auto border-b border-slate-800/50">
+        <div class="mb-10 border-l-4 border-amber-500 pl-4">
+            <h3 class="text-3xl font-black text-white uppercase tracking-tight">Interactive Schematic</h3>
+            <p class="text-slate-400 font-mono text-sm mt-1">Select highlighted zones on the Left & Right profiles for
+                specification data.</p>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+
+            <!-- LEFT SIDE VIEW -->
+            <div
+                class="bg-slate-900 border border-slate-700 rounded-xl p-6 shadow-2xl relative overflow-hidden group blueprint-bg">
+                <div
+                    class="absolute top-4 left-4 bg-slate-800 border border-slate-600 px-3 py-1 rounded text-xs font-mono text-amber-500 font-bold tracking-widest uppercase z-20">
+                    Driver Side (Left)</div>
+
+                <!-- SVG Schematic Container -->
+                <div
+                    class="relative w-full aspect-[8/3] mt-8 bg-slate-900 rounded-lg overflow-hidden border border-slate-700">
+                    <!-- Base SVG Drawing -->
+                    <svg viewBox="0 0 1160 380" class="w-full h-full text-slate-500 absolute inset-0 z-0 drop-shadow-lg"
+                        fill="none" stroke="currentColor" stroke-width="2">
+
+                        <!-- Embedded Authentic Blueprint -->
+                        <image href="./images/wireframe_precise_alpha.png" x="-10" y="-80" width="1180" height="520"
+                            opacity="0.9" filter="url(#glow-slate)" />
+
+                        <!-- Reference grid for mapping (can be disabled in prod) -->
+                        <rect x="0" y="0" width="1160" height="380" fill="url(#bg-grid-hero)" opacity="0.5"
+                            pointer-events="none" />
+                    </svg>
+
+                    <!-- Interactive CSS Hotspots -->
+                    <!-- L1 (Transverse) -->
+                    <div class="hotspot" style="top: 23.9%; left: 27.7%; width: 10.9%; height: 41.7%;"
+                        onclick="openModal('L1-R1')">
+                        <span class="indicator">L1</span>
+                    </div>
+                    <!-- L2 (Narrow Tall Compartment) -->
+                    <div class="hotspot" style="top: 23.9%; left: 39.7%; width: 5.9%; height: 41.7%;"
+                        onclick="openModal('L2-R2')">
+                        <span class="indicator">L2</span>
+                    </div>
+                    <!-- L3 (Above Front Tandem Wheel) -->
+                    <div class="hotspot" style="top: 23.9%; left: 46.7%; width: 11.3%; height: 21.6%;"
+                        onclick="openModal('L3')">
+                        <span class="indicator">L3</span>
+                    </div>
+                    <!-- L4 (Above Rear Tandem Wheel) -->
+                    <div class="hotspot" style="top: 23.9%; left: 59.7%; width: 11.3%; height: 21.6%;"
+                        onclick="openModal('L4')">
+                        <span class="indicator">L4</span>
+                    </div>
+                    <!-- L5 (Rear Large Compartment) -->
+                    <div class="hotspot" style="top: 23.9%; left: 72.6%; width: 11.3%; height: 41.7%;"
+                        onclick="openModal('L5')">
+                        <span class="indicator">L5</span>
+                    </div>
+                    <!-- Torque Box (Rear bottom) -->
+                    <div class="hotspot" style="top: 72%; left: 81.2%; width: 15%; height: 16%;"
+                        onclick="openModal('TorqueBox')">
+                        <span class="indicator text-[10px]">T-BOX</span>
+                    </div>
+                    <!-- Bucket -->
+                    <div class="hotspot" style="top: 3.3%; left: 93%; width: 6.2%; height: 16.6%;"
+                        onclick="openModal('Bucket')">
+                        <span class="indicator text-[10px]">BKT</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT SIDE VIEW -->
+            <div
+                class="bg-slate-900 border border-slate-700 rounded-xl p-6 shadow-2xl relative overflow-hidden group blueprint-bg">
+                <div
+                    class="absolute top-4 left-4 bg-slate-800 border border-slate-600 px-3 py-1 rounded text-xs font-mono text-orange-500 font-bold tracking-widest uppercase z-20">
+                    Officer Side (Right)</div>
+
+                <!-- SVG Schematic Container (No longer flipped, using native officer side image) -->
+                <div
+                    class="relative w-full aspect-[8/3] mt-8 bg-slate-900 rounded-lg overflow-hidden border border-slate-700">
+                    <!-- Base SVG Drawing -->
+                    <svg viewBox="0 0 1160 380" class="w-full h-full text-slate-500 absolute inset-0 z-0 drop-shadow-lg"
+                        fill="none" stroke="currentColor" stroke-width="2">
+
+                        <!-- Embedded Authentic Blueprint -->
+                        <image href="./images/officer_side_wireframe_view_alpha.png" x="-10" y="-80" width="1180"
+                            height="520" opacity="0.9" filter="url(#glow-slate)" />
+
+                        <!-- Reference grid for mapping (can be disabled in prod) -->
+                        <rect x="0" y="0" width="1160" height="380" fill="url(#bg-grid-hero)" opacity="0.5"
+                            pointer-events="none" />
+                    </svg>
+
+                    <!-- Interactive CSS Hotspots -->
+                    <!-- R1 (Transverse) -->
+                    <div class="hotspot" style="top: 23.9%; left: 27.7%; width: 10.9%; height: 41.7%;"
+                        onclick="openModal('L1-R1')">
+                        <span class="indicator">R1</span>
+                    </div>
+                    <!-- R2 (Narrow Tall Compartment) -->
+                    <div class="hotspot" style="top: 23.9%; left: 39.7%; width: 5.9%; height: 41.7%;"
+                        onclick="openModal('L2-R2')">
+                        <span class="indicator">R2</span>
+                    </div>
+                    <!-- R3 (Ladder Tunnel / Tandem Wheel Area) -->
+                    <div class="hotspot" style="top: 23.9%; left: 46.7%; width: 37.2%; height: 21.6%;"
+                        onclick="openModal('R3')">
+                        <span class="indicator">R3</span>
+                    </div>
+                    <!-- Torque Box -->
+                    <div class="hotspot" style="top: 72%; left: 81.2%; width: 15%; height: 16%;"
+                        onclick="openModal('TorqueBox')">
+                        <span class="indicator text-[10px]">T-BOX</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- NEW SECTION: Compartment SVGs (Tactical Loadout Visualization) -->
+    <section id="loadout" class="py-20 px-4 sm:px-6 lg:px-8 max-w-[90rem] mx-auto border-b border-slate-800/50">
+        <div class="mb-10 border-l-4 border-amber-500 pl-4">
+            <h3 class="text-3xl font-black text-white uppercase tracking-tight">Tactical Loadout</h3>
+            <p class="text-slate-400 font-mono text-sm mt-1">Detailed compartment schematics and animated equipment
+                deployment.</p>
+        </div>
+
+        <!-- Future-proofed CSS Grid for multiple SVGs -->
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+
+            <!-- SVG Card 1: Transverse Stabilization Bay -->
+            <div
+                class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden flex flex-col group blueprint-bg">
+                <div
+                    class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center relative">
+                    <h4 class="text-amber-500 font-bold tracking-widest uppercase text-sm">L1/R1 Transverse
+                        Stabilization Bay</h4>
+
+                    <!-- Pulsing UI Hint to encourage clicking the toggle -->
+                    <div
+                        class="flex items-center space-x-2 bg-slate-900 px-3 py-1 rounded-full border border-amber-500/30">
+                        <span class="flex h-2 w-2 relative">
+                            <span
+                                class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                        </span>
+                        <span class="text-[10px] font-mono text-amber-500 tracking-wider">INTERACTIVE SVG</span>
+                    </div>
+                </div>
+
+                <div class="p-6 flex-1 flex items-center justify-center">
+
+                    <!-- Pinned SVG integration -->
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"
+                        style="background-color: transparent; font-family: 'Inter', system-ui, sans-serif; max-width: 100%; height: auto;"
+                        class="w-full drop-shadow-2xl">
+                        <defs>
+                            <filter id="amber-glow" x="-50%" y="-50%" width="200%" height="200%">
+                                <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+                                <feColorMatrix in="blur" type="matrix"
+                                    values="1 0 0 0 0  0 0.62 0 0 0  0 0 0.04 0 0  0 0 0 1 0" result="coloredBlur" />
+                                <feMerge>
+                                    <feMergeNode in="coloredBlur" />
+                                    <feMergeNode in="SourceGraphic" />
+                                </feMerge>
+                            </filter>
+
+                            <pattern id="grid-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
+                                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#334155" stroke-width="1"
+                                    opacity="0.5" />
+                            </pattern>
+
+                            <g id="holmatro-strut">
+                                <rect x="-70" y="-15" width="140" height="30" rx="4" fill="none" stroke="#f59e0b"
+                                    stroke-width="2" filter="url(#amber-glow)" />
+                                <rect x="20" y="-18" width="15" height="36" rx="2" fill="#1e293b" stroke="#fbbf24"
+                                    stroke-width="2" />
+                                <path d="M -55 -15 C -65 -25, -85 -25, -95 -15 L -95 15 C -85 25, -65 25, -55 15"
+                                    fill="none" stroke="#fbbf24" stroke-width="2" />
+                                <circle cx="60" cy="0" r="8" fill="none" stroke="#fbbf24" stroke-width="2" />
+                                <path d="M 60 -8 L 80 -25 M 60 8 L 80 25" fill="none" stroke="#fbbf24" stroke-width="2"
+                                    stroke-dasharray="3,3" />
+                                <text x="-10" y="4" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="900"
+                                    letter-spacing="1" filter="url(#amber-glow)">HOLMATRO</text>
+                            </g>
+                        </defs>
+
+                        <g transform="translate(400, 250)">
+
+                            <g id="blueprint-structure">
+                                <!-- Top-Down Actual Truck Wireframe replacing generic blocks -->
+                                <image href="./images/top_wireframe_view_alpha.png" x="-500" y="-250" width="1000"
+                                    height="500" opacity="0.4" filter="url(#amber-glow)" />
+
+                                <text x="-235" y="-190" text-anchor="middle" fill="#94a3b8" font-size="12"
+                                    font-weight="400" letter-spacing="2">CAB CREW AREA</text>
+                                <text x="0" y="-210" text-anchor="middle" fill="#94a3b8" font-size="12"
+                                    font-weight="400" letter-spacing="2">PUMP HOUSE X-RAY</text>
+
+                                <rect x="-110" y="-90" width="220" height="180" fill="#0f172a" stroke="#f59e0b"
+                                    stroke-width="3" filter="url(#amber-glow)" opacity="0.8" />
+                                <line x1="0" y1="-90" x2="0" y2="90" stroke="#f59e0b" stroke-width="1"
+                                    stroke-dasharray="5,5" opacity="0.5" />
+                            </g>
+
+                            <g id="slide-tray">
+                                <rect x="-100" y="-80" width="200" height="160" fill="url(#grid-pattern)"
+                                    stroke="#f59e0b" stroke-width="2" />
+                                <rect x="-105" y="-85" width="210" height="170" fill="none" stroke="#fbbf24"
+                                    stroke-width="1" stroke-dasharray="10,5" opacity="0.5" />
+
+                                <use href="#holmatro-strut" x="0" y="-55" transform="rotate(0)" />
+
+                                <!-- Stokes Basket Implementation -->
+                                <g transform="translate(0, 0)">
+                                    <rect x="-80" y="-20" width="160" height="40" rx="10" fill="#0f172a"
+                                        stroke="#ea580c" stroke-width="2" />
+                                    <!-- Inner webbing -->
+                                    <path
+                                        d="M -70 -20 L -60 20 M -50 -20 L -40 20 M -30 -20 L -20 20 M -10 -20 L 0 20 M 10 -20 L 20 20 M 30 -20 L 40 20 M 50 -20 L 60 20 M 70 -20 L 80 20"
+                                        stroke="#ea580c" stroke-width="1" opacity="0.5" />
+                                    <path
+                                        d="M -60 -20 L -70 20 M -40 -20 L -50 20 M -20 -20 L -30 20 M 0 -20 L -10 20 M 20 -20 L 10 20 M 40 -20 L 30 20 M 60 -20 L 50 20 M 80 -20 L 70 20"
+                                        stroke="#ea580c" stroke-width="1" opacity="0.5" />
+                                    <text x="0" y="4" text-anchor="middle" fill="#f8fafc" font-size="10"
+                                        font-weight="900" letter-spacing="2" filter="url(#amber-glow)">STOKES
+                                        RESCUE</text>
+                                </g>
+
+                                <use href="#holmatro-strut" x="0" y="55" transform="rotate(180)" />
+
+                                <animateTransform attributeName="transform" type="translate"
+                                    values="0,0; -220,0; -220,0; 0,0; 220,0; 220,0; 0,0"
+                                    keyTimes="0; 0.2; 0.35; 0.5; 0.7; 0.85; 1" calcMode="spline"
+                                    keySplines="0.42 0 0.58 1; 0 0 1 1; 0.42 0 0.58 1; 0.42 0 0.58 1; 0 0 1 1; 0.42 0 0.58 1"
+                                    dur="12s" repeatCount="indefinite" begin="toggle_switch.click" />
+                                <animateTransform attributeName="transform" type="translate" values="0,0" dur="0.1s"
+                                    fill="freeze" begin="0s" />
+                            </g>
+
+                            <g id="l1-indicator" opacity="0.3">
+                                <path d="M -120 -100 L -160 -100 L -160 100 L -120 100" fill="none" stroke="#f59e0b"
+                                    stroke-width="2" />
+                                <text x="-200" y="0" text-anchor="middle" transform="rotate(-90 -200 0)" fill="#f59e0b"
+                                    font-size="14" font-weight="900" letter-spacing="1">L1 DEPLOY ZONE</text>
+                                <animate attributeName="opacity" values="0.3; 1; 1; 0.3; 0.3; 0.3; 0.3"
+                                    keyTimes="0; 0.2; 0.35; 0.5; 0.7; 0.85; 1" dur="12s" repeatCount="indefinite"
+                                    begin="toggle_switch.click" />
+                            </g>
+                            <g id="r1-indicator" opacity="0.3">
+                                <path d="M 120 -100 L 160 -100 L 160 100 L 120 100" fill="none" stroke="#f59e0b"
+                                    stroke-width="2" />
+                                <text x="200" y="0" text-anchor="middle" transform="rotate(90 200 0)" fill="#f59e0b"
+                                    font-size="14" font-weight="900" letter-spacing="1">R1 DEPLOY ZONE</text>
+                                <animate attributeName="opacity" values="0.3; 0.3; 0.3; 0.3; 1; 1; 0.3"
+                                    keyTimes="0; 0.2; 0.35; 0.5; 0.7; 0.85; 1" dur="12s" repeatCount="indefinite"
+                                    begin="toggle_switch.click" />
+                            </g>
+
+                            <text x="0" y="-260" text-anchor="middle" fill="#f8fafc" font-size="18" font-weight="900"
+                                letter-spacing="2">TRANSVERSE STABILIZATION BAY</text>
+                            <text x="0" y="-240" text-anchor="middle" fill="#f59e0b" font-size="12" font-weight="400"
+                                letter-spacing="1" font-family="monospace">STATUS: AMBIDEXTROUS DEPLOYMENT SYSTEM</text>
+
+                            <g id="toggle_switch" transform="translate(0, 200)" cursor="pointer"
+                                class="hover:opacity-80 transition-opacity">
+                                <rect x="-80" y="-20" width="160" height="40" rx="20" fill="#0f172a" stroke="#f59e0b"
+                                    stroke-width="2" />
+                                <text x="0" y="25" text-anchor="middle" fill="#94a3b8" font-size="10" font-weight="400"
+                                    letter-spacing="1">CLICK TO INITIATE DEPLOYMENT CYCLE</text>
+
+                                <g id="toggle_knob">
+                                    <circle cx="-40" cy="0" r="14" fill="#f59e0b" filter="url(#amber-glow)">
+                                        <animate attributeName="cx" values="-40; 40; 40; -40" keyTimes="0; 0.2; 0.8; 1"
+                                            calcMode="spline" keySplines="0.42 0 0.58 1; 0 0 1 1; 0.42 0 0.58 1"
+                                            dur="12s" repeatCount="indefinite" begin="toggle_switch.click" />
+                                    </circle>
+                                    <text x="-40" y="4" text-anchor="middle" fill="#020617" font-size="10"
+                                        font-weight="900">IDLE</text>
+                                    <text x="40" y="4" text-anchor="middle" fill="#020617" font-size="10"
+                                        font-weight="900" opacity="0">ACTIVE
+                                        <animate attributeName="opacity" values="0; 1; 1; 0" keyTimes="0; 0.2; 0.8; 1"
+                                            dur="12s" repeatCount="indefinite" begin="toggle_switch.click" />
+                                    </text>
+                                    <text x="-40" y="4" text-anchor="middle" fill="#020617" font-size="10"
+                                        font-weight="900">
+                                        <animate attributeName="opacity" values="1; 0; 0; 1" keyTimes="0; 0.2; 0.8; 1"
+                                            dur="12s" repeatCount="indefinite" begin="toggle_switch.click" />
+                                    </text>
+                                </g>
+                            </g>
+
+                        </g>
+                    </svg>
+
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Engineering & Stability Analysis -->
+    <section id="engineering" class="py-20 px-4 sm:px-6 lg:px-8 max-w-[90rem] mx-auto border-b border-slate-800/50">
+        <div class="mb-10 border-l-4 border-amber-500 pl-4">
+            <h3 class="text-3xl font-black text-white uppercase tracking-tight">Chassis Dynamics & C.O.G.</h3>
+            <p class="text-slate-400 font-mono text-sm mt-1">TAK-4 Independent Suspension cross-sectional stability
+                analysis.</p>
+        </div>
+
+        <div
+            class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl relative overflow-hidden flex items-center justify-center p-4 lg:p-10 blueprint-bg">
+            <!-- Animated SVG integration -->
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet"
+                style="background-color: transparent; font-family: 'Inter', sans-serif;"
+                class="w-full max-w-5xl drop-shadow-2xl">
+                <defs>
+                    <filter id="glow-cg" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="5 5" result="shadow" />
+                        <feColorMatrix type="matrix" values="0 0 0 0 0, 0 1 0 0 1, 0 0 1 0 1, 0 0 0 1 0" in="shadow"
+                            result="halo" />
+                        <feBlend mode="screen" in="halo" in2="SourceGraphic" />
+                    </filter>
+                    <linearGradient id="chassisGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#475569;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+                    </linearGradient>
+                    <g id="wheel">
+                        <circle cx="0" cy="0" r="60" fill="none" stroke="#1e293b" stroke-width="25" />
+                        <circle cx="0" cy="0" r="45" fill="none" stroke="#475569" stroke-width="5" />
+                        <line x1="-45" y1="0" x2="45" y2="0" stroke="#475569" stroke-width="3" />
+                        <line x1="0" y1="-45" x2="0" y2="45" stroke="#475569" stroke-width="3" />
+                    </g>
+                    <path id="suspensionArm" d="M-10,0 L10,0 L5,50 L-5,50 Z" fill="#64748b" stroke="#334155"
+                        stroke-width="2" />
+                    <g id="cgIndicator" filter="url(#glow-cg)">
+                        <circle cx="0" cy="0" r="15" fill="#f97316" fill-opacity="0.8" stroke="#f97316"
+                            stroke-width="3" />
+                        <line x1="-20" y1="0" x2="20" y2="0" stroke="#f97316" stroke-width="3" />
+                        <line x1="0" y1="-20" x2="0" y2="20" stroke="#f97316" stroke-width="3" />
+                        <circle cx="0" cy="0" r="25" fill="none" stroke="#f97316" stroke-width="2"
+                            stroke-dasharray="5,5">
+                            <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="5s"
+                                repeatCount="indefinite" />
+                        </circle>
+                    </g>
+                </defs>
+
+                <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+                    <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#1e293b" stroke-width="1" />
+                </pattern>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+
+                <path d="M0,700 C200,680 400,720 600,700 S1000,680 1200,700" fill="none" stroke="#334155"
+                    stroke-width="4" />
+
+                <g transform="translate(600, 400)">
+                    <g id="chassis" stroke="url(#chassisGradient)" stroke-width="4" fill="none">
+                        <path d="M-200,-150 L200,-150 L200,50 L-200,50 Z" />
+                        <line x1="-200" y1="-50" x2="200" y2="-50" />
+                        <path d="M-200,-150 L-350,-150 L-350,50 L-200,50" />
+                        <path d="M200,-150 L350,-150 L350,50 L200,50" />
+                        <line x1="-200" y1="50" x2="200" y2="50" stroke-width="6" />
+                        <line x1="-200" y1="-150" x2="200" y2="-150" stroke-width="6" />
+
+                        <text x="0" y="-180" text-anchor="middle" fill="#f8fafc" font-size="24" font-weight="900"
+                            letter-spacing="2">VELOCITY CHASSIS WIREFRAME</text>
+                    </g>
+
+                    <g transform="translate(-250, 100)">
+                        <use href="#wheel">
+                            <animateTransform attributeName="transform" type="translate" values="0,0; 0,-20; 0,10; 0,0"
+                                dur="4s" repeatCount="indefinite" keyTimes="0; 0.25; 0.75; 1" calcMode="spline"
+                                keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" />
+                        </use>
+                        <use href="#suspensionArm" transform="translate(0, -50) rotate(-10)">
+                            <animateTransform attributeName="transform" type="rotate" values="-10; -25; 5; -10" dur="4s"
+                                repeatCount="indefinite" keyTimes="0; 0.25; 0.75; 1" calcMode="spline"
+                                keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" additive="sum" />
+                        </use>
+                        <use href="#suspensionArm" transform="translate(0, 0) rotate(10)">
+                            <animateTransform attributeName="transform" type="rotate" values="10; 25; -5; 10" dur="4s"
+                                repeatCount="indefinite" keyTimes="0; 0.25; 0.75; 1" calcMode="spline"
+                                keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" additive="sum" />
+                        </use>
+                    </g>
+
+                    <g transform="translate(250, 100)">
+                        <use href="#wheel">
+                            <animateTransform attributeName="transform" type="translate" values="0,0; 0,15; 0,-25; 0,0"
+                                dur="4s" repeatCount="indefinite" keyTimes="0; 0.25; 0.75; 1" calcMode="spline"
+                                keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" />
+                        </use>
+                        <use href="#suspensionArm" transform="translate(0, -50) rotate(10)">
+                            <animateTransform attributeName="transform" type="rotate" values="10; 25; -5; 10" dur="4s"
+                                repeatCount="indefinite" keyTimes="0; 0.25; 0.75; 1" calcMode="spline"
+                                keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" additive="sum" />
+                        </use>
+                        <use href="#suspensionArm" transform="translate(0, 0) rotate(-10)">
+                            <animateTransform attributeName="transform" type="rotate" values="-10; -25; 5; -10" dur="4s"
+                                repeatCount="indefinite" keyTimes="0; 0.25; 0.75; 1" calcMode="spline"
+                                keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" additive="sum" />
+                        </use>
+                    </g>
+                    <text x="0" y="220" text-anchor="middle" fill="#94a3b8" font-size="18" font-weight="700"
+                        letter-spacing="1">TAK-4 INDEPENDENT SUSPENSION</text>
+
+                    <!-- Low C.O.G. Implementation (Wheel Well Tubes) -->
+                    <g opacity="0">
+                        <animate attributeName="opacity" values="0; 1; 1; 0" dur="8s" repeatCount="indefinite"
+                            keyTimes="0; 0.1; 0.9; 1" />
+
+                        <!-- Left SCBA Tube -->
+                        <g transform="translate(-240, 20)">
+                            <circle cx="0" cy="0" r="24" fill="#1e293b" stroke="#38bdf8" stroke-width="2"
+                                filter="url(#glow-cg)" />
+                            <circle cx="0" cy="0" r="18" fill="none" stroke="#38bdf8" stroke-width="1"
+                                stroke-dasharray="4,2" />
+                            <text x="0" y="4" text-anchor="middle" fill="#f8fafc" font-size="10" font-weight="900"
+                                letter-spacing="1">SCBA</text>
+                            <line x1="30" y1="-20" x2="60" y2="-40" stroke="#38bdf8" stroke-width="2" />
+                        </g>
+                        <text x="-180" y="-30" text-anchor="start" fill="#38bdf8" font-weight="bold"
+                            font-size="12">L-SIDE SCBA STORAGE</text>
+
+                        <!-- Right Extinguisher Tube -->
+                        <g transform="translate(240, 20)">
+                            <circle cx="0" cy="0" r="24" fill="#1e293b" stroke="#dc2626" stroke-width="2"
+                                filter="url(#glow-cg)" />
+                            <circle cx="0" cy="0" r="18" fill="none" stroke="#dc2626" stroke-width="1"
+                                stroke-dasharray="4,2" />
+                            <text x="0" y="4" text-anchor="middle" fill="#f8fafc" font-size="10" font-weight="900"
+                                letter-spacing="1">PW</text>
+                            <line x1="-30" y1="-20" x2="-60" y2="-40" stroke="#dc2626" stroke-width="2" />
+                        </g>
+                        <text x="180" y="-30" text-anchor="end" fill="#dc2626" font-weight="bold" font-size="12">R-SIDE
+                            WATER EXTINGUISHERS</text>
+                    </g>
+
+                    <use href="#cgIndicator" x="0" y="-50">
+                        <animate attributeName="y" values="-50; 0; 0; -50" dur="8s" repeatCount="indefinite"
+                            keyTimes="0; 0.1; 0.9; 1" calcMode="spline"
+                            keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" />
+                    </use>
+                    <text x="0" y="-80" text-anchor="middle" fill="#f97316" font-size="18" font-weight="900"
+                        letter-spacing="1">
+                        OPTIMIZED CENTER OF GRAVITY
+                        <animate attributeName="y" values="-80; -30; -30; -80" dur="8s" repeatCount="indefinite"
+                            keyTimes="0; 0.1; 0.9; 1" calcMode="spline"
+                            keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" />
+                    </text>
+
+                </g>
+
+                <!-- Data Overlays -->
+                <g transform="translate(60, 60)">
+                    <rect x="0" y="0" width="310" height="150" rx="8" fill="#0f172a" stroke="#475569" stroke-width="2"
+                        opacity="0.9" />
+                    <text x="20" y="30" fill="#f59e0b" font-weight="900" font-size="16" letter-spacing="1">AXLE LOAD
+                        DISTRIBUTION</text>
+                    <line x1="20" y1="40" x2="290" y2="40" stroke="#f59e0b" stroke-width="1" opacity="0.5" />
+                    <text x="20" y="70" fill="#f8fafc" font-size="14" font-family="monospace">FRONT: 24,000 LB
+                        TAK-4</text>
+                    <text x="20" y="100" fill="#f8fafc" font-size="14" font-family="monospace">REAR: 54,000 LB MERITOR
+                        TANDEM</text>
+                    <text x="20" y="130" fill="#94a3b8" font-size="12" font-family="monospace">TOTAL RATING: 78,000
+                        LBS</text>
+                </g>
+
+                <g transform="translate(830, 60)">
+                    <rect x="0" y="0" width="310" height="150" rx="8" fill="#0f172a" stroke="#475569" stroke-width="2"
+                        opacity="0.9" />
+                    <text x="20" y="30" fill="#38bdf8" font-weight="900" font-size="16" letter-spacing="1">C.O.G.
+                        OPTIMIZATION</text>
+                    <line x1="20" y1="40" x2="290" y2="40" stroke="#38bdf8" stroke-width="1" opacity="0.5" />
+                    <text x="20" y="70" fill="#f8fafc" font-size="14" font-family="monospace">WHEEL WELL MOUNTED:</text>
+                    <circle cx="26" cy="94" r="4" fill="#38bdf8" />
+                    <text x="40" y="98" fill="#e2e8f0" font-size="14" font-family="monospace">SPARE SCBA
+                        CYLINDERS</text>
+                    <circle cx="26" cy="122" r="4" fill="#dc2626" />
+                    <text x="40" y="126" fill="#e2e8f0" font-size="14" font-family="monospace">PW EXTINGUISHERS</text>
+                </g>
+
+                </g>
+            </svg>
+        </div>
+    </section>
+
+    <!-- Scroll-Triggered Itinerary -->
+    <section id="itinerary" class="py-20 bg-slate-950 relative">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="mb-16 border-l-4 border-amber-500 pl-4">
+                <h3 class="text-3xl font-black text-white uppercase tracking-tight">Work Group Schedule</h3>
+                <p class="text-slate-400 font-mono text-sm mt-1">4-Day structured evaluation sequence.</p>
+            </div>
+
+            <div class="relative border-l-2 border-slate-700 ml-4 md:ml-0 md:pl-0">
+
+                <!-- Day 1 -->
+                <div class="fade-up mb-12 relative pl-8 md:pl-0">
+                    <div
+                        class="md:hidden absolute w-4 h-4 bg-amber-500 rounded-full -left-[9px] top-2 border-2 border-slate-950 shadow-[0_0_8px_rgba(245,158,11,0.8)]">
+                    </div>
+                    <div class="grid md:grid-cols-5 gap-6">
+                        <div class="md:col-span-1 md:text-right md:pr-8 relative">
+                            <div
+                                class="hidden md:block absolute w-4 h-4 bg-amber-500 rounded-full -right-[9px] top-2 border-2 border-slate-950 shadow-[0_0_8px_rgba(245,158,11,0.8)] z-10">
+                            </div>
+                            <h4 class="text-amber-500 font-black text-2xl uppercase tracking-tighter">Day 1</h4>
+                            <p class="text-xs font-mono text-slate-500 mt-1 uppercase">Foundation</p>
+                        </div>
+                        <div
+                            class="md:col-span-4 bg-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl relative overflow-hidden group hover:border-amber-500 transition-colors">
+                            <div class="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
+                            <h5 class="text-white font-bold text-lg mb-3 flex items-center"><i data-lucide="compass"
+                                    class="mr-2 text-amber-500 w-5 h-5"></i> Orientation & Familiarization</h5>
+                            <p class="text-slate-400 text-sm leading-relaxed font-mono">
+                                Orientation to the committee goals. Deep-dive into Mid-Mount configuration features.
+                                Detailed review of Water Delivery systems with a strict focus on the 2000 GPM Pump
+                                performance capabilities.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 2 -->
+                <div class="fade-up mb-12 relative pl-8 md:pl-0">
+                    <div
+                        class="md:hidden absolute w-4 h-4 bg-amber-500 rounded-full -left-[9px] top-2 border-2 border-slate-950 shadow-[0_0_8px_rgba(245,158,11,0.8)]">
+                    </div>
+                    <div class="grid md:grid-cols-5 gap-6">
+                        <div class="md:col-span-1 md:text-right md:pr-8 relative">
+                            <div
+                                class="hidden md:block absolute w-4 h-4 bg-amber-500 rounded-full -right-[9px] top-2 border-2 border-slate-950 shadow-[0_0_8px_rgba(245,158,11,0.8)] z-10">
+                            </div>
+                            <h4 class="text-amber-500 font-black text-2xl uppercase tracking-tighter">Day 2</h4>
+                            <p class="text-xs font-mono text-slate-500 mt-1 uppercase">Rescue Ops</p>
+                        </div>
+                        <div
+                            class="md:col-span-4 bg-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl relative overflow-hidden group hover:border-amber-500 transition-colors">
+                            <div class="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
+                            <h5 class="text-white font-bold text-lg mb-3 flex items-center"><i data-lucide="scissors"
+                                    class="mr-2 text-amber-500 w-5 h-5"></i> Appliance & Extrication Eval</h5>
+                            <p class="text-slate-400 text-sm leading-relaxed font-mono">
+                                Appliance configuration evaluation. Comprehensive analysis of Vehicle Rescue Tools
+                                including direct vendor comparisons and operational testing of Amkus vs. Hurst hydraulic
+                                platforms.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 3 -->
+                <div class="fade-up mb-12 relative pl-8 md:pl-0">
+                    <div
+                        class="md:hidden absolute w-4 h-4 bg-amber-500 rounded-full -left-[9px] top-2 border-2 border-slate-950 shadow-[0_0_8px_rgba(245,158,11,0.8)]">
+                    </div>
+                    <div class="grid md:grid-cols-5 gap-6">
+                        <div class="md:col-span-1 md:text-right md:pr-8 relative">
+                            <div
+                                class="hidden md:block absolute w-4 h-4 bg-amber-500 rounded-full -right-[9px] top-2 border-2 border-slate-950 shadow-[0_0_8px_rgba(245,158,11,0.8)] z-10">
+                            </div>
+                            <h4 class="text-amber-500 font-black text-2xl uppercase tracking-tighter">Day 3</h4>
+                            <p class="text-xs font-mono text-slate-500 mt-1 uppercase">Power Tools</p>
+                        </div>
+                        <div
+                            class="md:col-span-4 bg-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl relative overflow-hidden group hover:border-amber-500 transition-colors">
+                            <div class="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
+                            <h5 class="text-white font-bold text-lg mb-3 flex items-center"><i data-lucide="zap"
+                                    class="mr-2 text-amber-500 w-5 h-5"></i> Energy & Equipment Strategy</h5>
+                            <p class="text-slate-400 text-sm leading-relaxed font-mono">
+                                Optimization of loose equipment storage. Debate and decision metrics on Battery vs. Gas
+                                Power Tools. Blueprinting charging logistics and onboard 120v wiring requirements.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day 4 -->
+                <div class="fade-up relative pl-8 md:pl-0">
+                    <div
+                        class="md:hidden absolute w-4 h-4 bg-orange-600 rounded-full -left-[9px] top-2 border-2 border-slate-950 shadow-[0_0_8px_rgba(234,88,12,0.8)]">
+                    </div>
+                    <div class="grid md:grid-cols-5 gap-6">
+                        <div class="md:col-span-1 md:text-right md:pr-8 relative">
+                            <div
+                                class="hidden md:block absolute w-4 h-4 bg-orange-600 rounded-full -right-[9px] top-2 border-2 border-slate-950 shadow-[0_0_8px_rgba(234,88,12,0.8)] z-10 animate-pulse">
+                            </div>
+                            <h4 class="text-orange-600 font-black text-2xl uppercase tracking-tighter">Day 4</h4>
+                            <p class="text-xs font-mono text-slate-500 mt-1 uppercase">Sign-Off</p>
+                        </div>
+                        <div
+                            class="md:col-span-4 bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-xl border border-orange-600/50 shadow-xl relative overflow-hidden group">
+                            <div class="absolute top-0 left-0 w-1 h-full bg-orange-600"></div>
+                            <h5 class="text-white font-bold text-lg mb-3 flex items-center"><i data-lucide="file-check"
+                                    class="mr-2 text-orange-500 w-5 h-5"></i> Final Recommendations</h5>
+                            <p class="text-slate-300 text-sm leading-relaxed font-mono">
+                                Consolidation of findings. Drafting of final recommendations and formal submission
+                                package delivery to the Safety Committee for procurement authorization.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-black py-8 border-t border-slate-800 text-center">
+        <div class="flex items-center justify-center mb-2">
+            <i data-lucide="shield-alert" class="text-slate-600 w-5 h-5 mr-2"></i>
+            <p class="text-slate-500 font-mono text-xs uppercase tracking-widest">MBFD Special Operations</p>
+        </div>
+        <p class="text-slate-600 text-xs font-mono">Dark Ops Dashboard // Authorized Personnel Only.</p>
+    </footer>
+
+    <!-- Sleek Centered Modal Overlay -->
+    <div id="modal-backdrop"
+        class="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-950/80 backdrop-blur-sm"
+        onclick="closeModal(event)">
+        <!-- Modal Content -->
+        <div id="modal-content"
+            class="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden"
+            onclick="event.stopPropagation()">
+            <!-- Header -->
+            <div class="bg-slate-800 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
+                <div class="flex items-center">
+                    <div
+                        class="h-8 w-8 rounded bg-amber-500/20 text-amber-500 flex items-center justify-center mr-3 border border-amber-500/50">
+                        <i data-lucide="box" class="w-4 h-4"></i>
+                    </div>
+                    <h3 id="modal-title" class="text-xl font-bold text-white tracking-wide uppercase font-mono">Zone
+                        Title</h3>
+                </div>
+                <button onclick="closeModal(null, true)"
+                    class="text-slate-400 hover:text-white transition-colors p-1 rounded hover:bg-slate-700">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6 space-y-6">
+
+                <div>
+                    <h4 class="text-xs font-black text-amber-500 uppercase tracking-widest mb-2 flex items-center">
+                        <i data-lucide="package" class="w-3 h-3 mr-1"></i> Storage Designation
+                    </h4>
+                    <p id="modal-storage"
+                        class="text-slate-300 font-mono text-sm leading-relaxed bg-slate-950/50 p-3 rounded border border-slate-800">
+                        Details...
+                    </p>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-black text-amber-500 uppercase tracking-widest mb-2 flex items-center">
+                        <i data-lucide="wrench" class="w-3 h-3 mr-1"></i> Mounting Architecture
+                    </h4>
+                    <p id="modal-mounting"
+                        class="text-slate-300 font-mono text-sm leading-relaxed bg-slate-950/50 p-3 rounded border border-slate-800">
+                        Details...
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-slate-950 px-6 py-3 border-t border-slate-800 flex justify-end">
+                <button onclick="closeModal(null, true)"
+                    class="text-xs font-mono text-slate-400 hover:text-amber-500 uppercase tracking-widest transition-colors">Close
+                    View [ESC]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Hardcoded Compartment Data based on prompt
+        const compartmentData = {
+            'L1-R1': {
+                title: "L1/R1 (Transverse) - Pump Panel/Crosslay",
+                storage: "Hydrant bags, 5\" Storz adapters, 2.5\" Smooth Bore nozzles.",
+                mounting: "Swing-out tool boards for easy access over high side."
+            },
+            'L2-R2': {
+                title: "L2/R2 (Wheel Well) - Fender Storage",
+                storage: "SCBA Cylinders (7 spare), Fire Extinguishers (Water/ABC), Irons (Flathead/Halligan).",
+                mounting: "PAC Trac vertical mounts."
+            },
+            'L3': {
+                title: "L3 (Driver Rear) - Fire Attack/Ventilation",
+                storage: "K12 Saws, Chainsaws, PPV Fan.",
+                mounting: "Vertical slide-out boards for saws, floor slide-out for fans."
+            },
+            'R3': {
+                title: "R3 (Officer Rear) - Heavy Rescue/Extrication",
+                storage: "Hydraulic Spreaders/Cutters (Amkus/Hurst), Ram, Cribbing, RIT Pack.",
+                mounting: "Angled shelves for battery tools with 120v charging wiring OR Lazy Susan for hydraulic pumps."
+            },
+            'TorqueBox': {
+                title: "Torque Box - Ground Ladders",
+                storage: "35' Ext, 24' Ext, (2) 16' Roof, Pike Poles (6', 8', 10', 12').",
+                mounting: "Enclosed rear ladder tunnel."
+            },
+            'Bucket': {
+                title: "Bucket - Aerial Ops",
+                storage: "Stokes Basket Mount (side), Parapet Ladder, Roof Kit.",
+                mounting: "Exterior bucket brackets and floor anchors."
+            }
+        };
+
+        // Modal Logic
+        const modalBackdrop = document.getElementById('modal-backdrop');
+        const modalTitle = document.getElementById('modal-title');
+        const modalStorage = document.getElementById('modal-storage');
+        const modalMounting = document.getElementById('modal-mounting');
+
+        function openModal(zoneKey) {
+            const data = compartmentData[zoneKey];
+            if (!data) return;
+
+            // Populate
+            modalTitle.innerText = data.title;
+            modalStorage.innerText = data.storage;
+            modalMounting.innerText = data.mounting;
+
+            // Open
+            modalBackdrop.classList.add('open');
+            document.body.style.overflow = 'hidden'; // Prevent scrolling
+        }
+
+        function closeModal(event, force = false) {
+            // Close if background is clicked or force parameter is true (close button)
+            if (force || (event && event.target === modalBackdrop)) {
+                modalBackdrop.classList.remove('open');
+                document.body.style.overflow = ''; // Restore scrolling
+            }
+        }
+
+        // Handle ESC key for modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modalBackdrop.classList.contains('open')) {
+                closeModal(null, true);
+            }
+        });
+
+        // Intersection Observer for scroll animations
+        document.addEventListener('DOMContentLoaded', () => {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, {
+                threshold: 0.15,
+                rootMargin: "0px 0px -50px 0px"
+            });
+
+            document.querySelectorAll('.fade-up').forEach(item => {
+                observer.observe(item);
+            });
+        });
+
+    </script>
+</body>
+
+</html>
