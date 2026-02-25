@@ -6,4 +6,6 @@ compatibility_date = "2024-01-01"
 binding = "AI"
 
 [vars]
-SUPPORT_HUB_URL = "https://support.darleyplex.com"
+SUPPORT_HUB_URL = "https://www.mbfdhub.com"
+BASEROW_URL = "https://baserow.mbfdhub.com"
+NOCOBASE_URL = "https://nocobase.mbfdhub.com"

@@ -1,0 +1,51 @@
+# NocoBase + cloudflared services — attach to existing mbfd-hub_sail Docker bridge network.
+# Start with: docker compose -f compose.yaml -f docker-compose.nocobase.yml up -d nocobase cloudflared
+# This does NOT affect any existing Laravel/Baserow containers.
+
+services:
+  nocobase:
+    image: nocobase/nocobase:latest
+    container_name: nocobase
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:13000:80"
+    environment:
+      # ── NocoBase main database ── points at our existing Laravel pgsql container
+      DB_DIALECT: postgres
+      DB_HOST: pgsql
+      DB_PORT: 5432
+      DB_DATABASE: mbfd_hub
+      DB_SCHEMA: nocobase
+      DB_USER: mbfd_user
+      DB_PASSWORD: mbfd_secure_pass_2026
+      DB_LOGGING: "off"
+      APP_KEY: nocobase_change_me_2026
+      APP_ENV: production
+      API_BASE_PATH: /api/
+    volumes:
+      - nocobase_storage:/app/nocobase/storage
+    networks:
+      - sail
+    depends_on:
+      - pgsql
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-mbfdhub
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    networks:
+      - sail
+    depends_on:
+      - nocobase
+
+networks:
+  sail:
+    external: true
+    name: mbfd-hub_sail
+
+volumes:
+  nocobase_storage:
+    driver: local

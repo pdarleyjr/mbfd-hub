@@ -1,0 +1,139 @@
+{
+  "type": "void",
+  "x-component": "Page",
+  "properties": {
+    "stats_row": {
+      "type": "void",
+      "x-component": "Grid",
+      "properties": {
+        "todos_stat": {
+          "type": "void",
+          "x-component": "CardItem",
+          "x-component-props": { "title": "Open Todos" },
+          "properties": {
+            "stat": {
+              "type": "void",
+              "x-component": "BlockItem",
+              "x-decorator": "TableBlockProvider",
+              "x-decorator-props": { "collection": "todos", "action": "list", "params": { "pageSize": 5 } }
+            }
+          }
+        },
+        "projects_stat": {
+          "type": "void",
+          "x-component": "CardItem",
+          "x-component-props": { "title": "Capital Projects" },
+          "properties": {
+            "stat": {
+              "type": "void",
+              "x-component": "BlockItem",
+              "x-decorator": "TableBlockProvider",
+              "x-decorator-props": { "collection": "capital_projects", "action": "list", "params": { "pageSize": 5 } }
+            }
+          }
+        }
+      }
+    },
+    "todos_table": {
+      "type": "void",
+      "x-component": "CardItem",
+      "x-component-props": { "title": "All Todos" },
+      "properties": {
+        "grid": {
+          "type": "void",
+          "x-component": "BlockItem",
+          "x-decorator": "TableBlockProvider",
+          "x-decorator-props": { "collection": "todos", "action": "list", "params": { "pageSize": 50 } },
+          "properties": {
+            "table": {
+              "type": "array",
+              "x-component": "TableV2",
+              "x-component-props": { "rowKey": "id" },
+              "properties": {
+                "title": { "type": "void", "x-component": "TableV2.Column", "properties": { "title": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "status": { "type": "void", "x-component": "TableV2.Column", "properties": { "status": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "assigned_to": { "type": "void", "x-component": "TableV2.Column", "properties": { "assigned_to": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "due_at": { "type": "void", "x-component": "TableV2.Column", "properties": { "due_at": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "capital_projects_table": {
+      "type": "void",
+      "x-component": "CardItem",
+      "x-component-props": { "title": "Capital Projects" },
+      "properties": {
+        "grid": {
+          "type": "void",
+          "x-component": "BlockItem",
+          "x-decorator": "TableBlockProvider",
+          "x-decorator-props": { "collection": "capital_projects", "action": "list", "params": { "pageSize": 50 } },
+          "properties": {
+            "table": {
+              "type": "array",
+              "x-component": "TableV2",
+              "x-component-props": { "rowKey": "id" },
+              "properties": {
+                "name": { "type": "void", "x-component": "TableV2.Column", "properties": { "name": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "status": { "type": "void", "x-component": "TableV2.Column", "properties": { "status": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "budget_amount": { "type": "void", "x-component": "TableV2.Column", "properties": { "budget_amount": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "station_inventory_table": {
+      "type": "void",
+      "x-component": "CardItem",
+      "x-component-props": { "title": "Station Inventory Submissions" },
+      "properties": {
+        "grid": {
+          "type": "void",
+          "x-component": "BlockItem",
+          "x-decorator": "TableBlockProvider",
+          "x-decorator-props": { "collection": "station_inventory_submissions", "action": "list", "params": { "pageSize": 50 } },
+          "properties": {
+            "table": {
+              "type": "array",
+              "x-component": "TableV2",
+              "x-component-props": { "rowKey": "id" },
+              "properties": {
+                "station_id": { "type": "void", "x-component": "TableV2.Column", "properties": { "station_id": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "employee_name": { "type": "void", "x-component": "TableV2.Column", "properties": { "employee_name": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "submitted_at": { "type": "void", "x-component": "TableV2.Column", "properties": { "submitted_at": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "users_table": {
+      "type": "void",
+      "x-component": "CardItem",
+      "x-component-props": { "title": "Users" },
+      "properties": {
+        "grid": {
+          "type": "void",
+          "x-component": "BlockItem",
+          "x-decorator": "TableBlockProvider",
+          "x-decorator-props": { "collection": "users", "action": "list", "params": { "pageSize": 50 } },
+          "properties": {
+            "table": {
+              "type": "array",
+              "x-component": "TableV2",
+              "x-component-props": { "rowKey": "id" },
+              "properties": {
+                "nickname": { "type": "void", "x-component": "TableV2.Column", "properties": { "nickname": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "email": { "type": "void", "x-component": "TableV2.Column", "properties": { "email": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "createdAt": { "type": "void", "x-component": "TableV2.Column", "properties": { "createdAt": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
