@@ -39,12 +39,13 @@ echo "Purging Cloudflare cache..."
 curl -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
   -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
   -H "Content-Type: application/json" \
-  --data '{"files":["https://support.darleyplex.com/daily/index.html","https://support.darleyplex.com/daily/","https://support.darleyplex.com/__version"]}'
+  --data '{"files":["https://support.darleyplex.com/daily/index.html","https://support.darleyplex.com/daily/","https://support.darleyplex.com/__version","https://www.mbfdhub.com/daily/index.html","https://www.mbfdhub.com/daily/","https://www.mbfdhub.com/__version"]}'
 
 # Basic smoke test
 echo "Running smoke tests..."
 sleep 5
 curl -sf https://support.darleyplex.com/__version | jq . || echo "Version endpoint check failed"
 curl -sf https://support.darleyplex.com/daily/ -o /dev/null && echo "Daily checkout accessible" || echo "Daily checkout check failed"
+curl -sf https://www.mbfdhub.com/__version | jq . || echo "www.mbfdhub.com version endpoint check failed"
 
 echo "Deploy complete!"

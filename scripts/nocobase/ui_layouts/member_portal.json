@@ -1,0 +1,95 @@
+{
+  "type": "void",
+  "x-component": "Page",
+  "properties": {
+    "apparatuses_block": {
+      "type": "void",
+      "x-component": "CardItem",
+      "x-component-props": { "title": "Apparatuses" },
+      "properties": {
+        "grid": {
+          "type": "void",
+          "x-component": "BlockItem",
+          "x-decorator": "TableBlockProvider",
+          "x-decorator-props": {
+            "collection": "apparatuses",
+            "action": "list",
+            "params": { "pageSize": 20 }
+          },
+          "properties": {
+            "table": {
+              "type": "array",
+              "x-component": "TableV2",
+              "x-component-props": { "rowKey": "id", "rowSelection": { "type": "checkbox" } },
+              "properties": {
+                "unit_id": { "type": "void", "x-component": "TableV2.Column", "properties": { "unit_id": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "name": { "type": "void", "x-component": "TableV2.Column", "properties": { "name": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "status": { "type": "void", "x-component": "TableV2.Column", "properties": { "status": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "current_location": { "type": "void", "x-component": "TableV2.Column", "properties": { "current_location": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "todos_block": {
+      "type": "void",
+      "x-component": "CardItem",
+      "x-component-props": { "title": "My Todos" },
+      "properties": {
+        "grid": {
+          "type": "void",
+          "x-component": "BlockItem",
+          "x-decorator": "TableBlockProvider",
+          "x-decorator-props": {
+            "collection": "todos",
+            "action": "list",
+            "params": { "pageSize": 20 }
+          },
+          "properties": {
+            "table": {
+              "type": "array",
+              "x-component": "TableV2",
+              "x-component-props": { "rowKey": "id" },
+              "properties": {
+                "title": { "type": "void", "x-component": "TableV2.Column", "properties": { "title": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "status": { "type": "void", "x-component": "TableV2.Column", "properties": { "status": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "priority": { "type": "void", "x-component": "TableV2.Column", "properties": { "priority": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "due_at": { "type": "void", "x-component": "TableV2.Column", "properties": { "due_at": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "defects_block": {
+      "type": "void",
+      "x-component": "CardItem",
+      "x-component-props": { "title": "Apparatus Defects" },
+      "properties": {
+        "grid": {
+          "type": "void",
+          "x-component": "BlockItem",
+          "x-decorator": "TableBlockProvider",
+          "x-decorator-props": {
+            "collection": "apparatus_defects",
+            "action": "list",
+            "params": { "pageSize": 20 }
+          },
+          "properties": {
+            "table": {
+              "type": "array",
+              "x-component": "TableV2",
+              "x-component-props": { "rowKey": "id" },
+              "properties": {
+                "notes": { "type": "void", "x-component": "TableV2.Column", "properties": { "notes": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "status": { "type": "void", "x-component": "TableV2.Column", "properties": { "status": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } },
+                "reported_date": { "type": "void", "x-component": "TableV2.Column", "properties": { "reported_date": { "type": "string", "x-component": "CollectionField", "x-read-pretty": true } } }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

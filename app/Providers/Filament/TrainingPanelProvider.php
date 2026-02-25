@@ -81,7 +81,7 @@ class TrainingPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->navigationItems([
                 NavigationItem::make('Baserow')
-                    ->url('https://baserow.support.darleyplex.com', shouldOpenInNewTab: true)
+                    ->url('https://baserow.mbfdhub.com', shouldOpenInNewTab: true)
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->group('External Tools')
                     ->sort(99),
