@@ -46,10 +46,11 @@ jobs:
             echo "✓ Backup created: $BACKUP_FILE"
             
             # Pull latest changes and reset to origin (deterministic deploy)
+            git remote set-url origin https://github.com/pdarleyjr/mbfd-hub.git
             git fetch origin
             git reset --hard origin/main
             git clean -fd
-            echo "✓ Repository reset to origin/main"
+            echo "✓ Repository reset to origin/main (pdarleyjr/mbfd-hub)"
             
             # Rebuild and restart containers
             docker compose up -d --build
