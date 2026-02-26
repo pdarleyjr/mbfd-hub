@@ -7,6 +7,17 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Serve manifest.json with no-cache headers to bypass CDN caching
+Route::get('/manifest.json', function () {
+    $response = response()->file(public_path('manifest.json'), [
+        'Content-Type' => 'application/manifest+json',
+    ]);
+    $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    $response->headers->set('Pragma', 'no-cache');
+    $response->headers->set('Expires', '0');
+    return $response;
+});
+
 Route::get('/daily', function () {
     $response = response()->file(public_path('daily/index.html'));
     $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
