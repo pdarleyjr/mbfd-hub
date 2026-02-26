@@ -1,27 +1,18 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-CaS0lott.css",
+    "file": "assets/app-2g5XIFwW.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
+  "resources/css/filament/admin/theme.css": {
+    "file": "assets/theme-D72zl40T.css",
+    "src": "resources/css/filament/admin/theme.css",
+    "isEntry": true
+  },
   "resources/js/app.js": {
-    "file": "assets/app-CAiCLEjY.js",
+    "file": "assets/app-CKl8NZMC.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
-  },
-  "resources/js/daily-checkout/src/index.css": {
-    "file": "assets/index-Dw35_pNi.css",
-    "src": "resources/js/daily-checkout/src/index.css",
-    "isEntry": true
-  },
-  "resources/js/daily-checkout/src/main.tsx": {
-    "file": "assets/main-DgoRHFJj.js",
-    "name": "main",
-    "src": "resources/js/daily-checkout/src/main.tsx",
-    "isEntry": true,
-    "css": [
-      "assets/index-Dw35_pNi.css"
-    ]
   }
 }

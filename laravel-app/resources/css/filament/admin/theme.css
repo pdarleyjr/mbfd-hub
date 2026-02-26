@@ -1,94 +1,76 @@
-@import '/vendor/filament/filament/resources/css/theme.css';
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@config 'tailwind.config.js';
 
 :root {
-  --mbfd-red: #B91C1C;
-  --mbfd-red-light: #DC2626;
-  --mbfd-red-dark: #991B1B;
-  --mbfd-slate-900: #0F172A;
-  --mbfd-slate-800: #1E293B;
-  --mbfd-slate-700: #334155;
-  --mbfd-slate-600: #475569;
-  --mbfd-slate-400: #94A3B8;
-  --mbfd-slate-200: #E2E8F0;
-  --mbfd-slate-100: #F1F5F9;
+    --mbfd-red: #B91C1C;
+    --mbfd-red-light: #DC2626;
+    --mbfd-red-dark: #991B1B;
+    --mbfd-slate-900: #0F172A;
+    --mbfd-slate-800: #1E293B;
+    --mbfd-slate-700: #334155;
+    --mbfd-slate-600: #475569;
+    --mbfd-slate-400: #94A3B8;
+    --mbfd-slate-200: #E2E8F0;
+    --mbfd-slate-100: #F1F5F9;
 }
 
 /* Primary color overrides — replace Filament's default blue with MBFD red */
 .fi-btn-color-primary,
 [data-fi-color="primary"] .fi-btn {
-  --fi-color: var(--mbfd-red);
-  --fi-color-dark: var(--mbfd-red-dark);
+    --fi-color: var(--mbfd-red);
+    --fi-color-dark: var(--mbfd-red-dark);
 }
 
 /* Sidebar background */
 .fi-sidebar {
-  background: var(--mbfd-slate-900) !important;
-}
-.fi-sidebar-nav-group-label {
-  color: var(--mbfd-red-light) !important;
-  font-weight: 700;
-  text-transform: uppercase;
-  font-size: 0.6875rem;
-  letter-spacing: 0.1em;
+    background: var(--mbfd-slate-900) !important;
 }
 
-/* Prevent flat white backgrounds — add subtle depth */
-.fi-main {
-  background: #0F172A !important;
-}
-.fi-page {
-  background: #0F172A !important;
-}
-.fi-wi-stats-overview-stat {
-  background: var(--mbfd-slate-800) !important;
-  border: 1px solid var(--mbfd-slate-700) !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
-}
-.fi-wi-stats-overview-stat-value {
-  color: var(--mbfd-slate-100) !important;
-}
-.fi-wi-stats-overview-stat-label {
-  color: var(--mbfd-slate-400) !important;
-}
-.fi-ta-ctn,
-.fi-fo-field-wrp,
-.fi-card {
-  background: var(--mbfd-slate-800) !important;
-  border-color: var(--mbfd-slate-700) !important;
+.fi-sidebar-nav-group-label {
+    color: var(--mbfd-red-light) !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
 }
 
 /* Active nav item */
-.fi-sidebar-item-active > .fi-sidebar-item-button {
-  background: rgba(185,28,28,0.15) !important;
-  border-left: 3px solid var(--mbfd-red) !important;
-  color: #fff !important;
+.fi-sidebar-item-active>.fi-sidebar-item-button {
+    background: rgba(185, 28, 28, 0.15) !important;
+    border-left: 3px solid var(--mbfd-red) !important;
+    color: #fff !important;
 }
+
 .fi-sidebar-item-active .fi-sidebar-item-label {
-  color: #fff !important;
+    color: #fff !important;
 }
 
 /* Widget card headers */
 .fi-wi-chart canvas {
-  filter: saturate(1.3);
-}
-
-/* Form inputs dark */
-.dark .fi-input,
-.fi-input {
-  background: var(--mbfd-slate-900) !important;
-  border-color: var(--mbfd-slate-700) !important;
-  color: var(--mbfd-slate-100) !important;
+    filter: saturate(1.3);
 }
 
 /* Table rows */
 .fi-ta-row:hover td {
-  background: rgba(185,28,28,0.05) !important;
+    background: rgba(185, 28, 28, 0.05) !important;
 }
 
 /* Badges/pills for status */
-.fi-badge-color-success { background: #166534 !important; color: #bbf7d0 !important; }
-.fi-badge-color-danger  { background: #7f1d1d !important; color: #fecaca !important; }
-.fi-badge-color-warning { background: #78350f !important; color: #fde68a !important; }
+.fi-badge-color-success {
+    background: #166534 !important;
+    color: #bbf7d0 !important;
+}
+
+.fi-badge-color-danger {
+    background: #7f1d1d !important;
+    color: #fecaca !important;
+}
+
+.fi-badge-color-warning {
+    background: #78350f !important;
+    color: #fde68a !important;
+}
 
 /**
  * Admin Dashboard Custom Theme
@@ -281,6 +263,7 @@ select:focus {
 
 /* Fix Mobile Sidebar - Make it a slide-out overlay, not fixed */
 @media (max-width: 1023px) {
+
     /* Sidebar Overlay - Should slide in from left */
     .fi-sidebar {
         position: fixed !important;
@@ -315,7 +298,7 @@ select:focus {
 
     /* Main content should not be pushed */
     .fi-main-ctn,
-    .fi-layout > main {
+    .fi-layout>main {
         margin-left: 0 !important;
         width: 100% !important;
     }
@@ -333,6 +316,7 @@ select:focus {
 
 /* Mobile Touch-Friendly Targets (48px minimum per Apple/Google guidelines) */
 @media (max-width: 1023px) {
+
     /* Navigation items */
     .fi-sidebar-item-button,
     .fi-sidebar-group-button {
@@ -356,7 +340,8 @@ select:focus {
     .fi-input,
     .fi-select {
         min-height: 44px !important;
-        font-size: 16px !important; /* Prevents iOS zoom on focus */
+        font-size: 16px !important;
+        /* Prevents iOS zoom on focus */
         @apply touch-manipulation;
     }
 
@@ -391,6 +376,7 @@ select:focus {
 /* iOS Safe Areas */
 @supports (padding: env(safe-area-inset-bottom)) {
     @media (max-width: 1023px) {
+
         /* Bottom safe area for iPhones with home indicator */
         .fi-main,
         .fi-main-ctn {
@@ -406,6 +392,7 @@ select:focus {
 
 /* Mobile Card/List Styling - App-like appearance */
 @media (max-width: 1023px) {
+
     /* Cards with subtle shadows like native iOS */
     .fi-wi,
     .fi-section {
@@ -431,6 +418,7 @@ html {
 }
 
 @media (max-width: 1023px) {
+
     .fi-ta-content,
     .fi-main,
     .dashboard-widget-scrollable {
@@ -477,6 +465,7 @@ html {
 
 /* Active/Pressed States for Touch Feedback */
 @media (max-width: 1023px) {
+
     .fi-sidebar-item-button:active,
     .fi-btn:active,
     .fi-ta-row:active {
@@ -510,6 +499,7 @@ html {
 
 /* Hide less important elements on mobile */
 @media (max-width: 640px) {
+
     /* Simplify table for small screens */
     .fi-ta-header-cell-label {
         font-size: 12px !important;
