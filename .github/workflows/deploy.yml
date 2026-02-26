@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://support.darleyplex.com
+      url: https://mbfdhub.com
     
     steps:
       - name: Checkout code
@@ -34,6 +34,7 @@ jobs:
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
           ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'
             set -e
@@ -48,8 +49,8 @@ jobs:
             # Pull latest changes and reset to origin (deterministic deploy)
             echo "=== Git Diagnostics ==="
             git remote -v
-            git remote set-url origin https://github.com/pdarleyjr/mbfd-hub.git
-            echo "Remote URL set to: $(git remote get-url origin)"
+            git remote set-url origin https://${{ secrets.GH_PAT }}@github.com/pdarleyjr/mbfd-hub.git
+            echo "Remote URL updated with auth token"
             git fetch origin --force --prune
             echo "Fetched. origin/main is: $(git rev-parse origin/main)"
             echo "Current HEAD before reset: $(git rev-parse HEAD)"
@@ -58,6 +59,9 @@ jobs:
             git clean -fd
             # Write deploy marker file (verifiable via HTTP)
             echo "{\"deployed_sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json
+            # Verify SHA matches what GitHub expects
+            VPS_SHA=$(git rev-parse HEAD)
+            echo "VPS SHA: $VPS_SHA"
             echo "=== End Git Diagnostics ==="
             echo "✓ Repository reset to origin/main (pdarleyjr/mbfd-hub)"
             
@@ -105,7 +109,7 @@ jobs:
           curl -X POST "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -H "Content-Type: application/json" \
-            --data '{"files":["https://mbfdhub.com/","https://mbfdhub.com/manifest.json","https://mbfdhub.com/site.webmanifest","https://support.darleyplex.com/daily/index.html","https://support.darleyplex.com/daily/","https://support.darleyplex.com/__version","https://www.mbfdhub.com/daily/index.html","https://www.mbfdhub.com/daily/","https://www.mbfdhub.com/__version"]}'
+            --data '{"files":["https://mbfdhub.com/","https://mbfdhub.com/manifest.json","https://mbfdhub.com/site.webmanifest","https://mbfdhub.com/daily/index.html","https://mbfdhub.com/daily/","https://mbfdhub.com/__version","https://www.mbfdhub.com/daily/index.html","https://www.mbfdhub.com/daily/","https://www.mbfdhub.com/__version"]}'
           echo "✓ Cloudflare cache purged"
 
       - name: Run Smoke Tests
@@ -117,14 +121,14 @@ jobs:
           sleep 5
           
           # Test version endpoint
-          if curl -sf https://support.darleyplex.com/__version | jq .; then
+          if curl -sf https://mbfdhub.com/__version | jq .; then
             echo "✓ Version endpoint check passed"
           else
             echo "⚠ Version endpoint check failed"
           fi
           
           # Test daily checkout page
-          if curl -sf https://support.darleyplex.com/daily/ -o /dev/null; then
+          if curl -sf https://mbfdhub.com/daily/ -o /dev/null; then
             echo "✓ Daily checkout accessible"
           else
             echo "⚠ Daily checkout check failed"
@@ -133,7 +137,7 @@ jobs:
       - name: Verify Service Workers
         run: |
           echo "Verifying /sw.js..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://support.darleyplex.com/sw.js)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://mbfdhub.com/sw.js)
           if [ "$HTTP_CODE" != "200" ]; then
             echo "ERROR: /sw.js returned $HTTP_CODE, expected 200"
             exit 1
@@ -141,14 +145,14 @@ jobs:
           echo "✓ /sw.js returned 200"
           
           # Verify content type is JavaScript
-          CONTENT_TYPE=$(curl -s -I https://support.darleyplex.com/sw.js | grep -i content-type | cut -d' ' -f2 | tr -d '\r')
+          CONTENT_TYPE=$(curl -s -I https://mbfdhub.com/sw.js | grep -i content-type | cut -d' ' -f2 | tr -d '\r')
           echo "Content-Type: $CONTENT_TYPE"
           if [[ "$CONTENT_TYPE" != *"javascript"* && "$CONTENT_TYPE" != *"text/plain"* ]]; then
             echo "WARNING: Unexpected Content-Type for service worker"
           fi
 
           echo "Verifying /daily/service-worker.js..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://support.darleyplex.com/daily/service-worker.js)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://mbfdhub.com/daily/service-worker.js)
           if [ "$HTTP_CODE" != "200" ]; then
             echo "ERROR: /daily/service-worker.js returned $HTTP_CODE, expected 200"
             exit 1
@@ -156,7 +160,7 @@ jobs:
           echo "✓ /daily/service-worker.js returned 200"
 
           echo "Verifying /manifest.json..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://support.darleyplex.com/manifest.json)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://mbfdhub.com/manifest.json)
           if [ "$HTTP_CODE" != "200" ]; then
             echo "ERROR: /manifest.json returned $HTTP_CODE, expected 200"
             exit 1
