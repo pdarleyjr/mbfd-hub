@@ -21,7 +21,7 @@ class TodoResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
-    protected static ?string $navigationGroup = 'Projects';
+    protected static ?string $navigationGroup = 'Project Management';
 
     protected static ?int $navigationSort = 1;
 

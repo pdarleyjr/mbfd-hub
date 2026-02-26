@@ -18,7 +18,9 @@ class ShopWorkResource extends Resource
     protected static ?string $model = ShopWork::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-wrench-screwdriver';
-    
+
+    protected static ?string $navigationGroup = 'Logistics';
+
     protected static ?string $navigationLabel = 'Shop Needs';
     
     protected static ?string $modelLabel = 'Shop Need';

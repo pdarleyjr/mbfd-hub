@@ -169,6 +169,7 @@ export default function CompartmentStep({ compartments, onSubmit, onBack }: Comp
       <button
         onClick={handleMarkAllPresent}
         className="w-full mb-6 py-3 px-4 bg-green-100 text-green-800 font-semibold rounded-lg border-2 border-green-300 hover:bg-green-200 transition-colors touch-manipulation"
+        style={{ minHeight: 44 }}
         aria-label="Mark all items in this compartment as present"
       >
         ✓ Mark All Present
@@ -246,6 +247,7 @@ export default function CompartmentStep({ compartments, onSubmit, onBack }: Comp
         <button
           onClick={handlePrevious}
           className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 touch-manipulation"
+          style={{ minWidth: 44, minHeight: 44 }}
         >
           {currentCompartmentIndex === 0 ? 'Back to Officer Info' : 'Previous Compartment'}
         </button>
@@ -253,6 +255,7 @@ export default function CompartmentStep({ compartments, onSubmit, onBack }: Comp
         <button
           onClick={handleNext}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 touch-manipulation"
+          style={{ minWidth: 44, minHeight: 44 }}
         >
           {isLastCompartment ? 'Review & Submit' : 'Next Compartment'}
         </button>

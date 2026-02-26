@@ -18,7 +18,7 @@ class SingleGasMeterResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-beaker';
     
-    protected static ?string $navigationGroup = 'Fire Equipment';
+    protected static ?string $navigationGroup = 'Logistics';
     
     protected static ?string $navigationLabel = 'Single Gas Meters';
     

@@ -19,7 +19,7 @@ class StatsOverviewWidget extends BaseWidget
             Stat::make('Total Apparatuses', Apparatus::count())
                 ->description('Fleet size')
                 ->descriptionIcon('heroicon-o-truck')
-                ->color('primary'),
+                ->color('danger'),
 
             Stat::make('Open Defects', ApparatusDefect::where('resolved', false)->count())
                 ->description('Requires attention')

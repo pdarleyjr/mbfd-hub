@@ -25,7 +25,7 @@ class RecommendationResource extends Resource
 
     protected static ?string $navigationLabel = 'Replacement Recommendations';
 
-    protected static ?string $navigationGroup = 'Fire Equipment';
+    protected static ?string $navigationGroup = 'Administration';
 
     protected static ?int $navigationSort = 3;
 

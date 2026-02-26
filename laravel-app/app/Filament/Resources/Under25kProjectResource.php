@@ -23,7 +23,7 @@ class Under25kProjectResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';
     
-    protected static ?string $navigationGroup = 'Projects';
+    protected static ?string $navigationGroup = 'Project Management';
     
     protected static ?string $navigationLabel = 'Under 25k';
     

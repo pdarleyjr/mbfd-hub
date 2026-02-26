@@ -43,7 +43,7 @@ class ExternalSourceResource extends Resource
                 ->label('Base URL')
                 ->url()
                 ->required()
-                ->default('https://baserow.support.darleyplex.com'),
+                ->default('https://baserow.mbfdhub.com'),
             Forms\Components\TextInput::make('token')
                 ->label('API Token')
                 ->password()
