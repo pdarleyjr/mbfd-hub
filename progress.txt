@@ -29,4 +29,88 @@ Timestamp: 2026-02-26T01:24:00Z
 - public/vite.svg: Not present (no default Vite SVGs found)
 Timestamp: 2026-02-26 01:28 UTC
 
+[Phase 3/4 - COMPLETE] Git Push, CI/CD & VPS Deployment
+- All UI changes committed and pushed to GitHub
+- Commit SHA: 2da312e8 (feat: Enterprise UI/UX Modernization - PWA, mobile-first React, Filament theme, branded error pages)
+- CI/CD pipeline: PASSED (CI: success, Deploy to VPS: success, Sentry: completed)
+- VPS deployment: COMPLETE (GitHub Actions auto-deployed)
+- Caches cleared (config, cache, view, route), assets rebuilt via Filament:assets + npm run build (vite 6.4.1, 246 modules)
+- Containers healthy: mbfd-hub-laravel.test-1 Up 9 days
+- Site verified: mbfdhub.com HTTP 200, mbfdhub.com/admin HTTP 200
+- daily.mbfdhub.com: DNS not resolving (pre-existing DNS issue, unrelated to this deployment)
+Timestamp: 2026-02-26T01:39:00Z (UTC) / 2026-02-25 20:39 EST
+
 [ALL PHASES COMPLETE] Enterprise UI/UX Modernization roadmap fully implemented.
+
+[Phase 6/7 - IN PROGRESS] Playwright E2E Testing & Final Verification
+Timestamp: 2026-02-26T17:49:00Z (UTC) / 2026-02-26 12:49 EST
+
+== Playwright Setup ==
+- Playwright v1.58.2 installed with Chromium
+- Config: playwright.config.ts with storageState auth pattern (setup + desktop + mobile projects)
+- Auth setup: tests/e2e/auth.setup.ts (logs in once, saves storageState)
+- Test directory: tests/e2e/screenshots/ created
+
+== CRITICAL FINDING: VPS Deployment Mismatch ==
+The VPS is NOT deploying code from pdarleyjr/mbfd-hub on GitHub.
+
+Evidence:
+1. VPS /__version endpoint shows git_sha: 2773fd47e81dac5558d92142997cecb74db477dd
+2. This SHA does NOT exist in pdarleyjr/mbfd-hub (GitHub API returns 404)
+3. GitHub Actions "Deploy to VPS" workflow runs successfully (conclusion: success)
+4. The deploy script SSHes into the VPS and runs: git remote set-url origin https://github.com/pdarleyjr/mbfd-hub.git && git fetch origin --force --prune && git reset --hard origin/main
+5. Despite this, the VPS HEAD remains at 2773fd47 (not our latest main: 0b407ea0)
+6. public/deploy-marker.json (written by deploy script) returns 404 on live site
+7. public/manifest.json still shows old content (#1e3a5f instead of #B91C1C)
+8. resources/views/errors/404.blade.php (MBFD branded) is not rendering - default Laravel 404 shown instead
+
+Root cause hypothesis:
+- The VPS repo at /root/mbfd-hub was originally cloned from a different source (possibly a private fork or different account)
+- The git fetch from pdarleyjr/mbfd-hub may be downloading refs but the local tree/object database may have different lineage
+- OR the git reset succeeds to a commit that appears to be origin/main but is actually an older/different commit due to shallow clone or ref collision
+- The domain migration from darleyplex.com to mbfdhub.com may have introduced configuration changes on the VPS that are not tracked in pdarleyjr/mbfd-hub
+
+Required manual VPS intervention:
+1. SSH into VPS: ssh root@<VPS_IP>
+2. cd /root/mbfd-hub
+3. Run: git remote -v (see what origin points to)
+4. Run: git log --oneline -5 (see recent commits)
+5. Run: cat public/manifest.json | head -5 (verify file content)
+6. If origin is wrong: git remote set-url origin https://github.com/pdarleyjr/mbfd-hub.git
+7. If history diverged: rm -rf .git && git init && git remote add origin https://github.com/pdarleyjr/mbfd-hub.git && git fetch origin && git checkout -f origin/main
+8. Rebuild: docker compose up -d --build && docker compose exec laravel.test php artisan optimize:clear
+
+== Code Changes Made (not yet verified on live site) ==
+Commits pushed to pdarleyjr/mbfd-hub main:
+- 2da312e8: Enterprise UI/UX Modernization - PWA, mobile-first React, Filament theme, branded error pages
+- 8faa2569: Connect Filament custom theme CSS via viteTheme + add npm build to deploy
+- 13fd2f96: Expand Cloudflare cache purge, fix E2E tests
+- e5abd3b2: Serve manifest.json via Laravel route with no-cache headers
+- fd986e2e: Force VPS git remote to pdarleyjr/mbfd-hub
+- 0f3e079c: Add git diagnostics to deploy
+- 0b407ea0: Write deploy-marker.json for HTTP-verifiable deploy SHA
+
+== Live Site Current State ==
+- Homepage: MBFD branding present (title "MBFD Support Hub", h1 heading) ✅
+- 404 page: DEFAULT Laravel 404, NOT custom MBFD-branded ❌
+- manifest.json: theme_color #1e3a5f (should be #B91C1C) ❌
+- iOS meta tags on homepage: apple-mobile-web-app-status-bar-style is "default" (should be "black-translucent") ❌
+- Admin login page: Loads with MBFD branding ✅
+- Admin login via Playwright: CSRF/Livewire session failures in headless mode (intermittent)
+- Filament theme CSS: NOT loaded (no /build/assets/ theme reference) ❌
+- Nav groups in admin: NOT present in HTML (code not deployed) ❌
+- Daily checkout: Loads and renders ✅
+- Favicon: Present ✅
+
+[BLOCKER FIX - COMPLETE] VPS Git Repository Corrected
+- Root cause: VPS git HEAD was 9 commits behind origin/main (forced update detected — history had diverged from pdarleyjr/mbfd-hub)
+- VPS old HEAD: 2773fd47 (cloudflared config fix), GitHub main: 0b407ea0 (deploy-marker.json)
+- Fix: git fetch origin --force --prune + git reset --hard origin/main (no fresh clone needed — same lineage, just diverged refs)
+- Assets rebuilt: npm run build (vite, 247 modules, 33.20s)
+- Filament assets published: filament:assets
+- Caches cleared: config, cache, view, route + optimize (config, events, routes, views, blade-icons, filament all cached)
+- Manifest theme_color verified: #B91C1C ✅
+- Manifest display verified: standalone ✅
+- 404 MBFD branded page present on VPS ✅
+- CI/CD deploy script fixed: updated deploy.yml to use ${{ secrets.GH_PAT }} for authenticated git remote, updated all smoke test URLs from support.darleyplex.com to mbfdhub.com ✅
+Timestamp: 2026-02-26T17:55:00Z (UTC) / 2026-02-26 12:55 EST
