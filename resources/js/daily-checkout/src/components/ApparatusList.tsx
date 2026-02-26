@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Apparatus } from '../types';
 import { ApiClient } from '../utils/api';
+import { ApparatusListSkeleton } from './SkeletonLoader';
 
 const enableApparatusForms = import.meta.env.VITE_ENABLE_APPARATUS_FORMS === 'true';
 
@@ -62,11 +63,7 @@ export default function ApparatusList() {
   };
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-64">
-        <div className="text-lg">Loading apparatuses...</div>
-      </div>
-    );
+    return <ApparatusListSkeleton />;
   }
 
   if (error) {
@@ -100,10 +97,10 @@ export default function ApparatusList() {
           {enableApparatusForms && (
             <Link
               to="/apparatuses"
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`px-4 py-3 rounded-md text-sm font-medium transition-colors min-h-[44px] flex items-center touch-manipulation ${
                 location.pathname.startsWith('/apparatuses')
                   ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  : 'text-gray-600 active:text-gray-900 active:bg-gray-100 focus:text-gray-900 focus:bg-gray-100'
               }`}
             >
               🚒 Apparatuses
@@ -111,20 +108,20 @@ export default function ApparatusList() {
           )}
           <Link
             to="/forms-hub"
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-3 rounded-md text-sm font-medium transition-colors min-h-[44px] flex items-center touch-manipulation ${
               location.pathname.startsWith('/forms-hub')
                 ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                : 'text-gray-600 active:text-gray-900 active:bg-gray-100 focus:text-gray-900 focus:bg-gray-100'
             }`}
           >
             📋 Forms Hub
           </Link>
           <Link
             to="/stations"
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-3 rounded-md text-sm font-medium transition-colors min-h-[44px] flex items-center touch-manipulation ${
               location.pathname.startsWith('/stations') && !location.pathname.startsWith('/forms-hub')
                 ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                : 'text-gray-600 active:text-gray-900 active:bg-gray-100 focus:text-gray-900 focus:bg-gray-100'
             }`}
           >
             🏢 Stations
@@ -168,7 +165,7 @@ export default function ApparatusList() {
           <Link
             key={apparatus.id}
             to={`/apparatus/${apparatus.slug}`}
-            className="block p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 touch-manipulation"
+            className="block p-6 bg-white rounded-lg shadow-md active:shadow-lg focus:shadow-lg transition-shadow border border-gray-200 touch-manipulation min-h-[44px]"
           >
             <div className="text-center">
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
