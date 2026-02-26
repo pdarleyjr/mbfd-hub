@@ -67,6 +67,11 @@ jobs:
             docker compose exec -T laravel.test php artisan filament:clear-cached-components
             echo "✓ Laravel optimizations complete"
             
+            # Build main Vite assets (CSS theme + JS)
+            docker compose exec -T laravel.test npm ci
+            docker compose exec -T laravel.test npm run build
+            echo "✓ Main Vite assets built"
+            
             # Build daily-checkout frontend
             cd resources/js/daily-checkout
             npm ci
