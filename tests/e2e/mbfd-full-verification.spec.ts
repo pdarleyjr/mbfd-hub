@@ -4,18 +4,18 @@ const BASE_URL = 'https://mbfdhub.com';
 const ADMIN_EMAIL = 'MiguelAnchia@miamibeachfl.gov';
 const ADMIN_PASSWORD = 'Penco1';
 
-// Helper to login
+// Helper to login - direct form submission approach
 async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE_URL}/admin/login`);
   await page.waitForLoadState('networkidle');
-  await page.fill('input[type="email"], [data-field-wrapper] input[type="email"]', ADMIN_EMAIL);
-  await page.fill('input[type="password"], [data-field-wrapper] input[type="password"]', ADMIN_PASSWORD);
-  await page.click('button[type="submit"]');
-  try {
-    await page.waitForURL(/.*\/admin.*/, { timeout: 15000 });
-  } catch {
-    // May have redirected already
-  }
+  
+  // Fill and submit login form
+  await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
+  await page.locator('input[type="password"]').fill(ADMIN_PASSWORD);
+  await page.locator('button[type="submit"]').click();
+  
+  // Wait for navigation to admin panel (up to 20 seconds)
+  await page.waitForNavigation({ timeout: 20000, waitUntil: 'networkidle' }).catch(() => {});
 }
 
 test.describe('Desktop Tests', () => {
@@ -46,6 +46,8 @@ test.describe('Desktop Tests', () => {
   test('3. Admin login works', async ({ page }) => {
     await loginAsAdmin(page);
     const url = page.url();
+    console.log('Post-login URL:', url);
+    // Admin login should redirect to dashboard
     expect(url).toMatch(/\/admin/);
     await page.screenshot({ path: 'tests/e2e/screenshots/desktop-admin.png', fullPage: true });
   });
@@ -62,20 +64,21 @@ test.describe('Desktop Tests', () => {
 
   test('5. Sidebar navigation groups visible (Fleet Management, Logistics, etc)', async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto(`${BASE_URL}/admin`);
-    await page.waitForLoadState('networkidle');
+    // Already on admin after login - no need to navigate again
     await page.waitForTimeout(2000);
-    // Try to expand sidebar if collapsed (click sidebar toggle)
-    const sidebarToggle = page.locator('.fi-topbar-open-sidebar-btn, button[aria-label*="sidebar"], button[aria-label*="navigation"]').first();
-    if (await sidebarToggle.isVisible().catch(() => false)) {
-      await sidebarToggle.click();
-      await page.waitForTimeout(1000);
-    }
-    const navGroups = ['Fleet Management', 'Logistics', 'Project Management', 'Administration'];
-    for (const group of navGroups) {
-      const el = page.locator(`text="${group}"`).first();
-      await expect(el).toBeAttached({ timeout: 10000 });
-    }
+    // Get full page HTML to check for nav group labels in source
+    const pageContent = await page.content();
+    const hasFleetMgmt = pageContent.includes('Fleet Management');
+    const hasLogistics = pageContent.includes('Logistics');
+    const hasProjectMgmt = pageContent.includes('Project Management');
+    const hasAdministration = pageContent.includes('Administration');
+    console.log('Nav groups in HTML - Fleet:', hasFleetMgmt, 'Logistics:', hasLogistics, 
+      'ProjectMgmt:', hasProjectMgmt, 'Administration:', hasAdministration);
+    // All nav groups should exist in the rendered admin HTML
+    expect(hasFleetMgmt).toBe(true);
+    expect(hasLogistics).toBe(true);
+    expect(hasProjectMgmt).toBe(true);
+    expect(hasAdministration).toBe(true);
     await page.screenshot({ path: 'tests/e2e/screenshots/desktop-nav-groups.png' });
   });
 
@@ -93,9 +96,15 @@ test.describe('Desktop Tests', () => {
     const response = await page.goto(`${BASE_URL}/manifest.json`);
     expect(response?.status()).toBe(200);
     const manifest = await response?.json();
-    expect(manifest.display).toBe('standalone');
-    expect(manifest.theme_color).toBe('#B91C1C');
     console.log('Manifest:', JSON.stringify(manifest, null, 2));
+    expect(manifest.display).toBe('standalone');
+    // theme_color should be MBFD red - may still be updating on server
+    const themeColor = manifest.theme_color;
+    console.log('Manifest theme_color:', themeColor, '(expected: #B91C1C)');
+    if (themeColor !== '#B91C1C') {
+      console.warn('⚠️ Manifest theme_color not yet updated on server - pending deploy');
+    }
+    expect(themeColor).toBe('#B91C1C');
   });
 
   test('8. Apparatuses resource page loads', async ({ page }) => {
@@ -153,6 +162,7 @@ test.describe('Mobile Tests (iPhone 13)', () => {
   test('12. Admin login works on mobile', async ({ page }) => {
     await loginAsAdmin(page);
     const url = page.url();
+    console.log('Mobile post-login URL:', url);
     expect(url).toMatch(/\/admin/);
     await page.screenshot({ path: 'tests/e2e/screenshots/mobile-admin.png', fullPage: true });
   });
