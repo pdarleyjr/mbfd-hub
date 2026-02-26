@@ -46,10 +46,17 @@ jobs:
             echo "✓ Backup created: $BACKUP_FILE"
             
             # Pull latest changes and reset to origin (deterministic deploy)
+            echo "=== Git Diagnostics ==="
+            git remote -v
             git remote set-url origin https://github.com/pdarleyjr/mbfd-hub.git
-            git fetch origin
+            echo "Remote URL set to: $(git remote get-url origin)"
+            git fetch origin --force --prune
+            echo "Fetched. origin/main is: $(git rev-parse origin/main)"
+            echo "Current HEAD before reset: $(git rev-parse HEAD)"
             git reset --hard origin/main
+            echo "HEAD after reset: $(git rev-parse HEAD)"
             git clean -fd
+            echo "=== End Git Diagnostics ==="
             echo "✓ Repository reset to origin/main (pdarleyjr/mbfd-hub)"
             
             # Rebuild and restart containers
