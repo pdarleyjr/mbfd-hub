@@ -56,6 +56,8 @@ jobs:
             git reset --hard origin/main
             echo "HEAD after reset: $(git rev-parse HEAD)"
             git clean -fd
+            # Write deploy marker file (verifiable via HTTP)
+            echo "{\"deployed_sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json
             echo "=== End Git Diagnostics ==="
             echo "✓ Repository reset to origin/main (pdarleyjr/mbfd-hub)"
             
