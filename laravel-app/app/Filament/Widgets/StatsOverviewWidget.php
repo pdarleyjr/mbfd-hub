@@ -17,24 +17,24 @@ class StatsOverviewWidget extends BaseWidget
 
         return [
             Stat::make('Total Apparatuses', Apparatus::count())
-                ->description('Fleet size')
-                ->descriptionIcon('heroicon-o-truck')
-                ->color('danger'),
+            ->description('Fleet size')
+            ->descriptionIcon('heroicon-o-truck')
+            ->extraAttributes(['class' => 'stat-card-total']),
 
             Stat::make('Open Defects', ApparatusDefect::where('resolved', false)->count())
-                ->description('Requires attention')
-                ->descriptionIcon('heroicon-o-exclamation-triangle')
-                ->color('danger'),
+            ->description('Requires attention')
+            ->descriptionIcon('heroicon-o-exclamation-triangle')
+            ->extraAttributes(['class' => 'stat-card-danger']),
 
             Stat::make('Inspections Today', ApparatusInspection::whereBetween('completed_at', [$today, $todayEnd])->count())
-                ->description('Completed today')
-                ->descriptionIcon('heroicon-o-clipboard-document-check')
-                ->color('success'),
+            ->description('Completed today')
+            ->descriptionIcon('heroicon-o-clipboard-document-check')
+            ->extraAttributes(['class' => 'stat-card-success']),
 
             Stat::make('Overdue Inspections', $this->getOverdueInspectionsCount())
-                ->description('Need inspection')
-                ->descriptionIcon('heroicon-o-clock')
-                ->color('warning'),
+            ->description('Need inspection')
+            ->descriptionIcon('heroicon-o-clock')
+            ->extraAttributes(['class' => 'stat-card-warning']),
         ];
     }
 

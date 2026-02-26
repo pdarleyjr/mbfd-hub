@@ -27,6 +27,19 @@
     background: var(--mbfd-slate-900) !important;
 }
 
+/* Fix sidebar text visibility (dark background needs light text) */
+.fi-sidebar-item-label {
+    color: var(--mbfd-slate-200) !important;
+}
+
+.fi-sidebar-item-icon {
+    color: var(--mbfd-slate-400) !important;
+}
+
+.fi-sidebar-group-label {
+    color: var(--mbfd-slate-400) !important;
+}
+
 .fi-sidebar-nav-group-label {
     color: var(--mbfd-red-light) !important;
     font-weight: 700;
@@ -42,13 +55,47 @@
     color: #fff !important;
 }
 
-.fi-sidebar-item-active .fi-sidebar-item-label {
+.fi-sidebar-item-active .fi-sidebar-item-label,
+.fi-sidebar-item-active .fi-sidebar-item-icon {
     color: #fff !important;
 }
 
 /* Widget card headers */
 .fi-wi-chart canvas {
     filter: saturate(1.3);
+}
+
+/* Colorful Action Cards (Widgets) */
+.stat-card-total {
+    background: linear-gradient(135deg, var(--mbfd-slate-700), var(--mbfd-slate-900)) !important;
+    border-top: 4px solid var(--mbfd-slate-400) !important;
+    color: white !important;
+}
+
+.stat-card-danger {
+    background: linear-gradient(135deg, var(--mbfd-red-dark), #7f1d1d) !important;
+    border-top: 4px solid var(--mbfd-red-light) !important;
+    color: white !important;
+}
+
+.stat-card-success {
+    background: linear-gradient(135deg, #166534, #14532d) !important;
+    border-top: 4px solid #4ade80 !important;
+    color: white !important;
+}
+
+.stat-card-warning {
+    background: linear-gradient(135deg, #d97706, #b45309) !important;
+    border-top: 4px solid #fbbf24 !important;
+    color: white !important;
+}
+
+/* Ensure inner text is white on solid cards */
+.stat-card-total *,
+.stat-card-danger *,
+.stat-card-success *,
+.stat-card-warning * {
+    color: white !important;
 }
 
 /* Table rows */
@@ -245,6 +292,31 @@
 /* Link Hover States */
 a:hover {
     @apply text-red-600 dark:text-red-400 transition-colors duration-200;
+}
+
+/* Base Typography Tracking */
+body,
+.fi-main {
+    letter-spacing: -0.01em;
+}
+
+/* Desktop Header - Glassmorphism */
+@media (min-width: 1024px) {
+    .fi-topbar {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 40 !important;
+        backdrop-filter: blur(12px) !important;
+        background: rgba(255, 255, 255, 0.85) !important;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+        transition: background-color 0.2s ease, backdrop-filter 0.2s ease;
+    }
+
+    .dark .fi-topbar {
+        background: rgba(15, 23, 42, 0.85) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
 }
 
 /* Card Hover Effects */
