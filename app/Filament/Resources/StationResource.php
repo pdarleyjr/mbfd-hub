@@ -21,7 +21,7 @@ class StationResource extends Resource
     protected static ?string $model = Station::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
-    protected static ?string $navigationGroup = 'Operations';
+    protected static ?string $navigationGroup = 'Fleet Management';
     protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form

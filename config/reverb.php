@@ -66,7 +66,7 @@ return [
             'capacity' => null,
             'allowed_origins' => explode(',', env(
                 'REVERB_ALLOWED_ORIGINS',
-                'https://www.mbfdhub.com,https://mbfdhub.com,https://support.darleyplex.com'
+                'https://www.mbfdhub.com,https://mbfdhub.com'
             )),
             'ping_interval' => env('REVERB_APP_PING_INTERVAL', 60),
             'max_message_size' => env('REVERB_APP_MAX_MESSAGE_SIZE', 10000),

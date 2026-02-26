@@ -23,11 +23,10 @@ Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filamen
 | `reverb` | `reverb` | 8080 | Laravel Reverb WebSockets |
 
 ## Domains
-- `support.darleyplex.com` → Laravel app (port 8000) / React SPA / `sw.js` (Cloudflare proxied, direct A record to VPS 145.223.73.170)
-- `www.mbfdhub.com` → NocoBase (port 13000) via Cloudflare Tunnel (tunnel ID: 89429799-7028-4df2-870d-f2fb858a49d7)
-- `mbfdhub.com` → NocoBase (port 13000) via same Cloudflare Tunnel
-- `nocobase.mbfdhub.com` → NocoBase (port 13000) via Cloudflare Tunnel [NEW - added 2026-02-25]
-- `baserow.mbfdhub.com` → Baserow (port 8082) via Cloudflare Tunnel [NEW - added 2026-02-25]
+- `www.mbfdhub.com` → Laravel/React app (port 8080) via Cloudflare Tunnel (tunnel ID: 89429799-7028-4df2-870d-f2fb858a49d7)
+- `mbfdhub.com` → same as www.mbfdhub.com (redirect)
+- `nocobase.mbfdhub.com` → NocoBase (port 13000) via Cloudflare Tunnel
+- `baserow.mbfdhub.com` → Baserow (port 8082) via Cloudflare Tunnel
 
 ## Credentials (non-production; rotate before go-live)
 - NocoBase admin: `admin@nocobase.com` / `admin123`
@@ -81,9 +80,9 @@ When a NocoBase Pro license is obtained:
 - `scripts/nocobase/ui_layouts/member_portal.json` — member portal UI schema
 - `scripts/nocobase/ui_layouts/admin_dashboard.json` — admin dashboard UI schema
 - `provision_nocobase_users.py` — user provisioning script
-- `.github/workflows/deploy.yml` — CI/CD deploy pipeline (smoke tests target `support.darleyplex.com`)
+- `.github/workflows/deploy.yml` — CI/CD deploy pipeline (smoke tests target `www.mbfdhub.com`)
 - `docs/BASEROW_INTEGRATION.md` — Baserow integration notes
 
 ## CI/CD Notes
-- Smoke tests in `deploy.yml` target `https://support.darleyplex.com` — do NOT change this domain
-- `www.mbfdhub.com` and the new mbfdhub.com tunnels are NocoBase only; they do NOT serve the SPA or `sw.js`
+- Smoke tests in `deploy.yml` target `https://www.mbfdhub.com`
+- All darleyplex.com references have been migrated to mbfdhub.com

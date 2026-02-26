@@ -19,6 +19,7 @@
     <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div class="max-w-md w-full space-y-8">
             <div class="text-center">
+                <img src="/images/mbfd_no_bg_new.png" alt="MBFD Hub" style="height: 80px; margin: 0 auto 1rem; display: block;">
                 <h1 class="text-4xl font-bold text-gray-900 mb-2">MBFD Support Hub</h1>
                 <p class="text-gray-600">Equipment management and daily checkout system</p>
             </div>

@@ -4,8 +4,9 @@
   "description": "Miami Beach Fire Department Support Services Hub",
   "start_url": "/admin",
   "display": "standalone",
-  "background_color": "#1e3a5f",
-  "theme_color": "#1e3a5f",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#1E293B",
+  "theme_color": "#B91C1C",
   "icons": [
     {
       "src": "/images/mbfd_app_icon_48.png",

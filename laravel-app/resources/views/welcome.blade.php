@@ -4,12 +4,20 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>MBFD Support Hub</title>
+    <!-- PWA iOS Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MBFD Hub">
+    <link rel="apple-touch-icon" href="/images/mbfd_app_icon_192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#B91C1C">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="antialiased bg-gray-50">
     <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div class="max-w-md w-full space-y-8">
             <div class="text-center">
+                <img src="/images/mbfd_no_bg_new.png" alt="MBFD Hub" style="height: 80px; margin: 0 auto 1rem; display: block;">
                 <h1 class="text-4xl font-bold text-gray-900 mb-2">MBFD Support Hub</h1>
                 <p class="text-gray-600">Equipment management and daily checkout system</p>
             </div>

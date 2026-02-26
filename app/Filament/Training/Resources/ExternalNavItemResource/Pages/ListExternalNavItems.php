@@ -16,7 +16,7 @@ class ListExternalNavItems extends ListRecords
             Actions\Action::make('open_baserow')
                 ->label('Open Baserow')
                 ->icon('heroicon-o-arrow-top-right-on-square')
-                ->url('https://baserow.support.darleyplex.com', shouldOpenInNewTab: true)
+                ->url('https://baserow.mbfdhub.com', shouldOpenInNewTab: true)
                 ->color('info'),
             Actions\CreateAction::make(),
         ];
