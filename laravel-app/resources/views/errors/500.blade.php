@@ -82,7 +82,7 @@
         </div>
         <a href="{{ url('/admin') }}" class="btn-home">← Dashboard</a>
         <a href="javascript:location.reload()" class="btn-refresh">↻ Retry</a>
-        <p class="footer-text">Moreau Beach Fire Department &bull; MBFD Hub</p>
+        <p class="footer-text">Miami Beach Fire Department &bull; MBFD Hub</p>
     </div>
 </body>
 </html>
