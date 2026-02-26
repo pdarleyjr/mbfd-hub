@@ -36,9 +36,11 @@ code {
     transform: scale(0) rotate(0deg);
     opacity: 0;
   }
+
   50% {
     transform: scale(1.2) rotate(10deg);
   }
+
   100% {
     transform: scale(1) rotate(0deg);
     opacity: 1;
@@ -55,6 +57,7 @@ code {
     transform: translateY(100%);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -78,9 +81,12 @@ code {
 
 /* Pulse animation for loading states */
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -114,7 +120,7 @@ code {
 }
 
 /* Ensure minimum touch target size */
-button, 
+button,
 input[type="button"],
 input[type="submit"],
 input[type="file"],
@@ -143,28 +149,65 @@ a {
 }
 
 /* MBFD Mobile-First Touch Optimizations */
-* { -webkit-tap-highlight-color: transparent; }
-button, [role="button"], input, select, textarea {
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+[role="button"],
+input,
+select,
+textarea {
   touch-action: manipulation;
 }
+
 .stepper-btn {
-  min-width: 44px; min-height: 44px;
-  display: flex; align-items: center; justify-content: center;
-  background: #1E293B; color: #F1F5F9;
-  border: 2px solid #334155; border-radius: 8px;
-  font-size: 1.5rem; font-weight: 700; cursor: pointer;
-  transition: background 0.15s;
-  -webkit-user-select: none; user-select: none;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFFFFF;
+  color: #0F172A;
+  /* White background, Slate-900 text */
+  border: 2px solid #E2E8F0;
+  border-radius: 8px;
+  /* Slate-200 border */
+  font-size: 1.5rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  -webkit-user-select: none;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  /* Subtle shadow */
 }
-.stepper-btn:active { background: #B91C1C; border-color: #B91C1C; }
+
+.stepper-btn:active {
+  background: #B91C1C;
+  color: #FFFFFF;
+  border-color: #B91C1C;
+}
+
 .stepper-input {
-  min-height: 44px; text-align: center;
-  background: #0F172A; color: #F8FAFC;
-  border: 2px solid #334155; border-radius: 8px;
-  font-size: 1.25rem; font-weight: 600;
-  width: 4rem; padding: 0 0.5rem;
+  min-height: 44px;
+  text-align: center;
+  background: #FFFFFF;
+  color: #0F172A;
+  /* White background, Slate-900 text */
+  border: 2px solid #E2E8F0;
+  border-radius: 8px;
+  /* Slate-200 border */
+  font-size: 1.25rem;
+  font-weight: 600;
+  width: 4rem;
+  padding: 0 0.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  /* Subtle shadow */
 }
+
 .stepper-input:focus {
-  outline: none; border-color: #B91C1C;
-  box-shadow: 0 0 0 3px rgba(185,28,28,0.3);
+  outline: none;
+  border-color: #B91C1C;
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.2);
 }

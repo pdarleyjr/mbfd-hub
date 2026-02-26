@@ -32,31 +32,6 @@
   letter-spacing: 0.1em;
 }
 
-/* Prevent flat white backgrounds — add subtle depth */
-.fi-main {
-  background: #0F172A !important;
-}
-.fi-page {
-  background: #0F172A !important;
-}
-.fi-wi-stats-overview-stat {
-  background: var(--mbfd-slate-800) !important;
-  border: 1px solid var(--mbfd-slate-700) !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
-}
-.fi-wi-stats-overview-stat-value {
-  color: var(--mbfd-slate-100) !important;
-}
-.fi-wi-stats-overview-stat-label {
-  color: var(--mbfd-slate-400) !important;
-}
-.fi-ta-ctn,
-.fi-fo-field-wrp,
-.fi-card {
-  background: var(--mbfd-slate-800) !important;
-  border-color: var(--mbfd-slate-700) !important;
-}
-
 /* Active nav item */
 .fi-sidebar-item-active > .fi-sidebar-item-button {
   background: rgba(185,28,28,0.15) !important;
@@ -70,14 +45,6 @@
 /* Widget card headers */
 .fi-wi-chart canvas {
   filter: saturate(1.3);
-}
-
-/* Form inputs dark */
-.dark .fi-input,
-.fi-input {
-  background: var(--mbfd-slate-900) !important;
-  border-color: var(--mbfd-slate-700) !important;
-  color: var(--mbfd-slate-100) !important;
 }
 
 /* Table rows */
