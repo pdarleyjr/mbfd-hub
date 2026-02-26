@@ -62,7 +62,7 @@
         <a href="{{ url('/admin') }}" class="btn-home">
             ← Return to Dashboard
         </a>
-        <p class="footer-text">Moreau Beach Fire Department &bull; MBFD Hub</p>
+        <p class="footer-text">Miami Beach Fire Department &bull; MBFD Hub</p>
     </div>
 </body>
 </html>
