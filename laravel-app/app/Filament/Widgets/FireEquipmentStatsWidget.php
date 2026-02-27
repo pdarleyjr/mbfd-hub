@@ -26,17 +26,17 @@ class FireEquipmentStatsWidget extends BaseWidget
             ->icon('heroicon-o-cube')
             ->description('Active inventory items')
             ->url(EquipmentItemResource::getUrl('index'))
-            ->extraAttributes(['class' => 'stat-card-total']),
+            ->color('info'),
 
             Stat::make('Low Stock Items', $lowStockCount)
             ->icon('heroicon-o-exclamation-triangle')
             ->description('Stock tracking disabled')
-            ->extraAttributes(['class' => 'stat-card-warning']),
+            ->color($lowStockCount > 0 ? 'warning' : 'success'),
 
             Stat::make('Out of Stock', $outOfStockCount)
             ->icon('heroicon-o-x-circle')
             ->description('Stock tracking disabled')
-            ->extraAttributes(['class' => 'stat-card-danger']),
+            ->color($outOfStockCount > 0 ? 'danger' : 'success'),
 
             Stat::make('Pending Recommendations',
             ApparatusDefectRecommendation::where('status', 'pending')->count()
@@ -44,7 +44,7 @@ class FireEquipmentStatsWidget extends BaseWidget
             ->icon('heroicon-o-light-bulb')
             ->description('Awaiting allocation')
             ->url(RecommendationResource::getUrl('index'))
-            ->extraAttributes(['class' => 'stat-card-warning']),
+            ->color('warning'),
         ];
     }
 }
