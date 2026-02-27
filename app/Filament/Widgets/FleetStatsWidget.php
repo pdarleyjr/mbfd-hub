@@ -31,6 +31,7 @@ class FleetStatsWidget extends BaseWidget
                 ->description("{$outOfService} out of service")
                 ->descriptionIcon($outOfService > 0 ? 'heroicon-m-exclamation-triangle' : 'heroicon-m-check-circle')
                 ->color($outOfService > 0 ? 'warning' : 'success')
+                ->chartColor($outOfService > 0 ? 'warning' : 'success')
                 ->extraAttributes(['class' => $outOfService > 0 ? 'bg-amber-50 border border-amber-200 rounded-xl' : 'bg-green-50 border border-green-200 rounded-xl'])
                 ->chart($this->getWeeklyFleetTrend())
                 ->url(route('filament.admin.resources.apparatuses.index')),
@@ -39,6 +40,7 @@ class FleetStatsWidget extends BaseWidget
                 ->description($outOfService > 0 ? 'Requires attention' : 'All in service')
                 ->descriptionIcon('heroicon-m-wrench-screwdriver')
                 ->color($outOfService > 3 ? 'danger' : ($outOfService > 0 ? 'warning' : 'success'))
+                ->chartColor($outOfService > 3 ? 'danger' : ($outOfService > 0 ? 'warning' : 'success'))
                 ->extraAttributes(['class' => $outOfService > 3 ? 'bg-red-50 border border-red-200 rounded-xl' : ($outOfService > 0 ? 'bg-amber-50 border border-amber-200 rounded-xl' : 'bg-green-50 border border-green-200 rounded-xl')])
                 ->url(route('filament.admin.resources.apparatuses.index')),
             
@@ -46,6 +48,7 @@ class FleetStatsWidget extends BaseWidget
                 ->description($criticalDefects > 0 ? "{$criticalDefects} critical defects" : 'No critical issues')
                 ->descriptionIcon($criticalDefects > 0 ? 'heroicon-m-exclamation-circle' : 'heroicon-m-check-badge')
                 ->color($criticalDefects > 0 ? 'danger' : ($openDefects > 5 ? 'warning' : 'success'))
+                ->chartColor($criticalDefects > 0 ? 'danger' : ($openDefects > 5 ? 'warning' : 'success'))
                 ->extraAttributes(['class' => $criticalDefects > 0 ? 'bg-red-50 border border-red-200 rounded-xl' : 'bg-green-50 border border-green-200 rounded-xl'])
                 ->chart($this->getWeeklyDefectsTrend())
                 ->url(route('filament.admin.resources.defects.index')),
