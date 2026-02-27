@@ -44,8 +44,8 @@ class AdminPanelProvider extends PanelProvider
             ->brandName('MBFD Support Hub')
             ->brandLogo(secure_asset('images/mbfd_no_bg_new.png'))
             ->brandLogoHeight('12rem')
-            ->darkModeBrandLogo(secure_asset('images/mbfd_no_bg_new.png'))
             ->favicon(secure_asset('favicon.ico'))
+            ->darkMode(false)
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->colors([
                 'primary' => Color::Red,

@@ -37,7 +37,7 @@ class InventoryOverviewWidget extends BaseWidget
                 ->description("{$lowStockCount} items need reordering")
                 ->descriptionIcon('heroicon-m-exclamation-triangle')
                 ->color($lowStockCount > 5 ? 'danger' : ($lowStockCount > 0 ? 'warning' : 'success'))
-                ->extraAttributes(['class' => $lowStockCount > 5 ? 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl' : ($lowStockCount > 0 ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl' : 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-xl')])
+                ->extraAttributes(['class' => $lowStockCount > 5 ? 'bg-red-50 border border-red-200 rounded-xl' : ($lowStockCount > 0 ? 'bg-amber-50 border border-amber-200 rounded-xl' : 'bg-green-50 border border-green-200 rounded-xl')])
                 ->chart($this->getWeeklyLowStockTrend())
                 ->url(route('filament.admin.resources.equipment-items.index')),
             
@@ -45,16 +45,16 @@ class InventoryOverviewWidget extends BaseWidget
                 ->description('Active equipment items')
                 ->descriptionIcon('heroicon-m-cube')
                 ->color('info')
-                ->extraAttributes(['class' => 'bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl']),
+                ->extraAttributes(['class' => 'bg-blue-50 border border-blue-200 rounded-xl']),
             
             Stat::make('Stock Status', $this->getStockStatusText($totalItems, $lowStockCount))
                 ->description($this->getStockHealthPercentage($totalItems, $lowStockCount))
                 ->descriptionIcon('heroicon-m-chart-bar')
                 ->color($this->getStockHealthColor($totalItems, $lowStockCount))
                 ->extraAttributes(['class' => match($this->getStockHealthColor($totalItems, $lowStockCount)) {
-                    'danger' => 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl',
-                    'warning' => 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl',
-                    default => 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-xl',
+                    'danger' => 'bg-red-50 border border-red-200 rounded-xl',
+                    'warning' => 'bg-amber-50 border border-amber-200 rounded-xl',
+                    default => 'bg-green-50 border border-green-200 rounded-xl',
                 }]),
         ];
     }
