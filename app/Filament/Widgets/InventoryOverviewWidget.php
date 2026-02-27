@@ -37,6 +37,7 @@ class InventoryOverviewWidget extends BaseWidget
                 ->description("{$lowStockCount} items need reordering")
                 ->descriptionIcon('heroicon-m-exclamation-triangle')
                 ->color($lowStockCount > 5 ? 'danger' : ($lowStockCount > 0 ? 'warning' : 'success'))
+                ->chartColor($lowStockCount > 5 ? 'danger' : ($lowStockCount > 0 ? 'warning' : 'success'))
                 ->extraAttributes(['class' => $lowStockCount > 5 ? 'bg-red-50 border border-red-200 rounded-xl' : ($lowStockCount > 0 ? 'bg-amber-50 border border-amber-200 rounded-xl' : 'bg-green-50 border border-green-200 rounded-xl')])
                 ->chart($this->getWeeklyLowStockTrend())
                 ->url(route('filament.admin.resources.equipment-items.index')),
