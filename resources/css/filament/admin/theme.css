@@ -1,65 +1,9 @@
 @import '/vendor/filament/filament/resources/css/theme.css';
 
-:root {
-  --mbfd-red: #B91C1C;
-  --mbfd-red-light: #DC2626;
-  --mbfd-red-dark: #991B1B;
-  --mbfd-slate-900: #0F172A;
-  --mbfd-slate-800: #1E293B;
-  --mbfd-slate-700: #334155;
-  --mbfd-slate-600: #475569;
-  --mbfd-slate-400: #94A3B8;
-  --mbfd-slate-200: #E2E8F0;
-  --mbfd-slate-100: #F1F5F9;
-}
-
-/* Primary color overrides — replace Filament's default blue with MBFD red */
-.fi-btn-color-primary,
-[data-fi-color="primary"] .fi-btn {
-  --fi-color: var(--mbfd-red);
-  --fi-color-dark: var(--mbfd-red-dark);
-}
-
-/* Sidebar background */
-.fi-sidebar {
-  background: var(--mbfd-slate-900) !important;
-}
-.fi-sidebar-nav-group-label {
-  color: var(--mbfd-red-light) !important;
-  font-weight: 700;
-  text-transform: uppercase;
-  font-size: 0.6875rem;
-  letter-spacing: 0.1em;
-}
-
-/* Active nav item */
-.fi-sidebar-item-active > .fi-sidebar-item-button {
-  background: rgba(185,28,28,0.15) !important;
-  border-left: 3px solid var(--mbfd-red) !important;
-  color: #fff !important;
-}
-.fi-sidebar-item-active .fi-sidebar-item-label {
-  color: #fff !important;
-}
-
-/* Widget card headers */
-.fi-wi-chart canvas {
-  filter: saturate(1.3);
-}
-
-/* Table rows */
-.fi-ta-row:hover td {
-  background: rgba(185,28,28,0.05) !important;
-}
-
-/* Badges/pills for status */
-.fi-badge-color-success { background: #166534 !important; color: #bbf7d0 !important; }
-.fi-badge-color-danger  { background: #7f1d1d !important; color: #fecaca !important; }
-.fi-badge-color-warning { background: #78350f !important; color: #fde68a !important; }
-
 /**
- * Admin Dashboard Custom Theme
- * FilamentPHP 3.x + Tailwind CSS
+ * MBFD Hub Admin Dashboard Theme
+ * Uses Filament's native theming via AdminPanelProvider->colors()
+ * Only adds utility classes and layout enhancements — never overrides Filament internals
  */
 
 /* 2-Column Grid Layout for Desktop Dashboard */
@@ -163,15 +107,9 @@
     @apply bg-gray-300 dark:bg-gray-600 rounded hover:bg-gray-400 dark:hover:bg-gray-500;
 }
 
-/* ===== DESKTOP ADMIN POLISH - HOVER STATES & INTERACTIONS ===== */
-
 /* Table Row Hover Effects */
 .fi-ta-row:hover {
     @apply bg-gray-50 dark:bg-gray-800/50 transition-colors duration-150;
-}
-
-.fi-ta-row:hover td {
-    @apply cursor-pointer;
 }
 
 /* Button Hover Effects */
@@ -179,13 +117,9 @@
     @apply transform scale-[1.02] transition-all duration-200;
 }
 
-.fi-btn-primary:hover {
-    @apply brightness-110;
-}
-
-/* Action Button Hover States */
-.fi-ta-actions button:hover {
-    @apply scale-110 transition-transform duration-200;
+/* Card Hover Effects */
+.fi-wi-stats-overview-card:hover {
+    @apply shadow-md transition-shadow duration-200;
 }
 
 /* Tooltip Styles for Icon Buttons */
@@ -214,7 +148,7 @@
     @apply block;
 }
 
-/* MBFD Red Accent Color */
+/* MBFD Red Accent Utility Classes */
 .mbfd-red {
     @apply text-red-600 dark:text-red-400;
 }
@@ -225,21 +159,4 @@
 
 .mbfd-red-border {
     @apply border-red-600 dark:border-red-500;
-}
-
-/* Link Hover States */
-a:hover {
-    @apply text-red-600 dark:text-red-400 transition-colors duration-200;
-}
-
-/* Card Hover Effects */
-.fi-wi-stats-overview-card:hover {
-    @apply shadow-md transition-shadow duration-200;
-}
-
-/* Form Field Focus States */
-input:focus,
-textarea:focus,
-select:focus {
-    @apply ring-2 ring-red-600 dark:ring-red-500 border-red-600 dark:border-red-500 transition-all duration-200;
 }
