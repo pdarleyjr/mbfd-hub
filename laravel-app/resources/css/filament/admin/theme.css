@@ -2,31 +2,10 @@
 
 @config 'tailwind.config.js';
 
-:root {
-    --mbfd-red: #B91C1C;
-    --mbfd-red-light: #DC2626;
-    --mbfd-red-dark: #991B1B;
-    --mbfd-slate-900: #0F172A;
-    --mbfd-slate-800: #1E293B;
-    --mbfd-slate-700: #334155;
-    --mbfd-slate-600: #475569;
-    --mbfd-slate-400: #94A3B8;
-    --mbfd-slate-200: #E2E8F0;
-    --mbfd-slate-100: #F1F5F9;
-}
-
-/* Primary color overrides — replace Filament's default blue with MBFD red */
-.fi-btn-color-primary,
-[data-fi-color="primary"] .fi-btn {
-    --fi-color: var(--mbfd-red);
-    --fi-color-dark: var(--mbfd-red-dark);
-}
-
-
-
 /**
- * Admin Dashboard Custom Theme
- * FilamentPHP 3.x + Tailwind CSS
+ * MBFD Hub Admin Dashboard Theme
+ * Uses Filament's native theming via AdminPanelProvider->colors()
+ * Only adds utility classes, layout enhancements, and mobile UX — never overrides Filament internals
  */
 
 /* 2-Column Grid Layout for Desktop Dashboard */
