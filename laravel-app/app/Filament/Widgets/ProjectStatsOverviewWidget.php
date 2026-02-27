@@ -46,7 +46,7 @@ class ProjectStatsOverviewWidget extends BaseWidget
             Stat::make('High Priority Projects', $highPriorityCount)
             ->description('Require immediate attention')
             ->descriptionIcon('heroicon-o-exclamation-triangle')
-            ->extraAttributes(['class' => 'stat-card-danger'])
+            ->color('danger')
             ->chart($highPriorityTrend)
             ->url(route('filament.admin.resources.capital-projects.index', [
                 'tableFilters' => ['priority' => ['values' => ['high', 'critical']]]
@@ -55,19 +55,19 @@ class ProjectStatsOverviewWidget extends BaseWidget
             Stat::make('Overdue Projects', $overdueCount)
             ->description('Past deadline')
             ->descriptionIcon('heroicon-o-clock')
-            ->extraAttributes(['class' => 'stat-card-warning'])
+            ->color('warning')
             ->url(route('filament.admin.resources.capital-projects.index')),
 
             Stat::make('Total Active Budget', '$' . number_format($activeBudget, 0))
             ->description('All active projects')
             ->descriptionIcon('heroicon-o-banknotes')
-            ->extraAttributes(['class' => 'stat-card-success'])
+            ->color('success')
             ->url(route('filament.admin.resources.capital-projects.index')),
 
             Stat::make('Completion Rate', $completionRate . '%')
             ->description('Overall progress')
             ->descriptionIcon('heroicon-o-chart-bar')
-            ->extraAttributes(['class' => 'stat-card-total'])
+            ->color('info')
             ->url(route('filament.admin.resources.capital-projects.index')),
         ];
     }
