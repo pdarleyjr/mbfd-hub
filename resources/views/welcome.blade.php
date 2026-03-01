@@ -63,8 +63,8 @@
     <header class="hero-gradient relative overflow-hidden">
         <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDJ2LTJoMzR6bTAtMzBoMnYySDM2VjR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-50"></div>
         <div class="relative max-w-4xl mx-auto px-6 py-12 md:py-16 text-center">
-            <div class="inline-flex items-center justify-center w-20 h-20 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 shadow-lg mb-6">
-                <img src="/images/mbfd_no_bg_new.png" alt="MBFD Logo" class="h-14 w-auto object-contain drop-shadow-md">
+            <div class="inline-flex items-center justify-center w-28 h-28 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 shadow-lg mb-6">
+                <img src="/images/mbfd_logo_new.png" alt="MBFD Logo" class="h-24 w-24 object-contain drop-shadow-md rounded-xl">
             </div>
             <h1 class="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white tracking-tight mb-3">
                 MBFD Support Hub
@@ -84,7 +84,7 @@
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 -mt-4 pb-12 space-y-8">
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 mt-8 pb-12 space-y-8">
 
         @if(env('FEATURE_AI_CHAT', true))
         <!-- AI Chat Assistant -->
