@@ -37,7 +37,7 @@
         <!-- Action Cards Grid -->
         <div class="max-w-3xl w-full grid grid-cols-1 md:grid-cols-2 gap-6">
             
-            <!-- Daily Checkout Card -->
+            <!-- MBFD Forms Card -->
             <a href="{{ url('/daily') }}" class="group block relative bg-white rounded-2xl shadow-sm border border-slate-200 p-8 hover:shadow-xl hover:border-red-200 hover:-translate-y-1 transition-all duration-300 overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1 bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 
