@@ -17,6 +17,26 @@
     }
 }
 
+/* Logo Styling - Ensure proper fit in sidebar/header */
+.fi-brand-logo {
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+}
+
+/* Brand section in sidebar */
+.fi-sidebar-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+}
+
+.fi-sidebar-brand img {
+    max-height: 2.5rem;
+    width: auto;
+}
+
 /* Widget Styling Enhancements */
 .fi-wi {
     @apply shadow-sm rounded-lg;
