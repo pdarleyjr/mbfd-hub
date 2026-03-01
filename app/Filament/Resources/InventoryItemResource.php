@@ -15,7 +15,7 @@ class InventoryItemResource extends Resource
     protected static ?string $model = InventoryItem::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cube';
-    protected static ?string $navigationGroup = 'Operations';
+    protected static ?string $navigationGroup = 'Inventory & Logistics';
     protected static ?string $navigationLabel = 'Supply Items';
     protected static ?int $navigationSort = 2;
 

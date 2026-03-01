@@ -20,7 +20,7 @@ class EquipmentItemResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-cube';
 
-    protected static ?string $navigationGroup = 'Fire Equipment';
+    protected static ?string $navigationGroup = 'Inventory & Logistics';
 
     protected static ?int $navigationSort = 1;
 

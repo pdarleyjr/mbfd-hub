@@ -19,7 +19,7 @@ class UniformResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
-    protected static ?string $navigationGroup = 'Logistics';
+    protected static ?string $navigationGroup = 'Inventory & Logistics';
 
     public static function form(Form $form): Form
     {

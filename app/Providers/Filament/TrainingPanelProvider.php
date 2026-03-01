@@ -7,11 +7,13 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\MenuItem;
+use Filament\Navigation\NavigationGroup;
 use Filament\Navigation\NavigationItem;
 use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\MaxWidth;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -37,6 +39,7 @@ class TrainingPanelProvider extends PanelProvider
             ->brandLogoHeight('3rem')
             ->darkModeBrandLogo(secure_asset('images/mbfd_no_bg_new.png'))
             ->favicon(secure_asset('favicon.ico'))
+            ->darkMode(false)
             ->colors([
                 'primary' => Color::Amber,
                 'danger' => Color::Rose,
@@ -46,6 +49,7 @@ class TrainingPanelProvider extends PanelProvider
                 'warning' => Color::Orange,
             ])
             ->font('Inter')
+            ->maxContentWidth(MaxWidth::SevenExtraLarge)
             ->plugin(ChatifyPlugin::make())
             ->discoverResources(in: app_path('Filament/Training/Resources'), for: 'App\\Filament\\Training\\Resources')
             ->discoverPages(in: app_path('Filament/Training/Pages'), for: 'App\\Filament\\Training\\Pages')
@@ -54,6 +58,24 @@ class TrainingPanelProvider extends PanelProvider
             ->pages([
                 \App\Filament\Training\Pages\Dashboard::class,
                 \App\Filament\Training\Pages\ExternalNavItemViewer::class,
+            ])
+            ->navigationGroups([
+                NavigationGroup::make()
+                    ->label('Dashboard')
+                    ->icon('heroicon-o-academic-cap')
+                    ->collapsible(false),
+                NavigationGroup::make()
+                    ->label('Training Tasks')
+                    ->icon('heroicon-o-clipboard-document-list')
+                    ->collapsible(false),
+                NavigationGroup::make()
+                    ->label('External Tools')
+                    ->icon('heroicon-o-globe-alt')
+                    ->collapsible(false),
+                NavigationGroup::make()
+                    ->label('Communication')
+                    ->icon('heroicon-o-chat-bubble-left-right')
+                    ->collapsible(false),
             ])
             ->userMenuItems([
                 MenuItem::make()

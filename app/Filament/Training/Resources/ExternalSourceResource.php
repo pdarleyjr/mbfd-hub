@@ -16,7 +16,7 @@ class ExternalSourceResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-server-stack';
 
-    protected static ?string $navigationGroup = 'Training Data';
+    protected static ?string $navigationGroup = 'External Tools';
 
     protected static ?string $navigationLabel = 'External Sources';
 
