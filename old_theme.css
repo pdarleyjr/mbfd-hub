@@ -1,0 +1,549 @@
+@import '/vendor/filament/filament/resources/css/theme.css';
+
+:root {
+  --mbfd-red: #B91C1C;
+  --mbfd-red-light: #DC2626;
+  --mbfd-red-dark: #991B1B;
+  --mbfd-slate-900: #0F172A;
+  --mbfd-slate-800: #1E293B;
+  --mbfd-slate-700: #334155;
+  --mbfd-slate-600: #475569;
+  --mbfd-slate-400: #94A3B8;
+  --mbfd-slate-200: #E2E8F0;
+  --mbfd-slate-100: #F1F5F9;
+}
+
+/* Primary color overrides — replace Filament's default blue with MBFD red */
+.fi-btn-color-primary,
+[data-fi-color="primary"] .fi-btn {
+  --fi-color: var(--mbfd-red);
+  --fi-color-dark: var(--mbfd-red-dark);
+}
+
+/* Sidebar background */
+.fi-sidebar {
+  background: var(--mbfd-slate-900) !important;
+}
+.fi-sidebar-nav-group-label {
+  color: var(--mbfd-red-light) !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+}
+
+/* Prevent flat white backgrounds — add subtle depth */
+.fi-main {
+  background: #0F172A !important;
+}
+.fi-page {
+  background: #0F172A !important;
+}
+.fi-wi-stats-overview-stat {
+  background: var(--mbfd-slate-800) !important;
+  border: 1px solid var(--mbfd-slate-700) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+}
+.fi-wi-stats-overview-stat-value {
+  color: var(--mbfd-slate-100) !important;
+}
+.fi-wi-stats-overview-stat-label {
+  color: var(--mbfd-slate-400) !important;
+}
+.fi-ta-ctn,
+.fi-fo-field-wrp,
+.fi-card {
+  background: var(--mbfd-slate-800) !important;
+  border-color: var(--mbfd-slate-700) !important;
+}
+
+/* Active nav item */
+.fi-sidebar-item-active > .fi-sidebar-item-button {
+  background: rgba(185,28,28,0.15) !important;
+  border-left: 3px solid var(--mbfd-red) !important;
+  color: #fff !important;
+}
+.fi-sidebar-item-active .fi-sidebar-item-label {
+  color: #fff !important;
+}
+
+/* Widget card headers */
+.fi-wi-chart canvas {
+  filter: saturate(1.3);
+}
+
+/* Form inputs dark */
+.dark .fi-input,
+.fi-input {
+  background: var(--mbfd-slate-900) !important;
+  border-color: var(--mbfd-slate-700) !important;
+  color: var(--mbfd-slate-100) !important;
+}
+
+/* Table rows */
+.fi-ta-row:hover td {
+  background: rgba(185,28,28,0.05) !important;
+}
+
+/* Badges/pills for status */
+.fi-badge-color-success { background: #166534 !important; color: #bbf7d0 !important; }
+.fi-badge-color-danger  { background: #7f1d1d !important; color: #fecaca !important; }
+.fi-badge-color-warning { background: #78350f !important; color: #fde68a !important; }
+
+/**
+ * Admin Dashboard Custom Theme
+ * FilamentPHP 3.x + Tailwind CSS
+ */
+
+/* 2-Column Grid Layout for Desktop Dashboard */
+@media (min-width: 1280px) {
+    .filament-widgets-container {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 1rem !important;
+    }
+}
+
+/* Widget Styling Enhancements */
+.fi-wi {
+    @apply shadow-sm rounded-lg;
+}
+
+.fi-section {
+    @apply shadow-sm rounded-lg border border-gray-200 dark:border-gray-700;
+}
+
+/* Zero-Scroll Dashboard - Constrained Heights */
+.dashboard-widget-scrollable {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.dashboard-widget-compact {
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+/* Critical Alert Styling */
+.alert-critical {
+    @apply bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800;
+}
+
+.alert-warning {
+    @apply bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800;
+}
+
+.alert-success {
+    @apply bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800;
+}
+
+.alert-info {
+    @apply bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800;
+}
+
+/* Stock Level Indicators */
+.stock-critical {
+    @apply text-red-600 dark:text-red-400 font-semibold;
+}
+
+.stock-low {
+    @apply text-yellow-600 dark:text-yellow-400 font-medium;
+}
+
+.stock-good {
+    @apply text-green-600 dark:text-green-400;
+}
+
+/* Bullet List Styling */
+.bullet-list {
+    @apply space-y-1.5;
+}
+
+.bullet-list li {
+    @apply text-sm flex items-start gap-2;
+}
+
+.bullet-list li::before {
+    content: "•";
+    @apply text-gray-400 dark:text-gray-500 mt-0.5;
+}
+
+/* Collapsible Widget States */
+.widget-collapsed {
+    max-height: 80px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-in-out;
+}
+
+.widget-expanded {
+    max-height: 600px;
+    transition: max-height 0.3s ease-in-out;
+}
+
+/* Custom Scrollbar */
+.dashboard-widget-scrollable::-webkit-scrollbar,
+.dashboard-widget-compact::-webkit-scrollbar {
+    width: 6px;
+}
+
+.dashboard-widget-scrollable::-webkit-scrollbar-track,
+.dashboard-widget-compact::-webkit-scrollbar-track {
+    @apply bg-gray-100 dark:bg-gray-800 rounded;
+}
+
+.dashboard-widget-scrollable::-webkit-scrollbar-thumb,
+.dashboard-widget-compact::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-600 rounded hover:bg-gray-400 dark:hover:bg-gray-500;
+}
+
+/* ===== DESKTOP ADMIN POLISH - HOVER STATES & INTERACTIONS ===== */
+
+/* Table Row Hover Effects */
+.fi-ta-row:hover {
+    @apply bg-gray-50 dark:bg-gray-800/50 transition-colors duration-150;
+}
+
+.fi-ta-row:hover td {
+    @apply cursor-pointer;
+}
+
+/* Button Hover Effects */
+.fi-btn:hover {
+    @apply transform scale-[1.02] transition-all duration-200;
+}
+
+.fi-btn-primary:hover {
+    @apply brightness-110;
+}
+
+/* Action Button Hover States */
+.fi-ta-actions button:hover {
+    @apply scale-110 transition-transform duration-200;
+}
+
+/* Tooltip Styles for Icon Buttons */
+[data-tooltip] {
+    @apply relative;
+}
+
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    @apply absolute hidden bg-gray-900 dark:bg-gray-700 text-white text-xs rounded px-2 py-1 z-50 whitespace-nowrap pointer-events-none;
+    bottom: calc(100% + 0.5rem);
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+[data-tooltip]::before {
+    content: "";
+    @apply absolute hidden border-4 border-transparent border-t-gray-900 dark:border-t-gray-700 z-50;
+    bottom: calc(100% + 0.125rem);
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:hover::before {
+    @apply block;
+}
+
+/* MBFD Red Accent Color */
+.mbfd-red {
+    @apply text-red-600 dark:text-red-400;
+}
+
+.mbfd-red-bg {
+    @apply bg-red-600 dark:bg-red-700;
+}
+
+.mbfd-red-border {
+    @apply border-red-600 dark:border-red-500;
+}
+
+/* Link Hover States */
+a:hover {
+    @apply text-red-600 dark:text-red-400 transition-colors duration-200;
+}
+
+/* Card Hover Effects */
+.fi-wi-stats-overview-card:hover {
+    @apply shadow-md transition-shadow duration-200;
+}
+
+/* Form Field Focus States */
+input:focus,
+textarea:focus,
+select:focus {
+    @apply ring-2 ring-red-600 dark:ring-red-500 border-red-600 dark:border-red-500 transition-all duration-200;
+}
+
+/* ===== MOBILE UI ENHANCEMENTS - iOS/Android App Feel ===== */
+
+/* Fix Mobile Sidebar - Make it a slide-out overlay, not fixed */
+@media (max-width: 1023px) {
+    /* Sidebar Overlay - Should slide in from left */
+    .fi-sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        z-index: 50 !important;
+        height: 100vh !important;
+        width: 280px !important;
+        max-width: 85vw !important;
+        transform: translateX(-100%) !important;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: none !important;
+    }
+
+    /* When sidebar is open */
+    .fi-sidebar-open .fi-sidebar,
+    .fi-sidebar[data-open="true"],
+    body:has(.fi-sidebar-nav[x-show="true"]) .fi-sidebar {
+        transform: translateX(0) !important;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    /* Backdrop overlay when sidebar is open */
+    .fi-sidebar-open::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 40;
+        backdrop-filter: blur(2px);
+    }
+
+    /* Main content should not be pushed */
+    .fi-main-ctn,
+    .fi-layout > main {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+
+    /* Mobile close button visibility */
+    .fi-sidebar-close-btn {
+        display: flex !important;
+    }
+
+    /* Hamburger menu always visible on mobile */
+    .fi-topbar-open-sidebar-btn {
+        display: flex !important;
+    }
+}
+
+/* Mobile Touch-Friendly Targets (48px minimum per Apple/Google guidelines) */
+@media (max-width: 1023px) {
+    /* Navigation items */
+    .fi-sidebar-item-button,
+    .fi-sidebar-group-button {
+        min-height: 48px !important;
+        padding: 12px 16px !important;
+        @apply touch-manipulation;
+    }
+
+    /* Table action buttons */
+    .fi-ta-actions button,
+    .fi-ac-btn-action {
+        min-width: 44px !important;
+        min-height: 44px !important;
+        @apply touch-manipulation;
+    }
+
+    /* Form inputs */
+    input,
+    textarea,
+    select,
+    .fi-input,
+    .fi-select {
+        min-height: 44px !important;
+        font-size: 16px !important; /* Prevents iOS zoom on focus */
+        @apply touch-manipulation;
+    }
+
+    /* Buttons */
+    .fi-btn,
+    button[type="submit"],
+    button[type="button"] {
+        min-height: 44px !important;
+        padding: 12px 20px !important;
+        @apply touch-manipulation;
+    }
+}
+
+/* Mobile Header - Fixed Top Bar with Safe Area */
+@media (max-width: 1023px) {
+    .fi-topbar {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 30 !important;
+        backdrop-filter: blur(10px) !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+        padding-top: env(safe-area-inset-top) !important;
+    }
+
+    .dark .fi-topbar {
+        background: rgba(17, 24, 39, 0.95) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+}
+
+/* iOS Safe Areas */
+@supports (padding: env(safe-area-inset-bottom)) {
+    @media (max-width: 1023px) {
+        /* Bottom safe area for iPhones with home indicator */
+        .fi-main,
+        .fi-main-ctn {
+            padding-bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
+        }
+
+        /* Top safe area for notched phones */
+        .fi-topbar {
+            padding-top: calc(0.75rem + env(safe-area-inset-top)) !important;
+        }
+    }
+}
+
+/* Mobile Card/List Styling - App-like appearance */
+@media (max-width: 1023px) {
+    /* Cards with subtle shadows like native iOS */
+    .fi-wi,
+    .fi-section {
+        @apply rounded-xl shadow-sm;
+        margin: 8px !important;
+    }
+
+    /* Table cells - more padding for touch */
+    .fi-ta-cell {
+        padding: 12px 8px !important;
+    }
+
+    /* Stats cards - full width stacking */
+    .fi-wi-stats-overview-stat {
+        width: 100% !important;
+    }
+}
+
+/* Smooth Scrolling - iOS momentum */
+html {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+@media (max-width: 1023px) {
+    .fi-ta-content,
+    .fi-main,
+    .dashboard-widget-scrollable {
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: contain !important;
+    }
+}
+
+/* Mobile Pull-to-Refresh Visual Hint */
+@media (max-width: 1023px) {
+    .fi-main::before {
+        content: "";
+        position: absolute;
+        top: -60px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40px;
+        height: 40px;
+        opacity: 0;
+        transition: opacity 0.2s;
+        pointer-events: none;
+    }
+}
+
+/* Mobile Typography - Larger, more readable */
+@media (max-width: 1023px) {
+    .fi-sidebar-item-label {
+        font-size: 16px !important;
+        font-weight: 500 !important;
+    }
+
+    .fi-header-heading {
+        font-size: 20px !important;
+        font-weight: 600 !important;
+    }
+
+    /* Slightly larger body text */
+    .fi-ta-cell,
+    .fi-section-content {
+        font-size: 15px !important;
+        line-height: 1.5 !important;
+    }
+}
+
+/* Active/Pressed States for Touch Feedback */
+@media (max-width: 1023px) {
+    .fi-sidebar-item-button:active,
+    .fi-btn:active,
+    .fi-ta-row:active {
+        @apply scale-[0.98] transition-transform duration-75;
+        opacity: 0.9;
+    }
+
+    /* iOS-style press effect on cards */
+    .fi-wi:active {
+        @apply scale-[0.99] transition-transform duration-100;
+    }
+}
+
+/* Bottom Navigation Indicator Space (like iOS) */
+@media (max-width: 1023px) {
+    body {
+        padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+}
+
+/* Mobile Form Layouts - Stack vertically */
+@media (max-width: 1023px) {
+    .fi-fo-field-wrp {
+        width: 100% !important;
+    }
+
+    .fi-fo-component-ctn {
+        gap: 16px !important;
+    }
+}
+
+/* Hide less important elements on mobile */
+@media (max-width: 640px) {
+    /* Simplify table for small screens */
+    .fi-ta-header-cell-label {
+        font-size: 12px !important;
+    }
+
+    /* Compact breadcrumbs */
+    .fi-breadcrumbs {
+        font-size: 12px !important;
+    }
+}
+
+/* Animation for smooth mobile interactions */
+@media (max-width: 1023px) {
+    * {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .fi-sidebar-item,
+    .fi-btn,
+    .fi-ta-row {
+        transition: background-color 0.15s ease, transform 0.1s ease;
+    }
+}
+
+/* Landscape phone optimization */
+@media (max-width: 1023px) and (orientation: landscape) {
+    .fi-sidebar {
+        width: 260px !important;
+    }
+
+    .fi-topbar {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+}
+
+/* ===== END MOBILE UI ENHANCEMENTS ===== */

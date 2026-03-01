@@ -1,0 +1,55 @@
+﻿2026-02-26T17:13:23.1188303Z ##[group]Run ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'
+2026-02-26T17:13:23.1188988Z [36;1mssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'[0m
+2026-02-26T17:13:23.1189413Z [36;1m  set -e[0m
+2026-02-26T17:13:23.1189741Z [36;1m  cd /***/mbfd-hub[0m
+2026-02-26T17:13:23.1189992Z [36;1m  [0m
+2026-02-26T17:13:23.1190389Z [36;1m  # Create backup before deploy[0m
+2026-02-26T17:13:23.1190765Z [36;1m  BACKUP_FILE="backups/mbfd_hub_$(date +%Y%m%d_%H%M%S).sql"[0m
+2026-02-26T17:13:23.1191133Z [36;1m  mkdir -p backups[0m
+2026-02-26T17:13:23.1191551Z [36;1m  docker compose exec -T pgsql pg_dump -U mbfd_user mbfd_hub > "$BACKUP_FILE"[0m
+2026-02-26T17:13:23.1192048Z [36;1m  echo "✓ Backup created: $BACKUP_FILE"[0m
+2026-02-26T17:13:23.1192350Z [36;1m  [0m
+2026-02-26T17:13:23.1192675Z [36;1m  # Pull latest changes and reset to origin (deterministic deploy)[0m
+2026-02-26T17:13:23.1193234Z [36;1m  git remote set-url origin https://github.com/pdarleyjr/mbfd-hub.git[0m
+2026-02-26T17:13:23.1193677Z [36;1m  git fetch origin[0m
+2026-02-26T17:13:23.1193955Z [36;1m  git reset --hard origin/main[0m
+2026-02-26T17:13:23.1194240Z [36;1m  git clean -fd[0m
+2026-02-26T17:13:23.1194592Z [36;1m  echo "✓ Repository reset to origin/main (pdarleyjr/mbfd-hub)"[0m
+2026-02-26T17:13:23.1194985Z [36;1m  [0m
+2026-02-26T17:13:23.1195216Z [36;1m  # Rebuild and restart containers[0m
+2026-02-26T17:13:23.1195528Z [36;1m  docker compose up -d --build[0m
+2026-02-26T17:13:23.1195853Z [36;1m  echo "✓ Containers rebuilt and restarted"[0m
+2026-02-26T17:13:23.1196159Z [36;1m  [0m
+2026-02-26T17:13:23.1196383Z [36;1m  # Wait for containers to be healthy[0m
+2026-02-26T17:13:23.1196687Z [36;1m  sleep 10[0m
+2026-02-26T17:13:23.1196905Z [36;1m  [0m
+2026-02-26T17:13:23.1197111Z [36;1m  # Run Laravel commands[0m
+2026-02-26T17:13:23.1197505Z [36;1m  docker compose exec -T laravel.test php artisan migrate --force[0m
+2026-02-26T17:13:23.1198006Z [36;1m  docker compose exec -T laravel.test php artisan optimize:clear[0m
+2026-02-26T17:13:23.1198525Z [36;1m  docker compose exec -T laravel.test php artisan config:cache[0m
+2026-02-26T17:13:23.1199005Z [36;1m  docker compose exec -T laravel.test php artisan route:cache[0m
+2026-02-26T17:13:23.1199468Z [36;1m  docker compose exec -T laravel.test php artisan view:cache[0m
+2026-02-26T17:13:23.1199997Z [36;1m  docker compose exec -T laravel.test php artisan filament:clear-cached-components[0m
+2026-02-26T17:13:23.1200725Z [36;1m  echo "✓ Laravel optimizations complete"[0m
+2026-02-26T17:13:23.1201027Z [36;1m  [0m
+2026-02-26T17:13:23.1201265Z [36;1m  # Build main Vite assets (CSS theme + JS)[0m
+2026-02-26T17:13:23.1201623Z [36;1m  docker compose exec -T laravel.test npm ci[0m
+2026-02-26T17:13:23.1201998Z [36;1m  docker compose exec -T laravel.test npm run build[0m
+2026-02-26T17:13:23.1202361Z [36;1m  echo "✓ Main Vite assets built"[0m
+2026-02-26T17:13:23.1202817Z [36;1m  [0m
+2026-02-26T17:13:23.1203050Z [36;1m  # Build daily-checkout frontend[0m
+2026-02-26T17:13:23.1203362Z [36;1m  cd resources/js/daily-checkout[0m
+2026-02-26T17:13:23.1203646Z [36;1m  npm ci[0m
+2026-02-26T17:13:23.1203869Z [36;1m  npm run build[0m
+2026-02-26T17:13:23.1204159Z [36;1m  cd /***/mbfd-hub[0m
+2026-02-26T17:13:23.1204450Z [36;1m  echo "✓ Daily-checkout frontend built"[0m
+2026-02-26T17:13:23.1204755Z [36;1mEOF[0m
+2026-02-26T17:13:23.1254386Z shell: /usr/bin/bash -e {0}
+2026-02-26T17:13:23.1254659Z env:
+2026-02-26T17:13:23.1254918Z   VPS_HOST: ***
+2026-02-26T17:13:23.1255170Z   VPS_USER: ***
+2026-02-26T17:13:23.1255388Z ##[endgroup]
+2026-02-26T17:13:24.8784436Z time="2026-02-26T17:13:24Z" level=warning msg="Found multiple config files with supported names: /***/mbfd-hub/compose.yaml, /***/mbfd-hub/docker-compose.yml"
+2026-02-26T17:13:24.8785692Z time="2026-02-26T17:13:24Z" level=warning msg="Using /***/mbfd-hub/compose.yaml"
+2026-02-26T17:13:24.8914076Z time="2026-02-26T17:13:24Z" level=warning msg="Found multiple config files with supported names: /***/mbfd-hub/compose.yaml, /***/mbfd-hub/docker-compose.yml"
+2026-02-26T17:13:24.8915552Z time="2026-02-26T17:13:24Z" level=warning msg="Using /***/mbfd-hub/compose.yaml"
