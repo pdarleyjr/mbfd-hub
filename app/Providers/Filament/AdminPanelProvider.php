@@ -46,7 +46,7 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogoHeight('8rem')
             ->favicon(secure_asset('favicon.ico'))
             ->darkMode(false)
-            ->viteTheme('resources/css/filament/admin/theme.css')
+            // REMOVED: viteTheme('resources/css/filament/admin/theme.css') - restoring default Filament styling
             ->colors([
                 'primary' => Color::Red,
                 'danger' => Color::Rose,
