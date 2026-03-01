@@ -49,7 +49,6 @@ class TrainingPanelProvider extends PanelProvider
                 'warning' => Color::Orange,
             ])
             ->font('Inter')
-            ->maxContentWidth(MaxWidth::SevenExtraLarge)
             ->plugin(ChatifyPlugin::make())
             ->discoverResources(in: app_path('Filament/Training/Resources'), for: 'App\\Filament\\Training\\Resources')
             ->discoverPages(in: app_path('Filament/Training/Pages'), for: 'App\\Filament\\Training\\Pages')
