@@ -53,7 +53,10 @@ class TrainingPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Training/Resources'), for: 'App\\Filament\\Training\\Resources')
             ->discoverPages(in: app_path('Filament/Training/Pages'), for: 'App\\Filament\\Training\\Pages')
             ->discoverWidgets(in: app_path('Filament/Training/Widgets'), for: 'App\\Filament\\Training\\Widgets')
-            ->widgets([])
+            ->widgets([
+                \App\Filament\Training\Widgets\TrainingStatsWidget::class,
+                \App\Filament\Training\Widgets\TrainingTodoWidget::class,
+            ])
             ->pages([
                 \App\Filament\Training\Pages\Dashboard::class,
                 \App\Filament\Training\Pages\ExternalNavItemViewer::class,
