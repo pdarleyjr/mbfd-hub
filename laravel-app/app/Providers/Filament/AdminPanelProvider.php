@@ -18,7 +18,6 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Filament\Widgets\SmartUpdatesWidget;
-use Filament\View\PanelsRenderHook;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -74,10 +73,6 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
-            ->renderHook(
-                PanelsRenderHook::HEAD_END,
-                fn (): string => view('filament.partials.ios-meta')->render(),
-            )
             ->spa();
     }
 }
