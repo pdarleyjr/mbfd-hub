@@ -44,7 +44,7 @@ class AdminPanelProvider extends PanelProvider
             ->login(Login::class)
             ->brandName('MBFD Support Hub')
             ->brandLogo(secure_asset('images/mbfd_no_bg_new.png'))
-            ->brandLogoHeight('8rem')
+            ->brandLogoHeight('3rem')
             ->favicon(secure_asset('favicon.ico'))
             ->darkMode(false)
             ->colors([
