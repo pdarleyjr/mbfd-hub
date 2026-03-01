@@ -4,9 +4,6 @@ namespace App\Filament\Training\Pages;
 
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Actions\Action;
-use Filament\Support\Enums\MaxWidth;
-use App\Filament\Training\Widgets\TrainingStatsWidget;
-use App\Filament\Training\Widgets\TrainingTodoWidget;
 
 class Dashboard extends BaseDashboard
 {
@@ -19,11 +16,6 @@ class Dashboard extends BaseDashboard
     public function getSubheading(): ?string
     {
         return 'Current training work queue, external sources, and division tools.';
-    }
-
-    public function getMaxContentWidth(): MaxWidth
-    {
-        return MaxWidth::SevenExtraLarge;
     }
 
     public function getColumns(): int|string|array
@@ -54,14 +46,6 @@ class Dashboard extends BaseDashboard
                 ->icon('heroicon-o-globe-alt')
                 ->color('gray')
                 ->url(fn () => route('filament.training.resources.external-sources.index')),
-        ];
-    }
-
-    public function getWidgets(): array
-    {
-        return [
-            TrainingStatsWidget::class,
-            TrainingTodoWidget::class,
         ];
     }
 }
