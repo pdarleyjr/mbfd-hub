@@ -26,6 +26,10 @@ use Illuminate\Support\Facades\Blade;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Settings;
 use App\Http\Middleware\RedirectTrainingUsers;
+use App\Filament\Widgets\FleetStatsWidget;
+use App\Filament\Widgets\InventoryOverviewWidget;
+use App\Filament\Widgets\TodoOverviewWidget;
+use App\Filament\Widgets\SmartUpdatesWidget;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
 
@@ -59,7 +63,12 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Pages\Dashboard::class,
             ])
-            ->widgets([])
+            ->widgets([
+                FleetStatsWidget::class,
+                InventoryOverviewWidget::class,
+                TodoOverviewWidget::class,
+                SmartUpdatesWidget::class,
+            ])
             ->navigationGroups([
                 NavigationGroup::make()
                     ->label('Dashboard')

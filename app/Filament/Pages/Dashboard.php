@@ -4,11 +4,6 @@ namespace App\Filament\Pages;
 
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Actions\Action;
-use Filament\Support\Enums\MaxWidth;
-use App\Filament\Widgets\FleetStatsWidget;
-use App\Filament\Widgets\InventoryOverviewWidget;
-use App\Filament\Widgets\TodoOverviewWidget;
-use App\Filament\Widgets\SmartUpdatesWidget;
 
 class Dashboard extends BaseDashboard
 {
@@ -19,11 +14,6 @@ class Dashboard extends BaseDashboard
     public function getSubheading(): ?string
     {
         return 'Operational overview for fleet, logistics, inventory, and active support-service tasks.';
-    }
-
-    public function getMaxContentWidth(): MaxWidth
-    {
-        return MaxWidth::ScreenTwoExtraLarge;
     }
 
     public function getColumns(): int|string|array
@@ -50,16 +40,6 @@ class Dashboard extends BaseDashboard
                 ->action(function () {
                     $this->dispatch('open-ai-chat');
                 }),
-        ];
-    }
-
-    public function getWidgets(): array
-    {
-        return [
-            FleetStatsWidget::class,
-            InventoryOverviewWidget::class,
-            TodoOverviewWidget::class,
-            SmartUpdatesWidget::class,
         ];
     }
 }
