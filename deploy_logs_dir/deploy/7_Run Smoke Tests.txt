@@ -1,0 +1,30 @@
+﻿2026-02-26T17:13:40.1994918Z ##[group]Run echo "Running smoke tests..."
+2026-02-26T17:13:40.1995304Z [36;1mecho "Running smoke tests..."[0m
+2026-02-26T17:13:40.1995595Z [36;1msleep 5[0m
+2026-02-26T17:13:40.1995809Z [36;1m[0m
+2026-02-26T17:13:40.1996023Z [36;1m# Test version endpoint[0m
+2026-02-26T17:13:40.1996418Z [36;1mif curl -sf https://support.darleyplex.com/__version | jq .; then[0m
+2026-02-26T17:13:40.1996869Z [36;1m  echo "✓ Version endpoint check passed"[0m
+2026-02-26T17:13:40.1997179Z [36;1melse[0m
+2026-02-26T17:13:40.1997415Z [36;1m  echo "⚠ Version endpoint check failed"[0m
+2026-02-26T17:13:40.1997753Z [36;1mfi[0m
+2026-02-26T17:13:40.1997947Z [36;1m[0m
+2026-02-26T17:13:40.1998162Z [36;1m# Test daily checkout page[0m
+2026-02-26T17:13:40.1998590Z [36;1mif curl -sf https://support.darleyplex.com/daily/ -o /dev/null; then[0m
+2026-02-26T17:13:40.1999026Z [36;1m  echo "✓ Daily checkout accessible"[0m
+2026-02-26T17:13:40.1999314Z [36;1melse[0m
+2026-02-26T17:13:40.1999544Z [36;1m  echo "⚠ Daily checkout check failed"[0m
+2026-02-26T17:13:40.1999867Z [36;1mfi[0m
+2026-02-26T17:13:40.2047634Z shell: /usr/bin/bash -e {0}
+2026-02-26T17:13:40.2047901Z env:
+2026-02-26T17:13:40.2048156Z   VPS_HOST: ***
+2026-02-26T17:13:40.2048392Z   VPS_USER: ***
+2026-02-26T17:13:40.2048602Z ##[endgroup]
+2026-02-26T17:13:40.2114101Z Running smoke tests...
+2026-02-26T17:13:45.6018409Z {
+2026-02-26T17:13:45.6018959Z   "git_sha": "2773fd47e81dac5558d92142997cecb74db477dd",
+2026-02-26T17:13:45.6019527Z   "branch": "main",
+2026-02-26T17:13:45.6019965Z   "build_time": "2026-02-26T17:13:45+00:00"
+2026-02-26T17:13:45.6020670Z }
+2026-02-26T17:13:45.6022643Z ✓ Version endpoint check passed
+2026-02-26T17:13:45.8521328Z ✓ Daily checkout accessible

@@ -1,0 +1,424 @@
+deploy	Set up job	﻿2026-02-26T22:27:13.4757332Z Current runner version: '2.331.0'
+deploy	Set up job	2026-02-26T22:27:13.4784689Z ##[group]Runner Image Provisioner
+deploy	Set up job	2026-02-26T22:27:13.4785734Z Hosted Compute Agent
+deploy	Set up job	2026-02-26T22:27:13.4786542Z Version: 20260213.493
+deploy	Set up job	2026-02-26T22:27:13.4787302Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+deploy	Set up job	2026-02-26T22:27:13.4788220Z Build Date: 2026-02-13T00:28:41Z
+deploy	Set up job	2026-02-26T22:27:13.4789016Z Worker ID: {090d21ce-c683-4684-b364-c9157bfd953a}
+deploy	Set up job	2026-02-26T22:27:13.4789873Z Azure Region: westus
+deploy	Set up job	2026-02-26T22:27:13.4790550Z ##[endgroup]
+deploy	Set up job	2026-02-26T22:27:13.4792134Z ##[group]Operating System
+deploy	Set up job	2026-02-26T22:27:13.4793389Z Ubuntu
+deploy	Set up job	2026-02-26T22:27:13.4794195Z 24.04.3
+deploy	Set up job	2026-02-26T22:27:13.4794920Z LTS
+deploy	Set up job	2026-02-26T22:27:13.4795560Z ##[endgroup]
+deploy	Set up job	2026-02-26T22:27:13.4796300Z ##[group]Runner Image
+deploy	Set up job	2026-02-26T22:27:13.4797046Z Image: ubuntu-24.04
+deploy	Set up job	2026-02-26T22:27:13.4797722Z Version: 20260224.36.1
+deploy	Set up job	2026-02-26T22:27:13.4798997Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260224.36/images/ubuntu/Ubuntu2404-Readme.md
+deploy	Set up job	2026-02-26T22:27:13.4800894Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260224.36
+deploy	Set up job	2026-02-26T22:27:13.4801961Z ##[endgroup]
+deploy	Set up job	2026-02-26T22:27:13.4803390Z ##[group]GITHUB_TOKEN Permissions
+deploy	Set up job	2026-02-26T22:27:13.4805826Z Contents: read
+deploy	Set up job	2026-02-26T22:27:13.4806677Z Metadata: read
+deploy	Set up job	2026-02-26T22:27:13.4807349Z Packages: read
+deploy	Set up job	2026-02-26T22:27:13.4808123Z ##[endgroup]
+deploy	Set up job	2026-02-26T22:27:13.4810668Z Secret source: Actions
+deploy	Set up job	2026-02-26T22:27:13.4811547Z Prepare workflow directory
+deploy	Set up job	2026-02-26T22:27:13.5145790Z Prepare all required actions
+deploy	Set up job	2026-02-26T22:27:13.5188355Z Getting action download info
+deploy	Set up job	2026-02-26T22:27:13.9818379Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+deploy	Set up job	2026-02-26T22:27:14.1656576Z Download action repository 'cloudflare/wrangler-action@v3' (SHA:da0e0dfe58b7a431659754fdf3f186c529afbe65)
+deploy	Set up job	2026-02-26T22:27:15.2228330Z Complete job name: deploy
+deploy	Checkout code	﻿2026-02-26T22:27:15.3049991Z ##[group]Run actions/checkout@v4
+deploy	Checkout code	2026-02-26T22:27:15.3051124Z with:
+deploy	Checkout code	2026-02-26T22:27:15.3051764Z   repository: pdarleyjr/mbfd-hub
+deploy	Checkout code	2026-02-26T22:27:15.3052734Z   token: ***
+deploy	Checkout code	2026-02-26T22:27:15.3053311Z   ssh-strict: true
+deploy	Checkout code	2026-02-26T22:27:15.3054283Z   ssh-user: git
+deploy	Checkout code	2026-02-26T22:27:15.3054986Z   persist-credentials: true
+deploy	Checkout code	2026-02-26T22:27:15.3055611Z   clean: true
+deploy	Checkout code	2026-02-26T22:27:15.3056183Z   sparse-checkout-cone-mode: true
+deploy	Checkout code	2026-02-26T22:27:15.3056861Z   fetch-depth: 1
+deploy	Checkout code	2026-02-26T22:27:15.3057438Z   fetch-tags: false
+deploy	Checkout code	2026-02-26T22:27:15.3058010Z   show-progress: true
+deploy	Checkout code	2026-02-26T22:27:15.3058582Z   lfs: false
+deploy	Checkout code	2026-02-26T22:27:15.3059124Z   submodules: false
+deploy	Checkout code	2026-02-26T22:27:15.3059722Z   set-safe-directory: true
+deploy	Checkout code	2026-02-26T22:27:15.3060765Z ##[endgroup]
+deploy	Checkout code	2026-02-26T22:27:15.4215048Z Syncing repository: pdarleyjr/mbfd-hub
+deploy	Checkout code	2026-02-26T22:27:15.4217568Z ##[group]Getting Git version info
+deploy	Checkout code	2026-02-26T22:27:15.4218593Z Working directory is '/home/runner/work/mbfd-hub/mbfd-hub'
+deploy	Checkout code	2026-02-26T22:27:15.4219985Z [command]/usr/bin/git version
+deploy	Checkout code	2026-02-26T22:27:15.4315057Z git version 2.53.0
+deploy	Checkout code	2026-02-26T22:27:15.4343607Z ##[endgroup]
+deploy	Checkout code	2026-02-26T22:27:15.4360192Z Temporarily overriding HOME='/home/runner/work/_temp/c7902ceb-2e78-4332-8c3a-2ba7a42edf65' before making global git config changes
+deploy	Checkout code	2026-02-26T22:27:15.4362947Z Adding repository directory to the temporary git global config as a safe directory
+deploy	Checkout code	2026-02-26T22:27:15.4375309Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/mbfd-hub/mbfd-hub
+deploy	Checkout code	2026-02-26T22:27:15.4422512Z Deleting the contents of '/home/runner/work/mbfd-hub/mbfd-hub'
+deploy	Checkout code	2026-02-26T22:27:15.4427391Z ##[group]Initializing the repository
+deploy	Checkout code	2026-02-26T22:27:15.4431856Z [command]/usr/bin/git init /home/runner/work/mbfd-hub/mbfd-hub
+deploy	Checkout code	2026-02-26T22:27:15.4579044Z hint: Using 'master' as the name for the initial branch. This default branch name
+deploy	Checkout code	2026-02-26T22:27:15.4580674Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+deploy	Checkout code	2026-02-26T22:27:15.4582779Z hint: to use in all of your new repositories, which will suppress this warning,
+deploy	Checkout code	2026-02-26T22:27:15.4585139Z hint: call:
+deploy	Checkout code	2026-02-26T22:27:15.4586027Z hint:
+deploy	Checkout code	2026-02-26T22:27:15.4587059Z hint: 	git config --global init.defaultBranch <name>
+deploy	Checkout code	2026-02-26T22:27:15.4587881Z hint:
+deploy	Checkout code	2026-02-26T22:27:15.4588609Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+deploy	Checkout code	2026-02-26T22:27:15.4589714Z hint: 'development'. The just-created branch can be renamed via this command:
+deploy	Checkout code	2026-02-26T22:27:15.4590602Z hint:
+deploy	Checkout code	2026-02-26T22:27:15.4591136Z hint: 	git branch -m <name>
+deploy	Checkout code	2026-02-26T22:27:15.4591870Z hint:
+deploy	Checkout code	2026-02-26T22:27:15.4593255Z hint: Disable this message with "git config set advice.defaultBranchName false"
+deploy	Checkout code	2026-02-26T22:27:15.4594815Z Initialized empty Git repository in /home/runner/work/mbfd-hub/mbfd-hub/.git/
+deploy	Checkout code	2026-02-26T22:27:15.4599395Z [command]/usr/bin/git remote add origin https://github.com/pdarleyjr/mbfd-hub
+deploy	Checkout code	2026-02-26T22:27:15.4640320Z ##[endgroup]
+deploy	Checkout code	2026-02-26T22:27:15.4641328Z ##[group]Disabling automatic garbage collection
+deploy	Checkout code	2026-02-26T22:27:15.4644121Z [command]/usr/bin/git config --local gc.auto 0
+deploy	Checkout code	2026-02-26T22:27:15.4676006Z ##[endgroup]
+deploy	Checkout code	2026-02-26T22:27:15.4676984Z ##[group]Setting up auth
+deploy	Checkout code	2026-02-26T22:27:15.4683004Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+deploy	Checkout code	2026-02-26T22:27:15.4716985Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+deploy	Checkout code	2026-02-26T22:27:15.5090546Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+deploy	Checkout code	2026-02-26T22:27:15.5124507Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+deploy	Checkout code	2026-02-26T22:27:15.5367716Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+deploy	Checkout code	2026-02-26T22:27:15.5414875Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+deploy	Checkout code	2026-02-26T22:27:15.5685624Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+deploy	Checkout code	2026-02-26T22:27:15.5728342Z ##[endgroup]
+deploy	Checkout code	2026-02-26T22:27:15.5730279Z ##[group]Fetching the repository
+deploy	Checkout code	2026-02-26T22:27:15.5738788Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +7d01e16bd2b47e58c717239069e67de62b6630b4:refs/remotes/origin/main
+deploy	Checkout code	2026-02-26T22:27:22.5851588Z From https://github.com/pdarleyjr/mbfd-hub
+deploy	Checkout code	2026-02-26T22:27:22.5853659Z  * [new ref]           7d01e16bd2b47e58c717239069e67de62b6630b4 -> origin/main
+deploy	Checkout code	2026-02-26T22:27:22.5890010Z ##[endgroup]
+deploy	Checkout code	2026-02-26T22:27:22.5892068Z ##[group]Determining the checkout info
+deploy	Checkout code	2026-02-26T22:27:22.5893502Z ##[endgroup]
+deploy	Checkout code	2026-02-26T22:27:22.5899129Z [command]/usr/bin/git sparse-checkout disable
+deploy	Checkout code	2026-02-26T22:27:22.5965734Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+deploy	Checkout code	2026-02-26T22:27:22.6000920Z ##[group]Checking out the ref
+deploy	Checkout code	2026-02-26T22:27:22.6003564Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+deploy	Checkout code	2026-02-26T22:27:23.6379760Z Updating files:  28% (7242/25552)
+deploy	Checkout code	2026-02-26T22:27:23.6512938Z Updating files:  29% (7411/25552)
+deploy	Checkout code	2026-02-26T22:27:23.6656988Z Updating files:  30% (7666/25552)
+deploy	Checkout code	2026-02-26T22:27:23.6788058Z Updating files:  31% (7922/25552)
+deploy	Checkout code	2026-02-26T22:27:23.6958757Z Updating files:  32% (8177/25552)
+deploy	Checkout code	2026-02-26T22:27:23.7092776Z Updating files:  33% (8433/25552)
+deploy	Checkout code	2026-02-26T22:27:23.7261390Z Updating files:  34% (8688/25552)
+deploy	Checkout code	2026-02-26T22:27:23.7404459Z Updating files:  35% (8944/25552)
+deploy	Checkout code	2026-02-26T22:27:23.7542503Z Updating files:  36% (9199/25552)
+deploy	Checkout code	2026-02-26T22:27:23.7693999Z Updating files:  37% (9455/25552)
+deploy	Checkout code	2026-02-26T22:27:23.7829304Z Updating files:  38% (9710/25552)
+deploy	Checkout code	2026-02-26T22:27:23.7957551Z Updating files:  39% (9966/25552)
+deploy	Checkout code	2026-02-26T22:27:23.8097374Z Updating files:  40% (10221/25552)
+deploy	Checkout code	2026-02-26T22:27:23.8629463Z Updating files:  41% (10477/25552)
+deploy	Checkout code	2026-02-26T22:27:23.8760409Z Updating files:  42% (10732/25552)
+deploy	Checkout code	2026-02-26T22:27:23.8892151Z Updating files:  43% (10988/25552)
+deploy	Checkout code	2026-02-26T22:27:23.9134487Z Updating files:  44% (11243/25552)
+deploy	Checkout code	2026-02-26T22:27:23.9349205Z Updating files:  45% (11499/25552)
+deploy	Checkout code	2026-02-26T22:27:23.9502045Z Updating files:  46% (11754/25552)
+deploy	Checkout code	2026-02-26T22:27:23.9622866Z Updating files:  47% (12010/25552)
+deploy	Checkout code	2026-02-26T22:27:23.9797488Z Updating files:  48% (12265/25552)
+deploy	Checkout code	2026-02-26T22:27:23.9930647Z Updating files:  49% (12521/25552)
+deploy	Checkout code	2026-02-26T22:27:24.0069795Z Updating files:  50% (12776/25552)
+deploy	Checkout code	2026-02-26T22:27:24.0209773Z Updating files:  51% (13032/25552)
+deploy	Checkout code	2026-02-26T22:27:24.0344474Z Updating files:  52% (13288/25552)
+deploy	Checkout code	2026-02-26T22:27:24.0490027Z Updating files:  53% (13543/25552)
+deploy	Checkout code	2026-02-26T22:27:24.0602119Z Updating files:  54% (13799/25552)
+deploy	Checkout code	2026-02-26T22:27:24.0714626Z Updating files:  55% (14054/25552)
+deploy	Checkout code	2026-02-26T22:27:24.0830204Z Updating files:  56% (14310/25552)
+deploy	Checkout code	2026-02-26T22:27:24.0966620Z Updating files:  57% (14565/25552)
+deploy	Checkout code	2026-02-26T22:27:24.1148536Z Updating files:  58% (14821/25552)
+deploy	Checkout code	2026-02-26T22:27:24.1302053Z Updating files:  59% (15076/25552)
+deploy	Checkout code	2026-02-26T22:27:24.1447577Z Updating files:  60% (15332/25552)
+deploy	Checkout code	2026-02-26T22:27:24.1587104Z Updating files:  61% (15587/25552)
+deploy	Checkout code	2026-02-26T22:27:24.1717528Z Updating files:  62% (15843/25552)
+deploy	Checkout code	2026-02-26T22:27:24.1864843Z Updating files:  63% (16098/25552)
+deploy	Checkout code	2026-02-26T22:27:24.1997304Z Updating files:  64% (16354/25552)
+deploy	Checkout code	2026-02-26T22:27:24.2133366Z Updating files:  65% (16609/25552)
+deploy	Checkout code	2026-02-26T22:27:24.4440488Z Updating files:  66% (16865/25552)
+deploy	Checkout code	2026-02-26T22:27:24.4615581Z Updating files:  67% (17120/25552)
+deploy	Checkout code	2026-02-26T22:27:24.4813662Z Updating files:  68% (17376/25552)
+deploy	Checkout code	2026-02-26T22:27:24.5470969Z Updating files:  69% (17631/25552)
+deploy	Checkout code	2026-02-26T22:27:24.5628640Z Updating files:  70% (17887/25552)
+deploy	Checkout code	2026-02-26T22:27:24.5869516Z Updating files:  71% (18142/25552)
+deploy	Checkout code	2026-02-26T22:27:24.6000548Z Updating files:  72% (18398/25552)
+deploy	Checkout code	2026-02-26T22:27:24.6126618Z Updating files:  73% (18653/25552)
+deploy	Checkout code	2026-02-26T22:27:24.6247892Z Updating files:  74% (18909/25552)
+deploy	Checkout code	2026-02-26T22:27:24.6253559Z Updating files:  75% (19164/25552)
+deploy	Checkout code	2026-02-26T22:27:24.6410976Z Updating files:  75% (19175/25552)
+deploy	Checkout code	2026-02-26T22:27:24.6572703Z Updating files:  76% (19420/25552)
+deploy	Checkout code	2026-02-26T22:27:24.6680422Z Updating files:  77% (19676/25552)
+deploy	Checkout code	2026-02-26T22:27:24.6790450Z Updating files:  78% (19931/25552)
+deploy	Checkout code	2026-02-26T22:27:24.6888059Z Updating files:  79% (20187/25552)
+deploy	Checkout code	2026-02-26T22:27:24.6987800Z Updating files:  80% (20442/25552)
+deploy	Checkout code	2026-02-26T22:27:24.7087494Z Updating files:  81% (20698/25552)
+deploy	Checkout code	2026-02-26T22:27:24.7188079Z Updating files:  82% (20953/25552)
+deploy	Checkout code	2026-02-26T22:27:24.7327358Z Updating files:  83% (21209/25552)
+deploy	Checkout code	2026-02-26T22:27:24.7453619Z Updating files:  84% (21464/25552)
+deploy	Checkout code	2026-02-26T22:27:24.7558350Z Updating files:  85% (21720/25552)
+deploy	Checkout code	2026-02-26T22:27:24.7676123Z Updating files:  86% (21975/25552)
+deploy	Checkout code	2026-02-26T22:27:24.8246456Z Updating files:  87% (22231/25552)
+deploy	Checkout code	2026-02-26T22:27:24.8369426Z Updating files:  88% (22486/25552)
+deploy	Checkout code	2026-02-26T22:27:24.8550035Z Updating files:  89% (22742/25552)
+deploy	Checkout code	2026-02-26T22:27:24.8726786Z Updating files:  90% (22997/25552)
+deploy	Checkout code	2026-02-26T22:27:24.8904569Z Updating files:  91% (23253/25552)
+deploy	Checkout code	2026-02-26T22:27:24.9027244Z Updating files:  92% (23508/25552)
+deploy	Checkout code	2026-02-26T22:27:24.9170933Z Updating files:  93% (23764/25552)
+deploy	Checkout code	2026-02-26T22:27:24.9294663Z Updating files:  94% (24019/25552)
+deploy	Checkout code	2026-02-26T22:27:24.9550929Z Updating files:  95% (24275/25552)
+deploy	Checkout code	2026-02-26T22:27:24.9963727Z Updating files:  96% (24530/25552)
+deploy	Checkout code	2026-02-26T22:27:25.0088662Z Updating files:  97% (24786/25552)
+deploy	Checkout code	2026-02-26T22:27:25.0335765Z Updating files:  98% (25041/25552)
+deploy	Checkout code	2026-02-26T22:27:25.0688462Z Updating files:  99% (25297/25552)
+deploy	Checkout code	2026-02-26T22:27:25.0689222Z Updating files: 100% (25552/25552)
+deploy	Checkout code	2026-02-26T22:27:25.0689871Z Updating files: 100% (25552/25552), done.
+deploy	Checkout code	2026-02-26T22:27:25.0982241Z Switched to a new branch 'main'
+deploy	Checkout code	2026-02-26T22:27:25.0984199Z branch 'main' set up to track 'origin/main'.
+deploy	Checkout code	2026-02-26T22:27:25.1074334Z ##[endgroup]
+deploy	Checkout code	2026-02-26T22:27:25.1120715Z [command]/usr/bin/git log -1 --format=%H
+deploy	Checkout code	2026-02-26T22:27:25.1147822Z 7d01e16bd2b47e58c717239069e67de62b6630b4
+deploy	Setup SSH	﻿2026-02-26T22:27:25.1355499Z ##[group]Run mkdir -p ~/.ssh
+deploy	Setup SSH	2026-02-26T22:27:25.1355963Z [36;1mmkdir -p ~/.ssh[0m
+deploy	Setup SSH	2026-02-26T22:27:25.1424956Z [36;1mecho "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa[0m
+deploy	Setup SSH	2026-02-26T22:27:25.1425392Z [36;1mchmod 600 ~/.ssh/id_rsa[0m
+deploy	Setup SSH	2026-02-26T22:27:25.1425788Z [36;1mssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts[0m
+deploy	Setup SSH	2026-02-26T22:27:25.1485164Z shell: /usr/bin/bash -e {0}
+deploy	Setup SSH	2026-02-26T22:27:25.1485558Z env:
+deploy	Setup SSH	2026-02-26T22:27:25.1488596Z   SSH_PRIVATE_KEY: ***
+deploy	Setup SSH	2026-02-26T22:27:25.1488953Z   VPS_HOST: ***
+deploy	Setup SSH	2026-02-26T22:27:25.1489257Z ##[endgroup]
+deploy	Setup SSH	2026-02-26T22:27:25.4094379Z # ***:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+deploy	Setup SSH	2026-02-26T22:27:25.6801724Z # ***:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+deploy	Setup SSH	2026-02-26T22:27:25.9719717Z # ***:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+deploy	Setup SSH	2026-02-26T22:27:26.2597256Z # ***:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+deploy	Setup SSH	2026-02-26T22:27:26.3387867Z # ***:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+deploy	Deploy to VPS	﻿2026-02-26T22:27:26.4253312Z ##[group]Run ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'
+deploy	Deploy to VPS	2026-02-26T22:27:26.4254262Z [36;1mssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4254700Z [36;1m  set -e[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4255141Z [36;1m  cd /***/mbfd-hub[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4255392Z [36;1m  [0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4255619Z [36;1m  # Create backup before deploy[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4256014Z [36;1m  BACKUP_FILE="backups/mbfd_hub_$(date +%Y%m%d_%H%M%S).sql"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4256404Z [36;1m  mkdir -p backups[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4256830Z [36;1m  docker compose exec -T pgsql pg_dump -U mbfd_user mbfd_hub > "$BACKUP_FILE"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4257333Z [36;1m  echo "✓ Backup created: $BACKUP_FILE"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4257657Z [36;1m  [0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4257984Z [36;1m  # Pull latest changes and reset to origin (deterministic deploy)[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4258436Z [36;1m  echo "=== Git Diagnostics ==="[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4258779Z [36;1m  git remote -v[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4259161Z [36;1m  git remote set-url origin https://@github.com/pdarleyjr/mbfd-hub.git[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4259641Z [36;1m  echo "Remote URL updated with auth token"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4259996Z [36;1m  git fetch origin --force --prune[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4260406Z [36;1m  echo "Fetched. origin/main is: $(git rev-parse origin/main)"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4260880Z [36;1m  echo "Current HEAD before reset: $(git rev-parse HEAD)"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4261275Z [36;1m  git reset --hard origin/main[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4261630Z [36;1m  echo "HEAD after reset: $(git rev-parse HEAD)"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4261974Z [36;1m  git clean -fd[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4262295Z [36;1m  # Write deploy marker file (verifiable via HTTP)[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4262953Z [36;1m  echo "{\"deployed_sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4263622Z [36;1m  # Verify SHA matches what GitHub expects[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4264176Z [36;1m  VPS_SHA=$(git rev-parse HEAD)[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4264489Z [36;1m  echo "VPS SHA: $VPS_SHA"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4264800Z [36;1m  echo "=== End Git Diagnostics ==="[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4265220Z [36;1m  echo "✓ Repository reset to origin/main (pdarleyjr/mbfd-hub)"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4265654Z [36;1m  [0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4265891Z [36;1m  # Rebuild and restart containers[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4266233Z [36;1m  docker compose up -d --build[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4266568Z [36;1m  echo "✓ Containers rebuilt and restarted"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4266894Z [36;1m  [0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4267128Z [36;1m  # Wait for containers to be healthy[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4267440Z [36;1m  sleep 10[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4267661Z [36;1m  [0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4267875Z [36;1m  # Run Laravel commands[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4268464Z [36;1m  docker compose exec -T laravel.test php artisan migrate --force[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4268986Z [36;1m  docker compose exec -T laravel.test php artisan optimize:clear[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4269507Z [36;1m  docker compose exec -T laravel.test php artisan config:cache[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4270000Z [36;1m  docker compose exec -T laravel.test php artisan route:cache[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4270493Z [36;1m  docker compose exec -T laravel.test php artisan view:cache[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4271055Z [36;1m  docker compose exec -T laravel.test php artisan filament:clear-cached-components[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4271575Z [36;1m  echo "✓ Laravel optimizations complete"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4271889Z [36;1m  [0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4272144Z [36;1m  # Build main Vite assets (CSS theme + JS)[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4272511Z [36;1m  docker compose exec -T laravel.test npm ci[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4272901Z [36;1m  docker compose exec -T laravel.test npm run build[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4273268Z [36;1m  echo "✓ Main Vite assets built"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4273545Z [36;1m  [0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4274256Z [36;1m  # Build daily-checkout frontend[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4274572Z [36;1m  cd resources/js/daily-checkout[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4274880Z [36;1m  npm ci[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4275099Z [36;1m  npm run build[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4275384Z [36;1m  cd /***/mbfd-hub[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4275677Z [36;1m  echo "✓ Daily-checkout frontend built"[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4275980Z [36;1mEOF[0m
+deploy	Deploy to VPS	2026-02-26T22:27:26.4326124Z shell: /usr/bin/bash -e {0}
+deploy	Deploy to VPS	2026-02-26T22:27:26.4326420Z env:
+deploy	Deploy to VPS	2026-02-26T22:27:26.4326697Z   VPS_HOST: ***
+deploy	Deploy to VPS	2026-02-26T22:27:26.4326965Z   VPS_USER: ***
+deploy	Deploy to VPS	2026-02-26T22:27:26.4327253Z   GITHUB_SHA: 7d01e16bd2b47e58c717239069e67de62b6630b4
+deploy	Deploy to VPS	2026-02-26T22:27:26.4327604Z ##[endgroup]
+deploy	Deploy to VPS	2026-02-26T22:27:28.4868945Z time="2026-02-26T22:27:28Z" level=warning msg="Found multiple config files with supported names: /***/mbfd-hub/compose.yaml, /***/mbfd-hub/docker-compose.yml"
+deploy	Deploy to VPS	2026-02-26T22:27:28.4871243Z time="2026-02-26T22:27:28Z" level=warning msg="Using /***/mbfd-hub/compose.yaml"
+deploy	Deploy to VPS	2026-02-26T22:27:28.5131807Z time="2026-02-26T22:27:28Z" level=warning msg="Found multiple config files with supported names: /***/mbfd-hub/compose.yaml, /***/mbfd-hub/docker-compose.yml"
+deploy	Deploy to VPS	2026-02-26T22:27:28.5134914Z time="2026-02-26T22:27:28Z" level=warning msg="Using /***/mbfd-hub/compose.yaml"
+deploy	Deploy Cloudflare Worker	﻿2026-02-26T22:27:28.9188285Z ##[group]Run cloudflare/wrangler-action@v3
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:28.9188631Z with:
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:28.9189046Z   apiToken: ***
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:28.9189295Z   workingDirectory: cloudflare-worker
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:28.9189591Z   command: deploy
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:28.9189806Z   quiet: false
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:28.9190018Z ##[endgroup]
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:29.0166471Z ##[group]🔍 Checking for existing Wrangler installation
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:29.0208682Z [command]/usr/local/bin/npx --no-install wrangler --version
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:34.7949656Z sh: 1: wrangler: Permission denied
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:34.8054604Z ⚠️ Wrangler not found or version is incompatible. Installing...
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:34.8055672Z ##[endgroup]
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:34.8056645Z ##[group]📥 Installing Wrangler
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:34.8073266Z [command]/usr/local/bin/npm i wrangler@3.90.0
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.7768574Z 
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.7769931Z added 25 packages, removed 12 packages, changed 11 packages, and audited 72 packages in 8s
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.7771034Z 
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.7771439Z 11 packages are looking for funding
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.7772035Z   run `npm fund` for details
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.8431447Z 
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.8432314Z 4 vulnerabilities (3 moderate, 1 high)
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.8432913Z 
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.8433165Z To address all issues, run:
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.8433750Z   npm audit fix --force
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.8434270Z 
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.8434430Z Run `npm audit` for details.
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.8648374Z ✅ Wrangler installed
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.8649363Z ##[endgroup]
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.8654841Z ##[group]🚀 Running Wrangler Commands
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:42.8673394Z [command]/usr/local/bin/npx wrangler deploy
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:43.8585163Z 
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:43.8586205Z  ⛅️ wrangler 3.90.0 (update available 4.69.0)
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:43.8586915Z ---------------------------------------------
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:43.8587232Z 
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:43.9015795Z [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mThe version of Wrangler you are using is now out-of-date.[0m
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:43.9016559Z 
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:43.9016770Z   Please update to the latest version to prevent critical errors.
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:43.9017413Z   Run `npm install --save-dev wrangler@4` to update to the latest version.
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:43.9017970Z   After installation, run Wrangler with `npx wrangler`.
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:43.9018283Z 
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:43.9018288Z 
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:49.8512930Z Total Upload: 9.30 KiB / gzip: 3.06 KiB
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:53.7068314Z Your worker has access to the following bindings:
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:53.7069085Z - AI:
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:53.7069374Z   - Name: AI
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:53.7069758Z - Vars:
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:53.7070170Z   - SUPPORT_HUB_URL: "https://www.mbfdhub.com"
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:53.7070797Z   - BASEROW_URL: "https://baserow.mbfdhub.com"
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:53.7071555Z   - NOCOBASE_URL: "https://nocobase.mbfdhub.com"
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:53.7079444Z Uploaded mbfd-support-ai (8.88 sec)
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:54.2188665Z Deployed mbfd-support-ai triggers (0.26 sec)
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:54.2190534Z   https://mbfd-support-ai.pdarleyjr.workers.dev
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:54.2191993Z Current Version ID: e167a25c-912c-4cc7-81ab-89d54d60b12d
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:54.2590993Z ##[endgroup]
+deploy	Deploy Cloudflare Worker	2026-02-26T22:27:54.2591930Z 🏁 Wrangler Action completed
+deploy	Purge Cloudflare Cache	﻿2026-02-26T22:27:54.2667280Z ##[group]Run curl -X POST "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2668298Z [36;1mcurl -X POST "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \[0m
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2669192Z [36;1m  -H "Authorization: ***" \[0m
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2669622Z [36;1m  -H "Content-Type: application/json" \[0m
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2671359Z [36;1m  --data '{"files":["https://mbfdhub.com/","https://mbfdhub.com/manifest.json","https://mbfdhub.com/site.webmanifest","https://mbfdhub.com/daily/index.html","https://mbfdhub.com/daily/","https://mbfdhub.com/__version","https://www.mbfdhub.com/daily/index.html","https://www.mbfdhub.com/daily/","https://www.mbfdhub.com/__version"]}'[0m
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2673077Z [36;1mecho "✓ Cloudflare cache purged"[0m
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2722537Z shell: /usr/bin/bash -e {0}
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2722910Z env:
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2723356Z   CLOUDFLARE_API_TOKEN: ***
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2723978Z   CLOUDFLARE_ZONE_ID: ***
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2724429Z ##[endgroup]
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2847712Z   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2848802Z                                  Dload  Upload   Total   Spent    Left  Speed
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.2849290Z 
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.3751475Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.3752711Z 100   414  100    93  100   321   1027   3546 --:--:-- --:--:-- --:--:--  4600
+deploy	Purge Cloudflare Cache	2026-02-26T22:27:54.3775194Z {"success":true,"errors":[],"messages":[],"result":{"id":"***"}}✓ Cloudflare cache purged
+deploy	Run Smoke Tests	﻿2026-02-26T22:27:54.3803529Z ##[group]Run echo "Running smoke tests..."
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3804178Z [36;1mecho "Running smoke tests..."[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3804492Z [36;1msleep 5[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3804737Z [36;1m[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3804967Z [36;1m# Test version endpoint[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3805366Z [36;1mif curl -sf https://mbfdhub.com/__version | jq .; then[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3805828Z [36;1m  echo "✓ Version endpoint check passed"[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3806175Z [36;1melse[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3806439Z [36;1m  echo "⚠ Version endpoint check failed"[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3806769Z [36;1mfi[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3807167Z [36;1m[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3807401Z [36;1m# Test daily checkout page[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3807810Z [36;1mif curl -sf https://mbfdhub.com/daily/ -o /dev/null; then[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3808236Z [36;1m  echo "✓ Daily checkout accessible"[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3808551Z [36;1melse[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3808800Z [36;1m  echo "⚠ Daily checkout check failed"[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3809144Z [36;1mfi[0m
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3856653Z shell: /usr/bin/bash -e {0}
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3856970Z env:
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3857251Z   VPS_HOST: ***
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3857519Z   VPS_USER: ***
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3857758Z ##[endgroup]
+deploy	Run Smoke Tests	2026-02-26T22:27:54.3922453Z Running smoke tests...
+deploy	Run Smoke Tests	2026-02-26T22:27:59.7744246Z {
+deploy	Run Smoke Tests	2026-02-26T22:27:59.7744826Z   "git_sha": "0b407ea0e7f681aa9b78fa9622cc7de05f3dc7ef",
+deploy	Run Smoke Tests	2026-02-26T22:27:59.7745393Z   "branch": "main",
+deploy	Run Smoke Tests	2026-02-26T22:27:59.7745690Z   "build_time": "2026-02-26T22:27:59+00:00"
+deploy	Run Smoke Tests	2026-02-26T22:27:59.7746028Z }
+deploy	Run Smoke Tests	2026-02-26T22:27:59.7748082Z ✓ Version endpoint check passed
+deploy	Run Smoke Tests	2026-02-26T22:28:00.0287117Z ✓ Daily checkout accessible
+deploy	Verify Service Workers	﻿2026-02-26T22:28:00.0319756Z ##[group]Run echo "Verifying /sw.js..."
+deploy	Verify Service Workers	2026-02-26T22:28:00.0320156Z [36;1mecho "Verifying /sw.js..."[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0320640Z [36;1mHTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://mbfdhub.com/sw.js)[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0321128Z [36;1mif [ "$HTTP_CODE" != "200" ]; then[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0321529Z [36;1m  echo "ERROR: /sw.js returned $HTTP_CODE, expected 200"[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0321906Z [36;1m  exit 1[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0322135Z [36;1mfi[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0322368Z [36;1mecho "✓ /sw.js returned 200"[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0322666Z [36;1m[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0322912Z [36;1m# Verify content type is JavaScript[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0323497Z [36;1mCONTENT_TYPE=$(curl -s -I https://mbfdhub.com/sw.js | grep -i content-type | cut -d' ' -f2 | tr -d '\r')[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0324327Z [36;1mecho "Content-Type: $CONTENT_TYPE"[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0342604Z [36;1mif [[ "$CONTENT_TYPE" != *"javascript"* && "$CONTENT_TYPE" != *"text/plain"* ]]; then[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0343252Z [36;1m  echo "WARNING: Unexpected Content-Type for service worker"[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0343650Z [36;1mfi[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0344045Z [36;1m[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0344312Z [36;1mecho "Verifying /daily/service-worker.js..."[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0344856Z [36;1mHTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://mbfdhub.com/daily/service-worker.js)[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0345356Z [36;1mif [ "$HTTP_CODE" != "200" ]; then[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0345779Z [36;1m  echo "ERROR: /daily/service-worker.js returned $HTTP_CODE, expected 200"[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0346191Z [36;1m  exit 1[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0346405Z [36;1mfi[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0346666Z [36;1mecho "✓ /daily/service-worker.js returned 200"[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0346995Z [36;1m[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0347216Z [36;1mecho "Verifying /manifest.json..."[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0347686Z [36;1mHTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://mbfdhub.com/manifest.json)[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0348172Z [36;1mif [ "$HTTP_CODE" != "200" ]; then[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0348561Z [36;1m  echo "ERROR: /manifest.json returned $HTTP_CODE, expected 200"[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0348938Z [36;1m  exit 1[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0349143Z [36;1mfi[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0349374Z [36;1mecho "✓ /manifest.json returned 200"[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0349658Z [36;1m[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0349910Z [36;1mecho "✓ Deployment and Verification complete!"[0m
+deploy	Verify Service Workers	2026-02-26T22:28:00.0398366Z shell: /usr/bin/bash -e {0}
+deploy	Verify Service Workers	2026-02-26T22:28:00.0398640Z ##[endgroup]
+deploy	Verify Service Workers	2026-02-26T22:28:00.0464913Z Verifying /sw.js...
+deploy	Verify Service Workers	2026-02-26T22:28:00.3074647Z ✓ /sw.js returned 200
+deploy	Verify Service Workers	2026-02-26T22:28:00.3519207Z Content-Type: application/javascript
+deploy	Verify Service Workers	2026-02-26T22:28:00.3520070Z Verifying /daily/service-worker.js...
+deploy	Verify Service Workers	2026-02-26T22:28:00.6095278Z ✓ /daily/service-worker.js returned 200
+deploy	Verify Service Workers	2026-02-26T22:28:00.6095966Z Verifying /manifest.json...
+deploy	Verify Service Workers	2026-02-26T22:28:00.8652668Z ✓ /manifest.json returned 200
+deploy	Verify Service Workers	2026-02-26T22:28:00.8653476Z ✓ Deployment and Verification complete!
+deploy	Post Checkout code	﻿2026-02-26T22:28:00.8747519Z Post job cleanup.
+deploy	Post Checkout code	2026-02-26T22:28:00.9704897Z [command]/usr/bin/git version
+deploy	Post Checkout code	2026-02-26T22:28:00.9743716Z git version 2.53.0
+deploy	Post Checkout code	2026-02-26T22:28:00.9789031Z Temporarily overriding HOME='/home/runner/work/_temp/a8f6d7ec-d8a7-41c7-ba8b-f5bb9eb1ae91' before making global git config changes
+deploy	Post Checkout code	2026-02-26T22:28:00.9790455Z Adding repository directory to the temporary git global config as a safe directory
+deploy	Post Checkout code	2026-02-26T22:28:00.9795971Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/mbfd-hub/mbfd-hub
+deploy	Post Checkout code	2026-02-26T22:28:00.9841438Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+deploy	Post Checkout code	2026-02-26T22:28:00.9875933Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+deploy	Post Checkout code	2026-02-26T22:28:01.0146216Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+deploy	Post Checkout code	2026-02-26T22:28:01.0168638Z http.https://github.com/.extraheader
+deploy	Post Checkout code	2026-02-26T22:28:01.0181517Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+deploy	Post Checkout code	2026-02-26T22:28:01.0213668Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+deploy	Post Checkout code	2026-02-26T22:28:01.0481772Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+deploy	Post Checkout code	2026-02-26T22:28:01.0517683Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+deploy	Complete job	﻿2026-02-26T22:28:01.0898845Z Evaluate and set environment url
+deploy	Complete job	2026-02-26T22:28:01.0901250Z Evaluated environment url: https://mbfdhub.com
+deploy	Complete job	2026-02-26T22:28:01.0902086Z Cleaning up orphan processes
