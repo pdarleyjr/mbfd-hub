@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Training\Pages\Dashboard as TrainingDashboard;
 use App\Filament\Training\Widgets\TrainingStatsWidget;
 use App\Filament\Training\Widgets\TrainingTodoWidget;
+use App\Filament\Pages\Auth\CustomLogin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -30,7 +31,7 @@ class TrainingPanelProvider extends PanelProvider
             ->default()
             ->id('training')
             ->path('training')
-            ->login()
+            ->login(CustomLogin::class)
             ->brandName('MBFD Training Hub')
             ->brandLogo('/images/mbfd-logo.png')
             ->brandLogoHeight('2.5rem')

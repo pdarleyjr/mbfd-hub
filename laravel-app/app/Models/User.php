@@ -22,6 +22,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'panel',
     ];
 
     /**
@@ -64,5 +65,29 @@ class User extends Authenticatable
     public static function findByEmail(string $email): ?self
     {
         return static::whereRaw('LOWER(email) = ?', [strtolower($email)])->first();
+    }
+
+    /**
+     * Get the user's assigned panel (admin or training).
+     */
+    public function getPanel(): string
+    {
+        return $this->panel ?? 'admin';
+    }
+
+    /**
+     * Check if user belongs to training panel.
+     */
+    public function isTrainingPanel(): bool
+    {
+        return $this->getPanel() === 'training';
+    }
+
+    /**
+     * Check if user belongs to admin panel.
+     */
+    public function isAdminPanel(): bool
+    {
+        return $this->getPanel() === 'admin';
     }
 }

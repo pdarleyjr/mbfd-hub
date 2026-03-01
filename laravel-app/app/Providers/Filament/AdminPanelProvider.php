@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\Admin\Dashboard;
+use App\Filament\Pages\Auth\CustomLogin;
 use App\Filament\Widgets\Admin\AdminStatsWidget;
 use App\Filament\Widgets\Admin\OperationalAlertsWidget;
 use App\Filament\Widgets\Admin\FleetSnapshotWidget;
@@ -35,7 +36,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(CustomLogin::class)
             ->brandName('MBFD Support Hub')
             ->brandLogo('/images/mbfd-logo.png')
             ->brandLogoHeight('2.5rem')
