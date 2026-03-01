@@ -16,9 +16,12 @@ class Dashboard extends BaseDashboard
 
     protected static ?string $title = 'Dashboard';
 
-    protected ?string $subheading = 'Operational overview for fleet, logistics, inventory, and active support-service tasks.';
+    public function getSubheading(): ?string
+    {
+        return 'Operational overview for fleet, logistics, inventory, and active support-service tasks.';
+    }
 
-    public function getMaxContentWidth(): MaxWidth|string|null
+    public function getMaxContentWidth(): MaxWidth
     {
         return MaxWidth::ScreenTwoExtraLarge;
     }
@@ -39,7 +42,7 @@ class Dashboard extends BaseDashboard
                 ->label('New Todo')
                 ->icon('heroicon-o-plus-circle')
                 ->color('primary')
-                ->url(route('filament.admin.resources.todos.create')),
+                ->url(fn () => route('filament.admin.resources.todos.create')),
             Action::make('askAI')
                 ->label('Ask AI Assistant')
                 ->icon('heroicon-o-sparkles')
@@ -47,47 +50,16 @@ class Dashboard extends BaseDashboard
                 ->action(function () {
                     $this->dispatch('open-ai-chat');
                 }),
-            Action::make('filterDashboard')
-                ->label('Filter Dashboard')
-                ->icon('heroicon-o-funnel')
-                ->color('gray')
-                ->url(route('filament.admin.resources.todos.index')),
-        ];
-    }
-
-    public function getHeaderWidgets(): array
-    {
-        return [
-            FleetStatsWidget::class,
-            InventoryOverviewWidget::class,
-        ];
-    }
-
-    public function getFooterWidgets(): array
-    {
-        return [
-            SmartUpdatesWidget::class,
         ];
     }
 
     public function getWidgets(): array
     {
         return [
+            FleetStatsWidget::class,
+            InventoryOverviewWidget::class,
             TodoOverviewWidget::class,
+            SmartUpdatesWidget::class,
         ];
-    }
-
-    public function getHeaderWidgetsColumns(): int|string|array
-    {
-        return [
-            'sm' => 1,
-            'md' => 2,
-            'xl' => 2,
-        ];
-    }
-
-    public function getFooterWidgetsColumns(): int|string|array
-    {
-        return 1;
     }
 }

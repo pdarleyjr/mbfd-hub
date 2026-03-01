@@ -52,7 +52,6 @@ class AdminPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
             ])
             ->font('Inter')
-            ->maxContentWidth(MaxWidth::ScreenTwoExtraLarge)
             ->plugin(FilamentShieldPlugin::make())
             ->plugin(ChatifyPlugin::make())
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
