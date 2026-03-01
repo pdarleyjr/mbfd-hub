@@ -14,11 +14,14 @@ class Dashboard extends BaseDashboard
 
     protected static ?string $title = 'Training Dashboard';
 
-    protected ?string $subheading = 'Current training work queue, external sources, and division tools.';
-
     protected static string $routePath = '/';
 
-    public function getMaxContentWidth(): MaxWidth|string|null
+    public function getSubheading(): ?string
+    {
+        return 'Current training work queue, external sources, and division tools.';
+    }
+
+    public function getMaxContentWidth(): MaxWidth
     {
         return MaxWidth::SevenExtraLarge;
     }
@@ -39,7 +42,7 @@ class Dashboard extends BaseDashboard
                 ->label('New Training Todo')
                 ->icon('heroicon-o-plus-circle')
                 ->color('primary')
-                ->url(route('filament.training.resources.training-todos.create')),
+                ->url(fn () => route('filament.training.resources.training-todos.create')),
             Action::make('openChatify')
                 ->label('Open Chatify')
                 ->icon('heroicon-o-chat-bubble-left-right')
@@ -50,30 +53,15 @@ class Dashboard extends BaseDashboard
                 ->label('External Sources')
                 ->icon('heroicon-o-globe-alt')
                 ->color('gray')
-                ->url(route('filament.training.resources.external-sources.index')),
-        ];
-    }
-
-    public function getHeaderWidgets(): array
-    {
-        return [
-            TrainingStatsWidget::class,
+                ->url(fn () => route('filament.training.resources.external-sources.index')),
         ];
     }
 
     public function getWidgets(): array
     {
         return [
+            TrainingStatsWidget::class,
             TrainingTodoWidget::class,
-        ];
-    }
-
-    public function getHeaderWidgetsColumns(): int|string|array
-    {
-        return [
-            'sm' => 1,
-            'md' => 2,
-            'xl' => 4,
         ];
     }
 }
