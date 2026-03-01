@@ -1,0 +1,62 @@
+﻿2026-02-26T17:33:06.6473215Z ##[group]Run ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'
+2026-02-26T17:33:06.6473881Z [36;1mssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'[0m
+2026-02-26T17:33:06.6474292Z [36;1m  set -e[0m
+2026-02-26T17:33:06.6474639Z [36;1m  cd /***/mbfd-hub[0m
+2026-02-26T17:33:06.6474901Z [36;1m  [0m
+2026-02-26T17:33:06.6475138Z [36;1m  # Create backup before deploy[0m
+2026-02-26T17:33:06.6475516Z [36;1m  BACKUP_FILE="backups/mbfd_hub_$(date +%Y%m%d_%H%M%S).sql"[0m
+2026-02-26T17:33:06.6475899Z [36;1m  mkdir -p backups[0m
+2026-02-26T17:33:06.6476315Z [36;1m  docker compose exec -T pgsql pg_dump -U mbfd_user mbfd_hub > "$BACKUP_FILE"[0m
+2026-02-26T17:33:06.6476805Z [36;1m  echo "✓ Backup created: $BACKUP_FILE"[0m
+2026-02-26T17:33:06.6477150Z [36;1m  [0m
+2026-02-26T17:33:06.6477482Z [36;1m  # Pull latest changes and reset to origin (deterministic deploy)[0m
+2026-02-26T17:33:06.6477894Z [36;1m  echo "=== Git Diagnostics ==="[0m
+2026-02-26T17:33:06.6478241Z [36;1m  git remote -v[0m
+2026-02-26T17:33:06.6478679Z [36;1m  git remote set-url origin https://github.com/pdarleyjr/mbfd-hub.git[0m
+2026-02-26T17:33:06.6479197Z [36;1m  echo "Remote URL set to: $(git remote get-url origin)"[0m
+2026-02-26T17:33:06.6479596Z [36;1m  git fetch origin --force --prune[0m
+2026-02-26T17:33:06.6479993Z [36;1m  echo "Fetched. origin/main is: $(git rev-parse origin/main)"[0m
+2026-02-26T17:33:06.6480443Z [36;1m  echo "Current HEAD before reset: $(git rev-parse HEAD)"[0m
+2026-02-26T17:33:06.6480821Z [36;1m  git reset --hard origin/main[0m
+2026-02-26T17:33:06.6481156Z [36;1m  echo "HEAD after reset: $(git rev-parse HEAD)"[0m
+2026-02-26T17:33:06.6481772Z [36;1m  git clean -fd[0m
+2026-02-26T17:33:06.6482054Z [36;1m  echo "=== End Git Diagnostics ==="[0m
+2026-02-26T17:33:06.6482474Z [36;1m  echo "✓ Repository reset to origin/main (pdarleyjr/mbfd-hub)"[0m
+2026-02-26T17:33:06.6482878Z [36;1m  [0m
+2026-02-26T17:33:06.6483118Z [36;1m  # Rebuild and restart containers[0m
+2026-02-26T17:33:06.6483435Z [36;1m  docker compose up -d --build[0m
+2026-02-26T17:33:06.6483761Z [36;1m  echo "✓ Containers rebuilt and restarted"[0m
+2026-02-26T17:33:06.6484075Z [36;1m  [0m
+2026-02-26T17:33:06.6484324Z [36;1m  # Wait for containers to be healthy[0m
+2026-02-26T17:33:06.6484626Z [36;1m  sleep 10[0m
+2026-02-26T17:33:06.6484861Z [36;1m  [0m
+2026-02-26T17:33:06.6485085Z [36;1m  # Run Laravel commands[0m
+2026-02-26T17:33:06.6485467Z [36;1m  docker compose exec -T laravel.test php artisan migrate --force[0m
+2026-02-26T17:33:06.6485943Z [36;1m  docker compose exec -T laravel.test php artisan optimize:clear[0m
+2026-02-26T17:33:06.6486413Z [36;1m  docker compose exec -T laravel.test php artisan config:cache[0m
+2026-02-26T17:33:06.6487094Z [36;1m  docker compose exec -T laravel.test php artisan route:cache[0m
+2026-02-26T17:33:06.6487555Z [36;1m  docker compose exec -T laravel.test php artisan view:cache[0m
+2026-02-26T17:33:06.6488074Z [36;1m  docker compose exec -T laravel.test php artisan filament:clear-cached-components[0m
+2026-02-26T17:33:06.6488571Z [36;1m  echo "✓ Laravel optimizations complete"[0m
+2026-02-26T17:33:06.6488877Z [36;1m  [0m
+2026-02-26T17:33:06.6489140Z [36;1m  # Build main Vite assets (CSS theme + JS)[0m
+2026-02-26T17:33:06.6489495Z [36;1m  docker compose exec -T laravel.test npm ci[0m
+2026-02-26T17:33:06.6489875Z [36;1m  docker compose exec -T laravel.test npm run build[0m
+2026-02-26T17:33:06.6490233Z [36;1m  echo "✓ Main Vite assets built"[0m
+2026-02-26T17:33:06.6490513Z [36;1m  [0m
+2026-02-26T17:33:06.6490749Z [36;1m  # Build daily-checkout frontend[0m
+2026-02-26T17:33:06.6491049Z [36;1m  cd resources/js/daily-checkout[0m
+2026-02-26T17:33:06.6491518Z [36;1m  npm ci[0m
+2026-02-26T17:33:06.6491761Z [36;1m  npm run build[0m
+2026-02-26T17:33:06.6492055Z [36;1m  cd /***/mbfd-hub[0m
+2026-02-26T17:33:06.6492353Z [36;1m  echo "✓ Daily-checkout frontend built"[0m
+2026-02-26T17:33:06.6492665Z [36;1mEOF[0m
+2026-02-26T17:33:06.6545349Z shell: /usr/bin/bash -e {0}
+2026-02-26T17:33:06.6545830Z env:
+2026-02-26T17:33:06.6546112Z   VPS_HOST: ***
+2026-02-26T17:33:06.6546383Z   VPS_USER: ***
+2026-02-26T17:33:06.6546602Z ##[endgroup]
+2026-02-26T17:33:08.6386615Z time="2026-02-26T17:33:08Z" level=warning msg="Found multiple config files with supported names: /***/mbfd-hub/compose.yaml, /***/mbfd-hub/docker-compose.yml"
+2026-02-26T17:33:08.6387791Z time="2026-02-26T17:33:08Z" level=warning msg="Using /***/mbfd-hub/compose.yaml"
+2026-02-26T17:33:08.6558907Z time="2026-02-26T17:33:08Z" level=warning msg="Found multiple config files with supported names: /***/mbfd-hub/compose.yaml, /***/mbfd-hub/docker-compose.yml"
+2026-02-26T17:33:08.6559778Z time="2026-02-26T17:33:08Z" level=warning msg="Using /***/mbfd-hub/compose.yaml"

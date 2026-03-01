@@ -1,0 +1,17 @@
+﻿2026-02-26T17:13:39.9615769Z ##[group]Run curl -X POST "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+2026-02-26T17:13:39.9616591Z [36;1mcurl -X POST "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \[0m
+2026-02-26T17:13:39.9617383Z [36;1m  -H "Authorization: ***" \[0m
+2026-02-26T17:13:39.9617708Z [36;1m  -H "Content-Type: application/json" \[0m
+2026-02-26T17:13:39.9619129Z [36;1m  --data '{"files":["https://mbfdhub.com/","https://mbfdhub.com/manifest.json","https://mbfdhub.com/site.webmanifest","https://support.darleyplex.com/daily/index.html","https://support.darleyplex.com/daily/","https://support.darleyplex.com/__version","https://www.mbfdhub.com/daily/index.html","https://www.mbfdhub.com/daily/","https://www.mbfdhub.com/__version"]}'[0m
+2026-02-26T17:13:39.9621136Z [36;1mecho "✓ Cloudflare cache purged"[0m
+2026-02-26T17:13:39.9670975Z shell: /usr/bin/bash -e {0}
+2026-02-26T17:13:39.9671235Z env:
+2026-02-26T17:13:39.9671577Z   CLOUDFLARE_API_TOKEN: ***
+2026-02-26T17:13:39.9671942Z   CLOUDFLARE_ZONE_ID: ***
+2026-02-26T17:13:39.9672187Z ##[endgroup]
+2026-02-26T17:13:39.9789301Z   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+2026-02-26T17:13:39.9790291Z                                  Dload  Upload   Total   Spent    Left  Speed
+2026-02-26T17:13:39.9790730Z 
+2026-02-26T17:13:40.1938862Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+2026-02-26T17:13:40.1939827Z 100   447  100    93  100   354    432   1646 --:--:-- --:--:-- --:--:--  2088
+2026-02-26T17:13:40.1966821Z {"success":true,"errors":[],"messages":[],"result":{"id":"***"}}✓ Cloudflare cache purged

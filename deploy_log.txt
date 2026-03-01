@@ -1,0 +1,423 @@
+deploy	UNKNOWN STEP	﻿2026-02-27T01:05:47.2725437Z Current runner version: '2.331.0'
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2761262Z ##[group]Runner Image Provisioner
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2762703Z Hosted Compute Agent
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2764045Z Version: 20260213.493
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2765472Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2767278Z Build Date: 2026-02-13T00:28:41Z
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2768675Z Worker ID: {475f10b2-d43c-46f9-bf31-3840527b848a}
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2770409Z Azure Region: eastus2
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2771708Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2774021Z ##[group]Operating System
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2775367Z Ubuntu
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2776418Z 24.04.3
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2777657Z LTS
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2778598Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2779702Z ##[group]Runner Image
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2780857Z Image: ubuntu-24.04
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2781922Z Version: 20260224.36.1
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2784229Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260224.36/images/ubuntu/Ubuntu2404-Readme.md
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2787423Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260224.36
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2789280Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2791590Z ##[group]GITHUB_TOKEN Permissions
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2794667Z Contents: read
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2795716Z Metadata: read
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2796996Z Packages: read
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2798119Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2801189Z Secret source: Actions
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.2802600Z Prepare workflow directory
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.3262267Z Prepare all required actions
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.3319661Z Getting action download info
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.6227367Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+deploy	UNKNOWN STEP	2026-02-27T01:05:47.7914792Z Download action repository 'cloudflare/wrangler-action@v3' (SHA:da0e0dfe58b7a431659754fdf3f186c529afbe65)
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.0780361Z Complete job name: deploy
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1522003Z ##[group]Run actions/checkout@v4
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1522950Z with:
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1523466Z   repository: pdarleyjr/mbfd-hub
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1524216Z   token: ***
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1524687Z   ssh-strict: true
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1525164Z   ssh-user: git
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1525659Z   persist-credentials: true
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1526192Z   clean: true
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1526875Z   sparse-checkout-cone-mode: true
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1527468Z   fetch-depth: 1
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1527944Z   fetch-tags: false
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1528431Z   show-progress: true
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1528912Z   lfs: false
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1529375Z   submodules: false
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1529867Z   set-safe-directory: true
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.1530640Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2635584Z Syncing repository: pdarleyjr/mbfd-hub
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2638689Z ##[group]Getting Git version info
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2639999Z Working directory is '/home/runner/work/mbfd-hub/mbfd-hub'
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2641946Z [command]/usr/bin/git version
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2710171Z git version 2.53.0
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2737647Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2752304Z Temporarily overriding HOME='/home/runner/work/_temp/4765d78c-96fc-4eae-8957-e29a6acaba41' before making global git config changes
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2766221Z Adding repository directory to the temporary git global config as a safe directory
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2768618Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/mbfd-hub/mbfd-hub
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2810925Z Deleting the contents of '/home/runner/work/mbfd-hub/mbfd-hub'
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2814699Z ##[group]Initializing the repository
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2818892Z [command]/usr/bin/git init /home/runner/work/mbfd-hub/mbfd-hub
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2957835Z hint: Using 'master' as the name for the initial branch. This default branch name
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2959789Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2961656Z hint: to use in all of your new repositories, which will suppress this warning,
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2963858Z hint: call:
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2964820Z hint:
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2965761Z hint: 	git config --global init.defaultBranch <name>
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2967173Z hint:
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2968389Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2970194Z hint: 'development'. The just-created branch can be renamed via this command:
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2971716Z hint:
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2972545Z hint: 	git branch -m <name>
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2973419Z hint:
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2974967Z hint: Disable this message with "git config set advice.defaultBranchName false"
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2977207Z Initialized empty Git repository in /home/runner/work/mbfd-hub/mbfd-hub/.git/
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.2980549Z [command]/usr/bin/git remote add origin https://github.com/pdarleyjr/mbfd-hub
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.3014547Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.3016142Z ##[group]Disabling automatic garbage collection
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.3018431Z [command]/usr/bin/git config --local gc.auto 0
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.3054548Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.3056070Z ##[group]Setting up auth
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.3070534Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.3106965Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.3522607Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.3560276Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.3795974Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.3828169Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.4073408Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.4109236Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.4110271Z ##[group]Fetching the repository
+deploy	UNKNOWN STEP	2026-02-27T01:05:48.4117816Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +37a1113c20245a1d6a252cdb5440567713832ad6:refs/remotes/origin/main
+deploy	UNKNOWN STEP	2026-02-27T01:05:54.3576861Z From https://github.com/pdarleyjr/mbfd-hub
+deploy	UNKNOWN STEP	2026-02-27T01:05:54.3578162Z  * [new ref]           37a1113c20245a1d6a252cdb5440567713832ad6 -> origin/main
+deploy	UNKNOWN STEP	2026-02-27T01:05:54.3615227Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:54.3617140Z ##[group]Determining the checkout info
+deploy	UNKNOWN STEP	2026-02-27T01:05:54.3619973Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:54.3624266Z [command]/usr/bin/git sparse-checkout disable
+deploy	UNKNOWN STEP	2026-02-27T01:05:54.3671565Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+deploy	UNKNOWN STEP	2026-02-27T01:05:54.3702192Z ##[group]Checking out the ref
+deploy	UNKNOWN STEP	2026-02-27T01:05:54.3708191Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.4091545Z Updating files:  30% (7690/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.4262124Z Updating files:  31% (7921/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.4427940Z Updating files:  32% (8177/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.4558732Z Updating files:  33% (8432/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.4700491Z Updating files:  34% (8688/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.4838291Z Updating files:  35% (8943/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.4973139Z Updating files:  36% (9199/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.5121442Z Updating files:  37% (9454/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.5249560Z Updating files:  38% (9710/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.5376120Z Updating files:  39% (9965/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.5511212Z Updating files:  40% (10221/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.5982239Z Updating files:  41% (10476/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.6104967Z Updating files:  42% (10732/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.6231941Z Updating files:  43% (10987/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.6470172Z Updating files:  44% (11243/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.6683629Z Updating files:  45% (11498/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.6861305Z Updating files:  46% (11754/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.6981247Z Updating files:  47% (12009/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.7112131Z Updating files:  48% (12265/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.7241973Z Updating files:  49% (12520/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.7392996Z Updating files:  50% (12776/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.7538838Z Updating files:  51% (13032/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.7673113Z Updating files:  52% (13287/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.7818962Z Updating files:  53% (13543/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.7955642Z Updating files:  54% (13798/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.8080709Z Updating files:  55% (14054/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.8194747Z Updating files:  56% (14309/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.8329846Z Updating files:  57% (14565/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.8469100Z Updating files:  58% (14820/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.8587999Z Updating files:  59% (15076/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.8740100Z Updating files:  60% (15331/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.8877210Z Updating files:  61% (15587/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.9001773Z Updating files:  62% (15842/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.9147495Z Updating files:  63% (16098/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.9276929Z Updating files:  64% (16353/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:55.9409237Z Updating files:  65% (16609/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.1717548Z Updating files:  66% (16864/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.1886956Z Updating files:  67% (17120/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.2083416Z Updating files:  68% (17375/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.2736800Z Updating files:  69% (17631/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.2908457Z Updating files:  70% (17886/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.3170124Z Updating files:  71% (18142/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.3298660Z Updating files:  72% (18397/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.3420646Z Updating files:  73% (18653/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.3642417Z Updating files:  74% (18908/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.3962232Z Updating files:  75% (19164/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.4007968Z Updating files:  75% (19394/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.4269247Z Updating files:  76% (19419/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.4421661Z Updating files:  77% (19675/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.4584664Z Updating files:  78% (19930/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.4734928Z Updating files:  79% (20186/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.4891585Z Updating files:  80% (20441/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.5042111Z Updating files:  81% (20697/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.5195905Z Updating files:  82% (20952/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.5342489Z Updating files:  83% (21208/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.5487489Z Updating files:  84% (21463/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.5644630Z Updating files:  85% (21719/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.5826378Z Updating files:  86% (21974/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.6451498Z Updating files:  87% (22230/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.6570310Z Updating files:  88% (22485/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.6744835Z Updating files:  89% (22741/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.6932814Z Updating files:  90% (22996/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.7104752Z Updating files:  91% (23252/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.7223750Z Updating files:  92% (23507/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.7362920Z Updating files:  93% (23763/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.7482718Z Updating files:  94% (24018/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.7730381Z Updating files:  95% (24274/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.7997564Z Updating files:  96% (24529/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.8119723Z Updating files:  97% (24785/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.8362376Z Updating files:  98% (25040/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.8704289Z Updating files:  99% (25296/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.8705358Z Updating files: 100% (25551/25551)
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.8706052Z Updating files: 100% (25551/25551), done.
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.8992941Z Switched to a new branch 'main'
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.8995761Z branch 'main' set up to track 'origin/main'.
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9089006Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9131693Z [command]/usr/bin/git log -1 --format=%H
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9155796Z 37a1113c20245a1d6a252cdb5440567713832ad6
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9350773Z ##[group]Run mkdir -p ~/.ssh
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9351161Z [36;1mmkdir -p ~/.ssh[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9351477Z [36;1mecho "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9351802Z [36;1mchmod 600 ~/.ssh/id_rsa[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9352149Z [36;1mssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9469769Z shell: /usr/bin/bash -e {0}
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9470061Z env:
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9472215Z   SSH_PRIVATE_KEY: ***
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9472490Z   VPS_HOST: ***
+deploy	UNKNOWN STEP	2026-02-27T01:05:56.9472706Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.0694205Z # ***:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.0887643Z # ***:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.1963623Z # ***:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.3029660Z # ***:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4065514Z # ***:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.12
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4326749Z ##[group]Run ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4327453Z [36;1mssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4327873Z [36;1m  set -e[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4328180Z [36;1m  cd /***/mbfd-hub[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4328424Z [36;1m  [0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4328648Z [36;1m  # Create backup before deploy[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4329021Z [36;1m  BACKUP_FILE="backups/mbfd_hub_$(date +%Y%m%d_%H%M%S).sql"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4329389Z [36;1m  mkdir -p backups[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4329806Z [36;1m  docker compose exec -T pgsql pg_dump -U mbfd_user mbfd_hub > "$BACKUP_FILE"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4330284Z [36;1m  echo "✓ Backup created: $BACKUP_FILE"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4330588Z [36;1m  [0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4330902Z [36;1m  # Pull latest changes and reset to origin (deterministic deploy)[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4331344Z [36;1m  echo "=== Git Diagnostics ==="[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4331663Z [36;1m  git remote -v[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4332047Z [36;1m  git remote set-url origin https://@github.com/pdarleyjr/mbfd-hub.git[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4332499Z [36;1m  echo "Remote URL updated with auth token"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4332834Z [36;1m  git fetch origin --force --prune[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4333225Z [36;1m  echo "Fetched. origin/main is: $(git rev-parse origin/main)"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4333674Z [36;1m  echo "Current HEAD before reset: $(git rev-parse HEAD)"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4334048Z [36;1m  git reset --hard origin/main[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4334382Z [36;1m  echo "HEAD after reset: $(git rev-parse HEAD)"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4334711Z [36;1m  git clean -fd[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4335018Z [36;1m  # Write deploy marker file (verifiable via HTTP)[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4335633Z [36;1m  echo "{\"deployed_sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4336240Z [36;1m  # Verify SHA matches what GitHub expects[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4336756Z [36;1m  VPS_SHA=$(git rev-parse HEAD)[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4337062Z [36;1m  echo "VPS SHA: $VPS_SHA"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4337359Z [36;1m  echo "=== End Git Diagnostics ==="[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4337777Z [36;1m  echo "✓ Repository reset to origin/main (pdarleyjr/mbfd-hub)"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4338156Z [36;1m  [0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4338391Z [36;1m  # Rebuild and restart containers[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4338701Z [36;1m  docker compose up -d --build[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4339031Z [36;1m  echo "✓ Containers rebuilt and restarted"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4339341Z [36;1m  [0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4339573Z [36;1m  # Wait for containers to be healthy[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4339872Z [36;1m  sleep 10[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4340088Z [36;1m  [0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4340312Z [36;1m  # Run Laravel commands[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4340701Z [36;1m  docker compose exec -T laravel.test php artisan migrate --force[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4341380Z [36;1m  docker compose exec -T laravel.test php artisan optimize:clear[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4341860Z [36;1m  docker compose exec -T laravel.test php artisan config:cache[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4342321Z [36;1m  docker compose exec -T laravel.test php artisan route:cache[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4342775Z [36;1m  docker compose exec -T laravel.test php artisan view:cache[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4343305Z [36;1m  docker compose exec -T laravel.test php artisan filament:clear-cached-components[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4343807Z [36;1m  echo "✓ Laravel optimizations complete"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4344107Z [36;1m  [0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4344359Z [36;1m  # Build main Vite assets (CSS theme + JS)[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4344716Z [36;1m  docker compose exec -T laravel.test npm ci[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4345102Z [36;1m  docker compose exec -T laravel.test npm run build[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4345462Z [36;1m  echo "✓ Main Vite assets built"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4345903Z [36;1m  [0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4346143Z [36;1m  # Build daily-checkout frontend[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4346449Z [36;1m  cd resources/js/daily-checkout[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4346873Z [36;1m  npm ci[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4347098Z [36;1m  npm run build[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4347387Z [36;1m  cd /***/mbfd-hub[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4347674Z [36;1m  echo "✓ Daily-checkout frontend built"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4347985Z [36;1mEOF[0m
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4399601Z shell: /usr/bin/bash -e {0}
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4399863Z env:
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4400122Z   VPS_HOST: ***
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4400346Z   VPS_USER: ***
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4400608Z   GITHUB_SHA: 37a1113c20245a1d6a252cdb5440567713832ad6
+deploy	UNKNOWN STEP	2026-02-27T01:05:57.4400954Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.1602839Z time="2026-02-27T01:05:59Z" level=warning msg="Found multiple config files with supported names: /***/mbfd-hub/compose.yaml, /***/mbfd-hub/docker-compose.yml"
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.1604815Z time="2026-02-27T01:05:59Z" level=warning msg="Using /***/mbfd-hub/compose.yaml"
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.2087816Z time="2026-02-27T01:05:59Z" level=warning msg="Found multiple config files with supported names: /***/mbfd-hub/compose.yaml, /***/mbfd-hub/docker-compose.yml"
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.2089108Z time="2026-02-27T01:05:59Z" level=warning msg="Using /***/mbfd-hub/compose.yaml"
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.6801999Z ##[group]Run cloudflare/wrangler-action@v3
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.6802317Z with:
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.6802674Z   apiToken: ***
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.6802913Z   workingDirectory: cloudflare-worker
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.6803197Z   command: deploy
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.6803407Z   quiet: false
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.6803616Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.7737380Z ##[group]🔍 Checking for existing Wrangler installation
+deploy	UNKNOWN STEP	2026-02-27T01:05:59.7778428Z [command]/usr/local/bin/npx --no-install wrangler --version
+deploy	UNKNOWN STEP	2026-02-27T01:06:03.6952630Z sh: 1: wrangler: Permission denied
+deploy	UNKNOWN STEP	2026-02-27T01:06:03.7058032Z ⚠️ Wrangler not found or version is incompatible. Installing...
+deploy	UNKNOWN STEP	2026-02-27T01:06:03.7059035Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:06:03.7059862Z ##[group]📥 Installing Wrangler
+deploy	UNKNOWN STEP	2026-02-27T01:06:03.7086083Z [command]/usr/local/bin/npm i wrangler@3.90.0
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.3719659Z 
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.3720957Z added 25 packages, removed 12 packages, changed 11 packages, and audited 72 packages in 9s
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.3722081Z 
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.3722335Z 11 packages are looking for funding
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.3722906Z   run `npm fund` for details
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.4387382Z 
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.4388423Z 4 vulnerabilities (3 moderate, 1 high)
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.4389303Z 
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.4389780Z To address all issues, run:
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.4390512Z   npm audit fix --force
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.4394150Z 
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.4394439Z Run `npm audit` for details.
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.4602497Z ✅ Wrangler installed
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.4603474Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.4608508Z ##[group]🚀 Running Wrangler Commands
+deploy	UNKNOWN STEP	2026-02-27T01:06:12.4630383Z [command]/usr/local/bin/npx wrangler deploy
+deploy	UNKNOWN STEP	2026-02-27T01:06:13.8167043Z 
+deploy	UNKNOWN STEP	2026-02-27T01:06:13.8167830Z  ⛅️ wrangler 3.90.0 (update available 4.69.0)
+deploy	UNKNOWN STEP	2026-02-27T01:06:13.8168217Z ---------------------------------------------
+deploy	UNKNOWN STEP	2026-02-27T01:06:13.8168440Z 
+deploy	UNKNOWN STEP	2026-02-27T01:06:13.8558732Z [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mThe version of Wrangler you are using is now out-of-date.[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:13.8559546Z 
+deploy	UNKNOWN STEP	2026-02-27T01:06:13.8559926Z   Please update to the latest version to prevent critical errors.
+deploy	UNKNOWN STEP	2026-02-27T01:06:13.8560877Z   Run `npm install --save-dev wrangler@4` to update to the latest version.
+deploy	UNKNOWN STEP	2026-02-27T01:06:13.8561772Z   After installation, run Wrangler with `npx wrangler`.
+deploy	UNKNOWN STEP	2026-02-27T01:06:13.8562247Z 
+deploy	UNKNOWN STEP	2026-02-27T01:06:13.8562254Z 
+deploy	UNKNOWN STEP	2026-02-27T01:06:21.3269204Z Total Upload: 9.30 KiB / gzip: 3.06 KiB
+deploy	UNKNOWN STEP	2026-02-27T01:06:26.7714505Z Your worker has access to the following bindings:
+deploy	UNKNOWN STEP	2026-02-27T01:06:26.7715230Z - AI:
+deploy	UNKNOWN STEP	2026-02-27T01:06:26.7715672Z   - Name: AI
+deploy	UNKNOWN STEP	2026-02-27T01:06:26.7715943Z - Vars:
+deploy	UNKNOWN STEP	2026-02-27T01:06:26.7716281Z   - SUPPORT_HUB_URL: "https://www.mbfdhub.com"
+deploy	UNKNOWN STEP	2026-02-27T01:06:26.7717105Z   - BASEROW_URL: "https://baserow.mbfdhub.com"
+deploy	UNKNOWN STEP	2026-02-27T01:06:26.7717546Z   - NOCOBASE_URL: "https://nocobase.mbfdhub.com"
+deploy	UNKNOWN STEP	2026-02-27T01:06:26.7724130Z Uploaded mbfd-support-ai (9.51 sec)
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9419547Z Deployed mbfd-support-ai triggers (0.86 sec)
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9420840Z   https://mbfd-support-ai.pdarleyjr.workers.dev
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9421535Z Current Version ID: 96b57a2a-e097-4a8f-8133-8cae77c7a60c
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9726131Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9727061Z 🏁 Wrangler Action completed
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9795919Z ##[group]Run curl -X POST "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9797105Z [36;1mcurl -X POST "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9797947Z [36;1m  -H "Authorization: ***" \[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9798278Z [36;1m  -H "Content-Type: application/json" \[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9799584Z [36;1m  --data '{"files":["https://mbfdhub.com/","https://mbfdhub.com/manifest.json","https://mbfdhub.com/site.webmanifest","https://mbfdhub.com/daily/index.html","https://mbfdhub.com/daily/","https://mbfdhub.com/__version","https://www.mbfdhub.com/daily/index.html","https://www.mbfdhub.com/daily/","https://www.mbfdhub.com/__version"]}'[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9800904Z [36;1mecho "✓ Cloudflare cache purged"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9849323Z shell: /usr/bin/bash -e {0}
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9849588Z env:
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9849927Z   CLOUDFLARE_API_TOKEN: ***
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9850286Z   CLOUDFLARE_ZONE_ID: ***
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9850532Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9969524Z   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9970351Z                                  Dload  Upload   Total   Spent    Left  Speed
+deploy	UNKNOWN STEP	2026-02-27T01:06:32.9970805Z 
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1081871Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1085611Z  77   414    0     0  100   321      0   2882 --:--:-- --:--:-- --:--:--  2866
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1086417Z 100   414  100    93  100   321    832   2872 --:--:-- --:--:-- --:--:--  3696
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1109041Z {"success":true,"errors":[],"messages":[],"result":{"id":"***"}}✓ Cloudflare cache purged
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1141635Z ##[group]Run echo "Running smoke tests..."
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1142019Z [36;1mecho "Running smoke tests..."[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1142310Z [36;1msleep 5[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1142524Z [36;1m[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1142842Z [36;1m# Test version endpoint[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1143276Z [36;1mif curl -sf https://mbfdhub.com/__version | jq .; then[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1143678Z [36;1m  echo "✓ Version endpoint check passed"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1143986Z [36;1melse[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1144223Z [36;1m  echo "⚠ Version endpoint check failed"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1144516Z [36;1mfi[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1144710Z [36;1m[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1145111Z [36;1m# Test daily checkout page[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1145471Z [36;1mif curl -sf https://mbfdhub.com/daily/ -o /dev/null; then[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1145852Z [36;1m  echo "✓ Daily checkout accessible"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1146313Z [36;1melse[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1146806Z [36;1m  echo "⚠ Daily checkout check failed"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1147099Z [36;1mfi[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1195841Z shell: /usr/bin/bash -e {0}
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1196103Z env:
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1196392Z   VPS_HOST: ***
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1197132Z   VPS_USER: ***
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1197352Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:06:33.1262723Z Running smoke tests...
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.3668120Z {
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.3668558Z   "git_sha": "aab1c7b61b0dcfd02e2bead338a00a9eb240a5dc",
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.3669102Z   "branch": "main",
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.3669502Z   "build_time": "2026-02-27T01:06:38+00:00"
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.3669964Z }
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.3675507Z ✓ Version endpoint check passed
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4592926Z ✓ Daily checkout accessible
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4623462Z ##[group]Run echo "Verifying /sw.js..."
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4623875Z [36;1mecho "Verifying /sw.js..."[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4624315Z [36;1mHTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://mbfdhub.com/sw.js)[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4624764Z [36;1mif [ "$HTTP_CODE" != "200" ]; then[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4625142Z [36;1m  echo "ERROR: /sw.js returned $HTTP_CODE, expected 200"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4625494Z [36;1m  exit 1[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4625709Z [36;1mfi[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4625924Z [36;1mecho "✓ /sw.js returned 200"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4626194Z [36;1m[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4626418Z [36;1m# Verify content type is JavaScript[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4627293Z [36;1mCONTENT_TYPE=$(curl -s -I https://mbfdhub.com/sw.js | grep -i content-type | cut -d' ' -f2 | tr -d '\r')[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4627823Z [36;1mecho "Content-Type: $CONTENT_TYPE"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4628307Z [36;1mif [[ "$CONTENT_TYPE" != *"javascript"* && "$CONTENT_TYPE" != *"text/plain"* ]]; then[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4628848Z [36;1m  echo "WARNING: Unexpected Content-Type for service worker"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4629206Z [36;1mfi[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4629393Z [36;1m[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4629646Z [36;1mecho "Verifying /daily/service-worker.js..."[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4647168Z [36;1mHTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://mbfdhub.com/daily/service-worker.js)[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4647759Z [36;1mif [ "$HTTP_CODE" != "200" ]; then[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4648212Z [36;1m  echo "ERROR: /daily/service-worker.js returned $HTTP_CODE, expected 200"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4648637Z [36;1m  exit 1[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4648846Z [36;1mfi[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4649120Z [36;1mecho "✓ /daily/service-worker.js returned 200"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4649450Z [36;1m[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4649685Z [36;1mecho "Verifying /manifest.json..."[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4650169Z [36;1mHTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://mbfdhub.com/manifest.json)[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4650651Z [36;1mif [ "$HTTP_CODE" != "200" ]; then[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4651041Z [36;1m  echo "ERROR: /manifest.json returned $HTTP_CODE, expected 200"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4651415Z [36;1m  exit 1[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4651635Z [36;1mfi[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4651873Z [36;1mecho "✓ /manifest.json returned 200"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4652168Z [36;1m[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4652428Z [36;1mecho "✓ Deployment and Verification complete!"[0m
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4700994Z shell: /usr/bin/bash -e {0}
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4701265Z ##[endgroup]
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.4767302Z Verifying /sw.js...
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.5698492Z ✓ /sw.js returned 200
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.6275500Z Content-Type: application/javascript
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.7287975Z Verifying /daily/service-worker.js...
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.7288998Z ✓ /daily/service-worker.js returned 200
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.7289404Z Verifying /manifest.json...
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.8229308Z ✓ /manifest.json returned 200
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.8230023Z ✓ Deployment and Verification complete!
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.8328452Z Post job cleanup.
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.9288194Z [command]/usr/bin/git version
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.9324777Z git version 2.53.0
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.9368793Z Temporarily overriding HOME='/home/runner/work/_temp/cddf3866-0350-4f41-8a38-0531bf37aab6' before making global git config changes
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.9370384Z Adding repository directory to the temporary git global config as a safe directory
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.9375247Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/mbfd-hub/mbfd-hub
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.9418479Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.9451924Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.9731475Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.9756118Z http.https://github.com/.extraheader
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.9770667Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+deploy	UNKNOWN STEP	2026-02-27T01:06:38.9807012Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+deploy	UNKNOWN STEP	2026-02-27T01:06:39.0075218Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+deploy	UNKNOWN STEP	2026-02-27T01:06:39.0110960Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+deploy	UNKNOWN STEP	2026-02-27T01:06:39.0497467Z Evaluate and set environment url
+deploy	UNKNOWN STEP	2026-02-27T01:06:39.0500238Z Evaluated environment url: https://mbfdhub.com
+deploy	UNKNOWN STEP	2026-02-27T01:06:39.0501101Z Cleaning up orphan processes

@@ -1,0 +1,43 @@
+{
+  "cookies": [
+    {
+      "name": "XSRF-TOKEN",
+      "value": "eyJpdiI6Ii9NMXdTaTdOblE5Mk1hU2h0UU1HQnc9PSIsInZhbHVlIjoiZXgxeENmVkRFY09FeFd1Q29lN2xSWlkvZGExRjhLTVhKR3d6RlZyUm5ycms0RW81NXg1SEY0MHdMakk4Q3BMdWIyMUowUENQYURtYTMrVHJJSmdYMUNiZjBzRTQ5U1NnT1N4WG90Kyt2eWFoTGJQWjZPcEM0ZjJEc2JYemJUeG8iLCJtYWMiOiIyZmY0NmJjMmY0NTUzNzIxZjlkMjFlNjgxMjFmMGU0ZmM0ZjQ2NzZjNDRlMjc1MzFhMDczNjRkYzgxZGI5NmZlIiwidGFnIjoiIn0%3D",
+      "domain": ".mbfdhub.com",
+      "path": "/",
+      "expires": 1772149996.816964,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "mbfd_support_hub_session",
+      "value": "eyJpdiI6ImYwZVhUeXVnUytWVXlQUjROZGJtYkE9PSIsInZhbHVlIjoieUFLOXBhRlBZVVg1aHQ5emhNQU0vVWhGNkRJOHAxYUkzRXV2cW41Sk5HU1ovWG1wNzhQNHZxM3ZyUGdvWDdCQkxMUjFXTElGcTNFQW5kNWpkcmZabDVyS21uSWlDTnk0QzZCWVdrYzY5YlpFYk1kMWtuUmZGMmZsWVMrTHl1akwiLCJtYWMiOiJiOTc0OWZkYjhkMDdmMmFiMDIzNTMxOWMwMjlmNDVjNjgwMmNiOTQzYTFlMjk4Y2Y3ZDQ2N2I2MzQ0OWMxMDY5IiwidGFnIjoiIn0%3D",
+      "domain": ".mbfdhub.com",
+      "path": "/",
+      "expires": 1772149996.817095,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://mbfdhub.com",
+      "localStorage": [
+        {
+          "name": "theme",
+          "value": "system"
+        },
+        {
+          "name": "isOpen",
+          "value": "true"
+        },
+        {
+          "name": "collapsedGroups",
+          "value": "[]"
+        }
+      ]
+    }
+  ]
+}

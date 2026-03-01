@@ -1,0 +1,121 @@
+{
+  "total_count": 1,
+  "jobs": [
+    {
+      "id": 65026172367,
+      "run_id": 22452908423,
+      "workflow_name": "Deploy to VPS",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/pdarleyjr/mbfd-hub/actions/runs/22452908423",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOQ9qQYM8AAAAPI9ylzw",
+      "head_sha": "fd986e2ef0f100e7f4486e5a575d17eb511e6f84",
+      "url": "https://api.github.com/repos/pdarleyjr/mbfd-hub/actions/jobs/65026172367",
+      "html_url": "https://github.com/pdarleyjr/mbfd-hub/actions/runs/22452908423/job/65026172367",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-02-26T17:13:07Z",
+      "started_at": "2026-02-26T17:13:10Z",
+      "completed_at": "2026-02-26T17:13:49Z",
+      "name": "deploy",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-02-26T17:13:11Z",
+          "completed_at": "2026-02-26T17:13:12Z"
+        },
+        {
+          "name": "Checkout code",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-02-26T17:13:12Z",
+          "completed_at": "2026-02-26T17:13:22Z"
+        },
+        {
+          "name": "Setup SSH",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-02-26T17:13:22Z",
+          "completed_at": "2026-02-26T17:13:23Z"
+        },
+        {
+          "name": "Deploy to VPS",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-02-26T17:13:23Z",
+          "completed_at": "2026-02-26T17:13:25Z"
+        },
+        {
+          "name": "Deploy Cloudflare Worker",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-02-26T17:13:25Z",
+          "completed_at": "2026-02-26T17:13:39Z"
+        },
+        {
+          "name": "Purge Cloudflare Cache",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-02-26T17:13:39Z",
+          "completed_at": "2026-02-26T17:13:40Z"
+        },
+        {
+          "name": "Run Smoke Tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-02-26T17:13:40Z",
+          "completed_at": "2026-02-26T17:13:45Z"
+        },
+        {
+          "name": "Verify Service Workers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-02-26T17:13:45Z",
+          "completed_at": "2026-02-26T17:13:46Z"
+        },
+        {
+          "name": "Notify on Failure",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 9,
+          "started_at": "2026-02-26T17:13:46Z",
+          "completed_at": "2026-02-26T17:13:46Z"
+        },
+        {
+          "name": "Post Checkout code",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-02-26T17:13:46Z",
+          "completed_at": "2026-02-26T17:13:46Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-02-26T17:13:46Z",
+          "completed_at": "2026-02-26T17:13:47Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/pdarleyjr/mbfd-hub/check-runs/65026172367",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000004881,
+      "runner_name": "GitHub Actions 1000004881",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

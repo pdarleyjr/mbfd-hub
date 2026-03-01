@@ -1,0 +1,43 @@
+﻿2026-02-26T17:33:35.7228683Z ##[group]Run echo "Verifying /sw.js..."
+2026-02-26T17:33:35.7229106Z [36;1mecho "Verifying /sw.js..."[0m
+2026-02-26T17:33:35.7229629Z [36;1mHTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://support.darleyplex.com/sw.js)[0m
+2026-02-26T17:33:35.7230149Z [36;1mif [ "$HTTP_CODE" != "200" ]; then[0m
+2026-02-26T17:33:35.7230554Z [36;1m  echo "ERROR: /sw.js returned $HTTP_CODE, expected 200"[0m
+2026-02-26T17:33:35.7230913Z [36;1m  exit 1[0m
+2026-02-26T17:33:35.7231148Z [36;1mfi[0m
+2026-02-26T17:33:35.7231621Z [36;1mecho "✓ /sw.js returned 200"[0m
+2026-02-26T17:33:35.7231923Z [36;1m[0m
+2026-02-26T17:33:35.7232169Z [36;1m# Verify content type is JavaScript[0m
+2026-02-26T17:33:35.7232750Z [36;1mCONTENT_TYPE=$(curl -s -I https://support.darleyplex.com/sw.js | grep -i content-type | cut -d' ' -f2 | tr -d '\r')[0m
+2026-02-26T17:33:35.7233324Z [36;1mecho "Content-Type: $CONTENT_TYPE"[0m
+2026-02-26T17:33:35.7233779Z [36;1mif [[ "$CONTENT_TYPE" != *"javascript"* && "$CONTENT_TYPE" != *"text/plain"* ]]; then[0m
+2026-02-26T17:33:35.7234354Z [36;1m  echo "WARNING: Unexpected Content-Type for service worker"[0m
+2026-02-26T17:33:35.7234723Z [36;1mfi[0m
+2026-02-26T17:33:35.7234931Z [36;1m[0m
+2026-02-26T17:33:35.7235209Z [36;1mecho "Verifying /daily/service-worker.js..."[0m
+2026-02-26T17:33:35.7235792Z [36;1mHTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://support.darleyplex.com/daily/service-worker.js)[0m
+2026-02-26T17:33:35.7236300Z [36;1mif [ "$HTTP_CODE" != "200" ]; then[0m
+2026-02-26T17:33:35.7236723Z [36;1m  echo "ERROR: /daily/service-worker.js returned $HTTP_CODE, expected 200"[0m
+2026-02-26T17:33:35.7237119Z [36;1m  exit 1[0m
+2026-02-26T17:33:35.7237345Z [36;1mfi[0m
+2026-02-26T17:33:35.7237604Z [36;1mecho "✓ /daily/service-worker.js returned 200"[0m
+2026-02-26T17:33:35.7237941Z [36;1m[0m
+2026-02-26T17:33:35.7238163Z [36;1mecho "Verifying /manifest.json..."[0m
+2026-02-26T17:33:35.7238665Z [36;1mHTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://support.darleyplex.com/manifest.json)[0m
+2026-02-26T17:33:35.7239154Z [36;1mif [ "$HTTP_CODE" != "200" ]; then[0m
+2026-02-26T17:33:35.7239530Z [36;1m  echo "ERROR: /manifest.json returned $HTTP_CODE, expected 200"[0m
+2026-02-26T17:33:35.7239893Z [36;1m  exit 1[0m
+2026-02-26T17:33:35.7240229Z [36;1mfi[0m
+2026-02-26T17:33:35.7260153Z [36;1mecho "✓ /manifest.json returned 200"[0m
+2026-02-26T17:33:35.7260580Z [36;1m[0m
+2026-02-26T17:33:35.7260974Z [36;1mecho "✓ Deployment and Verification complete!"[0m
+2026-02-26T17:33:35.7314115Z shell: /usr/bin/bash -e {0}
+2026-02-26T17:33:35.7314408Z ##[endgroup]
+2026-02-26T17:33:35.7390262Z Verifying /sw.js...
+2026-02-26T17:33:36.0193435Z ✓ /sw.js returned 200
+2026-02-26T17:33:36.2563469Z Content-Type: application/javascript
+2026-02-26T17:33:36.2564116Z Verifying /daily/service-worker.js...
+2026-02-26T17:33:36.5221857Z ✓ /daily/service-worker.js returned 200
+2026-02-26T17:33:36.5222454Z Verifying /manifest.json...
+2026-02-26T17:33:36.7810812Z ✓ /manifest.json returned 200
+2026-02-26T17:33:36.7811778Z ✓ Deployment and Verification complete!

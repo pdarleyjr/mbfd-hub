@@ -1,0 +1,55 @@
+﻿2026-02-26T17:33:08.9925566Z ##[group]Run cloudflare/wrangler-action@v3
+2026-02-26T17:33:08.9925890Z with:
+2026-02-26T17:33:08.9926331Z   apiToken: ***
+2026-02-26T17:33:08.9926594Z   workingDirectory: cloudflare-worker
+2026-02-26T17:33:08.9926897Z   command: deploy
+2026-02-26T17:33:08.9927123Z   quiet: false
+2026-02-26T17:33:08.9927350Z ##[endgroup]
+2026-02-26T17:33:09.0879740Z ##[group]🔍 Checking for existing Wrangler installation
+2026-02-26T17:33:09.0918882Z [command]/usr/local/bin/npx --no-install wrangler --version
+2026-02-26T17:33:09.7610069Z sh: 1: wrangler: Permission denied
+2026-02-26T17:33:09.7715632Z ⚠️ Wrangler not found or version is incompatible. Installing...
+2026-02-26T17:33:09.7716442Z ##[endgroup]
+2026-02-26T17:33:09.7717156Z ##[group]📥 Installing Wrangler
+2026-02-26T17:33:09.7743497Z [command]/usr/local/bin/npm i wrangler@3.90.0
+2026-02-26T17:33:17.8986495Z 
+2026-02-26T17:33:17.8987640Z added 25 packages, removed 12 packages, changed 11 packages, and audited 72 packages in 8s
+2026-02-26T17:33:17.8988554Z 
+2026-02-26T17:33:17.8988951Z 11 packages are looking for funding
+2026-02-26T17:33:17.8990561Z   run `npm fund` for details
+2026-02-26T17:33:17.9688333Z 
+2026-02-26T17:33:17.9689164Z 4 vulnerabilities (3 moderate, 1 high)
+2026-02-26T17:33:17.9689569Z 
+2026-02-26T17:33:17.9689726Z To address all issues, run:
+2026-02-26T17:33:17.9690168Z   npm audit fix --force
+2026-02-26T17:33:17.9690337Z 
+2026-02-26T17:33:17.9690439Z Run `npm audit` for details.
+2026-02-26T17:33:17.9914361Z ✅ Wrangler installed
+2026-02-26T17:33:17.9915100Z ##[endgroup]
+2026-02-26T17:33:17.9920590Z ##[group]🚀 Running Wrangler Commands
+2026-02-26T17:33:17.9940116Z [command]/usr/local/bin/npx wrangler deploy
+2026-02-26T17:33:19.1140204Z 
+2026-02-26T17:33:19.1141375Z  ⛅️ wrangler 3.90.0 (update available 4.69.0)
+2026-02-26T17:33:19.1142034Z ---------------------------------------------
+2026-02-26T17:33:19.1142370Z 
+2026-02-26T17:33:19.1542302Z [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mThe version of Wrangler you are using is now out-of-date.[0m
+2026-02-26T17:33:19.1543376Z 
+2026-02-26T17:33:19.1543583Z   Please update to the latest version to prevent critical errors.
+2026-02-26T17:33:19.1544223Z   Run `npm install --save-dev wrangler@4` to update to the latest version.
+2026-02-26T17:33:19.1544792Z   After installation, run Wrangler with `npx wrangler`.
+2026-02-26T17:33:19.1545041Z 
+2026-02-26T17:33:19.1545047Z 
+2026-02-26T17:33:20.6824233Z Total Upload: 9.30 KiB / gzip: 3.06 KiB
+2026-02-26T17:33:29.0390593Z Your worker has access to the following bindings:
+2026-02-26T17:33:29.0391412Z - AI:
+2026-02-26T17:33:29.0391734Z   - Name: AI
+2026-02-26T17:33:29.0392057Z - Vars:
+2026-02-26T17:33:29.0392443Z   - SUPPORT_HUB_URL: "https://www.mbfdhub.com"
+2026-02-26T17:33:29.0393001Z   - BASEROW_URL: "https://baserow.mbfdhub.com"
+2026-02-26T17:33:29.0393533Z   - NOCOBASE_URL: "https://nocobase.mbfdhub.com"
+2026-02-26T17:33:29.0400603Z Uploaded mbfd-support-ai (8.73 sec)
+2026-02-26T17:33:29.8510808Z Deployed mbfd-support-ai triggers (0.40 sec)
+2026-02-26T17:33:29.8511748Z   https://mbfd-support-ai.pdarleyjr.workers.dev
+2026-02-26T17:33:29.8513429Z Current Version ID: 4737cffd-b07f-4097-b3b7-d4fa17d16e2f
+2026-02-26T17:33:29.8911567Z ##[endgroup]
+2026-02-26T17:33:29.8912321Z 🏁 Wrangler Action completed
