@@ -21,7 +21,7 @@ class TodoResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
 
-    protected static ?string $navigationGroup = 'Project Management';
+    protected static ?string $navigationGroup = 'Active Operations';
 
     protected static ?string $navigationLabel = 'Todo List';
 

@@ -7,11 +7,13 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\MenuItem;
+use Filament\Navigation\NavigationGroup;
 use Filament\Navigation\NavigationItem;
 use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\MaxWidth;
 use Filament\Widgets;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -21,11 +23,6 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Illuminate\Support\Facades\Blade;
-use App\Filament\Widgets\FleetStatsWidget;
-use App\Filament\Widgets\InventoryOverviewWidget;
-use App\Filament\Widgets\TodoOverviewWidget;
-use App\Filament\Widgets\SmartUpdatesWidget;
-use App\Filament\Widgets\PushNotificationWidget;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Settings;
 use App\Http\Middleware\RedirectTrainingUsers;
@@ -46,7 +43,6 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogoHeight('8rem')
             ->favicon(secure_asset('favicon.ico'))
             ->darkMode(false)
-            // REMOVED: viteTheme('resources/css/filament/admin/theme.css') - restoring default Filament styling
             ->colors([
                 'primary' => Color::Red,
                 'danger' => Color::Rose,
@@ -56,6 +52,7 @@ class AdminPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
             ])
             ->font('Inter')
+            ->maxContentWidth(MaxWidth::ScreenTwoExtraLarge)
             ->plugin(FilamentShieldPlugin::make())
             ->plugin(ChatifyPlugin::make())
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
@@ -63,12 +60,31 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Pages\Dashboard::class,
             ])
-            ->widgets([
-                // Consolidated dashboard: Fleet + Inventory stats, Todo overview, AI Smart Updates
-                FleetStatsWidget::class,              // Fleet metrics: total apparatus, out of service, open defects
-                InventoryOverviewWidget::class,       // Inventory metrics: low stock items, total items, stock health
-                TodoOverviewWidget::class,            // Active todo items table
-                SmartUpdatesWidget::class,            // AI assistant with instant bullet summary
+            ->widgets([])
+            ->navigationGroups([
+                NavigationGroup::make()
+                    ->label('Dashboard')
+                    ->icon('heroicon-o-rectangle-group')
+                    ->collapsed(false),
+                NavigationGroup::make()
+                    ->label('Active Operations')
+                    ->icon('heroicon-o-clipboard-document-list')
+                    ->collapsed(false),
+                NavigationGroup::make()
+                    ->label('Fleet Management')
+                    ->icon('heroicon-o-truck'),
+                NavigationGroup::make()
+                    ->label('Inventory & Logistics')
+                    ->icon('heroicon-o-cube'),
+                NavigationGroup::make()
+                    ->label('Administration')
+                    ->icon('heroicon-o-cog-6-tooth'),
+                NavigationGroup::make()
+                    ->label('Communication / AI')
+                    ->icon('heroicon-o-chat-bubble-left-right'),
+                NavigationGroup::make()
+                    ->label('External Tools')
+                    ->icon('heroicon-o-arrow-top-right-on-square'),
             ])
             ->userMenuItems([
                 MenuItem::make()
