@@ -43,7 +43,7 @@ class AdminPanelProvider extends PanelProvider
             ->login(Login::class)
             ->brandName('MBFD Support Hub')
             ->brandLogo(secure_asset('images/mbfd_no_bg_new.png'))
-            ->brandLogoHeight('12rem')
+            ->brandLogoHeight('8rem')
             ->favicon(secure_asset('favicon.ico'))
             ->darkMode(false)
             ->viteTheme('resources/css/filament/admin/theme.css')
@@ -107,14 +107,10 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => '<meta name="apple-mobile-web-app-capable" content="yes">
+                fn (): string => '<meta name="mobile-web-app-capable" content="yes">
+                    <meta name="apple-mobile-web-app-capable" content="yes">
                     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-                    <meta name="apple-mobile-web-app-title" content="MBFD Hub">
-                    <style>
-                        /* Dashboard sidebar logo - smaller */
-                        .fi-sidebar-header img { max-height: 3rem !important; }
-                        /* Login page logo - keep large at 12rem */
-                    </style>'
+                    <meta name="apple-mobile-web-app-title" content="MBFD Hub">'
             );
     }
 }

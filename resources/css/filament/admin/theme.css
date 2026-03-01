@@ -3,16 +3,58 @@
 /**
  * MBFD Hub Admin — Enterprise Light Theme
  * Light mode ONLY (dark mode disabled in AdminPanelProvider)
+ * 
+ * RULES:
+ * - Do NOT override Filament's primary/danger/success/warning/info color pipeline
+ * - Use Filament-native ->color(), ->extraAttributes() for widget colors
+ * - Scoped, minimal overrides only
  */
 
 /* ===== PAGE BACKGROUND ===== */
 .fi-body {
-    @apply bg-gray-50;
+    @apply bg-slate-50;
+}
+
+/* ===== LOGIN PAGE ===== */
+.fi-simple-layout {
+    @apply bg-gradient-to-br from-slate-50 via-white to-slate-100 min-h-screen;
+}
+
+/* Login card */
+.fi-simple-main-ctn {
+    @apply shadow-xl border border-slate-200/80;
+    border-radius: 1.25rem;
+}
+
+/* Login brand logo sizing */
+.fi-simple-layout .fi-logo img,
+.fi-simple-layout .fi-logo {
+    max-height: 8rem;
+}
+
+/* FIX: Login button visibility — ensure the primary button is styled */
+.fi-simple-layout .fi-btn-primary,
+.fi-simple-layout button[type="submit"].fi-btn {
+    @apply bg-red-600 text-white font-semibold shadow-sm;
+    @apply hover:bg-red-700;
+    @apply focus:ring-2 focus:ring-red-500/50 focus:ring-offset-2;
+    min-height: 44px;
+    border-radius: 0.75rem;
+}
+
+/* Login page heading */
+.fi-simple-layout .fi-simple-header-heading {
+    @apply text-xl font-bold text-slate-900;
 }
 
 /* ===== SIDEBAR ===== */
 .fi-sidebar {
-    @apply bg-white border-r border-gray-200;
+    @apply bg-white border-r border-slate-200;
+}
+
+/* Sidebar logo sizing */
+.fi-sidebar-header img {
+    max-height: 3rem;
 }
 
 .fi-sidebar-nav-group-label {
@@ -30,34 +72,44 @@
 }
 
 .fi-sidebar-item-button:hover {
-    @apply bg-gray-50;
+    @apply bg-slate-50;
 }
 
 /* ===== TOPBAR ===== */
-.fi-topbar {
-    @apply bg-white border-b border-gray-200;
+	fi-topbar {
+    @apply bg-white/95 backdrop-blur-sm border-b border-slate-200;
 }
 
-/* ===== STAT CARDS — COLORED TINTED BACKGROUNDS ===== */
-.fi-wi-stats-overview-stat {
-    @apply rounded-xl shadow-sm border border-gray-200;
-    transition: box-shadow 0.2s ease;
+/* ===== PAGE HEADER ===== */
+	fi-header-heading {
+    @apply text-2xl font-bold text-slate-900 tracking-tight;
 }
 
-.fi-wi-stats-overview-stat:hover {
+	fi-header-subheading {
+    @apply text-sm text-slate-500;
+}
+
+/* ===== STAT CARDS ===== */
+	fi-wi-stats-overview-stat {
+    @apply rounded-xl shadow-sm border border-slate-200;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+	fi-wi-stats-overview-stat:hover {
     @apply shadow-md;
+    transform: translateY(-1px);
 }
 
 /* ===== WIDGETS & SECTIONS ===== */
-.fi-wi {
+	fi-wi {
     @apply shadow-sm rounded-xl;
 }
 
-.fi-section {
-    @apply shadow-sm rounded-xl border border-gray-200;
+	fi-section {
+    @apply shadow-sm rounded-xl border border-slate-200;
 }
 
-/* 2-Column Grid for Desktop */
+/* Dashboard 2-column grid on desktop */
 @media (min-width: 1280px) {
     .filament-widgets-container {
         display: grid !important;
@@ -67,55 +119,91 @@
 }
 
 /* ===== TABLE ENHANCEMENTS ===== */
-.fi-ta-row:hover {
-    @apply bg-gray-50 transition-colors duration-150;
+	fi-ta-row:hover {
+    @apply bg-slate-50/80 transition-colors duration-150;
+}
+
+	fi-ta-header-cell {
+    @apply text-xs font-semibold uppercase tracking-wider text-slate-500;
+}
+
+/* ===== BUTTONS ===== */
+/* Ensure all primary buttons are visible */
+	fi-btn-primary {
+    @apply shadow-sm;
+}
+
+/* ===== BADGES ===== */
+	fi-badge {
+    @apply font-medium;
 }
 
 /* ===== SCROLLABLE WIDGETS ===== */
-.dashboard-widget-scrollable {
+	dashboard-widget-scrollable {
     max-height: 400px;
     overflow-y: auto;
 }
 
-.dashboard-widget-compact {
+	dashboard-widget-compact {
     max-height: 350px;
     overflow-y: auto;
 }
 
-.dashboard-widget-scrollable::-webkit-scrollbar,
-.dashboard-widget-compact::-webkit-scrollbar {
+	dashboard-widget-scrollable::-webkit-scrollbar,
+	dashboard-widget-compact::-webkit-scrollbar {
     width: 6px;
 }
 
-.dashboard-widget-scrollable::-webkit-scrollbar-track,
-.dashboard-widget-compact::-webkit-scrollbar-track {
-    @apply bg-gray-100 rounded;
+	dashboard-widget-scrollable::-webkit-scrollbar-track,
+	dashboard-widget-compact::-webkit-scrollbar-track {
+    @apply bg-slate-100 rounded;
 }
 
-.dashboard-widget-scrollable::-webkit-scrollbar-thumb,
-.dashboard-widget-compact::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 rounded;
+	dashboard-widget-scrollable::-webkit-scrollbar-thumb,
+	dashboard-widget-compact::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded;
 }
 
 /* ===== ALERT UTILITIES ===== */
-.alert-critical { @apply bg-red-50 text-red-700 border-red-200; }
-.alert-warning { @apply bg-yellow-50 text-yellow-700 border-yellow-200; }
-.alert-success { @apply bg-green-50 text-green-700 border-green-200; }
-.alert-info { @apply bg-blue-50 text-blue-700 border-blue-200; }
+	alert-critical { @apply bg-red-50 text-red-700 border-red-200; }
+	alert-warning { @apply bg-yellow-50 text-yellow-700 border-yellow-200; }
+	alert-success { @apply bg-green-50 text-green-700 border-green-200; }
+	alert-info { @apply bg-blue-50 text-blue-700 border-blue-200; }
 
 /* ===== STOCK INDICATORS ===== */
-.stock-critical { @apply text-red-600 font-semibold; }
-.stock-low { @apply text-yellow-600 font-medium; }
-.stock-good { @apply text-green-600; }
+	stock-critical { @apply text-red-600 font-semibold; }
+	stock-low { @apply text-yellow-600 font-medium; }
+	stock-good { @apply text-green-600; }
 
-/* ===== FORM FOCUS ===== */
-input:focus,
-textarea:focus,
-select:focus {
-    @apply ring-2 ring-red-500/30 border-red-500 transition-all duration-200;
+/* ===== FORM FOCUS ENHANCEMENT ===== */
+	fi-input:focus-within {
+    @apply ring-2 ring-red-500/20 border-red-400;
 }
 
-/* ===== MBFD ACCENT UTILITIES ===== */
-.mbfd-red { @apply text-red-600; }
-.mbfd-red-bg { @apply bg-red-600; }
-.mbfd-red-border { @apply border-red-600; }
+/* ===== CARD HOVER UTILITY ===== */
+	fi-ta-ctn {
+    @apply rounded-xl overflow-hidden;
+}
+
+/* ===== EMPTY STATE ===== */
+	fi-ta-empty-state {
+    @apply py-12;
+}
+
+	fi-ta-empty-state-icon {
+    @apply text-slate-300;
+}
+
+/* ===== MODAL ===== */
+	fi-modal-window {
+    @apply rounded-2xl shadow-2xl;
+}
+
+/* ===== REDUCED MOTION ===== */
+@media (prefers-reduced-motion: reduce) {
+    .fi-wi-stats-overview-stat,
+    .fi-ta-row,
+    .fi-btn {
+        transition: none;
+    }
+}
