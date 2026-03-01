@@ -23,7 +23,7 @@ class CapitalProjectResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office';
     
-    protected static ?string $navigationGroup = 'Projects';
+    protected static ?string $navigationGroup = 'Active Operations';
     
     protected static ?int $navigationSort = 1;
 

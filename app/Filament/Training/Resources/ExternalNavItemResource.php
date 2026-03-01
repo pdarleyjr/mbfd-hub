@@ -19,7 +19,7 @@ class ExternalNavItemResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-squares-plus';
 
-    protected static ?string $navigationGroup = 'Training Data';
+    protected static ?string $navigationGroup = 'External Tools';
 
     protected static ?string $navigationLabel = 'Dynamic Nav Items';
 
