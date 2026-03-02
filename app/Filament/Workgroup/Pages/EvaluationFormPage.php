@@ -286,20 +286,9 @@ class EvaluationFormPage extends Page
         // Rating Scale Legend
         $schema[] = \Filament\Forms\Components\Section::make('Rating Scale')
             ->schema([
-                \Filament\Forms\Components\Group::make([
-                    \Filament\Forms\Components\Badge::make('5 - Outstanding')
-                        ->color('success'),
-                    \Filament\Forms\Components\Badge::make('4 - Strong')
-                        ->color('info'),
-                    \Filament\Forms\Components\Badge::make('3 - Acceptable')
-                        ->color('warning'),
-                    \Filament\Forms\Components\Badge::make('2 - Below Expectations')
-                        ->color('danger'),
-                    \Filament\Forms\Components\Badge::make('1 - Unacceptable')
-                        ->color('danger'),
-                    \Filament\Forms\Components\Badge::make('N/A - Not Applicable')
-                        ->color('gray'),
-                ])->columns(3)->columnSpanFull(),
+                \Filament\Forms\Components\Placeholder::make('rating_legend')
+                    ->label('')
+                    ->content('5 = Outstanding | 4 = Strong | 3 = Acceptable | 2 = Below Expectations | 1 = Unacceptable | N/A = Not Applicable'),
             ]);
 
         // SAVER Category Sections
