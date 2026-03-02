@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Workgroup;
 
 use App\Filament\Resources\Workgroup\Pages;
 use App\Models\EvaluationCategory;
+use App\Support\Workgroups\UniversalEvaluationRubric;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -49,6 +50,31 @@ class EvaluationCategoryResource extends Resource
                             ->default(0),
                     ])
                     ->columns(2),
+
+                Forms\Components\Section::make('Rubric Configuration')
+                    ->description('Configure how products in this category are evaluated')
+                    ->schema([
+                        Forms\Components\Select::make('assessment_profile')
+                            ->label('Assessment Profile')
+                            ->helperText('Determines which criteria are shown during evaluation')
+                            ->options(UniversalEvaluationRubric::getAssessmentProfiles())
+                            ->default('generic_apparatus'),
+                        Forms\Components\Textarea::make('instructions_markdown')
+                            ->label('Evaluator Instructions')
+                            ->helperText('Custom instructions for evaluators (supports markdown)')
+                            ->rows(4)
+                            ->columnSpanFull(),
+                        Forms\Components\TextInput::make('finalists_limit')
+                            ->numeric()
+                            ->label('Finalists Limit')
+                            ->helperText('Number of finalists to display (default: 2)')
+                            ->default(2),
+                        Forms\Components\Textarea::make('score_visibility_notes')
+                            ->label('Score Visibility Notes')
+                            ->helperText('Notes about how scores should be interpreted')
+                            ->rows(2),
+                    ])
+                    ->columns(2),
             ]);
     }
 
@@ -72,16 +98,22 @@ class EvaluationCategoryResource extends Resource
                             ->label('Display Order'),
                     ])
                     ->columns(3),
+                Infolists\Components\Section::make('Rubric Configuration')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('assessment_profile')
+                            ->label('Assessment Profile')
+                            ->state(fn ($record) => $record->assessment_profile_label ?? 'Generic'),
+                        Infolists\Components\TextEntry::make('finalists_limit')
+                            ->label('Finalists Limit'),
+                    ])
+                    ->columns(2),
                 Infolists\Components\Section::make('Statistics')
                     ->schema([
-                        Infolists\Components\TextEntry::make('templates_count')
-                            ->label('Templates')
-                            ->state(fn ($record) => $record->templates()->count()),
                         Infolists\Components\TextEntry::make('products_count')
                             ->label('Products')
                             ->state(fn ($record) => $record->candidateProducts()->count()),
                     ])
-                    ->columns(2),
+                    ->columns(1),
             ]);
     }
 
@@ -102,9 +134,10 @@ class EvaluationCategoryResource extends Resource
                 Tables\Columns\IconColumn::make('is_active')
                     ->boolean()
                     ->label('Active'),
-                Tables\Columns\TextColumn::make('templates_count')
-                    ->counts('templates')
-                    ->label('Templates'),
+                Tables\Columns\TextColumn::make('assessment_profile')
+                    ->label('Profile')
+                    ->formatStateUsing(fn ($state) => UniversalEvaluationRubric::getAssessmentProfiles()[$state] ?? $state ?? 'Generic')
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('products_count')
                     ->counts('candidateProducts')
                     ->label('Products'),
