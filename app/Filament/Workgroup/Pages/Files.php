@@ -20,7 +20,7 @@ class Files extends Page implements HasTable
 
     protected static ?string $navigationIcon = 'heroicon-o-document-duplicate';
 
-    protected static string $view = 'filament::pages.simple-page';
+    protected static string $view = 'filament-workgroup.pages.simple-page';
 
     protected static ?string $title = 'Files';
     
