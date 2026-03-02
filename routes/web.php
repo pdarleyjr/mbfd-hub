@@ -53,9 +53,13 @@ Route::get('/inventory-pdf/{submission}', [StationInventoryController::class, 'd
     ->name('download-inventory-pdf')
     ->middleware('auth');
 
-// Workgroup File Downloads
+// Workgroup File Downloads & Preview
 Route::get('/workgroup/file/{file}/download', [FileDownloadController::class, 'downloadFile'])
     ->name('workgroup.file.download')
+    ->middleware('auth');
+
+Route::get('/workgroup/file/{file}/preview', [FileDownloadController::class, 'previewFile'])
+    ->name('workgroup.file.preview')
     ->middleware('auth');
 
 Route::get('/workgroup/shared-upload/{upload}/download', [FileDownloadController::class, 'downloadSharedUpload'])

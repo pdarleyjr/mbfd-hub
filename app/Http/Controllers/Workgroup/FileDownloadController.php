@@ -17,27 +17,24 @@ class FileDownloadController extends Controller
      */
     public function downloadFile(WorkgroupFile $file)
     {
-        // Check if user has access to this file
+        $user = Auth::user();
+        
+        // Allow admins or workgroup members
+        $isAdmin = $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
         $member = $this->getCurrentMember();
         
-        if (!$member) {
+        if (!$isAdmin && (!$member || $member->workgroup_id !== $file->workgroup_id)) {
             abort(403, 'You do not have access to this file.');
         }
 
-        // Check if member belongs to the workgroup
-        if ($member->workgroup_id !== $file->workgroup_id) {
-            abort(403, 'You do not have access to this file.');
+        // Try multiple storage disks
+        foreach (['local', 'public'] as $disk) {
+            if (Storage::disk($disk)->exists($file->filepath)) {
+                return Storage::disk($disk)->download($file->filepath, $file->filename);
+            }
         }
 
-        // Check if file exists
-        if (!Storage::disk('public')->exists($file->filepath)) {
-            abort(404, 'File not found.');
-        }
-
-        return Storage::disk('public')->download(
-            $file->filepath,
-            $file->filename
-        );
+        abort(404, 'File not found.');
     }
 
     /**
@@ -66,6 +63,32 @@ class FileDownloadController extends Controller
             $upload->filepath,
             $upload->filename
         );
+    }
+
+    /**
+     * Preview a workgroup file inline (for PDFs).
+     */
+    public function previewFile(WorkgroupFile $file)
+    {
+        $user = Auth::user();
+        $isAdmin = $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+        $member = $this->getCurrentMember();
+        
+        if (!$isAdmin && (!$member || $member->workgroup_id !== $file->workgroup_id)) {
+            abort(403, 'You do not have access to this file.');
+        }
+
+        foreach (['local', 'public'] as $disk) {
+            if (Storage::disk($disk)->exists($file->filepath)) {
+                $mimeType = Storage::disk($disk)->mimeType($file->filepath);
+                return Storage::disk($disk)->response($file->filepath, $file->filename, [
+                    'Content-Type' => $mimeType,
+                    'Content-Disposition' => 'inline; filename="' . $file->filename . '"',
+                ]);
+            }
+        }
+
+        abort(404, 'File not found.');
     }
 
     /**
