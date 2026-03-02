@@ -21,7 +21,7 @@ class EvaluationFormPage extends Page
 {
     use InteractsWithForms;
 
-    protected static string $view = 'filament-workgroup.pages.simple-page';
+    protected static string $view = 'filament-workgroup.pages.evaluation-form';
 
     protected static ?string $title = 'Evaluate Product';
     
@@ -97,8 +97,6 @@ class EvaluationFormPage extends Page
         }
         
         $this->evaluationService = new EvaluationService();
-        $this->member = $this->getCurrentMember();
-        
         $this->member = $this->getCurrentMember();
         
         if (!$this->member) {
@@ -247,8 +245,7 @@ class EvaluationFormPage extends Page
     public function form(Form $form): Form
     {
         return $form
-            ->schema($this->getFormSchema())
-            ->statePath('*');
+            ->schema($this->getFormSchema());
     }
 
     protected function getFormSchema(): array
@@ -361,23 +358,6 @@ class EvaluationFormPage extends Page
                     ->rows(2)
                     ->disabled($this->isReadOnly),
             ]);
-
-        // Actions Section (only if not read-only)
-        if (!$this->isReadOnly) {
-            $schema[] = \Filament\Forms\Components\Section::make('Actions')
-                ->schema([
-                    \Filament\Forms\Components\Actions\Action::make('saveDraft')
-                        ->label('Save as Draft')
-                        ->action('saveDraft')
-                        ->color('gray'),
-                    \Filament\Forms\Components\Actions\Action::make('submit')
-                        ->label('Submit Evaluation')
-                        ->action('submitEvaluation')
-                        ->requiresConfirmation()
-                        ->disabled(!$this->canSubmit)
-                        ->color('success'),
-                ]);
-        }
 
         return $schema;
     }
