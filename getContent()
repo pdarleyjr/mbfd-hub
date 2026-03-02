@@ -1,0 +1,5 @@
+time="2026-03-02T11:44:42Z" level=warning msg="Found multiple config files with supported names: /root/mbfd-hub/compose.yaml, /root/mbfd-hub/docker-compose.yml"
+time="2026-03-02T11:44:42Z" level=warning msg="Using /root/mbfd-hub/compose.yaml"
+time="2026-03-02T11:44:42Z" level=warning msg="Found multiple config files with supported names: /root/mbfd-hub/compose.yaml, /root/mbfd-hub/docker-compose.yml"
+time="2026-03-02T11:44:42Z" level=warning msg="Using /root/mbfd-hub/compose.yaml"
+PHP Parse error:  syntax error, unexpected token "\", expecting end of file in Command line code on line 1

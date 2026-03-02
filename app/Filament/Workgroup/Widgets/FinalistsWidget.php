@@ -37,7 +37,7 @@ class FinalistsWidget extends BaseWidget
                     ])
                     ->icons([
                         1 => 'heroicon-o-trophy',
-                        2 => 'heroicon-o-medal',
+                        2 => 'heroicon-o-star',
                     ])
                     ->width('80px'),
 
