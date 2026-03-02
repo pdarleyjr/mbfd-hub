@@ -19,6 +19,15 @@ class Workgroup extends Model
         'created_by',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (Workgroup $workgroup) {
+            if (empty($workgroup->created_by) && auth()->check()) {
+                $workgroup->created_by = auth()->id();
+            }
+        });
+    }
+
     protected $casts = [
         'is_active' => 'boolean',
     ];

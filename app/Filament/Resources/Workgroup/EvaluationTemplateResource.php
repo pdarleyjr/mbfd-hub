@@ -61,7 +61,8 @@ class EvaluationTemplateResource extends Resource
                             ->label('Name'),
                         Infolists\Components\TextEntry::make('category.name')
                             ->label('Category'),
-                        Infolists\Components\BooleanEntry::make('is_active')
+                        Infolists\Components\IconEntry::make('is_active')
+                            ->boolean()
                             ->label('Active'),
                     ])
                     ->columns(3),
@@ -90,7 +91,8 @@ class EvaluationTemplateResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->label('Category'),
-                Tables\Columns\BooleanColumn::make('is_active')
+                Tables\Columns\IconColumn::make('is_active')
+                    ->boolean()
                     ->label('Active'),
                 Tables\Columns\TextColumn::make('criteria_count')
                     ->counts('criteria')
