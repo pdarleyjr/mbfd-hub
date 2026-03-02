@@ -28,7 +28,6 @@ use App\Filament\Workgroup\Pages\Evaluations;
 use App\Filament\Workgroup\Pages\SharedUploads;
 use App\Filament\Workgroup\Pages\Profile;
 use App\Filament\Workgroup\Pages\EvaluationFormPage;
-use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
 
 class WorkgroupPanelProvider extends PanelProvider
 {
@@ -52,10 +51,7 @@ class WorkgroupPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
             ])
             ->font('Inter')
-            ->plugin(ChatifyPlugin::make())
             ->discoverResources(in: app_path('Filament/Workgroup/Resources'), for: 'App\\Filament\\Workgroup\\Resources')
-            ->discoverPages(in: app_path('Filament/Workgroup/Pages'), for: 'App\\Filament\\Workgroup\\Pages')
-            ->discoverWidgets(in: app_path('Filament/Workgroup/Widgets'), for: 'App\\Filament\\Workgroup\\Widgets')
             ->pages([
                 Dashboard::class,
                 Files::class,
@@ -67,7 +63,6 @@ class WorkgroupPanelProvider extends PanelProvider
             ])
             ->widgets([
                 \App\Filament\Workgroup\Widgets\WorkgroupStatsWidget::class,
-                \App\Filament\Workgroup\Widgets\WorkgroupAdminStatsWidget::class,
                 \App\Filament\Workgroup\Widgets\SessionProgressWidget::class,
             ])
             ->navigationGroups([
