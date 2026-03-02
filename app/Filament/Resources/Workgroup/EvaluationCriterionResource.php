@@ -22,6 +22,9 @@ class EvaluationCriterionResource extends Resource
 
     protected static ?int $navigationSort = 7;
 
+    /** @deprecated Criteria are no longer used - using Universal Evaluation Rubric */
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Form $form): Form
