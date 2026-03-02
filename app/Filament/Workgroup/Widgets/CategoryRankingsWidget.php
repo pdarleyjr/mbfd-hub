@@ -50,7 +50,7 @@ class CategoryRankingsWidget extends BaseWidget
                 TextColumn::make('weighted_score')
                     ->label('Score')
                     ->formatStateUsing(fn ($state) => number_format($state, 2))
-                    ->sortable('weighted_score', descending: true)
+                    ->sortable()
                     ->badge()
                     ->color(fn ($state) => $this->getScoreColor($state)),
 

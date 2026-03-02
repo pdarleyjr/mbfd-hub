@@ -17,6 +17,7 @@ class EnsureWorkgroupPanelAccess
         }
 
         $hasAccess = $user->hasRole('super_admin')
+            || $user->hasRole('admin')
             || $user->hasRole('workgroup_admin')
             || $user->hasRole('workgroup_facilitator')
             || $user->hasRole('workgroup_member')
