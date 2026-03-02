@@ -85,6 +85,9 @@ class AdminPanelProvider extends PanelProvider
                     ->label('Inventory & Logistics')
                     ->icon('heroicon-o-cube'),
                 NavigationGroup::make()
+                    ->label('Workgroup Management')
+                    ->icon('heroicon-o-user-group'),
+                NavigationGroup::make()
                     ->label('Administration')
                     ->icon('heroicon-o-cog-6-tooth'),
                 NavigationGroup::make()

@@ -83,6 +83,15 @@ class User extends Authenticatable implements FilamentUser
                 || $this->can('training.access');
         }
 
+        // Workgroup panel: allow users with workgroup roles or permission
+        if ($panel->getId() === 'workgroups') {
+            return $this->hasRole('super_admin')
+                || $this->hasRole('workgroup_admin')
+                || $this->hasRole('workgroup_facilitator')
+                || $this->hasRole('workgroup_member')
+                || $this->can('workgroup.access');
+        }
+
         // Admin panel: allow any user with a valid role
         // Training-only users will be redirected by RedirectTrainingUsers middleware
         if ($panel->getId() === 'admin') {

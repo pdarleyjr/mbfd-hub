@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\StationInventoryController;
+use App\Http\Controllers\Workgroup\FileDownloadController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -50,5 +51,14 @@ Route::get('/__version', function() {
 // Station Inventory PDF Download
 Route::get('/inventory-pdf/{submission}', [StationInventoryController::class, 'downloadPdf'])
     ->name('download-inventory-pdf')
+    ->middleware('auth');
+
+// Workgroup File Downloads
+Route::get('/workgroup/file/{file}/download', [FileDownloadController::class, 'downloadFile'])
+    ->name('workgroup.file.download')
+    ->middleware('auth');
+
+Route::get('/workgroup/shared-upload/{upload}/download', [FileDownloadController::class, 'downloadSharedUpload'])
+    ->name('workgroup.shared-upload.download')
     ->middleware('auth');
 
