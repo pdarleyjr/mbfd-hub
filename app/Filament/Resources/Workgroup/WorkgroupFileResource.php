@@ -33,23 +33,22 @@ class WorkgroupFileResource extends Resource
                             ->label('File')
                             ->directory('workgroup-files')
                             ->visibility('private')
-                            ->required(),
-                        Forms\Components\TextInput::make('filename')
-                            ->label('Filename')
-                            ->disabled()
-                            ->dehydrated(false),
-                    ])
-                    ->columns(2),
+                            ->required()
+                            ->storeFileNamesIn('filename')
+                            ->acceptedFileTypes(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/*'])
+                            ->maxSize(51200),
+                    ]),
                 Forms\Components\Section::make('Association')
                     ->schema([
                         Forms\Components\Select::make('workgroup_id')
                             ->label('Workgroup')
                             ->options(fn () => Workgroup::orderBy('name')->pluck('name', 'id'))
                             ->searchable()
+                            ->required()
                             ->reactive()
                             ->afterStateUpdated(fn ($state, callable $set) => $set('workgroup_session_id', null)),
                         Forms\Components\Select::make('workgroup_session_id')
-                            ->label('Session')
+                            ->label('Session (Optional)')
                             ->options(function (callable $get) {
                                 $workgroupId = $get('workgroup_id');
                                 if (!$workgroupId) {
@@ -58,11 +57,8 @@ class WorkgroupFileResource extends Resource
                                 return WorkgroupSession::where('workgroup_id', $workgroupId)->pluck('name', 'id');
                             })
                             ->searchable(),
-                        Forms\Components\TextInput::make('file_type')
-                            ->label('File Type')
-                            ->maxLength(255),
                     ])
-                    ->columns(3),
+                    ->columns(2),
             ]);
     }
 
