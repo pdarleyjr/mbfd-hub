@@ -8,7 +8,6 @@ use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupMember;
 use Filament\Pages\Page;
 use Filament\Tables\Actions\Action;
-use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -21,21 +20,14 @@ class Evaluations extends Page implements HasTable
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
-
     protected static string $view = 'filament-workgroup.pages.simple-page';
-
     protected static ?string $title = 'Evaluations';
-
-    
     protected static ?string $navigationLabel = 'Evaluations';
 
-    public ?string $activeTab = 'pending';
-    
     public ?string $selectedSession = null;
 
     public function mount(): void
     {
-        // Set default session to active session
         $member = $this->getCurrentMember();
         if ($member && $member->workgroup) {
             $activeSession = $member->workgroup->sessions()->active()->first();
@@ -47,6 +39,8 @@ class Evaluations extends Page implements HasTable
 
     public function table(Table $table): Table
     {
+        $member = $this->getCurrentMember();
+
         return $table
             ->query($this->getEvaluationsQuery())
             ->columns([
@@ -64,92 +58,76 @@ class Evaluations extends Page implements HasTable
                     ->badge()
                     ->color('gray'),
 
-                BadgeColumn::make('status')
+                TextColumn::make('eval_status')
                     ->label('Status')
-                    ->colors([
-                        'warning' => 'draft',
-                        'success' => 'submitted',
-                        'gray' => 'pending',
-                    ]),
-
-                TextColumn::make('submitted_at')
-                    ->label('Submitted')
-                    ->dateTime('M j, Y g:i A')
-                    ->placeholder('-'),
+                    ->badge()
+                    ->getStateUsing(function ($record) use ($member) {
+                        if (!$member) return 'Not Started';
+                        $sub = EvaluationSubmission::where('workgroup_member_id', $member->id)
+                            ->where('candidate_product_id', $record->id)
+                            ->first();
+                        if (!$sub) return 'Not Started';
+                        return $sub->status === 'submitted' ? 'Completed' : 'In Progress';
+                    })
+                    ->color(fn (string $state) => match ($state) {
+                        'Completed' => 'success',
+                        'In Progress' => 'warning',
+                        default => 'gray',
+                    }),
             ])
             ->actions([
                 Action::make('evaluate')
-                    ->label('Evaluate')
-                    ->icon('heroicon-o-pencil-square')
-                    ->color('primary')
-                    ->url(fn ($record) => EvaluationFormPage::getUrl(['productId' => $record instanceof CandidateProduct ? $record->id : $record->candidateProduct->id]))
-                    ->visible(fn ($record) => $this->activeTab === 'pending'),
-                Action::make('edit_draft')
-                    ->label('Continue')
-                    ->icon('heroicon-o-pencil')
-                    ->color('warning')
-                    ->url(fn ($record) => EvaluationFormPage::getUrl(['productId' => $record instanceof CandidateProduct ? $record->id : $record->candidateProduct->id]))
-                    ->visible(fn ($record) => $this->activeTab === 'drafts'),
-                Action::make('view')
-                    ->label('View')
-                    ->icon('heroicon-o-eye')
-                    ->color('gray')
-                    ->url(fn ($record) => EvaluationFormPage::getUrl(['productId' => $record instanceof CandidateProduct ? $record->id : $record->candidateProduct->id]))
-                    ->visible(fn ($record) => $this->activeTab === 'completed'),
+                    ->label(function ($record) use ($member) {
+                        if (!$member) return 'Evaluate';
+                        $sub = EvaluationSubmission::where('workgroup_member_id', $member->id)
+                            ->where('candidate_product_id', $record->id)
+                            ->first();
+                        if (!$sub) return 'Evaluate';
+                        return $sub->status === 'submitted' ? 'View' : 'Continue';
+                    })
+                    ->icon(function ($record) use ($member) {
+                        if (!$member) return 'heroicon-o-pencil-square';
+                        $sub = EvaluationSubmission::where('workgroup_member_id', $member->id)
+                            ->where('candidate_product_id', $record->id)
+                            ->first();
+                        if ($sub && $sub->status === 'submitted') return 'heroicon-o-eye';
+                        return 'heroicon-o-pencil-square';
+                    })
+                    ->color(function ($record) use ($member) {
+                        if (!$member) return 'primary';
+                        $sub = EvaluationSubmission::where('workgroup_member_id', $member->id)
+                            ->where('candidate_product_id', $record->id)
+                            ->first();
+                        if ($sub && $sub->status === 'submitted') return 'gray';
+                        if ($sub) return 'warning';
+                        return 'primary';
+                    })
+                    ->url(fn ($record) => EvaluationFormPage::getUrl(['productId' => $record->id])),
             ])
-            ->emptyStateHeading('No evaluations found')
-            ->emptyStateDescription('No evaluations match the current filter.');
+            ->emptyStateHeading('No products to evaluate')
+            ->emptyStateDescription('No candidate products have been added to this session yet.');
     }
 
     protected function getEvaluationsQuery(): Builder
     {
         $member = $this->getCurrentMember();
-        
         if (!$member) {
             return CandidateProduct::whereNull('id');
         }
 
         $sessionId = $this->selectedSession ? (int) $this->selectedSession : null;
 
-        if ($this->activeTab === 'pending') {
-            // Get products without submissions
-            $evaluatedProductIds = EvaluationSubmission::where('workgroup_member_id', $member->id)
-                ->pluck('candidate_product_id')
-                ->toArray();
-                
-            return CandidateProduct::where('workgroup_session_id', $sessionId)
-                ->whereNotIn('id', $evaluatedProductIds)
-                ->with('category');
-        } elseif ($this->activeTab === 'drafts') {
-            return EvaluationSubmission::where('workgroup_member_id', $member->id)
-                ->where('status', 'draft')
-                ->with(['candidateProduct.category']);
-        } elseif ($this->activeTab === 'completed') {
-            return EvaluationSubmission::where('workgroup_member_id', $member->id)
-                ->where('status', 'submitted')
-                ->with(['candidateProduct.category']);
-        }
-
-        return CandidateProduct::whereNull('id');
+        return CandidateProduct::where('workgroup_session_id', $sessionId)
+            ->with('category')
+            ->orderBy('category_id')
+            ->orderBy('name');
     }
 
     protected function getCurrentMember(): ?WorkgroupMember
     {
-        $user = Auth::user();
-        
-        return WorkgroupMember::where('user_id', $user->id)
+        return WorkgroupMember::where('user_id', Auth::id())
             ->where('is_active', true)
             ->with(['workgroup.sessions'])
             ->first();
-    }
-
-    public function updatedActiveTab(): void
-    {
-        $this->dispatch('$refresh');
-    }
-
-    public function updatedSelectedSession(): void
-    {
-        $this->dispatch('$refresh');
     }
 }
