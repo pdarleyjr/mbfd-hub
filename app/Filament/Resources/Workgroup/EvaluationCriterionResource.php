@@ -116,21 +116,21 @@ class EvaluationCriterionResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()->hasRole('logistics_admin');
+        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
     }
 
     public static function canCreate(): bool
     {
-        return auth()->user()->hasRole('logistics_admin');
+        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
     }
 
     public static function canEdit($record): bool
     {
-        return auth()->user()->hasRole('logistics_admin');
+        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
     }
 
     public static function canDelete($record): bool
     {
-        return auth()->user()->hasRole('logistics_admin');
+        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
     }
 }

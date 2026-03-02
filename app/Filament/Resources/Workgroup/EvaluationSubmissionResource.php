@@ -136,11 +136,11 @@ class EvaluationSubmissionResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()->hasRole('logistics_admin');
+        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
     }
 
     public static function canView($record): bool
     {
-        return auth()->user()->hasRole('logistics_admin');
+        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
     }
 }
