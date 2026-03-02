@@ -290,4 +290,4 @@ class EvaluationFormPage extends Page
 
         return $member !== null;
     }
-}"
+}
