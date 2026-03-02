@@ -21,7 +21,7 @@ class Notes extends Page implements HasTable
 
     protected static ?string $navigationIcon = 'heroicon-o-pencil-square';
 
-    protected static string $view = 'filament::pages.simple-page';
+    protected static string $view = 'filament-workgroup.pages.simple-page';
 
     protected static ?string $title = 'My Notes';
     
