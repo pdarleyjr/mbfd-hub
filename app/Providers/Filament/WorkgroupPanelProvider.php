@@ -28,8 +28,6 @@ use App\Filament\Workgroup\Pages\Evaluations;
 use App\Filament\Workgroup\Pages\SharedUploads;
 use App\Filament\Workgroup\Pages\Profile;
 use App\Filament\Workgroup\Pages\EvaluationFormPage;
-use App\Filament\Workgroup\Pages\AdminDashboard;
-use App\Filament\Workgroup\Pages\SessionResultsPage;
 use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
 
 class WorkgroupPanelProvider extends PanelProvider
@@ -66,8 +64,6 @@ class WorkgroupPanelProvider extends PanelProvider
                 SharedUploads::class,
                 EvaluationFormPage::class,
                 Profile::class,
-                AdminDashboard::class,
-                SessionResultsPage::class,
             ])
             ->widgets([
                 \App\Filament\Workgroup\Widgets\WorkgroupStatsWidget::class,
@@ -86,10 +82,6 @@ class WorkgroupPanelProvider extends PanelProvider
                 NavigationGroup::make()
                     ->label('Files')
                     ->icon('heroicon-o-document-duplicate')
-                    ->collapsible(false),
-                NavigationGroup::make()
-                    ->label('Admin')
-                    ->icon('heroicon-o-cog')
                     ->collapsible(false),
                 NavigationGroup::make()
                     ->label('Personal')
@@ -125,16 +117,6 @@ class WorkgroupPanelProvider extends PanelProvider
             ])
             ->sidebarCollapsibleOnDesktop()
             ->navigationItems([
-                NavigationItem::make('Admin Dashboard')
-                    ->url(fn (): string => AdminDashboard::getUrl())
-                    ->icon('heroicon-o-chart-bar')
-                    ->group('Admin')
-                    ->sort(1),
-                NavigationItem::make('Session Results')
-                    ->url(fn (): string => SessionResultsPage::getUrl())
-                    ->icon('heroicon-o-trophy')
-                    ->group('Admin')
-                    ->sort(2),
                 NavigationItem::make('Baserow')
                     ->url('https://baserow.mbfdhub.com', shouldOpenInNewTab: true)
                     ->icon('heroicon-o-arrow-top-right-on-square')
