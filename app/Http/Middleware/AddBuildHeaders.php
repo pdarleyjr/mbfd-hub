@@ -13,13 +13,13 @@ class AddBuildHeaders
     {
         $response = $next($request);
         
-        // BinaryFileResponse doesn't support header() method
-        if ($response instanceof BinaryFileResponse) {
-            return $response;
+        // Use headers->set() which works on all response types
+        try {
+            $sha = cache()->remember('build_sha', 60, fn() => trim(shell_exec('git rev-parse HEAD') ?? 'unknown'));
+            $response->headers->set('X-App-Commit', $sha);
+        } catch (\Throwable $e) {
+            // Silently ignore if headers can't be set
         }
-        
-        $sha = cache()->remember('build_sha', 60, fn() => trim(shell_exec('git rev-parse HEAD') ?? 'unknown'));
-        $response->header('X-App-Commit', $sha);
         return $response;
     }
 }
