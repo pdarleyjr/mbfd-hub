@@ -356,22 +356,6 @@
                             </div>
                         </a>
 
-                        <!-- Training Portal -->
-                        <a href="{{ url('/training/login') }}" class="group block p-4 bg-white rounded-lg border border-slate-200 hover:border-blue-400 hover:shadow-card-hover transition-all duration-200">
-                            <div class="flex items-start gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                                    </svg>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <h3 class="font-semibold text-slate-800 group-hover:text-blue-700">Training Portal</h3>
-                                    <p class="text-sm text-slate-500">Access training modules, track certifications, and view schedules</p>
-                                </div>
-                                <svg class="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                            </div>
-                        </a>
-
                         <!-- Eval Feedback Hub -->
                         <a href="{{ url('/workgroups/login') }}" class="group block p-4 bg-white rounded-lg border border-slate-200 hover:border-indigo-400 hover:shadow-card-hover transition-all duration-200">
                             <div class="flex items-start gap-3">
