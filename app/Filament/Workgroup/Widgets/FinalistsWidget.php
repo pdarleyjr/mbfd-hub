@@ -4,17 +4,18 @@ namespace App\Filament\Workgroup\Widgets;
 
 use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
-use App\Models\EvaluationScore;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupSession;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Widget showing top 2 products (finalists) per rankable category
  * with visual distinction for gold and silver placements.
+ * Now uses the universal rubric overall_score field.
  */
 class FinalistsWidget extends BaseWidget
 {
@@ -80,7 +81,7 @@ class FinalistsWidget extends BaseWidget
             return CandidateProduct::query()->whereRaw('1 = 0');
         }
 
-        // Get top 2 products per category
+        // Get top 2 products per category using the new rubric overall_score
         return CandidateProduct::query()
             ->whereHas('session', fn($query) => 
                 $query->where('id', $session->id)
@@ -94,8 +95,18 @@ class FinalistsWidget extends BaseWidget
             ])
             ->select('candidate_products.*')
             ->addSelect([
-                'weighted_score' => EvaluationScore::selectRaw('COALESCE(AVG(score * (SELECT weight FROM evaluation_criteria WHERE id = evaluation_scores.criterion_id)), 0)')
-                    ->join('evaluation_submissions', 'evaluation_scores.submission_id', '=', 'evaluation_submissions.id')
+                // Use new rubric overall_score if available, fallback to legacy
+                'weighted_score' => EvaluationSubmission::selectRaw('COALESCE(
+                    AVG(overall_score),
+                    COALESCE(AVG(
+                        (SELECT SUM(es.score * ec.weight) / NULLIF(SUM(ec.weight), 0)
+                        FROM evaluation_scores es
+                        JOIN evaluation_criteria ec ON es.criterion_id = ec.id
+                        WHERE es.submission_id = evaluation_submissions.id
+                        AND es.score IS NOT NULL)
+                    ), 0)
+                )')
+                    ->join('evaluation_submissions', 'evaluation_submissions.candidate_product_id', '=', 'candidate_products.id')
                     ->whereColumn('evaluation_submissions.candidate_product_id', 'candidate_products.id')
                     ->where('evaluation_submissions.status', 'submitted'),
                 'response_count' => EvaluationSubmission::selectRaw('COUNT(*)')
@@ -124,13 +135,21 @@ class FinalistsWidget extends BaseWidget
             ])
             ->get()
             ->map(function ($product, $index) {
-                $avgScore = EvaluationScore::whereHas('submission', fn($q) => 
-                    $q->where('candidate_product_id', $product->id)
-                        ->where('status', 'submitted')
-                )
-                ->join('evaluation_criteria', 'evaluation_scores.criterion_id', '=', 'evaluation_criteria.id')
-                ->selectRaw('COALESCE(AVG(evaluation_scores.score * evaluation_criteria.weight), 0) as weighted_avg')
-                ->value('weighted_avg');
+                // Try to get rubric score first, fallback to legacy
+                $avgScore = EvaluationSubmission::where('candidate_product_id', $product->id)
+                    ->where('status', 'submitted')
+                    ->avg('overall_score');
+                
+                if ($avgScore === null) {
+                    // Fallback to legacy calculation
+                    $avgScore = DB::table('evaluation_submissions as es')
+                        ->join('evaluation_scores as score', 'score.submission_id', '=', 'es.id')
+                        ->join('evaluation_criteria as ec', 'ec.id', '=', 'score.criterion_id')
+                        ->where('es.candidate_product_id', $product->id)
+                        ->where('es.status', 'submitted')
+                        ->whereNotNull('score.score')
+                        ->avg(DB::raw('score.score * ec.weight'));
+                }
 
                 return [
                     'product' => $product,

@@ -6,14 +6,15 @@ use App\Models\CandidateProduct;
 use App\Models\EvaluationComment;
 use App\Models\EvaluationScore;
 use App\Models\EvaluationSubmission;
-use App\Models\EvaluationTemplate;
 use App\Models\WorkgroupMember;
+use App\Support\Workgroups\UniversalEvaluationRubric;
 use App\Services\Workgroup\EvaluationService;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Support\Enums\Alignment;
 use Illuminate\Support\Facades\Auth;
 
 class EvaluationFormPage extends Page
@@ -30,11 +31,34 @@ class EvaluationFormPage extends Page
     
     public ?int $submissionId = null;
     
-    public ?string $comment = null;
+    // Form state
+    public array $ratings = [];
     
-    public array $scores = [];
+    public array $notes = [];
     
-    public array $criteriaData = [];
+    // Decision fields
+    public ?string $advance_recommendation = null;
+    
+    public ?string $confidence_level = null;
+    
+    public bool $has_deal_breaker = false;
+    
+    public ?string $deal_breaker_note = null;
+    
+    // Narrative fields
+    public ?string $strongest_advantages = null;
+    
+    public ?string $biggest_weaknesses = null;
+    
+    public ?string $best_use_case = null;
+    
+    public ?string $compatibility_notes = null;
+    
+    public ?string $training_notes = null;
+    
+    public ?string $safety_concerns = null;
+    
+    public ?string $additional_comments = null;
     
     public ?CandidateProduct $product = null;
     
@@ -44,9 +68,15 @@ class EvaluationFormPage extends Page
     
     public array $criteria = [];
     
+    public array $criteriaByBucket = [];
+    
     public bool $isReadOnly = false;
     
     public bool $canSubmit = false;
+    
+    public string $instructions = '';
+    
+    public string $assessmentProfile = UniversalEvaluationRubric::PROFILE_GENERIC;
 
     protected EvaluationService $evaluationService;
 
@@ -73,9 +103,20 @@ class EvaluationFormPage extends Page
 
     protected function loadProduct(): void
     {
-        $this->product = CandidateProduct::with(['category', 'session', 'category.templates' => function ($q) {
-            $q->active();
-        }])->findOrFail($this->productId);
+        $this->product = CandidateProduct::with(['category', 'session'])->findOrFail($this->productId);
+
+        // Get assessment profile from category
+        $this->assessmentProfile = $this->product->category->assessment_profile ?? UniversalEvaluationRubric::PROFILE_GENERIC;
+        
+        // Load criteria from rubric
+        $this->criteriaByBucket = UniversalEvaluationRubric::getCriteriaByBucket($this->assessmentProfile);
+        
+        // Flatten criteria for easier access
+        foreach ($this->criteriaByBucket as $bucket => $criteria) {
+            foreach ($criteria as $id => $criterion) {
+                $this->criteria[$id] = $criterion;
+            }
+        }
 
         // Get or create draft submission
         $this->submission = $this->evaluationService->getOrCreateDraft($this->member, $this->productId);
@@ -86,43 +127,105 @@ class EvaluationFormPage extends Page
             $this->isReadOnly = true;
         }
 
-        // Load criteria from template
-        $template = $this->product->category->templates->first();
-        
-        if ($template) {
-            $this->criteria = $template->criteria()->orderBy('display_order')->get()->toArray();
-            
-            // Initialize scores from existing submission
-            foreach ($this->criteria as $criterion) {
-                $existingScore = $this->submission->scores
-                    ->where('criterion_id', $criterion['id'])
-                    ->first();
-                
-                $this->scores[$criterion['id']] = $existingScore?->score ?? '';
-            }
+        // Load existing rubric data from JSON payload
+        $this->loadExistingData();
+
+        // Get evaluator instructions
+        $this->instructions = $this->product->category->evaluator_instructions ?? 
+                             UniversalEvaluationRubric::getEvaluatorInstructions();
+
+        // Check if can submit
+        $this->checkCanSubmit();
+    }
+
+    protected function loadExistingData(): void
+    {
+        if (!$this->submission) {
+            return;
         }
 
-        // Load existing comment
-        $existingComment = EvaluationComment::where('submission_id', $this->submission->id)->first();
-        $this->comment = $existingComment?->comment ?? '';
+        // Load criterion ratings and notes from JSON payload
+        if ($this->submission->criterion_payload) {
+            $this->ratings = $this->submission->criterion_payload['ratings'] ?? [];
+            $this->notes = $this->submission->criterion_payload['notes'] ?? [];
+        }
 
-        // Check if can submit (all criteria scored)
-        $this->checkCanSubmit();
+        // Load decision fields
+        $this->advance_recommendation = $this->submission->advance_recommendation;
+        $this->confidence_level = $this->submission->confidence_level;
+        $this->has_deal_breaker = $this->submission->has_deal_breaker ?? false;
+        $this->deal_breaker_note = $this->submission->deal_breaker_note;
+
+        // Load narrative fields from JSON payload
+        if ($this->submission->narrative_payload) {
+            $narrative = $this->submission->narrative_payload;
+            $this->strongest_advantages = $narrative['strongest_advantages'] ?? null;
+            $this->biggest_weaknesses = $narrative['biggest_weaknesses'] ?? null;
+            $this->best_use_case = $narrative['best_use_case'] ?? null;
+            $this->compatibility_notes = $narrative['compatibility_notes'] ?? null;
+            $this->training_notes = $narrative['training_notes'] ?? null;
+            $this->safety_concerns = $narrative['safety_concerns'] ?? null;
+            $this->additional_comments = $narrative['additional_comments'] ?? null;
+        }
     }
 
     protected function checkCanSubmit(): void
     {
-        $this->canSubmit = true;
-        
-        foreach ($this->criteria as $criterion) {
-            if (!isset($this->scores[$criterion['id']]) || $this->scores[$criterion['id']] === '') {
+        // Must have ratings for all criteria
+        foreach ($this->criteria as $id => $criterion) {
+            if (!isset($this->ratings[$id]) || $this->ratings[$id] === '') {
                 $this->canSubmit = false;
-                break;
+                return;
             }
         }
+
+        // Must have recommendation
+        if (empty($this->advance_recommendation)) {
+            $this->canSubmit = false;
+            return;
+        }
+
+        // Must have confidence level
+        if (empty($this->confidence_level)) {
+            $this->canSubmit = false;
+            return;
+        }
+
+        // If deal-breaker, must have note
+        if ($this->has_deal_breaker && empty($this->deal_breaker_note)) {
+            $this->canSubmit = false;
+            return;
+        }
+
+        $this->canSubmit = true;
     }
 
-    public function updatedScores(): void
+    public function updatedRatings(): void
+    {
+        $this->checkCanSubmit();
+    }
+
+    public function updatedNotes(): void
+    {
+        $this->checkCanSubmit();
+    }
+
+    public function updatedAdvanceRecommendation(): void
+    {
+        $this->checkCanSubmit();
+    }
+
+    public function updatedConfidenceLevel(): void
+    {
+        $this->checkCanSubmit();
+    }
+
+    public function updatedHasDealBreaker(): void
+    {
+        $this->checkCanSubmit();
+    }
+
+    public function updatedDealBreakerNote(): void
     {
         $this->checkCanSubmit();
     }
@@ -131,12 +234,18 @@ class EvaluationFormPage extends Page
     {
         return $form
             ->schema($this->getFormSchema())
-            ->statePath('scores');
+            ->statePath('*');
     }
 
     protected function getFormSchema(): array
     {
         $schema = [];
+
+        // Instructions Section
+        $schema[] = \Filament\Forms\Components\Section::make('Evaluator Briefing')
+            ->description($this->instructions)
+            ->collapsed(false)
+            ->columns(1);
 
         // Product Info Header
         $schema[] = \Filament\Forms\Components\Section::make('Product Information')
@@ -147,41 +256,99 @@ class EvaluationFormPage extends Page
                     ->label('Manufacturer'),
                 \Filament\Forms\Components\TextEntry::make('product.model')
                     ->label('Model'),
-                \Filament\Forms\Components\TextEntry::make('product.category.name')
-                    ->label('Category'),
+                \Filament\Forms\Components\TextEntry::make('assessment_profile')
+                    ->label('Evaluation Profile')
+                    ->default(UniversalEvaluationRubric::getAssessmentProfiles()[$this->assessmentProfile] ?? 'Generic'),
             ])
             ->columns(2);
 
-        // Criteria Section
-        if (!empty($this->criteria)) {
-            $criteriaFields = [];
-
-            foreach ($this->criteria as $criterion) {
-                $criteriaFields[] = \Filament\Forms\Components\Group::make([
-                    \Filament\Forms\Components\TextEntry::make('criterion_name_' . $criterion['id'])
-                        ->label($criterion['name'])
-                        ->default($criterion['description'] ?? '')
-                        ->columnSpanFull(),
-                    \Filament\Forms\Components\TextInput::make('scores.' . $criterion['id'])
-                        ->label('Score (0-' . $criterion['max_score'] . ')')
-                        ->numeric()
-                        ->minValue(0)
-                        ->maxValue($criterion['max_score'])
-                        ->helperText('Weight: ' . $criterion['weight'])
-                        ->disabled($this->isReadOnly),
-                ])->columns(2);
-            }
-
-            $schema[] = \Filament\Forms\Components\Section::make('Evaluation Criteria')
-                ->schema($criteriaFields);
-        }
-
-        // Comments Section
-        $schema[] = \Filament\Forms\Components\Section::make('Additional Comments')
+        // Rating Scale Legend
+        $schema[] = \Filament\Forms\Components\Section::make('Rating Scale')
             ->schema([
-                Textarea::make('comment')
-                    ->label('Comments (Optional)')
-                    ->rows(4)
+                \Filament\Forms\Components\Group::make([
+                    \Filament\Forms\Components\Badge::make('5 - Outstanding')
+                        ->color('success'),
+                    \Filament\Forms\Components\Badge::make('4 - Strong')
+                        ->color('info'),
+                    \Filament\Forms\Components\Badge::make('3 - Acceptable')
+                        ->color('warning'),
+                    \Filament\Forms\Components\Badge::make('2 - Below Expectations')
+                        ->color('danger'),
+                    \Filament\Forms\Components\Badge::make('1 - Unacceptable')
+                        ->color('danger'),
+                    \Filament\Forms\Components\Badge::make('N/A - Not Applicable')
+                        ->color('gray'),
+                ])->columns(3)->columnSpanFull(),
+            ]);
+
+        // SAVER Category Sections
+        $schema = array_merge($schema, $this->getSaverSectionSchemas());
+
+        // Decision Section
+        $schema[] = \Filament\Forms\Components\Section::make('Evaluation Decision')
+            ->schema([
+                \Filament\Forms\Components\Select::make('advance_recommendation')
+                    ->label('Advance this item to finalist consideration?')
+                    ->options(UniversalEvaluationRubric::getRecommendationOptions())
+                    ->required()
+                    ->disabled($this->isReadOnly),
+                    
+                \Filament\Forms\Components\Select::make('confidence_level')
+                    ->label('Confidence in my evaluation')
+                    ->options(UniversalEvaluationRubric::getConfidenceOptions())
+                    ->required()
+                    ->disabled($this->isReadOnly),
+                    
+                \Filament\Forms\Components\Toggle::make('has_deal_breaker')
+                    ->label('Is there any deal-breaker?')
+                    ->disabled($this->isReadOnly)
+                    ->reactive(),
+                    
+                \Filament\Forms\Components\Textarea::make('deal_breaker_note')
+                    ->label('Deal-breaker details')
+                    ->visible(fn () => $this->has_deal_breaker)
+                    ->required(fn () => $this->has_deal_breaker)
+                    ->rows(2)
+                    ->disabled($this->isReadOnly),
+            ])
+            ->columns(2);
+
+        // Narrative Section
+        $schema[] = \Filament\Forms\Components\Section::make('Evaluation Narrative')
+            ->schema([
+                \Filament\Forms\Components\Textarea::make('strongest_advantages')
+                    ->label('Strongest Advantages')
+                    ->rows(2)
+                    ->disabled($this->isReadOnly),
+                    
+                \Filament\Forms\Components\Textarea::make('biggest_weaknesses')
+                    ->label('Biggest Weaknesses')
+                    ->rows(2)
+                    ->disabled($this->isReadOnly),
+                    
+                \Filament\Forms\Components\Textarea::make('best_use_case')
+                    ->label('Best Use Case on the Ladder Truck')
+                    ->rows(2)
+                    ->disabled($this->isReadOnly),
+                    
+                \Filament\Forms\Components\Textarea::make('compatibility_notes')
+                    ->label('Compatibility / Mounting Notes')
+                    ->rows(2)
+                    ->disabled($this->isReadOnly),
+                    
+                \Filament\Forms\Components\Textarea::make('training_notes')
+                    ->label('Training Notes')
+                    ->rows(2)
+                    ->disabled($this->isReadOnly),
+                    
+                \Filament\Forms\Components\Textarea::make('safety_concerns')
+                    ->label('Safety Concerns')
+                    ->rows(2)
+                    ->disabled($this->isReadOnly),
+                    
+                \Filament\Forms\Components\Textarea::make('additional_comments')
+                    ->label('Additional Comments')
+                    ->rows(2)
                     ->disabled($this->isReadOnly),
             ]);
 
@@ -205,10 +372,64 @@ class EvaluationFormPage extends Page
         return $schema;
     }
 
+    protected function getSaverSectionSchemas(): array
+    {
+        $schemas = [];
+        
+        $bucketConfig = [
+            'capability' => ['title' => 'Capability (30%)', 'icon' => 'heroicon-o-cpu-chip', 'description' => 'Core performance, safety, and effectiveness'],
+            'usability' => ['title' => 'Usability (30%)', 'icon' => 'heroicon-o-hand-thumb-up', 'description' => 'Ergonomics, ease of use, and portability'],
+            'affordability' => ['title' => 'Affordability (20%)', 'icon' => 'heroicon-o-currency-dollar', 'description' => 'Cost effectiveness and value'],
+            'maintainability' => ['title' => 'Maintainability (15%)', 'icon' => 'heroicon-o-wrench-screwdriver', 'description' => 'Service, support, and upkeep'],
+            'deployability' => ['title' => 'Deployability (5%)', 'icon' => 'heroicon-o-truck', 'description' => 'Ready-to-use and logistics'],
+        ];
+
+        foreach ($this->criteriaByBucket as $bucket => $criteria) {
+            if (empty($criteria)) {
+                continue;
+            }
+
+            $config = $bucketConfig[$bucket] ?? ['title' => ucfirst($bucket), 'icon' => 'heroicon-o-star', 'description' => ''];
+            
+            $criterionFields = [];
+            
+            foreach ($criteria as $id => $criterion) {
+                $criterionFields[] = \Filament\Forms\Components\Group::make([
+                    \Filament\Forms\Components\TextEntry::make('criterion_label_' . $id)
+                        ->label($criterion['name'])
+                        ->default($criterion['description'])
+                        ->columnSpanFull()
+                        ->hint(function () use ($criterion) {
+                            $sourceLabel = UniversalEvaluationRubric::getSourceLabel($criterion['source']);
+                            $color = UniversalEvaluationRubric::getSourceBadgeColor($criterion['source']);
+                            return "{$sourceLabel} • Weight: {$criterion['weight']}";
+                        }),
+                    \Filament\Forms\Components\Select::make('ratings.' . $id)
+                        ->label('Rating')
+                        ->options(UniversalEvaluationRubric::getRatingOptions())
+                        ->required()
+                        ->disabled($this->isReadOnly)
+                        ->columnSpan(1),
+                    \Filament\Forms\Components\TextInput::make('notes.' . $id)
+                        ->label('Notes (optional)')
+                        ->disabled($this->isReadOnly)
+                        ->columnSpan(1),
+                ])->columns(2);
+            }
+
+            $schemas[] = \Filament\Forms\Components\Section::make($config['title'])
+                ->description($config['description'])
+                ->icon($config['icon'])
+                ->schema($criterionFields)
+                ->collapsible();
+        }
+
+        return $schemas;
+    }
+
     public function saveDraft(): void
     {
-        $this->saveScores();
-        $this->saveComment();
+        $this->saveRubricData();
 
         Notification::make()
             ->title('Draft Saved')
@@ -222,18 +443,21 @@ class EvaluationFormPage extends Page
         if (!$this->canSubmit) {
             Notification::make()
                 ->title('Incomplete Evaluation')
-                ->body('Please complete all criteria before submitting.')
+                ->body('Please complete all required fields before submitting.')
                 ->danger()
                 ->send();
             return;
         }
 
-        $this->saveScores();
-        $this->saveComment();
+        $this->saveRubricData();
 
         try {
-            $this->submission = $this->evaluationService->submitEvaluation($this->submission);
+            $this->submission->update([
+                'status' => 'submitted',
+                'submitted_at' => now(),
+            ]);
             
+            $this->submission->refresh();
             $this->isReadOnly = true;
 
             Notification::make()
@@ -251,19 +475,52 @@ class EvaluationFormPage extends Page
         }
     }
 
-    protected function saveScores(): void
+    protected function saveRubricData(): void
     {
-        $filteredScores = array_filter($this->scores, fn($value) => $value !== '' && $value !== null);
-        
-        $this->submission = $this->evaluationService->saveScores($this->submission, $filteredScores);
-    }
+        if (!$this->submission) {
+            return;
+        }
 
-    protected function saveComment(): void
-    {
-        EvaluationComment::updateOrCreate(
-            ['submission_id' => $this->submission->id],
-            ['comment' => $this->comment ?? '']
-        );
+        // Calculate scores using the rubric
+        $ratings = array_filter($this->ratings, fn($v) => $v !== '' && $v !== null);
+        $scores = UniversalEvaluationRubric::calculateAllScores($ratings);
+
+        // Prepare criterion payload
+        $criterionPayload = [
+            'ratings' => $this->ratings,
+            'notes' => $this->notes ?? [],
+        ];
+
+        // Prepare narrative payload
+        $narrativePayload = [
+            'strongest_advantages' => $this->strongest_advantages,
+            'biggest_weaknesses' => $this->biggest_weaknesses,
+            'best_use_case' => $this->best_use_case,
+            'compatibility_notes' => $this->compatibility_notes,
+            'training_notes' => $this->training_notes,
+            'safety_concerns' => $this->safety_concerns,
+            'additional_comments' => $this->additional_comments,
+        ];
+
+        // Update submission
+        $this->submission->update([
+            'rubric_version' => UniversalEvaluationRubric::getVersion(),
+            'assessment_profile' => $this->assessmentProfile,
+            'overall_score' => $scores['overall_score'],
+            'capability_score' => $scores['capability_score'],
+            'usability_score' => $scores['usability_score'],
+            'affordability_score' => $scores['affordability_score'],
+            'maintainability_score' => $scores['maintainability_score'],
+            'deployability_score' => $scores['deployability_score'],
+            'advance_recommendation' => $this->advance_recommendation,
+            'confidence_level' => $this->confidence_level,
+            'has_deal_breaker' => $this->has_deal_breaker,
+            'deal_breaker_note' => $this->has_deal_breaker ? $this->deal_breaker_note : null,
+            'criterion_payload' => $criterionPayload,
+            'narrative_payload' => $narrativePayload,
+        ]);
+
+        $this->submission->refresh();
     }
 
     protected function getCurrentMember(): ?WorkgroupMember
