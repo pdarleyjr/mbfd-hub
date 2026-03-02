@@ -28,6 +28,9 @@ use App\Filament\Workgroup\Pages\Evaluations;
 use App\Filament\Workgroup\Pages\SharedUploads;
 use App\Filament\Workgroup\Pages\Profile;
 use App\Filament\Workgroup\Pages\EvaluationFormPage;
+use App\Filament\Workgroup\Pages\SessionResultsPage;
+use App\Filament\Resources\Workgroup\CandidateProductResource;
+use App\Filament\Resources\Workgroup\EvaluationCategoryResource;
 
 class WorkgroupPanelProvider extends PanelProvider
 {
@@ -51,7 +54,12 @@ class WorkgroupPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
             ])
             ->font('Inter')
-            ->discoverResources(in: app_path('Filament/Workgroup/Resources'), for: 'App\\Filament\\Workgroup\\Resources')
+            // Explicitly register only the needed resources
+            // This hides the deprecated EvaluationTemplateResource and EvaluationCriterionResource
+            ->resources([
+                EvaluationCategoryResource::class,
+                CandidateProductResource::class,
+            ])
             ->pages([
                 Dashboard::class,
                 Files::class,
@@ -60,6 +68,7 @@ class WorkgroupPanelProvider extends PanelProvider
                 SharedUploads::class,
                 EvaluationFormPage::class,
                 Profile::class,
+                SessionResultsPage::class,
             ])
             ->widgets([
                 \App\Filament\Workgroup\Widgets\WorkgroupStatsWidget::class,

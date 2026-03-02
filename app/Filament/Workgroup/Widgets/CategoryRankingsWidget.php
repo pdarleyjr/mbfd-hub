@@ -4,16 +4,16 @@ namespace App\Filament\Workgroup\Widgets;
 
 use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
-use App\Models\EvaluationScore;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupSession;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Widget showing top products per rankable category with weighted scores
- * and response counts.
+ * and response counts. Now uses the universal rubric overall_score field.
  */
 class CategoryRankingsWidget extends BaseWidget
 {
@@ -89,8 +89,18 @@ class CategoryRankingsWidget extends BaseWidget
             ->withCount('submissions')
             ->select('candidate_products.*')
             ->addSelect([
-                'weighted_score' => EvaluationScore::selectRaw('COALESCE(AVG(score * (SELECT weight FROM evaluation_criteria WHERE id = evaluation_scores.criterion_id)), 0)')
-                    ->join('evaluation_submissions', 'evaluation_scores.submission_id', '=', 'evaluation_submissions.id')
+                // Use new rubric overall_score if available, fallback to legacy calculation
+                'weighted_score' => EvaluationSubmission::selectRaw('COALESCE(
+                    AVG(overall_score),
+                    COALESCE(AVG(
+                        (SELECT SUM(es.score * ec.weight) / NULLIF(SUM(ec.weight), 0)
+                        FROM evaluation_scores es
+                        JOIN evaluation_criteria ec ON es.criterion_id = ec.id
+                        WHERE es.submission_id = evaluation_submissions.id
+                        AND es.score IS NOT NULL)
+                    ), 0)
+                )')
+                    ->join('evaluation_submissions', 'evaluation_submissions.candidate_product_id', '=', 'candidate_products.id')
                     ->whereColumn('evaluation_submissions.candidate_product_id', 'candidate_products.id')
                     ->where('evaluation_submissions.status', 'submitted'),
                 'response_count' => EvaluationSubmission::selectRaw('COUNT(*)')
@@ -102,11 +112,12 @@ class CategoryRankingsWidget extends BaseWidget
 
     protected function getScoreColor(float $score): string
     {
-        if ($score >= 8) {
+        // Score is 0-100 based on new rubric
+        if ($score >= 80) {
             return 'success';
-        } elseif ($score >= 6) {
+        } elseif ($score >= 60) {
             return 'warning';
-        } elseif ($score >= 4) {
+        } elseif ($score >= 40) {
             return 'danger';
         }
         return 'gray';
@@ -130,13 +141,21 @@ class CategoryRankingsWidget extends BaseWidget
             ])
             ->get()
             ->map(function ($product) {
-                $avgScore = EvaluationScore::whereHas('submission', fn($q) => 
-                    $q->where('candidate_product_id', $product->id)
-                        ->where('status', 'submitted')
-                )
-                ->join('evaluation_criteria', 'evaluation_scores.criterion_id', '=', 'evaluation_criteria.id')
-                ->selectRaw('COALESCE(AVG(evaluation_scores.score * evaluation_criteria.weight), 0) as weighted_avg')
-                ->value('weighted_avg');
+                // Try to get rubric score first, fallback to legacy
+                $avgScore = EvaluationSubmission::where('candidate_product_id', $product->id)
+                    ->where('status', 'submitted')
+                    ->avg('overall_score');
+                
+                if ($avgScore === null) {
+                    // Fallback to legacy calculation
+                    $avgScore = DB::table('evaluation_submissions as es')
+                        ->join('evaluation_scores as score', 'score.submission_id', '=', 'es.id')
+                        ->join('evaluation_criteria as ec', 'ec.id', '=', 'score.criterion_id')
+                        ->where('es.candidate_product_id', $product->id)
+                        ->where('es.status', 'submitted')
+                        ->whereNotNull('score.score')
+                        ->avg(DB::raw('score.score * ec.weight'));
+                }
 
                 return [
                     'product' => $product,
