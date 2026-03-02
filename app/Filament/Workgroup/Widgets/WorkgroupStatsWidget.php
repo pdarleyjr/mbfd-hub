@@ -76,7 +76,7 @@ class WorkgroupStatsWidget extends BaseWidget
 
             Stat::make('My Notes', $myNotesCount)
                 ->description('Private notes')
-                ->descriptionIcon('heroicon-o-note')
+                ->descriptionIcon('heroicon-o-pencil-square')
                 ->color('gray'),
 
             Stat::make('Shared', $sharedUploadsCount)
