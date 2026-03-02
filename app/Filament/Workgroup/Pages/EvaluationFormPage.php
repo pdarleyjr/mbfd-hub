@@ -82,8 +82,8 @@ class EvaluationFormPage extends Page
 
     public function mount(): void
     {
-        // Get productId from route parameter
-        $this->productId = (int) $this->getRouteParameter('productId', 0);
+        // Get productId from route parameter using Laravel request
+        $this->productId = (int) request()->get('productId', 0);
         
         if (!$this->productId) {
             Notification::make()
