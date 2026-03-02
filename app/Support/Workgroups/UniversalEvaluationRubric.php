@@ -186,223 +186,112 @@ class UniversalEvaluationRubric
 
     /**
      * Get all core criteria (always present regardless of profile)
+     * Condensed version - merged similar criteria for a streamlined evaluation experience
      */
     public static function getCoreCriteria(): array
     {
         return [
-            // CAPABILITY (8 criteria)
-            'capability' => [
-                'id' => 'cap_operational_effectiveness',
-                'name' => 'Operational Effectiveness',
-                'description' => 'How well does this tool perform its primary function in real rescue scenarios?',
+            // CAPABILITY (5 criteria - condensed from 8)
+            'cap_effectiveness' => [
+                'id' => 'cap_effectiveness',
+                'name' => 'Operational Effectiveness & Safety',
+                'description' => 'How well does this tool perform its primary function? Does it enhance responder safety?',
                 'weight' => 5,
                 'source' => self::SOURCE_OPERATIONAL,
                 'bucket' => 'capability',
             ],
-            [
-                'id' => 'cap_safety_risk_control',
-                'name' => 'Safety / Risk Control',
-                'description' => 'Does this tool enhance responder safety or reduce risks during operations?',
+            'cap_durability' => [
+                'id' => 'cap_durability',
+                'name' => 'Durability & Build Quality',
+                'description' => 'Is the construction robust enough for repeated field use? Standards compliance?',
                 'weight' => 5,
                 'source' => self::SOURCE_BOTH,
                 'bucket' => 'capability',
             ],
-            [
-                'id' => 'cap_durability_build_quality',
-                'name' => 'Durability / Build Quality',
-                'description' => 'Is the construction robust enough for repeated field use?',
-                'weight' => 5,
-                'source' => self::SOURCE_BOTH,
-                'bucket' => 'capability',
-            ],
-            [
-                'id' => 'cap_standards_compliance',
-                'name' => 'Standards / Compliance / Verified Performance',
-                'description' => 'Does it meet applicable NFPA, ANSI, or other standards?',
-                'weight' => 5,
-                'source' => self::SOURCE_SPECIFICATION,
-                'bucket' => 'capability',
-            ],
-            [
-                'id' => 'cap_interoperability',
-                'name' => 'Interoperability / Compatibility',
-                'description' => 'Does it work with existing apparatus equipment and standard accessories?',
-                'weight' => 4,
-                'source' => self::SOURCE_BOTH,
-                'bucket' => 'capability',
-            ],
-            [
+            'cap_versatility' => [
                 'id' => 'cap_versatility',
-                'name' => 'Versatility / Range of Use',
-                'description' => 'Can this tool handle multiple scenarios or is it single-purpose?',
+                'name' => 'Versatility & Compatibility',
+                'description' => 'Can it handle multiple scenarios? Works with existing equipment and accessories?',
                 'weight' => 4,
-                'source' => self::SOURCE_OPERATIONAL,
-                'bucket' => 'capability',
-            ],
-            [
-                'id' => 'cap_environmental_suitability',
-                'name' => 'Environmental Suitability',
-                'description' => 'Is it rated for extreme temperatures, weather, or hazardous environments?',
-                'weight' => 3,
-                'source' => self::SOURCE_SPECIFICATION,
-                'bucket' => 'capability',
-            ],
-            [
-                'id' => 'cap_accessory_support',
-                'name' => 'Accessory / Expansion Support',
-                'description' => 'Are there compatible accessories or attachments available?',
-                'weight' => 2,
                 'source' => self::SOURCE_BOTH,
                 'bucket' => 'capability',
             ],
 
-            // USABILITY (6 criteria)
-            'usability' => [
-                'id' => 'use_ergonomics_balance',
-                'name' => 'Ergonomics / Balance',
-                'description' => 'Is it well-balanced and comfortable to handle during use?',
+            // USABILITY (4 criteria - condensed from 6)
+            'use_ergonomics' => [
+                'id' => 'use_ergonomics',
+                'name' => 'Ergonomics & Ease of Use',
+                'description' => 'Well-balanced, intuitive, and comfortable to handle? Easy to learn?',
                 'weight' => 5,
                 'source' => self::SOURCE_OPERATIONAL,
                 'bucket' => 'usability',
             ],
-            [
-                'id' => 'use_ease_of_use',
-                'name' => 'Ease of Use / Intuitiveness',
-                'description' => 'Can operators quickly learn and effectively use this tool with minimal training?',
+            'use_ppe' => [
+                'id' => 'use_ppe',
+                'name' => 'PPE / Gloves & Tight-Space Use',
+                'description' => 'Can it be operated with turnout gloves and full PPE in confined spaces?',
                 'weight' => 5,
                 'source' => self::SOURCE_OPERATIONAL,
                 'bucket' => 'usability',
             ],
-            [
-                'id' => 'use_ppe_gloves',
-                'name' => 'Use with PPE / Gloves',
-                'description' => 'Can it be effectively operated while wearing turnout gloves and full PPE?',
-                'weight' => 5,
-                'source' => self::SOURCE_OPERATIONAL,
-                'bucket' => 'usability',
-            ],
-            [
+            'use_portability' => [
                 'id' => 'use_portability',
-                'name' => 'Portability / Carry Burden / Scene Mobility',
-                'description' => 'How easy is it to transport and position at the scene?',
+                'name' => 'Portability & Scene Mobility',
+                'description' => 'How easy is it to transport, position, and control at the scene?',
                 'weight' => 4,
                 'source' => self::SOURCE_BOTH,
-                'bucket' => 'usability',
-            ],
-            [
-                'id' => 'use_tight_space',
-                'name' => 'Tight-Space / Awkward-Access Handling',
-                'description' => 'Can it operate effectively in confined spaces typical of vehicle rescue?',
-                'weight' => 4,
-                'source' => self::SOURCE_OPERATIONAL,
-                'bucket' => 'usability',
-            ],
-            [
-                'id' => 'use_control_feedback',
-                'name' => 'Control Clarity / Visual-Tactile Feedback',
-                'description' => 'Does the operator have clear feedback on tool performance?',
-                'weight' => 2,
-                'source' => self::SOURCE_OPERATIONAL,
                 'bucket' => 'usability',
             ],
 
-            // AFFORDABILITY (4 criteria)
-            'affordability' => [
-                'id' => 'aff_lifecycle_cost',
-                'name' => 'Lifecycle / Consumable Cost',
-                'description' => 'What are the ongoing operational costs over expected lifespan?',
-                'weight' => 5,
-                'source' => self::SOURCE_SPECIFICATION,
-                'bucket' => 'affordability',
-            ],
-            [
-                'id' => 'aff_value_capability',
-                'name' => 'Value vs Capability',
-                'description' => 'Does the price justify the features and performance offered?',
+            // AFFORDABILITY (3 criteria - condensed from 4)
+            'aff_value' => [
+                'id' => 'aff_value',
+                'name' => 'Overall Value & Cost',
+                'description' => 'Does the price justify the features? Including acquisition and lifecycle costs.',
                 'weight' => 5,
                 'source' => self::SOURCE_BOTH,
                 'bucket' => 'affordability',
             ],
-            [
-                'id' => 'aff_acquisition_cost',
-                'name' => 'Acquisition Cost',
-                'description' => 'Initial purchase price including any required accessories.',
-                'weight' => 4,
-                'source' => self::SOURCE_SPECIFICATION,
-                'bucket' => 'affordability',
-            ],
-            [
-                'id' => 'aff_commonality_savings',
-                'name' => 'Commonality / Compatibility Savings',
+            'aff_commonality' => [
+                'id' => 'aff_commonality',
+                'name' => 'Fleet Commonality & Savings',
                 'description' => 'Can it share batteries, chargers, or accessories with existing fleet?',
                 'weight' => 3,
                 'source' => self::SOURCE_SPECIFICATION,
                 'bucket' => 'affordability',
             ],
 
-            // MAINTAINABILITY (5 criteria)
-            'maintainability' => [
-                'id' => 'maint_training_burden',
-                'name' => 'Training Burden / Documentation Quality',
-                'description' => 'Is training straightforward? Are manuals and guides clear?',
+            // MAINTAINABILITY (3 criteria - condensed from 5)
+            'maint_support' => [
+                'id' => 'maint_support',
+                'name' => 'Service Support & Parts Availability',
+                'description' => 'Reliable vendor support? Parts readily available? Good warranty?',
                 'weight' => 5,
                 'source' => self::SOURCE_BOTH,
                 'bucket' => 'maintainability',
             ],
-            [
-                'id' => 'maint_vendor_support',
-                'name' => 'Vendor / Service Support',
-                'description' => 'Is there reliable local vendor support for repairs and parts?',
-                'weight' => 4,
-                'source' => self::SOURCE_SPECIFICATION,
-                'bucket' => 'maintainability',
-            ],
-            [
-                'id' => 'maint_in_house',
-                'name' => 'In-House Maintenance / Inspectability',
-                'description' => 'Can routine inspection and basic maintenance be done in-house?',
+            'maint_training' => [
+                'id' => 'maint_training',
+                'name' => 'Training & In-House Maintenance',
+                'description' => 'Easy to train on? Can routine maintenance be done in-house?',
                 'weight' => 4,
                 'source' => self::SOURCE_BOTH,
                 'bucket' => 'maintainability',
             ],
-            [
-                'id' => 'maint_parts_availability',
-                'name' => 'Parts / Consumables / Availability',
-                'description' => 'Are replacement parts and consumables readily available?',
-                'weight' => 4,
-                'source' => self::SOURCE_SPECIFICATION,
-                'bucket' => 'maintainability',
-            ],
-            [
-                'id' => 'maint_warranty',
-                'name' => 'Warranty / Service Plan',
-                'description' => 'What warranty coverage is included?',
-                'weight' => 3,
-                'source' => self::SOURCE_SPECIFICATION,
-                'bucket' => 'maintainability',
-            ],
 
-            // DEPLOYABILITY (3 criteria)
-            'deployability' => [
-                'id' => 'dep_ready_time',
-                'name' => 'Ready-to-Use / Startup Time',
+            // DEPLOYABILITY (2 criteria - condensed from 3)
+            'dep_readiness' => [
+                'id' => 'dep_readiness',
+                'name' => 'Ready-to-Use & Startup Time',
                 'description' => 'How quickly can it be deployed from storage to operation?',
                 'weight' => 5,
                 'source' => self::SOURCE_OPERATIONAL,
                 'bucket' => 'deployability',
             ],
-            [
-                'id' => 'dep_storage_footprint',
-                'name' => 'Storage / Mounting Footprint',
-                'description' => 'What space requirements for apparatus mounting or station storage?',
-                'weight' => 3,
-                'source' => self::SOURCE_BOTH,
-                'bucket' => 'deployability',
-            ],
-            [
-                'id' => 'dep_logistics',
-                'name' => 'Apparatus / Scene Deployment Logistics',
-                'description' => 'How does it affect apparatus loading and scene setup?',
+            'dep_storage' => [
+                'id' => 'dep_storage',
+                'name' => 'Storage & Apparatus Logistics',
+                'description' => 'Space requirements for mounting/storage? Impact on apparatus loading?',
                 'weight' => 3,
                 'source' => self::SOURCE_BOTH,
                 'bucket' => 'deployability',
@@ -417,123 +306,64 @@ class UniversalEvaluationRubric
     {
         $packs = [
             self::PROFILE_POWERED_TOOL => [
-                // Powered Tool pack (6 criteria)
-                [
-                    'id' => 'pwr_source_performance',
-                    'name' => 'Power Source Performance / Charge Behavior',
-                    'description' => 'How does it perform under load? Is there voltage sag or power drop?',
+                'pwr_performance' => [
+                    'id' => 'pwr_performance',
+                    'name' => 'Power & Runtime Performance',
+                    'description' => 'Power under load, runtime endurance, charge behavior?',
                     'weight' => 5,
                     'source' => self::SOURCE_BOTH,
                     'bucket' => 'capability',
                 ],
-                [
-                    'id' => 'pwr_runtime_endurance',
-                    'name' => 'Runtime / Endurance Under Load',
-                    'description' => 'How long does it operate under realistic rescue conditions?',
-                    'weight' => 5,
-                    'source' => self::SOURCE_BOTH,
-                    'bucket' => 'capability',
-                ],
-                [
-                    'id' => 'pwr_battery_commonality',
-                    'name' => 'Battery / Power Commonality & Swap Speed',
-                    'description' => 'Are batteries interchangeable with existing fleet tools?',
+                'pwr_battery' => [
+                    'id' => 'pwr_battery',
+                    'name' => 'Battery Commonality & Diagnostics',
+                    'description' => 'Interchangeable batteries? Status indicators? Swap speed?',
                     'weight' => 4,
                     'source' => self::SOURCE_BOTH,
                     'bucket' => 'affordability',
                 ],
-                [
-                    'id' => 'pwr_status_indicators',
-                    'name' => 'Status Indicators / Diagnostics',
-                    'description' => 'Are charge level, fault codes, and diagnostics clear?',
-                    'weight' => 2,
-                    'source' => self::SOURCE_OPERATIONAL,
-                    'bucket' => 'usability',
-                ],
-                [
-                    'id' => 'pwr_fail_safe',
-                    'name' => 'Fail-Safe / Jam Recovery / Emergency Release',
-                    'description' => 'Can it be quickly safed or recovered if stuck?',
-                    'weight' => 2,
+                'pwr_safety' => [
+                    'id' => 'pwr_safety',
+                    'name' => 'Fail-Safe, Lighting & Recovery',
+                    'description' => 'Jam recovery? Emergency release? Integrated lighting?',
+                    'weight' => 3,
                     'source' => self::SOURCE_BOTH,
                     'bucket' => 'capability',
-                ],
-                [
-                    'id' => 'pwr_integrated_lighting',
-                    'name' => 'Integrated Lighting',
-                    'description' => 'Does it have built-in work lights for low-light operations?',
-                    'weight' => 1,
-                    'source' => self::SOURCE_OPERATIONAL,
-                    'bucket' => 'usability',
                 ],
             ],
 
             self::PROFILE_HAND_TOOL => [
-                // Hand Tool / Forcible Entry pack (4 criteria)
-                [
-                    'id' => 'hnd_breaching_effectiveness',
-                    'name' => 'Breaching / Prying / Striking Effectiveness',
-                    'description' => 'How effective is it at primary rescue tasks?',
+                'hnd_effectiveness' => [
+                    'id' => 'hnd_effectiveness',
+                    'name' => 'Breaching & Striking Effectiveness',
+                    'description' => 'How effective at primary forcible entry tasks?',
                     'weight' => 5,
                     'source' => self::SOURCE_OPERATIONAL,
                     'bucket' => 'capability',
                 ],
-                [
-                    'id' => 'hnd_mechanical_simplicity',
-                    'name' => 'Mechanical Simplicity / Low Failure Risk',
-                    'description' => 'Fewer moving parts means fewer failure points in the field.',
-                    'weight' => 4,
-                    'source' => self::SOURCE_BOTH,
-                    'bucket' => 'capability',
-                ],
-                [
-                    'id' => 'hnd_edge_retention',
-                    'name' => 'Edge / Tip / Wear Retention',
-                    'description' => 'How long does it maintain effectiveness before requiring replacement?',
+                'hnd_durability' => [
+                    'id' => 'hnd_durability',
+                    'name' => 'Mechanical Simplicity & Wear Retention',
+                    'description' => 'Few failure points? Maintains edge/tip effectiveness?',
                     'weight' => 4,
                     'source' => self::SOURCE_BOTH,
                     'bucket' => 'maintainability',
                 ],
-                [
-                    'id' => 'hnd_tight_space_access',
-                    'name' => 'Tight-Space Access / Control',
-                    'description' => 'Can it be effectively controlled in confined rescue scenarios?',
-                    'weight' => 4,
-                    'source' => self::SOURCE_OPERATIONAL,
-                    'bucket' => 'usability',
-                ],
             ],
 
             self::PROFILE_STABILIZATION => [
-                // Stabilization / Support pack (4 criteria)
-                [
-                    'id' => 'stb_holding_strength',
-                    'name' => 'Holding Strength / Stability Confidence',
-                    'description' => 'Does it provide reliable stabilization you can trust?',
+                'stb_strength' => [
+                    'id' => 'stb_strength',
+                    'name' => 'Holding Strength & Adaptability',
+                    'description' => 'Reliable stabilization? Adapts to various vehicles?',
                     'weight' => 5,
                     'source' => self::SOURCE_OPERATIONAL,
                     'bucket' => 'capability',
                 ],
-                [
-                    'id' => 'stb_adjustment_range',
-                    'name' => 'Adjustment Range / Adaptability',
-                    'description' => 'Can it adapt to various vehicle sizes and positions?',
-                    'weight' => 4,
-                    'source' => self::SOURCE_OPERATIONAL,
-                    'bucket' => 'capability',
-                ],
-                [
-                    'id' => 'stb_surface_bite',
-                    'name' => 'Surface Bite / Anchor Confidence',
-                    'description' => 'Does it grip securely without damaging vehicle surfaces?',
-                    'weight' => 4,
-                    'source' => self::SOURCE_OPERATIONAL,
-                    'bucket' => 'capability',
-                ],
-                [
-                    'id' => 'stb_secondary_safety',
-                    'name' => 'Secondary Safety / Load Retention',
-                    'description' => 'Are there backup retention features if primary fails?',
+                'stb_safety' => [
+                    'id' => 'stb_safety',
+                    'name' => 'Surface Grip & Secondary Safety',
+                    'description' => 'Secure grip? Backup retention features?',
                     'weight' => 4,
                     'source' => self::SOURCE_BOTH,
                     'bucket' => 'capability',
@@ -541,46 +371,21 @@ class UniversalEvaluationRubric
             ],
 
             self::PROFILE_WATER_FLOW => [
-                // Water / Flow Appliance pack (5 criteria)
-                [
-                    'id' => 'wtr_flow_capacity',
-                    'name' => 'Flow Capacity / Hydraulic Efficiency',
-                    'description' => 'Does it meet required GPM for fire suppression?',
-                    'weight' => 5,
-                    'source' => self::SOURCE_SPECIFICATION,
-                    'bucket' => 'capability',
-                ],
-                [
-                    'id' => 'wtr_coupling_compat',
-                    'name' => 'Coupling / Interface Compatibility',
-                    'description' => 'Does it connect to standard hose threads and apparatus?',
+                'wtr_flow' => [
+                    'id' => 'wtr_flow',
+                    'name' => 'Flow Capacity & Compatibility',
+                    'description' => 'Meets GPM requirements? Standard coupling compatibility?',
                     'weight' => 5,
                     'source' => self::SOURCE_BOTH,
-                    'bucket' => 'deployability',
+                    'bucket' => 'capability',
                 ],
-                [
-                    'id' => 'wtr_control_stability',
-                    'name' => 'Control / Reaction / Stability',
-                    'description' => 'Is it controllable during operation?',
+                'wtr_control' => [
+                    'id' => 'wtr_control',
+                    'name' => 'Control & Maintenance',
+                    'description' => 'Controllable during operation? Easy post-use maintenance?',
                     'weight' => 4,
-                    'source' => self::SOURCE_OPERATIONAL,
+                    'source' => self::SOURCE_BOTH,
                     'bucket' => 'usability',
-                ],
-                [
-                    'id' => 'wtr_friction_loss',
-                    'name' => 'Restriction / Friction-Loss Profile',
-                    'description' => 'What is the friction loss through the device?',
-                    'weight' => 4,
-                    'source' => self::SOURCE_SPECIFICATION,
-                    'bucket' => 'capability',
-                ],
-                [
-                    'id' => 'wtr_maintenance_simplicity',
-                    'name' => 'Flush / Drain / Maintenance Simplicity',
-                    'description' => 'How easy is post-use maintenance and winterization?',
-                    'weight' => 2,
-                    'source' => self::SOURCE_BOTH,
-                    'bucket' => 'maintainability',
                 ],
             ],
         ];
