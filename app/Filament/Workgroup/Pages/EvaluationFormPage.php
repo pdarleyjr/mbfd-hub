@@ -80,10 +80,24 @@ class EvaluationFormPage extends Page
 
     protected EvaluationService $evaluationService;
 
-    public function mount(int $productId): void
+    public function mount(): void
     {
+        // Get productId from route parameter
+        $this->productId = (int) $this->getRouteParameter('productId', 0);
+        
+        if (!$this->productId) {
+            Notification::make()
+                ->title('Invalid Product')
+                ->body('No product specified for evaluation.')
+                ->danger()
+                ->send();
+            
+            $this->redirect(Evaluations::getUrl());
+            return;
+        }
+        
         $this->evaluationService = new EvaluationService();
-        $this->productId = $productId;
+        $this->member = $this->getCurrentMember();
         
         $this->member = $this->getCurrentMember();
         
