@@ -1,7 +1,7 @@
 
    Psy\Exception\ParseErrorException 
 
-  PHP Parse error: Syntax error, unexpected ',' on line 1
+  PHP Parse error: Syntax error, unexpected T_NS_SEPARATOR, expecting ';' on line 1
 
   at vendor/psy/psysh/src/Exception/ParseErrorException.php:44
      40▕      * @param \PhpParser\Error $e
