@@ -55,7 +55,8 @@ class WorkgroupResource extends Resource
                             ->label('Name'),
                         Infolists\Components\TextEntry::make('description')
                             ->label('Description'),
-                        Infolists\Components\BooleanEntry::make('is_active')
+                        Infolists\Components\IconEntry::make('is_active')
+                            ->boolean()
                             ->label('Active'),
                     ])
                     ->columns(3),
@@ -95,7 +96,8 @@ class WorkgroupResource extends Resource
                     ->searchable()
                     ->limit(50)
                     ->label('Description'),
-                Tables\Columns\BooleanColumn::make('is_active')
+                Tables\Columns\IconColumn::make('is_active')
+                    ->boolean()
                     ->label('Active'),
                 Tables\Columns\TextColumn::make('members_count')
                     ->counts('members')
