@@ -22,7 +22,7 @@ class Evaluations extends Page implements HasTable
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
-    protected static string $view = 'filament::pages.simple-page';
+    protected static string $view = 'filament-workgroup.pages.simple-page';
 
     protected static ?string $title = 'Evaluations';
 

@@ -20,7 +20,7 @@ class EvaluationFormPage extends Page
 {
     use InteractsWithForms;
 
-    protected static string $view = 'filament-workgroup::pages.evaluation-form';
+    protected static string $view = 'filament-workgroup.pages.simple-page';
 
     protected static ?string $title = 'Evaluate Product';
     
