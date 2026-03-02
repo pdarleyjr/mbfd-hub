@@ -24,6 +24,21 @@ class WorkgroupFile extends Model
         'file_size' => 'integer',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (WorkgroupFile $file) {
+            if (empty($file->uploaded_by) && auth()->check()) {
+                $file->uploaded_by = auth()->id();
+            }
+            if ($file->filepath && empty($file->file_type)) {
+                $file->file_type = pathinfo($file->filepath, PATHINFO_EXTENSION);
+            }
+            if ($file->filepath && empty($file->filename)) {
+                $file->filename = basename($file->filepath);
+            }
+        });
+    }
+
     /**
      * Get the workgroup this file belongs to.
      */

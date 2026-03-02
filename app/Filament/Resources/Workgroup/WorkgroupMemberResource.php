@@ -12,6 +12,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Hash;
 
 class WorkgroupMemberResource extends Resource
 {
@@ -29,11 +30,37 @@ class WorkgroupMemberResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Member Information')
                     ->schema([
+                        Forms\Components\Toggle::make('create_new_user')
+                            ->label('Create New User Account')
+                            ->default(false)
+                            ->reactive()
+                            ->dehydrated(false)
+                            ->columnSpanFull(),
                         Forms\Components\Select::make('user_id')
-                            ->label('User')
+                            ->label('Select Existing User')
                             ->options(fn () => User::orderBy('name')->pluck('name', 'id'))
                             ->searchable()
-                            ->required(),
+                            ->required(fn (callable $get) => !$get('create_new_user'))
+                            ->visible(fn (callable $get) => !$get('create_new_user')),
+                        Forms\Components\TextInput::make('new_user_name')
+                            ->label('Full Name')
+                            ->required(fn (callable $get) => $get('create_new_user'))
+                            ->visible(fn (callable $get) => $get('create_new_user'))
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('new_user_email')
+                            ->label('Email')
+                            ->email()
+                            ->required(fn (callable $get) => $get('create_new_user'))
+                            ->visible(fn (callable $get) => $get('create_new_user'))
+                            ->unique('users', 'email')
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('new_user_password')
+                            ->label('Password')
+                            ->password()
+                            ->required(fn (callable $get) => $get('create_new_user'))
+                            ->visible(fn (callable $get) => $get('create_new_user'))
+                            ->minLength(6)
+                            ->dehydrated(false),
                         Forms\Components\Select::make('workgroup_id')
                             ->label('Workgroup')
                             ->options(fn () => Workgroup::orderBy('name')->pluck('name', 'id'))

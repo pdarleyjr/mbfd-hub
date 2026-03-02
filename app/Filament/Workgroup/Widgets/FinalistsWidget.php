@@ -22,7 +22,7 @@ class FinalistsWidget extends BaseWidget
 
     protected int | string | array $columnSpan = 'full';
 
-    public function getTable(): Table
+    public function table(Table $table): Table
     {
         $session = $this->session ?? WorkgroupSession::active()->first();
         
