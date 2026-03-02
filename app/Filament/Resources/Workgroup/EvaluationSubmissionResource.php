@@ -11,6 +11,8 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Filament\Forms;
+use Filament\Forms\Form;
 
 class EvaluationSubmissionResource extends Resource
 {
@@ -22,7 +24,7 @@ class EvaluationSubmissionResource extends Resource
 
     protected static ?int $navigationSort = 9;
 
-    public static function form($form): $form
+    public static function form(Form $form): Form
     {
         return $form
             ->schema([]);
