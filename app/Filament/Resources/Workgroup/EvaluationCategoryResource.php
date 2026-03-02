@@ -62,9 +62,11 @@ class EvaluationCategoryResource extends Resource
                             ->label('Name'),
                         Infolists\Components\TextEntry::make('description')
                             ->label('Description'),
-                        Infolists\Components\BooleanEntry::make('is_rankable')
+                        Infolists\Components\IconEntry::make('is_rankable')
+                            ->boolean()
                             ->label('Rankable'),
-                        Infolists\Components\BooleanEntry::make('is_active')
+                        Infolists\Components\IconEntry::make('is_active')
+                            ->boolean()
                             ->label('Active'),
                         Infolists\Components\TextEntry::make('display_order')
                             ->label('Display Order'),
@@ -94,9 +96,11 @@ class EvaluationCategoryResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->label('Name'),
-                Tables\Columns\BooleanColumn::make('is_rankable')
+                Tables\Columns\IconColumn::make('is_rankable')
+                    ->boolean()
                     ->label('Rankable'),
-                Tables\Columns\BooleanColumn::make('is_active')
+                Tables\Columns\IconColumn::make('is_active')
+                    ->boolean()
                     ->label('Active'),
                 Tables\Columns\TextColumn::make('templates_count')
                     ->counts('templates')

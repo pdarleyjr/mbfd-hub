@@ -78,7 +78,8 @@ class WorkgroupMemberResource extends Resource
                         'member' => 'info',
                         default => 'gray',
                     }),
-                Tables\Columns\BooleanColumn::make('is_active')
+                Tables\Columns\IconColumn::make('is_active')
+                    ->boolean()
                     ->label('Active'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
