@@ -77,11 +77,25 @@ class Files extends Page implements HasTable
                     ->sortable(),
             ])
             ->actions([
+                \Filament\Tables\Actions\Action::make('preview')
+                    ->label('View')
+                    ->icon('heroicon-o-eye')
+                    ->color('primary')
+                    ->modalContent(fn ($record) => view('filament-workgroup.components.file-preview', [
+                        'url' => route('workgroup.file.preview', $record),
+                        'filename' => $record->filename,
+                        'fileType' => $record->file_type,
+                    ]))
+                    ->modalHeading(fn ($record) => $record->filename)
+                    ->modalWidth('7xl')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close'),
                 \Filament\Tables\Actions\Action::make('download')
                     ->label('Download')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('gray')
-                    ->url(fn ($record) => $this->getDownloadUrl($record)),
+                    ->url(fn ($record) => $this->getDownloadUrl($record))
+                    ->openUrlInNewTab(),
             ])
             ->emptyStateHeading('No files found');
     }
