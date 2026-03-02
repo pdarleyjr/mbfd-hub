@@ -19,7 +19,7 @@ class Notes extends Page implements HasTable
 {
     use InteractsWithTable;
 
-    protected static ?string $navigationIcon = 'heroicon-o-note';
+    protected static ?string $navigationIcon = 'heroicon-o-pencil-square';
 
     protected static string $view = 'filament::pages.simple-page';
 

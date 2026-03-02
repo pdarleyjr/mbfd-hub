@@ -41,7 +41,7 @@ class Dashboard extends BaseDashboard
         return [
             Action::make('openNotes')
                 ->label('My Notes')
-                ->icon('heroicon-o-note')
+                ->icon('heroicon-o-pencil-square')
                 ->color('gray')
                 ->url(fn () => Notes::getUrl()),
             Action::make('openEvaluations')
@@ -120,7 +120,7 @@ class Dashboard extends BaseDashboard
 
             Stat::make('My Notes', $myNotesCount)
                 ->description('Private notes')
-                ->descriptionIcon('heroicon-o-note')
+                ->descriptionIcon('heroicon-o-pencil-square')
                 ->color('gray'),
 
             Stat::make('Shared Uploads', $sharedUploadsCount)
