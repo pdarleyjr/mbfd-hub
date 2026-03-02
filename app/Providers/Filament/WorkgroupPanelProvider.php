@@ -82,10 +82,6 @@ class WorkgroupPanelProvider extends PanelProvider
                     ->label('Personal')
                     ->icon('heroicon-o-user')
                     ->collapsible(false),
-                NavigationGroup::make()
-                    ->label('External Tools')
-                    ->icon('heroicon-o-globe-alt')
-                    ->collapsible(false),
             ])
             ->userMenuItems([
                 MenuItem::make()
@@ -110,13 +106,6 @@ class WorkgroupPanelProvider extends PanelProvider
                 Authenticate::class,
                 EnsureWorkgroupPanelAccess::class,
             ])
-            ->sidebarCollapsibleOnDesktop()
-            ->navigationItems([
-                NavigationItem::make('Baserow')
-                    ->url('https://baserow.mbfdhub.com', shouldOpenInNewTab: true)
-                    ->icon('heroicon-o-arrow-top-right-on-square')
-                    ->group('External Tools')
-                    ->sort(99),
-            ]);
+            ->sidebarCollapsibleOnDesktop();
     }
 }
