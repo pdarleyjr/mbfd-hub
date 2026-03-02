@@ -20,7 +20,7 @@ class SharedUploads extends Page implements HasTable
 
     protected static ?string $navigationIcon = 'heroicon-o-cloud-arrow-up';
 
-    protected static string $view = 'filament::pages.simple-page';
+    protected static string $view = 'filament-workgroup.pages.simple-page';
 
     protected static ?string $title = 'Shared Uploads';
     

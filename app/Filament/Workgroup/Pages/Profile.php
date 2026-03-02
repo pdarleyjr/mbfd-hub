@@ -12,7 +12,7 @@ class Profile extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-user-circle';
 
-    protected static string $view = 'filament::pages.simple-page';
+    protected static string $view = 'filament-workgroup.pages.profile';
 
     protected static ?string $title = 'Profile';
     
