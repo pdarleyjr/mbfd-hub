@@ -264,15 +264,22 @@ class EvaluationFormPage extends Page
         // Product Info Header
         $schema[] = \Filament\Forms\Components\Section::make('Product Information')
             ->schema([
-                \Filament\Forms\Components\TextEntry::make('product.name')
-                    ->label('Product Name'),
-                \Filament\Forms\Components\TextEntry::make('product.manufacturer')
-                    ->label('Manufacturer'),
-                \Filament\Forms\Components\TextEntry::make('product.model')
-                    ->label('Model'),
-                \Filament\Forms\Components\TextEntry::make('assessment_profile')
+                \Filament\Forms\Components\TextInput::make('product_name')
+                    ->label('Product Name')
+                    ->default($this->product?->name)
+                    ->disabled(),
+                \Filament\Forms\Components\TextInput::make('product_manufacturer')
+                    ->label('Manufacturer')
+                    ->default($this->product?->manufacturer)
+                    ->disabled(),
+                \Filament\Forms\Components\TextInput::make('product_model')
+                    ->label('Model')
+                    ->default($this->product?->model)
+                    ->disabled(),
+                \Filament\Forms\Components\TextInput::make('assessment_profile_display')
                     ->label('Evaluation Profile')
-                    ->default(UniversalEvaluationRubric::getAssessmentProfiles()[$this->assessmentProfile] ?? 'Generic'),
+                    ->default(UniversalEvaluationRubric::getAssessmentProfiles()[$this->assessmentProfile] ?? 'Generic')
+                    ->disabled(),
             ])
             ->columns(2);
 
@@ -409,15 +416,11 @@ class EvaluationFormPage extends Page
             
             foreach ($criteria as $id => $criterion) {
                 $criterionFields[] = \Filament\Forms\Components\Group::make([
-                    \Filament\Forms\Components\TextEntry::make('criterion_label_' . $id)
+                    \Filament\Forms\Components\TextInput::make('criterion_label_' . $id)
                         ->label($criterion['name'])
                         ->default($criterion['description'])
-                        ->columnSpanFull()
-                        ->hint(function () use ($criterion) {
-                            $sourceLabel = UniversalEvaluationRubric::getSourceLabel($criterion['source']);
-                            $color = UniversalEvaluationRubric::getSourceBadgeColor($criterion['source']);
-                            return "{$sourceLabel} • Weight: {$criterion['weight']}";
-                        }),
+                        ->disabled()
+                        ->columnSpanFull(),
                     \Filament\Forms\Components\Select::make('ratings.' . $id)
                         ->label('Rating')
                         ->options(UniversalEvaluationRubric::getRatingOptions())
