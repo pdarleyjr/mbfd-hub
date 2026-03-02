@@ -25,6 +25,9 @@ class EvaluationTemplateResource extends Resource
 
     protected static ?int $navigationSort = 6;
 
+    /** @deprecated Templates are no longer used - using Universal Evaluation Rubric */
+    protected static bool $shouldRegisterNavigation = false;
+
     public static function form(Form $form): Form
     {
         return $form
