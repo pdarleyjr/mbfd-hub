@@ -22,7 +22,7 @@ class CategoryRankingsWidget extends BaseWidget
 
     protected int | string | array $columnSpan = 'full';
 
-    protected function getTable(): Table
+    public function getTable(): Table
     {
         $session = $this->session ?? WorkgroupSession::active()->first();
         
