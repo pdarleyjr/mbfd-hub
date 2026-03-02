@@ -1,4 +1,4 @@
-"<?php
+<?php
 
 namespace App\Filament\Workgroup\Pages;
 
@@ -290,4 +290,4 @@ class EvaluationFormPage extends Page
 
         return $member !== null;
     }
-}" 
+}"
