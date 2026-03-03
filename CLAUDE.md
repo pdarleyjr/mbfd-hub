@@ -9,18 +9,17 @@ Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filamen
 ## VPS
 - **Host:** `145.223.73.170`
 - **SSH:** `ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@145.223.73.170`
-- **Compose file:** `/root/mbfd-hub/docker-compose.yml`
+- **Compose file:** `/root/mbfd-hub/compose.yaml`
 - **Env file:** `/root/mbfd-hub/.env`
 
 ## Docker Services
 | Service | Internal Host | External Port | Notes |
 |---------|--------------|--------------|-------|
-| `app` | `app` | 8000 | Laravel + Octane |
+| `laravel.test` | `app` | 8080 | Laravel + Octane |
 | `nocobase` | `nocobase` | 13000 | NocoBase CE (community) |
 | `baserow` | `baserow` | 80 (internal) | Baserow self-hosted |
-| `db` | `db` | 5432 (internal) | PostgreSQL |
-| `redis` | `redis` | 6379 (internal) | Redis |
-| `reverb` | `reverb` | 8080 | Laravel Reverb WebSockets |
+| `pgsql` | `db` | 5432 (internal) | PostgreSQL |
+| `cloudflared` | `cloudflared-mbfdhub` | — | Cloudflare Tunnel |
 
 ## Domains
 - `www.mbfdhub.com` → Laravel/React app (port 8080) via Cloudflare Tunnel (tunnel ID: 89429799-7028-4df2-870d-f2fb858a49d7)
@@ -68,7 +67,7 @@ The `plugin-workflow-request` IS available in CE. Use it to call Baserow's REST 
 
 ### Pro Upgrade Path
 When a NocoBase Pro license is obtained:
-1. Edit `/root/mbfd-hub/docker-compose.yml`: change `nocobase/nocobase:latest` → `nocobase/nocobase:pro`
+1. Edit `/root/mbfd-hub/compose.yaml`: change `nocobase/nocobase:latest` → `nocobase/nocobase:pro`
 2. Run `docker compose pull nocobase && docker compose up -d nocobase`
 3. Re-execute phase 6 registration (script template in `.ai/context/nocobase_deployment_plan.md`)
 4. Baserow datasource: `type: "http-api"`, `baseURL: "http://baserow:80/api"`, `Authorization: Token <BASEROW_TOKEN>`
@@ -149,3 +148,46 @@ Shared trait: `app/Filament/Concerns/HasExportActions.php` (available but resour
 
 ### ⚠️ High-Volume Monitoring
 If `InspectionResource` or `StationResource/RelationManagers/InventorySubmissionsRelationManager` exceeds ~5,000 rows, consider migrating those specific tables to Filament's native queue-backed exporter (`Filament\Actions\Exports\ExcelExport`) to prevent PHP memory exhaustion during exports.
+
+---
+
+## Google Sheets Apparatus Sync (2026-03-03)
+
+### Overview
+One-way automatic sync from the MBFD Hub Fire Apparatus admin page to the `Equipment Maintenance` tab in Google Sheets.
+
+### Target Spreadsheet
+- **Spreadsheet ID:** `1u9MYILAkfEaMfNZnBujvB1J0J33Ha8TybWCd_mVMJC4`
+- **Tab:** `Equipment Maintenance` (sheetId: `1714038258`)
+- **Column mapping:** A=Designation, B=Vehicle#, C=Status, D=Location, E=Comments, F=Reported
+
+### Architecture
+- `App\Services\GoogleSheets\ApparatusSheetSyncService` — core sync service with metadata verification and retry
+- `App\Jobs\SyncApparatusToSheetJob` — queued job dispatched after each apparatus save
+- `App\Observers\ApparatusObserver` — stamps `reported_at`, dispatches sync job after commit
+- `App\Console\Commands\SyncApparatusSheet` — `artisan apparatus:sync-sheet [--dry-run] [--force]`
+- `config/google_sheets.php` — feature flag + secure credential path config
+
+### Credentials
+- Service account JSON: `/root/secrets/google_service_account.json` on VPS host
+- Mounted read-only into container at `/run/secrets/google_service_account.json`
+- **Never committed to git**
+- Loaded via env var `GOOGLE_SERVICE_ACCOUNT_JSON_PATH`
+
+### Env Vars (in /root/mbfd-hub/.env)
+```
+GOOGLE_SHEETS_APPARATUS_SYNC_ENABLED=true
+GOOGLE_SERVICE_ACCOUNT_JSON_PATH=/run/secrets/google_service_account.json
+GOOGLE_SHEETS_SPREADSHEET_ID=1u9MYILAkfEaMfNZnBujvB1J0J33Ha8TybWCd_mVMJC4
+GOOGLE_SHEETS_TAB_TITLE="Equipment Maintenance"
+GOOGLE_SHEETS_TAB_SHEET_ID=1714038258
+```
+
+### Fire Apparatus Page UI Changes
+- **Location column**: Condenses Station + Assignment + Current Location into smart single column
+- **Class column**: Hidden by default (data preserved, toggleable)
+- **Notes → Comments**: Column relabeled
+- **Reported**: New auto-stamped datetime column
+
+### Google API Package
+`google/apiclient:^2.15` installed via Composer.
