@@ -113,15 +113,6 @@ class Evaluations extends Page implements HasTable
 
         $sessionId = $this->selectedSession ? (int) $this->selectedSession : null;
 
-        // Get submissions for this member in the current session
-        $memberSubmissionIds = [];
-        if ($sessionId && $member) {
-            $memberSubmissionIds = EvaluationSubmission::where('workgroup_member_id', $member->id)
-                ->whereHas('candidateProduct', fn($q) => $q->where('workgroup_session_id', $sessionId))
-                ->pluck('candidate_product_id', 'id')
-                ->toArray();
-        }
-
         return CandidateProduct::where('workgroup_session_id', $sessionId)
             ->with(['category', 'session'])
             // Eager load submissions for the current member to avoid N+1
@@ -131,8 +122,6 @@ class Evaluations extends Page implements HasTable
                     $q->whereHas('candidateProduct', fn($sq) => $sq->where('workgroup_session_id', $sessionId));
                 }
             }])
-            // Add submission relation for quick access in table
-            ->with('submissions')
             ->orderBy('category_id')
             ->orderBy('name');
     }
