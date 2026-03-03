@@ -6,6 +6,9 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Forms;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
+use pxlrbt\FilamentExcel\Exports\ExcelExport;
 
 class StationInventoryItemsRelationManager extends RelationManager
 {
@@ -62,6 +65,24 @@ class StationInventoryItemsRelationManager extends RelationManager
                         'overstocked' => 'Overstocked',
                     ]),
             ])
+            
+            ->headerActions([
+                ExportAction::make('export')
+                    ->label('Export')
+                    ->color('gray')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->exports([
+                        ExcelExport::make('xlsx')
+                            ->label('Export as Excel (.xlsx)')
+                            ->fromTable()
+                            ->withFilename('mbfd_station_inventory_' . date('Y-m-d')),
+                        ExcelExport::make('csv')
+                            ->label('Export as CSV (.csv)')
+                            ->fromTable()
+                            ->withFilename('mbfd_station_inventory_' . date('Y-m-d'))
+                            ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
+                    ]),
+            ])
             ->actions([
                 Tables\Actions\EditAction::make()
                     ->form([
@@ -113,6 +134,19 @@ class StationInventoryItemsRelationManager extends RelationManager
                         $record->save();
                     }),
             ])
-            ->bulkActions([]);
+            ->bulkActions([                    ExportBulkAction::make('export_selected')
+                        ->label('Export Selected')
+                        ->exports([
+                            ExcelExport::make('xlsx')
+                                ->label('Export as Excel (.xlsx)')
+                                ->fromTable()
+                                ->withFilename('mbfd_station_inventory_selected_' . date('Y-m-d')),
+                            ExcelExport::make('csv')
+                                ->label('Export as CSV (.csv)')
+                                ->fromTable()
+                                ->withFilename('mbfd_station_inventory_selected_' . date('Y-m-d'))
+                                ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
+                        ]),
+]);
     }
 }

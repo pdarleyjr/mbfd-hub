@@ -10,6 +10,9 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
+use pxlrbt\FilamentExcel\Exports\ExcelExport;
 
 class Under25kProjectsRelationManager extends RelationManager
 {
@@ -73,11 +76,42 @@ class Under25kProjectsRelationManager extends RelationManager
                         ]);
                     }),
             ])
+            
+            ->headerActions([
+                ExportAction::make('export')
+                    ->label('Export')
+                    ->color('gray')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->exports([
+                        ExcelExport::make('xlsx')
+                            ->label('Export as Excel (.xlsx)')
+                            ->fromTable()
+                            ->withFilename('mbfd_station_under25k_' . date('Y-m-d')),
+                        ExcelExport::make('csv')
+                            ->label('Export as CSV (.csv)')
+                            ->fromTable()
+                            ->withFilename('mbfd_station_under25k_' . date('Y-m-d'))
+                            ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
+                    ]),
+            ])
             ->actions([
                 Tables\Actions\ViewAction::make()
                     ->url(fn (Under25kProject $record): string => Under25kProjectResource::getUrl('view', ['record' => $record]))
                     ->openUrlInNewTab(false),
             ])
-            ->bulkActions([]);
+            ->bulkActions([                    ExportBulkAction::make('export_selected')
+                        ->label('Export Selected')
+                        ->exports([
+                            ExcelExport::make('xlsx')
+                                ->label('Export as Excel (.xlsx)')
+                                ->fromTable()
+                                ->withFilename('mbfd_station_under25k_selected_' . date('Y-m-d')),
+                            ExcelExport::make('csv')
+                                ->label('Export as CSV (.csv)')
+                                ->fromTable()
+                                ->withFilename('mbfd_station_under25k_selected_' . date('Y-m-d'))
+                                ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
+                        ]),
+]);
     }
 }

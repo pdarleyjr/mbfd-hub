@@ -13,6 +13,9 @@ use Filament\Tables\Table;
 use Filament\Resources\Resource;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
+use pxlrbt\FilamentExcel\Exports\ExcelExport;
 
 class EquipmentItemResource extends Resource
 {
@@ -212,6 +215,24 @@ class EquipmentItemResource extends Resource
                     ->trueLabel('Active only')
                     ->falseLabel('Inactive only'),
             ])
+            
+            ->headerActions([
+                ExportAction::make('export')
+                    ->label('Export')
+                    ->color('gray')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->exports([
+                        ExcelExport::make('xlsx')
+                            ->label('Export as Excel (.xlsx)')
+                            ->fromTable()
+                            ->withFilename('mbfd_equipment_items_' . date('Y-m-d')),
+                        ExcelExport::make('csv')
+                            ->label('Export as CSV (.csv)')
+                            ->fromTable()
+                            ->withFilename('mbfd_equipment_items_' . date('Y-m-d'))
+                            ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
+                    ]),
+            ])
             ->actions([
                 Tables\Actions\Action::make('adjust_stock')
                     ->label('Adjust Stock')
@@ -326,7 +347,20 @@ class EquipmentItemResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                                        ExportBulkAction::make('export_selected')
+                        ->label('Export Selected')
+                        ->exports([
+                            ExcelExport::make('xlsx')
+                                ->label('Export as Excel (.xlsx)')
+                                ->fromTable()
+                                ->withFilename('mbfd_equipment_items_selected_' . date('Y-m-d')),
+                            ExcelExport::make('csv')
+                                ->label('Export as CSV (.csv)')
+                                ->fromTable()
+                                ->withFilename('mbfd_equipment_items_selected_' . date('Y-m-d'))
+                                ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
+                        ]),
+Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
     }

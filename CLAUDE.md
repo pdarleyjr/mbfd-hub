@@ -86,3 +86,66 @@ When a NocoBase Pro license is obtained:
 ## CI/CD Notes
 - Smoke tests in `deploy.yml` target `https://www.mbfdhub.com`
 - All darleyplex.com references have been migrated to mbfdhub.com
+
+---
+
+## Pump Simulator (2026-03-03)
+
+### Summary
+A React SPA pump training simulator implemented as a new Vite entry point within the Laravel app.
+
+### Route
+- `GET /pump-simulator` — public, no auth required
+- Served by `Route::view('/pump-simulator', 'pump-simulator')->name('pump-simulator')` in `routes/web.php`
+- Blade template: `resources/views/pump-simulator.blade.php`
+
+### Frontend Architecture
+- Entry: `resources/js/pump-simulator/main.tsx`
+- State: Zustand store at `resources/js/pump-simulator/stores/usePumpStore.tsx`
+- Components: `PumpPanel.tsx`, `Gauge.tsx`, `ValveControl.tsx`, `ShiftModeToggle.tsx`
+- CSS: `resources/js/pump-simulator/styles/index.css` (bundled into the main.tsx JS chunk — do NOT add CSS separately to `@vite()` directive)
+- Vite config: `pump-simulator` input added in `vite.config.js`
+
+### Dependencies Added
+- `react`, `react-dom`, `@types/react`, `@types/react-dom` — React runtime
+- `zustand` — state management
+- `framer-motion` — animations for gauge needles
+
+### Deployment Notes
+- The `database/migrations/2026_02_17_000005_update_apparatuses_status_constraint.php` migration requires `'Available'` status to be included (VPS had rows with status='Available')
+- After merging `feature/pump-simulator` to `main` on VPS, run `npm install` to add React packages before `npm run build`
+- The CSS for the pump simulator is automatically bundled into the JS chunk by Vite — only reference `main.tsx` in the blade `@vite()` directive
+
+---
+
+## Export Feature — CSV / XLSX (2026-03-03)
+
+### Package
+`pxlrbt/filament-excel` ^2.5 installed via `composer require` in the `laravel.test` Docker container.
+
+### Coverage
+All tables across all three Filament panels now have:
+- **Header Export button** — exports the entire table (respecting active filters) as `.xlsx` or `.csv`
+- **Bulk Export action** — exports only the checked/selected rows as `.xlsx` or `.csv`
+
+**Panels and resources covered:**
+- **Logistics panel** (15 resources + 12 relation managers)
+- **Training panel** (3 resources)
+- **Workgroup panel** (9 resources + 4 relation managers)
+
+Note: `SingleGasMeterResource` already had a native Filament ExportAction before this feature; it was NOT modified to avoid duplication.
+
+### Implementation Pattern
+Each resource file has:
+```php
+use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
+use pxlrbt\FilamentExcel\Exports\ExcelExport;
+```
+- `->headerActions([ExportAction::make('export')->exports([xlsx, csv])])` in `table()`
+- `ExportBulkAction::make('export_selected')` inside `BulkActionGroup::make([...])` in `table()`
+
+Shared trait: `app/Filament/Concerns/HasExportActions.php` (available but resources are patched inline for Filament compatibility).
+
+### ⚠️ High-Volume Monitoring
+If `InspectionResource` or `StationResource/RelationManagers/InventorySubmissionsRelationManager` exceeds ~5,000 rows, consider migrating those specific tables to Filament's native queue-backed exporter (`Filament\Actions\Exports\ExcelExport`) to prevent PHP memory exhaustion during exports.

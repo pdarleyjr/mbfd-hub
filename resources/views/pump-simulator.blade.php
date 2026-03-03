@@ -26,7 +26,7 @@
             }
         }
     </script>
-    @vite(['resources/js/pump-simulator/main.tsx', 'resources/js/pump-simulator/styles/index.css'])
+    @vite(['resources/js/pump-simulator/main.tsx'])
 </head>
 <body class="bg-gray-900">
     <div id="pump-simulator-root"></div>

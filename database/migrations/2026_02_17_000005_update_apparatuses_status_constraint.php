@@ -13,7 +13,7 @@ return new class extends Migration
     {
         DB::statement('ALTER TABLE apparatuses DROP CONSTRAINT IF EXISTS apparatuses_status_check');
         DB::statement("ALTER TABLE apparatuses ADD CONSTRAINT apparatuses_status_check CHECK (status IN (
-            'In Service', 'Out of Service', 'Maintenance',
+            'In Service', 'Out of Service', 'Maintenance', 'Available',
             'in_service', 'out_of_service', 'maintenance', 'reserve', 'in_repair'
         ))");
     }

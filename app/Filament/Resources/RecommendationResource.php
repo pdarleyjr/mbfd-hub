@@ -16,6 +16,9 @@ use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Closure;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
+use pxlrbt\FilamentExcel\Exports\ExcelExport;
 
 class RecommendationResource extends Resource
 {
@@ -146,6 +149,24 @@ class RecommendationResource extends Resource
                         'fuzzy' => 'Fuzzy',
                         'ai' => 'AI',
                         'manual' => 'Manual',
+                    ]),
+            ])
+            
+            ->headerActions([
+                ExportAction::make('export')
+                    ->label('Export')
+                    ->color('gray')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->exports([
+                        ExcelExport::make('xlsx')
+                            ->label('Export as Excel (.xlsx)')
+                            ->fromTable()
+                            ->withFilename('mbfd_recommendations_' . date('Y-m-d')),
+                        ExcelExport::make('csv')
+                            ->label('Export as CSV (.csv)')
+                            ->fromTable()
+                            ->withFilename('mbfd_recommendations_' . date('Y-m-d'))
+                            ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
                     ]),
             ])
             ->actions([
@@ -294,7 +315,20 @@ class RecommendationResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                                        ExportBulkAction::make('export_selected')
+                        ->label('Export Selected')
+                        ->exports([
+                            ExcelExport::make('xlsx')
+                                ->label('Export as Excel (.xlsx)')
+                                ->fromTable()
+                                ->withFilename('mbfd_recommendations_selected_' . date('Y-m-d')),
+                            ExcelExport::make('csv')
+                                ->label('Export as CSV (.csv)')
+                                ->fromTable()
+                                ->withFilename('mbfd_recommendations_selected_' . date('Y-m-d'))
+                                ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
+                        ]),
+Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');

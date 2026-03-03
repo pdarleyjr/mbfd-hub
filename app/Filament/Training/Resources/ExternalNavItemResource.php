@@ -12,6 +12,9 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
+use pxlrbt\FilamentExcel\Exports\ExcelExport;
 
 class ExternalNavItemResource extends Resource
 {
@@ -110,6 +113,41 @@ class ExternalNavItemResource extends Resource
             ])
             ->defaultSort('sort_order')
             ->reorderable('sort_order')
+            
+            ->headerActions([
+                ExportAction::make('export')
+                    ->label('Export')
+                    ->color('gray')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->exports([
+                        ExcelExport::make('xlsx')
+                            ->label('Export as Excel (.xlsx)')
+                            ->fromTable()
+                            ->withFilename('mbfd_training_nav_items_' . date('Y-m-d')),
+                        ExcelExport::make('csv')
+                            ->label('Export as CSV (.csv)')
+                            ->fromTable()
+                            ->withFilename('mbfd_training_nav_items_' . date('Y-m-d'))
+                            ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
+                    ]),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                                        ExportBulkAction::make('export_selected')
+                        ->label('Export Selected')
+                        ->exports([
+                            ExcelExport::make('xlsx')
+                                ->label('Export as Excel (.xlsx)')
+                                ->fromTable()
+                                ->withFilename('mbfd_training_nav_items_selected_' . date('Y-m-d')),
+                            ExcelExport::make('csv')
+                                ->label('Export as CSV (.csv)')
+                                ->fromTable()
+                                ->withFilename('mbfd_training_nav_items_selected_' . date('Y-m-d'))
+                                ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
+                        ]),
+                ]),
+            ])
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),

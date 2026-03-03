@@ -17,6 +17,7 @@
         "laravel/sanctum": "*",
         "laravel/tinker": "^2.9",
         "monzer/filament-chatify-integration": "^1.0",
+        "pxlrbt/filament-excel": "^2.5",
         "sentry/sentry-laravel": "*",
         "spatie/laravel-permission": "^6.24"
     },

@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-BkIGJT3O.css",
+    "file": "assets/app-DGdgaH-7.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -16,7 +16,7 @@
     "src": "resources/js/pump-simulator/main.tsx",
     "isEntry": true,
     "css": [
-      "assets/main-D-7Bg2YI.css"
+      "assets/main-BlpA3qIb.css"
     ]
   },
   "resources/js/push-notification-widget.js": {
