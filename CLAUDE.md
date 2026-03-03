@@ -9,17 +9,18 @@ Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filamen
 ## VPS
 - **Host:** `145.223.73.170`
 - **SSH:** `ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@145.223.73.170`
-- **Compose file:** `/root/mbfd-hub/compose.yaml`
+- **Compose file:** `/root/mbfd-hub/docker-compose.yml`
 - **Env file:** `/root/mbfd-hub/.env`
 
 ## Docker Services
 | Service | Internal Host | External Port | Notes |
 |---------|--------------|--------------|-------|
-| `laravel.test` | `app` | 8080 | Laravel + Octane |
+| `app` | `app` | 8000 | Laravel + Octane |
 | `nocobase` | `nocobase` | 13000 | NocoBase CE (community) |
 | `baserow` | `baserow` | 80 (internal) | Baserow self-hosted |
-| `pgsql` | `db` | 5432 (internal) | PostgreSQL |
-| `cloudflared` | `cloudflared-mbfdhub` | — | Cloudflare Tunnel |
+| `db` | `db` | 5432 (internal) | PostgreSQL |
+| `redis` | `redis` | 6379 (internal) | Redis |
+| `reverb` | `reverb` | 8080 | Laravel Reverb WebSockets |
 
 ## Domains
 - `www.mbfdhub.com` → Laravel/React app (port 8080) via Cloudflare Tunnel (tunnel ID: 89429799-7028-4df2-870d-f2fb858a49d7)
@@ -67,87 +68,11 @@ The `plugin-workflow-request` IS available in CE. Use it to call Baserow's REST 
 
 ### Pro Upgrade Path
 When a NocoBase Pro license is obtained:
-1. Edit `/root/mbfd-hub/compose.yaml`: change `nocobase/nocobase:latest` → `nocobase/nocobase:pro`
+1. Edit `/root/mbfd-hub/docker-compose.yml`: change `nocobase/nocobase:latest` → `nocobase/nocobase:pro`
 2. Run `docker compose pull nocobase && docker compose up -d nocobase`
 3. Re-execute phase 6 registration (script template in `.ai/context/nocobase_deployment_plan.md`)
 4. Baserow datasource: `type: "http-api"`, `baseURL: "http://baserow:80/api"`, `Authorization: Token <BASEROW_TOKEN>`
 5. Register collections: `apparatuses`, `todos`, `apparatus_defects`, `capital_projects`, `station_inventory_submissions`
-
----
-
-## Key Files
-- `scripts/nocobase/ui_layouts/member_portal.json` — member portal UI schema
-- `scripts/nocobase/ui_layouts/admin_dashboard.json` — admin dashboard UI schema
-- `provision_nocobase_users.py` — user provisioning script
-- `.github/workflows/deploy.yml` — CI/CD deploy pipeline (smoke tests target `www.mbfdhub.com`)
-- `docs/BASEROW_INTEGRATION.md` — Baserow integration notes
-
-## CI/CD Notes
-- Smoke tests in `deploy.yml` target `https://www.mbfdhub.com`
-- All darleyplex.com references have been migrated to mbfdhub.com
-
----
-
-## Pump Simulator (2026-03-03)
-
-### Summary
-A React SPA pump training simulator implemented as a new Vite entry point within the Laravel app.
-
-### Route
-- `GET /pump-simulator` — public, no auth required
-- Served by `Route::view('/pump-simulator', 'pump-simulator')->name('pump-simulator')` in `routes/web.php`
-- Blade template: `resources/views/pump-simulator.blade.php`
-
-### Frontend Architecture
-- Entry: `resources/js/pump-simulator/main.tsx`
-- State: Zustand store at `resources/js/pump-simulator/stores/usePumpStore.tsx`
-- Components: `PumpPanel.tsx`, `Gauge.tsx`, `ValveControl.tsx`, `ShiftModeToggle.tsx`
-- CSS: `resources/js/pump-simulator/styles/index.css` (bundled into the main.tsx JS chunk — do NOT add CSS separately to `@vite()` directive)
-- Vite config: `pump-simulator` input added in `vite.config.js`
-
-### Dependencies Added
-- `react`, `react-dom`, `@types/react`, `@types/react-dom` — React runtime
-- `zustand` — state management
-- `framer-motion` — animations for gauge needles
-
-### Deployment Notes
-- The `database/migrations/2026_02_17_000005_update_apparatuses_status_constraint.php` migration requires `'Available'` status to be included (VPS had rows with status='Available')
-- After merging `feature/pump-simulator` to `main` on VPS, run `npm install` to add React packages before `npm run build`
-- The CSS for the pump simulator is automatically bundled into the JS chunk by Vite — only reference `main.tsx` in the blade `@vite()` directive
-
----
-
-## Export Feature — CSV / XLSX (2026-03-03)
-
-### Package
-`pxlrbt/filament-excel` ^2.5 installed via `composer require` in the `laravel.test` Docker container.
-
-### Coverage
-All tables across all three Filament panels now have:
-- **Header Export button** — exports the entire table (respecting active filters) as `.xlsx` or `.csv`
-- **Bulk Export action** — exports only the checked/selected rows as `.xlsx` or `.csv`
-
-**Panels and resources covered:**
-- **Logistics panel** (15 resources + 12 relation managers)
-- **Training panel** (3 resources)
-- **Workgroup panel** (9 resources + 4 relation managers)
-
-Note: `SingleGasMeterResource` already had a native Filament ExportAction before this feature; it was NOT modified to avoid duplication.
-
-### Implementation Pattern
-Each resource file has:
-```php
-use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
-use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
-use pxlrbt\FilamentExcel\Exports\ExcelExport;
-```
-- `->headerActions([ExportAction::make('export')->exports([xlsx, csv])])` in `table()`
-- `ExportBulkAction::make('export_selected')` inside `BulkActionGroup::make([...])` in `table()`
-
-Shared trait: `app/Filament/Concerns/HasExportActions.php` (available but resources are patched inline for Filament compatibility).
-
-### ⚠️ High-Volume Monitoring
-If `InspectionResource` or `StationResource/RelationManagers/InventorySubmissionsRelationManager` exceeds ~5,000 rows, consider migrating those specific tables to Filament's native queue-backed exporter (`Filament\Actions\Exports\ExcelExport`) to prevent PHP memory exhaustion during exports.
 
 ---
 
@@ -185,9 +110,103 @@ GOOGLE_SHEETS_TAB_SHEET_ID=1714038258
 
 ### Fire Apparatus Page UI Changes
 - **Location column**: Condenses Station + Assignment + Current Location into smart single column
-- **Class column**: Hidden by default (data preserved, toggleable)
+- **Class column**: Hidden by default (data preserved, togglable)
 - **Notes → Comments**: Column relabeled
 - **Reported**: New auto-stamped datetime column
 
-### Google API Package
-`google/apiclient:^2.15` installed via Composer.
+---
+
+## Key Files
+- `scripts/nocobase/ui_layouts/member_portal.json` — member portal UI schema
+- `scripts/nocobase/ui_layouts/admin_dashboard.json` — admin dashboard UI schema
+- `provision_nocobase_users.py` — user provisioning script
+- `.github/workflows/deploy.yml` — CI/CD deploy pipeline (smoke tests target `www.mbfdhub.com`)
+- `docs/BASEROW_INTEGRATION.md` — Baserow integration notes
+
+## CI/CD Notes
+- Smoke tests in `deploy.yml` target `https://www.mbfdhub.com`
+- All darleyplex.com references have been migrated to mbfdhub.com
+
+---
+
+## Pump Simulator V2 (2026-03-03)
+
+### Summary
+A React SPA pump training simulator implemented as a new Vite entry point within the Laravel app. **V2 upgrade (2026-03-03):** Fixed critical build errors, migrated to real Zustand, added advanced fire hydraulics.
+
+### Route
+- `GET /pump-simulator` — public, no auth required
+- Served by `Route::view('/pump-simulator', 'pump-simulator')->name('pump-simulator')` in `routes/web.php`
+- Blade template: `resources/views/pump-simulator.blade.php`
+
+### V2 Build Fixes Applied
+- **Removed Tailwind CDN** from blade template (was causing MIME/build conflicts)
+- **Added `import React`** to all .tsx files (fixes `ReferenceError: React is not defined`)
+- **Removed `rollupOptions.output.entryFileNames`** from `vite.config.js` (was overriding ALL entry filenames)
+- **⚠️ STRICT RULE: No `@apply` in pump-simulator CSS** — causes iOS black-screen crash. All styles use plain CSS properties or inline styles.
+
+### Frontend Architecture
+- Entry: `resources/js/pump-simulator/main.tsx`
+- State: **Zustand store** at `resources/js/pump-simulator/stores/usePumpStore.tsx` (migrated from React Context)
+- Components: `PumpPanel.tsx`, `Gauge.tsx` (SVG chrome bezel), `ValveControl.tsx` (expanded), `ShiftModeToggle.tsx`
+- CSS: `resources/js/pump-simulator/styles/index.css` (bundled into the main.tsx JS chunk — do NOT add CSS separately to `@vite()` directive)
+- Vite config: `pump-simulator` input added in `vite.config.js`
+
+### Zustand Hydraulics Store Architecture
+- **10 nozzle profiles**: Smooth bore (15/16", 1", 1⅛", 1¼"), fog (100-250 GPM), master stream (500 GPM), booster (60 GPM)
+- **Friction loss formula**: `FL = C × (GPM/100)² × (Length/100)`
+  - Coefficients: 1" = 150, 1¾" = 15.5, 2½" = 2.0, 3" = 0.8, 5" = 0.08
+- **Intake controls**: Tank-to-Pump, 5" LDH Intake, 3" Pony Suction
+- **6 discharge lines**: 2× Crosslays (1¾"), Deck Gun (2½"), Booster (1"), 2× Discharge (2½")
+- **Per-line config**: Adjustable hose length and nozzle selection
+- **Computed state**: Total flow GPM, pump capacity %, master discharge pressure, cavitation detection
+- **Cavitation trigger**: pump mode + intake < 0 PSI + MDP > 150 + throttle > 40%
+
+### Framer Motion Animations
+- **Gauge needle**: Spring animation (`stiffness: 100, damping: 10`)
+- **Cavitation vibration**: Keyframe array on needle rotation + CSS shake on panel
+- **Valve toggles**: Spring-animated thumb position
+
+### Dependencies Added
+- `react`, `react-dom`, `@types/react`, `@types/react-dom` — React runtime
+- `zustand` — state management (actual Zustand, not React Context wrapper)
+- `framer-motion` — animations for gauge needles and cavitation
+
+### Deployment Notes
+- The `database/migrations/2026_02_17_000005_update_apparatuses_status_constraint.php` migration requires `'Available'` status to be included (VPS had rows with status='Available')
+- After merging to `main` on VPS, run `npm install` then `npm run build` to rebuild Vite assets
+- The CSS for the pump simulator is automatically bundled into the JS chunk by Vite — only reference `main.tsx` in the blade `@vite()` directive
+
+---
+
+## Export Feature — CSV / XLSX (2026-03-03)
+
+### Package
+`pxlrbt/filament-excel` ^2.5 installed via `composer require` in the `laravel.test` Docker container.
+
+### Coverage
+All tables across all three Filament panels now have:
+- **Header Export button** — exports the entire table (respecting active filters) as `.xlsx` or `.csv`
+- **Bulk Export action** — exports only the checked/selected rows as `.xlsx` or `.csv`
+
+**Panels and resources covered:**
+- **Logistics panel** (15 resources + 12 relation managers)
+- **Training panel** (3 resources)
+- **Workgroup panel** (9 resources + 4 relation managers)
+
+Note: `SingleGasMeterResource` already had a native Filament ExportAction before this feature; it was NOT modified to avoid duplication.
+
+### Implementation Pattern
+Each resource file has:
+```php
+use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
+use pxlrbt\FilamentExcel\Exports\ExcelExport;
+```
+- `->headerActions([ExportAction::make('export')->exports([xlsx, csv])])` in `table()`
+- `ExportBulkAction::make('export_selected')` inside `BulkActionGroup::make([...])` in `table()`
+
+Shared trait: `app/Filament/Concerns/HasExportActions.php` (available but resources are patched inline for Filament compatibility).
+
+### ⚠️ High-Volume Monitoring
+If `InspectionResource` or `StationResource/RelationManagers/InventorySubmissionsRelationManager` exceeds ~5,000 rows, consider migrating those specific tables to Filament's native queue-backed exporter (`Filament\Actions\Exports\ExcelExport`) to prevent PHP memory exhaustion during exports.
