@@ -1,62 +1,18 @@
-/.phpunit.cache
 /node_modules
-**/node_modules
 /public/hot
 /public/storage
 /storage/*.key
-/storage/pail
+/storage/app/public/*
 /vendor
-**/package-lock.json
-.env*
-!.env.example
-.phpactor.json
+.env
+.env.backup
+.env.production
 .phpunit.result.cache
-Homestead.json
-Homestead.yaml
-npm-debug.log
-yarn-error.log
-/auth.json
-/.fleet
-/.idea
-/.nova
-/.vscode
-/.zed
-*.code-workspace
-
-# Logs
-*.log
-
-# Temp/debug scripts in root
-/fix_*.php
-/debug_*.php
-/check_*.php
-/verify_*.php
-/create_*.sh
-/test_*.php
-/sentry_test.php
-
-# PowerShell diagnostic scripts (contain credentials/tokens)
-*.ps1
-/check_ip_rules.ps1
-/check_vps.ps1
-/create_user_vps.ps1
-/fetch_user_ip.ps1
-/fetch_waf_logs.ps1
-/final_system_check.ps1
-/final_system_check_sql.ps1
-/fix_admin_access.ps1
-/deploy_inventory_fix.ps1
-
-# Documentation with potentially sensitive content
-TOKEN_GENERATION_GUIDE.md
-PROJECT_SUMMARY.md
-.project_summary.md
-
-# Temporary files directory
-/temp_files/
-
-# Local credentials and secrets (NEVER commit)
-.local/
-pics/
-MBFD_HUB_DISCOVERY_REPORT_2026-02-12.md
-PERFORMANCE_FIX_REPORT_2026-02-12.md
+Heroku.php
+PhpStorm.php
+auth.json
+docker-compose.override.yml
+docker-compose.vps.yml
+compose.vps.yml
+*.local
+_test_observer_temp.php
