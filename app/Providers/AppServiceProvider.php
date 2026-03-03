@@ -4,8 +4,10 @@ namespace App\Providers;
 
 use App\Models\Todo;
 use App\Models\ChMessage;
+use App\Models\Apparatus;
 use App\Observers\TodoObserver;
 use App\Observers\ChMessageObserver;
+use App\Observers\ApparatusObserver;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Support\Facades\URL;
@@ -14,9 +16,6 @@ use Illuminate\Support\Facades\Vite;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         $this->app->bind(
@@ -25,9 +24,6 @@ class AppServiceProvider extends ServiceProvider
         );
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         if (str_contains(config('app.url'), 'https://')) {
@@ -36,8 +32,8 @@ class AppServiceProvider extends ServiceProvider
         
         Todo::observe(TodoObserver::class);
         ChMessage::observe(ChMessageObserver::class);
+        Apparatus::observe(ApparatusObserver::class);
 
-        // Register push notification widget JavaScript
         FilamentAsset::register([
             Js::make('push-notification-widget', Vite::asset('resources/js/push-notification-widget.js')),
         ]);

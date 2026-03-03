@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ApparatusResource\Pages;
 use App\Filament\Resources\ApparatusResource\RelationManagers;
+use App\Jobs\SyncApparatusToSheetJob;
 use App\Models\Apparatus;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -76,6 +77,7 @@ class ApparatusResource extends Resource
                         Forms\Components\DatePicker::make('last_service_date'),
                     ])->columns(4),
                 Forms\Components\Textarea::make('notes')
+                    ->label('Comments')
                     ->columnSpanFull(),
                 Forms\Components\Section::make('Vehicle Details')
                     ->schema([
@@ -111,24 +113,6 @@ class ApparatusResource extends Resource
                     ->label('Vehicle #')
                     ->searchable()
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('class_description')
-                    ->label('Class')
-                    ->searchable()
-                    ->placeholder('—'),
-                Tables\Columns\TextColumn::make('station.station_number')
-                    ->label('Station')
-                    ->searchable()
-                    ->sortable()
-                    ->state(fn (Apparatus $record): ?string => $record->station?->station_number)
-                    ->placeholder('—'),
-                Tables\Columns\TextColumn::make('assignment')
-                    ->label('Assignment')
-                    ->searchable()
-                    ->placeholder('—'),
-                Tables\Columns\TextColumn::make('current_location')
-                    ->label('Current Location')
-                    ->searchable()
-                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
@@ -140,9 +124,39 @@ class ApparatusResource extends Resource
                         default => 'gray',
                     })
                     ->placeholder('—'),
+                Tables\Columns\TextColumn::make('location_display')
+                    ->label('Location')
+                    ->getStateUsing(function (Apparatus $record): string {
+                        $stationLabel = $record->station ? 'Station ' . $record->station->station_number : null;
+                        $assignment   = trim($record->assignment ?? '');
+                        $currentLoc   = trim($record->current_location ?? '');
+
+                        if ($currentLoc && $currentLoc === $assignment) {
+                            $currentLoc = '';
+                        }
+
+                        if ($currentLoc && $assignment && $currentLoc !== $stationLabel) {
+                            return "{$assignment} → {$currentLoc}";
+                        }
+
+                        return $currentLoc ?: $assignment ?: $stationLabel ?: '—';
+                    })
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->where(function ($q) use ($search) {
+                            $q->where('assignment', 'like', "%{$search}%")
+                              ->orWhere('current_location', 'like', "%{$search}%");
+                        });
+                    })
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('notes')
+                    ->label('Comments')
                     ->limit(30)
                     ->tooltip(fn ($record) => $record->notes)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('reported_at')
+                    ->label('Reported')
+                    ->dateTime('n/j/Y')
+                    ->sortable()
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('inspections_count')
                     ->label('Inspections')
@@ -154,6 +168,27 @@ class ApparatusResource extends Resource
                     ->getStateUsing(fn (Apparatus $record) => $record->defects()->where('resolved', false)->count())
                     ->badge()
                     ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
+                // Hidden/toggleable columns — data preserved, not shown by default
+                Tables\Columns\TextColumn::make('class_description')
+                    ->label('Class')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('station.station_number')
+                    ->label('Station')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('assignment')
+                    ->label('Assignment')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('current_location')
+                    ->label('Current Location')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('unit_id')
                     ->label('Unit ID')
                     ->searchable()
@@ -219,7 +254,6 @@ class ApparatusResource extends Resource
                     ->label('Has Active Issues')
                     ->query(fn (Builder $query) => $query->whereHas('defects', fn ($q) => $q->where('resolved', false))),
             ])
-            
             ->headerActions([
                 ExportAction::make('export')
                     ->label('Export')
@@ -236,6 +270,22 @@ class ApparatusResource extends Resource
                             ->withFilename('mbfd_apparatuses_' . date('Y-m-d'))
                             ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
                     ]),
+                Tables\Actions\Action::make('sync_to_sheet')
+                    ->label('Sync to Google Sheet')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('success')
+                    ->visible(fn () => config('google_sheets.apparatus_sync_enabled'))
+                    ->requiresConfirmation()
+                    ->modalHeading('Sync Fire Apparatus to Google Sheet')
+                    ->modalDescription('This will overwrite the Equipment Maintenance tab with current apparatus data. Continue?')
+                    ->action(function () {
+                        SyncApparatusToSheetJob::dispatch();
+                        \Filament\Notifications\Notification::make()
+                            ->title('Sync Queued')
+                            ->body('The apparatus data will be synced to the Equipment Maintenance sheet shortly.')
+                            ->success()
+                            ->send();
+                    }),
             ])
             ->actions([
                 Tables\Actions\Action::make('start_daily_checkout')
@@ -276,7 +326,7 @@ class ApparatusResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                                        ExportBulkAction::make('export_selected')
+                    ExportBulkAction::make('export_selected')
                         ->label('Export Selected')
                         ->exports([
                             ExcelExport::make('xlsx')
@@ -289,7 +339,7 @@ class ApparatusResource extends Resource
                                 ->withFilename('mbfd_apparatuses_selected_' . date('Y-m-d'))
                                 ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
                         ]),
-Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
     }

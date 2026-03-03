@@ -29,16 +29,15 @@ class Apparatus extends Model
         'last_service_date',
         'notes',
         'station_id',
+        'reported_at',
     ];
 
     protected $casts = [
         'mileage' => 'decimal:2',
         'last_service_date' => 'date',
+        'reported_at' => 'datetime',
     ];
 
-    /**
-     * Get the station that owns this apparatus
-     */
     public function station(): BelongsTo
     {
         return $this->belongsTo(Station::class);
@@ -59,17 +58,11 @@ class Apparatus extends Model
         return $this->hasMany(ApparatusDefect::class)->where('resolved', false);
     }
 
-    /**
-     * Get all inventory allocations for this apparatus
-     */
     public function inventoryAllocations()
     {
         return $this->hasMany(ApparatusInventoryAllocation::class, 'apparatus_id');
     }
 
-    /**
-     * Get all single gas meters for this apparatus
-     */
     public function singleGasMeters()
     {
         return $this->hasMany(SingleGasMeter::class);
