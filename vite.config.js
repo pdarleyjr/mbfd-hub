@@ -35,10 +35,5 @@ export default defineConfig({
     ],
     build: {
         sourcemap: 'hidden', // Generate source maps for Sentry
-        rollupOptions: {
-            output: {
-                entryFileNames: 'pump-simulator.js',
-            },
-        },
     },
 });
