@@ -1,13 +1,15 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
+import react from '@vitejs/plugin-react';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 
 export default defineConfig({
     plugins: [
+        react(),
         laravel({
             input: [
-                'resources/css/app.css', 
-                'resources/js/app.js', 
+                'resources/css/app.css',
+                'resources/js/app.js',
                 'resources/js/pump-simulator/main.tsx',
                 'resources/js/push-notification-widget.js'
             ],
