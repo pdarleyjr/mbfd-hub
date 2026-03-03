@@ -54,8 +54,11 @@ class EvaluationService
     public function getCategoryRankings(int $categoryId, ?int $sessionId = null): Collection
     {
         $query = CandidateProduct::where('category_id', $categoryId)
-            ->with(['category', 'submissions' => function ($q) {
-                $q->where('status', 'submitted')->with('scores.criterion');
+            ->with(['category', 'submissions' => function ($q) use ($sessionId) {
+                $q->where('status', 'submitted');
+                if ($sessionId) {
+                    $q->whereHas('candidateProduct', fn($sq) => $sq->where('workgroup_session_id', $sessionId));
+                }
             }]);
 
         if ($sessionId) {
@@ -67,7 +70,9 @@ class EvaluationService
         $rankings = $products->map(function ($product) {
             $submittedSubmissions = $product->submissions->filter(fn($s) => $s->status === 'submitted');
             $responseCount = $submittedSubmissions->count();
-            $scores = $submittedSubmissions->flatMap(fn($s) => $s->scores);
+            
+            // Use pre-calculated rubric overall_score instead of legacy EvaluationScore relationship
+            $scores = $submittedSubmissions->map(fn($s) => $s->overall_score)->filter(fn($s) => $s !== null);
             
             if ($scores->isEmpty()) {
                 return [
@@ -78,17 +83,7 @@ class EvaluationService
                 ];
             }
 
-            $totalScore = 0;
-            $totalWeight = 0;
-
-            foreach ($scores as $score) {
-                if ($score->score !== null && $score->criterion) {
-                    $totalScore += $score->score * $score->criterion->weight;
-                    $totalWeight += $score->criterion->weight;
-                }
-            }
-
-            $weightedAverage = $totalWeight > 0 ? round($totalScore / $totalWeight, 2) : null;
+            $weightedAverage = round($scores->avg(), 2);
 
             return [
                 'product' => $product,
@@ -152,7 +147,8 @@ class EvaluationService
                         'submission_id' => $submission->id,
                         'evaluator' => $submission->member?->user?->name,
                         'product' => $submission->candidateProduct->display_name ?? $submission->candidateProduct->name,
-                        'score' => $submission->total_score,
+                        // Use pre-calculated rubric overall_score instead of legacy total_score
+                        'score' => $submission->overall_score,
                         'comments' => $submission->comments->pluck('comment', 'category_id')->toArray(),
                         'submitted_at' => $submission->submitted_at,
                     ];
@@ -309,7 +305,6 @@ class EvaluationService
         
         $submissions = EvaluationSubmission::where('candidate_product_id', $productId)
             ->where('status', 'submitted')
-            ->with('scores.criterion')
             ->get();
 
         $responseCount = $submissions->count();
@@ -325,21 +320,22 @@ class EvaluationService
             ];
         }
 
-        $allScores = $submissions->flatMap(fn($s) => $s->scores);
+        // Use pre-calculated rubric overall_score instead of legacy EvaluationScore relationship
+        $scores = $submissions->map(fn($s) => $s->overall_score)->filter(fn($s) => $s !== null);
         
-        $totalScore = 0;
-        $totalWeight = 0;
-        $scoreValues = [];
-
-        foreach ($allScores as $score) {
-            if ($score->score !== null && $score->criterion) {
-                $totalScore += $score->score * $score->criterion->weight;
-                $totalWeight += $score->criterion->weight;
-                $scoreValues[] = $score->score;
-            }
+        if ($scores->isEmpty()) {
+            return [
+                'product' => $product,
+                'response_count' => $responseCount,
+                'weighted_average' => null,
+                'min_score' => null,
+                'max_score' => null,
+                'meets_threshold' => false,
+            ];
         }
 
-        $weightedAverage = $totalWeight > 0 ? round($totalScore / $totalWeight, 2) : null;
+        $weightedAverage = round($scores->avg(), 2);
+        $scoreValues = $scores->toArray();
 
         return [
             'product' => $product,

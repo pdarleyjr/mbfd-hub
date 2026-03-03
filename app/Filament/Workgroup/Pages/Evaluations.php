@@ -63,9 +63,8 @@ class Evaluations extends Page implements HasTable
                     ->badge()
                     ->getStateUsing(function ($record) use ($member) {
                         if (!$member) return 'Not Started';
-                        $sub = EvaluationSubmission::where('workgroup_member_id', $member->id)
-                            ->where('candidate_product_id', $record->id)
-                            ->first();
+                        // Get the submission from the eager loaded collection
+                        $sub = $record->submissions->firstWhere('workgroup_member_id', $member->id);
                         if (!$sub) return 'Not Started';
                         return $sub->status === 'submitted' ? 'Completed' : 'In Progress';
                     })
@@ -79,25 +78,22 @@ class Evaluations extends Page implements HasTable
                 Action::make('evaluate')
                     ->label(function ($record) use ($member) {
                         if (!$member) return 'Evaluate';
-                        $sub = EvaluationSubmission::where('workgroup_member_id', $member->id)
-                            ->where('candidate_product_id', $record->id)
-                            ->first();
+                        // Get the submission from the eager loaded collection
+                        $sub = $record->submissions->firstWhere('workgroup_member_id', $member->id);
                         if (!$sub) return 'Evaluate';
                         return $sub->status === 'submitted' ? 'View' : 'Continue';
                     })
                     ->icon(function ($record) use ($member) {
                         if (!$member) return 'heroicon-o-pencil-square';
-                        $sub = EvaluationSubmission::where('workgroup_member_id', $member->id)
-                            ->where('candidate_product_id', $record->id)
-                            ->first();
+                        // Get the submission from the eager loaded collection
+                        $sub = $record->submissions->firstWhere('workgroup_member_id', $member->id);
                         if ($sub && $sub->status === 'submitted') return 'heroicon-o-eye';
                         return 'heroicon-o-pencil-square';
                     })
                     ->color(function ($record) use ($member) {
                         if (!$member) return 'primary';
-                        $sub = EvaluationSubmission::where('workgroup_member_id', $member->id)
-                            ->where('candidate_product_id', $record->id)
-                            ->first();
+                        // Get the submission from the eager loaded collection
+                        $sub = $record->submissions->firstWhere('workgroup_member_id', $member->id);
                         if ($sub && $sub->status === 'submitted') return 'gray';
                         if ($sub) return 'warning';
                         return 'primary';
@@ -117,8 +113,26 @@ class Evaluations extends Page implements HasTable
 
         $sessionId = $this->selectedSession ? (int) $this->selectedSession : null;
 
+        // Get submissions for this member in the current session
+        $memberSubmissionIds = [];
+        if ($sessionId && $member) {
+            $memberSubmissionIds = EvaluationSubmission::where('workgroup_member_id', $member->id)
+                ->whereHas('candidateProduct', fn($q) => $q->where('workgroup_session_id', $sessionId))
+                ->pluck('candidate_product_id', 'id')
+                ->toArray();
+        }
+
         return CandidateProduct::where('workgroup_session_id', $sessionId)
-            ->with('category')
+            ->with(['category', 'session'])
+            // Eager load submissions for the current member to avoid N+1
+            ->with(['submissions' => function ($q) use ($member, $sessionId) {
+                $q->where('workgroup_member_id', $member?->id);
+                if ($sessionId) {
+                    $q->whereHas('candidateProduct', fn($sq) => $sq->where('workgroup_session_id', $sessionId));
+                }
+            }])
+            // Add submission relation for quick access in table
+            ->with('submissions')
             ->orderBy('category_id')
             ->orderBy('name');
     }
