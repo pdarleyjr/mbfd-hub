@@ -8,6 +8,9 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Pump Simulator - Public route for training
+Route::view('/pump-simulator')->name('pump-simulator');
+
 // Serve manifest.json with no-cache headers to bypass CDN caching
 Route::get('/manifest.json', function () {
     $response = response()->file(public_path('manifest.json'), [

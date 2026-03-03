@@ -372,6 +372,22 @@
                             </div>
                         </a>
 
+                        <!-- Pump Simulator -->
+                        <a href="{{ url('/pump-simulator') }}" class="group block p-4 bg-white rounded-lg border border-slate-200 hover:border-amber-400 hover:shadow-card-hover transition-all duration-200">
+                            <div class="flex items-start gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                    </svg>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="font-semibold text-slate-800 group-hover:text-amber-700">Pump Simulator</h3>
+                                    <p class="text-sm text-slate-500">Fire pump operations training and simulations</p>
+                                </div>
+                                <svg class="w-5 h-5 text-slate-300 group-hover:text-amber-500 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            </div>
+                        </a>
+
                     </div>
                 </div>
             </div>
