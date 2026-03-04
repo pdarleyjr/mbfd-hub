@@ -11,17 +11,19 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Anonymous Member Live View — read-only simplified dashboard for members.
+ * Anonymous Member Live View - read-only simplified dashboard for members.
  * Displays aggregate scores and anonymous feedback.
- * Members have no access to the Admin Data Hub.
+ * ALL workgroup members can access this page.
  */
 class SessionResultsPage extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-trophy';
     protected static ?string $title = 'Session Results';
     protected static string $view = 'filament-workgroup.pages.session-results';
-    protected static ?string $navigationLabel = 'Results';
+    protected static ?string $navigationLabel = 'Results & Analytics';
+    protected static ?string $navigationGroup = 'Analytics';
     protected static ?string $slug = 'session-results';
+    protected static ?int $navigationSort = 2;
 
     public function getHeading(): string
     {
@@ -51,9 +53,6 @@ class SessionResultsPage extends Page
         return WorkgroupMember::where('user_id', $user->id)->where('is_active', true)->exists();
     }
 
-    /**
-     * Get aggregate product scores for the active session.
-     */
     public function getProductScores(): array
     {
         $session = WorkgroupSession::active()->first();
@@ -61,6 +60,7 @@ class SessionResultsPage extends Page
 
         return CandidateProduct::where('workgroup_session_id', $session->id)
             ->whereHas('category', fn($q) => $q->where('is_rankable', true))
+            ->with('category')
             ->get()
             ->map(function ($product) {
                 $avgScore = EvaluationSubmission::where('candidate_product_id', $product->id)
@@ -74,26 +74,25 @@ class SessionResultsPage extends Page
 
                 return [
                     'name' => $product->name,
-                    'manufacturer' => $product->manufacturer,
+                    'manufacturer' => $product->manufacturer ?? '',
                     'category' => $product->category?->name ?? 'N/A',
                     'avg_score' => $avgScore !== null ? number_format($avgScore, 1) : 'N/A',
                     'response_count' => $responseCount,
                 ];
             })
-            ->sortByDesc('avg_score')
+            ->sortByDesc(fn ($p) => is_numeric($p['avg_score']) ? (float)$p['avg_score'] : 0)
             ->values()
             ->toArray();
     }
 
-    /**
-     * Get anonymous feedback (no evaluator names shown).
-     */
     public function getAnonymousFeedback(): array
     {
         $session = WorkgroupSession::active()->first();
         if (!$session) return [];
 
-        return EvaluationSubmission::where('session_id', $session->id)
+        return EvaluationSubmission::whereHas('candidateProduct', fn($q) => 
+                $q->where('workgroup_session_id', $session->id)
+            )
             ->where('status', 'submitted')
             ->whereNotNull('narrative_payload')
             ->get()

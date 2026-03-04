@@ -22,8 +22,7 @@ use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * The Admin "Workgroup Data Hub" — single consolidated admin page.
- * Handles live charts, evaluator tracking, AI summary, and all exports.
+ * The Admin "Workgroup Data Hub" - single consolidated admin page.
  */
 class AdminDashboard extends Page
 {
@@ -31,7 +30,9 @@ class AdminDashboard extends Page
     protected static ?string $title = 'Workgroup Data Hub';
     protected static string $view = 'filament-workgroup.pages.admin-dashboard';
     protected static ?string $navigationLabel = 'Data Hub';
+    protected static ?string $navigationGroup = 'Analytics';
     protected static ?string $slug = 'admin-dashboard';
+    protected static ?int $navigationSort = 1;
 
     public function getHeading(): string
     {
@@ -40,7 +41,7 @@ class AdminDashboard extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Live analytics, evaluator tracking, AI intelligence, and exports — all in one place.';
+        return 'Live analytics, evaluator tracking, AI intelligence, and exports.';
     }
 
     public function getWidgets(): array

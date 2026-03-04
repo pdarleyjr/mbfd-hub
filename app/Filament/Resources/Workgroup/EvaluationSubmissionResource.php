@@ -107,7 +107,6 @@ class EvaluationSubmissionResource extends Resource
             ->headerActions([
                 ExportAction::make('export')->exports([
                     ExcelExport::make('xlsx')->fromTable()->withFilename('evaluation-submissions-' . date('Y-m-d')),
-                    ExcelExport::make('csv')->fromTable()->withFilename('evaluation-submissions-' . date('Y-m-d'))->asCsv(),
                 ]),
             ])
             ->actions([
