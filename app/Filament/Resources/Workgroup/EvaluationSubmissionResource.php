@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Workgroup;
 
 use App\Filament\Resources\Workgroup\Pages;
 use App\Models\EvaluationSubmission;
+use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
@@ -22,12 +23,17 @@ use pxlrbt\FilamentExcel\Exports\ExcelExport;
 class EvaluationSubmissionResource extends Resource
 {
     protected static ?string $model = EvaluationSubmission::class;
-
     protected static ?string $navigationIcon = 'heroicon-o-document-check';
-
     protected static ?string $navigationGroup = 'Workgroup Management';
-
     protected static ?int $navigationSort = 9;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = auth()->user();
+        if (!$user) return false;
+        $member = WorkgroupMember::where('user_id', $user->id)->where('is_active', true)->first();
+        return $member && in_array($member->role, ['admin', 'facilitator']);
+    }
 
     public static function form(Form $form): Form
     {
@@ -51,13 +57,9 @@ class EvaluationSubmissionResource extends Resource
                         Infolists\Components\TextEntry::make('status')
                             ->badge()
                             ->color(fn (string $state): string => match ($state) {
-                                'draft' => 'gray',
-                                'submitted' => 'success',
-                                default => 'gray',
+                                'draft' => 'gray', 'submitted' => 'success', default => 'gray',
                             }),
-                        Infolists\Components\IconEntry::make('is_locked')
-                            ->label('Locked')
-                            ->boolean(),
+                        Infolists\Components\IconEntry::make('is_locked')->label('Locked')->boolean(),
                         Infolists\Components\TextEntry::make('submitted_at')->dateTime(),
                         Infolists\Components\TextEntry::make('total_score')
                             ->label('Score')
@@ -77,9 +79,7 @@ class EvaluationSubmissionResource extends Resource
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'draft' => 'gray',
-                        'submitted' => 'success',
-                        default => 'gray',
+                        'draft' => 'gray', 'submitted' => 'success', default => 'gray',
                     }),
                 Tables\Columns\IconColumn::make('is_locked')->boolean()->label('Locked'),
                 Tables\Columns\TextColumn::make('total_score')
@@ -94,14 +94,10 @@ class EvaluationSubmissionResource extends Resource
                     ->options(fn () => WorkgroupSession::pluck('name', 'id'))
                     ->query(function (Builder $query, array $data) {
                         if ($data['value']) {
-                            $query->whereHas('candidateProduct', function ($q) use ($data) {
-                                $q->where('workgroup_session_id', $data['value']);
-                            });
+                            $query->whereHas('candidateProduct', fn ($q) => $q->where('workgroup_session_id', $data['value']));
                         }
                     }),
-                Tables\Filters\SelectFilter::make('status')
-                    ->label('Status')
-                    ->options(['draft' => 'Draft', 'submitted' => 'Submitted']),
+                Tables\Filters\SelectFilter::make('status')->options(['draft' => 'Draft', 'submitted' => 'Submitted']),
                 Tables\Filters\TernaryFilter::make('is_locked')->label('Locked'),
             ])
             ->headerActions([
@@ -109,48 +105,22 @@ class EvaluationSubmissionResource extends Resource
                     ExcelExport::make('xlsx')->fromTable()->withFilename('evaluation-submissions-' . date('Y-m-d')),
                 ]),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-            ])
+            ->actions([Tables\Actions\ViewAction::make()])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\BulkAction::make('lock_evaluations')
-                        ->label('Lock Evaluations')
-                        ->icon('heroicon-o-lock-closed')
-                        ->color('danger')
-                        ->requiresConfirmation()
-                        ->deselectRecordsAfterCompletion()
+                        ->label('Lock Evaluations')->icon('heroicon-o-lock-closed')->color('danger')
+                        ->requiresConfirmation()->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records): void {
-                            $count = 0;
-                            foreach ($records as $record) {
-                                if (!$record->is_locked) {
-                                    $record->update(['is_locked' => true]);
-                                    $count++;
-                                }
-                            }
-                            Notification::make()
-                                ->title("Locked {$count} evaluation(s)")
-                                ->success()
-                                ->send();
+                            $count = $records->filter(fn ($r) => !$r->is_locked)->each(fn ($r) => $r->update(['is_locked' => true]))->count();
+                            Notification::make()->title("Locked {$count} evaluation(s)")->success()->send();
                         }),
                     Tables\Actions\BulkAction::make('unlock_evaluations')
-                        ->label('Unlock Evaluations')
-                        ->icon('heroicon-o-lock-open')
-                        ->color('warning')
-                        ->requiresConfirmation()
-                        ->deselectRecordsAfterCompletion()
+                        ->label('Unlock Evaluations')->icon('heroicon-o-lock-open')->color('warning')
+                        ->requiresConfirmation()->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records): void {
-                            $count = 0;
-                            foreach ($records as $record) {
-                                if ($record->is_locked) {
-                                    $record->update(['is_locked' => false]);
-                                    $count++;
-                                }
-                            }
-                            Notification::make()
-                                ->title("Unlocked {$count} evaluation(s)")
-                                ->success()
-                                ->send();
+                            $count = $records->filter(fn ($r) => $r->is_locked)->each(fn ($r) => $r->update(['is_locked' => false]))->count();
+                            Notification::make()->title("Unlocked {$count} evaluation(s)")->success()->send();
                         }),
                     ExportBulkAction::make('export_selected'),
                 ]),

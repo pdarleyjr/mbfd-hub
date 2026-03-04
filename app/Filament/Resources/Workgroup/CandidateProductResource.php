@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Workgroup;
 use App\Filament\Resources\Workgroup\Pages;
 use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
+use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -13,7 +14,6 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
 use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
 use pxlrbt\FilamentExcel\Exports\ExcelExport;
@@ -21,12 +21,17 @@ use pxlrbt\FilamentExcel\Exports\ExcelExport;
 class CandidateProductResource extends Resource
 {
     protected static ?string $model = CandidateProduct::class;
-
     protected static ?string $navigationIcon = 'heroicon-o-cube';
-
     protected static ?string $navigationGroup = 'Workgroup Management';
+    protected static ?int $navigationSort = 5;
 
-    protected static ?int $navigationSort = 8;
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = auth()->user();
+        if (!$user) return false;
+        $member = WorkgroupMember::where('user_id', $user->id)->where('is_active', true)->first();
+        return $member && in_array($member->role, ['admin', 'facilitator']);
+    }
 
     public static function form(Form $form): Form
     {
@@ -34,125 +39,56 @@ class CandidateProductResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Product Information')
                     ->schema([
-                        Forms\Components\TextInput::make('name')
-                            ->required()
-                            ->maxLength(255)
-                            ->label('Product Name'),
-                        Forms\Components\TextInput::make('manufacturer')
-                            ->maxLength(255)
-                            ->label('Manufacturer'),
-                        Forms\Components\TextInput::make('model')
-                            ->maxLength(255)
-                            ->label('Model'),
-                        Forms\Components\Textarea::make('description')
-                            ->maxLength(1000)
-                            ->columnSpanFull(),
-                    ])
-                    ->columns(2),
-                Forms\Components\Section::make('Classification')
-                    ->schema([
+                        Forms\Components\TextInput::make('name')->required()->maxLength(255)->label('Product Name'),
                         Forms\Components\Select::make('workgroup_session_id')
                             ->label('Session')
                             ->options(fn () => WorkgroupSession::orderBy('name')->pluck('name', 'id'))
-                            ->searchable()
-                            ->required(),
+                            ->searchable()->required(),
                         Forms\Components\Select::make('category_id')
                             ->label('Category')
-                            ->options(fn () => EvaluationCategory::orderBy('display_order')->pluck('name', 'id'))
-                            ->searchable()
-                            ->required(),
-                    ])
-                    ->columns(2),
+                            ->options(fn () => EvaluationCategory::orderBy('name')->pluck('name', 'id'))
+                            ->searchable()->nullable(),
+                        Forms\Components\TextInput::make('manufacturer')->maxLength(255),
+                        Forms\Components\TextInput::make('model')->maxLength(255),
+                        Forms\Components\Textarea::make('description')->maxLength(1000)->columnSpanFull(),
+                    ])->columns(2),
             ]);
     }
 
     public static function infolist(Infolist $infolist): Infolist
     {
-        return $infolist
-            ->schema([
-                Infolists\Components\Section::make('Product Details')
-                    ->schema([
-                        Infolists\Components\TextEntry::make('name')
-                            ->label('Name'),
-                        Infolists\Components\TextEntry::make('manufacturer')
-                            ->label('Manufacturer'),
-                        Infolists\Components\TextEntry::make('model')
-                            ->label('Model'),
-                    ])
-                    ->columns(3),
-                Infolists\Components\Section::make('Classification')
-                    ->schema([
-                        Infolists\Components\TextEntry::make('session.name')
-                            ->label('Session'),
-                        Infolists\Components\TextEntry::make('category.name')
-                            ->label('Category'),
-                    ])
-                    ->columns(2),
-                Infolists\Components\Section::make('Statistics')
-                    ->schema([
-                        Infolists\Components\TextEntry::make('submissions_count')
-                            ->label('Submissions')
-                            ->state(fn ($record) => $record->submissions()->count()),
-                    ])
-                    ->columns(1),
-            ]);
+        return $infolist->schema([
+            Infolists\Components\Section::make('Product Details')->schema([
+                Infolists\Components\TextEntry::make('name'),
+                Infolists\Components\TextEntry::make('session.name')->label('Session'),
+                Infolists\Components\TextEntry::make('category.name')->label('Category'),
+                Infolists\Components\TextEntry::make('manufacturer'),
+                Infolists\Components\TextEntry::make('model'),
+                Infolists\Components\TextEntry::make('description'),
+            ])->columns(3),
+        ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')
-                    ->searchable()
-                    ->sortable()
-                    ->label('Name'),
-                Tables\Columns\TextColumn::make('manufacturer')
-                    ->searchable()
-                    ->label('Manufacturer'),
-                Tables\Columns\TextColumn::make('model')
-                    ->searchable()
-                    ->label('Model'),
-                Tables\Columns\TextColumn::make('category.name')
-                    ->searchable()
-                    ->sortable()
-                    ->label('Category'),
-                Tables\Columns\TextColumn::make('session.name')
-                    ->searchable()
-                    ->sortable()
-                    ->label('Session'),
-                Tables\Columns\TextColumn::make('submissions_count')
-                    ->counts('submissions')
-                    ->label('Submissions'),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('session.name')->sortable()->label('Session'),
+                Tables\Columns\TextColumn::make('category.name')->sortable()->label('Category'),
+                Tables\Columns\TextColumn::make('manufacturer')->searchable(),
+                Tables\Columns\TextColumn::make('model')->searchable(),
+                Tables\Columns\TextColumn::make('submissions_count')->counts('submissions')->label('Evaluations'),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('workgroup_session_id')
                     ->label('Session')
                     ->options(fn () => WorkgroupSession::pluck('name', 'id')),
-                Tables\Filters\SelectFilter::make('category_id')
-                    ->label('Category')
-                    ->options(fn () => EvaluationCategory::pluck('name', 'id')),
             ])
-            
             ->headerActions([
-                ExportAction::make('export')
-                    ->label('Export')
-                    ->color('gray')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->exports([
-                        ExcelExport::make('xlsx')
-                            ->label('Export as Excel (.xlsx)')
-                            ->fromTable()
-                            ->withFilename('mbfd_wg_candidate_products_' . date('Y-m-d')),
-                        ExcelExport::make('csv')
-                            ->label('Export as CSV (.csv)')
-                            ->fromTable()
-                            ->withFilename('mbfd_wg_candidate_products_' . date('Y-m-d'))
-                            ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
-                    ]),
+                ExportAction::make('export')->exports([
+                    ExcelExport::make('xlsx')->fromTable()->withFilename('candidate-products-' . date('Y-m-d')),
+                ]),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -161,20 +97,8 @@ class CandidateProductResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                                        ExportBulkAction::make('export_selected')
-                        ->label('Export Selected')
-                        ->exports([
-                            ExcelExport::make('xlsx')
-                                ->label('Export as Excel (.xlsx)')
-                                ->fromTable()
-                                ->withFilename('mbfd_wg_candidate_products_selected_' . date('Y-m-d')),
-                            ExcelExport::make('csv')
-                                ->label('Export as CSV (.csv)')
-                                ->fromTable()
-                                ->withFilename('mbfd_wg_candidate_products_selected_' . date('Y-m-d'))
-                                ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
-                        ]),
-Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make(),
+                    ExportBulkAction::make('export_selected'),
                 ]),
             ]);
     }
@@ -195,16 +119,6 @@ Tables\Actions\DeleteBulkAction::make(),
     }
 
     public static function canCreate(): bool
-    {
-        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
-    }
-
-    public static function canEdit($record): bool
-    {
-        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
-    }
-
-    public static function canDelete($record): bool
     {
         return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
     }
