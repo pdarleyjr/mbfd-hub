@@ -59,21 +59,17 @@ class EvaluationFormPage extends Page
     public function mount(): void
     {
         $this->productId = (int) request()->get('productId', 0);
-
         if (!$this->productId) {
             $this->redirect(Evaluations::getUrl());
             return;
         }
-
         $this->evaluationService = new EvaluationService();
         $this->member = $this->getCurrentMember();
-
         if (!$this->member) {
             Notification::make()->title('Access Denied')->body('You must be a workgroup member.')->danger()->send();
             $this->redirect(Evaluations::getUrl());
             return;
         }
-
         $this->loadProduct();
     }
 
@@ -82,17 +78,16 @@ class EvaluationFormPage extends Page
         $this->product = CandidateProduct::with(['category', 'session'])->findOrFail($this->productId);
         $this->assessmentProfile = $this->product->category->getRawOriginal('assessment_profile') ?? 'generic_apparatus';
         $this->criteriaByBucket = UniversalEvaluationRubric::getCriteriaByBucket($this->assessmentProfile);
-
         foreach ($this->criteriaByBucket as $bucket => $bucketCriteria) {
             foreach ($bucketCriteria as $id => $criterion) {
                 $this->criteria[$id] = $criterion;
             }
         }
-
         $this->submission = $this->evaluationService->getOrCreateDraft($this->member, $this->productId);
         $this->submissionId = $this->submission->id;
 
-        if ($this->submission->isSubmitted()) {
+        // Only read-only if LOCKED (not just submitted - allow editing submitted evals)
+        if ($this->submission->is_locked) {
             $this->isReadOnly = true;
         }
 
@@ -103,17 +98,14 @@ class EvaluationFormPage extends Page
     protected function loadExistingData(): void
     {
         if (!$this->submission) return;
-
         if ($this->submission->criterion_payload) {
             $this->ratings = $this->submission->criterion_payload['ratings'] ?? [];
             $this->notes = $this->submission->criterion_payload['notes'] ?? [];
         }
-
         $this->advance_recommendation = $this->submission->advance_recommendation;
         $this->confidence_level = $this->submission->confidence_level;
         $this->has_deal_breaker = $this->submission->has_deal_breaker ?? false;
         $this->deal_breaker_note = $this->submission->deal_breaker_note;
-
         if ($this->submission->narrative_payload) {
             $n = $this->submission->narrative_payload;
             $this->strongest_advantages = $n['strongest_advantages'] ?? null;
@@ -151,9 +143,6 @@ class EvaluationFormPage extends Page
     public function updatedHasDealBreaker(): void { $this->checkCanSubmit(); }
     public function updatedDealBreakerNote(): void { $this->checkCanSubmit(); }
 
-    /**
-     * Set all ratings to highest score (5).
-     */
     public function setAllHighest(): void
     {
         foreach ($this->criteria as $id => $criterion) {
@@ -171,8 +160,6 @@ class EvaluationFormPage extends Page
     protected function getFormSchema(): array
     {
         $schema = [];
-
-        // Product Info
         $profileLabel = UniversalEvaluationRubric::getAssessmentProfiles()[$this->assessmentProfile] ?? 'Generic';
         $schema[] = Section::make('Product Information')
             ->schema([
@@ -180,10 +167,8 @@ class EvaluationFormPage extends Page
                 Placeholder::make('product_mfr')->label('Manufacturer')->content($this->product?->manufacturer ?? '-'),
                 Placeholder::make('product_model')->label('Model')->content($this->product?->model ?? '-'),
                 Placeholder::make('profile')->label('Evaluation Profile')->content($profileLabel),
-            ])
-            ->columns(4);
+            ])->columns(4);
 
-        // Rating legend
         $schema[] = Section::make('Rating Scale')
             ->schema([
                 Placeholder::make('legend')->label('')->content(new HtmlString(
@@ -196,7 +181,6 @@ class EvaluationFormPage extends Page
                 )),
             ])->collapsed();
 
-        // SAVER sections
         $bucketConfig = [
             'capability' => ['title' => 'Capability (30%)', 'desc' => 'Performance, safety, and effectiveness'],
             'usability' => ['title' => 'Usability (30%)', 'desc' => 'Ergonomics, ease of use, and portability'],
@@ -209,7 +193,6 @@ class EvaluationFormPage extends Page
             if (empty($bucketCriteria)) continue;
             $config = $bucketConfig[$bucket] ?? ['title' => ucfirst($bucket), 'desc' => ''];
             $fields = [];
-
             foreach ($bucketCriteria as $id => $criterion) {
                 $srcLabel = UniversalEvaluationRubric::getSourceLabel($criterion['source']);
                 $fields[] = Group::make([
@@ -228,34 +211,20 @@ class EvaluationFormPage extends Page
                         ->columnSpan(1),
                 ])->columns(2);
             }
-
-            $schema[] = Section::make($config['title'])
-                ->description($config['desc'])
-                ->schema($fields)
-                ->collapsible();
+            $schema[] = Section::make($config['title'])->description($config['desc'])->schema($fields)->collapsible();
         }
 
-        // Decision
         $schema[] = Section::make('Evaluation Decision')
             ->schema([
-                Select::make('advance_recommendation')
-                    ->label('Advance to finalist?')
-                    ->options(UniversalEvaluationRubric::getRecommendationOptions())
-                    ->required()->disabled($this->isReadOnly),
-                Select::make('confidence_level')
-                    ->label('Confidence')
-                    ->options(UniversalEvaluationRubric::getConfidenceOptions())
-                    ->required()->disabled($this->isReadOnly),
-                Toggle::make('has_deal_breaker')
-                    ->label('Deal-breaker?')
-                    ->disabled($this->isReadOnly)->reactive(),
-                Textarea::make('deal_breaker_note')
-                    ->label('Deal-breaker details')
-                    ->visible(fn () => $this->has_deal_breaker)
-                    ->rows(2)->disabled($this->isReadOnly),
+                Select::make('advance_recommendation')->label('Advance to finalist?')
+                    ->options(UniversalEvaluationRubric::getRecommendationOptions())->required()->disabled($this->isReadOnly),
+                Select::make('confidence_level')->label('Confidence')
+                    ->options(UniversalEvaluationRubric::getConfidenceOptions())->required()->disabled($this->isReadOnly),
+                Toggle::make('has_deal_breaker')->label('Deal-breaker?')->disabled($this->isReadOnly)->reactive(),
+                Textarea::make('deal_breaker_note')->label('Deal-breaker details')
+                    ->visible(fn () => $this->has_deal_breaker)->rows(2)->disabled($this->isReadOnly),
             ])->columns(2);
 
-        // Narrative
         $schema[] = Section::make('Narrative Feedback')->collapsible()->schema([
             Textarea::make('strongest_advantages')->label('Strongest Advantages')->rows(2)->disabled($this->isReadOnly),
             Textarea::make('biggest_weaknesses')->label('Biggest Weaknesses')->rows(2)->disabled($this->isReadOnly),
@@ -269,12 +238,20 @@ class EvaluationFormPage extends Page
 
     public function saveDraft(): void
     {
+        if ($this->isReadOnly) {
+            Notification::make()->title('Locked')->body('This evaluation is locked and cannot be edited.')->danger()->send();
+            return;
+        }
         $this->saveRubricData();
         Notification::make()->title('Draft Saved')->success()->send();
     }
 
     public function submitEvaluation(): void
     {
+        if ($this->isReadOnly) {
+            Notification::make()->title('Locked')->body('This evaluation is locked.')->danger()->send();
+            return;
+        }
         if (!$this->canSubmit) {
             Notification::make()->title('Incomplete')->body('Complete all fields first.')->danger()->send();
             return;
@@ -283,8 +260,10 @@ class EvaluationFormPage extends Page
         try {
             $this->submission->update(['status' => 'submitted', 'submitted_at' => now()]);
             $this->submission->refresh();
-            $this->isReadOnly = true;
-            Notification::make()->title('Evaluation Submitted')->success()->send();
+            Notification::make()->title('Evaluation Submitted')->body('You can still edit this until an admin locks it.')->success()->send();
+
+            // Fire event for AI worker
+            event(new \App\Events\EvaluationSubmitted($this->submission));
         } catch (\Exception $e) {
             Notification::make()->title('Failed')->body($e->getMessage())->danger()->send();
         }
@@ -295,8 +274,8 @@ class EvaluationFormPage extends Page
         if (!$this->submission) return;
         $ratings = array_filter($this->ratings, fn($v) => $v !== '' && $v !== null);
         $scores = UniversalEvaluationRubric::calculateAllScores($ratings);
-
         $this->submission->update([
+            'user_id' => $this->member->user_id,
             'rubric_version' => UniversalEvaluationRubric::getVersion(),
             'assessment_profile' => $this->assessmentProfile,
             'overall_score' => $scores['overall_score'],
