@@ -14,8 +14,11 @@ class EvaluationSubmission extends Model
 
     protected $fillable = [
         'workgroup_member_id',
+        'user_id',
         'candidate_product_id',
+        'session_id',
         'status',
+        'is_locked',
         'submitted_at',
         // Rubric versioning and profile
         'rubric_version',
@@ -39,6 +42,7 @@ class EvaluationSubmission extends Model
 
     protected $casts = [
         'submitted_at' => 'datetime',
+        'is_locked' => 'boolean',
         'overall_score' => 'decimal:2',
         'capability_score' => 'decimal:2',
         'usability_score' => 'decimal:2',
@@ -59,6 +63,14 @@ class EvaluationSubmission extends Model
     }
 
     /**
+     * Get the user who created this submission.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
      * Get the candidate product being evaluated.
      */
     public function candidateProduct(): BelongsTo
@@ -67,7 +79,15 @@ class EvaluationSubmission extends Model
     }
 
     /**
-     * Get all scores for this submission (legacy - for backward compatibility).
+     * Get the session this submission belongs to.
+     */
+    public function session(): BelongsTo
+    {
+        return $this->belongsTo(WorkgroupSession::class, 'session_id');
+    }
+
+    /**
+     * Get all scores for this submission (legacy).
      */
     public function scores(): HasMany
     {
@@ -75,83 +95,81 @@ class EvaluationSubmission extends Model
     }
 
     /**
-     * Get all comments for this submission (legacy - for backward compatibility).
+     * Get all comments for this submission (legacy).
      */
     public function comments(): HasMany
     {
         return $this->hasMany(EvaluationComment::class, 'submission_id');
     }
 
-    /**
-     * Scope to get draft submissions.
-     */
     public function scopeDraft($query)
     {
         return $query->where('status', 'draft');
     }
 
-    /**
-     * Scope to get submitted evaluations.
-     */
     public function scopeSubmitted($query)
     {
         return $query->where('status', 'submitted');
     }
 
-    /**
-     * Check if submission is a draft.
-     */
+    public function scopeLocked($query)
+    {
+        return $query->where('is_locked', true);
+    }
+
+    public function scopeUnlocked($query)
+    {
+        return $query->where('is_locked', false);
+    }
+
+    public function scopeOfficialOnly($query)
+    {
+        return $query->whereHas('user', function ($q) {
+            $q->whereExists(function ($sub) {
+                $sub->select(\Illuminate\Support\Facades\DB::raw(1))
+                    ->from('session_user')
+                    ->whereColumn('session_user.user_id', 'users.id')
+                    ->where('session_user.is_official_evaluator', true);
+            });
+        });
+    }
+
     public function isDraft(): bool
     {
         return $this->status === 'draft';
     }
 
-    /**
-     * Check if submission has been submitted.
-     */
     public function isSubmitted(): bool
     {
         return $this->status === 'submitted';
     }
 
-    /**
-     * Get criterion ratings from criterion_payload JSON.
-     */
+    public function isLocked(): bool
+    {
+        return (bool) $this->is_locked;
+    }
+
     public function getCriterionRatings(): array
     {
         return $this->criterion_payload['ratings'] ?? [];
     }
 
-    /**
-     * Get criterion notes from criterion_payload JSON.
-     */
     public function getCriterionNotes(): array
     {
         return $this->criterion_payload['notes'] ?? [];
     }
 
-    /**
-     * Get narrative data from narrative_payload JSON.
-     */
     public function getNarrative(): array
     {
         return $this->narrative_payload ?? [];
     }
 
-    /**
-     * Calculate and store rubric scores from criterion ratings.
-     */
     public function calculateRubricScores(): void
     {
         $ratings = $this->getCriterionRatings();
-        
-        if (empty($ratings)) {
-            return;
-        }
+        if (empty($ratings)) return;
 
-        // Use the rubric to calculate scores
         $scores = UniversalEvaluationRubric::calculateAllScores($ratings);
-        
         $this->rubric_version = UniversalEvaluationRubric::getVersion();
         $this->overall_score = $scores['overall_score'];
         $this->capability_score = $scores['capability_score'];
@@ -161,9 +179,6 @@ class EvaluationSubmission extends Model
         $this->deployability_score = $scores['deployability_score'];
     }
 
-    /**
-     * Get the category score for a specific SAVER bucket.
-     */
     public function getCategoryScore(string $bucket): ?float
     {
         return match($bucket) {
@@ -176,9 +191,6 @@ class EvaluationSubmission extends Model
         };
     }
 
-    /**
-     * Get recommendation label.
-     */
     public function getRecommendationLabelAttribute(): string
     {
         return match($this->advance_recommendation) {
@@ -189,9 +201,6 @@ class EvaluationSubmission extends Model
         };
     }
 
-    /**
-     * Get confidence label.
-     */
     public function getConfidenceLabelAttribute(): string
     {
         return match($this->confidence_level) {
@@ -202,35 +211,24 @@ class EvaluationSubmission extends Model
         };
     }
 
-    /**
-     * Check if this submission uses the universal rubric.
-     */
     public function hasUniversalRubric(): bool
     {
         return !empty($this->rubric_version) && !empty($this->criterion_payload);
     }
 
-    /**
-     * Calculate total weighted score (legacy support - prefers rubric scores).
-     */
     public function getTotalScoreAttribute(): ?float
     {
-        // If we have rubric scores, use overall_score
         if ($this->hasUniversalRubric() && $this->overall_score !== null) {
             return $this->overall_score;
         }
-        
-        // Fall back to legacy calculation from scores relationship
         $totalScore = 0;
         $totalWeight = 0;
-
         foreach ($this->scores as $score) {
             if ($score->score !== null && $score->criterion) {
                 $totalScore += $score->score * $score->criterion->weight;
                 $totalWeight += $score->criterion->weight;
             }
         }
-
         return $totalWeight > 0 ? round($totalScore / $totalWeight, 2) : null;
     }
 }

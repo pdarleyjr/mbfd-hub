@@ -11,8 +11,10 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
 use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
 use pxlrbt\FilamentExcel\Exports\ExcelExport;
@@ -29,8 +31,7 @@ class EvaluationSubmissionResource extends Resource
 
     public static function form(Form $form): Form
     {
-        return $form
-            ->schema([]);
+        return $form->schema([]);
     }
 
     public static function infolist(Infolist $infolist): Infolist
@@ -39,18 +40,12 @@ class EvaluationSubmissionResource extends Resource
             ->schema([
                 Infolists\Components\Section::make('Submission Details')
                     ->schema([
-                        Infolists\Components\TextEntry::make('member.user.name')
-                            ->label('Evaluator'),
-                        Infolists\Components\TextEntry::make('candidateProduct.name')
-                            ->label('Product'),
-                        Infolists\Components\TextEntry::make('candidateProduct.manufacturer')
-                            ->label('Manufacturer'),
-                        Infolists\Components\TextEntry::make('candidateProduct.model')
-                            ->label('Model'),
-                        Infolists\Components\TextEntry::make('candidateProduct.category.name')
-                            ->label('Category'),
-                    ])
-                    ->columns(3),
+                        Infolists\Components\TextEntry::make('member.user.name')->label('Evaluator'),
+                        Infolists\Components\TextEntry::make('candidateProduct.name')->label('Product'),
+                        Infolists\Components\TextEntry::make('candidateProduct.manufacturer')->label('Manufacturer'),
+                        Infolists\Components\TextEntry::make('candidateProduct.model')->label('Model'),
+                        Infolists\Components\TextEntry::make('candidateProduct.category.name')->label('Category'),
+                    ])->columns(3),
                 Infolists\Components\Section::make('Status & Scoring')
                     ->schema([
                         Infolists\Components\TextEntry::make('status')
@@ -60,13 +55,14 @@ class EvaluationSubmissionResource extends Resource
                                 'submitted' => 'success',
                                 default => 'gray',
                             }),
-                        Infolists\Components\TextEntry::make('submitted_at')
-                            ->dateTime(),
+                        Infolists\Components\IconEntry::make('is_locked')
+                            ->label('Locked')
+                            ->boolean(),
+                        Infolists\Components\TextEntry::make('submitted_at')->dateTime(),
                         Infolists\Components\TextEntry::make('total_score')
                             ->label('Score')
                             ->state(fn ($record) => $record->total_score !== null ? number_format($record->total_score, 2) . '%' : '-'),
-                    ])
-                    ->columns(3),
+                    ])->columns(4),
             ]);
     }
 
@@ -74,21 +70,10 @@ class EvaluationSubmissionResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('member.user.name')
-                    ->searchable()
-                    ->sortable()
-                    ->label('Evaluator'),
-                Tables\Columns\TextColumn::make('candidateProduct.name')
-                    ->searchable()
-                    ->sortable()
-                    ->label('Product'),
-                Tables\Columns\TextColumn::make('candidateProduct.manufacturer')
-                    ->searchable()
-                    ->label('Manufacturer'),
-                Tables\Columns\TextColumn::make('candidateProduct.category.name')
-                    ->searchable()
-                    ->sortable()
-                    ->label('Category'),
+                Tables\Columns\TextColumn::make('member.user.name')->searchable()->sortable()->label('Evaluator'),
+                Tables\Columns\TextColumn::make('candidateProduct.name')->searchable()->sortable()->label('Product'),
+                Tables\Columns\TextColumn::make('candidateProduct.manufacturer')->searchable()->label('Manufacturer'),
+                Tables\Columns\TextColumn::make('candidateProduct.category.name')->searchable()->sortable()->label('Category'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -96,14 +81,12 @@ class EvaluationSubmissionResource extends Resource
                         'submitted' => 'success',
                         default => 'gray',
                     }),
+                Tables\Columns\IconColumn::make('is_locked')->boolean()->label('Locked'),
                 Tables\Columns\TextColumn::make('total_score')
                     ->label('Score')
                     ->formatStateUsing(fn ($state, $record) => $record->total_score !== null ? number_format($record->total_score, 2) . '%' : '-')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('submitted_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->label('Submitted'),
+                Tables\Columns\TextColumn::make('submitted_at')->dateTime()->sortable()->label('Submitted'),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('workgroup_session_id')
@@ -118,46 +101,61 @@ class EvaluationSubmissionResource extends Resource
                     }),
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Status')
-                    ->options([
-                        'draft' => 'Draft',
-                        'submitted' => 'Submitted',
-                    ]),
+                    ->options(['draft' => 'Draft', 'submitted' => 'Submitted']),
+                Tables\Filters\TernaryFilter::make('is_locked')->label('Locked'),
             ])
-            
             ->headerActions([
-                ExportAction::make('export')
-                    ->label('Export')
-                    ->color('gray')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->exports([
-                        ExcelExport::make('xlsx')
-                            ->label('Export as Excel (.xlsx)')
-                            ->fromTable()
-                            ->withFilename('mbfd_wg_eval_submissions_' . date('Y-m-d')),
-                        ExcelExport::make('csv')
-                            ->label('Export as CSV (.csv)')
-                            ->fromTable()
-                            ->withFilename('mbfd_wg_eval_submissions_' . date('Y-m-d'))
-                            ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
-                    ]),
+                ExportAction::make('export')->exports([
+                    ExcelExport::make('xlsx')->fromTable()->withFilename('evaluation-submissions-' . date('Y-m-d')),
+                    ExcelExport::make('csv')->fromTable()->withFilename('evaluation-submissions-' . date('Y-m-d'))->asCsv(),
+                ]),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
             ])
-            ->bulkActions([                    ExportBulkAction::make('export_selected')
-                        ->label('Export Selected')
-                        ->exports([
-                            ExcelExport::make('xlsx')
-                                ->label('Export as Excel (.xlsx)')
-                                ->fromTable()
-                                ->withFilename('mbfd_wg_eval_submissions_selected_' . date('Y-m-d')),
-                            ExcelExport::make('csv')
-                                ->label('Export as CSV (.csv)')
-                                ->fromTable()
-                                ->withFilename('mbfd_wg_eval_submissions_selected_' . date('Y-m-d'))
-                                ->withWriterType(\Maatwebsite\Excel\Excel::CSV),
-                        ]),
-]);
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('lock_evaluations')
+                        ->label('Lock Evaluations')
+                        ->icon('heroicon-o-lock-closed')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records): void {
+                            $count = 0;
+                            foreach ($records as $record) {
+                                if (!$record->is_locked) {
+                                    $record->update(['is_locked' => true]);
+                                    $count++;
+                                }
+                            }
+                            Notification::make()
+                                ->title("Locked {$count} evaluation(s)")
+                                ->success()
+                                ->send();
+                        }),
+                    Tables\Actions\BulkAction::make('unlock_evaluations')
+                        ->label('Unlock Evaluations')
+                        ->icon('heroicon-o-lock-open')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records): void {
+                            $count = 0;
+                            foreach ($records as $record) {
+                                if ($record->is_locked) {
+                                    $record->update(['is_locked' => false]);
+                                    $count++;
+                                }
+                            }
+                            Notification::make()
+                                ->title("Unlocked {$count} evaluation(s)")
+                                ->success()
+                                ->send();
+                        }),
+                    ExportBulkAction::make('export_selected'),
+                ]),
+            ]);
     }
 
     public static function getPages(): array

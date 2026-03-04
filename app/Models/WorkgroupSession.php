@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WorkgroupSession extends Model
@@ -24,65 +25,67 @@ class WorkgroupSession extends Model
         'end_date' => 'date',
     ];
 
-    /**
-     * Get the workgroup this session belongs to.
-     */
     public function workgroup(): BelongsTo
     {
         return $this->belongsTo(Workgroup::class);
     }
 
-    /**
-     * Get all files for this session.
-     */
     public function files(): HasMany
     {
         return $this->hasMany(WorkgroupFile::class);
     }
 
-    /**
-     * Get all shared uploads for this session.
-     */
     public function sharedUploads(): HasMany
     {
         return $this->hasMany(WorkgroupSharedUpload::class);
     }
 
-    /**
-     * Get all candidate products for this session.
-     */
     public function candidateProducts(): HasMany
     {
-        return $this->hasMany(CandidateProduct::class);
+        return $this->hasMany(CandidateProduct::class, 'workgroup_session_id');
     }
 
     /**
-     * Scope to get active sessions.
+     * Users assigned to this session (pivot with is_official_evaluator).
      */
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'session_user', 'workgroup_session_id', 'user_id')
+            ->withPivot('is_official_evaluator')
+            ->withTimestamps();
+    }
+
+    /**
+     * Official evaluators for this session.
+     */
+    public function officialEvaluators(): BelongsToMany
+    {
+        return $this->users()->wherePivot('is_official_evaluator', true);
+    }
+
+    /**
+     * Get evaluation submissions for this session.
+     */
+    public function submissions(): HasMany
+    {
+        return $this->hasMany(EvaluationSubmission::class, 'session_id');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
     }
 
-    /**
-     * Scope to get draft sessions.
-     */
     public function scopeDraft($query)
     {
         return $query->where('status', 'draft');
     }
 
-    /**
-     * Scope to get completed sessions.
-     */
     public function scopeCompleted($query)
     {
         return $query->where('status', 'completed');
     }
 
-    /**
-     * Check if session is currently active.
-     */
     public function isActive(): bool
     {
         return $this->status === 'active';
