@@ -2,12 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
-/**
- * Normalize all user emails to lowercase and add a case-insensitive unique index.
- * Merges any duplicate accounts that have the same email with different casing.
- */
 return new class extends Migration
 {
     public function up(): void
@@ -17,38 +12,47 @@ return new class extends Migration
         DB::statement('DROP INDEX IF EXISTS users_email_unique');
 
         // Step 2: Find case-insensitive duplicates BEFORE normalizing
-        $duplicates = DB::select('
+        $duplicates = DB::select("
             SELECT LOWER(email) as norm_email, array_agg(id ORDER BY id) as ids
             FROM users
             GROUP BY LOWER(email)
             HAVING COUNT(*) > 1
-        ');
+        ");
 
         foreach ($duplicates as $dup) {
             $ids = trim($dup->ids, '{}');
             $idArray = array_map('intval', explode(',', $ids));
-            $keepId = $idArray[0]; // Keep the lowest ID
+            $keepId = $idArray[0];
             $deleteIds = array_slice($idArray, 1);
 
             foreach ($deleteIds as $deleteId) {
-                // Reassign FK references from deleted user to kept user
-                // workgroup_members - only if no conflict
-                $existingWgs = DB::select('SELECT workgroup_id FROM workgroup_members WHERE user_id = ?', [$keepId]);
-                $existingWgIds = array_column($existingWgs, 'workgroup_id');
-                DB::delete('DELETE FROM workgroup_members WHERE user_id = ? AND workgroup_id = ANY(?)', [$deleteId, '{' . implode(',', $existingWgIds) . '}']);
-                DB::update('UPDATE workgroup_members SET user_id = ? WHERE user_id = ?', [$keepId, $deleteId]);
-
+                // Update ALL foreign key references from deleted user to kept user
+                // workgroup_members
+                DB::statement('DELETE FROM workgroup_members WHERE user_id = ? AND workgroup_id IN (SELECT workgroup_id FROM workgroup_members WHERE user_id = ?)', [$deleteId, $keepId]);
+                DB::statement('UPDATE workgroup_members SET user_id = ? WHERE user_id = ?', [$keepId, $deleteId]);
                 // session_user
-                DB::delete('DELETE FROM "session_user" WHERE user_id = ?', [$deleteId]);
-
+                DB::statement('DELETE FROM "session_user" WHERE user_id = ?', [$deleteId]);
                 // evaluation_submissions
-                DB::update('UPDATE evaluation_submissions SET user_id = ? WHERE user_id = ?', [$keepId, $deleteId]);
+                DB::statement('UPDATE evaluation_submissions SET user_id = ? WHERE user_id = ?', [$keepId, $deleteId]);
+                // workgroup_notes
+                DB::statement('UPDATE workgroup_notes SET shared_with_user_id = ? WHERE shared_with_user_id = ?', [$keepId, $deleteId]);
+                // workgroups.created_by
+                DB::statement('UPDATE workgroups SET created_by = ? WHERE created_by = ?', [$keepId, $deleteId]);
+                // workgroup_files.uploaded_by
+                DB::statement('UPDATE workgroup_files SET uploaded_by = ? WHERE uploaded_by = ?', [$keepId, $deleteId]);
+                // workgroup_shared_uploads
+                DB::statement('UPDATE workgroup_shared_uploads SET uploaded_by = ? WHERE uploaded_by = ?', [$keepId, $deleteId]);
+                // notifications
+                DB::statement('UPDATE notifications SET notifiable_id = ? WHERE notifiable_type = ? AND notifiable_id = ?', [$keepId, 'App\\Models\\User', $deleteId]);
+                // personal_access_tokens
+                DB::statement('DELETE FROM personal_access_tokens WHERE tokenable_type = ? AND tokenable_id = ?', ['App\\Models\\User', $deleteId]);
+                // model_has_roles
+                DB::statement('DELETE FROM model_has_roles WHERE model_type = ? AND model_id = ?', ['App\\Models\\User', $deleteId]);
+                // model_has_permissions
+                DB::statement('DELETE FROM model_has_permissions WHERE model_type = ? AND model_id = ?', ['App\\Models\\User', $deleteId]);
 
-                // workgroup_notes shared_with_user_id
-                DB::update('UPDATE workgroup_notes SET shared_with_user_id = ? WHERE shared_with_user_id = ?', [$keepId, $deleteId]);
-
-                // Delete the duplicate user
-                DB::delete('DELETE FROM users WHERE id = ?', [$deleteId]);
+                // Finally delete the duplicate user
+                DB::statement('DELETE FROM users WHERE id = ?', [$deleteId]);
             }
         }
 
@@ -62,7 +66,6 @@ return new class extends Migration
     public function down(): void
     {
         DB::statement('DROP INDEX IF EXISTS users_email_ci_unique');
-        // Re-add original unique constraint
         DB::statement('ALTER TABLE users ADD CONSTRAINT users_email_unique UNIQUE (email)');
     }
 };
