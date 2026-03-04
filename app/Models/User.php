@@ -2,105 +2,79 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasName;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Spatie\Permission\Traits\HasRoles;
 use Laravel\Sanctum\HasApiTokens;
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Panel;
-use Illuminate\Database\Eloquent\Casts\Attribute;
+use Spatie\Permission\Traits\HasRoles;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable implements FilamentUser, HasName
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, HasRoles, HasPushSubscriptions;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'name',
         'email',
         'password',
-        'display_name',
-        'rank',
-        'station',
-        'phone',
         'must_change_password',
+        'rank',
+        'station_assignment',
+        'shift',
+        'is_admin',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'must_change_password' => 'boolean',
+            'is_admin' => 'boolean',
         ];
     }
 
     /**
-     * Make email case-insensitive by always storing lowercase.
+     * Normalize email to lowercase on set to prevent case-sensitive duplicates.
      */
-    protected function email(): Attribute
+    public function setEmailAttribute($value): void
     {
-        return Attribute::make(
-            get: fn (string $value) => $value,
-            set: fn (string $value) => strtolower($value),
-        );
+        $this->attributes['email'] = strtolower($value);
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return true;
+    }
+
+    public function getFilamentName(): string
+    {
+        return $this->name;
     }
 
     /**
-     * Determine if the user can access the Filament admin panel.
-     * Training users are allowed through admin panel auth check so the
-     * RedirectTrainingUsers middleware can redirect them to /training.
+     * Get workgroup sessions this user is assigned to.
      */
-    public function canAccessPanel(Panel $panel): bool
+    public function workgroupSessions()
     {
-        if ($panel->getId() === 'training') {
-            return $this->hasRole('super_admin')
-                || $this->hasRole('training_admin')
-                || $this->hasRole('training_viewer')
-                || $this->can('training.access');
-        }
+        return $this->belongsToMany(WorkgroupSession::class, 'session_user', 'user_id', 'workgroup_session_id')
+            ->withPivot('is_official_evaluator')
+            ->withTimestamps();
+    }
 
-        // Workgroup panel: allow users with workgroup roles or permission
-        if ($panel->getId() === 'workgroups') {
-            return $this->hasRole('super_admin')
-                || $this->hasRole('workgroup_admin')
-                || $this->hasRole('workgroup_facilitator')
-                || $this->hasRole('workgroup_member')
-                || $this->can('workgroup.access');
-        }
-
-        // Admin panel: allow any user with a valid role
-        // Training-only users will be redirected by RedirectTrainingUsers middleware
-        if ($panel->getId() === 'admin') {
-            return $this->hasRole('super_admin')
-                || $this->hasRole('admin')
-                || $this->hasRole('training_admin')
-                || $this->hasRole('training_viewer');
-        }
-
-        return false;
+    /**
+     * Get workgroup memberships.
+     */
+    public function workgroupMemberships()
+    {
+        return $this->hasMany(WorkgroupMember::class);
     }
 }
