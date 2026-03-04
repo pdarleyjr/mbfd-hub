@@ -6,59 +6,60 @@ use App\Filament\Workgroup\Exports\WorkgroupCompletionStatusExporter;
 use App\Filament\Workgroup\Exports\WorkgroupFeedbackExporter;
 use App\Filament\Workgroup\Exports\WorkgroupFinalistsExporter;
 use App\Filament\Workgroup\Exports\WorkgroupScoresExporter;
+use App\Filament\Workgroup\Widgets\AiSummaryWidget;
 use App\Filament\Workgroup\Widgets\CategoryRankingsWidget;
+use App\Filament\Workgroup\Widgets\EvaluatorTrackingWidget;
 use App\Filament\Workgroup\Widgets\FinalistsWidget;
 use App\Filament\Workgroup\Widgets\NonRankableFeedbackWidget;
+use App\Filament\Workgroup\Widgets\ProductScoreChartWidget;
 use App\Filament\Workgroup\Widgets\SessionProgressWidget;
 use App\Filament\Workgroup\Widgets\WorkgroupAdminStatsWidget;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
+use Filament\Actions\Action;
 use Filament\Actions\ExportAction;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Admin Dashboard page showing system-wide analytics and rankings.
- * Accessible to facilitators and admins.
+ * The Admin "Workgroup Data Hub" — single consolidated admin page.
+ * Handles live charts, evaluator tracking, AI summary, and all exports.
  */
 class AdminDashboard extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
-
-    protected static ?string $title = 'Admin Dashboard';
-
-    protected static string $view = 'filament.workgroup.pages.admin-dashboard';
-
-    protected static ?string $navigationLabel = 'Admin Dashboard';
-
+    protected static ?string $title = 'Workgroup Data Hub';
+    protected static string $view = 'filament-workgroup.pages.admin-dashboard';
+    protected static ?string $navigationLabel = 'Data Hub';
     protected static ?string $slug = 'admin-dashboard';
 
     public function getHeading(): string
     {
-        return 'Workgroup Analytics Dashboard';
+        return 'Workgroup Data Hub';
     }
 
     public function getSubheading(): ?string
     {
-        return 'Overview of all workgroups, sessions, evaluations, and results.';
+        return 'Live analytics, evaluator tracking, AI intelligence, and exports — all in one place.';
     }
 
     public function getWidgets(): array
     {
         return [
+            AiSummaryWidget::class,
             WorkgroupAdminStatsWidget::class,
+            ProductScoreChartWidget::class,
+            EvaluatorTrackingWidget::class,
             SessionProgressWidget::class,
+            CategoryRankingsWidget::class,
+            FinalistsWidget::class,
+            NonRankableFeedbackWidget::class,
         ];
     }
 
     public function getColumns(): int|string|array
     {
-        return [
-            'sm' => 1,
-            'md' => 2,
-            'lg' => 3,
-            'xl' => 4,
-        ];
+        return ['sm' => 1, 'md' => 2, 'lg' => 3, 'xl' => 4];
     }
 
     protected function getHeaderActions(): array
@@ -66,6 +67,13 @@ class AdminDashboard extends Page
         $session = WorkgroupSession::active()->first();
 
         return [
+            Action::make('generateExecutiveReport')
+                ->label('Generate Executive Report')
+                ->icon('heroicon-o-document-arrow-down')
+                ->color('primary')
+                ->url(fn () => route('workgroup.executive-report'), shouldOpenInNewTab: true)
+                ->visible(fn () => $session !== null),
+
             ExportAction::make('exportFinalists')
                 ->label('Export Finalists')
                 ->exporter(WorkgroupFinalistsExporter::class)
@@ -77,7 +85,7 @@ class AdminDashboard extends Page
                 ->visible(fn () => $session !== null),
 
             ExportAction::make('exportCompletion')
-                ->label('Export Completion Status')
+                ->label('Export Completion')
                 ->exporter(WorkgroupCompletionStatusExporter::class),
 
             ExportAction::make('exportFeedback')
@@ -90,22 +98,15 @@ class AdminDashboard extends Page
     public static function canAccess(): bool
     {
         $user = Auth::user();
-        
-        if (!$user) {
-            return false;
-        }
+        if (!$user) return false;
 
-        $member = WorkgroupMember::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->first();
-
+        $member = WorkgroupMember::where('user_id', $user->id)->where('is_active', true)->first();
         return $member && in_array($member->role, ['admin', 'facilitator']);
     }
 
     public function mount(): void
     {
         parent::mount();
-
         abort_unless(static::canAccess(), 403);
     }
 }

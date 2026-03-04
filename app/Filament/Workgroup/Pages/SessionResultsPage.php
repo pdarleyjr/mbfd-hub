@@ -2,207 +2,117 @@
 
 namespace App\Filament\Workgroup\Pages;
 
-use App\Filament\Workgroup\Exports\WorkgroupCompletionStatusExporter;
-use App\Filament\Workgroup\Exports\WorkgroupFeedbackExporter;
-use App\Filament\Workgroup\Exports\WorkgroupFinalistsExporter;
-use App\Filament\Workgroup\Exports\WorkgroupScoresExporter;
-use App\Filament\Workgroup\Widgets\CategoryRankingsWidget;
-use App\Filament\Workgroup\Widgets\FinalistsWidget;
-use App\Filament\Workgroup\Widgets\NonRankableFeedbackWidget;
-use App\Models\EvaluationCategory;
+use App\Models\CandidateProduct;
+use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
-use Filament\Actions\ExportAction;
-use Filament\Actions\SelectAction;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Session Results page showing detailed rankings by category
- * with export functionality.
+ * Anonymous Member Live View — read-only simplified dashboard for members.
+ * Displays aggregate scores and anonymous feedback.
+ * Members have no access to the Admin Data Hub.
  */
 class SessionResultsPage extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-trophy';
-
     protected static ?string $title = 'Session Results';
-
-    protected static string $view = 'filament.workgroup.pages.session-results';
-
+    protected static string $view = 'filament-workgroup.pages.session-results';
     protected static ?string $navigationLabel = 'Results';
-
     protected static ?string $slug = 'session-results';
-
-    public ?WorkgroupSession $selectedSession = null;
-    public ?EvaluationCategory $selectedCategory = null;
 
     public function getHeading(): string
     {
-        $session = $this->selectedSession ?? WorkgroupSession::active()->first();
+        $session = WorkgroupSession::active()->first();
         return $session ? "Results: {$session->name}" : 'Session Results';
     }
 
     public function getSubheading(): ?string
     {
-        return 'View rankings, finalists, and export evaluation results.';
+        return 'Aggregate scores and anonymous feedback from the evaluation session.';
     }
 
     public function mount(): void
     {
         parent::mount();
-
         abort_unless(static::canAccess(), 403);
-        
-        $this->selectedSession = WorkgroupSession::active()->first();
     }
 
-    public function getWidgets(): array
-    {
-        return [
-            FinalistsWidget::class,
-            CategoryRankingsWidget::class,
-            NonRankableFeedbackWidget::class,
-        ];
-    }
-
-    public function getColumns(): int|string|array
-    {
-        return [
-            'sm' => 1,
-            'md' => 2,
-        ];
-    }
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            SelectAction::make('selectSession')
-                ->label('Select Session')
-                ->options(fn () => $this->getSessionOptions())
-                ->default(fn () => $this->selectedSession?->id)
-                ->after(fn (SelectAction $action) => $action->successNotificationTitle('Session selected'))
-                ->action(function (SelectAction $action, ?int $sessionId) {
-                    $this->selectedSession = $sessionId 
-                        ? WorkgroupSession::find($sessionId) 
-                        : WorkgroupSession::active()->first();
-                }),
-
-            SelectAction::make('selectCategory')
-                ->label('Filter by Category')
-                ->options(fn () => $this->getCategoryOptions())
-                ->nullable()
-                ->after(fn (SelectAction $action) => $action->successNotificationTitle('Category selected'))
-                ->action(function (SelectAction $action, ?int $categoryId) {
-                    $this->selectedCategory = $categoryId 
-                        ? EvaluationCategory::find($categoryId) 
-                        : null;
-                }),
-
-            ExportAction::make('exportFinalists')
-                ->label('Export Finalists')
-                ->exporter(WorkgroupFinalistsExporter::class),
-
-            ExportAction::make('exportScores')
-                ->label('Export All Scores')
-                ->exporter(WorkgroupScoresExporter::class),
-
-            ExportAction::make('exportCompletion')
-                ->label('Export Completion Status')
-                ->exporter(WorkgroupCompletionStatusExporter::class),
-
-            ExportAction::make('exportFeedback')
-                ->label('Export Feedback')
-                ->exporter(WorkgroupFeedbackExporter::class),
-        ];
-    }
-
-    protected function getSessionOptions(): array
-    {
-        return WorkgroupSession::all()
-            ->pluck('name', 'id')
-            ->toArray();
-    }
-
-    protected function getCategoryOptions(): array
-    {
-        if (!$this->selectedSession) {
-            return [];
-        }
-
-        return EvaluationCategory::active()
-            ->ordered()
-            ->pluck('name', 'id')
-            ->toArray();
-    }
-
+    /**
+     * All workgroup members can access results (read-only).
+     */
     public static function canAccess(): bool
     {
         $user = Auth::user();
-        
-        if (!$user) {
-            return false;
-        }
+        if (!$user) return false;
 
-        $member = WorkgroupMember::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->first();
-
-        return $member && in_array($member->role, ['admin', 'facilitator']);
+        return WorkgroupMember::where('user_id', $user->id)->where('is_active', true)->exists();
     }
 
     /**
-     * Get rankable categories for display.
+     * Get aggregate product scores for the active session.
      */
-    public function getRankableCategories(): array
+    public function getProductScores(): array
     {
-        if (!$this->selectedSession) {
-            return [];
-        }
+        $session = WorkgroupSession::active()->first();
+        if (!$session) return [];
 
-        return EvaluationCategory::rankable()
-            ->active()
-            ->ordered()
+        return CandidateProduct::where('workgroup_session_id', $session->id)
+            ->whereHas('category', fn($q) => $q->where('is_rankable', true))
             ->get()
+            ->map(function ($product) {
+                $avgScore = EvaluationSubmission::where('candidate_product_id', $product->id)
+                    ->where('status', 'submitted')
+                    ->whereNotNull('overall_score')
+                    ->avg('overall_score');
+
+                $responseCount = EvaluationSubmission::where('candidate_product_id', $product->id)
+                    ->where('status', 'submitted')
+                    ->count();
+
+                return [
+                    'name' => $product->name,
+                    'manufacturer' => $product->manufacturer,
+                    'category' => $product->category?->name ?? 'N/A',
+                    'avg_score' => $avgScore !== null ? number_format($avgScore, 1) : 'N/A',
+                    'response_count' => $responseCount,
+                ];
+            })
+            ->sortByDesc('avg_score')
+            ->values()
             ->toArray();
     }
 
     /**
-     * Get non-rankable categories for display.
+     * Get anonymous feedback (no evaluator names shown).
      */
-    public function getNonRankableCategories(): array
+    public function getAnonymousFeedback(): array
     {
-        if (!$this->selectedSession) {
-            return [];
-        }
+        $session = WorkgroupSession::active()->first();
+        if (!$session) return [];
 
-        return EvaluationCategory::where('is_rankable', false)
-            ->active()
-            ->ordered()
+        return EvaluationSubmission::where('session_id', $session->id)
+            ->where('status', 'submitted')
+            ->whereNotNull('narrative_payload')
             ->get()
+            ->flatMap(function ($submission) {
+                $narratives = $submission->narrative_payload ?? [];
+                $feedback = [];
+                foreach ($narratives as $key => $text) {
+                    if (!empty($text) && is_string($text)) {
+                        $feedback[] = [
+                            'product' => $submission->candidateProduct?->name ?? 'Unknown',
+                            'type' => ucfirst(str_replace('_', ' ', $key)),
+                            'text' => $text,
+                        ];
+                    }
+                }
+                return $feedback;
+            })
+            ->shuffle()
+            ->take(20)
             ->toArray();
-    }
-
-    /**
-     * Get finalists data for display.
-     */
-    public function getFinalistsData(): array
-    {
-        if (!$this->selectedSession) {
-            return [];
-        }
-
-        return FinalistsWidget::getAllFinalists();
-    }
-
-    /**
-     * Get feedback data for display.
-     */
-    public function getFeedbackData(): array
-    {
-        if (!$this->selectedSession) {
-            return [];
-        }
-
-        return NonRankableFeedbackWidget::getAggregatedFeedback();
     }
 }

@@ -1,116 +1,84 @@
-{{-- Session Results View --}}
+{{-- Anonymous Member Results View --}}
 <x-filament-panels::page>
     <div class="space-y-6">
-        {{-- Finalists Section --}}
-        <x-filament::card>
-            <x-filament::card.heading>
+        {{-- Aggregate Scores Section --}}
+        <x-filament::section>
+            <x-slot name="heading">
                 <div class="flex items-center gap-2">
-                    <x-heroicon-o-trophy class="w-6 h-6 text-warning" />
-                    <span>Finalists</span>
+                    <x-heroicon-o-chart-bar class="w-5 h-5 text-primary-500" />
+                    <span>Product Score Overview</span>
                 </div>
-            </x-filament::card.heading>
-            <x-filament::card.content>
-                @php
-                    $finalistsData = $this->getFinalistsData();
-                @endphp
+            </x-slot>
+            <x-slot name="description">Average scores from all submitted evaluations.</x-slot>
 
-                @if(empty($finalistsData))
-                    <p class="text-gray-500 text-center py-4">No active session or no finalists yet.</p>
-                @else
-                    <div class="space-y-6">
-                        @foreach($finalistsData as $categoryName => $finalists)
-                            <div class="border rounded-lg p-4">
-                                <h4 class="font-semibold text-lg mb-3">{{ $categoryName }}</h4>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    @foreach($finalists as $index => $finalist)
-                                        <div class="flex items-center gap-3 p-3 rounded-lg {{ $index === 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-gray-50 border-gray-200' }} border">
-                                            <div class="flex-shrink-0">
-                                                @if($index === 0)
-                                                    <x-heroicon-o-trophy class="w-8 h-8 text-yellow-500" />
-                                                @else
-                                                    <x-heroicon-o-medal class="w-8 h-8 text-gray-400" />
-                                                @endif
-                                            </div>
-                                            <div>
-                                                <p class="font-medium">{{ $finalist['product']['name'] }}</p>
-                                                <p class="text-sm text-gray-600">
-                                                    {{ $finalist['product']['manufacturer'] ?? '' }} 
-                                                    {{ $finalist['product']['model'] ?? '' }}
-                                                </p>
-                                                <p class="text-sm font-semibold text-green-600">
-                                                    Score: {{ number_format($finalist['weighted_score'], 2) }}
-                                                    ({{ $finalist['response_count'] }} responses)
-                                                </p>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-            </x-filament::card.content>
-        </x-filament::card>
+            @php $products = $this->getProductScores(); @endphp
 
-        {{-- Category Rankings --}}
-        <x-filament::card>
-            <x-filament::card.heading>
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-chart-bar class="w-6 h-6 text-primary" />
-                    <span>All Rankings</span>
-                </div>
-            </x-filament::card.heading>
-            <x-filament::card.content>
-                @foreach($this->getWidgets() as $widget)
-                    @if($widget instanceof \App\Filament\Workgroup\Widgets\CategoryRankingsWidget)
-                        {{ \Filament\Support\Facades\FilamentView::renderWidget($widget) }}
-                    @endif
-                @endforeach
-            </x-filament::card.content>
-        </x-filament::card>
-
-        {{-- Non-Rankable Feedback --}}
-        <x-filament::card>
-            <x-filament::card.heading>
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-chat-bubble-left-right class="w-6 h-6 text-info" />
-                    <span>Feedback Summary</span>
-                </div>
-            </x-filament::card.heading>
-            <x-filament::card.content>
-                @php
-                    $feedbackData = $this->getFeedbackData();
-                @endphp
-
-                @if(empty($feedbackData))
-                    <p class="text-gray-500 text-center py-4">No non-rankable categories or feedback yet.</p>
-                @else
-                    <div class="space-y-4">
-                        @foreach($feedbackData as $feedback)
-                            <div class="border rounded-lg p-4">
-                                <h4 class="font-semibold mb-2">{{ $feedback['category']['name'] }}</h4>
-                                <p class="text-sm text-gray-600 mb-3">
-                                    {{ $feedback['product_count'] }} products evaluated, 
-                                    {{ $feedback['total_comments'] }} total comments
-                                </p>
-                                
-                                @foreach($feedback['products'] as $product)
-                                    <div class="mb-3 pb-3 border-b last:border-b-0">
-                                        <p class="font-medium">{{ $product['product'] }}</p>
-                                        @if(!empty($product['comments']))
-                                            <ul class="mt-2 space-y-1">
-                                                @foreach($product['comments'] as $comment)
-                                                    <li class="text-sm text-gray-600 italic">"{{ $comment }}"</li>
-                                                @endforeach
-                                            </ul>
+            @if (empty($products))
+                <p class="text-gray-500 italic">No evaluation data available yet.</p>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-200 dark:border-gray-700">
+                                <th class="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Product</th>
+                                <th class="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Manufacturer</th>
+                                <th class="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Category</th>
+                                <th class="text-center py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Avg Score</th>
+                                <th class="text-center py-3 px-4 font-semibold text-gray-600 dark:text-gray-400">Responses</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($products as $product)
+                                <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                    <td class="py-3 px-4 font-medium text-gray-900 dark:text-white">{{ $product['name'] }}</td>
+                                    <td class="py-3 px-4 text-gray-600 dark:text-gray-400">{{ $product['manufacturer'] }}</td>
+                                    <td class="py-3 px-4 text-gray-600 dark:text-gray-400">{{ $product['category'] }}</td>
+                                    <td class="py-3 px-4 text-center">
+                                        @if ($product['avg_score'] !== 'N/A')
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                {{ (float)$product['avg_score'] >= 80 ? 'bg-green-100 text-green-800' : ((float)$product['avg_score'] >= 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') }}">
+                                                {{ $product['avg_score'] }}/100
+                                            </span>
+                                        @else
+                                            <span class="text-gray-400">—</span>
                                         @endif
-                                    </div>
-                                @endforeach
+                                    </td>
+                                    <td class="py-3 px-4 text-center text-gray-600 dark:text-gray-400">{{ $product['response_count'] }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </x-filament::section>
+
+        {{-- Anonymous Feedback Section --}}
+        <x-filament::section>
+            <x-slot name="heading">
+                <div class="flex items-center gap-2">
+                    <x-heroicon-o-chat-bubble-left-right class="w-5 h-5 text-primary-500" />
+                    <span>Anonymous Feedback</span>
+                </div>
+            </x-slot>
+            <x-slot name="description">General feedback from evaluators (names hidden to protect evaluation integrity).</x-slot>
+
+            @php $feedback = $this->getAnonymousFeedback(); @endphp
+
+            @if (empty($feedback))
+                <p class="text-gray-500 italic">No feedback submitted yet.</p>
+            @else
+                <div class="space-y-3">
+                    @foreach ($feedback as $item)
+                        <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">{{ $item['product'] }}</span>
+                                <span class="text-xs text-gray-400">{{ $item['type'] }}</span>
                             </div>
-                        @endforeach
-                    </div>
-                @endif
-            </x-filament::card.content>
-        </x-filament::card>
+                            <p class="text-sm text-gray-700 dark:text-gray-300">{{ $item['text'] }}</p>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </x-filament::section>
     </div>
 </x-filament-panels::page>
