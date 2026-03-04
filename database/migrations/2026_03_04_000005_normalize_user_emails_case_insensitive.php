@@ -1,24 +1,24 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
  * Normalize all user emails to lowercase and add a case-insensitive unique index.
- * This prevents duplicate accounts with different email casing.
+ * Merges any duplicate accounts that have the same email with different casing.
  */
 return new class extends Migration
 {
     public function up(): void
     {
-        // Normalize all emails to lowercase
-        DB::statement('UPDATE users SET email = LOWER(email)');
+        // Step 1: Drop the existing case-sensitive unique index
+        DB::statement('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_unique');
+        DB::statement('DROP INDEX IF EXISTS users_email_unique');
 
-        // Merge any duplicates that arise (keep lowest ID)
+        // Step 2: Find case-insensitive duplicates BEFORE normalizing
         $duplicates = DB::select('
-            SELECT LOWER(email) as email, array_agg(id ORDER BY id) as ids
+            SELECT LOWER(email) as norm_email, array_agg(id ORDER BY id) as ids
             FROM users
             GROUP BY LOWER(email)
             HAVING COUNT(*) > 1
@@ -26,27 +26,43 @@ return new class extends Migration
 
         foreach ($duplicates as $dup) {
             $ids = trim($dup->ids, '{}');
-            $idArray = explode(',', $ids);
-            $keepId = (int) $idArray[0];
+            $idArray = array_map('intval', explode(',', $ids));
+            $keepId = $idArray[0]; // Keep the lowest ID
             $deleteIds = array_slice($idArray, 1);
 
             foreach ($deleteIds as $deleteId) {
-                $deleteId = (int) $deleteId;
-                // Move FK references to the kept user
-                DB::statement('UPDATE workgroup_members SET user_id = ? WHERE user_id = ? AND NOT EXISTS (SELECT 1 FROM workgroup_members WHERE user_id = ? AND workgroup_id = (SELECT workgroup_id FROM workgroup_members WHERE user_id = ? LIMIT 1))', [$keepId, $deleteId, $keepId, $deleteId]);
-                DB::statement('DELETE FROM workgroup_members WHERE user_id = ?', [$deleteId]);
-                DB::statement('UPDATE evaluation_submissions SET user_id = ? WHERE user_id = ?', [$keepId, $deleteId]);
-                DB::statement('DELETE FROM "session_user" WHERE user_id = ?', [$deleteId]);
-                DB::statement('DELETE FROM users WHERE id = ?', [$deleteId]);
+                // Reassign FK references from deleted user to kept user
+                // workgroup_members - only if no conflict
+                $existingWgs = DB::select('SELECT workgroup_id FROM workgroup_members WHERE user_id = ?', [$keepId]);
+                $existingWgIds = array_column($existingWgs, 'workgroup_id');
+                DB::delete('DELETE FROM workgroup_members WHERE user_id = ? AND workgroup_id = ANY(?)', [$deleteId, '{' . implode(',', $existingWgIds) . '}']);
+                DB::update('UPDATE workgroup_members SET user_id = ? WHERE user_id = ?', [$keepId, $deleteId]);
+
+                // session_user
+                DB::delete('DELETE FROM "session_user" WHERE user_id = ?', [$deleteId]);
+
+                // evaluation_submissions
+                DB::update('UPDATE evaluation_submissions SET user_id = ? WHERE user_id = ?', [$keepId, $deleteId]);
+
+                // workgroup_notes shared_with_user_id
+                DB::update('UPDATE workgroup_notes SET shared_with_user_id = ? WHERE shared_with_user_id = ?', [$keepId, $deleteId]);
+
+                // Delete the duplicate user
+                DB::delete('DELETE FROM users WHERE id = ?', [$deleteId]);
             }
         }
 
-        // Add case-insensitive unique index
+        // Step 3: Normalize all emails to lowercase
+        DB::statement('UPDATE users SET email = LOWER(email)');
+
+        // Step 4: Add case-insensitive unique index
         DB::statement('CREATE UNIQUE INDEX users_email_ci_unique ON users (LOWER(email))');
     }
 
     public function down(): void
     {
         DB::statement('DROP INDEX IF EXISTS users_email_ci_unique');
+        // Re-add original unique constraint
+        DB::statement('ALTER TABLE users ADD CONSTRAINT users_email_unique UNIQUE (email)');
     }
 };
