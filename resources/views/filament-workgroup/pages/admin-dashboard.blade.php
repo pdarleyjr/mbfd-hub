@@ -1,7 +1,7 @@
 {{-- Admin Data Hub View --}}
 <x-filament-panels::page>
     <div class="space-y-6">
-        {{-- AI Summary Widget at top --}}
+        {{-- AI Summary Widget --}}
         @livewire(\App\Filament\Workgroup\Widgets\AiSummaryWidget::class)
 
         {{-- Stats Overview --}}

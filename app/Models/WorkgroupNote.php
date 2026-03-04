@@ -15,37 +15,31 @@ class WorkgroupNote extends Model
         'workgroup_session_id',
         'title',
         'content',
+        'is_shared',
+        'shared_with_user_id',
     ];
 
-    /**
-     * Get the member who created this note.
-     */
+    protected $casts = [
+        'is_shared' => 'boolean',
+    ];
+
     public function member(): BelongsTo
     {
         return $this->belongsTo(WorkgroupMember::class, 'workgroup_member_id');
     }
 
-    /**
-     * Get the session this note belongs to (if any).
-     */
     public function session(): BelongsTo
     {
         return $this->belongsTo(WorkgroupSession::class, 'workgroup_session_id');
     }
 
-    /**
-     * Get the workgroup this note belongs to through the member.
-     */
-    public function workgroup(): BelongsTo
+    public function sharedWithUser(): BelongsTo
     {
-        return $this->belongsTo(Workgroup::class);
+        return $this->belongsTo(User::class, 'shared_with_user_id');
     }
 
-    /**
-     * Get truncated content preview.
-     */
-    public function getPreviewAttribute(int $length = 100): string
+    public function getPreviewAttribute(): string
     {
-        return \Str::limit($this->content, $length);
+        return \Str::limit(strip_tags($this->content), 100);
     }
 }
