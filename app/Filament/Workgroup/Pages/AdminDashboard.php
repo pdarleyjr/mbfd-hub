@@ -21,9 +21,6 @@ use Filament\Actions\ExportAction;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
-/**
- * The Admin "Workgroup Data Hub" - single consolidated admin page.
- */
 class AdminDashboard extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
@@ -100,14 +97,12 @@ class AdminDashboard extends Page
     {
         $user = Auth::user();
         if (!$user) return false;
-
         $member = WorkgroupMember::where('user_id', $user->id)->where('is_active', true)->first();
         return $member && in_array($member->role, ['admin', 'facilitator']);
     }
 
     public function mount(): void
     {
-        parent::mount();
         abort_unless(static::canAccess(), 403);
     }
 }

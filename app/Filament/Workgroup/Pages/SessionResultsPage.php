@@ -8,13 +8,7 @@ use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
-/**
- * Anonymous Member Live View - read-only simplified dashboard for members.
- * Displays aggregate scores and anonymous feedback.
- * ALL workgroup members can access this page.
- */
 class SessionResultsPage extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-trophy';
@@ -38,18 +32,13 @@ class SessionResultsPage extends Page
 
     public function mount(): void
     {
-        parent::mount();
         abort_unless(static::canAccess(), 403);
     }
 
-    /**
-     * All workgroup members can access results (read-only).
-     */
     public static function canAccess(): bool
     {
         $user = Auth::user();
         if (!$user) return false;
-
         return WorkgroupMember::where('user_id', $user->id)->where('is_active', true)->exists();
     }
 
@@ -67,11 +56,8 @@ class SessionResultsPage extends Page
                     ->where('status', 'submitted')
                     ->whereNotNull('overall_score')
                     ->avg('overall_score');
-
                 $responseCount = EvaluationSubmission::where('candidate_product_id', $product->id)
-                    ->where('status', 'submitted')
-                    ->count();
-
+                    ->where('status', 'submitted')->count();
                 return [
                     'name' => $product->name,
                     'manufacturer' => $product->manufacturer ?? '',
@@ -90,11 +76,12 @@ class SessionResultsPage extends Page
         $session = WorkgroupSession::active()->first();
         if (!$session) return [];
 
-        return EvaluationSubmission::whereHas('candidateProduct', fn($q) => 
+        return EvaluationSubmission::whereHas('candidateProduct', fn($q) =>
                 $q->where('workgroup_session_id', $session->id)
             )
             ->where('status', 'submitted')
             ->whereNotNull('narrative_payload')
+            ->with('candidateProduct')
             ->get()
             ->flatMap(function ($submission) {
                 $narratives = $submission->narrative_payload ?? [];
