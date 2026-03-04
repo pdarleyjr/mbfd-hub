@@ -8,8 +8,6 @@ use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
-use Filament\Navigation\NavigationItem;
-use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -29,8 +27,10 @@ use App\Filament\Workgroup\Pages\SharedUploads;
 use App\Filament\Workgroup\Pages\Profile;
 use App\Filament\Workgroup\Pages\EvaluationFormPage;
 use App\Filament\Workgroup\Pages\SessionResultsPage;
+use App\Filament\Workgroup\Pages\AdminDashboard;
 use App\Filament\Resources\Workgroup\CandidateProductResource;
 use App\Filament\Resources\Workgroup\EvaluationCategoryResource;
+use App\Filament\Resources\Workgroup\EvaluationSubmissionResource;
 
 class WorkgroupPanelProvider extends PanelProvider
 {
@@ -54,14 +54,14 @@ class WorkgroupPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
             ])
             ->font('Inter')
-            // Explicitly register only the needed resources
-            // This hides the deprecated EvaluationTemplateResource and EvaluationCriterionResource
             ->resources([
                 EvaluationCategoryResource::class,
                 CandidateProductResource::class,
+                EvaluationSubmissionResource::class,
             ])
             ->pages([
                 Dashboard::class,
+                AdminDashboard::class,
                 Files::class,
                 Notes::class,
                 Evaluations::class,
