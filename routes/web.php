@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Workgroup\FileDownloadController;
+use App\Http\Controllers\Workgroup\ExecutiveReportController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -69,3 +70,7 @@ Route::get('/workgroup/shared-upload/{upload}/download', [FileDownloadController
     ->name('workgroup.shared-upload.download')
     ->middleware('auth');
 
+// Executive Report PDF Generation
+Route::get('/workgroup/executive-report', [ExecutiveReportController::class, 'generate'])
+    ->name('workgroup.executive-report')
+    ->middleware('auth');
