@@ -13,6 +13,8 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class SharedUploads extends Page implements HasTable
 {
@@ -149,23 +151,55 @@ class SharedUploads extends Page implements HasTable
             return;
         }
 
-        // Handle the uploaded file
+        // Filament FileUpload in action forms returns a string (temp storage path),
+        // not an UploadedFile object. Handle both cases.
         if (is_array($file)) {
-            $file = $file[0];
+            $file = reset($file); // Get first element
         }
 
-        $path = $file->store('workgroup-shared-uploads/' . $member->workgroup->id, 'public');
-        
-        WorkgroupSharedUpload::create([
-            'workgroup_id' => $member->workgroup->id,
-            'workgroup_session_id' => $this->selectedSession ? (int) $this->selectedSession : null,
-            'user_id' => Auth::id(),
-            'workgroup_member_id' => $member->id,
-            'filename' => $file->getClientOriginalName(),
-            'filepath' => $path,
-            'file_type' => $file->getMimeType(),
-            'file_size' => $file->getSize(),
-        ]);
+        if (is_string($file)) {
+            // Filament already stored the file in the default Livewire temp directory.
+            // Move it to the permanent location on the public disk.
+            $tempPath = $file; // e.g. "livewire-tmp/abc123.pdf"
+            $filename = pathinfo($tempPath, PATHINFO_BASENAME);
+            $extension = pathinfo($tempPath, PATHINFO_EXTENSION);
+            $permanentDir = 'workgroup-shared-uploads/' . $member->workgroup->id;
+            $permanentPath = $permanentDir . '/' . $filename;
+
+            // Move from default disk (local) to public disk
+            $contents = Storage::disk('local')->get($tempPath);
+            Storage::disk('public')->put($permanentPath, $contents);
+            $fileSize = Storage::disk('public')->size($permanentPath);
+            $mimeType = Storage::disk('public')->mimeType($permanentPath);
+
+            // Clean up temp file
+            Storage::disk('local')->delete($tempPath);
+
+            WorkgroupSharedUpload::create([
+                'workgroup_id' => $member->workgroup->id,
+                'workgroup_session_id' => $this->selectedSession ? (int) $this->selectedSession : null,
+                'user_id' => Auth::id(),
+                'workgroup_member_id' => $member->id,
+                'filename' => $filename,
+                'filepath' => $permanentPath,
+                'file_type' => $mimeType ?: ('application/' . $extension),
+                'file_size' => $fileSize,
+            ]);
+        } else {
+            // UploadedFile object (fallback for direct uploads)
+            $path = $file->store('workgroup-shared-uploads/' . $member->workgroup->id, 'public');
+
+            WorkgroupSharedUpload::create([
+                'workgroup_id' => $member->workgroup->id,
+                'workgroup_session_id' => $this->selectedSession ? (int) $this->selectedSession : null,
+                'user_id' => Auth::id(),
+                'workgroup_member_id' => $member->id,
+                'filename' => $file->getClientOriginalName(),
+                'filepath' => $path,
+                'file_type' => $file->getMimeType(),
+                'file_size' => $file->getSize(),
+            ]);
+        }
     }
 
     public function updatedSelectedSession(): void

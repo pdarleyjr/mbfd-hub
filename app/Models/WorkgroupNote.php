@@ -15,6 +15,12 @@ class WorkgroupNote extends Model
         'workgroup_session_id',
         'title',
         'content',
+        'is_shared',
+        'shared_with_user_id',
+    ];
+
+    protected $casts = [
+        'is_shared' => 'boolean',
     ];
 
     /**
@@ -42,10 +48,19 @@ class WorkgroupNote extends Model
     }
 
     /**
-     * Get truncated content preview.
+     * Get the user this note is shared with.
      */
-    public function getPreviewAttribute(int $length = 100): string
+    public function sharedWith(): BelongsTo
     {
-        return \Str::limit($this->content, $length);
+        return $this->belongsTo(User::class, 'shared_with_user_id');
+    }
+
+    /**
+     * Get truncated content preview.
+     * Note: Eloquent accessor system passes null as first arg.
+     */
+    public function getPreviewAttribute($length = null): string
+    {
+        return \Str::limit(strip_tags($this->content ?? ''), (int) ($length ?? 100));
     }
 }
