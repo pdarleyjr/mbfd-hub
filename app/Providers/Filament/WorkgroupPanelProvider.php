@@ -75,6 +75,8 @@ class WorkgroupPanelProvider extends PanelProvider
             ->widgets([
                 \App\Filament\Workgroup\Widgets\WorkgroupStatsWidget::class,
                 \App\Filament\Workgroup\Widgets\SessionProgressWidget::class,
+                \App\Filament\Workgroup\Widgets\FinalistsWidget::class,
+                \App\Filament\Workgroup\Widgets\CategoryRankingsWidget::class,
             ])
             ->navigationGroups([
                 NavigationGroup::make()

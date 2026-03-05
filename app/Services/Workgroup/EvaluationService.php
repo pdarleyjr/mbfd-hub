@@ -209,15 +209,17 @@ class EvaluationService
         $totalMembers = WorkgroupMember::where('is_active', true)->count();
         $maxSubmissions = $totalProducts * $totalMembers;
 
-        $submissionQuery = EvaluationSubmission::whereHas('candidateProduct', function ($q) use ($sessionId) {
-            if ($sessionId) {
-                $q->where('workgroup_session_id', $sessionId);
-            }
-        });
+        $baseQuery = function () use ($sessionId) {
+            return EvaluationSubmission::whereHas('candidateProduct', function ($q) use ($sessionId) {
+                if ($sessionId) {
+                    $q->where('workgroup_session_id', $sessionId);
+                }
+            });
+        };
 
-        $totalSubmissions = $submissionQuery->count();
-        $draftSubmissions = $submissionQuery->where('status', 'draft')->count();
-        $submittedSubmissions = $submissionQuery->where('status', 'submitted')->count();
+        $totalSubmissions = $baseQuery()->count();
+        $draftSubmissions = $baseQuery()->where('status', 'draft')->count();
+        $submittedSubmissions = $baseQuery()->where('status', 'submitted')->count();
 
         return [
             'total_products' => $totalProducts,
