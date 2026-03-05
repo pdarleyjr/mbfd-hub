@@ -37,5 +37,12 @@ export default defineConfig({
       testMatch: /mbfd-full-verification\.spec\.ts/,
       grep: /Mobile/,
     },
+    {
+      name: 'workgroup',
+      use: {
+        viewport: { width: 1280, height: 800 },
+      },
+      testMatch: /workgroup-evaluations\.spec\.ts/,
+    },
   ],
 });

@@ -6,7 +6,6 @@ use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupSession;
-use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
@@ -30,49 +29,48 @@ class FinalistsWidget extends BaseWidget
         return $table
             ->query($this->getQuery($session))
             ->columns([
-                BadgeColumn::make('rank')
-                    ->label('Position')
-                    ->colors([
-                        'warning' => 1, // Gold
-                        'gray' => 2,    // Silver
-                    ])
-                    ->icons([
-                        1 => 'heroicon-o-trophy',
-                        2 => 'heroicon-o-star',
-                    ])
-                    ->width('80px'),
-
                 TextColumn::make('category.name')
                     ->label('Category')
                     ->searchable()
+                    ->weight('bold')
                     ->wrap(),
 
-                TextColumn::make('product.name')
+                TextColumn::make('name')
                     ->label('Product')
                     ->searchable()
                     ->wrap(),
 
-                TextColumn::make('product.manufacturer')
+                TextColumn::make('manufacturer')
                     ->label('Manufacturer')
                     ->toggleable(),
 
-                TextColumn::make('product.model')
+                TextColumn::make('model')
                     ->label('Model')
                     ->toggleable(),
 
                 TextColumn::make('weighted_score')
                     ->label('Score')
-                    ->formatStateUsing(fn ($state) => number_format($state, 2))
+                    ->formatStateUsing(fn ($state) => $state ? number_format((float) $state, 2) : '—')
                     ->sortable()
                     ->badge()
-                    ->color('success'),
+                    ->color(fn ($state) => match(true) {
+                        !$state => 'gray',
+                        (float) $state >= 80 => 'success',
+                        (float) $state >= 60 => 'warning',
+                        default => 'danger',
+                    }),
 
                 TextColumn::make('response_count')
                     ->label('Responses')
-                    ->sortable(),
+                    ->sortable()
+                    ->badge()
+                    ->color('info'),
             ])
-            ->defaultSort('category_id')
-            ->paginated(false);
+            ->defaultSort('weighted_score', 'desc')
+            ->paginated(false)
+            ->emptyStateHeading('No Finalists Yet')
+            ->emptyStateDescription('Rankings will appear once evaluations are submitted.')
+            ->emptyStateIcon('heroicon-o-trophy');
     }
 
     protected function getQuery(?WorkgroupSession $session)
@@ -81,40 +79,23 @@ class FinalistsWidget extends BaseWidget
             return CandidateProduct::query()->whereRaw('1 = 0');
         }
 
-        // Get top 2 products per category using the new rubric overall_score
         return CandidateProduct::query()
-            ->whereHas('session', fn($query) => 
-                $query->where('id', $session->id)
-            )
+            ->where('workgroup_session_id', $session->id)
             ->whereHas('category', fn($query) => 
                 $query->where('is_rankable', true)
             )
-            ->with(['category', 'session'])
-            ->withCount(['submissions' => fn($q) => 
-                $q->where('status', 'submitted')
-            ])
+            ->with(['category'])
             ->select('candidate_products.*')
             ->addSelect([
-                // Use new rubric overall_score if available, fallback to legacy
-                'weighted_score' => EvaluationSubmission::selectRaw('COALESCE(
-                    AVG(overall_score),
-                    COALESCE(AVG(
-                        (SELECT SUM(es.score * ec.weight) / NULLIF(SUM(ec.weight), 0)
-                        FROM evaluation_scores es
-                        JOIN evaluation_criteria ec ON es.criterion_id = ec.id
-                        WHERE es.submission_id = evaluation_submissions.id
-                        AND es.score IS NOT NULL)
-                    ), 0)
-                )')
-                    ->join('evaluation_submissions', 'evaluation_submissions.candidate_product_id', '=', 'candidate_products.id')
-                    ->whereColumn('evaluation_submissions.candidate_product_id', 'candidate_products.id')
-                    ->where('evaluation_submissions.status', 'submitted'),
+                'weighted_score' => EvaluationSubmission::selectRaw('AVG(overall_score)')
+                    ->whereColumn('candidate_product_id', 'candidate_products.id')
+                    ->where('status', 'submitted'),
                 'response_count' => EvaluationSubmission::selectRaw('COUNT(*)')
                     ->whereColumn('candidate_product_id', 'candidate_products.id')
                     ->where('status', 'submitted'),
             ])
-            ->orderByDesc('weighted_score')
-            ->orderBy('category_id');
+            ->orderBy('category_id')
+            ->orderByDesc('weighted_score');
     }
 
     /**

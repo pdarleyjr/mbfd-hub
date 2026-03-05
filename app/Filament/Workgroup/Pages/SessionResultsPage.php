@@ -2,24 +2,26 @@
 
 namespace App\Filament\Workgroup\Pages;
 
-use App\Filament\Workgroup\Exports\WorkgroupAIReportExporter;
-use App\Filament\Workgroup\Exports\WorkgroupCompletionStatusExporter;
-use App\Filament\Workgroup\Exports\WorkgroupFeedbackExporter;
-use App\Filament\Workgroup\Exports\WorkgroupFinalistsExporter;
-use App\Filament\Workgroup\Exports\WorkgroupScoresExporter;
+use App\Filament\Workgroup\Widgets\CategoryRankingsWidget;
+use App\Filament\Workgroup\Widgets\FinalistsWidget;
+use App\Filament\Workgroup\Widgets\SessionProgressWidget;
+use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
+use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
+use App\Services\Workgroup\EvaluationService;
 use Filament\Actions\Action;
-use Filament\Actions\ExportAction;
 use Filament\Forms\Components\Select;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Session Results page showing export functionality and AI report generation.
- * NOTE: Widget rendering disabled due to Filament v2/v3 compatibility issues in FinalistsWidget.
- * Use Export Actions to access the data.
+ * Session Results — comprehensive evaluation results dashboard.
+ *
+ * Shows: session progress stats, category rankings, finalists table,
+ * AI executive report generator, and per-category drill-down data.
+ * All widgets receive the selected session via Livewire properties.
  */
 class SessionResultsPage extends Page
 {
@@ -33,134 +35,169 @@ class SessionResultsPage extends Page
 
     protected static ?string $slug = 'session-results';
 
-    public ?WorkgroupSession $selectedSession = null;
-    public ?EvaluationCategory $selectedCategory = null;
+    protected static ?int $navigationSort = 5;
+
+    public ?int $selectedSessionId = null;
 
     public function getHeading(): string
     {
-        $session = $this->selectedSession ?? WorkgroupSession::active()->first();
+        $session = $this->getSelectedSession();
         return $session ? "Results: {$session->name}" : 'Session Results';
     }
 
     public function getSubheading(): ?string
     {
-        return 'View rankings, finalists, and export evaluation results.';
+        $session = $this->getSelectedSession();
+        if (!$session) {
+            return 'No active evaluation session found.';
+        }
+
+        $progress = app(EvaluationService::class)->getSessionProgress($session->id);
+        return "Completion: {$progress['completion_percentage']}% — {$progress['submitted_submissions']} of {$progress['max_possible_submissions']} evaluations submitted";
     }
 
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
-        
-        $this->selectedSession = WorkgroupSession::active()->first();
+
+        $activeSession = WorkgroupSession::active()->first();
+        $this->selectedSessionId = $activeSession?->id;
     }
 
-    public function getWidgets(): array
+    public function getSelectedSession(): ?WorkgroupSession
     {
-        // Widgets disabled — FinalistsWidget uses Filament v2 BadgeColumn (not v3 compatible)
-        // TODO: Fix FinalistsWidget to use TextColumn::badge() before re-enabling
-        return [];
+        if ($this->selectedSessionId) {
+            return WorkgroupSession::find($this->selectedSessionId);
+        }
+        return WorkgroupSession::active()->first();
     }
 
-    public function getColumns(): int|string|array
+    /**
+     * Livewire method to switch session from the Blade dropdown.
+     */
+    public function switchSession(?int $sessionId): void
     {
+        $this->selectedSessionId = $sessionId;
+    }
+
+    // ─── Header Widgets ─────────────────────────────────────────────
+    protected function getHeaderWidgets(): array
+    {
+        $session = $this->getSelectedSession();
+
         return [
-            'sm' => 1,
-            'md' => 2,
+            SessionProgressWidget::make([
+                'session' => $session,
+            ]),
         ];
     }
 
+    // ─── Footer Widgets (rankings table) ────────────────────────────
+    protected function getFooterWidgets(): array
+    {
+        $session = $this->getSelectedSession();
+
+        return [
+            FinalistsWidget::make([
+                'session' => $session,
+            ]),
+        ];
+    }
+
+    protected function getHeaderWidgetsColumns(): int|string|array
+    {
+        return 1;
+    }
+
+    protected function getFooterWidgetsColumns(): int|string|array
+    {
+        return 1;
+    }
+
+    // ─── Header Actions ─────────────────────────────────────────────
     protected function getHeaderActions(): array
     {
         return [
             Action::make('selectSession')
-                ->label('Select Session')
+                ->label('Switch Session')
+                ->icon('heroicon-o-calendar')
+                ->color('gray')
                 ->form([
                     Select::make('session_id')
-                        ->label('Session')
-                        ->options(fn () => $this->getSessionOptions())
-                        ->default(fn () => $this->selectedSession?->id),
+                        ->label('Evaluation Session')
+                        ->options(fn () => WorkgroupSession::orderByDesc('created_at')->pluck('name', 'id')->toArray())
+                        ->default(fn () => $this->selectedSessionId)
+                        ->required(),
                 ])
-                ->action(function (array $data) {
-                    $this->selectedSession = isset($data['session_id'])
-                        ? WorkgroupSession::find($data['session_id'])
-                        : WorkgroupSession::active()->first();
+                ->action(function (array $data): void {
+                    $this->selectedSessionId = $data['session_id'] ?? null;
                 }),
-
-            Action::make('selectCategory')
-                ->label('Filter by Category')
-                ->form([
-                    Select::make('category_id')
-                        ->label('Category')
-                        ->options(fn () => $this->getCategoryOptions())
-                        ->nullable(),
-                ])
-                ->action(function (array $data) {
-                    $this->selectedCategory = isset($data['category_id'])
-                        ? EvaluationCategory::find($data['category_id'])
-                        : null;
-                }),
-
-            ExportAction::make('exportAIReport')
-                ->label('🤖 Export AI Report')
-                ->color('violet')
-                ->exporter(WorkgroupAIReportExporter::class)
-                ->tooltip('Export all products with AI-generated analytical summaries — for Health & Safety Committee presentation'),
-
-            ExportAction::make('exportFinalists')
-                ->label('Export Finalists')
-                ->exporter(WorkgroupFinalistsExporter::class),
-
-            ExportAction::make('exportScores')
-                ->label('Export All Scores')
-                ->exporter(WorkgroupScoresExporter::class),
-
-            ExportAction::make('exportCompletion')
-                ->label('Export Completion Status')
-                ->exporter(WorkgroupCompletionStatusExporter::class),
-
-            ExportAction::make('exportFeedback')
-                ->label('Export Feedback')
-                ->exporter(WorkgroupFeedbackExporter::class),
         ];
     }
 
-    protected function getSessionOptions(): array
+    // ─── View Data (passed to blade) ────────────────────────────────
+    protected function getViewData(): array
     {
-        return WorkgroupSession::all()
-            ->pluck('name', 'id')
-            ->toArray();
-    }
-
-    protected function getCategoryOptions(): array
-    {
-        if (!$this->selectedSession) {
-            return [];
+        $session = $this->getSelectedSession();
+        if (!$session) {
+            return [
+                'session' => null,
+                'categoryResults' => collect(),
+                'progress' => null,
+                'sessions' => WorkgroupSession::orderByDesc('created_at')->get(),
+            ];
         }
 
-        return EvaluationCategory::active()
-            ->ordered()
-            ->pluck('name', 'id')
-            ->toArray();
+        $evalService = app(EvaluationService::class);
+        $results = $evalService->getSessionResults($session->id);
+        $progress = $evalService->getSessionProgress($session->id);
+
+        // Enhance category results with SAVER score breakdown
+        $categoryResults = collect($results['rankable_categories'])->map(function ($cat) {
+            $rankings = collect($cat['rankings'])->map(function ($item) {
+                $product = $item['product'];
+                $submissions = EvaluationSubmission::where('candidate_product_id', $product->id)
+                    ->where('status', 'submitted')
+                    ->get();
+
+                return array_merge($item, [
+                    'capability_avg' => $submissions->avg('capability_score'),
+                    'usability_avg' => $submissions->avg('usability_score'),
+                    'affordability_avg' => $submissions->avg('affordability_score'),
+                    'maintainability_avg' => $submissions->avg('maintainability_score'),
+                    'deployability_avg' => $submissions->avg('deployability_score'),
+                    'advance_yes' => $submissions->where('advance_recommendation', 'yes')->count(),
+                    'advance_no' => $submissions->where('advance_recommendation', 'no')->count(),
+                    'deal_breakers' => $submissions->where('has_deal_breaker', true)->count(),
+                ]);
+            });
+
+            return array_merge($cat, ['rankings' => $rankings]);
+        });
+
+        return [
+            'session' => $session,
+            'categoryResults' => $categoryResults,
+            'progress' => $progress,
+            'sessions' => WorkgroupSession::orderByDesc('created_at')->get(),
+        ];
     }
 
+    // ─── Access Control ─────────────────────────────────────────────
     public static function canAccess(): bool
     {
         $user = Auth::user();
-        
+
         if (!$user) {
             return false;
         }
 
-        // All active workgroup members can view session results (read-only access)
-        // Admins and super_admins also have access
         if ($user->hasRole(['super_admin', 'admin', 'logistics_admin'])) {
             return true;
         }
 
-        $member = WorkgroupMember::where('user_id', $user->id)
+        return WorkgroupMember::where('user_id', $user->id)
             ->where('is_active', true)
-            ->first();
-
-        return $member !== null;
+            ->exists();
     }
 }

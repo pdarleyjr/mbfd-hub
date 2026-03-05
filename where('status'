@@ -1,0 +1,18 @@
+    public function getOrCreateDraft(WorkgroupMember $member, int $productId): EvaluationSubmission
+    {
+        $submission = EvaluationSubmission::where('workgroup_member_id', $member->id)
+            ->where('candidate_product_id', $productId)
+            ->where('status', 'draft')
+            ->first();
+
+        if (!$submission) {
+            $submission = EvaluationSubmission::create([
+                'workgroup_member_id' => $member->id,
+                'candidate_product_id' => $productId,
+                'status' => 'draft',
+            ]);
+        }
+
+        return $submission->load(['scores.criterion', 'candidateProduct.category', 'candidateProduct.session']);
+    }
+
