@@ -1,78 +1,179 @@
 import React from 'react';
+import { motion } from 'framer-motion';
+import { usePumpStore, NOZZLE_PROFILES } from '../stores/usePumpStore';
+import type { HoseLineConfig } from '../types';
 
-interface ValveControlProps {
-  dischargeValveOpen: boolean;
-  auxiliaryValveOpen: boolean;
-  onDischargeValveChange: (open: boolean) => void;
-  onAuxiliaryValveChange: (open: boolean) => void;
-  disabled?: boolean;
-}
+const LINE_IDS = ['crosslay1', 'crosslay2', 'deckGun', 'boosterLine', 'discharge1', 'discharge2'] as const;
 
-const ValveControl: React.FC<ValveControlProps> = ({
-  dischargeValveOpen,
-  auxiliaryValveOpen,
-  onDischargeValveChange,
-  onAuxiliaryValveChange,
-  disabled = false,
-}) => {
+const ValveToggle: React.FC<{ label: string; isOpen: boolean; onToggle: () => void; color: string }> = ({
+  label, isOpen, onToggle, color,
+}) => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
+    <span style={{ color: '#ccc', fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>{label}</span>
+    <button
+      onClick={onToggle}
+      style={{
+        position: 'relative',
+        width: 48,
+        height: 26,
+        borderRadius: 13,
+        border: 'none',
+        cursor: 'pointer',
+        background: isOpen ? color : '#333',
+        transition: 'background 0.3s',
+      }}
+    >
+      <motion.div
+        style={{
+          position: 'absolute',
+          top: 3,
+          width: 20,
+          height: 20,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle at 35% 35%, #fff, #ccc)',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+        }}
+        animate={{ left: isOpen ? 25 : 3 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+      />
+    </button>
+  </div>
+);
+
+const LineDetail: React.FC<{ lineId: string; line: HoseLineConfig }> = ({ lineId, line }) => {
+  const { setLineLength, setLineNozzle } = usePumpStore();
+
   return (
-    <div className="bg-gray-800 rounded-lg p-4 shadow-lg border border-gray-700">
-      <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Valve Controls</h3>
-      
-      <div className="space-y-3">
-        {/* Discharge Valve */}
-        <div className="flex items-center justify-between">
-          <span className="text-gray-300 text-sm font-medium">Master Discharge</span>
-          <button
-            onClick={() => onDischargeValveChange(!dischargeValveOpen)}
-            disabled={disabled}
-            className={`relative w-14 h-8 rounded-full transition-all duration-300 ${
-              dischargeValveOpen ? 'bg-emerald-500' : 'bg-gray-600'
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-          >
-            <div
-              className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 ${
-                dischargeValveOpen ? 'left-7' : 'left-1'
-              }`}
-            />
-          </button>
+    <div style={{
+      background: 'rgba(255,255,255,0.03)',
+      borderRadius: 6,
+      padding: '6px 8px',
+      margin: '4px 0',
+    }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <label style={{ color: '#888', fontSize: 10, fontWeight: 600 }}>
+          {line.diameter}" × 
+          <input
+            type="number"
+            value={line.length}
+            onChange={(e) => setLineLength(lineId, Number(e.target.value))}
+            style={{
+              width: 50,
+              background: '#1a1a2a',
+              border: '1px solid #333',
+              borderRadius: 4,
+              color: '#ddd',
+              padding: '2px 4px',
+              fontSize: 11,
+              marginLeft: 4,
+            }}
+          />
+          ft
+        </label>
+        <select
+          value={line.nozzle.name}
+          onChange={(e) => {
+            const nozzle = Object.values(NOZZLE_PROFILES).find(n => n.name === e.target.value);
+            if (nozzle) setLineNozzle(lineId, nozzle);
+          }}
+          style={{
+            background: '#1a1a2a',
+            border: '1px solid #333',
+            borderRadius: 4,
+            color: '#ddd',
+            padding: '2px 4px',
+            fontSize: 10,
+            flex: 1,
+            minWidth: 100,
+          }}
+        >
+          {Object.values(NOZZLE_PROFILES).map(n => (
+            <option key={n.name} value={n.name}>{n.name}</option>
+          ))}
+        </select>
+      </div>
+      {line.isOpen && line.flowRate > 0 && (
+        <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: 10 }}>
+          <span style={{ color: '#3b82f6' }}>{line.flowRate} GPM</span>
+          <span style={{ color: '#f59e0b' }}>FL: {line.frictionLoss.toFixed(1)} PSI</span>
+          <span style={{ color: '#22c55e' }}>NP: {line.nozzle.nozzlePressure} PSI</span>
         </div>
+      )}
+    </div>
+  );
+};
 
-        {/* Discharge Valve Status */}
-        <div className="flex items-center gap-2 text-xs">
-          <div className={`w-2 h-2 rounded-full ${dischargeValveOpen ? 'bg-emerald-500' : 'bg-gray-500'}`} />
-          <span className={dischargeValveOpen ? 'text-emerald-400' : 'text-gray-500'}>
-            {dischargeValveOpen ? 'OPEN - Pressurized' : 'CLOSED'}
+const ValveControl: React.FC = () => {
+  const store = usePumpStore();
+
+  return (
+    <div className="metal-card" style={{ padding: 16 }}>
+      <h3 style={{ color: '#888', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
+        Intake Controls
+      </h3>
+
+      <ValveToggle label="Tank to Pump" isOpen={store.tankToPump} onToggle={store.toggleTankToPump} color="#3b82f6" />
+      <ValveToggle label={'5" LDH Intake'} isOpen={store.fiveInchIntake} onToggle={store.toggleFiveInchIntake} color="#6366f1" />
+      <ValveToggle label={'3" Pony Suction'} isOpen={store.threeInchPonySuction} onToggle={store.toggleThreeInchPonySuction} color="#8b5cf6" />
+
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '12px 0' }} />
+
+      <h3 style={{ color: '#888', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+        Discharge Lines
+      </h3>
+
+      {LINE_IDS.map((id) => {
+        const line = store[id] as HoseLineConfig;
+        return (
+          <div key={id}>
+            <ValveToggle
+              label={line.label}
+              isOpen={line.isOpen}
+              onToggle={() => store.toggleLine(id)}
+              color={line.isOpen ? '#22c55e' : '#333'}
+            />
+            <LineDetail lineId={id} line={line} />
+          </div>
+        );
+      })}
+
+      {/* Flow summary */}
+      <div style={{
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        marginTop: 12,
+        paddingTop: 8,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+          <span style={{ color: '#888' }}>Total Flow</span>
+          <span style={{ color: '#3b82f6', fontWeight: 700 }}>{store.totalFlowGPM} GPM</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 4 }}>
+          <span style={{ color: '#888' }}>Pump Capacity</span>
+          <span style={{
+            color: store.pumpCapacityPercent > 90 ? '#ef4444' : store.pumpCapacityPercent > 70 ? '#f59e0b' : '#22c55e',
+            fontWeight: 700,
+          }}>
+            {store.pumpCapacityPercent}%
           </span>
         </div>
-
-        {/* Divider */}
-        <div className="border-t border-gray-700 my-2" />
-
-        {/* Auxiliary Valve */}
-        <div className="flex items-center justify-between">
-          <span className="text-gray-300 text-sm font-medium">Auxiliary</span>
-          <button
-            onClick={() => onAuxiliaryValveChange(!auxiliaryValveOpen)}
-            disabled={disabled}
-            className={`relative w-14 h-8 rounded-full transition-all duration-300 ${
-              auxiliaryValveOpen ? 'bg-blue-500' : 'bg-gray-600'
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-          >
-            <div
-              className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 ${
-                auxiliaryValveOpen ? 'left-7' : 'left-1'
-              }`}
-            />
-          </button>
-        </div>
-
-        {/* Auxiliary Valve Status */}
-        <div className="flex items-center gap-2 text-xs">
-          <div className={`w-2 h-2 rounded-full ${auxiliaryValveOpen ? 'bg-blue-500' : 'bg-gray-500'}`} />
-          <span className={auxiliaryValveOpen ? 'text-blue-400' : 'text-gray-500'}>
-            {auxiliaryValveOpen ? 'OPEN' : 'CLOSED'}
-          </span>
+        {/* Capacity bar */}
+        <div style={{
+          width: '100%',
+          height: 4,
+          background: '#1a1a2a',
+          borderRadius: 2,
+          marginTop: 6,
+          overflow: 'hidden',
+        }}>
+          <motion.div
+            style={{
+              height: '100%',
+              borderRadius: 2,
+              background: store.pumpCapacityPercent > 90 ? '#ef4444' : store.pumpCapacityPercent > 70 ? '#f59e0b' : '#22c55e',
+            }}
+            animate={{ width: `${store.pumpCapacityPercent}%` }}
+            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+          />
         </div>
       </div>
     </div>

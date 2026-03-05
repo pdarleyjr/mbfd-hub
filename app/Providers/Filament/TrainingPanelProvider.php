@@ -14,6 +14,8 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\MaxWidth;
+use Filament\View\PanelsRenderHook;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -33,6 +35,7 @@ class TrainingPanelProvider extends PanelProvider
         return $panel
             ->id('training')
             ->path('training')
+            ->homeUrl('/')
             ->login(Login::class)
             ->brandName('MBFD Training Division')
             ->brandLogo(secure_asset('images/mbfd_no_bg_new.png'))
@@ -81,6 +84,10 @@ class TrainingPanelProvider extends PanelProvider
             ])
             ->userMenuItems([
                 MenuItem::make()
+                    ->label('Return to Home')
+                    ->icon('heroicon-o-home')
+                    ->url('/'),
+                MenuItem::make()
                     ->label('Settings')
                     ->url(fn (): string => TrainingSettings::getUrl())
                     ->icon('heroicon-o-cog-6-tooth'),
@@ -109,7 +116,11 @@ class TrainingPanelProvider extends PanelProvider
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->group('External Tools')
                     ->sort(99),
-            ]);
+            ])
+            ->renderHook(
+                PanelsRenderHook::GLOBAL_SEARCH_BEFORE,
+                fn (): string => '<a href="/" class="flex items-center justify-center w-10 h-10 rounded-lg text-gray-500 hover:text-primary-500 hover:bg-gray-100 transition" title="Return to Home" aria-label="Return to Home"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg></a>'
+            );
     }
 
     public function boot(): void

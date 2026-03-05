@@ -117,6 +117,9 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
+                                <button @click="clearConversation()" title="Clear conversation" class="text-slate-400 hover:text-slate-200 transition-colors p-1 rounded">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
                                 <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs">
                                     <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
                                     Online
@@ -146,13 +149,14 @@
                                 <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
                                     <div :class="msg.role === 'user' 
                                         ? 'bg-red-600 text-white rounded-2xl rounded-br-md px-4 py-2.5 max-w-xs md:max-w-md text-sm shadow-sm' 
-                                        : 'msg-ai bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-bl-md px-4 py-2.5 max-w-xs md:max-w-lg text-sm shadow-sm'"
-                                        x-html="msg.role === 'user' ? msg.content : renderMarkdown(msg.content)">
+                                        : 'msg-ai bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-bl-md px-4 py-2.5 max-w-xs md:max-w-lg text-sm shadow-sm'">
+                                        <span x-html="msg.role === 'user' ? msg.content : renderMarkdown(msg.content)"></span>
+                                        <span x-show="msg.streaming" class="inline-block w-1.5 h-4 bg-red-500 ml-0.5 animate-pulse rounded-sm align-text-bottom"></span>
                                     </div>
                                 </div>
                             </template>
-                            <!-- Typing Indicator -->
-                            <div x-show="loading" class="flex justify-start">
+                            <!-- Typing Indicator (shown only when loading and no streaming message yet) -->
+                            <div x-show="loading && !messages.some(m => m.streaming)" class="flex justify-start">
                                 <div class="bg-white border border-slate-200 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
                                     <div class="flex items-center gap-2 mb-1">
                                         <span class="typing-dot w-2 h-2 bg-red-400 rounded-full inline-block"></span>
@@ -215,12 +219,30 @@
                         expanded: true,
                         messages: [{
                             role: 'assistant',
-                            content: 'Welcome! I\'m the MBFD Support Assistant. Ask me anything about driver manuals, SOGs, department procedures, or station operations.'
+                            content: 'Welcome! I\'m the MBFD Support Assistant. Ask me anything about driver manuals, SOGs, department procedures, or station operations.\n\n*I remember our conversation — feel free to ask follow-up questions.*'
                         }],
                         userInput: '',
                         loading: false,
                         lastSources: [],
+                        streamBuffer: '',
                         workerUrl: 'https://mbfd-support-ai.pdarleyjr.workers.dev/chat',
+
+                        // Build conversation history for context (last 10 messages)
+                        get conversationHistory() {
+                            return this.messages.slice(-10).map(m => ({
+                                role: m.role,
+                                content: m.plainContent || m.content
+                            }));
+                        },
+
+                        clearConversation() {
+                            this.messages = [{
+                                role: 'assistant',
+                                content: 'Conversation cleared. How can I help you?',
+                                plainContent: 'Conversation cleared. How can I help you?'
+                            }];
+                            this.lastSources = [];
+                        },
 
                         askQuestion(q) {
                             this.userInput = q;
@@ -229,61 +251,146 @@
 
                         renderMarkdown(text) {
                             if (!text) return '';
-                            // First escape HTML to prevent XSS
                             const escaped = text
                                 .replace(/&/g, '&amp;')
                                 .replace(/</g, '&lt;')
                                 .replace(/>/g, '&gt;')
                                 .replace(/"/g, '&quot;')
                                 .replace(/'/g, '&#039;');
-                            // Then render markdown
                             return escaped
                                 .replace(/### (.*?)(\n|$)/g, '<h3>$1</h3>')
+                                .replace(/## (.*?)(\n|$)/g, '<h3>$1</h3>')
                                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                                .replace(/`(.*?)`/g, '<code class="bg-slate-100 px-1 rounded text-sm">$1</code>')
+                                .replace(/`(.*?)`/g, '<code class="bg-slate-100 px-1 rounded text-xs font-mono">$1</code>')
                                 .replace(/^\* (.+)$/gm, '<li>$1</li>')
-                                .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
-                                .replace(/<\/ul>\s*<ul>/g, '')
-                                .replace(/\n\n/g, '</p><p>')
+                                .replace(/^- (.+)$/gm, '<li>$1</li>')
+                                .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+                                .replace(/(<li>.*?<\/li>(\n)?)+/gs, match => '<ul class="list-disc ml-4 mb-2">' + match + '</ul>')
+                                .replace(/<\/ul>\s*<ul[^>]*>/g, '')
+                                .replace(/\n\n/g, '</p><p class="mb-2">')
                                 .replace(/\n/g, '<br>')
-                                .replace(/^/, '<p>').replace(/$/, '</p>')
-                                .replace(/<p><\/p>/g, '');
+                                .replace(/^/, '<p class="mb-2">').replace(/$/, '</p>')
+                                .replace(/<p class="mb-2"><\/p>/g, '');
                         },
 
                         async sendMessage() {
                             const msg = this.userInput.trim();
                             if (!msg || this.loading) return;
 
-                            this.expanded = true;
-                            this.messages.push({ role: 'user', content: msg });
+                            // Store plain content for history
+                            this.messages.push({ role: 'user', content: msg, plainContent: msg });
                             this.userInput = '';
                             this.loading = true;
                             this.lastSources = [];
                             await this.$nextTick();
                             this.scrollToBottom();
 
+                            // Add streaming placeholder
+                            const streamIndex = this.messages.length;
+                            this.messages.push({ role: 'assistant', content: '', plainContent: '', streaming: true });
+
                             try {
                                 const resp = await fetch(this.workerUrl, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ message: msg })
+                                    body: JSON.stringify({
+                                        message: msg,
+                                        history: this.conversationHistory.slice(0, -2), // exclude current msg
+                                        stream: true
+                                    })
                                 });
 
                                 if (!resp.ok) {
                                     const err = await resp.json().catch(() => ({}));
-                                    throw new Error(err.error || 'Request failed');
+                                    throw new Error(err.error || `Request failed (${resp.status})`);
                                 }
 
-                                const data = await resp.json();
-                                this.messages.push({ role: 'assistant', content: data.response });
-                                this.lastSources = data.sources || [];
+                                // Parse sources from header if available
+                                const sourcesHeader = resp.headers.get('X-Sources');
+                                if (sourcesHeader) {
+                                    try { this.lastSources = JSON.parse(sourcesHeader); } catch(e) {}
+                                }
+
+                                // Stream the response
+                                const reader = resp.body.getReader();
+                                const decoder = new TextDecoder();
+                                let fullText = '';
+
+                                while (true) {
+                                    const { done, value } = await reader.read();
+                                    if (done) break;
+
+                                    const chunk = decoder.decode(value, { stream: true });
+                                    const lines = chunk.split('\n');
+
+                                    for (const line of lines) {
+                                        if (line.startsWith('data: ')) {
+                                            const data = line.slice(6).trim();
+                                            if (data === '[DONE]') continue;
+                                            try {
+                                                const parsed = JSON.parse(data);
+                                                const token = parsed.response || parsed.token || '';
+                                                if (token) {
+                                                    fullText += token;
+                                                    this.messages[streamIndex].content = fullText;
+                                                    this.messages[streamIndex].plainContent = fullText;
+                                                    this.$nextTick(() => this.scrollToBottom());
+                                                }
+                                                // Extract sources from streaming response if embedded
+                                                if (parsed.sources) {
+                                                    this.lastSources = parsed.sources;
+                                                }
+                                            } catch (e) {
+                                                // Some chunks may not be JSON (e.g., partial tokens)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                this.messages[streamIndex].streaming = false;
+
+                                // Fallback: if streaming didn't work, try non-streaming
+                                if (!fullText) {
+                                    await this.sendMessageNonStreaming(msg, streamIndex);
+                                }
+
                             } catch (e) {
-                                this.messages.push({ role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' });
+                                // Streaming failed — fallback to non-streaming
+                                try {
+                                    await this.sendMessageNonStreaming(msg, streamIndex);
+                                } catch (e2) {
+                                    this.messages[streamIndex].content = 'Sorry, I encountered an error. Please try again.';
+                                    this.messages[streamIndex].plainContent = '';
+                                    this.messages[streamIndex].streaming = false;
+                                }
                             } finally {
                                 this.loading = false;
                                 this.scrollToBottom();
                             }
+                        },
+
+                        async sendMessageNonStreaming(msg, streamIndex) {
+                            const resp = await fetch(this.workerUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    message: msg,
+                                    history: this.conversationHistory.slice(0, -2),
+                                    stream: false
+                                })
+                            });
+
+                            if (!resp.ok) {
+                                const err = await resp.json().catch(() => ({}));
+                                throw new Error(err.error || 'Request failed');
+                            }
+
+                            const data = await resp.json();
+                            this.messages[streamIndex].content = data.response || '';
+                            this.messages[streamIndex].plainContent = data.response || '';
+                            this.messages[streamIndex].streaming = false;
+                            this.lastSources = data.sources || [];
                         },
 
                         scrollToBottom() {
@@ -373,7 +480,7 @@
                         </a>
 
                         <!-- Pump Simulator -->
-                        <a href="{{ url('/pump-simulator') }}" class="group block p-4 bg-white rounded-lg border border-slate-200 hover:border-amber-400 hover:shadow-card-hover transition-all duration-200">
+                        <a href="https://pdarleyjr.github.io/puc-sim-manual-ui/" target="_blank" rel="noopener noreferrer" class="group block p-4 bg-white rounded-lg border border-slate-200 hover:border-amber-400 hover:shadow-card-hover transition-all duration-200">
                             <div class="flex items-start gap-3">
                                 <div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -381,8 +488,8 @@
                                     </svg>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <h3 class="font-semibold text-slate-800 group-hover:text-amber-700">Pump Simulator</h3>
-                                    <p class="text-sm text-slate-500">Fire pump operations training and simulations</p>
+                                    <h3 class="font-semibold text-slate-800 group-hover:text-amber-700">Pump Panel</h3>
+                                    <p class="text-sm text-slate-500">PUC pump panel operations training simulator</p>
                                 </div>
                                 <svg class="w-5 h-5 text-slate-300 group-hover:text-amber-500 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             </div>

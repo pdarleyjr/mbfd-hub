@@ -1,0 +1,18 @@
+name = "mbfd-workgroup-ai"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+# Workers AI binding — uses free tier (10k neurons/day)
+[ai]
+binding = "AI"
+
+# Vectorize index for vendor product specs/PDFs
+# Dimensions: 1024 (matches bge-large-en-v1.5 output)
+# Metric: cosine (best for semantic similarity)
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "workgroup-specs"
+
+[vars]
+ALLOWED_ORIGIN = "https://www.mbfdhub.com"
+WORKER_ENV = "production"

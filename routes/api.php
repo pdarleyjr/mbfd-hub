@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\TestNotificationController;
 use App\Http\Controllers\Api\BigTicketRequestController;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Api\StationInventoryV2Controller;
+use App\Http\Controllers\Workgroup\WorkgroupAIController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -92,3 +93,14 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
             Route::post('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class , 'createSupplyRequest']);
         }
         );    });
+
+// =========================================================================
+// Workgroup AI Routes — Eval analysis & AI summaries (separate from chatbot)
+// Requires authentication (Filament session auth via 'web' middleware)
+// =========================================================================
+Route::prefix('workgroup/ai')->middleware(['web', 'auth'])->group(function () {
+    Route::post('analyze-product/{productId}', [WorkgroupAIController::class, 'analyzeProduct']);
+    Route::post('category-summary', [WorkgroupAIController::class, 'categorySummary']);
+    Route::post('executive-report', [WorkgroupAIController::class, 'executiveReport']);
+    Route::post('vectorize-upload/{uploadId}', [WorkgroupAIController::class, 'vectorizeUpload']);
+});

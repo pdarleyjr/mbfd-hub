@@ -2,6 +2,7 @@
 
 namespace App\Filament\Workgroup\Pages;
 
+use App\Filament\Workgroup\Exports\WorkgroupAIReportExporter;
 use App\Filament\Workgroup\Exports\WorkgroupCompletionStatusExporter;
 use App\Filament\Workgroup\Exports\WorkgroupFeedbackExporter;
 use App\Filament\Workgroup\Exports\WorkgroupFinalistsExporter;
@@ -66,6 +67,13 @@ class AdminDashboard extends Page
         $session = WorkgroupSession::active()->first();
 
         return [
+            ExportAction::make('exportAIReport')
+                ->label('🤖 Export AI Report')
+                ->color('violet')
+                ->exporter(WorkgroupAIReportExporter::class)
+                ->tooltip('Export all products with AI-generated analytical summaries — for Health & Safety Committee presentation')
+                ->visible(fn () => $session !== null),
+
             ExportAction::make('exportFinalists')
                 ->label('Export Finalists')
                 ->exporter(WorkgroupFinalistsExporter::class)

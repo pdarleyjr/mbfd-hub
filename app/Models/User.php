@@ -86,6 +86,8 @@ class User extends Authenticatable implements FilamentUser
         // Workgroup panel: allow users with workgroup roles or permission
         if ($panel->getId() === 'workgroups') {
             return $this->hasRole('super_admin')
+                || $this->hasRole('admin')
+                || $this->hasRole('logistics_admin')
                 || $this->hasRole('workgroup_admin')
                 || $this->hasRole('workgroup_facilitator')
                 || $this->hasRole('workgroup_member')
@@ -97,6 +99,7 @@ class User extends Authenticatable implements FilamentUser
         if ($panel->getId() === 'admin') {
             return $this->hasRole('super_admin')
                 || $this->hasRole('admin')
+                || $this->hasRole('logistics_admin')
                 || $this->hasRole('training_admin')
                 || $this->hasRole('training_viewer');
         }

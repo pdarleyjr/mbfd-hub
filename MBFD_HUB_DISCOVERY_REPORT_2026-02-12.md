@@ -1,17 +1,17 @@
 # MBFD HUB — CURRENT STATE REPORT
 **Generated**: 2026-02-12 20:18 EST  
-**Last Updated**: 2026-03-02 17:24 EST  
-**Status**: ALL SYSTEMS OPERATIONAL ✅ (Workgroup/Eval Feedback Hub Panel Implemented)
+**Last Updated**: 2026-03-05 22:00 EST  
+**Status**: ALL SYSTEMS OPERATIONAL ✅ (Pump Simulator V2 + Workgroup/Eval Feedback Hub + CSV/XLSX Export + Google Sheets Apparatus Sync + Workgroup AI Evaluation System Implemented)
 
 **Original Mission**: Produce READ-ONLY technical discovery for: (1) MBFD Hub dual-host migration (2) Redesign "inventory request" into "station on-hand count" system with PIN-gated stations, threshold alerts, and admin workflow.
 
-**Current Status**: **Project Successfully Deployed & Operational** — All phases complete. A third Filament panel (Workgroup/Eval Feedback Hub) has been implemented since the last report.
+**Current Status**: **Project Successfully Deployed & Operational** — All phases complete. A third Filament panel (Workgroup/Eval Feedback Hub) has been implemented. Google Sheets auto-sync for Fire Apparatus is now live.
 
 ---
 
 ## EXECUTIVE SUMMARY
 
-### ✅ COMPLETED ITEMS (as of 2026-03-02)
+### ✅ COMPLETED ITEMS (as of 2026-03-03)
 
 **ALL CRITICAL ITEMS COMPLETED** ✅:
 - **Station Inventory V2**: Fully implemented (PIN-gated, threshold alerts, audit trail).
@@ -84,6 +84,137 @@
 
 **Access Control**: Requires `super_admin`, `admin`, or `logistics_admin` role
 
+### 🆕 NEW SINCE 2026-03-03 (latest): Google Sheets Apparatus Sync + UI Refactor
+
+**One-way auto-sync from Fire Apparatus admin page to Google Sheets** ✅ (2026-03-03):
+
+**Target Spreadsheet:**
+- **Spreadsheet ID**: `1u9MYILAkfEaMfNZnBujvB1J0J33Ha8TybWCd_mVMJC4`
+- **Tab**: `Equipment Maintenance` (sheetId: `1714038258`)
+- **Column Mapping**: A=Designation, B=Vehicle#, C=Status, D=Location, E=Comments, F=Reported
+
+**Architecture:**
+- [`app/Services/GoogleSheets/ApparatusSheetSyncService.php`](app/Services/GoogleSheets/ApparatusSheetSyncService.php) — Core sync service: metadata verification, fail-closed sheetId check, retry with exponential backoff, clear/rewrite pattern
+- [`app/Jobs/SyncApparatusToSheetJob.php`](app/Jobs/SyncApparatusToSheetJob.php) — Queued (database), 3 retries, 60s backoff, Sentry reporting
+- [`app/Observers/ApparatusObserver.php`](app/Observers/ApparatusObserver.php) — Stamps `reported_at = now()` on save, dispatches job `afterCommit()`
+- [`app/Console/Commands/SyncApparatusSheet.php`](app/Console/Commands/SyncApparatusSheet.php) — `artisan apparatus:sync-sheet [--dry-run] [--force]` for manual recovery/backfill
+- [`config/google_sheets.php`](config/google_sheets.php) — Feature flag + spreadsheet config (no secrets in repo)
+
+**Security:**
+- Service account JSON stored at `/root/secrets/google_service_account.json` on host (chmod 600)
+- Mounted read-only into container at `/run/secrets/google_service_account.json`
+- Never committed to git
+
+**Fire Apparatus Page UI Changes:**
+- **Location column**: Smart condensed column replacing Station + Assignment + Current Location (applies "Assignment → Current Location" arrow notation when apparatus is deployed away from assignment)
+- **Class column**: Hidden by default (data preserved in DB, user-togglable via column visibility)
+- **Notes → Comments**: Field and column relabeled
+- **Reported column**: New auto-stamped datetime (updated whenever apparatus record changes)
+
+**Data Update (2026-03-03)**:
+- Applied 2/27/2026 apparatus status report — 11 records updated with current statuses, locations, and comments
+- Google Sheet synced with live data (26 rows)
+
+**GitHub Commits**: `0b9766e` (implementation), `581dcde` (data update), `b69043e` (gitignore)
+
+### 🆕 NEW SINCE 2026-03-03 (earlier): Pump Simulator → V2
+
+**Standalone React SPA for Fire Pump Operations Training — V2 Upgrade** ✅ (2026-03-03):
+- **URL**: `/pump-simulator` (public access - no authentication required)
+- **Tech Stack**: React 18, Zustand (actual store, not Context), Framer Motion, Tailwind CSS (via PostCSS, NO CDN)
+
+**V2 Build Fixes**:
+- Removed Tailwind CDN from blade template (MIME/build conflict)
+- Added explicit `import React` to all .tsx files (ReferenceError fix)
+- Removed `rollupOptions.output.entryFileNames` from vite.config.js (broke other entries)
+- Eliminated all `@apply` directives from CSS (iOS black-screen crash prevention)
+
+**V2 Features**:
+- 3 SVG chrome bezel gauges (Intake, Discharge, Tachometer) with Framer Motion spring needles
+- Brushed-metal dark panel UI with metal-card surfaces
+- **10 nozzle profiles**: Smooth bore (15/16" to 1¼"), Fog (100-250 GPM), Master Stream (500 GPM), Booster (60 GPM)
+- **Friction loss calculation**: FL = C × (GPM/100)² × (L/100) with hose diameter coefficients
+- **Expanded valve array**: Tank-to-Pump, 5" LDH Intake, 3" Pony Suction
+- **6 configurable discharge lines**: 2× Crosslays (1¾"), Deck Gun (2½"), Booster (1"), 2× Discharge (2½")
+- Per-line hose length and nozzle selection
+- Real-time total flow GPM and pump capacity percentage
+- Cavitation detection with vibration animation
+- iOS safe-area support, responsive mobile layout
+
+**Technical Implementation**:
+- `@vitejs/plugin-react` in package.json
+- Vite entry point: `resources/js/pump-simulator/main.tsx`
+- Route in `routes/web.php`: `Route::view('/pump-simulator')`
+- Blade template: `resources/views/pump-simulator.blade.php`
+- **⚠️ STRICT RULE: No `@apply` in pump-simulator CSS files**
+
+**Files**:
+- [`resources/js/pump-simulator/main.tsx`](resources/js/pump-simulator/main.tsx) - React entry point
+- [`resources/js/pump-simulator/App.tsx`](resources/js/pump-simulator/App.tsx) - Main application component
+- [`resources/js/pump-simulator/stores/usePumpStore.tsx`](resources/js/pump-simulator/stores/usePumpStore.tsx) - Zustand state store with hydraulics math
+- [`resources/js/pump-simulator/components/Gauge.tsx`](resources/js/pump-simulator/components/Gauge.tsx) - SVG chrome bezel gauge
+- [`resources/js/pump-simulator/components/ValveControl.tsx`](resources/js/pump-simulator/components/ValveControl.tsx) - Expanded valve controls
+- [`resources/js/pump-simulator/components/PumpPanel.tsx`](resources/js/pump-simulator/components/PumpPanel.tsx) - Main panel layout
+- [`resources/js/pump-simulator/types/index.ts`](resources/js/pump-simulator/types/index.ts) - TypeScript types
+- [`resources/views/pump-simulator.blade.php`](resources/views/pump-simulator.blade.php) - Blade template (no CDN)
+
+### 🆕 NEW SINCE 2026-03-03 (later): CSV / XLSX Export Feature
+
+**Export capability added to ALL admin tables** ✅ (2026-03-03):
+
+**Package**: `pxlrbt/filament-excel ^2.5` (installed via Composer into `laravel.test` container)
+
+**What was added to every table:**
+- **Header Export button** — exports the full table (respecting active filters) as `.xlsx` or `.csv`
+- **Row-level bulk Export** — select specific rows with checkboxes, then export only those selections as `.xlsx` or `.csv`
+
+**Coverage — Logistics Panel (Admin):**
+| Resource | Header Export | Bulk Export |
+|---|---|---|
+| Fire Apparatus | ✅ | ✅ |
+| Capital Projects | ✅ | ✅ |
+| Defects | ✅ | ✅ |
+| Equipment Items | ✅ | ✅ |
+| Inspections | ✅ | ✅ |
+| Inventory Items | ✅ | ✅ |
+| Inventory Locations | ✅ | ✅ |
+| Recommendations | ✅ | ✅ |
+| Shop Works | ✅ | ✅ |
+| Stations | ✅ | ✅ |
+| Todos | ✅ | ✅ |
+| Under-25k Projects | ✅ | ✅ |
+| Uniforms | ✅ | ✅ |
+| Unit Master Vehicles | ✅ | ✅ |
+| Users | ✅ | ✅ |
+| + 12 Relation Manager tables | ✅ | ✅ |
+
+**Coverage — Training Panel:**
+| Resource | Header Export | Bulk Export |
+|---|---|---|
+| External Nav Items | ✅ | ✅ |
+| External Sources | ✅ | ✅ |
+| Training Todos | ✅ | ✅ |
+
+**Coverage — Workgroup Panel:**
+| Resource | Header Export | Bulk Export |
+|---|---|---|
+| Candidate Products | ✅ | ✅ |
+| Evaluation Categories | ✅ | ✅ |
+| Evaluation Criteria | ✅ | ✅ |
+| Evaluation Submissions | ✅ | ✅ |
+| Evaluation Templates | ✅ | ✅ |
+| Workgroup Files | ✅ | ✅ |
+| Workgroup Members | ✅ | ✅ |
+| Workgroups | ✅ | ✅ |
+| Workgroup Sessions | ✅ | ✅ |
+| + 4 Relation Manager tables | ✅ | ✅ |
+
+**Note**: `SingleGasMeterResource` already had a native Filament `ExportAction` — not duplicated. Workgroup dashboard pages (`AdminDashboard`, `SessionResultsPage`) retain their existing specialized native exporters (scores, finalists, feedback, completion status).
+
+**Shared Trait**: [`app/Filament/Concerns/HasExportActions.php`](app/Filament/Concerns/HasExportActions.php)
+
+**GitHub Commit**: `f8215fe5` — "feat: add CSV/XLSX export to all admin panel tables via pxlrbt/filament-excel"
+
 ### 🐛 BUG FIXES SINCE 2026-02-27
 
 1. **AddBuildHeaders Middleware (2026-03-02)** - Fixed StreamedResponse crashing by using `headers->set()` instead of `header()`
@@ -105,15 +236,64 @@ The landing page has been redesigned as an enterprise operational portal:
 
 ---
 
-## SECTION J — FILAMENT PANELS SUMMARY (2026-03-02)
+## SECTION J — FILAMENT PANELS SUMMARY (2026-03-03)
 
-The application now has **three Filament panels**:
+The application now has **three Filament panels** (plus one public SPA):
 
-| Panel | Path | Purpose | Auth |
+| Panel React | Path | Purpose | Auth |
 |-------|------|---------|------|
 | Admin | `/admin` | Logistics/Operations | super_admin, admin, training_admin |
 | Training | `/training` | Training Division | training_admin, training_viewer |
 | Workgroup | `/workgroups` | Eval Feedback Hub | super_admin, admin, logistics_admin |
+
+**Public React SPAs** (no authentication required):
+
+| SPA | Path | Purpose |
+|-----|------|---------|
+| Pump Simulator | `/pump-simulator` | Fire pump operations training |
+
+---
+
+### 🆕 NEW SINCE 2026-03-04: Workgroup Analytics, Note Sharing, AI Worker, Bug Fixes
+
+**Workgroup Analytics Page (Admin Panel)** ✅ (2026-03-04):
+- **URL**: `/admin/workgroup-analytics` under "Workgroup Management" sidebar
+- AI Intelligence Summary card (Cloudflare Worker integration)
+- Active Session stats grid
+- Top 3 Products Per Category with gold/silver/bronze ranking
+- Evaluator Completion Tracker table
+- Access: `super_admin`, `admin`, `logistics_admin`
+
+**Workgroup Data Hub (Workgroup Panel)** ✅ (2026-03-04):
+- **URL**: `/workgroups/admin-dashboard`
+- Same analytics for workgroup facilitators/admins
+
+**Session Results Page Fix** ✅ (2026-03-04):
+- **URL**: `/workgroups/session-results`
+- Fixed 500 error (removed `parent::mount()`, fixed Filament v3 compatibility, fixed `sort_order` → `display_order`)
+- Now accessible to ALL workgroup members (read-only)
+- Shows aggregate product scores and anonymous feedback
+
+**Note Sharing Feature** ✅ (2026-03-04):
+- Share notes with entire workgroup or specific member
+- Toggle + select UI in create/edit forms
+- Share action on each note row
+- Migration: `2026_03_04_000004_add_sharing_fields_to_workgroup_notes.php`
+
+**Cloudflare Workgroup AI Worker** ✅ (2026-03-04):
+- **Worker URL**: `https://mbfd-workgroup-ai.pdarleyjr.workers.dev`
+- **Vectorize Index**: `workgroup-specs` (1024 dimensions, cosine metric)
+- Endpoints: `/vectorize`, `/analyze`, `/summary`, `/executive-report`, `/health`
+- Models: `@cf/baai/bge-large-en-v1.5` (embeddings), `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (analysis)
+
+**Home Button Restoration** ✅ (2026-03-04):
+- Admin panel: Home icon in header bar + "Return to Home" in user menu
+- Workgroup panel: `homeUrl('/')` + "Home" in user dropdown
+
+**Production Rescue** (2026-03-04):
+- Previous agent had switched VPS to feature branch and injected files directly
+- Rolled back to `main`, removed injected migration artifact, cleared caches
+- All features properly merged via local→GitHub→VPS workflow
 
 ---
 

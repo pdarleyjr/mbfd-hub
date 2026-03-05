@@ -1,259 +1,253 @@
+import React from 'react';
 import { motion } from 'framer-motion';
-import React, { useEffect } from 'react';
 import Gauge from './Gauge';
 import ShiftModeToggle from './ShiftModeToggle';
 import ValveControl from './ValveControl';
-import { usePumpStore, useTransientState } from '../stores/usePumpStore';
+import { usePumpStore } from '../stores/usePumpStore';
 
 const PumpPanel: React.FC = () => {
-  const {
-    shiftMode,
-    engineRpm,
-    intakePressure,
-    masterDischargePressure,
-    throttlePosition,
-    dischargeValveOpen,
-    auxiliaryValveOpen,
-    setShiftMode,
-    setEngineRpm,
-    setIntakePressure,
-    setThrottlePosition,
-    setDischargeValveOpen,
-    setAuxiliaryValveOpen,
-    reset,
-  } = usePumpStore();
-
-  const { isCavitating } = useTransientState();
-
-  // Calculate transient state for cavitation detection
-  const cavitationDetected = 
-    intakePressure > -5 && 
-    masterDischargePressure > 200 && 
-    throttlePosition > 50;
-
-  // Throttle slider change handler
-  const handleThrottleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setThrottlePosition(Number(e.target.value));
-  };
-
-  // RPM slider change handler  
-  const handleRpmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEngineRpm(Number(e.target.value));
-  };
-
-  // Intake pressure slider change handler
-  const handleIntakeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setIntakePressure(Number(e.target.value));
-  };
+  const store = usePumpStore();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 lg:p-8">
+    <div className="pump-panel-bg" style={{ padding: 16 }}>
       {/* Header */}
-      <div className="max-w-7xl mx-auto mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-white">Pump Simulator</h1>
-            <p className="text-gray-400 text-sm">Fire Pump Operations Training</p>
-          </div>
-          <button
-            onClick={reset}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors"
+      <div style={{ maxWidth: 1200, margin: '0 auto 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: -0.5 }}>
+            PUMP SIMULATOR
+          </h1>
+          <p style={{ color: '#666', fontSize: 12, margin: '2px 0 0' }}>
+            Pierce Fire Apparatus — Pump Operations Training
+          </p>
+        </div>
+        <motion.button
+          onClick={store.reset}
+          style={{
+            padding: '8px 16px',
+            background: 'linear-gradient(135deg, #333, #222)',
+            border: '1px solid #444',
+            borderRadius: 6,
+            color: '#ccc',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+          whileTap={{ scale: 0.95 }}
+        >
+          RESET PANEL
+        </motion.button>
+      </div>
+
+      {/* Main grid */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
+
+        {/* Left — Gauges + Engine */}
+        <div>
+          {/* Gauge Panel */}
+          <motion.div
+            className={store.isCavitating ? 'cavitation-active' : ''}
           >
-            Reset Panel
-          </button>
-        </div>
-      </div>
+            <div className="metal-card" style={{ padding: 20, marginBottom: 16 }}>
+              <h2 style={{ color: '#888', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 16 }}>
+                Pressure Gauges
+              </h2>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Left Column - Gauges */}
-          <div className="lg:col-span-2">
-            <motion.div
-              animate={cavitationDetected ? {
-                x: [0, -2, 2, -2, 2, 0],
-                y: [0, 2, -2, 2, -2, 0],
-              } : {}}
-              transition={cavitationDetected ? {
-                duration: 0.15,
-                repeat: Infinity,
-                repeatDelay: 0.1,
-              } : {}}
-            >
-              <div className="bg-gray-800 rounded-xl p-6 shadow-xl border border-gray-700">
-                <h2 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-6">Pressure Gauges</h2>
-                
-                <div className="flex flex-wrap justify-center gap-8">
-                  {/* Intake Pressure Gauge */}
-                  <Gauge
-                    value={intakePressure}
-                    min={-30}
-                    max={30}
-                    label="Intake"
-                    unit="PSI"
-                    warningThreshold={-5}
-                    dangerThreshold={-10}
-                  />
-
-                  {/* Master Discharge Pressure Gauge */}
-                  <Gauge
-                    value={masterDischargePressure}
-                    min={0}
-                    max={400}
-                    label="Master Discharge"
-                    unit="PSI"
-                    warningThreshold={250}
-                    dangerThreshold={350}
-                    isCavitating={cavitationDetected}
-                  />
-                </div>
-
-                {/* Cavitation Warning */}
-                {cavitationDetected && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-4 p-3 bg-red-900/50 border border-red-500 rounded-lg flex items-center gap-3"
-                  >
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 0.5, repeat: Infinity }}
-                      className="w-3 h-3 bg-red-500 rounded-full"
-                    />
-                    <span className="text-red-200 text-sm font-medium">
-                      CAVITATION WARNING - Low intake pressure with high discharge pressure
-                    </span>
-                  </motion.div>
-                )}
-              </div>
-            </motion.div>
-
-            {/* Engine Controls */}
-            <div className="mt-6 bg-gray-800 rounded-xl p-6 shadow-xl border border-gray-700">
-              <h2 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Engine Controls</h2>
-              
-              {/* Throttle */}
-              <div className="mb-6">
-                <div className="flex justify-between mb-2">
-                  <label className="text-gray-300 text-sm font-medium">Throttle</label>
-                  <span className="text-amber-400 font-bold">{throttlePosition}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={throttlePosition}
-                  onChange={handleThrottleChange}
-                  className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 24 }}>
+                <Gauge
+                  value={store.intakePressure}
+                  min={-30}
+                  max={30}
+                  label="Intake"
+                  unit="PSI"
+                  warningThreshold={-10}
+                  dangerThreshold={-20}
+                />
+                <Gauge
+                  value={store.masterDischargePressure}
+                  min={0}
+                  max={400}
+                  label="Discharge"
+                  unit="PSI"
+                  warningThreshold={250}
+                  dangerThreshold={350}
+                  isCavitating={store.isCavitating}
+                />
+                <Gauge
+                  value={store.engineRpm}
+                  min={0}
+                  max={3000}
+                  label="Tachometer"
+                  unit="RPM"
+                  warningThreshold={2400}
+                  dangerThreshold={2800}
                 />
               </div>
 
-              {/* RPM */}
-              <div>
-                <div className="flex justify-between mb-2">
-                  <label className="text-gray-300 text-sm font-medium">Engine RPM</label>
-                  <span className="text-emerald-400 font-bold">{engineRpm} RPM</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="3000"
-                  value={engineRpm}
-                  onChange={handleRpmChange}
-                  className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                />
+              {/* Cavitation Warning */}
+              {store.isCavitating && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  style={{
+                    marginTop: 16,
+                    padding: 12,
+                    background: 'rgba(220,38,38,0.15)',
+                    border: '1px solid #ef4444',
+                    borderRadius: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}
+                >
+                  <div className="warning-blink" style={{
+                    width: 10, height: 10, borderRadius: '50%', background: '#ef4444',
+                    boxShadow: '0 0 10px #ef4444',
+                  }} />
+                  <span style={{ color: '#fca5a5', fontSize: 13, fontWeight: 600 }}>
+                    ⚠ CAVITATION — Reduce throttle or increase intake pressure
+                  </span>
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+
+          {/* Engine Controls */}
+          <div className="metal-card" style={{ padding: 20, marginBottom: 16 }}>
+            <h2 style={{ color: '#888', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
+              Engine Controls
+            </h2>
+
+            {/* Throttle */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ color: '#ccc', fontSize: 12, fontWeight: 600 }}>Throttle</label>
+                <span style={{ color: '#f59e0b', fontWeight: 700, fontFamily: 'monospace', fontSize: 14 }}>
+                  {store.throttlePosition}%
+                </span>
               </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={store.throttlePosition}
+                onChange={(e) => store.setThrottlePosition(Number(e.target.value))}
+                style={{ width: '100%' }}
+              />
             </div>
 
-            {/* Intake Pressure Control */}
-            <div className="mt-6 bg-gray-800 rounded-xl p-6 shadow-xl border border-gray-700">
-              <h2 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Intake Conditions</h2>
-              
-              <div>
-                <div className="flex justify-between mb-2">
-                  <label className="text-gray-300 text-sm font-medium">Intake Vacuum/Pressure</label>
-                  <span className={intakePressure < -5 ? 'text-red-400 font-bold' : 'text-blue-400 font-bold'}>
-                    {intakePressure} PSI
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="-30"
-                  max="10"
-                  value={intakePressure}
-                  onChange={handleIntakeChange}
-                  className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                />
-                <p className="text-gray-500 text-xs mt-2">
-                  Negative values represent vacuum (sucking water). Keep above -5 PSI to avoid cavitation.
-                </p>
+            {/* RPM */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ color: '#ccc', fontSize: 12, fontWeight: 600 }}>Engine RPM</label>
+                <span style={{ color: '#22c55e', fontWeight: 700, fontFamily: 'monospace', fontSize: 14 }}>
+                  {store.engineRpm} RPM
+                </span>
               </div>
+              <input
+                type="range"
+                min="0"
+                max="3000"
+                step="50"
+                value={store.engineRpm}
+                onChange={(e) => store.setEngineRpm(Number(e.target.value))}
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            {/* Intake Pressure */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ color: '#ccc', fontSize: 12, fontWeight: 600 }}>Intake Vacuum/Pressure</label>
+                <span style={{
+                  color: store.intakePressure < -10 ? '#ef4444' : '#3b82f6',
+                  fontWeight: 700, fontFamily: 'monospace', fontSize: 14,
+                }}>
+                  {store.intakePressure} PSI
+                </span>
+              </div>
+              <input
+                type="range"
+                min="-30"
+                max="30"
+                value={store.intakePressure}
+                onChange={(e) => store.setIntakePressure(Number(e.target.value))}
+                style={{ width: '100%' }}
+              />
+              <p style={{ color: '#555', fontSize: 10, marginTop: 4 }}>
+                Negative = vacuum. Keep above -10 PSI to prevent cavitation.
+              </p>
             </div>
           </div>
 
-          {/* Right Column - Controls */}
-          <div className="space-y-6">
-            {/* Shift Mode Toggle */}
-            <ShiftModeToggle
-              mode={shiftMode}
-              onChange={setShiftMode}
-            />
-
-            {/* Valve Controls */}
-            <ValveControl
-              dischargeValveOpen={dischargeValveOpen}
-              auxiliaryValveOpen={auxiliaryValveOpen}
-              onDischargeValveChange={setDischargeValveOpen}
-              onAuxiliaryValveChange={setAuxiliaryValveOpen}
-            />
-
-            {/* Status Panel */}
-            <div className="bg-gray-800 rounded-lg p-4 shadow-lg border border-gray-700">
-              <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">System Status</h3>
-              
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Mode</span>
-                  <span className={shiftMode === 'pump' ? 'text-amber-400 font-medium' : 'text-emerald-400 font-medium'}>
-                    {shiftMode.toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Discharge</span>
-                  <span className={dischargeValveOpen ? 'text-emerald-400' : 'text-gray-500'}>
-                    {dischargeValveOpen ? 'PRESSURIZED' : 'CLOSED'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Auxiliary</span>
-                  <span className={auxiliaryValveOpen ? 'text-blue-400' : 'text-gray-500'}>
-                    {auxiliaryValveOpen ? 'OPEN' : 'CLOSED'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Cavitation Risk</span>
-                  <span className={cavitationDetected ? 'text-red-400 font-medium' : 'text-emerald-400'}>
-                    {cavitationDetected ? 'HIGH' : 'NORMAL'}
-                  </span>
-                </div>
+          {/* Quick Reference Card */}
+          <div className="metal-card" style={{ padding: 16 }}>
+            <h3 style={{ color: '#888', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+              Hydraulics Reference
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 10, color: '#888' }}>
+              <div>
+                <strong style={{ color: '#aaa' }}>Friction Loss Formula:</strong><br />
+                FL = C × (GPM/100)² × (L/100)
               </div>
-            </div>
-
-            {/* Instructions */}
-            <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
-              <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-2">How to Use</h3>
-              <ol className="text-gray-500 text-xs space-y-1 list-decimal list-inside">
-                <li>Switch to PUMP mode to engage pump</li>
-                <li>Open Master Discharge valve</li>
-                <li>Increase RPM and Throttle</li>
-                <li>Monitor discharge pressure</li>
-                <li>Avoid cavitation (low intake vacuum)</li>
-              </ol>
+              <div>
+                <strong style={{ color: '#aaa' }}>Coefficients (C):</strong><br />
+                1¾" = 15.5 | 2½" = 2.0 | 3" = 0.8 | 5" = 0.08
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Right Column — Controls */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <ShiftModeToggle mode={store.shiftMode} onChange={store.setShiftMode} />
+          <ValveControl />
+
+          {/* System Status */}
+          <div className="metal-card" style={{ padding: 16 }}>
+            <h3 style={{ color: '#888', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+              System Status
+            </h3>
+            <div style={{ fontSize: 12 }}>
+              {[
+                { label: 'Mode', value: store.shiftMode.toUpperCase(), color: store.shiftMode === 'pump' ? '#f59e0b' : '#22c55e' },
+                { label: 'Discharge PSI', value: store.masterDischargePressure.toFixed(1), color: '#3b82f6' },
+                { label: 'Total Flow', value: `${store.totalFlowGPM} GPM`, color: '#3b82f6' },
+                { label: 'Pump Load', value: `${store.pumpCapacityPercent}%`, color: store.pumpCapacityPercent > 90 ? '#ef4444' : '#22c55e' },
+                { label: 'Cavitation', value: store.isCavitating ? 'DANGER' : 'OK', color: store.isCavitating ? '#ef4444' : '#22c55e' },
+              ].map((row) => (
+                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
+                  <span style={{ color: '#666' }}>{row.label}</span>
+                  <span style={{ color: row.color, fontWeight: 600, fontFamily: 'monospace' }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* How to Use */}
+          <div className="metal-card" style={{ padding: 16, opacity: 0.8 }}>
+            <h3 style={{ color: '#888', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>
+              How to Use
+            </h3>
+            <ol style={{ color: '#666', fontSize: 10, paddingLeft: 16, margin: 0, lineHeight: 1.6 }}>
+              <li>Switch to PUMP mode</li>
+              <li>Open Tank to Pump valve</li>
+              <li>Select and open discharge lines</li>
+              <li>Increase RPM and Throttle</li>
+              <li>Monitor discharge pressure and flow</li>
+              <li>Watch for cavitation warnings</li>
+            </ol>
+          </div>
+        </div>
       </div>
+
+      {/* Mobile: stack columns */}
+      <style>{`
+        @media (max-width: 768px) {
+          div[style*="grid-template-columns: 1fr 320px"] {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };

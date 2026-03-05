@@ -29,11 +29,13 @@ class Apparatus extends Model
         'last_service_date',
         'notes',
         'station_id',
+        'reported_at',
     ];
 
     protected $casts = [
         'mileage' => 'decimal:2',
         'last_service_date' => 'date',
+        'reported_at' => 'datetime',
     ];
 
     /**

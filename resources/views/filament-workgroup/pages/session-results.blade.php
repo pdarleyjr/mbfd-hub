@@ -28,7 +28,7 @@
                                                 @if($index === 0)
                                                     <x-heroicon-o-trophy class="w-8 h-8 text-yellow-500" />
                                                 @else
-                                                    <x-heroicon-o-medal class="w-8 h-8 text-gray-400" />
+                                                    <x-heroicon-o-trophy class="w-8 h-8 text-gray-400" />
                                                 @endif
                                             </div>
                                             <div>
