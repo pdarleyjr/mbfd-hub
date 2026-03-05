@@ -196,8 +196,13 @@
     function workgroupAIPanel() {
         return {
             loading: false, report: null, error: null, copied: false,
+            init() {
+                // Auto-generate report on first page load
+                this.generateReport(false);
+            },
             async generateReport(force = false) {
-                this.loading = true; this.error = null; this.report = null;
+                this.loading = true; this.error = null;
+                if (force) this.report = null;
                 try {
                     const resp = await fetch('/api/workgroup/ai/executive-report', {
                         method: 'POST',

@@ -232,8 +232,12 @@ If `InspectionResource` or `StationResource/RelationManagers/InventorySubmission
 ### Session Results Page (Fixed)
 - **URL**: `/workgroups/session-results`
 - **File**: `app/Filament/Workgroup/Pages/SessionResultsPage.php`
-- **View**: `resources/views/filament-workgroup/pages/session-results.blade.php`
+- **View**: `resources/views/filament/workgroup/pages/session-results.blade.php`
 - Read-only for ALL workgroup members, shows aggregate scores + anonymous feedback
+- **2026-03-05 Rebuild**: Full page rebuild with header stats widgets, SAVER score breakdown table, AI report panel, Filament v3 `Action` + `Select` form for session switching
+- **Widgets enabled**: `SessionProgressWidget` (header), `FinalistsWidget` (footer) — both receive session via Livewire property
+- **FinalistsWidget fix**: Replaced deprecated `BadgeColumn` (Filament v2) with `TextColumn::badge()` (Filament v3)
+- **heroicon-o-medal fix**: Replaced non-existent `heroicon-o-medal` with `heroicon-o-trophy` in `filament-workgroup/pages/session-results.blade.php`
 
 ### Note Sharing Feature
 - **File**: `app/Filament/Workgroup/Pages/Notes.php`
@@ -267,7 +271,7 @@ If `InspectionResource` or `StationResource/RelationManagers/InventorySubmission
 # 
 # ### Cloudflare works illustrated with a diagram (omitted for formatting):  
 # [Diagram of Cloudflare Workers and Vectorize Indexes]  
-# |                         |аниюстрация             |                               |–––––––––––––––––––––| ولасническа careless |Võtivad andmed|Ятира набъл_seed|ʼ.splitext(d)’|
+# |                         |аниюстрация             |                               |–––––––––––––––––––––| volticheska careless |Võtivad andmed|Ятира набъл_seed|ʼ.splitext(d)’|
 # |———————————————————–|—————————————————–|—————————————————-|——————————————|[Cloudflare Worker|None|Handled by YakshOhkLee (https://github.com/yakshohklee)||
 # |ER Workgroup Workshop     |[https://docs.google.com/forms/d/|                               || grads|JSON|CSV|API|
 # |Session Log               |[https://docs.google.com/forms/d/|                               || grads|JSON|CSV|API|
@@ -416,6 +420,50 @@ The tool opens a Chromium profile at `~/.notebooklm-mcp/chrome-profile`. If the 
 | `resources/views/welcome.blade.php` | External pump panel link |
 | `resources/js/daily-checkout/src/App.tsx` | HomeNav component |
 | `cloudflare-worker/workgroup-ai/` | Cloudflare AI Worker source |
+
+---
+
+## ⚠️ Recent Migration: Session Results Page Rebuild (2026-03-05 Late Evening)
+
+### Root Cause of Original 500 Error
+`Filament\Actions\SelectAction` was imported and used in `SessionResultsPage.php` — this class **does not exist** in Filament v3. It was likely copied from a Filament v2 example or hallucinated by a previous AI agent.
+
+### Changes Made
+
+#### `app/Filament/Workgroup/Pages/SessionResultsPage.php` — Full Rebuild
+- Removed non-existent `SelectAction` import; replaced with `Action` + `Select` form
+- Added `getHeaderWidgets()` returning `SessionProgressWidget` with session passed via `::make()`
+- Added `getFooterWidgets()` returning `FinalistsWidget` with session passed via `::make()`  
+- Added `getViewData()` returning rich category results with SAVER score breakdowns
+- Added `switchSession()` Livewire method for interactive session selection
+- Methods `getHeaderWidgetsColumns()` / `getFooterWidgetsColumns()` must be **public** (parent class requires it)
+
+#### `app/Filament/Workgroup/Widgets/FinalistsWidget.php` — v3 Fix
+- Removed `use Filament\Tables\Columns\BadgeColumn;` (Filament v2)
+- Replaced `BadgeColumn::make('rank')` with `TextColumn::make()` using `->badge()` and `->color()` (Filament v3)
+- Simplified subquery: uses direct `AVG(overall_score)` instead of complex COALESCE with legacy fallback
+- Added `emptyStateHeading`, `emptyStateDescription`, `emptyStateIcon` for better UX
+
+#### `resources/views/filament/workgroup/pages/session-results.blade.php` — Rich UI
+- Renders `getHeaderWidgets()` (session progress stats)
+- AI Executive Report panel (same Alpine.js component, improved styling)
+- Category Rankings grid: shows each rankable category with full SAVER breakdown table (S/A/V/E/R columns)
+- Gold/silver placement badges for top 2 finalists per category
+- Advance recommendation votes (✓/✕) and deal-breaker warnings
+- Response count with threshold indicators
+- Empty state for no active session
+- Renders `getFooterWidgets()` (finalists table)
+
+#### `resources/views/filament-workgroup/pages/session-results.blade.php` — Icon Fix
+- Replaced `heroicon-o-medal` (doesn't exist) with `heroicon-o-trophy`
+- This file is NOT the active view (the active one is at `filament/workgroup/pages/`) but caused `view:cache` failures
+
+### NotebookLM MCP Server Issue
+- NotebookLM MCP returns empty `answer: ""` even after re-authentication
+- `notebook_query` succeeds (status: success) but answer is always empty string
+- `notebook_get` and `notebook_list` fail with AuthenticationError even after running `npx auth`
+- **Root cause likely**: Session cookies may expire faster than expected, or the MCP server's cookie extraction may be broken
+- **Workaround**: Use local project files + Context7 Filament docs for research
 
 ---
 
