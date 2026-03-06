@@ -551,38 +551,33 @@ WORKGROUP_AI_WORKER_URL=https://mbfd-workgroup-ai.pdarleyjr.workers.dev
 
 ---
 
-## Count Evaluations Toggle (2026-03-06)
+## 🆕 Workgroup User & Results Page Fixes (2026-03-06 Afternoon)
 
-### Overview
-Admins can toggle whether a workgroup member's evaluations count toward results, analytics, and AI reports. This allows admin/observer accounts to have full access but not pollute the committee data.
+### Luis Cruzado Login Fix
+- **User**: `luiscruzado@miamibeachfl.gov` (user_id=23)
+- **Root cause**: Had `workgroup_member` role but NO `workgroup_members` database record — could not access workgroup dashboard, evaluations, or files
+- **Fix**: Created `WorkgroupMember` record (member_id=16, workgroup_id=2, role=member, is_active=true, count_evaluations=true)
+- **Also set**: `email_verified_at` (was NULL, not required by panel but set for consistency)
+- **NOTE**: Evelio Aleman (user_id=26) and Alejandro Trujillo (user_id=22) are NOT workgroup members — do NOT create records for them
 
-### Implementation
-- **Migration**: `2026_03_06_000001_add_count_evaluations_to_workgroup_members.php` — adds `count_evaluations` boolean (default: true)
-- **Model**: `WorkgroupMember` — added `count_evaluations` to fillable/casts, added `scopeCountable()`
-- **Admin UI**: `WorkgroupMemberResource` — `ToggleColumn::make('count_evaluations')` for inline toggling + form field
-- **EvaluationService**: All query methods (`getCategoryRankings`, `getNonRankableFeedback`, `getSessionProgress`, `getProductStats`) filter by `whereHas('member', fn($q) => $q->where('count_evaluations', true))`
-- **WorkgroupAIService**: `analyzeProduct()`, `buildCategoriesForReport()`, `buildOverallStats()` all filter by countable members
-- **FinalistsWidget**: Subqueries filter by countable members
-- **SessionResultsPage**: SAVER breakdown queries filter by countable members
+### getOrCreateDraft ERROR-010 Fix (Finally Deployed to VPS)
+- **File**: `app/Services/Workgroup/EvaluationService.php`
+- The `->where('status', 'draft')` filter in `getOrCreateDraft()` was STILL present on VPS despite being documented as fixed
+- Removed the filter so it finds ANY existing submission regardless of status
+- This prevents unique constraint violations when users revisit submitted evaluations
 
-### Usage
-1. Go to Admin Panel → Workgroup Members
-2. Toggle "Count Evals" to OFF for observer/admin accounts (e.g., peterdarley, grecia)
-3. Their submissions are immediately excluded from all results, rankings, progress %, and AI reports
-4. They can still access, submit, and view evaluations — their data just doesn't affect the official results
+### View Cache Fix (ERROR-001 Resolution)
+- **File**: `resources/views/filament-workgroup/pages/session-results.blade.php`
+- This UNUSED alternate blade view had `x-filament::card.heading` components (Filament v2 only)
+- Replaced with a comment stub so `php artisan view:cache` succeeds
+- The ACTIVE view at `resources/views/filament/workgroup/pages/session-results.blade.php` is unaffected
+
+### NS_BINDING_ABORTED Errors (Browser-Side, Not Server Bug)
+- These are browser request cancellations — occur when Livewire sends AJAX updates and old requests get superseded
+- Normal Filament v3 behavior with multiple widget polls and AI report auto-generation
+- NOT a server error and does NOT indicate broken functionality
+
+### GitHub Commit
+- `c36c5cf6` — fix: getOrCreateDraft status filter + stale blade view cache fix
 
 ---
-
-## Admin Password Management (2026-03-06)
-
-### Overview
-Admin users can now reset passwords for any user directly from the Users resource.
-
-### Implementation
-- **UserResource**: Now visible in admin sidebar for `super_admin` and `admin` roles
-- **Reset Password Action**: Table action with key icon — opens a confirmation modal with password + confirmation fields
-- **Edit form**: Password field on edit shows helpful text "Leave blank to keep current password"
-- **Security**: Password is hashed with `Hash::make()` before storage; only `super_admin` and `admin` can see/use the reset action
-
-### Note on Viewing Passwords
-Passwords are stored as bcrypt hashes (one-way) — they **cannot be viewed**. The only option is to reset them. This is standard security practice.
