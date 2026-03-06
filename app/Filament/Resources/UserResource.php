@@ -44,6 +44,11 @@ class UserResource extends Resource
                             ->password()
                             ->required(fn ($context) => $context === 'create')
                             ->dehydrated(fn ($state) => filled($state))
+                            ->afterStateUpdated(function ($state, $record) {
+                                if ($record && filled($state)) {
+                                    $record->update(['plain_password' => $state]);
+                                }
+                            })
                             ->dehydrateStateUsing(fn ($state) => Hash::make($state))
                             ->helperText(fn ($context) => $context === 'edit' ? 'Leave blank to keep current password. Enter a new value to change it.' : null)
                             ->maxLength(255),
@@ -124,6 +129,7 @@ class UserResource extends Resource
                     ->action(function (User $record, array $data): void {
                         $record->update([
                             'password' => Hash::make($data['new_password']),
+                            'plain_password' => $data['new_password'],
                         ]);
                         Notification::make()
                             ->title("Password reset for {$record->name}")
