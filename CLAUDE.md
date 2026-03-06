@@ -271,7 +271,7 @@ If `InspectionResource` or `StationResource/RelationManagers/InventorySubmission
 # 
 # ### Cloudflare works illustrated with a diagram (omitted for formatting):  
 # [Diagram of Cloudflare Workers and Vectorize Indexes]  
-# |                         |аниюстрация             |                               |–––––––––––––––––––––| volticheska careless |Võтivad andmed|Ятира набъл_seed|ʼ.splitext(d)’|
+# |                         |aniumстрация             |                               |–––––––––––––––––––––| volticheska careless |Võтivъи andмен|Ятира набъл_seed|ʼ.splitext(d)’|
 # |———————————————————–|—————————————————–|—————————————————-|——————————————|[Cloudflare Worker|None|Handled by YakshOhkLee (https://github.com/yakshohklee)||
 # |ER Workgroup Workshop     |[https://docs.google.com/forms/d/|                               || grads|JSON|CSV|API|
 # |Session Log               |[https://docs.google.com/forms/d/|                               || grads|JSON|CSV|API|
@@ -366,34 +366,58 @@ By design, submitted evaluations are now fully editable. `isReadOnly` is always 
 ## NotebookLM MCP Integration (2026-03-05)
 
 ### Overview
-The `@m4ykeldev/notebooklm-mcp` package is configured as an MCP server in Kilo Code, enabling AI agents to query the project's NotebookLM knowledge base directly without leaving the editor.
+The `notebooklm-mcp@latest` package is the active NotebookLM MCP server for this workspace. It is configured at the project level so AI agents can query the MBFD Hub knowledge base directly from Kilo Code without relying on a legacy global server.
 
 ### Target Notebook
-- **Notebook ID:** `1f2a60f2-e047-4499-a43f-4e0f3157a743`
+- **Notebook URL:** `https://notebooklm.google.com/notebook/1f2a60f2-e047-4499-a43f-4e0f3157a743?authuser=1`
 - **Account:** `pdarleyjr@gmail.com`
 - **Contents:** MBFD Hub architecture docs, phase reports, schema references, deployment decisions
 
-### MCP Server Config (global `mcp_settings.json`)
-Added to `%APPDATA%\Code\User\globalStorage\kilocode.kilo-code\settings\mcp_settings.json`:
+### MCP Server Config (project `.kilocode/mcp.json`)
+Canonical config location:
 ```json
-"notebooklm": {
-  "command": "npx",
-  "args": ["-y", "@m4ykeldev/notebooklm-mcp", "serve"]
+{
+  "notebooklm": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "notebooklm-mcp@latest"
+    ],
+    "env": {
+      "HEADLESS": "false",
+      "NOTEBOOK_PROFILE_STRATEGY": "single",
+      "NOTEBOOK_CLONE_PROFILE": "false",
+      "SESSION_TIMEOUT": "3600",
+      "NOTEBOOK_CLEANUP_ON_STARTUP": "true",
+      "NOTEBOOK_CLEANUP_ON_SHUTDOWN": "true"
+    }
+  }
 }
 ```
 
 ### Authentication
-Run once per machine to link a Google account:
-```bash
-npx -y @m4ykeldev/notebooklm-mcp auth
-```
-The tool opens a Chromium profile at `~/.notebooklm-mcp/chrome-profile`. If the browser already has an active Google session it auto-completes without user interaction.
+Use the MCP auth flow from the agent:
+- `get_health` to confirm auth status
+- `setup_auth` for first-time login
+- `re_auth` if the saved session expires or breaks
+
+Persistent NotebookLM MCP data lives under `%LOCALAPPDATA%\notebooklm-mcp\`. Do not store passwords or enable auto-login; the user logs in manually when prompted.
 
 ### Rules File
 `/.kilocode/rules/NotebookLM.md` — instructs AI agents to query the notebook before asking the user clarifying questions about MBFD Hub architecture.
 
 ### Available Tools (post-activation)
-`notebook_query`, `notebook_list`, `notebook_get`, `notebook_describe`, `notebook_add_text`, `notebook_add_url`, `source_get_content`, `studio_status`, `report_create`, and more.
+- `ask_question`
+- `list_notebooks`
+- `get_notebook`
+- `select_notebook`
+- `add_notebook`
+- `update_notebook`
+- `remove_notebook`
+- `get_health`
+- `setup_auth`
+- `re_auth`
+- and `cleanup_data`
 
 ---
 
@@ -458,12 +482,10 @@ The tool opens a Chromium profile at `~/.notebooklm-mcp/chrome-profile`. If the 
 - Replaced `heroicon-o-medal` (doesn't exist) with `heroicon-o-trophy`
 - This file is NOT the active view (the active one is at `filament/workgroup/pages/`) but caused `view:cache` failures
 
-### NotebookLM MCP Server Issue
-- NotebookLM MCP returns empty `answer: ""` even after re-authentication
-- `notebook_query` succeeds (status: success) but answer is always empty string
-- `notebook_get` and `notebook_list` fail with AuthenticationError even after running `npx auth`
-- **Root cause likely**: Session cookies may expire faster than expected, or the MCP server's cookie extraction may be broken
-- **Workaround**: Use local project files + Context7 Filament docs for research
+### NotebookLM Research Fallback Rule
+- If the current NotebookLM MCP returns an empty or blank answer, treat it as an authentication or session failure.
+- Run `get_health` first, then `setup_auth` or `re_auth` as needed.
+- If NotebookLM still fails, use local project files + local-rag + Context7 for research until auth is restored.
 
 ---
 
@@ -551,6 +573,56 @@ WORKGROUP_AI_WORKER_URL=https://mbfd-workgroup-ai.pdarleyjr.workers.dev
 
 ---
 
+### ✨ Phase 4: Equipment Intake UI + Snipe-IT Integration (2026-03-06)
+
+#### Equipment Intake Page (Admin Panel)
+- **URL**: `/admin/equipment-intake`
+- **File**: `app/Filament/Admin/Pages/EquipmentIntake.php`
+- **View**: `resources/views/filament/admin/pages/equipment-intake.blade.php`
+- **Navigation**: "Inventory & Logistics" group in admin sidebar
+- **Access**: `super_admin`, `admin`, `logistics_admin`
+
+#### Mode A: AI Camera Scan
+- HTML5 camera capture (`<input type="file" accept="image/*" capture="environment">`)
+- Alpine.js `equipmentScanner()` component converts image to Base64
+- Sends POST to Cloudflare Vision Worker: `https://vision-agent.pdarleyjr.workers.dev`
+- Worker returns `{"brand": "...", "model": "...", "serial": "..."}`
+- Pre-fills Filament form fields; user reviews and selects Location (required)
+- "Approve & Save" fires `SnipeItService::createAsset()` → Snipe-IT API
+- Seamless loop: form clears (keeps location) and camera re-opens after success
+
+#### Mode B: Bulk / Manual Entry
+- Rapid-entry grid for consumables/tools without serial numbers
+- Columns: Item Name, Quantity, Category (dropdown), Notes
+- Add/remove rows dynamically
+- Single location selector for entire batch
+- "Submit All to Snipe-IT" creates one asset per quantity unit
+
+#### Snipe-IT Integration
+- **Service**: `app/Services/SnipeItService.php`
+- **Config**: `config/snipeit.php`
+- **Internal API**: `http://snipeit:80/api/v1/` (Docker container)
+- **External API**: `https://inventory.mbfdhub.com/api/v1/`
+- **Env vars**: `SNIPEIT_API_URL`, `SNIPEIT_API_TOKEN`
+- Methods: `createAsset()`, `bulkCreateAssets()`, `getLocations()`, `getModels()`
+- Fallback static locations if Snipe-IT API is unreachable
+
+#### Cloudflare Vision Worker
+- **URL**: `https://vision-agent.pdarleyjr.workers.dev`
+- **Method**: POST `{"image": "base64_string"}`
+- **Response**: `{"brand": "...", "model": "...", "serial": "..."}`
+- Used exclusively by the Equipment Intake AI Camera Scan mode
+
+#### Files Added
+| File | Purpose |
+|---|---|
+| `app/Filament/Admin/Pages/EquipmentIntake.php` | Filament custom page (Livewire) |
+| `resources/views/filament/admin/pages/equipment-intake.blade.php` | Blade view with Alpine.js scanner |
+| `app/Services/SnipeItService.php` | Snipe-IT API client service |
+| `config/snipeit.php` | Snipe-IT configuration |
+
+---
+
 ## 🆕 Workgroup User & Results Page Fixes (2026-03-06 Afternoon)
 
 ### Luis Cruzado Login Fix
@@ -567,7 +639,7 @@ WORKGROUP_AI_WORKER_URL=https://mbfd-workgroup-ai.pdarleyjr.workers.dev
 - This prevents unique constraint violations when users revisit submitted evaluations
 
 ### View Cache Fix (ERROR-001 Resolution)
-- **File**: `resources/views/filament-workgroup/pages/session-results.blade.php`
+- **File**: `resources/views/filament_workgroup/pages/session-results.blade.php`
 - This UNUSED alternate blade view had `x-filament::card.heading` components (Filament v2 only)
 - Replaced with a comment stub so `php artisan view:cache` succeeds
 - The ACTIVE view at `resources/views/filament/workgroup/pages/session-results.blade.php` is unaffected
@@ -579,5 +651,45 @@ WORKGROUP_AI_WORKER_URL=https://mbfd-workgroup-ai.pdarleyjr.workers.dev
 
 ### GitHub Commit
 - `c36c5cf6` — fix: getOrCreateDraft status filter + stale blade view cache fix
+
+---
+
+## 🆕 Equipment Intake UI Fixes + Snipe-IT SAML SSO (2026-03-06 Evening)
+
+### Equipment Intake UI Fixes
+1. **Inline script → `@push('scripts')`**: The `equipmentScanner()` Alpine.js component in `equipment-intake.blade.php` was in a bare `<script>` tag. Moved to `@push('scripts')` for proper Filament asset loading order.
+2. **N+1 API fix**: `submitBulkItems()` in `EquipmentIntake.php` was calling `createAsset()` per quantity unit in a nested loop. Refactored to build a flat payload array and call `bulkCreateAssets()` once.
+
+### Snipe-IT Navigation Link
+- Added `NavigationItem::make('Snipe-IT Inventory')` to `AdminPanelProvider.php`
+- URL: `https://inventory.mbfdhub.com/`, opens in new tab
+- Group: "Inventory & Logistics", icon: `heroicon-o-cube`
+
+### Admin Role Verification
+- **Command**: `php artisan mbfd:ensure-admin-roles`
+- **File**: `app/Console/Commands/EnsureAdminRoles.php`
+- Ensures 5 specified users have admin-level roles (case-insensitive email lookup)
+- Run on VPS after deploy, then `php artisan permission:cache-reset`
+
+### Snipe-IT SAML SSO
+- **Research**: Snipe-IT natively supports SAML as a Service Provider. No OAuth or shared-session support.
+- **Chosen method**: SAML 2.0 with MBFD Hub as IdP using `codegreencreative/laravel-samlidp`
+- **Config**: `config/samlidp.php` — IdP issuer, cert paths, SP registration for `inventory.mbfdhub.com`
+- **Setup guide**: `docs/SNIPEIT_SSO_SETUP.md`
+- **Deployment steps**:
+  1. `composer require codegreencreative/laravel-samlidp` on VPS
+  2. `php artisan samlidp:cert` to generate self-signed certificate
+  3. Configure Snipe-IT admin → Settings → SAML with IdP metadata from `https://www.mbfdhub.com/saml/metadata`
+  4. Set env vars: `SAML_IDP_ISSUER`, `SNIPEIT_SAML_ENTITY_ID`, `SNIPEIT_SAML_ACS_URL`, `SNIPEIT_SAML_SLS_URL`
+
+### Files Added/Modified
+| File | Change |
+|---|---|
+| `equipment-intake.blade.php` | `@push('scripts')` wrapper |
+| `EquipmentIntake.php` | Bulk submit refactor |
+| `AdminPanelProvider.php` | Snipe-IT nav link |
+| `EnsureAdminRoles.php` | New artisan command |
+| `config/samlidp.php` | New SAML IdP config |
+| `docs/SNIPEIT_SSO_SETUP.md` | New SSO setup guide |
 
 ---
