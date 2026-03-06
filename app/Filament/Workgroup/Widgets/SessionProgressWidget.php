@@ -17,6 +17,8 @@ class SessionProgressWidget extends BaseWidget
 {
     public ?WorkgroupSession $session = null;
 
+    protected static ?string $pollingInterval = '30s';
+    
     protected function getStats(): array
     {
         $session = $this->session ?? WorkgroupSession::active()->first();
@@ -31,10 +33,15 @@ class SessionProgressWidget extends BaseWidget
         }
 
         $totalProducts = $session->candidateProducts()->count();
-        $totalMembers = WorkgroupMember::where('is_active', true)->count();
+        $totalMembers = WorkgroupMember::where('is_active', true)->where('count_evaluations', true)->count();
         
-        // Get completed submissions count
+        // Get completed submissions count — only from countable members
+        $countableMemberIds = WorkgroupMember::where('is_active', true)
+            ->where('count_evaluations', true)
+            ->pluck('id');
+        
         $completedSubmissions = EvaluationSubmission::where('status', 'submitted')
+            ->whereIn('workgroup_member_id', $countableMemberIds)
             ->whereHas('candidateProduct', fn($q) => 
                 $q->where('workgroup_session_id', $session->id)
             )
@@ -85,6 +92,7 @@ class SessionProgressWidget extends BaseWidget
     protected function getEvaluatorStats(WorkgroupSession $session): array
     {
         $members = WorkgroupMember::where('is_active', true)
+            ->where('count_evaluations', true)
             ->with(['submissions' => fn($q) => 
                 $q->whereHas('candidateProduct', fn($sq) => 
                     $sq->where('workgroup_session_id', $session->id)
