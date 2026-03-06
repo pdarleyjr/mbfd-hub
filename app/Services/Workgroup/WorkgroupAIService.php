@@ -186,6 +186,7 @@ class WorkgroupAIService
         return Cache::remember($cacheKey, 7200, function () use ($product) {
             $submissions = EvaluationSubmission::where('candidate_product_id', $product->id)
                 ->where('status', 'submitted')
+                ->whereHas('member', fn($q) => $q->where('count_evaluations', true))
                 ->with(['member.user'])
                 ->get();
 
@@ -369,9 +370,10 @@ class WorkgroupAIService
 
     protected function buildCategoriesForReport(WorkgroupSession $session): array
     {
-        // Get all products grouped by category
+        // Get all products grouped by category — only include countable submissions
         $products = CandidateProduct::where('workgroup_session_id', $session->id)
-            ->with(['category', 'submissions' => fn($q) => $q->where('status', 'submitted')])
+            ->with(['category', 'submissions' => fn($q) => $q->where('status', 'submitted')
+                ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))])
             ->get();
 
         $grouped = $products->groupBy('category.name');
@@ -417,9 +419,11 @@ class WorkgroupAIService
         $products     = CandidateProduct::where('workgroup_session_id', $session->id)->count();
         $submissions  = EvaluationSubmission::whereHas('candidateProduct', fn($q) => $q->where('workgroup_session_id', $session->id))
             ->where('status', 'submitted')
+            ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))
             ->count();
         $evaluatorIds = EvaluationSubmission::whereHas('candidateProduct', fn($q) => $q->where('workgroup_session_id', $session->id))
             ->where('status', 'submitted')
+            ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))
             ->distinct('workgroup_member_id')
             ->count('workgroup_member_id');
 

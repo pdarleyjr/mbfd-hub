@@ -89,10 +89,12 @@ class FinalistsWidget extends BaseWidget
             ->addSelect([
                 'weighted_score' => EvaluationSubmission::selectRaw('AVG(overall_score)')
                     ->whereColumn('candidate_product_id', 'candidate_products.id')
-                    ->where('status', 'submitted'),
+                    ->where('status', 'submitted')
+                    ->whereHas('member', fn($q) => $q->where('count_evaluations', true)),
                 'response_count' => EvaluationSubmission::selectRaw('COUNT(*)')
                     ->whereColumn('candidate_product_id', 'candidate_products.id')
-                    ->where('status', 'submitted'),
+                    ->where('status', 'submitted')
+                    ->whereHas('member', fn($q) => $q->where('count_evaluations', true)),
             ])
             ->orderBy('category_id')
             ->orderByDesc('weighted_score');

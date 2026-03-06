@@ -99,8 +99,8 @@ When writing your analysis, always:
 5. Reference technical specifications from vendor documents when available
 6. Conclude with a clear recommendation`;
 
-const EXECUTIVE_REPORT_SYSTEM_PROMPT = `You are an expert technical writer and public safety procurement analyst for the Miami Beach Fire Department.
-You are creating a formal executive evaluation report for the Mid-Mount Ladder Truck Equipment Evaluation Workgroup.
+const EXECUTIVE_REPORT_SYSTEM_PROMPT = `You are an expert data analyst and technical writer for the Miami Beach Fire Department.
+You are creating a formal data analysis report for the Mid-Mount Ladder Truck Equipment Evaluation Workgroup.
 
 This report will be presented to:
 - The Health & Safety Committee
@@ -109,19 +109,16 @@ This report will be presented to:
 
 Report Requirements:
 - Formal, professional tone suitable for command-level review
-- Organized by equipment category with clear rankings
-- Include comparative analysis across competing products
-- Highlight the committee's consensus recommendations
-- Reference both quantitative scores and qualitative feedback
-- Note any products that should advance as finalists vs. those eliminated
-- Must be clear, actionable, and ready for decision-making
+- Focus SOLELY on analyzing the data that has been collected (uploaded files, evaluation submissions, member notes)
+- Provide in-depth analysis of evaluation scores, patterns, and trends
+- Reference uploaded vendor specification documents and what they reveal
+- Summarize evaluator feedback and identify consensus/disagreements
+- DO NOT make purchasing, procurement, or "next steps" recommendations
+- DO NOT suggest what to buy or recommend specific products for purchase
+- Simply present the analyzed data clearly and objectively
+- Highlight interesting patterns, outliers, and notable findings in the data
 
-Remember: The committee has been evaluating tools for purchase for a NEW Mid-Mount Ladder Truck. Categories include:
-- Battery-operated hydraulic tools (cutters, spreaders, rams) — ranked by brand overall, NOT individually  
-- Forcible entry tools — ranked by similar item type
-- Struts — single category for all strut products
-
-Ranking Note: Battery hydraulic tools from the same brand should be considered together as a brand package, not as individual tools.`;
+Remember: Your job is to ANALYZE and PRESENT the collected data, not to advise on procurement decisions.`;
 
 // =============================================================================
 // HANDLERS
@@ -377,9 +374,9 @@ ${productsText}
 Category Notes: ${cat.notes || cat.aiSummary || 'See individual product analyses'}`;
   }).join('\n\n---\n\n');
 
-  const userPrompt = `EXECUTIVE EVALUATION REPORT REQUEST
+  const userPrompt = `EXECUTIVE DATA ANALYSIS REPORT REQUEST
 
-Report Title: Mid-Mount Ladder Truck Equipment Evaluation
+Report Title: Mid-Mount Ladder Truck Equipment Evaluation — Data Analysis
 Session: ${sessionName || 'Ladder Truck Procurement Evaluation'}
 Date: ${sessionDate || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
 Prepared for: Health & Safety Committee, Fire Chief Digna Abello
@@ -394,28 +391,33 @@ Categories Evaluated: ${categories.length}
 ${categoriesFormatted}
 
 === TASK ===
-Generate a complete, formal executive evaluation report. Structure:
+Generate a complete, formal data analysis report. Structure:
 
 1. EXECUTIVE OVERVIEW
-   - Purpose of evaluation and committee mandate
-   - Summary of process (how many evaluators, sessions, products tested)
+   - Purpose of the evaluation and data collection effort
+   - Summary of participation (how many evaluators, sessions, products tested)
    
-2. CATEGORY FINDINGS (one section per category)
-   - For each category: overview, ranked results, finalist recommendation
-   - For Battery Hydraulics: group by brand, compare brand packages
+2. DATA ANALYSIS BY CATEGORY (one section per category)
+   - For each category: score distribution, patterns, evaluator consensus
+   - For Battery Hydraulics: analyze scores by brand groupings
+   - Reference any uploaded vendor specification documents and their key data points
    
-3. FINALIST RECOMMENDATIONS
-   - Clear list of recommended finalists by category
-   - Rationale for each recommendation
+3. EVALUATOR FEEDBACK ANALYSIS
+   - Common themes across evaluator narratives
+   - Areas of strong agreement vs. divergent opinions
+   - Notable deal-breaker reports and their context
    
-4. NOTABLE CONCERNS / DISQUALIFICATIONS
-   - Products with deal-breakers or unanimous poor ratings
-   
-5. NEXT STEPS
-   - Recommended procurement actions
-   - Any items requiring additional review
+4. DATA PATTERNS & OBSERVATIONS
+   - Score distributions and statistical observations
+   - Categories with clear frontrunners vs. close competitions
+   - Any data anomalies or outliers worth noting
 
-Format professionally. Use headers and structured layout. This is a formal document.`;
+5. SUMMARY OF COLLECTED DATA
+   - High-level overview of all data gathered to date
+   - Areas where more data may be needed
+
+DO NOT include purchasing recommendations or procurement next steps.
+Format professionally. Use headers and structured layout. This is a formal analytical document.`;
 
   const messages = [
     { role: 'system', content: EXECUTIVE_REPORT_SYSTEM_PROMPT },
