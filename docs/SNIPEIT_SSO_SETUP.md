@@ -1,4 +1,26 @@
-# Snipe-IT SAML SSO Setup Guide
+# Snipe-IT SSO & User Setup Guide
+
+## Current Status (2026-03-06)
+
+### ✅ Completed
+- **5 users created in Snipe-IT** with superuser permissions and password `Penco3`
+- **API token generated** and configured in MBFD Hub `.env` (`SNIPEIT_API_URL`, `SNIPEIT_API_TOKEN`)
+- **SAML IdP package installed** (`codegreencreative/laravel-samlidp` v5.3) on MBFD Hub
+- **Self-signed certificate generated** at `storage/samlidp/cert.pem` and `storage/samlidp/key.pem`
+- **SAML metadata endpoint** available at `https://www.mbfdhub.com/saml/metadata`
+- **Snipe-IT navigation link** in admin sidebar under "Inventory & Logistics"
+
+### ⚠️ SAML SSO — Partially Configured (Needs Fix)
+The SAML IdP metadata endpoint at `/saml/metadata` is returning the **cert file path** instead of the actual certificate content in the `<ds:X509Certificate>` element. This causes Snipe-IT to crash with a 500 error when SAML is enabled (`Attempt to read property "timestamp" on null` in `Saml.php:184`).
+
+**SAML is currently DISABLED** in Snipe-IT to prevent the 500 error. Direct username/password login works.
+
+**To fix**: The `codegreencreative/laravel-samlidp` package config needs the cert content to be loaded via `file_get_contents()` or the package's cert reading mechanism needs to be debugged. The cert file itself is valid (verified via `head -3 storage/samlidp/cert.pem`).
+
+### Direct Login (Working Now)
+Users can log into Snipe-IT at `https://inventory.mbfdhub.com/` with:
+- **Username**: their email prefix (e.g., `peterdarley`)
+- **Password**: `Penco3`
 
 ## Overview
 
@@ -87,14 +109,12 @@ SNIPEIT_SAML_SLS_URL=https://inventory.mbfdhub.com/saml/sls
 
 ## Users with Access
 
-The following users should have matching accounts in both MBFD Hub (admin role) and Snipe-IT:
+| Email | Snipe-IT Username | Role |
+|---|---|---|
+| PeterDarley@miamibeachfl.gov | peterdarley | superuser (admin) |
+| MiguelAnchia@miamibeachfl.gov | miguelanchia | superuser |
+| RichardQuintela@miamibeachfl.gov | richardquintela | superuser |
+| GreciaTrabanino@miamibeachfl.gov | greciatrabanino | superuser |
+| geralddeyoung@miamibeachfl.gov | geralddeyoung | superuser |
 
-| Email | MBFD Hub Role |
-|---|---|
-| MiguelAnchia@miamibeachfl.gov | admin |
-| RichardQuintela@miamibeachfl.gov | admin |
-| PeterDarley@miamibeachfl.gov | super_admin |
-| GreciaTrabanino@miamibeachfl.gov | admin |
-| geralddeyoung@miamibeachfl.gov | admin |
-
-Run `php artisan mbfd:ensure-admin-roles` to verify/assign roles.
+All users have password: `Penco3` (should be changed on first login).
