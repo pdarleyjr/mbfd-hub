@@ -20,9 +20,13 @@ class WorkgroupAdminStatsWidget extends BaseWidget
         $totalWorkgroups = Workgroup::count();
         $activeWorkgroups = Workgroup::active()->count();
         $activeSessions = WorkgroupSession::active()->count();
+        $countableMembers = WorkgroupMember::where('is_active', true)->where('count_evaluations', true)->count();
         $totalMembers = WorkgroupMember::where('is_active', true)->count();
+        $countableMemberIds = WorkgroupMember::where('is_active', true)->where('count_evaluations', true)->pluck('id');
         $pendingEvaluations = $this->getPendingEvaluationsCount();
-        $completedEvaluations = EvaluationSubmission::submitted()->count();
+        $completedEvaluations = EvaluationSubmission::where('status', 'submitted')
+            ->whereIn('workgroup_member_id', $countableMemberIds)
+            ->count();
         $totalSessions = WorkgroupSession::count();
 
         return [
@@ -36,8 +40,8 @@ class WorkgroupAdminStatsWidget extends BaseWidget
                 ->descriptionIcon('heroicon-o-calendar')
                 ->color($activeSessions > 0 ? 'success' : 'gray'),
 
-            Stat::make('Total Members', $totalMembers)
-                ->description('Active members')
+            Stat::make('Evaluators', $countableMembers)
+                ->description("{$totalMembers} total members ({$countableMembers} counting)")
                 ->descriptionIcon('heroicon-o-users')
                 ->color('info'),
 
@@ -47,7 +51,7 @@ class WorkgroupAdminStatsWidget extends BaseWidget
                 ->color($pendingEvaluations > 0 ? 'warning' : 'success'),
 
             Stat::make('Completed', $completedEvaluations)
-                ->description('Total submissions')
+                ->description('Countable submissions')
                 ->descriptionIcon('heroicon-o-check-circle')
                 ->color('success'),
         ];
@@ -62,20 +66,21 @@ class WorkgroupAdminStatsWidget extends BaseWidget
         }
 
         $totalProducts = $activeSession->candidateProducts()->count();
-        $totalMembers = WorkgroupMember::where('is_active', true)->count();
+        $countableMembers = WorkgroupMember::where('is_active', true)->where('count_evaluations', true)->count();
+        $countableMemberIds = WorkgroupMember::where('is_active', true)->where('count_evaluations', true)->pluck('id');
         
-        if ($totalProducts === 0 || $totalMembers === 0) {
+        if ($totalProducts === 0 || $countableMembers === 0) {
             return 0;
         }
 
         $completedSubmissions = EvaluationSubmission::where('status', 'submitted')
+            ->whereIn('workgroup_member_id', $countableMemberIds)
             ->whereHas('candidateProduct', fn($q) => 
                 $q->where('workgroup_session_id', $activeSession->id)
             )
             ->count();
 
-        // Total possible = products * members
-        $totalPossible = $totalProducts * $totalMembers;
+        $totalPossible = $totalProducts * $countableMembers;
         
         return max(0, $totalPossible - $completedSubmissions);
     }

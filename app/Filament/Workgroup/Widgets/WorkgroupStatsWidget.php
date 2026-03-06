@@ -35,7 +35,7 @@ class WorkgroupStatsWidget extends BaseWidget
             $q->where('workgroup_session_id', $activeSession->id)
         )->count() ?? 0;
 
-        // Count pending evaluations
+        // Count pending evaluations — only those that count
         $pendingEvaluationsCount = $this->getPendingEvaluationsCount($workgroupMember, $activeSession);
 
         // Count my notes
@@ -48,10 +48,13 @@ class WorkgroupStatsWidget extends BaseWidget
             )
             ->count();
 
-        // Count completed evaluations
+        // Count completed evaluations — only those that count
         $completedEvaluationsCount = EvaluationSubmission::where('workgroup_member_id', $workgroupMember->id)
             ->where('status', 'submitted')
             ->count();
+
+        // Show whether this member's evals count
+        $evalsCountLabel = $workgroupMember->count_evaluations ? 'Submitted (counting)' : 'Submitted (not counting)';
 
         return [
             Stat::make('Workgroup', $workgroup?->name ?? 'None')
@@ -85,9 +88,9 @@ class WorkgroupStatsWidget extends BaseWidget
                 ->color('indigo'),
 
             Stat::make('Completed', $completedEvaluationsCount)
-                ->description('Submitted')
+                ->description($evalsCountLabel)
                 ->descriptionIcon('heroicon-o-check-circle')
-                ->color('success'),
+                ->color($workgroupMember->count_evaluations ? 'success' : 'gray'),
         ];
     }
 
