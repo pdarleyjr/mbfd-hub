@@ -16,10 +16,12 @@ class WorkgroupMember extends Model
         'user_id',
         'role',
         'is_active',
+        'count_evaluations',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'count_evaluations' => 'boolean',
     ];
 
     /**
@@ -68,6 +70,14 @@ class WorkgroupMember extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope to get only members whose evaluations count toward results.
+     */
+    public function scopeCountable($query)
+    {
+        return $query->where('count_evaluations', true);
     }
 
     /**
