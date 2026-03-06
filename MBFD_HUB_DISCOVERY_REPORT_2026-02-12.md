@@ -287,7 +287,7 @@ The application now has **three Filament panels** (plus one public SPA):
 - **Worker URL**: `https://mbfd-workgroup-ai.pdarleyjr.workers.dev`
 - **Vectorize Index**: `workgroup-specs` (1024 dimensions, cosine metric)
 - Endpoints: `/vectorize`, `/analyze`, `/summary`, `/executive-report`, `/health`
-- Models: `@cf/baai/bge-large-en-v1.5` (embeddings), `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (analysis)
+- Models: `@cf/baai/bge-large-en-v1.5` (embeddings), `@cf/meta/llama-3.3-7b-instruct-fp8-fast` (analysis)
 
 **Home Button Restoration** ✅ (2026-03-04):
 - Admin panel: Home icon in header bar + "Return to Home" in user menu
@@ -352,6 +352,30 @@ The application now has **three Filament panels** (plus one public SPA):
 - Analyzes uploaded files, evaluation scores, patterns, and consensus
 
 **GitHub Commits**: `e63d8dc5`, `62b8d11e`
+
+---
+
+### 🆕 NEW (2026-03-06 Afternoon): Workgroup User Fix + Code Deployment
+
+**Luis Cruzado Login Fix** ✅:
+- User `luiscruzado@miamibeachfl.gov` (user_id=23) had `workgroup_member` role but NO `workgroup_members` record
+- Created WorkgroupMember (member_id=16, workgroup_id=2, role=member, active, counting)
+- **Evelio Aleman and Alejandro Trujillo are NOT workgroup members** — no records for them
+
+**getOrCreateDraft Fix** ✅:
+- ERROR-010 fix was documented but never deployed to VPS (SCP failed silently)
+- Removed `->where('status', 'draft')` from `EvaluationService::getOrCreateDraft()` directly on VPS
+- Prevents unique constraint violations when revisiting submitted evaluations
+
+**View Cache Fix** ✅:
+- `filament-workgroup/pages/session-results.blade.php` (unused file) had Filament v2 components blocking `view:cache`
+- Replaced with comment stub; active view at `filament/workgroup/pages/` is unaffected
+
+**NS_BINDING_ABORTED Errors**:
+- Browser-side request cancellations, NOT server errors
+- Normal Livewire/Filament v3 widget polling behavior
+
+**GitHub Commit**: `c36c5cf6`
 
 ---
 
