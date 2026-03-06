@@ -5,6 +5,7 @@ namespace App\Filament\Workgroup\Widgets;
 use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
 use App\Models\EvaluationSubmission;
+use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -74,6 +75,7 @@ class CategoryRankingsWidget extends BaseWidget
         }
 
         $categoryId = $this->category?->id;
+        $countableMemberIds = WorkgroupMember::where('count_evaluations', true)->pluck('id');
 
         return CandidateProduct::query()
             ->when($categoryId, fn($query) => 
@@ -89,23 +91,14 @@ class CategoryRankingsWidget extends BaseWidget
             ->withCount('submissions')
             ->select('candidate_products.*')
             ->addSelect([
-                // Use new rubric overall_score if available, fallback to legacy calculation
-                'weighted_score' => EvaluationSubmission::selectRaw('COALESCE(
-                    AVG(overall_score),
-                    COALESCE(AVG(
-                        (SELECT SUM(es.score * ec.weight) / NULLIF(SUM(ec.weight), 0)
-                        FROM evaluation_scores es
-                        JOIN evaluation_criteria ec ON es.criterion_id = ec.id
-                        WHERE es.submission_id = evaluation_submissions.id
-                        AND es.score IS NOT NULL)
-                    ), 0)
-                )')
-                    ->join('evaluation_submissions', 'evaluation_submissions.candidate_product_id', '=', 'candidate_products.id')
-                    ->whereColumn('evaluation_submissions.candidate_product_id', 'candidate_products.id')
-                    ->where('evaluation_submissions.status', 'submitted'),
+                'weighted_score' => EvaluationSubmission::selectRaw('AVG(overall_score)')
+                    ->whereColumn('candidate_product_id', 'candidate_products.id')
+                    ->where('status', 'submitted')
+                    ->whereIn('workgroup_member_id', $countableMemberIds),
                 'response_count' => EvaluationSubmission::selectRaw('COUNT(*)')
                     ->whereColumn('candidate_product_id', 'candidate_products.id')
-                    ->where('status', 'submitted'),
+                    ->where('status', 'submitted')
+                    ->whereIn('workgroup_member_id', $countableMemberIds),
             ])
             ->orderByDesc('weighted_score');
     }

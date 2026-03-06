@@ -5,6 +5,7 @@ namespace App\Filament\Workgroup\Widgets;
 use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
 use App\Models\EvaluationSubmission;
+use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -79,6 +80,9 @@ class FinalistsWidget extends BaseWidget
             return CandidateProduct::query()->whereRaw('1 = 0');
         }
 
+        // Get IDs of members whose evaluations count
+        $countableMemberIds = WorkgroupMember::where('count_evaluations', true)->pluck('id');
+
         return CandidateProduct::query()
             ->where('workgroup_session_id', $session->id)
             ->whereHas('category', fn($query) => 
@@ -90,11 +94,11 @@ class FinalistsWidget extends BaseWidget
                 'weighted_score' => EvaluationSubmission::selectRaw('AVG(overall_score)')
                     ->whereColumn('candidate_product_id', 'candidate_products.id')
                     ->where('status', 'submitted')
-                    ->whereHas('member', fn($q) => $q->where('count_evaluations', true)),
+                    ->whereIn('workgroup_member_id', $countableMemberIds),
                 'response_count' => EvaluationSubmission::selectRaw('COUNT(*)')
                     ->whereColumn('candidate_product_id', 'candidate_products.id')
                     ->where('status', 'submitted')
-                    ->whereHas('member', fn($q) => $q->where('count_evaluations', true)),
+                    ->whereIn('workgroup_member_id', $countableMemberIds),
             ])
             ->orderBy('category_id')
             ->orderByDesc('weighted_score');
