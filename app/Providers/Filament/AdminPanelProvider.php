@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Blade;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Settings;
 use App\Http\Middleware\RedirectTrainingUsers;
+use App\Filament\Admin\Pages\EquipmentIntake;
 use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\TodoOverviewWidget;
@@ -62,6 +63,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 Pages\Dashboard::class,
+                EquipmentIntake::class,
             ])
             ->widgets([
                 FleetStatsWidget::class,
@@ -131,6 +133,11 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->group('External Tools')
                     ->sort(99),
+                NavigationItem::make('Snipe-IT Inventory')
+                    ->url('https://inventory.mbfdhub.com/', shouldOpenInNewTab: true)
+                    ->icon('heroicon-o-cube')
+                    ->group('Inventory & Logistics')
+                    ->sort(10),
             ])
             ->renderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_BEFORE,

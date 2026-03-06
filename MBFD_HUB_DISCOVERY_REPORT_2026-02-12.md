@@ -1,7 +1,7 @@
 # MBFD HUB — CURRENT STATE REPORT
 **Generated**: 2026-02-12 20:18 EST  
-**Last Updated**: 2026-03-05 23:45 EST  
-**Status**: ALL SYSTEMS OPERATIONAL ✅ (Pump Simulator V2 + Workgroup/Eval Feedback Hub + CSV/XLSX Export + Google Sheets Apparatus Sync + Workgroup AI Evaluation System + Session Results Page Rebuild)
+**Last Updated**: 2026-03-06 15:30 EST  
+**Status**: ALL SYSTEMS OPERATIONAL ✅ (Pump Simulator V2 + Workgroup/Eval Feedback Hub + CSV/XLSX Export + Google Sheets Apparatus Sync + Workgroup AI Evaluation System + Session Results Page Rebuild + Equipment Intake + Snipe-IT SSO)
 
 **Original Mission**: Produce READ-ONLY technical discovery for: (1) MBFD Hub dual-host migration (2) Redesign "inventory request" into "station on-hand count" system with PIN-gated stations, threshold alerts, and admin workflow.
 
@@ -376,6 +376,70 @@ The application now has **three Filament panels** (plus one public SPA):
 - Normal Livewire/Filament v3 widget polling behavior
 
 **GitHub Commit**: `c36c5cf6`
+
+---
+
+### 🆕 NEW (2026-03-06 Evening): Phase 4 — Equipment Intake UI + Snipe-IT Integration
+
+**Equipment Intake Custom Page** ✅ (Admin Panel):
+- **URL**: `/admin/equipment-intake`
+- **File**: [`app/Filament/Admin/Pages/EquipmentIntake.php`](app/Filament/Admin/Pages/EquipmentIntake.php)
+- **View**: [`resources/views/filament/admin/pages/equipment-intake.blade.php`](resources/views/filament/admin/pages/equipment-intake.blade.php)
+- **Navigation**: "Inventory & Logistics" sidebar group
+- **Access**: `super_admin`, `admin`, `logistics_admin`
+
+**Mode A — AI Camera Scan**:
+- HTML5 camera capture with `capture="environment"` for mobile rear camera
+- Alpine.js component converts photo to Base64 and POSTs to Cloudflare Vision Worker
+- **Vision Worker**: `https://vision-agent.pdarleyjr.workers.dev` — returns `{brand, model, serial}`
+- Pre-fills form fields; user reviews, selects Location (required), then "Approve & Save"
+- Saves asset to Snipe-IT via `SnipeItService::createAsset()`
+- Seamless loop: clears form (keeps location) for next scan
+
+**Mode B — Bulk / Manual Entry**:
+- Rapid-entry grid for consumables/tools without serial numbers
+- Dynamic add/remove rows with Item Name, Quantity, Category, Notes
+- Single location selector; "Submit All to Snipe-IT" creates assets in batch
+
+**Snipe-IT Service**:
+- [`app/Services/SnipeItService.php`](app/Services/SnipeItService.php) — API client
+- [`config/snipeit.php`](config/snipeit.php) — configuration
+- **Internal API**: `http://snipeit:80/api/v1/` (Docker)
+- **External API**: `https://inventory.mbfdhub.com/api/v1/`
+- Env vars: `SNIPEIT_API_URL`, `SNIPEIT_API_TOKEN`
+
+**Responsive Design**: Mobile-first layout with stacked fields on small screens, grid on desktop. Tab switcher between AI Scan and Bulk modes.
+
+---
+
+### 🆕 Equipment Intake UI Fixes + Snipe-IT SAML SSO (2026-03-06 Evening)
+
+**UI Fixes** ✅:
+- Moved `equipmentScanner()` Alpine.js component from inline `<script>` to `@push('scripts')` for proper Filament asset loading
+- Refactored `submitBulkItems()` to use `bulkCreateAssets()` instead of N+1 `createAsset()` calls per quantity unit
+
+**Snipe-IT Navigation Link** ✅:
+- Added "Snipe-IT Inventory" (`https://inventory.mbfdhub.com/`) to admin sidebar under "Inventory & Logistics"
+
+**Admin Role Verification** ✅:
+- New artisan command: `php artisan mbfd:ensure-admin-roles`
+- Ensures 5 specified users (Miguel Anchia, Richard Quintela, Peter Darley, Grecia Trabanino, Gerald DeYoung) have admin-level roles
+
+**Snipe-IT SAML SSO** ✅:
+- **Method**: SAML 2.0 — MBFD Hub as IdP, Snipe-IT as SP
+- **Package**: `codegreencreative/laravel-samlidp`
+- **Config**: [`config/samlidp.php`](config/samlidp.php)
+- **Setup Guide**: [`docs/SNIPEIT_SSO_SETUP.md`](docs/SNIPEIT_SSO_SETUP.md)
+- Snipe-IT natively supports SAML SP — no code changes to Snipe-IT needed
+- IdP metadata available at `https://www.mbfdhub.com/saml/metadata`
+
+**Files Added/Modified**:
+| File | Purpose |
+|---|---|
+| [`app/Console/Commands/EnsureAdminRoles.php`](app/Console/Commands/EnsureAdminRoles.php) | Admin role verification command |
+| [`config/samlidp.php`](config/samlidp.php) | SAML IdP configuration |
+| [`docs/SNIPEIT_SSO_SETUP.md`](docs/SNIPEIT_SSO_SETUP.md) | SSO setup guide |
+| [`app/Providers/Filament/AdminPanelProvider.php`](app/Providers/Filament/AdminPanelProvider.php) | Snipe-IT nav link |
 
 ---
 

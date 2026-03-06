@@ -62,3 +62,11 @@ AI_AGENT_ERRORS.md
 # Local credentials and secrets (NEVER commit)
 .local/
 pics/
+
+# MCP local artifacts
+/.ai/mcp/**
+/.kilocode/mcp.local.json
+
+# Prevent accidental in-workspace local-rag storage
+/lancedb/
+/models/
