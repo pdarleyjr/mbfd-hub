@@ -77,6 +77,34 @@ class SnipeItService
     }
 
     /**
+     * Create a location in Snipe-IT.
+     */
+    public function createLocation(string $name): array
+    {
+        try {
+            $response = Http::withToken($this->token)
+                ->timeout($this->timeout)
+                ->accept('application/json')
+                ->post("{$this->baseUrl}/locations", [
+                    'name' => $name,
+                ]);
+
+            if ($response->successful()) {
+                Log::info('Snipe-IT location created', ['response' => $response->json()]);
+                return ['success' => true, 'data' => $response->json()];
+            }
+
+            return [
+                'success' => false,
+                'error' => $response->json('messages') ?? $response->body(),
+            ];
+        } catch (\Exception $e) {
+            Log::error('Snipe-IT create location error', ['message' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
      * Get locations from Snipe-IT for dropdown.
      */
     public function getLocations(): array
@@ -105,8 +133,9 @@ class SnipeItService
             2 => 'Station 2',
             3 => 'Station 3',
             4 => 'Station 4',
-            5 => 'Warehouse',
-            6 => 'Shop',
+            5 => 'Supply Room',
+            6 => 'Station 6',
+            7 => 'Shop',
         ];
     }
 

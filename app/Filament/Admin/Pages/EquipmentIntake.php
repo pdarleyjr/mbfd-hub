@@ -36,6 +36,9 @@ class EquipmentIntake extends Page implements HasForms
     public array $bulk_items = [];
     public ?string $bulk_location = null;
 
+    // Shared: new location creation
+    public ?string $new_location_name = null;
+
     public static function canAccess(): bool
     {
         $user = auth()->user();
@@ -222,6 +225,47 @@ class EquipmentIntake extends Page implements HasForms
         if (count($this->bulk_items) > 1) {
             unset($this->bulk_items[$index]);
             $this->bulk_items = array_values($this->bulk_items);
+        }
+    }
+
+    /**
+     * Create a new location in Snipe-IT and select it.
+     */
+    public function createNewLocation(): void
+    {
+        if (empty($this->new_location_name)) {
+            Notification::make()
+                ->title('Location name required')
+                ->body('Please enter a name for the new location.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        $snipeIt = app(SnipeItService::class);
+        $result = $snipeIt->createLocation($this->new_location_name);
+
+        if ($result['success']) {
+            $newId = $result['data']['payload']['id'] ?? $result['data']['id'] ?? null;
+            Notification::make()
+                ->title('Location Created')
+                ->body("'{$this->new_location_name}' has been created in Snipe-IT.")
+                ->success()
+                ->send();
+
+            // Auto-select the new location
+            if ($newId) {
+                $this->scan_location = (string) $newId;
+                $this->bulk_location = (string) $newId;
+            }
+            $this->new_location_name = null;
+        } else {
+            $error = is_array($result['error']) ? json_encode($result['error']) : $result['error'];
+            Notification::make()
+                ->title('Failed to create location')
+                ->body($error)
+                ->danger()
+                ->send();
         }
     }
 
