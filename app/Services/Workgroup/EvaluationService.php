@@ -264,8 +264,7 @@ class EvaluationService
     {
         $submission = EvaluationSubmission::where('workgroup_member_id', $member->id)
             ->where('candidate_product_id', $productId)
-            ->where('status', 'draft')
-            ->first();
+            ->first(); // No status filter — find ANY existing submission (ERROR-010 fix)
 
         if (!$submission) {
             $submission = EvaluationSubmission::create([
