@@ -6,10 +6,12 @@ use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
@@ -21,7 +23,7 @@ class UserResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return auth()->user()?->hasAnyRole(['super_admin', 'admin']) ?? false;
     }
 
     public static function form(Form $form): Form
@@ -42,6 +44,8 @@ class UserResource extends Resource
                             ->password()
                             ->required(fn ($context) => $context === 'create')
                             ->dehydrated(fn ($state) => filled($state))
+                            ->dehydrateStateUsing(fn ($state) => Hash::make($state))
+                            ->helperText(fn ($context) => $context === 'edit' ? 'Leave blank to keep current password. Enter a new value to change it.' : null)
                             ->maxLength(255),
                     ])
                     ->columns(2),
@@ -100,6 +104,33 @@ class UserResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('resetPassword')
+                    ->label('Reset Password')
+                    ->icon('heroicon-o-key')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->form([
+                        Forms\Components\TextInput::make('new_password')
+                            ->label('New Password')
+                            ->password()
+                            ->required()
+                            ->minLength(6)
+                            ->confirmed(),
+                        Forms\Components\TextInput::make('new_password_confirmation')
+                            ->label('Confirm Password')
+                            ->password()
+                            ->required(),
+                    ])
+                    ->action(function (User $record, array $data): void {
+                        $record->update([
+                            'password' => Hash::make($data['new_password']),
+                        ]);
+                        Notification::make()
+                            ->title("Password reset for {$record->name}")
+                            ->success()
+                            ->send();
+                    })
+                    ->visible(fn () => auth()->user()?->hasAnyRole(['super_admin', 'admin'])),
                 Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
@@ -127,6 +158,6 @@ class UserResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->check(); // Temporarily allow all authenticated users
+        return auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false;
     }
 }
