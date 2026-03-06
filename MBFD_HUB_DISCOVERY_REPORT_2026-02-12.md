@@ -331,6 +331,28 @@ The application now has **three Filament panels** (plus one public SPA):
 
 **GitHub Commits**: `671a4ac3`, `da0268b7`, `66df0cc2`, `4fd153bc`
 
+### 🆕 NEW (2026-03-06): Count Evaluations Toggle + Admin Password Reset
+
+**Count Evaluations Toggle** ✅:
+- `count_evaluations` boolean on `workgroup_members` table (default: true)
+- Inline `ToggleColumn` on Workgroup Members table for instant toggling
+- When OFF: member's submissions excluded from ALL results, rankings, analytics, progress %, AI reports
+- Members retain full access — only their data impact is removed
+- All query layers updated: `EvaluationService`, `WorkgroupAIService`, `FinalistsWidget`, `SessionResultsPage`
+
+**Admin Password Reset** ✅:
+- Users resource now visible in admin sidebar (`super_admin`, `admin`)
+- "Reset Password" action with confirmation modal (password + confirm fields, min 6 chars)
+- Edit form password helper text for clarity
+- Passwords are bcrypt-hashed — cannot be viewed, only reset
+
+**AI Report Scope Change** ✅:
+- Executive report AI prompt updated: focuses on data analysis only
+- No procurement/purchasing recommendations or "next steps" suggestions
+- Analyzes uploaded files, evaluation scores, patterns, and consensus
+
+**GitHub Commits**: `e63d8dc5`, `62b8d11e`
+
 ---
 
 **END OF DISCOVERY REPORT**

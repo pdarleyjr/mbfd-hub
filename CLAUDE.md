@@ -271,7 +271,7 @@ If `InspectionResource` or `StationResource/RelationManagers/InventorySubmission
 # 
 # ### Cloudflare works illustrated with a diagram (omitted for formatting):  
 # [Diagram of Cloudflare Workers and Vectorize Indexes]  
-# |                         |аниюстрация             |                               |–––––––––––––––––––––| volticheska careless |Võtivad andmed|Ятира набъл_seed|ʼ.splitext(d)’|
+# |                         |аниюстрация             |                               |–––––––––––––––––––––| volticheska careless |Võтivad andmed|Ятира набъл_seed|ʼ.splitext(d)’|
 # |———————————————————–|—————————————————–|—————————————————-|——————————————|[Cloudflare Worker|None|Handled by YakshOhkLee (https://github.com/yakshohklee)||
 # |ER Workgroup Workshop     |[https://docs.google.com/forms/d/|                               || grads|JSON|CSV|API|
 # |Session Log               |[https://docs.google.com/forms/d/|                               || grads|JSON|CSV|API|
@@ -548,3 +548,41 @@ WORKGROUP_AI_WORKER_URL=https://mbfd-workgroup-ai.pdarleyjr.workers.dev
 
 ### VPS Commit
 `be0f4c30` — feat: workgroup AI eval system + chatbot optimization
+
+---
+
+## Count Evaluations Toggle (2026-03-06)
+
+### Overview
+Admins can toggle whether a workgroup member's evaluations count toward results, analytics, and AI reports. This allows admin/observer accounts to have full access but not pollute the committee data.
+
+### Implementation
+- **Migration**: `2026_03_06_000001_add_count_evaluations_to_workgroup_members.php` — adds `count_evaluations` boolean (default: true)
+- **Model**: `WorkgroupMember` — added `count_evaluations` to fillable/casts, added `scopeCountable()`
+- **Admin UI**: `WorkgroupMemberResource` — `ToggleColumn::make('count_evaluations')` for inline toggling + form field
+- **EvaluationService**: All query methods (`getCategoryRankings`, `getNonRankableFeedback`, `getSessionProgress`, `getProductStats`) filter by `whereHas('member', fn($q) => $q->where('count_evaluations', true))`
+- **WorkgroupAIService**: `analyzeProduct()`, `buildCategoriesForReport()`, `buildOverallStats()` all filter by countable members
+- **FinalistsWidget**: Subqueries filter by countable members
+- **SessionResultsPage**: SAVER breakdown queries filter by countable members
+
+### Usage
+1. Go to Admin Panel → Workgroup Members
+2. Toggle "Count Evals" to OFF for observer/admin accounts (e.g., peterdarley, grecia)
+3. Their submissions are immediately excluded from all results, rankings, progress %, and AI reports
+4. They can still access, submit, and view evaluations — their data just doesn't affect the official results
+
+---
+
+## Admin Password Management (2026-03-06)
+
+### Overview
+Admin users can now reset passwords for any user directly from the Users resource.
+
+### Implementation
+- **UserResource**: Now visible in admin sidebar for `super_admin` and `admin` roles
+- **Reset Password Action**: Table action with key icon — opens a confirmation modal with password + confirmation fields
+- **Edit form**: Password field on edit shows helpful text "Leave blank to keep current password"
+- **Security**: Password is hashed with `Hash::make()` before storage; only `super_admin` and `admin` can see/use the reset action
+
+### Note on Viewing Passwords
+Passwords are stored as bcrypt hashes (one-way) — they **cannot be viewed**. The only option is to reset them. This is standard security practice.
