@@ -158,6 +158,7 @@ class SessionResultsPage extends Page
                 $product = $item['product'];
                 $submissions = EvaluationSubmission::where('candidate_product_id', $product->id)
                     ->where('status', 'submitted')
+                    ->whereHas('member', fn($q) => $q->where('count_evaluations', true))
                     ->get();
 
                 return array_merge($item, [

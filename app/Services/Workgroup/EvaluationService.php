@@ -13,6 +13,17 @@ class EvaluationService
 {
     protected int $minimumResponseThreshold = 3;
 
+    /**
+     * Base scope for submissions that should count toward results.
+     * Excludes members where count_evaluations = false.
+     */
+    protected function countableSubmissions(): \Illuminate\Database\Eloquent\Builder
+    {
+        return EvaluationSubmission::whereHas('member', function ($q) {
+            $q->where('count_evaluations', true);
+        });
+    }
+
     public function setMinimumResponseThreshold(int $threshold): self
     {
         $this->minimumResponseThreshold = $threshold;
@@ -55,7 +66,8 @@ class EvaluationService
     {
         $query = CandidateProduct::where('category_id', $categoryId)
             ->with(['category', 'submissions' => function ($q) use ($sessionId) {
-                $q->where('status', 'submitted');
+                $q->where('status', 'submitted')
+                  ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true));
                 if ($sessionId) {
                     $q->whereHas('candidateProduct', fn($sq) => $sq->where('workgroup_session_id', $sessionId));
                 }
@@ -134,12 +146,13 @@ class EvaluationService
         $feedback = collect();
 
         foreach ($nonRankableCategories as $category) {
-            $submissions = EvaluationSubmission::whereHas('candidateProduct', function ($q) use ($category, $sessionId) {
-                $q->where('category_id', $category->id);
-                if ($sessionId) {
-                    $q->where('workgroup_session_id', $sessionId);
-                }
-            })->where('status', 'submitted')->with(['member.user', 'candidateProduct', 'comments'])->get();
+            $submissions = $this->countableSubmissions()
+                ->whereHas('candidateProduct', function ($q) use ($category, $sessionId) {
+                    $q->where('category_id', $category->id);
+                    if ($sessionId) {
+                        $q->where('workgroup_session_id', $sessionId);
+                    }
+                })->where('status', 'submitted')->with(['member.user', 'candidateProduct', 'comments'])->get();
 
             if ($submissions->isNotEmpty()) {
                 $categoryFeedback = $submissions->map(function ($submission) use ($category) {
@@ -206,11 +219,11 @@ class EvaluationService
         }
         
         $totalProducts = $query->count();
-        $totalMembers = WorkgroupMember::where('is_active', true)->count();
+        $totalMembers = WorkgroupMember::where('is_active', true)->where('count_evaluations', true)->count();
         $maxSubmissions = $totalProducts * $totalMembers;
 
         $baseQuery = function () use ($sessionId) {
-            return EvaluationSubmission::whereHas('candidateProduct', function ($q) use ($sessionId) {
+            return $this->countableSubmissions()->whereHas('candidateProduct', function ($q) use ($sessionId) {
                 if ($sessionId) {
                     $q->where('workgroup_session_id', $sessionId);
                 }
@@ -305,7 +318,8 @@ class EvaluationService
     {
         $product = CandidateProduct::with('category')->findOrFail($productId);
         
-        $submissions = EvaluationSubmission::where('candidate_product_id', $productId)
+        $submissions = $this->countableSubmissions()
+            ->where('candidate_product_id', $productId)
             ->where('status', 'submitted')
             ->get();
 

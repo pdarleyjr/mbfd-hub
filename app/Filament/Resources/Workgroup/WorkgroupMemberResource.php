@@ -77,6 +77,10 @@ class WorkgroupMemberResource extends Resource
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),
+                        Forms\Components\Toggle::make('count_evaluations')
+                            ->label('Count Evaluations')
+                            ->helperText('When OFF, this member\'s submissions are excluded from results, rankings, analytics, and AI reports.')
+                            ->default(true),
                     ])
                     ->columns(2),
             ]);
@@ -108,6 +112,13 @@ class WorkgroupMemberResource extends Resource
                 Tables\Columns\IconColumn::make('is_active')
                     ->boolean()
                     ->label('Active'),
+                Tables\Columns\ToggleColumn::make('count_evaluations')
+                    ->label('Count Evals')
+                    ->sortable()
+                    ->afterStateUpdated(function ($record) {
+                        // Clear AI caches when toggling so reports refresh
+                        \Illuminate\Support\Facades\Cache::forget("workgroup_ai_exec_report_{$record->workgroup_id}");
+                    }),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
