@@ -17,7 +17,7 @@ class EquipmentIntake extends Page implements HasForms
     protected static ?string $navigationLabel = 'Equipment Intake';
     protected static ?string $title = 'Equipment Intake';
     protected static ?string $slug = 'equipment-intake';
-    protected static ?string $navigationGroup = 'Inventory & Logistics';
+    protected static ?string $navigationGroup = 'Equipment and Inventory';
     protected static ?int $navigationSort = 5;
 
     protected static string $view = 'filament.admin.pages.equipment-intake';
@@ -94,10 +94,12 @@ class EquipmentIntake extends Page implements HasForms
         $snipeIt = app(SnipeItService::class);
 
         $result = $snipeIt->createAsset([
-            'brand' => $this->scan_brand,
-            'model' => $this->scan_model,
-            'serial' => $this->scan_serial,
+            'brand'       => $this->scan_brand,
+            'model'       => $this->scan_model,
+            'serial'      => $this->scan_serial,
             'location_id' => $this->scan_location,
+            'notes'       => $this->scan_notes,
+            'category'    => 'General',
         ]);
 
         if ($result['success']) {
@@ -163,17 +165,38 @@ class EquipmentIntake extends Page implements HasForms
         $successCount = 0;
         $failCount = 0;
 
-        // Build flat array of asset payloads, expanding quantity
+        // Build payloads. Consumables use qty; hardware items expand individually.
+        $consumableCategories = ['Consumable', 'Medical', 'Medical Supply'];
         $assetPayloads = [];
         foreach ($validItems as $item) {
-            $qty = max(1, (int) ($item['quantity'] ?? 1));
-            for ($i = 0; $i < $qty; $i++) {
+            $qty          = max(1, (int) ($item['quantity'] ?? 1));
+            $categoryName = $item['category'] ?? 'General';
+            $isConsumable = in_array($categoryName, $consumableCategories, true);
+
+            if ($isConsumable) {
+                // One consumable entry with qty
                 $assetPayloads[] = [
-                    'brand' => $item['category'] ?? 'Consumable',
-                    'model' => $item['name'],
-                    'serial' => null,
+                    'name'        => $item['name'],
+                    'model'       => $item['name'],
+                    'category'    => $categoryName,
+                    'qty'         => $qty,
+                    'notes'       => $item['notes'] ?? '',
+                    'serial'      => null,
                     'location_id' => $this->bulk_location,
                 ];
+            } else {
+                // Hardware: create one asset per unit
+                for ($i = 0; $i < $qty; $i++) {
+                    $assetPayloads[] = [
+                        'name'        => $item['name'],
+                        'model'       => $item['name'],
+                        'category'    => $categoryName,
+                        'qty'         => 1,
+                        'notes'       => $item['notes'] ?? '',
+                        'serial'      => null,
+                        'location_id' => $this->bulk_location,
+                    ];
+                }
             }
         }
 
