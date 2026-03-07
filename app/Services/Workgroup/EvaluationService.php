@@ -8,6 +8,7 @@ use App\Models\EvaluationScore;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupMember;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class EvaluationService
 {
@@ -255,9 +256,52 @@ class EvaluationService
 
         if ($sessionId) {
             $query->where('workgroup_session_id', $sessionId);
+
+            // Enforce attendance: only show products from sessions the member attended.
+            // Members who already have submissions for this session retain access regardless.
+            if (!$this->canMemberAccessSession($member, $sessionId)) {
+                return collect(); // No access — return empty list
+            }
         }
 
         return $query->orderBy('category_id')->orderBy('name')->get();
+    }
+
+    /**
+     * Check whether a workgroup member is allowed to access (view/submit)
+     * evaluations for a given session.
+     *
+     * Access is granted if EITHER:
+     *   a) The member is in the attendance pivot table for that session, OR
+     *   b) The member already has an existing evaluation submission for that
+     *      session (backfill / historical data preservation).
+     *
+     * Admins / facilitators are never blocked — only base 'member' role.
+     */
+    public function canMemberAccessSession(WorkgroupMember $member, int $sessionId): bool
+    {
+        // Admins and facilitators always have access
+        if (in_array($member->role, ['admin', 'facilitator'])) {
+            return true;
+        }
+
+        // Check attendance pivot table
+        $inAttendance = DB::table('session_workgroup_member_attendance')
+            ->where('workgroup_session_id', $sessionId)
+            ->where('workgroup_member_id', $member->id)
+            ->exists();
+
+        if ($inAttendance) {
+            return true;
+        }
+
+        // Backfill safety: if the member already has any submission for this session
+        // (e.g., historical data), grant read/edit access even if not in attendance table.
+        $hasExistingSubmission = EvaluationSubmission::where('workgroup_member_id', $member->id)
+            ->whereHas('candidateProduct', fn($q) => $q->where('workgroup_session_id', $sessionId))
+            ->exists();
+
+        return $hasExistingSubmission;
     }
 
     public function getOrCreateDraft(WorkgroupMember $member, int $productId): EvaluationSubmission

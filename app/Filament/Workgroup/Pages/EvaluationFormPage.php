@@ -83,6 +83,24 @@ class EvaluationFormPage extends Page
         $this->assessmentProfile = $this->product->category->getRawOriginal('assessment_profile') ?? 'generic_apparatus';
         $this->criteriaByBucket = UniversalEvaluationRubric::getCriteriaByBucket($this->assessmentProfile);
 
+        // ---------------------------------------------------------------
+        // ATTENDANCE CHECK — enforce that base members can only evaluate
+        // products from sessions they attended (or already have evaluated).
+        // Admins and facilitators are never blocked.
+        // ---------------------------------------------------------------
+        $sessionId = $this->product->workgroup_session_id;
+        if ($sessionId && $this->member->role === 'member') {
+            if (!$this->evaluationService->canMemberAccessSession($this->member, $sessionId)) {
+                Notification::make()
+                    ->title('Access Denied')
+                    ->body('You do not have attendance for this session and therefore cannot evaluate its products.')
+                    ->danger()
+                    ->send();
+                $this->redirect(Evaluations::getUrl());
+                return;
+            }
+        }
+
         foreach ($this->criteriaByBucket as $bucket => $bucketCriteria) {
             foreach ($bucketCriteria as $id => $criterion) {
                 $this->criteria[$id] = $criterion;
@@ -91,10 +109,6 @@ class EvaluationFormPage extends Page
 
         $this->submission = $this->evaluationService->getOrCreateDraft($this->member, $this->productId);
         $this->submissionId = $this->submission->id;
-
-        if ($this->submission->isSubmitted()) {
-            $this->isReadOnly = true;
-        }
 
         $this->loadExistingData();
         $this->checkCanSubmit();
@@ -283,7 +297,6 @@ class EvaluationFormPage extends Page
         try {
             $this->submission->update(['status' => 'submitted', 'submitted_at' => now()]);
             $this->submission->refresh();
-            $this->isReadOnly = true;
             Notification::make()->title('Evaluation Submitted')->success()->send();
         } catch (\Exception $e) {
             Notification::make()->title('Failed')->body($e->getMessage())->danger()->send();
