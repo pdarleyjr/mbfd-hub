@@ -64,15 +64,14 @@ class WorkgroupSessionResource extends Resource
                             ->label('Attending Members')
                             ->relationship(
                                 name: 'attendees',
-                                titleAttribute: 'name',
-                                modifyQueryUsing: fn (Builder $query, Forms\Get $get) =>
+                                titleAttribute: 'id',
+                                modifyQueryUsing: fn (\Illuminate\Database\Eloquent\Builder $query) =>
                                     $query->where('is_active', true)
                                           ->whereNotNull('user_id')
-                                          ->when(
-                                              $get('workgroup_id'),
-                                              fn (Builder $q, $id) => $q->where('workgroup_id', $id)
-                                          )
                                           ->with('user')
+                            )
+                            ->getOptionLabelFromRecordUsing(fn (WorkgroupMember $record) =>
+                                $record->user?->name ?? "Member #{$record->id}"
                             )
                             ->columns(2)
                             ->searchable()
