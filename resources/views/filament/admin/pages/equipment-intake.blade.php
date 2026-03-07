@@ -2,13 +2,13 @@
     {{-- Tab Switcher --}}
     <div x-data="{ activeTab: 'scan' }" class="space-y-6">
         {{-- Tab Navigation --}}
-        <div class="flex gap-2 border-b border-gray-200 pb-0">
+        <div class="flex gap-2 border-b border-gray-200 pb-0 overflow-x-auto">
             <button
                 @click="activeTab = 'scan'"
                 :class="activeTab === 'scan'
                     ? 'border-primary-500 text-primary-600 font-semibold'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                class="px-4 py-3 text-sm border-b-2 transition-colors flex items-center gap-2"
+                class="px-4 py-3 text-sm border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap"
             >
                 <x-heroicon-o-camera class="w-5 h-5" />
                 <span>AI Camera Scan</span>
@@ -18,10 +18,20 @@
                 :class="activeTab === 'bulk'
                     ? 'border-primary-500 text-primary-600 font-semibold'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                class="px-4 py-3 text-sm border-b-2 transition-colors flex items-center gap-2"
+                class="px-4 py-3 text-sm border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap"
             >
                 <x-heroicon-o-table-cells class="w-5 h-5" />
                 <span>Bulk / Manual Entry</span>
+            </button>
+            <button
+                @click="activeTab = 'ai_bulk'"
+                :class="activeTab === 'ai_bulk'
+                    ? 'border-primary-500 text-primary-600 font-semibold'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                class="px-4 py-3 text-sm border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap"
+            >
+                <x-heroicon-o-sparkles class="w-5 h-5" />
+                <span>AI Bulk Import</span>
             </button>
         </div>
 
@@ -400,6 +410,240 @@
                 </div>
             </div>
         </div>
+
+        {{-- ============================================================ --}}
+        {{-- MODE C: AI Bulk Import --}}
+        {{-- ============================================================ --}}
+        <div x-show="activeTab === 'ai_bulk'" x-cloak>
+            <div
+                x-data="aiBulkScanner()"
+                class="space-y-6"
+            >
+                {{-- Upload Section --}}
+                <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-violet-50 text-violet-600">
+                            <x-heroicon-o-sparkles class="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-950">AI Bulk Import</h3>
+                            <p class="text-sm text-gray-500">Select up to 20 photos of <strong>different</strong> tools. The AI will analyze each photo and populate a grid for you to review before submitting.</p>
+                        </div>
+                    </div>
+
+                    {{-- File picker --}}
+                    <label class="fi-btn fi-btn-size-md relative inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors bg-violet-600 text-white hover:bg-violet-500 cursor-pointer">
+                        <x-heroicon-o-photo class="w-5 h-5" />
+                        <span>Select Equipment Photos</span>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            class="sr-only"
+                            @change="startBulkAnalysis($event)"
+                            x-ref="bulkInput"
+                        />
+                    </label>
+
+                    {{-- Progress bar --}}
+                    <template x-if="totalImages > 0">
+                        <div class="mt-4">
+                            <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                                <span x-text="`Analyzed ${doneImages} of ${totalImages} photos`"></span>
+                                <span x-show="doneImages === totalImages && totalImages > 0" class="text-success-600 font-medium">✓ Complete</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                    class="bg-violet-600 h-2 rounded-full transition-all duration-300"
+                                    :style="`width: ${totalImages > 0 ? Math.round((doneImages / totalImages) * 100) : 0}%`"
+                                ></div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                {{-- Global Location + Apply --}}
+                <template x-if="$wire.ai_bulk_items.length > 0">
+                    <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+                            <div class="flex-1 max-w-xs" x-data="{ showNewLoc: false }">
+                                <label class="fi-fo-field-wrp-label text-sm font-medium text-gray-950 block mb-1">
+                                    Apply Location to All <span class="text-danger-600">*</span>
+                                </label>
+                                <div x-show="!showNewLoc">
+                                    <select
+                                        wire:model="ai_bulk_global_location"
+                                        class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                                    >
+                                        <option value="">Select location...</option>
+                                        @foreach($this->locations as $id => $name)
+                                            <option value="{{ $id }}">{{ $name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="button" @click="showNewLoc = true" class="mt-1 text-xs text-primary-600 hover:underline">+ Create new location</button>
+                                </div>
+                                <div x-show="showNewLoc" class="space-y-2">
+                                    <input type="text" wire:model="new_location_name"
+                                        class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-sm"
+                                        placeholder="New location name..." />
+                                    <div class="flex gap-2">
+                                        <button type="button" wire:click="createNewLocation" class="text-xs text-success-600 hover:underline">Save</button>
+                                        <button type="button" @click="showNewLoc = false" class="text-xs text-gray-500 hover:underline">Cancel</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                wire:click="applyGlobalLocationToBulk"
+                                class="fi-btn fi-btn-size-md relative inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold shadow-sm bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50"
+                            >
+                                <x-heroicon-o-arrow-down-on-square-stack class="w-5 h-5" />
+                                Apply to All Rows
+                            </button>
+                        </div>
+                    </div>
+                </template>
+
+                {{-- Results Grid --}}
+                <template x-if="$wire.ai_bulk_items.length > 0">
+                    <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-base font-semibold text-gray-950">
+                                Review & Edit (<span x-text="$wire.ai_bulk_items.length"></span> items)
+                            </h3>
+                            <button
+                                type="button"
+                                wire:click="resetAiBulk"
+                                class="text-sm text-gray-400 hover:text-danger-600 transition"
+                            >Clear All</button>
+                        </div>
+
+                        {{-- Row list --}}
+                        <div class="space-y-4">
+                            @forelse($ai_bulk_items as $idx => $row)
+                                <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start p-4 rounded-xl bg-gray-50 ring-1 ring-gray-100">
+
+                                    {{-- Thumbnail --}}
+                                    <div class="sm:col-span-1 flex items-center justify-center">
+                                        @if(!empty($row['thumbnail']))
+                                            <img src="{{ $row['thumbnail'] }}" class="w-16 h-16 object-cover rounded-lg ring-1 ring-gray-200" />
+                                        @else
+                                            <div class="w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400">
+                                                <x-heroicon-o-photo class="w-8 h-8" />
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    {{-- Error --}}
+                                    @if(!empty($row['error']))
+                                        <div class="sm:col-span-10 flex items-center gap-2 text-sm text-danger-600 p-2 bg-danger-50 rounded-lg">
+                                            <x-heroicon-o-exclamation-triangle class="w-4 h-4 flex-shrink-0" />
+                                            {{ $row['error'] }}
+                                        </div>
+                                    @else
+                                        {{-- Brand --}}
+                                        <div class="sm:col-span-2">
+                                            <label class="text-xs font-medium text-gray-500 mb-1 block">Brand</label>
+                                            <input type="text" wire:model="ai_bulk_items.{{ $idx }}.brand"
+                                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-sm"
+                                                placeholder="Brand" />
+                                        </div>
+
+                                        {{-- Model --}}
+                                        <div class="sm:col-span-2">
+                                            <label class="text-xs font-medium text-gray-500 mb-1 block">Model</label>
+                                            <input type="text" wire:model="ai_bulk_items.{{ $idx }}.model"
+                                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-sm"
+                                                placeholder="Model" />
+                                        </div>
+
+                                        {{-- Serial --}}
+                                        <div class="sm:col-span-2">
+                                            <label class="text-xs font-medium text-gray-500 mb-1 block">Serial #</label>
+                                            <input type="text" wire:model="ai_bulk_items.{{ $idx }}.serial"
+                                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-sm"
+                                                placeholder="Serial" />
+                                        </div>
+
+                                        {{-- Category --}}
+                                        <div class="sm:col-span-2">
+                                            <label class="text-xs font-medium text-gray-500 mb-1 block">Category</label>
+                                            <select wire:model="ai_bulk_items.{{ $idx }}.category"
+                                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-sm">
+                                                <option value="General">General</option>
+                                                <option value="Tool">Tool</option>
+                                                <option value="PPE">PPE</option>
+                                                <option value="Electronics">Electronics</option>
+                                                <option value="Hose">Hose / Fitting</option>
+                                                <option value="Medical">Medical Supply</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        </div>
+
+                                        {{-- Location per row --}}
+                                        <div class="sm:col-span-2">
+                                            <label class="text-xs font-medium text-gray-500 mb-1 block">Location</label>
+                                            <select wire:model="ai_bulk_items.{{ $idx }}.location_id"
+                                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-sm">
+                                                <option value="">Select...</option>
+                                                @foreach($this->locations as $id => $name)
+                                                    <option value="{{ $id }}">{{ $name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    @endif
+
+                                    {{-- Remove --}}
+                                    <div class="sm:col-span-1 flex items-center justify-end">
+                                        <button
+                                            type="button"
+                                            wire:click="removeAiBulkRow({{ $idx }})"
+                                            class="text-gray-400 hover:text-danger-600 transition p-1"
+                                            title="Remove row"
+                                        >
+                                            <x-heroicon-o-x-circle class="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            @empty
+                                {{-- empty state handled by x-if above --}}
+                            @endforelse
+                        </div>
+
+                        {{-- Submit --}}
+                        <div class="mt-6 flex flex-col sm:flex-row gap-3">
+                            <button
+                                type="button"
+                                wire:click="submitAiBulkItems"
+                                wire:loading.attr="disabled"
+                                class="fi-btn fi-btn-size-md relative inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold shadow-sm bg-primary-600 text-white hover:bg-primary-500 disabled:opacity-50"
+                            >
+                                <x-heroicon-o-arrow-up-tray class="w-5 h-5" />
+                                <span wire:loading.remove wire:target="submitAiBulkItems">Submit All to Snipe-IT</span>
+                                <span wire:loading wire:target="submitAiBulkItems">Submitting...</span>
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="resetAiBulk"
+                                class="fi-btn fi-btn-size-md relative inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold shadow-sm bg-white text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50"
+                            >
+                                <x-heroicon-o-arrow-path class="w-5 h-5" />
+                                Start Over
+                            </button>
+                        </div>
+                    </div>
+                </template>
+
+                {{-- Empty state --}}
+                <template x-if="$wire.ai_bulk_items.length === 0 && totalImages === 0">
+                    <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-12 text-center">
+                        <x-heroicon-o-sparkles class="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                        <p class="text-sm text-gray-500">Select photos above to get started. The AI will fill in Brand, Model, and Serial Number for each tool automatically.</p>
+                    </div>
+                </template>
+            </div>
+        </div>
+
     </div>
 
     {{-- Alpine.js: AI Camera Scanner Component --}}
@@ -501,6 +745,90 @@
                     this.scanError = null;
                     if (this.$refs.cameraInput) this.$refs.cameraInput.value = '';
                     if (this.$refs.galleryInput) this.$refs.galleryInput.value = '';
+                },
+            };
+        }
+
+        // -----------------------------------------------------------------------
+        // AI Bulk Scanner — Mode C
+        // -----------------------------------------------------------------------
+        function aiBulkScanner() {
+            return {
+                totalImages: 0,
+                doneImages: 0,
+
+                async startBulkAnalysis(event) {
+                    const files = Array.from(event.target.files).slice(0, 20);
+                    if (!files.length) return;
+
+                    this.totalImages = files.length;
+                    this.doneImages  = 0;
+
+                    // Reset the file input so the same file can be re-selected
+                    event.target.value = '';
+
+                    // Process sequentially to avoid hammering the Worker and
+                    // to keep Livewire calls ordered
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const thumbnail = URL.createObjectURL(file);
+
+                        try {
+                            const base64 = await this.fileToBase64(file);
+
+                            const response = await fetch('https://vision-agent.pdarleyjr.workers.dev', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ image: base64 }),
+                            });
+
+                            if (!response.ok) throw new Error(`Vision API ${response.status}`);
+
+                            const data = await response.json();
+
+                            await @this.aiBulkAddResult(
+                                data.brand || 'Unknown',
+                                data.model || 'Unknown',
+                                data.serial || 'Unknown',
+                                thumbnail,
+                                -1
+                            );
+                        } catch (err) {
+                            await @this.aiBulkRowError(
+                                'Scan failed: ' + err.message,
+                                -1
+                            );
+                        }
+
+                        this.doneImages++;
+                    }
+                },
+
+                fileToBase64(file) {
+                    return new Promise((resolve, reject) => {
+                        // Compress before sending: canvas rescale to max 1024px
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const img = new Image();
+                            img.onload = () => {
+                                const MAX = 1024;
+                                let w = img.width, h = img.height;
+                                if (w > MAX || h > MAX) {
+                                    if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+                                    else        { w = Math.round(w * MAX / h); h = MAX; }
+                                }
+                                const canvas = document.createElement('canvas');
+                                canvas.width = w; canvas.height = h;
+                                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                                // Return raw base64 (no data-URI prefix)
+                                resolve(canvas.toDataURL('image/jpeg', 0.80).split(',')[1]);
+                            };
+                            img.onerror = reject;
+                            img.src = e.target.result;
+                        };
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
                 },
             };
         }
