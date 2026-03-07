@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\DB;
 /**
  * Widget showing per-session completion progress, evaluator status,
  * and products evaluated.
+ *
+ * IMPORTANT (2026-03-07 fix — ERROR-014): member counts now scoped to
+ * session_workgroup_member_attendance pivot table, not all active members.
  */
 class SessionProgressWidget extends BaseWidget
 {
@@ -33,15 +36,24 @@ class SessionProgressWidget extends BaseWidget
         }
 
         $totalProducts = $session->candidateProducts()->count();
-        $totalMembers = WorkgroupMember::where('is_active', true)->where('count_evaluations', true)->count();
-        
-        // Get completed submissions count — only from countable members
-        $countableMemberIds = WorkgroupMember::where('is_active', true)
-            ->where('count_evaluations', true)
-            ->pluck('id');
-        
+
+        // Count only members who: (a) attended this session AND (b) have count_evaluations=true.
+        // Fallback to all active countable members if attendance table is empty for this session.
+        $attendingMemberIds = $this->getAttendingMemberIds($session);
+
+        if (empty($attendingMemberIds)) {
+            // No attendance configured yet — fall back gracefully
+            $attendingMemberIds = WorkgroupMember::where('is_active', true)
+                ->where('count_evaluations', true)
+                ->pluck('id')
+                ->toArray();
+        }
+
+        $totalMembers = count($attendingMemberIds);
+
+        // Get completed submissions — only from attending countable members
         $completedSubmissions = EvaluationSubmission::where('status', 'submitted')
-            ->whereIn('workgroup_member_id', $countableMemberIds)
+            ->whereIn('workgroup_member_id', $attendingMemberIds)
             ->whereHas('candidateProduct', fn($q) => 
                 $q->where('workgroup_session_id', $session->id)
             )
@@ -52,9 +64,6 @@ class SessionProgressWidget extends BaseWidget
         $completionPercentage = $totalPossible > 0 
             ? round(($completedSubmissions / $totalPossible) * 100, 1) 
             : 0;
-
-        // Get evaluator breakdown
-        $evaluatorStats = $this->getEvaluatorStats($session);
 
         return [
             Stat::make('Session', $session->name)
@@ -68,7 +77,7 @@ class SessionProgressWidget extends BaseWidget
                 ->color('info'),
 
             Stat::make('Evaluators', $totalMembers)
-                ->description('Active members')
+                ->description('Attending members')
                 ->descriptionIcon('heroicon-o-users')
                 ->color('primary'),
 
@@ -82,17 +91,40 @@ class SessionProgressWidget extends BaseWidget
                 ->descriptionIcon('heroicon-o-check-circle')
                 ->color('success'),
 
-            Stat::make('Pending', $totalPossible - $completedSubmissions)
+            Stat::make('Pending', max(0, $totalPossible - $completedSubmissions))
                 ->description('Awaiting submission')
-                ->descriptionIcon('heroicon-o-clock')
-                ->color('warning'),
+                ->descriptionIcon('heroicon-o-clock'),
         ];
     }
 
-    protected function getEvaluatorStats(WorkgroupSession $session): array
+    /**
+     * Get IDs of members who attended the given session and have count_evaluations=true.
+     */
+    protected function getAttendingMemberIds(WorkgroupSession $session): array
     {
+        return WorkgroupMember::where('is_active', true)
+            ->where('count_evaluations', true)
+            ->whereHas('sessionsAttended', fn($q) =>
+                $q->where('workgroup_sessions.id', $session->id)
+            )
+            ->pluck('id')
+            ->toArray();
+    }
+
+    /**
+     * Get per-evaluator breakdown, scoped to attending members only.
+     *
+     * @param int[] $attendingMemberIds
+     */
+    protected function getEvaluatorStats(WorkgroupSession $session, array $attendingMemberIds): array
+    {
+        if (empty($attendingMemberIds)) {
+            return [];
+        }
+
         $members = WorkgroupMember::where('is_active', true)
             ->where('count_evaluations', true)
+            ->whereIn('id', $attendingMemberIds)
             ->with(['submissions' => fn($q) => 
                 $q->whereHas('candidateProduct', fn($sq) => 
                     $sq->where('workgroup_session_id', $session->id)
@@ -102,11 +134,11 @@ class SessionProgressWidget extends BaseWidget
 
         $stats = [];
         foreach ($members as $member) {
-            $completed = $member->submissions()->where('status', 'submitted')->count();
+            $completed = $member->submissions->where('status', 'submitted')->count();
             $total = $session->candidateProducts()->count();
             
             $stats[] = [
-                'name' => $member->user->name ?? 'Unknown',
+                'name' => $member->user?->name ?? 'Unknown',
                 'completed' => $completed,
                 'total' => $total,
                 'percentage' => $total > 0 ? round(($completed / $total) * 100) : 0,

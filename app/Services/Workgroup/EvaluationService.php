@@ -220,7 +220,32 @@ class EvaluationService
         }
         
         $totalProducts = $query->count();
-        $totalMembers = WorkgroupMember::where('is_active', true)->where('count_evaluations', true)->count();
+
+        // When a specific session is requested, count only the members who
+        // attended that session (per the attendance pivot table) and also
+        // have count_evaluations=true.
+        // If no sessionId is provided (global view), fall back to all active
+        // countable members.
+        if ($sessionId) {
+            $totalMembers = WorkgroupMember::where('is_active', true)
+                ->where('count_evaluations', true)
+                ->whereHas('sessionsAttended', fn($q) =>
+                    $q->where('workgroup_sessions.id', $sessionId)
+                )
+                ->count();
+
+            // If attendance table is empty for this session (e.g. admin hasn't
+            // configured it yet), fall back gracefully to all countable members
+            // so the display isn't broken.
+            if ($totalMembers === 0) {
+                $totalMembers = WorkgroupMember::where('is_active', true)
+                    ->where('count_evaluations', true)
+                    ->count();
+            }
+        } else {
+            $totalMembers = WorkgroupMember::where('is_active', true)->where('count_evaluations', true)->count();
+        }
+
         $maxSubmissions = $totalProducts * $totalMembers;
 
         $baseQuery = function () use ($sessionId) {
