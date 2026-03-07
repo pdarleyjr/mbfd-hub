@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WorkgroupSession extends Model
@@ -86,5 +87,18 @@ class WorkgroupSession extends Model
     public function isActive(): bool
     {
         return $this->status === 'active';
+    }
+
+    /**
+     * Get all workgroup members who attended this session (pivot table).
+     */
+    public function attendees(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            WorkgroupMember::class,
+            'session_workgroup_member_attendance',
+            'workgroup_session_id',
+            'workgroup_member_id'
+        )->withTimestamps();
     }
 }

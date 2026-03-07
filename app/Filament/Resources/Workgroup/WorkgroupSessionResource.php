@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Workgroup;
 
 use App\Filament\Resources\Workgroup\Pages;
 use App\Models\Workgroup;
+use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -38,7 +39,8 @@ class WorkgroupSessionResource extends Resource
                             ->label('Workgroup')
                             ->options(fn () => Workgroup::orderBy('name')->pluck('name', 'id'))
                             ->searchable()
-                            ->required(),
+                            ->required()
+                            ->live(),
                         Forms\Components\DatePicker::make('start_date')
                             ->label('Start Date'),
                         Forms\Components\DatePicker::make('end_date')
@@ -46,14 +48,36 @@ class WorkgroupSessionResource extends Resource
                         Forms\Components\Select::make('status')
                             ->label('Status')
                             ->options([
-                                'draft' => 'Draft',
-                                'active' => 'Active',
+                                'draft'     => 'Draft',
+                                'active'    => 'Active',
                                 'completed' => 'Completed',
                             ])
                             ->default('draft')
                             ->required(),
                     ])
                     ->columns(2),
+
+                Forms\Components\Section::make('Session Attendance')
+                    ->description('Select the workgroup members who attended this session. Only these members will be able to evaluate session products.')
+                    ->schema([
+                        Forms\Components\CheckboxList::make('attendees')
+                            ->label('Attending Members')
+                            ->relationship(
+                                name: 'attendees',
+                                titleAttribute: 'name',
+                                modifyQueryUsing: fn (Builder $query, Forms\Get $get) =>
+                                    $query->where('is_active', true)
+                                          ->whereNotNull('user_id')
+                                          ->when(
+                                              $get('workgroup_id'),
+                                              fn (Builder $q, $id) => $q->where('workgroup_id', $id)
+                                          )
+                                          ->with('user')
+                            )
+                            ->columns(2)
+                            ->searchable()
+                            ->helperText('Check all members who physically attended this session day.'),
+                    ]),
             ]);
     }
 
@@ -166,6 +190,13 @@ class WorkgroupSessionResource extends Resource
             'create' => Pages\CreateWorkgroupSession::route('/create'),
             'view' => Pages\ViewWorkgroupSession::route('/{record}'),
             'edit' => Pages\EditWorkgroupSession::route('/{record}/edit'),
+        ];
+    }
+
+    public static function getRelationManagers(): array
+    {
+        return [
+            \App\Filament\Resources\Workgroup\RelationManagers\AttendanceRelationManager::class,
         ];
     }
 

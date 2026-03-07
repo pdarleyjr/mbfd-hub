@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WorkgroupMember extends Model
@@ -22,6 +23,20 @@ class WorkgroupMember extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'count_evaluations' => 'boolean',
+    ];
+
+    /**
+     * Virtual 'name' attribute — returns the linked user's display name.
+     * Used by Filament forms (CheckboxList / Select relationship lookups).
+     * NOTE: must NOT use int type hint (AI_AGENT_ERRORS.md ERROR-002 pattern).
+     */
+    public function getNameAttribute($value = null): string
+    {
+        return $this->user?->name ?? "Member #{$this->id}";
+    }
+
+    protected $appends = [
+        'name',
     ];
 
     /**
@@ -94,5 +109,18 @@ class WorkgroupMember extends Model
     public function isFacilitator(): bool
     {
         return in_array($this->role, ['admin', 'facilitator']);
+    }
+
+    /**
+     * Get all sessions this member attended (pivot table).
+     */
+    public function sessionsAttended(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            \App\Models\WorkgroupSession::class,
+            'session_workgroup_member_attendance',
+            'workgroup_member_id',
+            'workgroup_session_id'
+        )->withTimestamps();
     }
 }
