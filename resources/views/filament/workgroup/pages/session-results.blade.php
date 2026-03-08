@@ -173,6 +173,90 @@
     </div>
     @endif
 
+    {{-- 🛒 Brand Group Purchase Analysis --}}
+    @if(!empty($brandGroupedAnalysis) && $session)
+    <div class="mt-6">
+        <div class="mb-4 flex items-center gap-3">
+            <div class="w-9 h-9 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Package Purchase Recommendation</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Brand rankings by composite score — best value when purchasing a complete tool set from a single manufacturer for fleet consistency</p>
+            </div>
+        </div>
+
+        @foreach($brandGroupedAnalysis as $group)
+        <div class="fi-section rounded-xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 mb-4 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-amber-50 dark:bg-amber-950/20">
+                <h3 class="text-base font-semibold text-amber-900 dark:text-amber-200">{{ $group['category_name'] }}</h3>
+                <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                    {{ $group['brand_count'] }} brands · {{ $group['total_products'] }} products compared
+                    — composite score averages all brand product evaluations
+                </p>
+            </div>
+            <div class="p-4">
+                @foreach($group['brand_rankings'] as $rank => $brandData)
+                @php
+                    $isTop = $rank === 0;
+                    $medal = match($rank) { 0 => '🥇', 1 => '🥈', 2 => '🥉', default => '#'.($rank+1) };
+                @endphp
+                <div class="mb-4 {{ !$loop->last ? 'pb-4 border-b border-gray-100 dark:border-gray-800' : '' }}">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="text-2xl" title="Rank {{ $rank+1 }}">{{ $medal }}</span>
+                        <div class="flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-base font-bold {{ $isTop ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-gray-300' }}">
+                                    {{ $brandData['brand'] }}
+                                </span>
+                                @if($brandData['composite_score'] !== null)
+                                <span class="px-2.5 py-0.5 rounded-full text-sm font-bold
+                                    {{ $isTop ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' }}">
+                                    {{ number_format($brandData['composite_score'], 1) }} composite avg
+                                </span>
+                                @else
+                                <span class="px-2 py-0.5 rounded text-xs text-gray-400 bg-gray-100 dark:bg-gray-800">No scores yet</span>
+                                @endif
+                                @if($isTop && $brandData['composite_score'] !== null)
+                                <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
+                                    ✓ Best Complete Package
+                                </span>
+                                @endif
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                {{ $brandData['scored_product_count'] }} / {{ $brandData['product_count'] }} products have evaluation data
+                            </p>
+                        </div>
+                    </div>
+                    {{-- Per-product breakdown --}}
+                    <div class="ml-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        @foreach($brandData['product_scores'] as $ps)
+                        <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-xs">
+                            <span class="text-gray-600 dark:text-gray-400 truncate mr-2">{{ $ps['product']->name }}</span>
+                            @if($ps['avg_score'] !== null)
+                            <span class="font-semibold flex-shrink-0
+                                {{ $ps['avg_score'] >= 70 ? 'text-green-600 dark:text-green-400' : ($ps['avg_score'] >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">
+                                {{ number_format($ps['avg_score'], 1) }}
+                            </span>
+                            @else
+                            <span class="text-gray-300 flex-shrink-0">—</span>
+                            @endif
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            <div class="px-6 py-3 bg-amber-50/50 dark:bg-amber-950/10 border-t border-gray-100 dark:border-gray-800">
+                <p class="text-xs text-gray-600 dark:text-gray-400">
+                    <strong>⚠️ Package Purchase Note:</strong> Individual tools from different manufacturers may score higher in isolation (e.g. a member's preferred cutter is TNT), but the composite ranking above reflects the best-value choice when procuring a <em>complete {{ $group['category_name'] }}</em> set from one vendor — accounting for fleet consistency, training standardization, and parts/maintenance alignment.
+                </p>
+            </div>
+        </div>
+        @endforeach
+    </div>
+    @endif
+
     {{-- Footer Widgets (Finalists Table) --}}
     <div class="mt-6">
         <x-filament-widgets::widgets

@@ -1,0 +1,15 @@
+{
+  "name": "vision-agent",
+  "version": "1.0.0",
+  "description": "MBFD Hub Vision Agent — AI-powered equipment image analysis Worker",
+  "main": "src/index.ts",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241205.0",
+    "typescript": "^5.5.2",
+    "wrangler": "^3.99.0"
+  }
+}

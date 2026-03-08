@@ -18,7 +18,7 @@ class EquipmentIntake extends Page implements HasForms
     protected static ?string $title = 'Equipment Intake';
     protected static ?string $slug = 'equipment-intake';
     protected static ?string $navigationGroup = 'Inventory & Logistics';
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 10;
 
     protected static string $view = 'filament.admin.pages.equipment-intake';
 
@@ -35,6 +35,10 @@ class EquipmentIntake extends Page implements HasForms
     // Mode B: Bulk import state
     public array $bulk_items = [];
     public ?string $bulk_location = null;
+
+    // Mode C: AI Bulk Import state
+    public array $ai_bulk_items = [];   // each row: {thumbnail, brand, model, serial, category, notes, location_id, processing, error}
+    public ?string $ai_bulk_global_location = null;
 
     // Shared: new location creation
     public ?string $new_location_name = null;
@@ -54,6 +58,7 @@ class EquipmentIntake extends Page implements HasForms
         $this->bulk_items = [
             ['name' => '', 'quantity' => 1, 'category' => '', 'notes' => ''],
         ];
+        $this->ai_bulk_items = [];
     }
 
     /**
@@ -94,10 +99,12 @@ class EquipmentIntake extends Page implements HasForms
         $snipeIt = app(SnipeItService::class);
 
         $result = $snipeIt->createAsset([
-            'brand' => $this->scan_brand,
-            'model' => $this->scan_model,
-            'serial' => $this->scan_serial,
+            'brand'       => $this->scan_brand,
+            'model'       => $this->scan_model,
+            'serial'      => $this->scan_serial,
             'location_id' => $this->scan_location,
+            'notes'       => $this->scan_notes,
+            'category'    => 'General',
         ]);
 
         if ($result['success']) {
@@ -163,17 +170,38 @@ class EquipmentIntake extends Page implements HasForms
         $successCount = 0;
         $failCount = 0;
 
-        // Build flat array of asset payloads, expanding quantity
+        // Build payloads. Consumables use qty; hardware items expand individually.
+        $consumableCategories = ['Consumable', 'Medical', 'Medical Supply'];
         $assetPayloads = [];
         foreach ($validItems as $item) {
-            $qty = max(1, (int) ($item['quantity'] ?? 1));
-            for ($i = 0; $i < $qty; $i++) {
+            $qty          = max(1, (int) ($item['quantity'] ?? 1));
+            $categoryName = $item['category'] ?? 'General';
+            $isConsumable = in_array($categoryName, $consumableCategories, true);
+
+            if ($isConsumable) {
+                // One consumable entry with qty
                 $assetPayloads[] = [
-                    'brand' => $item['category'] ?? 'Consumable',
-                    'model' => $item['name'],
-                    'serial' => null,
+                    'name'        => $item['name'],
+                    'model'       => $item['name'],
+                    'category'    => $categoryName,
+                    'qty'         => $qty,
+                    'notes'       => $item['notes'] ?? '',
+                    'serial'      => null,
                     'location_id' => $this->bulk_location,
                 ];
+            } else {
+                // Hardware: create one asset per unit
+                for ($i = 0; $i < $qty; $i++) {
+                    $assetPayloads[] = [
+                        'name'        => $item['name'],
+                        'model'       => $item['name'],
+                        'category'    => $categoryName,
+                        'qty'         => 1,
+                        'notes'       => $item['notes'] ?? '',
+                        'serial'      => null,
+                        'location_id' => $this->bulk_location,
+                    ];
+                }
             }
         }
 
@@ -228,6 +256,178 @@ class EquipmentIntake extends Page implements HasForms
         }
     }
 
+    // =========================================================================
+    // Mode C: AI Bulk Import
+    // =========================================================================
+
+    /**
+     * Called from Alpine.js when the AI has finished analyzing one image in bulk mode.
+     * Adds a new row to the ai_bulk_items array with the returned data.
+     *
+     * @param string $brand
+     * @param string $model
+     * @param string $serial
+     * @param string $thumbnail  data-URI thumbnail of the image
+     * @param int    $index      which slot to update (-1 = append new row)
+     */
+    public function aiBulkAddResult(string $brand, string $model, string $serial, string $thumbnail, int $index = -1): void
+    {
+        $row = [
+            'thumbnail'   => $thumbnail,
+            'brand'       => $brand !== 'Unknown' ? $brand : '',
+            'model'       => $model !== 'Unknown' ? $model : '',
+            'serial'      => $serial !== 'Unknown' ? $serial : '',
+            'category'    => 'General',
+            'notes'       => '',
+            'location_id' => $this->ai_bulk_global_location ?? '',
+            'error'       => null,
+        ];
+
+        if ($index >= 0 && isset($this->ai_bulk_items[$index])) {
+            $this->ai_bulk_items[$index] = $row;
+        } else {
+            $this->ai_bulk_items[] = $row;
+        }
+    }
+
+    /**
+     * Called from Alpine.js when a single bulk scan fails.
+     */
+    public function aiBulkRowError(string $message, int $index = -1): void
+    {
+        $row = [
+            'thumbnail'   => '',
+            'brand'       => '',
+            'model'       => '',
+            'serial'      => '',
+            'category'    => 'General',
+            'notes'       => '',
+            'location_id' => $this->ai_bulk_global_location ?? '',
+            'error'       => $message,
+        ];
+
+        if ($index >= 0 && isset($this->ai_bulk_items[$index])) {
+            $this->ai_bulk_items[$index] = array_merge($this->ai_bulk_items[$index], ['error' => $message]);
+        } else {
+            $this->ai_bulk_items[] = $row;
+        }
+    }
+
+    /**
+     * Apply the global location to all AI bulk rows.
+     */
+    public function applyGlobalLocationToBulk(): void
+    {
+        if (empty($this->ai_bulk_global_location)) return;
+
+        $this->ai_bulk_items = array_map(function ($item) {
+            $item['location_id'] = $this->ai_bulk_global_location;
+            return $item;
+        }, $this->ai_bulk_items);
+    }
+
+    /**
+     * Remove a row from the AI bulk grid.
+     */
+    public function removeAiBulkRow(int $index): void
+    {
+        unset($this->ai_bulk_items[$index]);
+        $this->ai_bulk_items = array_values($this->ai_bulk_items);
+    }
+
+    /**
+     * Submit all AI bulk rows to Snipe-IT.
+     */
+    public function submitAiBulkItems(): void
+    {
+        $validItems = array_filter($this->ai_bulk_items, function ($item) {
+            return !empty($item['brand']) || !empty($item['model']) || !empty($item['serial']);
+        });
+
+        if (empty($validItems)) {
+            Notification::make()
+                ->title('No Items')
+                ->body('Please scan some equipment photos first.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        // Validate all rows have a location
+        $missingLocation = false;
+        foreach ($validItems as $item) {
+            if (empty($item['location_id'])) {
+                $missingLocation = true;
+                break;
+            }
+        }
+
+        if ($missingLocation) {
+            Notification::make()
+                ->title('Location Required')
+                ->body('Please assign a location to all items before submitting. Use "Apply to All" for bulk assignment.')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $snipeIt = app(SnipeItService::class);
+
+        $assetPayloads = array_map(fn($item) => [
+            'brand'       => $item['brand'] ?: 'Unknown',
+            'model'       => $item['model'] ?: ($item['brand'] ?: 'Unknown Equipment'),
+            'serial'      => $item['serial'] ?: null,
+            'category'    => $item['category'] ?: 'General',
+            'notes'       => $item['notes'] ?? '',
+            'location_id' => $item['location_id'],
+            'qty'         => 1,
+        ], array_values($validItems));
+
+        $results = $snipeIt->bulkCreateAssets($assetPayloads);
+
+        $successCount = 0;
+        $failCount    = 0;
+        foreach ($results as $result) {
+            if ($result['success']) {
+                $successCount++;
+            } else {
+                $failCount++;
+                Log::warning('AI Bulk Import row failed', $result);
+            }
+        }
+
+        if ($successCount > 0) {
+            Notification::make()
+                ->title('AI Bulk Import Complete')
+                ->body("{$successCount} item(s) logged to Snipe-IT." . ($failCount > 0 ? " {$failCount} failed — check logs." : ''))
+                ->success()
+                ->send();
+        } else {
+            Notification::make()
+                ->title('AI Bulk Import Failed')
+                ->body("All {$failCount} item(s) failed to save.")
+                ->danger()
+                ->send();
+        }
+
+        if ($successCount > 0) {
+            $this->ai_bulk_items = [];
+        }
+    }
+
+    /**
+     * Reset the AI bulk import grid.
+     */
+    public function resetAiBulk(): void
+    {
+        $this->ai_bulk_items = [];
+        $this->ai_bulk_global_location = null;
+    }
+
+    // =========================================================================
+    // Shared helpers
+    // =========================================================================
+
     /**
      * Create a new location in Snipe-IT and select it.
      */
@@ -257,6 +457,7 @@ class EquipmentIntake extends Page implements HasForms
             if ($newId) {
                 $this->scan_location = (string) $newId;
                 $this->bulk_location = (string) $newId;
+                $this->ai_bulk_global_location = (string) $newId;
             }
             $this->new_location_name = null;
         } else {
