@@ -1,21 +1,19 @@
 /**
- * MBFD Hub — Vision Agent Worker
- * Cloudflare Worker for AI-powered equipment image analysis.
+ * MBFD Hub — Vision Agent Worker v2
+ * ==================================
+ * AI-powered equipment image analysis using
+ * @cf/meta/llama-3.2-11b-vision-instruct
+ * (best free-tier vision model on Cloudflare Workers AI)
  *
- * Primary model:  @cf/llava-hf/llava-1.5-7b-hf
- *   - input: { image: number[], prompt: string, max_tokens: number }
- *   - no Terms of Service gate
+ * ToS accepted 2026-03-08 via: POST { "prompt": "agree" }
  *
- * Fallback model: @cf/meta/llama-3.2-11b-vision-instruct
- *   - requires prior `{ prompt: "agree" }` submission (done)
- *   - input: { messages: [...], max_tokens: number }
+ * API:
+ *   GET  /              → health check
+ *   POST /              { image: "base64string" }
+ *                    or { images: ["b64", "b64", ...] }  (max 5)
  *
- * Accepts:
- *   GET  /    health check
- *   POST /    { image: "base64string" }  OR  { images: ["base64", ...] }
- *
- * Returns:
- *   { brand, model, serial, confidence, notes, images_analyzed }
+ * Response:
+ *   { brand, model, serial, confidence, notes, images_analyzed, raw_text }
  */
 
 interface Env {
@@ -26,22 +24,28 @@ const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Max-Age': '86400',
 };
 
-const PRIMARY_MODEL   = '@cf/llava-hf/llava-1.5-7b-hf';
-const SECONDARY_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
+/** The only model we use — best quality, free tier, ToS accepted */
+const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
 
-const EXTRACTION_PROMPT = `You are an equipment inventory assistant for the Miami Beach Fire Department. \
-Analyze this equipment image and extract the following information:
-1. Brand / Manufacturer name (e.g. Scott, MSA, Motorola, Honeywell, Hurst)
-2. Model number or name (e.g. Air-Pak X3 Pro, G1, APX 6000)
-3. Serial number — look on labels, data plates, or asset tags
+/**
+ * Extraction prompt — instructs the model to return ONLY valid JSON.
+ * Uses short, direct phrasing for best results.
+ */
+const EXTRACTION_PROMPT = `Look at this equipment image from a fire station.
+Extract EXACTLY these fields and respond with ONLY a JSON object:
 
-Reply ONLY with a compact JSON object on a single line. No markdown, no code fences:
-{"brand":"value or empty string","model":"value or empty string","serial":"value or empty string","confidence":"high|medium|low","notes":"brief observation"}`;
+{"brand":"manufacturer name","model":"model number or name","serial":"serial number","confidence":"high|medium|low","notes":"brief observation"}
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+Rules:
+- brand: company or manufacturer (e.g. Scott, MSA, Motorola, Hurst, Honeywell, 3M, Bullard)
+- model: model number or name (e.g. Air-Pak X3, APX 6000, Jaws HD-55)
+- serial: serial number from label or data plate (starts with letters+digits)
+- confidence: high if you can clearly read labels, medium if partially visible, low if guessing
+- notes: one sentence about what you see (not more)
+- If a field is not visible or readable, use empty string ""
+- Output ONLY the JSON object, no explanation, no markdown`;
 
 function jsonResp(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -50,133 +54,145 @@ function jsonResp(data: unknown, status = 200): Response {
   });
 }
 
-/** Strip data-URI prefix and decode base64 → Uint8Array. */
-function base64ToBytes(b64: string): Uint8Array {
-  const raw = b64.includes(',') ? b64.split(',')[1] : b64;
-  const bin = atob(raw);
-  const arr = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-  return arr;
-}
-
-/** Normalise base64 → proper data-URI (llama-3.2 needs this). */
-function toDataUri(b64: string): string {
+/** Ensure base64 has a data URI prefix (required by llama-3.2 vision). */
+function ensureDataUri(b64: string): string {
   if (b64.startsWith('data:')) return b64;
+  // Detect format from magic bytes if possible, default to JPEG
   return `data:image/jpeg;base64,${b64}`;
 }
 
-/** Extract structured fields from raw AI text. */
-function parseAIOutput(raw: string): Record<string, string> {
-  let text = raw.trim();
-  // Remove markdown code fences if present
+/** Robustly parse JSON from model output (handles markdown fences, nested text, etc.). */
+function parseJSON(raw: string): Record<string, string> {
+  let text = (raw || '').trim();
+
+  // Strip markdown code fences
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
-  // Extract first JSON-ish block
-  const s = text.indexOf('{');
-  const e = text.lastIndexOf('}');
-  if (s !== -1 && e > s) text = text.slice(s, e + 1);
+
+  // Find JSON object
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    text = text.slice(start, end + 1);
+  }
 
   try {
     const obj = JSON.parse(text);
     return {
-      brand:      String(obj.brand      ?? ''),
-      model:      String(obj.model      ?? ''),
-      serial:     String(obj.serial     ?? ''),
-      confidence: String(obj.confidence ?? 'low'),
-      notes:      String(obj.notes      ?? ''),
+      brand:      String(obj.brand      ?? '').trim(),
+      model:      String(obj.model      ?? '').trim(),
+      serial:     String(obj.serial     ?? '').trim(),
+      confidence: String(obj.confidence ?? 'low').trim(),
+      notes:      String(obj.notes      ?? '').trim(),
     };
   } catch {
-    // Regex fallback
+    // Regex fallback for when model output isn't clean JSON
+    const extract = (key: string) =>
+      (text.match(new RegExp(`"${key}"\\s*:\\s*"([^"]*)"`, 'i')) ?? [])[1]?.trim() ?? '';
     return {
-      brand:      (text.match(/"brand"\s*:\s*"([^"]*)"/i)      ?? [])[1] ?? '',
-      model:      (text.match(/"model"\s*:\s*"([^"]*)"/i)      ?? [])[1] ?? '',
-      serial:     (text.match(/"serial"\s*:\s*"([^"]*)"/i)     ?? [])[1] ?? '',
-      confidence: (text.match(/"confidence"\s*:\s*"([^"]*)"/i) ?? [])[1] ?? 'low',
-      notes:      `parse error — raw: ${text.slice(0, 200)}`,
+      brand:      extract('brand'),
+      model:      extract('model'),
+      serial:     extract('serial'),
+      confidence: extract('confidence') || 'low',
+      notes:      extract('notes') || `Partial parse from: ${text.slice(0, 100)}`,
     };
   }
 }
 
-// ─── Model calls ─────────────────────────────────────────────────────────────
-
 /**
- * LLaVA 1.5 7B — image as byte array.
- * Ref: https://developers.cloudflare.com/workflows (ImageProcessingWorkflow example)
+ * Analyze a single image using llama-3.2-11b-vision-instruct.
+ *
+ * Correct format per Cloudflare docs (llama-vision-tutorial):
+ *   messages: [system + user text], image: dataUri  (top-level)
+ *
+ * OR rich-content format:
+ *   messages: [{ role: "user", content: [{ type: "text" }, { type: "image_url", image_url: { url } }] }]
  */
-async function callLlava(env: Env, b64: string): Promise<Record<string, string>> {
-  const bytes = base64ToBytes(b64);
-  const resp = await (env.AI as any).run(PRIMARY_MODEL, {
-    image:      [...bytes],   // number[]
-    prompt:     EXTRACTION_PROMPT,
-    max_tokens: 512,
-  });
-  const raw = typeof resp === 'string'
-    ? resp
-    : (resp?.description ?? resp?.response ?? JSON.stringify(resp));
-  return parseAIOutput(raw);
-}
+async function analyzeImage(env: Env, b64: string): Promise<{ parsed: Record<string, string>; rawText: string }> {
+  const dataUri = ensureDataUri(b64);
 
-/**
- * Llama 3.2 11B Vision — messages array with image_url content part.
- * Note: ToS already accepted via { prompt: "agree" }.
- */
-async function callLlama(env: Env, b64: string): Promise<Record<string, string>> {
-  const dataUri = toDataUri(b64);
-  const resp = await (env.AI as any).run(SECONDARY_MODEL, {
+  const response = await env.AI.run(VISION_MODEL, {
     messages: [
       {
         role: 'user',
         content: [
-          { type: 'text',      text: EXTRACTION_PROMPT },
+          { type: 'text', text: EXTRACTION_PROMPT },
           { type: 'image_url', image_url: { url: dataUri } },
         ],
       },
     ],
     max_tokens: 512,
   });
-  const raw = typeof resp === 'string'
-    ? resp
-    : (resp?.response ?? JSON.stringify(resp));
-  return parseAIOutput(raw);
+
+  // The model may return response.response as an OBJECT (when it correctly outputs JSON)
+  // or as a STRING (when it outputs text we need to parse)
+  if (response && typeof response === 'object' && response.response && typeof response.response === 'object') {
+    // Model returned structured JSON directly — perfect!
+    const obj = response.response as Record<string, unknown>;
+    const rawText = JSON.stringify(obj);
+    return {
+      rawText,
+      parsed: {
+        brand:      String(obj.brand      ?? '').trim(),
+        model:      String(obj.model      ?? '').trim(),
+        serial:     String(obj.serial     ?? '').trim(),
+        confidence: String(obj.confidence ?? 'low').trim(),
+        notes:      String(obj.notes      ?? '').trim(),
+      },
+    };
+  }
+
+  // Extract raw text from various possible string response shapes
+  let rawText = '';
+  if (typeof response === 'string') {
+    rawText = response;
+  } else if (response && typeof response === 'object') {
+    if (typeof response.response === 'string') {
+      rawText = response.response;
+    } else if (typeof response.description === 'string') {
+      rawText = response.description;
+    } else if (typeof response.content === 'string') {
+      rawText = response.content;
+    } else if (Array.isArray(response.choices) && response.choices[0]?.message?.content) {
+      rawText = String(response.choices[0].message.content);
+    } else if (Array.isArray(response.messages) && response.messages[0]?.content) {
+      rawText = String(response.messages[0].content);
+    } else {
+      rawText = JSON.stringify(response);
+    }
+  }
+
+  return { parsed: parseJSON(rawText || ''), rawText };
 }
 
-/** Attempt primary, then fallback. */
-async function analyzeImage(env: Env, b64: string): Promise<Record<string, string>> {
-  try {
-    return await callLlava(env, b64);
-  } catch (e1: any) {
-    console.warn(`LLaVA failed (${e1.message}), trying Llama 3.2 Vision…`);
+/**
+ * Merge results from multiple images.
+ * First non-empty value wins; upgrades confidence; appends notes.
+ */
+function merge(
+  results: Array<{ parsed: Record<string, string>; rawText: string }>
+): { parsed: Record<string, string>; rawText: string } {
+  if (results.length === 0) {
+    return { parsed: { brand: '', model: '', serial: '', confidence: 'low', notes: '' }, rawText: '' };
   }
-  try {
-    return await callLlama(env, b64);
-  } catch (e2: any) {
-    console.error(`Llama 3.2 Vision also failed: ${e2.message}`);
-    return { brand: '', model: '', serial: '', confidence: 'low', notes: `Analysis failed: ${e2.message}` };
-  }
-}
-
-/** Merge results from multiple photos (first non-empty wins per field). */
-function mergeResults(results: Record<string, string>[]): Record<string, string> {
-  if (!results.length) return { brand: '', model: '', serial: '', confidence: 'low', notes: '' };
   if (results.length === 1) return results[0];
 
   const score = (c: string) => c === 'high' ? 3 : c === 'medium' ? 2 : 1;
-  const out: Record<string, string> = { brand: '', model: '', serial: '', confidence: 'low', notes: '' };
+  const merged: Record<string, string> = { brand: '', model: '', serial: '', confidence: 'low', notes: '' };
 
-  for (const r of results) {
-    if (!out.brand  && r.brand)  out.brand  = r.brand;
-    if (!out.model  && r.model)  out.model  = r.model;
-    if (!out.serial && r.serial) out.serial = r.serial;
-    if (score(r.confidence) > score(out.confidence)) out.confidence = r.confidence;
+  for (const { parsed } of results) {
+    if (!merged.brand  && parsed.brand)  merged.brand  = parsed.brand;
+    if (!merged.model  && parsed.model)  merged.model  = parsed.model;
+    if (!merged.serial && parsed.serial) merged.serial = parsed.serial;
+    if (score(parsed.confidence) > score(merged.confidence)) merged.confidence = parsed.confidence;
   }
-  out.notes = results
-    .map((r, i) => r.notes ? `Photo ${i + 1}: ${r.notes}` : '')
+
+  merged.notes = results
+    .map((r, i) => r.parsed.notes ? `Photo ${i + 1}: ${r.parsed.notes}` : '')
     .filter(Boolean)
     .join(' | ');
 
-  return out;
+  return { parsed: merged, rawText: results.map(r => r.rawText).join('\n---\n') };
 }
-
-// ─── Entry point ─────────────────────────────────────────────────────────────
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -184,13 +200,11 @@ export default {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
-    // Health check
     if (request.method === 'GET') {
       return jsonResp({
-        status:    'ok',
-        worker:    'vision-agent',
-        model:     PRIMARY_MODEL,
-        fallback:  SECONDARY_MODEL,
+        status: 'ok',
+        worker: 'vision-agent',
+        model: VISION_MODEL,
         timestamp: new Date().toISOString(),
       });
     }
@@ -202,13 +216,13 @@ export default {
     try {
       const body = await request.json() as Record<string, unknown>;
 
-      // Normalise single/multiple image inputs
+      // Normalise to image array
       let images: string[] = [];
       if (typeof body.image === 'string' && body.image.length > 0) {
         images = [body.image as string];
       } else if (Array.isArray(body.images)) {
         images = (body.images as unknown[]).filter(
-          (x): x is string => typeof x === 'string' && x.length > 0
+          (x): x is string => typeof x === 'string' && (x as string).length > 0
         );
       }
 
@@ -219,21 +233,35 @@ export default {
         );
       }
 
-      images = images.slice(0, 5); // limit to 5 images per request
+      images = images.slice(0, 5); // safety limit
 
-      const results: Record<string, string>[] = [];
+      const results: Array<{ parsed: Record<string, string>; rawText: string }> = [];
       for (const img of images) {
-        results.push(await analyzeImage(env, img));
+        try {
+          results.push(await analyzeImage(env, img));
+        } catch (err: any) {
+          console.error('Image analysis error:', err?.message);
+          results.push({
+            parsed: { brand: '', model: '', serial: '', confidence: 'low', notes: `Failed: ${err?.message ?? 'unknown error'}` },
+            rawText: '',
+          });
+        }
       }
 
-      const merged = mergeResults(results);
-      return jsonResp({ ...merged, images_analyzed: results.length });
+      const { parsed, rawText } = merge(results);
+
+      return jsonResp({
+        brand:  parsed.brand,
+        model:  parsed.model,
+        serial: parsed.serial,
+        confidence: parsed.confidence,
+        notes:  parsed.notes,
+        images_analyzed: results.length,
+        raw_text: rawText,  // include for debugging
+      });
     } catch (err: any) {
-      console.error('Vision agent top-level error:', err);
-      return jsonResp(
-        { error: 'Vision processing failed: ' + (err?.message ?? String(err)) },
-        500
-      );
+      console.error('Worker error:', err);
+      return jsonResp({ error: `Vision processing failed: ${err?.message ?? String(err)}` }, 500);
     }
   },
-} satisfies ExportedHandler<Env>;
+};
