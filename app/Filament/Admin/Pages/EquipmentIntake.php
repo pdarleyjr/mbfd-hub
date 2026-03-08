@@ -28,6 +28,7 @@ class EquipmentIntake extends Page implements HasForms
     public ?string $scan_serial = null;
     public ?string $scan_location = null;
     public ?string $scan_notes = null;
+    public ?string $scan_type = 'hardware';  // hardware | accessory | consumable | component
     public bool $scan_processing = false;
     public ?string $scan_error = null;
     public ?string $scan_success = null;
@@ -110,6 +111,7 @@ class EquipmentIntake extends Page implements HasForms
             'location_id' => $this->scan_location,
             'notes'       => $this->scan_notes,
             'category'    => 'General',
+            'scan_type'   => $this->scan_type ?? 'hardware',
         ]);
 
         if ($result['success']) {
@@ -120,8 +122,11 @@ class EquipmentIntake extends Page implements HasForms
                 ->success()
                 ->send();
 
-            // Clear form for next scan — keep location for seamless loop
+            // Clear form for next scan — keep location and item type for seamless loop
             $this->resetScanForm();
+
+            // Notify Alpine.js to clear the camera buffer and ready the next scan
+            $this->dispatch('equipment-saved');
         } else {
             $error = is_array($result['error']) ? json_encode($result['error']) : $result['error'];
             Notification::make()
@@ -133,7 +138,7 @@ class EquipmentIntake extends Page implements HasForms
     }
 
     /**
-     * Reset the scan form for the next item (keeps location).
+     * Reset the scan form for the next item (keeps location and scan_type).
      */
     public function resetScanForm(): void
     {
@@ -144,6 +149,7 @@ class EquipmentIntake extends Page implements HasForms
         $this->scan_error = null;
         $this->scan_success = null;
         $this->scan_processing = false;
+        // NOTE: scan_location and scan_type are intentionally preserved for seamless continuous scanning
     }
 
     /**
