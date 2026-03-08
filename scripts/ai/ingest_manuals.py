@@ -34,8 +34,8 @@ CF_ACCOUNT_ID  = "265122b6d6f29457b0ca950c55f3ac6e"
 EMBED_MODEL    = "@cf/baai/bge-large-en-v1.5"
 INDEX_NAME     = "mbfd-rag-index"
 
-CHUNK_WORDS    = 600   # target words per chunk
-OVERLAP_WORDS  = 75    # word overlap between chunks
+CHUNK_WORDS    = 400   # target words per chunk (smaller = more granular, better retrieval)
+OVERLAP_WORDS  = 60    # word overlap between chunks
 BATCH_SIZE     = 50    # vectors per Vectorize insert call
 
 SOURCES = [
@@ -215,7 +215,7 @@ def run_ingestion():
                 "metadata": {
                     "source":      record["source"],
                     "chunk_index": record["chunk_index"],
-                    "text":        record["text"][:1000],  # Vectorize metadata limit ~10KB
+                    "text":        record["text"][:4000],  # Vectorize metadata limit ~10KB
                 },
             })
 
