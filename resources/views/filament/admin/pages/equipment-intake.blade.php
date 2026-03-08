@@ -171,19 +171,19 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Brand / Manufacturer</label>
-                            <input type="text" wire:model.live="scan_brand"
+                            <input type="text" wire:model="scan_brand"
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                                 style="min-height:44px;" placeholder="e.g. Scott, MSA, Motorola" />
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
-                            <input type="text" wire:model.live="scan_model"
+                            <input type="text" wire:model="scan_model"
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                                 style="min-height:44px;" placeholder="e.g. Air-Pak X3 Pro" />
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
-                            <input type="text" wire:model.live="scan_serial"
+                            <input type="text" wire:model="scan_serial"
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                                 style="min-height:44px;" placeholder="e.g. SN-2024-00123" />
                         </div>
@@ -591,18 +591,36 @@
 
                         const data = await response.json();
 
-                        // Send parsed data to Livewire
-                        this.$wire.processVisionResult(
+                        // Send parsed data to Livewire — MUST await so DOM patches apply
+                        await this.$wire.processVisionResult(
                             data.brand || '',
                             data.model || '',
-                            data.serial || ''
+                            data.serial || '',
+                            data.notes || ''
                         );
 
                         this.processing = false;
+
+                        // Show status message
+                        const extracted = [];
+                        if (data.brand)  extracted.push('Brand: ' + data.brand);
+                        if (data.model)  extracted.push('Model: ' + data.model);
+                        if (data.serial) extracted.push('Serial: ' + data.serial);
+
+                        if (extracted.length > 0) {
+                            this.scanStatus = '\u2705 AI extracted: ' + extracted.join(' · ') + ' (confidence: ' + (data.confidence || 'low') + '). Review the fields below, select a Location, and click Approve & Save.';
+                            this.scanStatusType = 'success';
+                        } else {
+                            this.scanStatus = '\u26a0\ufe0f AI analyzed the photo but could not read equipment labels (confidence: ' + (data.confidence || 'low') + '). ' + (data.notes ? 'Notes: ' + data.notes + '. ' : '') + 'Please fill in the fields manually.';
+                            this.scanStatusType = 'warn';
+                        }
+
                     } catch (err) {
                         this.processing = false;
                         this.scanError = 'AI scan failed: ' + err.message + '. You can fill in the fields manually.';
-                        this.$wire.handleScanError(err.message);
+                        this.scanStatus = '\u274c Scan failed: ' + (err.message || 'Unknown error') + '. Fill in the form manually.';
+                        this.scanStatusType = 'error';
+                        this.$wire.handleScanError(err.message || 'Unknown error');
                     }
                 },
 
