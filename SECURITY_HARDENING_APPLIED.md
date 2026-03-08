@@ -1,6 +1,6 @@
 # Security Hardening Implementation Plan
 **Date:** 2026-02-03  
-**VPS IP:** 145.223.73.170  
+**VPS IP:** [VPS_IP_REDACTED]  
 **Status:** ⏳ PENDING EXECUTION (SSH connection interrupted)
 
 ---
@@ -107,7 +107,7 @@ docker port mbfd-hub-pgsql-1
    
    # Should NOT be accessible from public
    # (Testfrom another machine)
-   telnet 145.223.73.170 5432  # Should fail/timeout
+   telnet [VPS_IP_REDACTED] 5432  # Should fail/timeout
    ```
 
 6. **Verify app can still connect (internal network):**
@@ -358,7 +358,7 @@ ss -tlnp | grep 5432
 # Should show: 127.0.0.1:5432 OR nothing for docker-proxy
 
 # From external machine:
-telnet 145.223.73.170 5432
+telnet [VPS_IP_REDACTED] 5432
 # Should: Connection refused or timeout
 ```
 

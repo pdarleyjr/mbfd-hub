@@ -21,11 +21,11 @@ This project will deploy Snipe-IT on the MBFD Hub VPS and create a dual-method e
 ### Admin Users (Pre-synced from MBFD Hub)
 | Email | Password | Role |
 |-------|----------|------|
-| MiguelAnchia@miamibeachfl.gov | Penco1 | Admin |
-| RichardQuintela@miamibeachfl.gov | Penco2 | Admin |
-| PeterDarley@miamibeachfl.gov | Penco3 | Admin |
-| GreciaTrabanino@miamibeachfl.gov | MBFDSupport! | Admin |
-| geralddeyoung@miamibeachfl.gov | MBFDGerry1 | Admin |
+| MiguelAnchia@miamibeachfl.gov | [REDACTED] | Admin |
+| RichardQuintela@miamibeachfl.gov | [REDACTED] | Admin |
+| PeterDarley@miamibeachfl.gov | [REDACTED] | Admin |
+| GreciaTrabanino@miamibeachfl.gov | [REDACTED] | Admin |
+| geralddeyoung@miamibeachfl.gov | [REDACTED] | Admin |
 
 ### Sync Configuration
 - **Direction**: One-way (MBFD Hub → Snipe-IT)

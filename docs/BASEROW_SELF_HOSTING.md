@@ -91,7 +91,7 @@ sudo systemctl reload nginx
 ### DNS Record
 Create an **A record** in Cloudflare DNS:
 - **Name:** `baserow.support`
-- **Content:** Your VPS IP (e.g., `145.223.73.170`)
+- **Content:** Your VPS IP (e.g., `[VPS_IP_REDACTED]`)
 - **Proxy:** Enabled (orange cloud)
 
 ### SSL/TLS

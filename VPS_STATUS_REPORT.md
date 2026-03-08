@@ -1,6 +1,6 @@
 # VPS Forensic Analysis Report
 **Date:** 2026-02-03  
-**VPS IP:** 145.223.73.170  
+**VPS IP:** [VPS_IP_REDACTED]  
 **Analysis Duration:** ~45 minutes  
 **System:** Ubuntu 6.8.0-87-generic (6 days uptime at time of analysis)
 

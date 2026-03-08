@@ -1,6 +1,6 @@
 # CRITICAL SECURITY INCIDENT REPORT
 ## Date: February 2, 2026
-## VPS: 145.223.73.170 (Hostinger Docker VPS)
+## VPS: [VPS_IP_REDACTED] (Hostinger Docker VPS)
 
 ---
 

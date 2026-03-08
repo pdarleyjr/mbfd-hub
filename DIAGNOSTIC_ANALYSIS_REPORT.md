@@ -2,7 +2,7 @@
 ## MBFD Support Hub - Production Admin Dashboard Authentication
 
 **Date:** 2026-01-26  
-**Server:** 145.223.73.170 (support.darleyplex.com)  
+**Server:** [VPS_IP_REDACTED] (support.darleyplex.com)  
 **Repository:** pdarleyjr/mbfd-hub  
 **Status:** ✅ RESOLVED
 
@@ -20,7 +20,7 @@ Two critical authentication issues were blocking admin dashboard access:
 Both issues have been **resolved** and admin login is now fully functional.
 
 ### Verification
-✅ Miguel Anchia successfully logged in with `MiguelAnchia@miamibeachfl.gov` / `Penco1`  
+✅ Miguel Anchia successfully logged in with `MiguelAnchia@miamibeachfl.gov` / `[REDACTED]`  
 ✅ Dashboard loaded with full admin functionality
 
 ---
@@ -97,10 +97,10 @@ $query->whereRaw('LOWER(' . $model->getAuthIdentifierName() . ') = ?', [strtolow
 
 | Email | Password | Role |
 |-------|----------|------|
-| MiguelAnchia@miamibeachfl.gov | Penco1 | Admin |
-| RichardQuintela@miamibeachfl.gov | Penco2 | Admin |
-| PeterDarley@miamibeachfl.gov | Penco3 | Admin |
-| geralddeyoung@miamibeachfl.gov | MBFDGerry1 | User |
+| MiguelAnchia@miamibeachfl.gov | [REDACTED] | Admin |
+| RichardQuintela@miamibeachfl.gov | [REDACTED] | Admin |
+| PeterDarley@miamibeachfl.gov | [REDACTED] | Admin |
+| geralddeyoung@miamibeachfl.gov | [REDACTED] | User |
 
 **Note:** Emails are case-insensitive, passwords are case-sensitive.
 

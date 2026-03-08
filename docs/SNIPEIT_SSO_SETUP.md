@@ -3,7 +3,7 @@
 ## Current Status (2026-03-06)
 
 ### ✅ Completed
-- **5 users created in Snipe-IT** with superuser permissions and password `Penco3`
+- **5 users created in Snipe-IT** with superuser permissions and password `[REDACTED]`
 - **API token generated** and configured in MBFD Hub `.env` (`SNIPEIT_API_URL`, `SNIPEIT_API_TOKEN`)
 - **SAML IdP package installed** (`codegreencreative/laravel-samlidp` v5.3) on MBFD Hub
 - **Self-signed certificate generated** at `storage/samlidp/cert.pem` and `storage/samlidp/key.pem`
@@ -20,7 +20,7 @@ The SAML IdP metadata endpoint at `/saml/metadata` is returning the **cert file 
 ### Direct Login (Working Now)
 Users can log into Snipe-IT at `https://inventory.mbfdhub.com/` with:
 - **Username**: their email prefix (e.g., `peterdarley`)
-- **Password**: `Penco3`
+- **Password**: `[REDACTED]`
 
 ## Overview
 
@@ -117,4 +117,4 @@ SNIPEIT_SAML_SLS_URL=https://inventory.mbfdhub.com/saml/sls
 | GreciaTrabanino@miamibeachfl.gov | greciatrabanino | superuser |
 | geralddeyoung@miamibeachfl.gov | geralddeyoung | superuser |
 
-All users have password: `Penco3` (should be changed on first login).
+All users have password: `[REDACTED]` (should be changed on first login).

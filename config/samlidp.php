@@ -26,26 +26,53 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Login URI
+    |--------------------------------------------------------------------------
+    | The URI for the SSO endpoint. The metadata SingleSignOnService Location
+    | will point here. Must handle SAMLRequest query parameter.
+    */
+    'login_uri' => 'saml/sso',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Issuer URI (metadata endpoint path)
+    |--------------------------------------------------------------------------
+    */
+    'issuer_uri' => 'saml/metadata',
+
+    /*
+    |--------------------------------------------------------------------------
     | Certificate & Key Paths
     |--------------------------------------------------------------------------
     | Generated via: php artisan samlidp:cert
     */
-    'cert' => storage_path('samlidp/cert.pem'),
-    'key' => storage_path('samlidp/key.pem'),
+    'cert' => 'file://' . storage_path('samlidp/cert.pem'),
+    'key' => 'file://' . storage_path('samlidp/key.pem'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Encryption & Signing
+    |--------------------------------------------------------------------------
+    */
+    'encrypt_assertion' => false,
+    'messages_signed' => true,
+    'digest_algorithm' => \RobRichards\XMLSecLibs\XMLSecurityDSig::SHA256,
 
     /*
     |--------------------------------------------------------------------------
     | Service Providers
     |--------------------------------------------------------------------------
     | Each SP that can authenticate via this IdP.
-    | The key is the SP Entity ID; the value contains the ACS URL and logout URL.
+    | The key is the base64-encoded ACS URL; the value contains the ACS URL and logout URL.
     */
     'sp' => [
         // Snipe-IT at inventory.mbfdhub.com
-        env('SNIPEIT_SAML_ENTITY_ID', 'https://inventory.mbfdhub.com') => [
+        // Key must be base64_encode of the ACS URL
+        base64_encode(env('SNIPEIT_SAML_ACS_URL', 'https://inventory.mbfdhub.com/saml/acs')) => [
             'destination' => env('SNIPEIT_SAML_ACS_URL', 'https://inventory.mbfdhub.com/saml/acs'),
             'logout' => env('SNIPEIT_SAML_SLS_URL', 'https://inventory.mbfdhub.com/saml/sls'),
             'query_params' => false,
+            'encrypt_assertion' => false,
         ],
     ],
 
@@ -76,4 +103,23 @@ return [
     */
     'perform_single_logout' => true,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Guards
+    |--------------------------------------------------------------------------
+    | List of auth guards the SAML IdP will listen to for Login/Logout events.
+    */
+    'guards' => ['web'],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Event Listeners
+    |--------------------------------------------------------------------------
+    */
+    'events' => [
+        'CodeGreenCreative\SamlIdp\Events\Assertion' => [],
+        'Illuminate\Auth\Events\Logout' => ['CodeGreenCreative\SamlIdp\Listeners\SamlLogout'],
+        'Illuminate\Auth\Events\Authenticated' => ['CodeGreenCreative\SamlIdp\Listeners\SamlAuthenticated'],
+        'Illuminate\Auth\Events\Login' => ['CodeGreenCreative\SamlIdp\Listeners\SamlLogin'],
+    ],
 ];

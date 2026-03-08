@@ -7,6 +7,7 @@ use Filament\Forms\Form;
 use Filament\Pages\Auth\Login as BaseLogin;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\RedirectResponse;
 use App\Models\User;
 
 class Login extends BaseLogin
@@ -57,6 +58,20 @@ class Login extends BaseLogin
         }
 
         session()->regenerate();
+
+        // Check for pending SAML SSO request (from Snipe-IT or other SP)
+        if (session()->has('saml_request')) {
+            $samlRequest = session()->pull('saml_request');
+            $relayState = session()->pull('saml_relay_state');
+
+            $url = url('/saml/sso') . '?' . http_build_query(array_filter([
+                'SAMLRequest' => $samlRequest,
+                'RelayState' => $relayState,
+            ]));
+
+            $this->redirect($url);
+            return null;
+        }
 
         return app(\Filament\Http\Responses\Auth\Contracts\LoginResponse::class);
     }

@@ -1,7 +1,7 @@
 # Training Panel Full Functionality Verification Report
 
 **Date:** February 9, 2026  
-**VPS:** root@145.223.73.170  
+**VPS:** root@[VPS_IP_REDACTED]  
 **Code Directory:** `/root/mbfd-hub`  
 **Environment:** Production (support.darleyplex.com)
 
@@ -39,8 +39,8 @@ content-type: text/html; charset=utf-8
 
 ### Step 3: Authenticated User Access ⚠️ MANUAL VERIFICATION REQUIRED
 **Test Credentials:**
-- danielgato@miamibeachfl.gov / Gato1234!
-- victorwhite@miamibeachfl.gov / Vic1234!
+- danielgato@miamibeachfl.gov / [REDACTED]
+- victorwhite@miamibeachfl.gov / [REDACTED]
 
 **Required Roles:** Users must have one of:
 - `super_admin`
@@ -127,7 +127,7 @@ navigationItems([
 **Alternative Verification Needed:** 
 ```bash
 # Try this command instead:
-ssh root@145.223.73.170 "cd /root/mbfd-hub && sudo -u www-data php artisan tinker --execute='echo \App\Models\ExternalNavItem::count();'"
+ssh root@[VPS_IP_REDACTED] "cd /root/mbfd-hub && sudo -u www-data php artisan tinker --execute='echo \App\Models\ExternalNavItem::count();'"
 ```
 
 OR access through application UI after logging in as training admin.
@@ -208,7 +208,7 @@ Users must have ONE of:
 ### 1. **User Access Verification (HIGH PRIORITY)**
 ```bash
 # Verify test users have correct roles:
-ssh root@145.223.73.170
+ssh root@[VPS_IP_REDACTED]
 cd /root/mbfd-hub
 sudo -u www-data php artisan tinker
 

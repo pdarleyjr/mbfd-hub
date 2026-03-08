@@ -10,6 +10,7 @@
         "appstract/laravel-stock": "^1.2",
         "barryvdh/laravel-dompdf": "^2.2",
         "bezhansalleh/filament-shield": "^3.2",
+        "codegreencreative/laravel-samlidp": "^5.3",
         "filament/filament": "^3.2",
         "laravel-notification-channels/webpush": "^10.4",
         "laravel/framework": "^11.31",

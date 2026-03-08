@@ -72,13 +72,13 @@ All 11 major tasks completed and deployed to production.
 
 ### Prerequisites
 - SSH access configured: `~/.ssh/id_ed25519_hpb_docker`
-- VPS IP: `145.223.73.170`
+- VPS IP: `[VPS_IP_REDACTED]`
 - Project path: `/var/www/mbfd-support-hub`
 
 ### Deployment Commands
 ```bash
 # 1. SSH into VPS
-ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@145.223.73.170
+ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@[VPS_IP_REDACTED]
 
 # 2. Navigate to project directory
 cd /var/www/mbfd-support-hub
@@ -202,7 +202,7 @@ cat public/daily/index.html | grep -E "\/assets\/"
 ### Quick Rollback Command
 ```bash
 # SSH to VPS
-ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@145.223.73.170
+ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@[VPS_IP_REDACTED]
 
 # Navigate to project
 cd /var/www/mbfd-support-hub

@@ -5,6 +5,10 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+# Principle of Least Privilege — restrict default token permissions
+permissions:
+  contents: read
+
 concurrency:
   group: production-deployment
   cancel-in-progress: true
@@ -12,13 +16,15 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # read code only — no write needed for deploy
     environment:
       name: production
       url: https://mbfdhub.com
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Setup SSH
         env:
@@ -95,7 +101,7 @@ jobs:
           EOF
 
       - name: Deploy Cloudflare Worker
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65  # v3.14.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: 'cloudflare-worker'

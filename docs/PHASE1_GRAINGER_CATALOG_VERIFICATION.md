@@ -62,7 +62,7 @@ This phase sets the foundation for Phase 2 (Replenishment Dashboard) and Phase 3
 **Test Case 1.1: View vendor information in Supply Items table**
 
 1. Navigate to: `https://support.darleyplex.com/admin/inventory-items`
-2. Login as admin: `MiguelAnchia@miamibeachfl.gov` / `Penco1`
+2. Login as admin: `MiguelAnchia@miamibeachfl.gov` / `[REDACTED]`
 
 **Expected Results:**
 - ✅ Table displays new "Vendor" column (between "Low Threshold" and "Active")
@@ -215,7 +215,7 @@ This phase sets the foundation for Phase 2 (Replenishment Dashboard) and Phase 3
 
 **Test Case 4.1: Disable Grainger links feature**
 
-1. SSH into VPS: `ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@145.223.73.170`
+1. SSH into VPS: `ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@[VPS_IP_REDACTED]`
 2. Edit `/root/mbfd-hub/.env`:
    ```bash
    nano /root/mbfd-hub/.env
@@ -352,7 +352,7 @@ If Phase 1 causes issues:
 
 1. **Quick rollback (zero downtime):**
    ```bash
-   ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@145.223.73.170
+   ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@[VPS_IP_REDACTED]
    cd /root/mbfd-hub
    git checkout main
    docker compose exec laravel.test php artisan migrate:rollback --step=1 --force
