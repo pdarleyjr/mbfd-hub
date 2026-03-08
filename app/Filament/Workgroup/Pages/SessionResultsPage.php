@@ -181,6 +181,7 @@ class SessionResultsPage extends Page
             'categoryResults' => $categoryResults,
             'progress' => $progress,
             'sessions' => WorkgroupSession::orderByDesc('created_at')->get(),
+            'brandGroupedAnalysis' => $evalService->getBrandGroupedAnalysis($session->id),
         ];
     }
 
