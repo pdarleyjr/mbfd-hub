@@ -283,6 +283,130 @@ Either update the `mbfd-hub-app` Dockerfile to PHP 8.4+, or remove the PHP 8.4 c
 
 ---
 
+### ERROR-008: `@this` Fails in Async Callbacks in Livewire v3 + Alpine.js
+
+**Date**: 2026-03-08  
+**Severity**: 🔴 CRITICAL — Livewire methods appear to be called but form fields never populate  
+**File(s) Affected**: `resources/views/filament/admin/pages/equipment-intake.blade.php`
+
+**Symptom**:
+User uploads photo, clicks "Analyze with AI" button — the button disappears (processing state activates), the Worker returns a response, but form fields (Brand, Model, Serial) are never populated. No feedback is shown in the UI. Silent failure.
+
+**Root Cause**:
+In Livewire v3 with Alpine.js, `@this` is a Blade directive that compiles to `window.Livewire.find('COMPONENT_ID')`. When used inside `@push('scripts')`, the function that contains `@this` calls gets exported to global scope. When the function is called asynchronously (in a `fetch` callback), the `@this` reference **works** syntactically but the Livewire update cycle doesn't correctly re-render the form because the call happens outside the Alpine.js reactive context.
+
+The correct approach in Livewire v3 is to use **`$wire`** — the Livewire magnetic property injected into Alpine.js components. `$wire` is available as `this.$wire` within Alpine.js `x-data` component methods and works correctly in async callbacks.
+
+**Wrong pattern** (`@push('scripts')`):
+```javascript
+@push('scripts')
+<script>
+function equipmentScanner() {
+    return {
+        async analyzeAllImages() {
+            const data = await response.json();
+            // WRONG — @this not reliable in async @push context
+            @this.processVisionResult(data.brand, data.model, data.serial);
+        }
+    };
+}
+</script>
+@endpush
+```
+
+**Correct pattern** (inline `x-data`, using `$wire`):
+```html
+<div x-data="{
+    async analyzeAllImages() {
+        const data = await response.json();
+        // CORRECT — $wire is Livewire v3 Alpine magic property
+        await this.$wire.processVisionResult(data.brand, data.model, data.serial, data.notes);
+    }
+}">
+```
+
+**Fix Applied**:
+1. Kept functions in `@push('scripts')` but replaced ALL `@this.xxx()` calls with `this.$wire.xxx()`
+2. Added status messages visible in the UI at each step
+3. Verified fix: `@this count: 0`, `$wire count: 4` in blade file
+
+**Prevention**:
+- **NEVER use `@this` in async functions** inside `@push('scripts')` in Livewire v3
+- **ALWAYS use `this.$wire` inside Alpine.js `x-data` component methods** for calling Livewire
+- If you must use `@push('scripts')`, use `window.Livewire.find(wireId).methodName()` instead
+- Add visible status messages so silent failures are immediately obvious during testing
+
+---
+
+### ERROR-009: Cloudflare Workers AI — llama-3.2-11b Vision Response Format
+
+**Date**: 2026-03-08  
+**Severity**: 🟡 MEDIUM — Worker returns data but it's silently dropped due to wrong extraction  
+**File(s) Affected**: `cloudflare-worker/vision-agent/src/index.ts`
+
+**Symptom**:
+Vision Worker is called and gets a 200 response from Cloudflare AI, but the extracted brand/model/serial fields are all empty strings.
+
+**Root Cause**:
+`@cf/meta/llama-3.2-11b-vision-instruct` returns the response in a nested object format:
+```json
+{
+  "response": {
+    "brand": "HURST",
+    "model": "Jaws of Life",
+    "serial": "",
+    "confidence": "low",
+    "notes": "partially visible"
+  },
+  "tool_calls": [],
+  "usage": { "prompt_tokens": 1804, "completion_tokens": 30, ... }
+}
+```
+
+**The `response` field is an OBJECT (not a string)** when the model returns properly structured JSON. Previous code only checked for string responses or `JSON.stringify(response)`.
+
+**Fix Applied**:
+Added explicit check for `response.response` being an object:
+```typescript
+if (response && typeof response === 'object' && response.response && typeof response.response === 'object') {
+    // Model returned structured JSON directly — extract fields
+    const obj = response.response as Record<string, unknown>;
+    return {
+        parsed: {
+            brand:      String(obj.brand      ?? '').trim(),
+            model:      String(obj.model      ?? '').trim(),
+            serial:     String(obj.serial     ?? '').trim(),
+            confidence: String(obj.confidence ?? 'low').trim(),
+            notes:      String(obj.notes      ?? '').trim(),
+        },
+        rawText: JSON.stringify(obj),
+    };
+}
+```
+
+**Cloudflare AI API Format Reference (llama-3.2-11b-vision)**:
+```typescript
+// CORRECT format per Cloudflare documentation:
+const response = await env.AI.run('@cf/meta/llama-3.2-11b-vision-instruct', {
+    messages: [{
+        role: 'user',
+        content: [
+            { type: 'text', text: YOUR_PROMPT },
+            { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,...' } },
+        ],
+    }],
+    max_tokens: 512,
+});
+// response.response can be string OR object depending on model output
+```
+
+**Prevention**:
+- Always handle BOTH `response.response` as string AND as object
+- Test with a real image during Worker development
+- Include `raw_text` in the API response for debugging
+
+---
+
 ### ERROR-018: Filament v3 Widgets as Livewire Children — Stale State on Parent Property Change
 **Date**: 2026-03-08
 **Root cause**: Filament v3 widgets are separate Livewire components. Passing new session props via make() sets INITIAL state only. When parent page re-renders after wire:click, widgets may NOT remount — they keep old session data.

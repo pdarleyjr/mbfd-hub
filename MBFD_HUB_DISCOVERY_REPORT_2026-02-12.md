@@ -475,4 +475,26 @@ The application now has **three Filament panels** (plus one public SPA):
 
 ---
 
+---
+
+### 🔧 Equipment Intake Pipeline — Round 2 Fixes (2026-03-08 Afternoon)
+
+**User Reported**: "Click Analyze — nothing happens, no data populates, no feedback shown."
+
+**Root Causes Identified**:
+1. `@this` in `@push('scripts')` async callbacks doesn't trigger Livewire v3 reactivity
+2. llama-3.2-11b vision API requires `image_url` in messages array (not top-level `image`)
+3. `response.response` is an object when model returns structured JSON (not just a string)
+
+**Fixes**:
+| File | Change |
+|------|--------|
+| `cloudflare-worker/vision-agent/src/index.ts` | Correct API format: messages array + image_url content type; handle object response |
+| `resources/views/filament/admin/pages/equipment-intake.blade.php` | `@this` → `this.$wire`; add status messages; add scanStatus display |
+| `app/Filament/Admin/Pages/EquipmentIntake.php` | `processVisionResult()` accepts optional `notes` parameter |
+
+**Commit**: `ec73be23` on `feat/equipment-intake-ai-bulk`
+
+**Verified**: Worker returns `{"brand":"HURST","model":"Jaws of Life",...}` from real fire equipment images.
+
 **END OF DISCOVERY REPORT**
