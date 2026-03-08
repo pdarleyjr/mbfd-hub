@@ -6,7 +6,7 @@
     - NO bare SVG heroicons for decorative large icons (use inline style for sizing)
     - All touch targets min 48px height
     - File inputs use capture="environment" for camera, multiple for gallery
---}}
+}}
 <x-filament-panels::page>
     {{-- Scoped inline styles for items not in Tailwind purge --}}
     <style>
@@ -65,12 +65,12 @@
             </button>
             <button type="button" @click="activeTab = 'bulk'"
                 :class="activeTab === 'bulk' ? 'ei-tab-btn active' : 'ei-tab-btn'">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75.125V8.25A2.25 2.25 0 014.5 6h15A2.25 2.25 0 0121.75 8.25v10.125m-18.375 1.125c0 .621.504 1.125 1.125 1.125M20.25 19.5h-1.5A1.125 1.125 0 0117.625 18.375m3.375-10.125V7.5A.75.75 0 0020.25 6.75H3.75A.75.75 0 003 7.5v.75m0 0h18m-18 0v10.125" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75.125V8.25A2.25 2.25 0 014.5 6h15A2.25 2.25 0 0121.75 8.25v.75m0 0h18m-18 0v10.125m-18.375 10.125c0 .409.504 1.125 1.125 1.125M15.75 11.125c-.753.007-1.008.252-1.008 1.125s.255 1.125 1.008 1.125m0 0h5.25M7.5 15.5V5m8.008 0H11.5a2.25 2.25 0 00-2.533 1.373L3 16.5h2.583a1.128 1.128 0 01.966 1.737M5.583 16.549l8.384-8.25a2.25 2.25 0 00-2.583-2.25M13.5l-5.159-5.159a2.25 2.25 0 012.583-2.25m8.008 0h4.967M7.5 16.5" /></svg>
                 <span>Manual Entry</span>
             </button>
             <button type="button" @click="activeTab = 'ai_bulk'"
                 :class="activeTab === 'ai_bulk' ? 'ei-tab-btn active' : 'ei-tab-btn'">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L2.25 12l2.846-.813a3.375 3.375 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" /></svg>
                 <span>AI Bulk Import</span>
             </button>
         </div>
@@ -79,7 +79,7 @@
         {{-- MODE A: AI Camera Scan --}}
         {{-- ============================================================ --}}
         <div x-show="activeTab === 'scan'" x-cloak>
-            <div x-data="equipmentScanner()" class="space-y-5">
+            <div x-data="equipmentScanner()" @equipment-saved.window="resetCapture()" class="space-y-5">
 
                 {{-- Camera Capture Card --}}
                 <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-4 sm:p-6">
@@ -166,6 +166,21 @@
                 {{-- Asset Details Form --}}
                 <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-4 sm:p-6">
                     <h3 class="text-base font-semibold text-gray-900 mb-4">Asset Details</h3>
+
+                    {{-- Item Type Selector }}
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Item Type</label>
+                        <select wire:model="scan_type"
+                            class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base sm:max-w-xs"
+                            style="min-height:44px;">
+                            <option value="hardware">Hardware Asset (tracked, has serial)</option>
+                            <option value="accessory">Accessory (consumable add-on)</option>
+                            <option value="consumable">Consumable (disposable supply)</option>
+                            <option value="component">Component (part of a larger asset)</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-400">Determines which Snipe-IT endpoint the item is saved to.</p>
+                    </div>
+
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Brand / Manufacturer</label>
@@ -321,7 +336,7 @@
                                         @if(count($bulk_items) > 1)
                                             <button type="button" wire:click="removeBulkRow({{ $index }})"
                                                 style="color:#9ca3af;padding:8px;border:none;background:none;cursor:pointer;" title="Remove">
-                                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0 -4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                             </button>
                                         @endif
                                     </div>
