@@ -93,3 +93,9 @@ budget.json
 
 # Database backups (local only)
 backups/*.sql
+
+# SAML certs (never in repo)
+storage/samlidp/
+snipeit.env
+*.pem
+*.key
