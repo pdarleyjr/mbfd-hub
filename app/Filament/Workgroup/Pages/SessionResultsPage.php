@@ -4,12 +4,6 @@ namespace App\Filament\Workgroup\Pages;
 
 use App\Filament\Workgroup\Widgets\CategoryRankingsWidget;
 use App\Filament\Workgroup\Widgets\FinalistsWidget;
-use App\Filament\Workgroup\Widgets\SessionProgressWidget;
-use App\Models\CandidateProduct;
-use App\Models\EvaluationCategory;
-use App\Models\EvaluationSubmission;
-use App\Models\WorkgroupMember;
-use App\Models\WorkgroupSession;
 use App\Services\Workgroup\EvaluationService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -96,17 +90,9 @@ class SessionResultsPage extends Page
     // ─── Header Widgets ─────────────────────────────────────────────
     protected function getHeaderWidgets(): array
     {
-        $session = $this->getSelectedSession();
-        if (!$session) {
-            // Overall Results: no session-specific progress widget
-            return [];
-        }
-
-        return [
-            SessionProgressWidget::make([
-                'session' => $session,
-            ]),
-        ];
+        // Progress stats are now rendered directly in the blade view using $progress
+        // from getViewData() — this avoids Livewire child component stale-state issues
+        return [];
     }
 
     // ─── Footer Widgets (rankings table) ────────────────────────────
