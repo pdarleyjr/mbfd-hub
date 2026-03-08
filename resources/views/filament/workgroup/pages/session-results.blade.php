@@ -35,7 +35,7 @@
     @endif
 
     {{-- Session Progress Widgets --}}
-    @if($session)
+    @if(true)
     <x-filament-widgets::widgets
         :widgets="$this->getHeaderWidgets()"
         :columns="$this->getHeaderWidgetsColumns()"
@@ -293,7 +293,7 @@
     @endif
 
     {{-- Footer Widgets (Finalists Table) --}}
-    <div class="mt-6">
+    <div class="mt-6" wire:key="finalists-{{ $selectedSessionId }}">
         <x-filament-widgets::widgets
             :widgets="$this->getFooterWidgets()"
             :columns="$this->getFooterWidgetsColumns()"
