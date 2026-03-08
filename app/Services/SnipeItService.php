@@ -46,8 +46,17 @@ class SnipeItService
 
     protected function createHardwareAsset(array $data): array
     {
-        $name = trim(($data['brand'] ?? '') . ' ' . ($data['model'] ?? ''));
-        if ($name === '' || $name === ' ') $name = 'Unknown Equipment';
+        // Asset Name: use item_name if provided, otherwise fall back to brand + model
+        $assetName = trim($data['item_name'] ?? '');
+        if ($assetName === '') {
+            $assetName = trim(($data['brand'] ?? '') . ' ' . ($data['model'] ?? ''));
+        }
+        if ($assetName === '' || $assetName === ' ') {
+            $assetName = 'Unknown Equipment';
+        }
+
+        // Category: use AI-provided category if available, otherwise fall back to data['category']
+        $categoryName = $data['category'] ?? 'General';
 
         // Resolve or create manufacturer + category + model chain
         $manufacturerId = null;
@@ -55,11 +64,15 @@ class SnipeItService
             $manufacturerId = $this->resolveOrCreateManufacturer($data['brand']);
         }
 
-        $categoryId = $this->resolveOrCreateCategory($data['category'] ?? 'General', 'asset');
-        $modelId    = $this->resolveOrCreateModel($name, $manufacturerId, $categoryId);
+        $categoryId = $this->resolveOrCreateCategory($categoryName, 'asset');
+
+        // Model name uses brand + model number for lookup/creation
+        $modelName = trim(($data['brand'] ?? '') . ' ' . ($data['model'] ?? ''));
+        if ($modelName === '' || $modelName === ' ') $modelName = $assetName;
+        $modelId = $this->resolveOrCreateModel($modelName, $manufacturerId, $categoryId);
 
         $payload = [
-            'name'           => $name,
+            'name'           => $assetName,
             'serial'         => $data['serial'] ?? null,
             'status_id'      => $data['status_id'] ?? 2,  // Ready to Deploy
             'rtd_location_id'=> $data['location_id'] ?? null,

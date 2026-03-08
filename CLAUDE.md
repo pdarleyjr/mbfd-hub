@@ -237,7 +237,7 @@ If `InspectionResource` or `StationResource/RelationManagers/InventorySubmission
 - **2026-03-05 Rebuild**: Full page rebuild with header stats widgets, SAVER score breakdown table, AI report panel, Filament v3 `Action` + `Select` form for session switching
 - **Widgets enabled**: `SessionProgressWidget` (header), `FinalistsWidget` (footer) — both receive session via Livewire property
 - **FinalistsWidget fix**: Replaced deprecated `BadgeColumn` (Filament v2) with `TextColumn::badge()` (Filament v3)
-- **heroicon-o-medal fix**: Replaced non-existent `heroicon-o-medal` with `heroicon-o-trophy` in `filament-workgroup/pages/session-results.blade.php`
+- **heroicon-o-medal fix**: Replaced non-existent `heroicon-o-medal` with `heroicon-o-trophy` in `filament/workgroup/pages/session-results.blade.php`
 
 ### Note Sharing Feature
 - **File**: `app/Filament/Workgroup/Pages/Notes.php`
@@ -271,7 +271,7 @@ If `InspectionResource` or `StationResource/RelationManagers/InventorySubmission
 # 
 # ### Cloudflare works illustrated with a diagram (omitted for formatting):  
 # [Diagram of Cloudflare Workers and Vectorize Indexes]  
-# |                         |aniumстрация             |                               |–––––––––––––––––––––| volticheska careless |Võтivъи andмен|Ятира набъл_seed|ʼ.splitext(d)’|
+# |                         |aniumstraция             |                               |–––––––––––––––––––––| volticheska careless |Võтivъи andмен|Ятира набъл_seed|ʼ.splitext(d)’|
 # |———————————————————–|—————————————————–|—————————————————-|——————————————|[Cloudflare Worker|None|Handled by YakshOhkLee (https://github.com/yakshohklee)||
 # |ER Workgroup Workshop     |[https://docs.google.com/forms/d/|                               || grads|JSON|CSV|API|
 # |Session Log               |[https://docs.google.com/forms/d/|                               || grads|JSON|CSV|API|
@@ -726,6 +726,74 @@ await this.$wire.processVisionResult(brand, model, serial, notes);
 ```
 
 See ERROR-008 and ERROR-009 in AI_AGENT_ERRORS.md.
+
+---
+
+## 🆕 Equipment Intake — Item Type Routing + Continuous Scan Loop (2026-03-08 Evening)
+
+### Changes Made
+
+#### `app/Filament/Admin/Pages/EquipmentIntake.php`
+- Added `public ?string $scan_type = 'hardware'` — allows per-scan type selection
+- `resetScanForm()` now preserves `$scan_location` AND `$scan_type` (both kept for seamless loop)
+- `approveAndSave()` passes `scan_type` to `SnipeItService::createAsset()`
+- `approveAndSave()` dispatches `$this->dispatch('equipment-saved')` on success (browser event triggers Alpine.js camera reset)
+
+#### `resources/views/filament/admin/pages/equipment-intake.blade.php`
+- `equipmentScanner()` Alpine.js wrapper now has `@equipment-saved.window="resetCapture()"` — auto-clears camera buffer after each successful save
+- New **Item Type** select dropdown (`wire:model="scan_type"`) added above Brand/Model fields with options:
+  - `hardware` → Hardware Asset (tracked, has serial)
+  - `accessory` → Accessory (consumable add-on)
+  - `consumable` → Consumable (disposable supply)
+  - `component` → Component (part of a larger asset)
+
+#### `app/Services/SnipeItService.php` — Dynamic Routing
+- `createAsset()` now dispatches to the correct Snipe-IT endpoint based on `$data['scan_type']`:
+  - `hardware` → `createHardwareAsset()` → resolves Manufacturer + Category + Model chain → `POST /hardware`
+  - `accessory` → `createAccessory()` → resolves Category → `POST /accessories`
+  - `consumable` → `createConsumable()` → resolves Category → `POST /consumables`
+  - `component` → `createComponent()` → resolves Category → `POST /components`
+- New helper methods: `resolveOrCreateManufacturer()`, `resolveOrCreateCategory()`, `resolveOrCreateModel()`
+- Generic `post()` helper strips null values before sending to Snipe-IT (prevents validation errors)
+- `createLocation()` refactored to use the new `post()` helper
+
+### Key Patterns
+```php
+// PHP dispatch browser event (Livewire v3):
+$this->dispatch('equipment-saved');
+
+// Alpine.js listener in blade (uses x-on shorthand @event.window):
+<div x-data="equipmentScanner()" @equipment-saved.window="resetCapture()">
+```
+
+### GitHub Commit
+- `72dd975b` — feat: item-type dynamic routing + continuous scan loop
+
+---
+
+## 🆕 mbfd-support-ai RAG Rebuild + Apparatus Routing (2026-03-08 Evening)
+
+### Overview
+The `mbfd-support-ai` chatbot RAG knowledge base was wiped and rebuilt from scratch with four new operational manuals. The system prompt was updated with intelligent apparatus routing logic.
+
+### Vectorize Index
+- **Index**: `mbfd-rag-index` (deleted and recreated — 1024-dim cosine)
+- **Total vectors**: 183
+- **Source tags**: `puc_engine` (40 chunks), `l3` (133 chunks), `support_sog` (10 chunks)
+- **L1/L11**: `L1_L11_manual.pdf` is a scanned image PDF — no text layer — 0 chunks ingested. Re-ingest with OCR'd version.
+
+### New System Prompt Routing Rules
+- Engine/E1/E2/PUC queries → only `puc_engine` context
+- L1/L11/Ladder 1/Ladder 11 → only `l1_l11` context
+- L3/Ladder 3 → only `l3` context
+- Ambiguous "ladder"/"truck" with no unit number → ask for clarification, do NOT guess
+- General/policy questions → `support_sog` context
+
+### Ingestion Script
+- `scripts/ai/ingest_manuals.py` — re-runnable to refresh the index
+- `scripts/ai/.venv` — Python venv with pymupdf + requests
+- Similarity threshold remains 0.2 (ERROR-004)
+- Worker deployed: Version `6e2f6107-8d92-4786-8c83-1ea09643f05c`
 
 ---
 

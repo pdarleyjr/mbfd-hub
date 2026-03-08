@@ -497,4 +497,36 @@ The application now has **three Filament panels** (plus one public SPA):
 
 **Verified**: Worker returns `{"brand":"HURST","model":"Jaws of Life",...}` from real fire equipment images.
 
+---
+
+## UPDATE — 2026-03-08 Evening: mbfd-support-ai RAG Rebuild + Apparatus Routing
+
+### Actions Taken
+
+**Phase 1 — Vector Index Rebuild**:
+- Deleted `mbfd-rag-index` (Cloudflare Vectorize)
+- Recreated `mbfd-rag-index` (1024-dim, cosine metric)
+
+**Phase 2 — Manual Ingestion**:
+- Script: `scripts/ai/ingest_manuals.py` (Python venv at `scripts/ai/.venv`)
+- 183 vectors inserted:
+  | Source | File | Chunks |
+  |---|---|---|
+  | `puc_engine` | PUC_Engine_manual.pdf | 40 |
+  | `l3` | L3_manual.pdf | 133 |
+  | `support_sog` | Support Services SOG.md | 10 |
+  | `l1_l11` | L1_L11_manual.pdf | **0 — scanned image PDF** |
+
+- ⚠️ `L1_L11_manual.pdf` is a scanned image PDF with no text layer. Re-ingest with OCR'd version when available.
+
+**Phase 3 — System Prompt Updated** (`cloudflare-worker/src/index.ts`):
+- Apparatus routing: Engine → `puc_engine`, L1/L11 → `l1_l11`, L3 → `l3`, General → `support_sog`
+- Critical: ambiguous "ladder"/"truck" without unit number → ask for clarification, never guess
+
+**Phase 4 — Deployment + Verification**:
+- Worker deployed: `mbfd-support-ai` Version `6e2f6107-8d92-4786-8c83-1ea09643f05c`
+- Test 1 (engine query): Correctly returned `puc_engine` context with pump pressure data ✅
+- Test 2 (ambiguous "ladder truck"): Correctly asked for L1/L11 vs L3 clarification ✅
+- Committed to `feat/equipment-intake-ai-bulk` branch
+
 **END OF DISCOVERY REPORT**

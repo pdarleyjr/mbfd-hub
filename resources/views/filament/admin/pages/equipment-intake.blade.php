@@ -6,7 +6,7 @@
     - NO bare SVG heroicons for decorative large icons (use inline style for sizing)
     - All touch targets min 48px height
     - File inputs use capture="environment" for camera, multiple for gallery
-}}
+--}}
 <x-filament-panels::page>
     {{-- Scoped inline styles for items not in Tailwind purge --}}
     <style>
@@ -65,12 +65,12 @@
             </button>
             <button type="button" @click="activeTab = 'bulk'"
                 :class="activeTab === 'bulk' ? 'ei-tab-btn active' : 'ei-tab-btn'">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75.125V8.25A2.25 2.25 0 014.5 6h15A2.25 2.25 0 0121.75 8.25v.75m0 0h18m-18 0v10.125m-18.375 10.125c0 .409.504 1.125 1.125 1.125M15.75 11.125c-.753.007-1.008.252-1.008 1.125s.255 1.125 1.008 1.125m0 0h5.25M7.5 15.5V5m8.008 0H11.5a2.25 2.25 0 00-2.533 1.373L3 16.5h2.583a1.128 1.128 0 01.966 1.737M5.583 16.549l8.384-8.25a2.25 2.25 0 00-2.583-2.25M13.5l-5.159-5.159a2.25 2.25 0 012.583-2.25m8.008 0h4.967M7.5 16.5" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75.125V8.25A2.25 2.25 0 014.5 6h15A2.25 2.25 0 0121.75 8.25v10.125m-18.375 1.125c0 .621.504 1.125 1.125 1.125M20.25 19.5h-1.5A1.125 1.125 0 0117.625 18.375m3.375-10.125V7.5A.75.75 0 0020.25 6.75H3.75A.75.75 0 003 7.5v.75m0 0h18m-18 0v10.125" /></svg>
                 <span>Manual Entry</span>
             </button>
             <button type="button" @click="activeTab = 'ai_bulk'"
                 :class="activeTab === 'ai_bulk' ? 'ei-tab-btn active' : 'ei-tab-btn'">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L2.25 12l2.846-.813a3.375 3.375 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" /></svg>
                 <span>AI Bulk Import</span>
             </button>
         </div>
@@ -142,18 +142,6 @@
                         </div>
                     </template>
 
-
-                    {{-- Status message (non-processing) --}}
-                    <template x-if="!processing && scanStatus">
-                        <div class="mt-4 p-3 rounded-lg text-sm font-medium"
-                            :style="scanStatusType==='success' ? 'background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;'
-                                  : scanStatusType==='warn'    ? 'background:#fffbeb;color:#92400e;border:1px solid #fde68a;'
-                                  : scanStatusType==='error'   ? 'background:#fef2f2;color:#dc2626;border:1px solid #fecaca;'
-                                  :                             'background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;'">
-                            <span x-text="scanStatus"></span>
-                        </div>
-                    </template>
-
                     {{-- Error --}}
                     <template x-if="scanError">
                         <div class="mt-4 p-3 rounded-lg text-sm flex items-start gap-2" style="background:#fef2f2;color:#dc2626;">
@@ -166,11 +154,10 @@
                 {{-- Asset Details Form --}}
                 <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-4 sm:p-6">
                     <h3 class="text-base font-semibold text-gray-900 mb-4">Asset Details</h3>
-
-                    {{-- Item Type Selector }}
+                    {{-- Item Type Selector --}}
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Item Type</label>
-                        <select wire:model="scan_type"
+                        <select wire:model.live="scan_type"
                             class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base sm:max-w-xs"
                             style="min-height:44px;">
                             <option value="hardware">Hardware Asset (tracked, has serial)</option>
@@ -184,21 +171,33 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Brand / Manufacturer</label>
-                            <input type="text" wire:model="scan_brand"
+                            <input type="text" :value="aiField_brand" @input="aiField_brand=$event.target.value; $wire.set('scan_brand',$event.target.value)"
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                                 style="min-height:44px;" placeholder="e.g. Scott, MSA, Motorola" />
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
-                            <input type="text" wire:model="scan_model"
+                            <input type="text" :value="aiField_model" @input="aiField_model=$event.target.value; $wire.set('scan_model',$event.target.value)"
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                                 style="min-height:44px;" placeholder="e.g. Air-Pak X3 Pro" />
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
-                            <input type="text" wire:model="scan_serial"
+                            <input type="text" :value="aiField_serial" @input="aiField_serial=$event.target.value; $wire.set('scan_serial',$event.target.value)"
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                                 style="min-height:44px;" placeholder="e.g. SN-2024-00123" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Item / Device Name <span class="text-gray-400 text-xs">(AI-suggested)</span></label>
+                            <input type="text" :value="aiField_item_name" @input="aiField_item_name=$event.target.value"
+                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
+                                style="min-height:44px;" placeholder="e.g. 18 inch chainsaw, hydraulic spreader" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Category <span class="text-gray-400 text-xs">(AI-suggested)</span></label>
+                            <input type="text" :value="aiField_category" @input="aiField_category=$event.target.value"
+                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
+                                style="min-height:44px;" placeholder="e.g. Saw, Rescue Tool, SCBA, Fan" />
                         </div>
                         <div x-data="{ showNewLoc: false }">
                             <label class="block text-sm font-medium text-gray-700 mb-1">
@@ -233,10 +232,13 @@
                             placeholder="Any additional notes..."></textarea>
                     </div>
                     <div class="mt-5 flex flex-col gap-3 sm:flex-row">
-                        <button type="button" wire:click="approveAndSave" wire:loading.attr="disabled" class="ei-btn-primary">
+                        <button type="button"
+                            @click="isSaving=true; $wire.approveAndSaveWithData(aiField_brand, aiField_model, aiField_serial, aiField_item_name, aiField_category).then(()=>{isSaving=false})"
+                            :disabled="isSaving"
+                            class="ei-btn-primary">
                             <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span wire:loading.remove wire:target="approveAndSave">Approve & Save to Snipe-IT</span>
-                            <span wire:loading wire:target="approveAndSave">Saving…</span>
+                            <span x-show="!isSaving">Approve &amp; Save to Snipe-IT</span>
+                            <span x-show="isSaving">Saving&#x2026;</span>
                         </button>
                         <button type="button" wire:click="resetScanForm" class="ei-btn-secondary">
                             <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
@@ -336,7 +338,7 @@
                                         @if(count($bulk_items) > 1)
                                             <button type="button" wire:click="removeBulkRow({{ $index }})"
                                                 style="color:#9ca3af;padding:8px;border:none;background:none;cursor:pointer;" title="Remove">
-                                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0 -4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                             </button>
                                         @endif
                                     </div>
@@ -549,8 +551,6 @@
                 imageFiles: [],
                 processing: false,
                 scanError: null,
-                scanStatus: '',
-                scanStatusType: 'info',
 
                 handleCapture(event) {
                     const file = event.target.files[0];
@@ -606,13 +606,12 @@
 
                         const data = await response.json();
 
-                        // Send parsed data to Livewire
-                        await this.$wire.processVisionResult(
-                            data.brand || '',
-                            data.model || '',
-                            data.serial || '',
-                            data.notes || ''
-                        );
+                        // Set Alpine state immediately (instant DOM update, no Livewire latency)
+                        this.aiField_brand     = data.brand     || '';
+                        this.aiField_model     = data.model     || '';
+                        this.aiField_serial    = data.serial    || '';
+                        this.aiField_item_name = data.item_name || '';
+                        this.aiField_category  = data.category  || '';
 
                         this.processing = false;
 
@@ -623,17 +622,17 @@
                         if (data.serial) extracted.push('Serial: ' + data.serial);
 
                         if (extracted.length > 0) {
-                            this.scanStatus = '✅ AI extracted: ' + extracted.join(' · ') + ' (confidence: ' + (data.confidence || 'low') + '). Review the fields below, select a Location, and click Approve & Save.';
+                            this.scanStatus = '\u2705 AI extracted: ' + extracted.join(' · ') + ' (confidence: ' + (data.confidence || 'low') + '). Review the fields below, select a Location, and click Approve & Save.';
                             this.scanStatusType = 'success';
                         } else {
-                            this.scanStatus = '⚠️ AI analyzed the photo but could not read equipment labels (confidence: ' + (data.confidence || 'low') + '). ' + (data.notes ? 'Notes: ' + data.notes + '. ' : '') + 'Please fill in the fields manually.';
+                            this.scanStatus = '\u26a0\ufe0f AI analyzed the photo but could not read equipment labels (confidence: ' + (data.confidence || 'low') + '). ' + (data.notes ? 'Notes: ' + data.notes + '. ' : '') + 'Please fill in the fields manually.';
                             this.scanStatusType = 'warn';
                         }
 
                     } catch (err) {
                         this.processing = false;
                         this.scanError = 'AI scan failed: ' + err.message + '. You can fill in the fields manually.';
-                        this.scanStatus = '❌ Scan failed: ' + (err.message || 'Unknown error') + '. Fill in the form manually.';
+                        this.scanStatus = '\u274c Scan failed: ' + (err.message || 'Unknown error') + '. Fill in the form manually.';
                         this.scanStatusType = 'error';
                         this.$wire.handleScanError(err.message || 'Unknown error');
                     }
@@ -657,6 +656,13 @@
                     this.imageFiles = [];
                     this.processing = false;
                     this.scanError = null;
+                    this.scanStatus = '';
+                    this.aiField_brand     = '';
+                    this.aiField_model     = '';
+                    this.aiField_serial    = '';
+                    this.aiField_item_name = '';
+                    this.aiField_category  = '';
+                    this.isSaving = false;
                     if (this.$refs.cameraInput) this.$refs.cameraInput.value = '';
                     if (this.$refs.galleryInput) this.$refs.galleryInput.value = '';
                 },
