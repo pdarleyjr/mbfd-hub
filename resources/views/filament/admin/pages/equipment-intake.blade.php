@@ -171,19 +171,19 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Brand / Manufacturer</label>
-                            <input type="text" wire:model="scan_brand"
+                            <input type="text" :value="aiField_brand" @input="aiField_brand=$event.target.value; $wire.set('scan_brand',$event.target.value)"
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                                 style="min-height:44px;" placeholder="e.g. Scott, MSA, Motorola" />
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
-                            <input type="text" wire:model="scan_model"
+                            <input type="text" :value="aiField_model" @input="aiField_model=$event.target.value; $wire.set('scan_model',$event.target.value)"
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                                 style="min-height:44px;" placeholder="e.g. Air-Pak X3 Pro" />
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
-                            <input type="text" wire:model="scan_serial"
+                            <input type="text" :value="aiField_serial" @input="aiField_serial=$event.target.value; $wire.set('scan_serial',$event.target.value)"
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                                 style="min-height:44px;" placeholder="e.g. SN-2024-00123" />
                         </div>
@@ -591,13 +591,16 @@
 
                         const data = await response.json();
 
-                        // Send parsed data to Livewire — MUST await so DOM patches apply
-                        await this.$wire.processVisionResult(
-                            data.brand || '',
-                            data.model || '',
-                            data.serial || '',
-                            data.notes || ''
-                        );
+                        // Set Alpine state immediately (instant DOM update, no Livewire latency)
+                        this.aiField_brand  = data.brand  || '';
+                        this.aiField_model  = data.model  || '';
+                        this.aiField_serial = data.serial || '';
+
+                        // Sync to Livewire backend (for Approve & Save to use)
+                        this.$wire.set('scan_brand',  this.aiField_brand);
+                        this.$wire.set('scan_model',  this.aiField_model);
+                        this.$wire.set('scan_serial', this.aiField_serial);
+                        if (data.notes) this.$wire.set('scan_notes', 'AI: ' + data.notes);
 
                         this.processing = false;
 
@@ -642,6 +645,10 @@
                     this.imageFiles = [];
                     this.processing = false;
                     this.scanError = null;
+                    this.scanStatus = '';
+                    this.aiField_brand  = '';
+                    this.aiField_model  = '';
+                    this.aiField_serial = '';
                     if (this.$refs.cameraInput) this.$refs.cameraInput.value = '';
                     if (this.$refs.galleryInput) this.$refs.galleryInput.value = '';
                 },
