@@ -187,6 +187,18 @@
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                                 style="min-height:44px;" placeholder="e.g. SN-2024-00123" />
                         </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Item / Device Name <span class="text-gray-400 text-xs">(AI-suggested)</span></label>
+                            <input type="text" :value="aiField_item_name" @input="aiField_item_name=$event.target.value"
+                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
+                                style="min-height:44px;" placeholder="e.g. 18 inch chainsaw, hydraulic spreader" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Category <span class="text-gray-400 text-xs">(AI-suggested)</span></label>
+                            <input type="text" :value="aiField_category" @input="aiField_category=$event.target.value"
+                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
+                                style="min-height:44px;" placeholder="e.g. Saw, Rescue Tool, SCBA, Fan" />
+                        </div>
                         <div x-data="{ showNewLoc: false }">
                             <label class="block text-sm font-medium text-gray-700 mb-1">
                                 Location <span style="color:#dc2626;">*</span>
@@ -220,10 +232,13 @@
                             placeholder="Any additional notes..."></textarea>
                     </div>
                     <div class="mt-5 flex flex-col gap-3 sm:flex-row">
-                        <button type="button" wire:click="approveAndSave" wire:loading.attr="disabled" class="ei-btn-primary">
+                        <button type="button"
+                            @click="isSaving=true; $wire.approveAndSaveWithData(aiField_brand, aiField_model, aiField_serial, aiField_item_name, aiField_category).then(()=>{isSaving=false})"
+                            :disabled="isSaving"
+                            class="ei-btn-primary">
                             <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span wire:loading.remove wire:target="approveAndSave">Approve & Save to Snipe-IT</span>
-                            <span wire:loading wire:target="approveAndSave">Saving…</span>
+                            <span x-show="!isSaving">Approve &amp; Save to Snipe-IT</span>
+                            <span x-show="isSaving">Saving&#x2026;</span>
                         </button>
                         <button type="button" wire:click="resetScanForm" class="ei-btn-secondary">
                             <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
@@ -592,15 +607,11 @@
                         const data = await response.json();
 
                         // Set Alpine state immediately (instant DOM update, no Livewire latency)
-                        this.aiField_brand  = data.brand  || '';
-                        this.aiField_model  = data.model  || '';
-                        this.aiField_serial = data.serial || '';
-
-                        // Sync to Livewire backend (for Approve & Save to use)
-                        this.$wire.set('scan_brand',  this.aiField_brand);
-                        this.$wire.set('scan_model',  this.aiField_model);
-                        this.$wire.set('scan_serial', this.aiField_serial);
-                        if (data.notes) this.$wire.set('scan_notes', 'AI: ' + data.notes);
+                        this.aiField_brand     = data.brand     || '';
+                        this.aiField_model     = data.model     || '';
+                        this.aiField_serial    = data.serial    || '';
+                        this.aiField_item_name = data.item_name || '';
+                        this.aiField_category  = data.category  || '';
 
                         this.processing = false;
 
@@ -646,9 +657,12 @@
                     this.processing = false;
                     this.scanError = null;
                     this.scanStatus = '';
-                    this.aiField_brand  = '';
-                    this.aiField_model  = '';
-                    this.aiField_serial = '';
+                    this.aiField_brand     = '';
+                    this.aiField_model     = '';
+                    this.aiField_serial    = '';
+                    this.aiField_item_name = '';
+                    this.aiField_category  = '';
+                    this.isSaving = false;
                     if (this.$refs.cameraInput) this.$refs.cameraInput.value = '';
                     if (this.$refs.galleryInput) this.$refs.galleryInput.value = '';
                 },

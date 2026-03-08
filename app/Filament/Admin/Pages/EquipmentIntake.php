@@ -28,6 +28,9 @@ class EquipmentIntake extends Page implements HasForms
     public ?string $scan_serial = null;
     public ?string $scan_location = null;
     public ?string $scan_notes = null;
+    public ?string $scan_type = 'hardware';  // hardware | accessory | consumable | component
+    public ?string $scan_item_name = null;   // AI-identified descriptive name
+    public ?string $scan_category = null;    // AI-identified category (Saw, Fan, Rescue Tool, etc.)
     public bool $scan_processing = false;
     public ?string $scan_error = null;
     public ?string $scan_success = null;
@@ -63,13 +66,14 @@ class EquipmentIntake extends Page implements HasForms
 
     /**
      * Process the AI vision scan result sent from the frontend Alpine.js component.
-     * Called via $wire.processVisionResult() from Alpine.js (Livewire v3 magic property).
      */
-    public function processVisionResult(string $brand, string $model, string $serial, string $notes = ''): void
+    public function processVisionResult(string $brand, string $model, string $serial, string $notes = '', string $item_name = '', string $category = ''): void
     {
         $this->scan_brand = $brand;
         $this->scan_model = $model;
         $this->scan_serial = $serial;
+        $this->scan_item_name = $item_name ?: null;
+        $this->scan_category = $category ?: null;
         // Only set notes if AI found something useful and field is currently empty
         if ($notes && !$this->scan_notes) {
             $this->scan_notes = 'AI: ' . $notes;
@@ -85,6 +89,24 @@ class EquipmentIntake extends Page implements HasForms
     {
         $this->scan_error = $message;
         $this->scan_processing = false;
+    }
+
+    /**
+     * Approve & Save with data passed directly from Alpine.js.
+     * This bypasses the $wire.set() async race condition by receiving
+     * the current field values inline with the method call.
+     */
+    public function approveAndSaveWithData(string $brand = '', string $model = '', string $serial = '', string $item_name = '', string $category = ''): void
+    {
+        // Override PHP properties with the values passed from Alpine
+        if ($brand)     $this->scan_brand     = $brand;
+        if ($model)     $this->scan_model      = $model;
+        if ($serial)    $this->scan_serial     = $serial;
+        if ($item_name) $this->scan_item_name  = $item_name;
+        if ($category)  $this->scan_category   = $category;
+
+        // Now call the standard save flow
+        $this->approveAndSave();
     }
 
     /**
@@ -109,7 +131,9 @@ class EquipmentIntake extends Page implements HasForms
             'serial'      => $this->scan_serial,
             'location_id' => $this->scan_location,
             'notes'       => $this->scan_notes,
-            'category'    => 'General',
+            'category'    => $this->scan_category ?: 'General',
+            'item_name'   => $this->scan_item_name,
+            'scan_type'   => $this->scan_type ?? 'hardware',
         ]);
 
         if ($result['success']) {
@@ -120,8 +144,11 @@ class EquipmentIntake extends Page implements HasForms
                 ->success()
                 ->send();
 
-            // Clear form for next scan — keep location for seamless loop
+            // Clear form for next scan — keep location and item type for seamless loop
             $this->resetScanForm();
+
+            // Notify Alpine.js to clear the camera buffer and ready the next scan
+            $this->dispatch('equipment-saved');
         } else {
             $error = is_array($result['error']) ? json_encode($result['error']) : $result['error'];
             Notification::make()
@@ -133,7 +160,7 @@ class EquipmentIntake extends Page implements HasForms
     }
 
     /**
-     * Reset the scan form for the next item (keeps location).
+     * Reset the scan form for the next item (keeps location and scan_type).
      */
     public function resetScanForm(): void
     {
@@ -141,9 +168,12 @@ class EquipmentIntake extends Page implements HasForms
         $this->scan_model = null;
         $this->scan_serial = null;
         $this->scan_notes = null;
+        $this->scan_item_name = null;
+        $this->scan_category = null;
         $this->scan_error = null;
         $this->scan_success = null;
         $this->scan_processing = false;
+        // NOTE: scan_location and scan_type are intentionally preserved for seamless continuous scanning
     }
 
     /**
