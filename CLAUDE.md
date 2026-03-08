@@ -1,10 +1,10 @@
 # CLAUDE.md — MBFD Hub AI Context
 
-> **Mission Status: ✅ NocoBase Infrastructure Deployment — COMPLETE** (2026-02-24)  
-> Phases 1–5, 7, 8, 9 fully complete. Phase 6 CE-blocked (documented below).
+> **Mission Status: ✅ Production** (2026-03-08)  
+> NocoBase has been **decommissioned** (2026-03-08) — container stopped, image removed, volume deleted. All Nocobase scripts removed from repo.
 
 ## Project Identity
-Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filament 3 backend, React SPA daily checkout, NocoBase admin overlay, Baserow data platform — all containerized on a single VPS.
+Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filament 3 backend, React SPA daily checkout, Baserow data platform — all containerized on a single VPS.
 
 ## VPS
 - **Host:** `145.223.73.170`
@@ -16,7 +16,6 @@ Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filamen
 | Service | Internal Host | External Port | Notes |
 |---------|--------------|--------------|-------|
 | `app` | `app` | 8000 | Laravel + Octane |
-| `nocobase` | `nocobase` | 13000 | NocoBase CE (community) |
 | `baserow` | `baserow` | 80 (internal) | Baserow self-hosted |
 | `db` | `db` | 5432 (internal) | PostgreSQL |
 | `redis` | `redis` | 6379 (internal) | Redis |
@@ -25,23 +24,12 @@ Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filamen
 ## Domains
 - `www.mbfdhub.com` → Laravel/React app (port 8080) via Cloudflare Tunnel (tunnel ID: 89429799-7028-4df2-870d-f2fb858a49d7)
 - `mbfdhub.com` → same as www.mbfdhub.com (redirect)
-- `nocobase.mbfdhub.com` → NocoBase (port 13000) via Cloudflare Tunnel
 - `baserow.mbfdhub.com` → Baserow (port 8082) via Cloudflare Tunnel
 
 ## Credentials (non-production; rotate before go-live)
-- NocoBase admin: `admin@nocobase.com` / `admin123`
 - Baserow token: `5c25f5700fedb0f3b46f77b3c9ef41cf` (in `.env` as `BASEROW_TOKEN`)
 - GitHub: `pdarleyjr@gmail.com` / token in `.env`
 - Sentry DSN: in `config/sentry.php`
-
-## Phase Status
-| Phase | Status | Notes |
-|-------|--------|-------|
-| 1–5 | ✅ Complete | Apparatus, todos, capital projects, inventory, shop works |
-| 6 | ⚠️ Blocked | `http-api` datasource requires NocoBase Pro. Workaround: use `plugin-workflow-request` to call `http://baserow:80/api/` with `Authorization: Token {{BASEROW_TOKEN}}` |
-| 7 | ✅ Complete | User provisioning via `provision_nocobase_users.py` |
-| 8 | ✅ Complete | UI layouts injected: member_portal (uid: `15ex2ujxqm4`), admin_dashboard (uid: `afo40tnn0c4`) |
-| 9 | ✅ Complete | This file + `.ai/context/nocobase_deployment_plan.md` |
 
 ---
 
@@ -117,9 +105,6 @@ GOOGLE_SHEETS_TAB_SHEET_ID=1714038258
 ---
 
 ## Key Files
-- `scripts/nocobase/ui_layouts/member_portal.json` — member portal UI schema
-- `scripts/nocobase/ui_layouts/admin_dashboard.json` — admin dashboard UI schema
-- `provision_nocobase_users.py` — user provisioning script
 - `.github/workflows/deploy.yml` — CI/CD deploy pipeline (smoke tests target `www.mbfdhub.com`)
 - `docs/BASEROW_INTEGRATION.md` — Baserow integration notes
 
