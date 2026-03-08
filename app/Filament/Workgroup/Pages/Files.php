@@ -109,14 +109,15 @@ class Files extends Page implements HasTable
         }
 
         $workgroupId = $member->workgroup->id;
-        $sessionId = $this->selectedSession ? (int) $this->selectedSession : null;
 
+        // Show ALL files for the workgroup — no session filtering
+        // (Files are reference materials that should be accessible across all sessions)
         if ($this->activeTab === 'assigned') {
             return WorkgroupFile::where('workgroup_id', $workgroupId)
-                ->when($sessionId, fn($q) => $q->where('workgroup_session_id', $sessionId));
+                ->orderBy('created_at', 'desc');
         } else {
             return WorkgroupSharedUpload::where('workgroup_id', $workgroupId)
-                ->when($sessionId, fn($q) => $q->where('workgroup_session_id', $sessionId));
+                ->orderBy('created_at', 'desc');
         }
     }
 
