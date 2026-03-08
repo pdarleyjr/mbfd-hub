@@ -36,10 +36,10 @@
 
     {{-- Session Progress Widgets --}}
     @if(true)
-    <x-filament-widgets::widgets
+    <div wire:key="progress-{{ $selectedSessionId }}"><x-filament-widgets::widgets
         :widgets="$this->getHeaderWidgets()"
         :columns="$this->getHeaderWidgetsColumns()"
-    />
+    /></div>
 
     {{-- AI Executive Report Panel --}}
     <div
