@@ -142,6 +142,18 @@
                         </div>
                     </template>
 
+
+                    {{-- Status message (non-processing) --}}
+                    <template x-if="!processing && scanStatus">
+                        <div class="mt-4 p-3 rounded-lg text-sm font-medium"
+                            :style="scanStatusType==='success' ? 'background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;'
+                                  : scanStatusType==='warn'    ? 'background:#fffbeb;color:#92400e;border:1px solid #fde68a;'
+                                  : scanStatusType==='error'   ? 'background:#fef2f2;color:#dc2626;border:1px solid #fecaca;'
+                                  :                             'background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;'">
+                            <span x-text="scanStatus"></span>
+                        </div>
+                    </template>
+
                     {{-- Error --}}
                     <template x-if="scanError">
                         <div class="mt-4 p-3 rounded-lg text-sm flex items-start gap-2" style="background:#fef2f2;color:#dc2626;">
@@ -522,6 +534,8 @@
                 imageFiles: [],
                 processing: false,
                 scanError: null,
+                scanStatus: '',
+                scanStatusType: 'info',
 
                 handleCapture(event) {
                     const file = event.target.files[0];
@@ -578,17 +592,35 @@
                         const data = await response.json();
 
                         // Send parsed data to Livewire
-                        @this.processVisionResult(
+                        await this.$wire.processVisionResult(
                             data.brand || '',
                             data.model || '',
-                            data.serial || ''
+                            data.serial || '',
+                            data.notes || ''
                         );
 
                         this.processing = false;
+
+                        // Show status message
+                        const extracted = [];
+                        if (data.brand)  extracted.push('Brand: ' + data.brand);
+                        if (data.model)  extracted.push('Model: ' + data.model);
+                        if (data.serial) extracted.push('Serial: ' + data.serial);
+
+                        if (extracted.length > 0) {
+                            this.scanStatus = '✅ AI extracted: ' + extracted.join(' · ') + ' (confidence: ' + (data.confidence || 'low') + '). Review the fields below, select a Location, and click Approve & Save.';
+                            this.scanStatusType = 'success';
+                        } else {
+                            this.scanStatus = '⚠️ AI analyzed the photo but could not read equipment labels (confidence: ' + (data.confidence || 'low') + '). ' + (data.notes ? 'Notes: ' + data.notes + '. ' : '') + 'Please fill in the fields manually.';
+                            this.scanStatusType = 'warn';
+                        }
+
                     } catch (err) {
                         this.processing = false;
                         this.scanError = 'AI scan failed: ' + err.message + '. You can fill in the fields manually.';
-                        @this.handleScanError(err.message);
+                        this.scanStatus = '❌ Scan failed: ' + (err.message || 'Unknown error') + '. Fill in the form manually.';
+                        this.scanStatusType = 'error';
+                        this.$wire.handleScanError(err.message || 'Unknown error');
                     }
                 },
 
@@ -653,7 +685,7 @@
 
                             const data = await response.json();
 
-                            await @this.aiBulkAddResult(
+                            await this.$wire.aiBulkAddResult(
                                 data.brand || 'Unknown',
                                 data.model || 'Unknown',
                                 data.serial || 'Unknown',
@@ -661,7 +693,7 @@
                                 -1
                             );
                         } catch (err) {
-                            await @this.aiBulkRowError(
+                            await this.$wire.aiBulkRowError(
                                 'Scan failed: ' + err.message,
                                 -1
                             );
