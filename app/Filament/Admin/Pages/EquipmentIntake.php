@@ -63,12 +63,17 @@ class EquipmentIntake extends Page implements HasForms
 
     /**
      * Process the AI vision scan result sent from the frontend Alpine.js component.
+     * Called via $wire.processVisionResult() from Alpine.js (Livewire v3 magic property).
      */
-    public function processVisionResult(string $brand, string $model, string $serial): void
+    public function processVisionResult(string $brand, string $model, string $serial, string $notes = ''): void
     {
         $this->scan_brand = $brand;
         $this->scan_model = $model;
         $this->scan_serial = $serial;
+        // Only set notes if AI found something useful and field is currently empty
+        if ($notes && !$this->scan_notes) {
+            $this->scan_notes = 'AI: ' . $notes;
+        }
         $this->scan_error = null;
         $this->scan_processing = false;
     }
