@@ -6,7 +6,7 @@
     - NO bare SVG heroicons for decorative large icons (use inline style for sizing)
     - All touch targets min 48px height
     - File inputs use capture="environment" for camera, multiple for gallery
-}}
+--}}
 <x-filament-panels::page>
     {{-- Scoped inline styles for items not in Tailwind purge --}}
     <style>
@@ -65,12 +65,12 @@
             </button>
             <button type="button" @click="activeTab = 'bulk'"
                 :class="activeTab === 'bulk' ? 'ei-tab-btn active' : 'ei-tab-btn'">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75.125V8.25A2.25 2.25 0 004.5 6h15A2.25 2.25 0 0021.75 8.25v.75m0 0h18m-18 0v10.125m-18.375 10.125c0 .409.504 1.125 1.125 1.125M15.75 11.125c-.753.007-1.008.252-1.008 1.125s.255 1.125 1.008 1.125m0 0h5.25M7.5 15.5V5m8.008 0H11.5a2.25 2.25 0 00-2.533 1.373L3 16.5h2.583a1.128 1.128 0 01.966 1.737M5.583 16.549l8.384-8.25a2.25 2.25 0 00-2.583-2.25M13.5l-5.159-5.159a2.25 2.25 0 012.455-2.456L18 2.25l-1.183-.259a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456z" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394z" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75.125V8.25A2.25 2.25 0 014.5 6h15A2.25 2.25 0 0121.75 8.25v10.125m-18.375 1.125c0 .621.504 1.125 1.125 1.125M20.25 19.5h-1.5A1.125 1.125 0 0117.625 18.375m3.375-10.125V7.5A.75.75 0 0020.25 6.75H3.75A.75.75 0 003 7.5v.75m0 0h18m-18 0v10.125" /></svg>
                 <span>Manual Entry</span>
             </button>
             <button type="button" @click="activeTab = 'ai_bulk'"
                 :class="activeTab === 'ai_bulk' ? 'ei-tab-btn active' : 'ei-tab-btn'">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L2.25 12l2.846-.813a3.375 3.375 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" /></path></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" /></svg>
                 <span>AI Bulk Import</span>
             </button>
         </div>
@@ -105,14 +105,14 @@
                     <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                         {{-- Take Photo — mobile camera --}}
                         <label class="ei-btn-primary" style="cursor:pointer;" :class="imageFiles.length >= 3 ? 'opacity-50 pointer-events-none' : ''">
-                            <svg style="width:20px;height:20px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" /></path></svg>
+                            <svg style="width:20px;height:20px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" /></svg>
                             <span x-text="imageFiles.length === 0 ? 'Take Photo' : 'Add Another Photo'"></span>
                             <input type="file" accept="image/*" capture="environment" style="display:none;" @change="handleCapture($event)" x-ref="cameraInput" />
                         </label>
 
                         {{-- Choose from Gallery --}}
                         <label class="ei-btn-secondary" style="cursor:pointer;" :class="imageFiles.length >= 3 ? 'opacity-50 pointer-events-none' : ''">
-                            <svg style="width:20px;height:20px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.007v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
+                            <svg style="width:20px;height:20px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
                             <span>Choose from Gallery</span>
                             <input type="file" accept="image/*" multiple style="display:none;" @change="handleGallerySelect($event)" x-ref="galleryInput" />
                         </label>
@@ -136,28 +136,16 @@
                         <div class="mt-4 flex items-center gap-3" style="color:#4f46e5;">
                             <svg class="animate-spin" style="width:24px;height:24px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle style="opacity:0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path style="opacity:0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z""></path>
+                                <path style="opacity:0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                             </svg>
                             <span class="text-sm font-medium">Analyzing <span x-text="imageFiles.length"></span> image(s) with AI…</span>
-                        </div>
-                    </template>
-
-
-                    {{-- Status message (non-processing) --}}
-                    <template x-if="!processing && scanStatus">
-                        <div class="mt-4 p-3 rounded-lg text-sm font-medium"
-                            :style="scanStatusType==='success' ? 'background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;'
-                                  : scanStatusType==='warn'    ? 'background:#fffbeb;color:#92400e;border:1px solid #fde68a;'
-                                  : scanStatusType==='error'   ? 'background:#fef2f2;color:#dc2626;border:1px solid #fecaca;'
-                                  :                             'background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;'">
-                            <span x-text="scanStatus"></span>
                         </div>
                     </template>
 
                     {{-- Error --}}
                     <template x-if="scanError">
                         <div class="mt-4 p-3 rounded-lg text-sm flex items-start gap-2" style="background:#fef2f2;color:#dc2626;">
-                            <svg style="width:18px;height:18px;flex-shrink:0;margin-top:1px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></path></svg>
+                            <svg style="width:18px;height:18px;flex-shrink:0;margin-top:1px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
                             <span x-text="scanError"></span>
                         </div>
                     </template>
@@ -166,7 +154,6 @@
                 {{-- Asset Details Form --}}
                 <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-4 sm:p-6">
                     <h3 class="text-base font-semibold text-gray-900 mb-4">Asset Details</h3>
-
                     {{-- Item Type Selector --}}
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Item Type</label>
@@ -336,7 +323,7 @@
                                         @if(count($bulk_items) > 1)
                                             <button type="button" wire:click="removeBulkRow({{ $index }})"
                                                 style="color:#9ca3af;padding:8px;border:none;background:none;cursor:pointer;" title="Remove">
-                                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0 -4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                             </button>
                                         @endif
                                     </div>
@@ -351,7 +338,7 @@
                             Add Row
                         </button>
                         <button type="button" wire:click="submitBulkItems" wire:loading.attr="disabled" class="ei-btn-primary">
-                            <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-10.125V8.25A2.25 2.25 0 004.5 6h15A2.25 2.25 0 0021 8.25v.75m0 0h-3.5" /></svg>
+                            <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
                             <span wire:loading.remove wire:target="submitBulkItems">Submit All to Snipe-IT</span>
                             <span wire:loading wire:target="submitBulkItems">Submitting…</span>
                         </button>
@@ -374,11 +361,10 @@
                         The AI will analyze each photo and fill in Brand, Model &amp; Serial for you to review.
                     </p>
 
-                    {{-- Big upload zone — always visible }}
+                    {{-- Big upload zone — always visible --}}
                     <label class="ei-upload-zone" style="cursor:pointer;" :class="totalImages > 0 && doneImages < totalImages ? 'pointer-events-none opacity-75' : ''">
                         <svg style="width:48px;height:48px;color:#9ca3af;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 00-1.423-1.423L2.25 12l2.846-.813a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a2.25 2.25 0 11-4.5 0" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                         </svg>
                         <div>
                             <p class="text-base font-semibold text-gray-700">Tap to select equipment photos</p>
@@ -407,7 +393,7 @@
                                 <label class="block text-sm font-medium text-gray-700 mb-1">
                                     Bulk Location <span style="color:#dc2626;">*</span>
                                 </label>
-                                <div x-show="!showNewLoc3" class="relative">
+                                <div x-show="!showNewLoc3">
                                     <select wire:model="ai_bulk_global_location"
                                         class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="min-height:44px;">
                                         <option value="">Select location...</option>
@@ -415,7 +401,7 @@
                                             <option value="{{ $id }}">{{ $name }}</option>
                                         @endforeach
                                     </select>
-                                    <button type="button" @click="showNewLoc3 = true" class="absolute right-2 top-1/2 -translate-y-1/2 text-sm" style="color:#4f46e5;">+ New location</button>
+                                    <button type="button" @click="showNewLoc3 = true" class="mt-1 text-sm" style="color:#4f46e5;">+ New location</button>
                                 </div>
                                 <div x-show="showNewLoc3" class="space-y-2">
                                     <input type="text" wire:model="new_location_name"
@@ -428,7 +414,7 @@
                                 </div>
                             </div>
                             <button type="button" wire:click="applyGlobalLocationToBulk" class="ei-btn-secondary">
-                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 16.5V5m15 2.25v7.5m-12 0h3" />><path stroke-linecap="round" stroke-linejoin="round" d="M16.89 10.248a1 1 0 000-2.096l-6-6a1 1 0 00-2.18 0l-6 6a1 1 0 002.18 0z" /></path></svg>
+                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 16.5v-9m0 0l-3 3m3-3l3 3m6 3v-9m0 0l-3 3m3-3l3 3" /></svg>
                                 Apply to All Rows
                             </button>
                         </div>
@@ -449,7 +435,7 @@
                                     {{-- Row header: thumbnail + error or fields --}}
                                     @if(!empty($row['error']))
                                         <div style="display:flex;align-items:center;gap:8px;color:#dc2626;background:#fef2f2;padding:8px 12px;border-radius:8px;font-size:14px;">
-                                            <svg style="width:16px;height:16px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008h-.008V15.75zM10.5 15.75h.007v.008h-.008V15.75zM12 15.75h.007v.008h-.008V15.75z" /></path></svg>
+                                            <svg style="width:16px;height:16px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
                                             <span>{{ $row['error'] }}</span>
                                         </div>
                                     @else
@@ -459,7 +445,7 @@
                                                 <img src="{{ $row['thumbnail'] }}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid #e5e7eb;" />
                                             @else
                                                 <div style="width:64px;height:64px;background:#e5e7eb;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-                                                    <svg style="width:28px;height:28px;color:#9ca3af;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.007v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
+                                                    <svg style="width:28px;height:28px;color:#9ca3af;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" /></svg>
                                                 </div>
                                             @endif
                                             <div class="flex-1 min-w-0">
@@ -550,8 +536,6 @@
                 imageFiles: [],
                 processing: false,
                 scanError: null,
-                scanStatus: '',
-                scanStatusType: 'info',
 
                 handleCapture(event) {
                     const file = event.target.files[0];
@@ -608,35 +592,17 @@
                         const data = await response.json();
 
                         // Send parsed data to Livewire
-                        await this.$wire.processVisionResult(
+                        this.$wire.processVisionResult(
                             data.brand || '',
                             data.model || '',
-                            data.serial || '',
-                            data.notes || ''
+                            data.serial || ''
                         );
 
                         this.processing = false;
-
-                        // Show status message
-                        const extracted = [];
-                        if (data.brand)  extracted.push('Brand: ' + data.brand);
-                        if (data.model)  extracted.push('Model: ' + data.model);
-                        if (data.serial) extracted.push('Serial: ' + data.serial);
-
-                        if (extracted.length > 0) {
-                            this.scanStatus = '✅ AI extracted: ' + extracted.join(' · ') + ' (confidence: ' + (data.confidence || 'low') + '). Review the fields below, select a Location, and click Approve & Save.';
-                            this.scanStatusType = 'success';
-                        } else {
-                            this.scanStatus = '⚠️ AI analyzed the photo but could not read equipment labels (confidence: ' + (data.confidence || 'low') + '). ' + (data.notes ? 'Notes: ' + data.notes + '. ' : '') + 'Please fill in the fields manually.';
-                            this.scanStatusType = 'warn';
-                        }
-
                     } catch (err) {
                         this.processing = false;
                         this.scanError = 'AI scan failed: ' + err.message + '. You can fill in the fields manually.';
-                        this.scanStatus = '❌ Scan failed: ' + (err.message || 'Unknown error') + '. Fill in the form manually.';
-                        this.scanStatusType = 'error';
-                        this.$wire.handleScanError(err.message || 'Unknown error');
+                        this.$wire.handleScanError(err.message);
                     }
                 },
 
