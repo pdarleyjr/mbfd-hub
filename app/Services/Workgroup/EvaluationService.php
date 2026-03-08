@@ -430,4 +430,115 @@ class EvaluationService
             'meets_threshold' => $responseCount >= $this->minimumResponseThreshold,
         ];
     }
+
+    /**
+     * Get grouped brand purchase analysis for a given session.
+     *
+     * Groups candidate products by manufacturer within each rankable category
+     * and computes a composite (average) score per brand across ALL their products.
+     * Used to inform "best-value complete package purchase" decisions.
+     *
+     * Returns an array of groups. Each group has:
+     *   - group_name: e.g. "Battery-Operated Extrication Tools"
+     *   - category_ids: array of category IDs included in the group
+     *   - brand_rankings: sorted array of brands w/ composite score + per-product breakdown
+     *
+     * Only includes categories where multiple manufacturers compete for the same product type
+     * (i.e. categories with ≥2 manufacturers AND ≥2 products).
+     */
+    public function getBrandGroupedAnalysis(?int $sessionId = null): array
+    {
+        if (!$sessionId) {
+            return [];
+        }
+
+        // Get all rankable categories with products in this session
+        $categories = \App\Models\EvaluationCategory::rankable()->active()->get();
+
+        $groups = [];
+
+        foreach ($categories as $category) {
+            $products = \App\Models\CandidateProduct::where('category_id', $category->id)
+                ->where('workgroup_session_id', $sessionId)
+                ->get();
+
+            if ($products->isEmpty()) {
+                continue;
+            }
+
+            // Group products by manufacturer
+            $byManufacturer = $products->groupBy('manufacturer')
+                ->filter(fn($p) => $p->first()?->manufacturer); // skip null manufacturer
+
+            if ($byManufacturer->count() < 2) {
+                // Only one brand — no comparison needed
+                continue;
+            }
+
+            // Check there are multiple product types (e.g. cutter, spreader, ram)
+            // by checking if brands share the same product names across types
+            $productNames = $products->pluck('name')->unique()->values();
+            if ($productNames->count() < 2) {
+                continue;
+            }
+
+            // Compute composite brand scores
+            $brandRankings = [];
+
+            foreach ($byManufacturer as $brand => $brandProducts) {
+                $productScores = [];
+                foreach ($brandProducts as $product) {
+                    $submissions = $this->countableSubmissions()
+                        ->where('candidate_product_id', $product->id)
+                        ->where('status', 'submitted')
+                        ->get();
+
+                    $scores = $submissions->map(fn($s) => $s->overall_score)->filter(fn($s) => $s !== null);
+                    $avgScore = $scores->isNotEmpty() ? round($scores->avg(), 2) : null;
+                    $responseCount = $submissions->count();
+
+                    $productScores[] = [
+                        'product' => $product,
+                        'avg_score' => $avgScore,
+                        'response_count' => $responseCount,
+                        'capability_avg' => $responseCount > 0 ? round($submissions->avg('capability_score'), 2) : null,
+                        'usability_avg' => $responseCount > 0 ? round($submissions->avg('usability_score'), 2) : null,
+                        'affordability_avg' => $responseCount > 0 ? round($submissions->avg('affordability_score'), 2) : null,
+                    ];
+                }
+
+                // Composite score = average of per-product averages (only include scored products)
+                $scoredProducts = array_filter($productScores, fn($p) => $p['avg_score'] !== null);
+                $compositeScore = count($scoredProducts) > 0
+                    ? round(collect($scoredProducts)->avg('avg_score'), 2)
+                    : null;
+
+                $brandRankings[] = [
+                    'brand' => $brand,
+                    'composite_score' => $compositeScore,
+                    'product_count' => count($productScores),
+                    'scored_product_count' => count($scoredProducts),
+                    'product_scores' => $productScores,
+                ];
+            }
+
+            // Sort by composite score descending, nulls last
+            usort($brandRankings, function ($a, $b) {
+                if ($a['composite_score'] === null && $b['composite_score'] === null) return 0;
+                if ($a['composite_score'] === null) return 1;
+                if ($b['composite_score'] === null) return -1;
+                return $b['composite_score'] <=> $a['composite_score'];
+            });
+
+            $groups[] = [
+                'category_name' => $category->name,
+                'category_id' => $category->id,
+                'total_products' => $products->count(),
+                'brand_count' => $byManufacturer->count(),
+                'brand_rankings' => $brandRankings,
+            ];
+        }
+
+        return $groups;
+    }
 }
