@@ -63,13 +63,17 @@ class Files extends Page implements HasTable
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('session.name')
+                    ->label('Session')
+                    ->badge()
+                    ->color('primary')
+                    ->default('All Sessions')
+                    ->placeholder('—'),
+
                 TextColumn::make('file_type')
                     ->label('Type')
                     ->badge()
                     ->color('gray'),
-
-                TextColumn::make('formatted_size')
-                    ->label('Size'),
 
                 TextColumn::make('created_at')
                     ->label('Uploaded')
