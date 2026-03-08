@@ -793,7 +793,34 @@ The `mbfd-support-ai` chatbot RAG knowledge base was wiped and rebuilt from scra
 - `scripts/ai/ingest_manuals.py` — re-runnable to refresh the index
 - `scripts/ai/.venv` — Python venv with pymupdf + requests
 - Similarity threshold remains 0.2 (ERROR-004)
-- Worker deployed: Version `6e2f6107-8d92-4786-8c83-1ea09643f05c`
+- Final Worker version: `2fb2bdc8` (commit `1e358375`)
+
+### Driver Manual Added (2026-03-08 Evening)
+- **File**: `driver_manual.pdf` (148 pages, 178K chars) — source tag `driver_manual`
+- **Content**: General apparatus driver info, daily/weekly checks, pump hydraulics, aerial operations, emergency overrides, unit specs (720-gal tank, E1/E2/E3/L1/L11/L3 designations)
+- **⚠️ Conflict Risk**: Driver manual contains outdated SOG/policy content (Equipment Maintenance policy, Vehicle Inspection procedure, Backing procedures, Driver responsibility rules)
+- **Resolution**: System prompt explicitly instructs AI to:
+  1. Use `support_sog` for ALL policy/procedure questions — it is HIGHEST AUTHORITY
+  2. Use `driver_manual` ONLY for factual technical data (specs, calculations, mechanical procedures)
+  3. Discard any `POLICY:` sections from driver_manual in favor of support_sog
+- **Verified**: "Report damaged equipment?" query → AI cited `support_sog` even when `driver_manual` was also retrieved
+
+### Final RAG Index State
+- **Total vectors**: 360 (400-word chunks, 4000-char metadata, topK=10)
+- `puc_engine`: 61 | `l3`: 204 | `driver_manual`: 80 | `support_sog`: 15 | `l1_l11`: 0 (scanned PDF)
+
+### Unit Designations (from driver_manual)
+| Unit | Designation | Chassis |
+|---|---|---|
+| E1 | Unit# 20503 | Pierce Ultimate (PUC) |
+| E2 | Unit# 2-16 | Pierce Ultimate (PUC) |
+| E3 | Unit# 2-22 | Pierce Ultimate (PUC) |
+| E4 | Unit# 20504 | Pierce Ultimate (PUC) |
+| E11 | Unit# 2-14 | Pierce Ultimate (PUC) |
+| E21 | Unit# 2-18 | Pierce Ultimate (PUC) |
+| L1 | Unit# 2-12 | Pierce Dash-2000 |
+| L11 | Unit# 2-6 | Pierce Dash-2000 |
+| L3 | Unit# 17505 | Arrow XT |
 
 ---
 
