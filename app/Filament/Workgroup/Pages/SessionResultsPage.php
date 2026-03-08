@@ -94,31 +94,18 @@ class SessionResultsPage extends Page
     // ─── Header Widgets ─────────────────────────────────────────────
     protected function getHeaderWidgets(): array
     {
-        $session = $this->getSelectedSession();
-
-        // Only show session progress stats when viewing a specific session
-        // (not in Overall Results mode where session is null)
-        if (!$session) {
-            return [];
-        }
-
-        return [
-            SessionProgressWidget::make([
-                'session' => $session,
-            ]),
-        ];
+        // Progress stats are rendered directly in the blade from $progress
+        // to avoid Livewire child component stale-state issues when switching sessions.
+        // The $progress data is included in getViewData() which is always fresh.
+        return [];
     }
 
     // ─── Footer Widgets (rankings table) ────────────────────────────
     protected function getFooterWidgets(): array
     {
-        $session = $this->getSelectedSession();
-
-        return [
-            FinalistsWidget::make([
-                'session' => $session, // null = overall
-            ]),
-        ];
+        // Finalists data is now rendered directly in the blade from $categoryResults
+        // to avoid Livewire child component stale-state issues when switching sessions.
+        return [];
     }
 
     public function getHeaderWidgetsColumns(): int|string|array

@@ -36,10 +36,27 @@
 
     {{-- Session Progress Widgets --}}
     @if(true)
-    <div wire:key="progress-{{ $selectedSessionId }}"><x-filament-widgets::widgets
-        :widgets="$this->getHeaderWidgets()"
-        :columns="$this->getHeaderWidgetsColumns()"
-    /></div>
+    {{-- Session Progress Stats (inline — always fresh on Livewire re-render, avoids child widget stale-state) --}}
+    @if($progress)
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+        @php
+            $pStats = [
+                ['label' => 'Products',    'val' => $progress['total_products']],
+                ['label' => 'Evaluators',  'val' => $progress['total_members']],
+                ['label' => 'Submitted',   'val' => $progress['submitted_submissions']],
+                ['label' => 'In Progress', 'val' => $progress['draft_submissions']],
+                ['label' => 'Pending',     'val' => max(0, $progress['max_possible_submissions'] - $progress['submitted_submissions'])],
+                ['label' => 'Completion',  'val' => $progress['completion_percentage'] . '%'],
+            ];
+        @endphp
+        @foreach($pStats as $s)
+        <div class="fi-wi-stats-overview-stat rounded-xl bg-white dark:bg-gray-900 p-4 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 text-center">
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">{{ $s['label'] }}</p>
+            <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white">{{ $s['val'] }}</p>
+        </div>
+        @endforeach
+    </div>
+    @endif
 
     {{-- AI Executive Report Panel --}}
     <div
@@ -292,13 +309,67 @@
     </div>
     @endif
 
-    {{-- Footer Widgets (Finalists Table) --}}
-    <div class="mt-6" wire:key="finalists-{{ $selectedSessionId }}">
-        <x-filament-widgets::widgets
-            :widgets="$this->getFooterWidgets()"
-            :columns="$this->getFooterWidgetsColumns()"
-        />
+    {{-- Finalists Summary (inline HTML — always reflects current session data) --}}
+    @php
+        $finalists = collect();
+        foreach($categoryResults as $cat) {
+            if (!empty($cat['rankings'])) {
+                $top = collect($cat['rankings'])->filter(fn($r) => $r['meets_threshold'])->take(2);
+                foreach($top as $idx => $item) {
+                    $finalists->push([
+                        'category' => $cat['category_name'],
+                        'rank' => $idx + 1,
+                        'product' => $item['product'],
+                        'score' => $item['weighted_average'],
+                        'responses' => $item['response_count'],
+                    ]);
+                }
+            }
+        }
+    @endphp
+    @if($finalists->isNotEmpty())
+    <div class="mt-6">
+        <div class="fi-section rounded-xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
+                <x-heroicon-o-trophy class="w-5 h-5 text-amber-500 flex-shrink-0" />
+                <h3 class="text-base font-semibold text-gray-900 dark:text-white">Top Finalists</h3>
+                <span class="text-xs text-gray-400">(minimum {{ $progress['minimum_threshold'] ?? 3 }} evaluations required)</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-800/50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Rank</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Category</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Product</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Manufacturer</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Avg Score</th>
+                            <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Responses</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        @foreach($finalists as $finalist)
+                        <tr class="{{ $finalist['rank'] === 1 ? 'bg-amber-50/40 dark:bg-amber-950/10' : '' }}">
+                            <td class="px-4 py-3">
+                                <span class="text-xl">{{ $finalist['rank'] === 1 ? '🥇' : '🥈' }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $finalist['category'] }}</td>
+                            <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $finalist['product']->name }}</td>
+                            <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ $finalist['product']->manufacturer ?? '—' }}</td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="px-2 py-0.5 rounded-full text-xs font-bold {{ $finalist['rank'] === 1 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' }}">
+                                    {{ number_format($finalist['score'], 1) }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-center text-gray-500">{{ $finalist['responses'] }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
+    @endif
 
     @else
     {{-- No Session State --}}
