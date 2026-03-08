@@ -7,8 +7,8 @@
 Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filament 3 backend, React SPA daily checkout, NocoBase admin overlay, Baserow data platform — all containerized on a single VPS.
 
 ## VPS
-- **Host:** `145.223.73.170`
-- **SSH:** `ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@145.223.73.170`
+- **Host:** `[VPS_IP_REDACTED]`
+- **SSH:** `ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@[VPS_IP_REDACTED]`
 - **Compose file:** `/root/mbfd-hub/docker-compose.yml`
 - **Env file:** `/root/mbfd-hub/.env`
 
@@ -23,14 +23,14 @@ Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filamen
 | `reverb` | `reverb` | 8080 | Laravel Reverb WebSockets |
 
 ## Domains
-- `www.mbfdhub.com` → Laravel/React app (port 8080) via Cloudflare Tunnel (tunnel ID: 89429799-7028-4df2-870d-f2fb858a49d7)
+- `www.mbfdhub.com` → Laravel/React app (port 8080) via Cloudflare Tunnel (tunnel ID: [TUNNEL_ID_REDACTED])
 - `mbfdhub.com` → same as www.mbfdhub.com (redirect)
 - `nocobase.mbfdhub.com` → NocoBase (port 13000) via Cloudflare Tunnel
 - `baserow.mbfdhub.com` → Baserow (port 8082) via Cloudflare Tunnel
 
 ## Credentials (non-production; rotate before go-live)
-- NocoBase admin: `admin@nocobase.com` / `admin123`
-- Baserow token: `5c25f5700fedb0f3b46f77b3c9ef41cf` (in `.env` as `BASEROW_TOKEN`)
+- NocoBase admin: `admin@nocobase.com` / `[NOCOBASE_PASS_REDACTED]`
+- Baserow token: `[BASEROW_TOKEN_REDACTED]` (in `.env` as `BASEROW_TOKEN`)
 - GitHub: `pdarleyjr@gmail.com` / token in `.env`
 - Sentry DSN: in `config/sentry.php`
 
@@ -56,7 +56,7 @@ Only `type: "main"` (the built-in PostgreSQL datasource) is available in CE.
 The `plugin-workflow-request` IS available in CE. Use it to call Baserow's REST API from within NocoBase Workflows:
 
 - **Baserow internal URL:** `http://baserow:80/api/`
-- **Auth header:** `Authorization: Token 5c25f5700fedb0f3b46f77b3c9ef41cf`
+- **Auth header:** `Authorization: Token [BASEROW_TOKEN_REDACTED]`
 - **Token env var:** `BASEROW_TOKEN` in `/root/mbfd-hub/.env`
 
 **How to configure in NocoBase UI:**

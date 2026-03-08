@@ -12,13 +12,13 @@
 ```bash
 scp -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" -o "StrictHostKeyChecking=no" \
     "laravel-app/app/Console/Commands/ImportMBFDData.php" \
-    root@145.223.73.170:/root/mbfd-hub/app/Console/Commands/ImportMBFDData.php
+    root@[VPS_IP_REDACTED]:/root/mbfd-hub/app/Console/Commands/ImportMBFDData.php
 ```
 
 ### Step 2: SSH into VPS
 
 ```bash
-ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" -o "StrictHostKeyChecking=no" root@145.223.73.170
+ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" -o "StrictHostKeyChecking=no" root@[VPS_IP_REDACTED]
 ```
 
 ### Step 3: Navigate to Project Directory

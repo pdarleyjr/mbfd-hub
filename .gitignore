@@ -70,3 +70,26 @@ pics/
 # Prevent accidental in-workspace local-rag storage
 /lancedb/
 /models/
+
+# Temp/debug files (cleanup 2026-03-08)
+*.backup
+*.backup2
+ci_logs*.txt
+ci_jobs*.json
+deploy_log*.txt
+full_deploy_log*.txt
+latest_deploy*.json
+latest_jobs*.json
+remote_stats.txt
+runs*.json
+progress.txt
+budget.json
+*.b64
+*_b64.txt
+
+# Local secrets
+.env.local
+.env.*.local
+
+# Database backups (local only)
+backups/*.sql

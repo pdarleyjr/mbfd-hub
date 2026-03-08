@@ -9,10 +9,10 @@ The Training Division panel is a separate Filament v3 panel accessible at `/trai
 
 ## User Credentials
 Training users with `training_admin` role:
-- danielgato@miamibeachfl.gov / Gato1234!
-- victorwhite@miamibeachfl.gov / Vic1234!
-- ClaudioNavas@miamibeachfl.gov / Flea1234!
-- michaelsica@miamibeachfl.gov / Sica1234!
+- danielgato@miamibeachfl.gov / [REDACTED]
+- victorwhite@miamibeachfl.gov / [REDACTED]
+- ClaudioNavas@miamibeachfl.gov / [REDACTED]
+- michaelsica@miamibeachfl.gov / [REDACTED]
 
 ## Roles & Permissions
 - `training_admin` - Full access to Training panel

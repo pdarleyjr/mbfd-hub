@@ -10,12 +10,12 @@ Run these PowerShell commands from the project root:
 # Copy migration file
 scp -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" `
     "database/migrations/2026_02_03_000001_fix_capital_projects_schema.php" `
-    root@145.223.73.170:/var/www/mbfd-support-hub/database/migrations/
+    root@[VPS_IP_REDACTED]:/var/www/mbfd-support-hub/database/migrations/
 
 # Copy RelationManager
 scp -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" `
     "app/Filament/Resources/StationResource/RelationManagers/CapitalProjectsRelationManager.php" `
-    root@145.223.73.170:/var/www/mbfd-support-hub/app/Filament/Resources/StationResource/RelationManagers/
+    root@[VPS_IP_REDACTED]:/var/www/mbfd-support-hub/app/Filament/Resources/StationResource/RelationManagers/
 ```
 
 If you get a host key warning, type `yes` to accept.
@@ -23,7 +23,7 @@ If you get a host key warning, type `yes` to accept.
 ## Step 2: SSH into VPS and Run Commands
 
 ```bash
-ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@145.223.73.170
+ssh -i "C:\Users\Peter Darley\.ssh\id_ed25519_hpb_docker" root@[VPS_IP_REDACTED]
 ```
 
 Once connected, run:

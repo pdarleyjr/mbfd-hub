@@ -4,7 +4,7 @@
 > ⚠️ **CRITICAL MANDATE**: Every AI agent working on this codebase MUST read this entire file BEFORE making any changes. Failure to read this file WILL result in breaking existing functionality.
 
 **Last Updated**: 2026-03-05  
-**Project**: MBFD Hub (Laravel 11, Filament v3, VPS at 145.223.73.170)
+**Project**: MBFD Hub (Laravel 11, Filament v3, VPS at [VPS_IP_REDACTED])
 
 ---
 

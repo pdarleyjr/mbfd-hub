@@ -23,7 +23,67 @@ services:
             - ./:/var/www/html
         networks:
             - app-network
+            - sail
+
+    snipeit_db:
+        image: mariadb:10.11
+        container_name: snipeit_db
+        restart: unless-stopped
+        environment:
+            MYSQL_ROOT_PASSWORD: ${SNIPEIT_DB_ROOT_PASSWORD}
+            MYSQL_DATABASE: ${SNIPEIT_DB_DATABASE}
+            MYSQL_USER: ${SNIPEIT_DB_USERNAME}
+            MYSQL_PASSWORD: ${SNIPEIT_DB_PASSWORD}
+        volumes:
+            - snipeit_db_data:/var/lib/mysql
+        networks:
+            - app-network
+        healthcheck:
+            test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+            start_period: 30s
+            timeout: 10s
+            retries: 5
+
+    snipeit:
+        image: snipe/snipe-it:latest
+        container_name: snipeit
+        restart: unless-stopped
+        depends_on:
+            snipeit_db:
+                condition: service_healthy
+        environment:
+            APP_URL: ${SNIPEIT_APP_URL:-https://inventory.mbfdhub.com}
+            APP_KEY: ${SNIPEIT_APP_KEY}
+            DB_HOST: snipeit_db
+            DB_DATABASE: ${SNIPEIT_DB_DATABASE}
+            DB_USERNAME: ${SNIPEIT_DB_USERNAME}
+            DB_PASSWORD: ${SNIPEIT_DB_PASSWORD}
+            DB_CONNECTION: mysql
+            DB_PORT: 3306
+            MAIL_MAILER: ${SNIPEIT_MAIL_MAILER:-log}
+            MAIL_HOST: ${SNIPEIT_MAIL_HOST:-mailhog}
+            MAIL_PORT: ${SNIPEIT_MAIL_PORT:-1025}
+            MAIL_FROM_ADDRESS: ${SNIPEIT_MAIL_FROM_ADDRESS:-noreply@mbfdhub.com}
+            MAIL_FROM_NAME: ${SNIPEIT_MAIL_FROM_NAME:-Snipe-IT}
+            TZ: America/New_York
+        volumes:
+            - snipeit_data:/var/www/html/storage
+            - snipeit_uploads:/var/www/html/public/uploads
+        networks:
+            - app-network
+            - sail
 
 networks:
     app-network:
         driver: bridge
+    sail:
+        external: true
+        name: mbfd-hub_sail
+
+volumes:
+    snipeit_db_data:
+        name: snipeit_db_data
+    snipeit_data:
+        name: snipeit_data
+    snipeit_uploads:
+        name: snipeit_uploads

@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Workgroup\FileDownloadController;
+use App\Http\Controllers\SamlSsoController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -39,6 +40,9 @@ Route::get('/daily/{any}', function () {
     return $response;
 })->where('any', '.*');
 
+// SAML SSO endpoint - handles SAMLRequest from Snipe-IT SP
+Route::get('/saml/sso', SamlSsoController::class)->middleware('web')->name('saml.sso');
+
 Route::get('/__version', function() {
     $sha = cache()->remember('build_sha', 60, fn() => trim(shell_exec('git rev-parse HEAD') ?? 'unknown'));
     $branch = cache()->remember('build_branch', 60, fn() => trim(shell_exec('git rev-parse --abbrev-ref HEAD') ?? 'unknown'));
@@ -68,4 +72,12 @@ Route::get('/workgroup/file/{file}/preview', [FileDownloadController::class, 'pr
 Route::get('/workgroup/shared-upload/{upload}/download', [FileDownloadController::class, 'downloadSharedUpload'])
     ->name('workgroup.shared-upload.download')
     ->middleware('auth');
+
+ Route::get('/ping', function () { return 'pong'; });
+    
+Route::group(['prefix' => 'api'], function () {
+    Route::middleware('auth:api')->get('/user', function (Request $request) {
+        return $request->user();
+    });
+});
 
