@@ -36,15 +36,17 @@ const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
 const EXTRACTION_PROMPT = `Look at this equipment image from a fire station.
 Extract EXACTLY these fields and respond with ONLY a JSON object:
 
-{"brand":"manufacturer name","model":"model number or name","serial":"serial number","confidence":"high|medium|low","notes":"brief observation"}
+{"brand":"manufacturer name","model":"model number or name","serial":"serial number","item_name":"descriptive item name","category":"equipment category","confidence":"high|medium|low","notes":"brief observation"}
 
 Rules:
 - brand: company or manufacturer (e.g. Scott, MSA, Motorola, Hurst, Honeywell, 3M, Bullard)
-- model: model number or name (e.g. Air-Pak X3, APX 6000, Jaws HD-55)
-- serial: serial number from label or data plate (starts with letters+digits)
+- model: model number or alphanumeric code from label (e.g. Air-Pak X3, K970, CE-2171-RS)
+- serial: serial number from label or data plate
+- item_name: short descriptive name of WHAT it is (e.g. "18 inch chainsaw", "SCBA air pack", "hydraulic spreader", "PPV fan") - only if confident, otherwise empty string ""
+- category: ONE of these categories only if clearly identifiable - "Saw", "Fan", "Rescue Tool", "SCBA", "PPE", "Radio", "Tool", "Medical", "Hose", "Other" - otherwise empty string ""
 - confidence: high if you can clearly read labels, medium if partially visible, low if guessing
-- notes: one sentence about what you see (not more)
-- If a field is not visible or readable, use empty string ""
+- notes: one sentence about what you see (optional)
+- If a field is not visible or readable, use empty string "" — DO NOT GUESS
 - Output ONLY the JSON object, no explanation, no markdown`;
 
 function jsonResp(data: unknown, status = 200): Response {
@@ -81,6 +83,8 @@ function parseJSON(raw: string): Record<string, string> {
       brand:      String(obj.brand      ?? '').trim(),
       model:      String(obj.model      ?? '').trim(),
       serial:     String(obj.serial     ?? '').trim(),
+      item_name:  String(obj.item_name  ?? '').trim(),
+      category:   String(obj.category   ?? '').trim(),
       confidence: String(obj.confidence ?? 'low').trim(),
       notes:      String(obj.notes      ?? '').trim(),
     };
@@ -92,6 +96,8 @@ function parseJSON(raw: string): Record<string, string> {
       brand:      extract('brand'),
       model:      extract('model'),
       serial:     extract('serial'),
+      item_name:  extract('item_name'),
+      category:   extract('category'),
       confidence: extract('confidence') || 'low',
       notes:      extract('notes') || `Partial parse from: ${text.slice(0, 100)}`,
     };
@@ -135,6 +141,8 @@ async function analyzeImage(env: Env, b64: string): Promise<{ parsed: Record<str
         brand:      String(obj.brand      ?? '').trim(),
         model:      String(obj.model      ?? '').trim(),
         serial:     String(obj.serial     ?? '').trim(),
+        item_name:  String(obj.item_name  ?? '').trim(),
+        category:   String(obj.category   ?? '').trim(),
         confidence: String(obj.confidence ?? 'low').trim(),
         notes:      String(obj.notes      ?? '').trim(),
       },
@@ -172,17 +180,19 @@ function merge(
   results: Array<{ parsed: Record<string, string>; rawText: string }>
 ): { parsed: Record<string, string>; rawText: string } {
   if (results.length === 0) {
-    return { parsed: { brand: '', model: '', serial: '', confidence: 'low', notes: '' }, rawText: '' };
+    return { parsed: { brand: '', model: '', serial: '', item_name: '', category: '', confidence: 'low', notes: '' }, rawText: '' };
   }
   if (results.length === 1) return results[0];
 
   const score = (c: string) => c === 'high' ? 3 : c === 'medium' ? 2 : 1;
-  const merged: Record<string, string> = { brand: '', model: '', serial: '', confidence: 'low', notes: '' };
+  const merged: Record<string, string> = { brand: '', model: '', serial: '', item_name: '', category: '', confidence: 'low', notes: '' };
 
   for (const { parsed } of results) {
-    if (!merged.brand  && parsed.brand)  merged.brand  = parsed.brand;
-    if (!merged.model  && parsed.model)  merged.model  = parsed.model;
-    if (!merged.serial && parsed.serial) merged.serial = parsed.serial;
+    if (!merged.brand     && parsed.brand)     merged.brand     = parsed.brand;
+    if (!merged.model     && parsed.model)     merged.model     = parsed.model;
+    if (!merged.serial    && parsed.serial)    merged.serial    = parsed.serial;
+    if (!merged.item_name && parsed.item_name) merged.item_name = parsed.item_name;
+    if (!merged.category  && parsed.category)  merged.category  = parsed.category;
     if (score(parsed.confidence) > score(merged.confidence)) merged.confidence = parsed.confidence;
   }
 
@@ -254,6 +264,8 @@ export default {
         brand:  parsed.brand,
         model:  parsed.model,
         serial: parsed.serial,
+        item_name: parsed.item_name,
+        category: parsed.category,
         confidence: parsed.confidence,
         notes:  parsed.notes,
         images_analyzed: results.length,

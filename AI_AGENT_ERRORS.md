@@ -405,11 +405,69 @@ const response = await env.AI.run('@cf/meta/llama-3.2-11b-vision-instruct', {
 - Test with a real image during Worker development
 - Include `raw_text` in the API response for debugging
 
----
-
 ### ERROR-018: Filament v3 Widgets as Livewire Children — Stale State on Parent Property Change
 **Date**: 2026-03-08
 **Root cause**: Filament v3 widgets are separate Livewire components. Passing new session props via make() sets INITIAL state only. When parent page re-renders after wire:click, widgets may NOT remount — they keep old session data.
 **Wrong approach**: wire:key on HTML div does NOT force widget remounting
 **Correct fix**: Remove Livewire widgets from pages with reactive switching. Compute all data in getViewData() (always fresh) and render as plain HTML in blade.
 **Commits**: d167eb45
+
+---
+
+### ERROR-019: Livewire v3 `dispatch()` vs Browser Events for Alpine.js
+
+**Date**: 2026-03-08  
+**Severity**: 🟡 MEDIUM — camera buffer never clears after save; user must manually reset  
+**File(s) Affected**: `app/Filament/Admin/Pages/EquipmentIntake.php`, `equipment-intake.blade.php`
+
+**Symptom**:
+After clicking "Approve & Save" and a successful Snipe-IT submission, the camera thumbnail strip still shows the old photos. The user has to manually click "Clear All" before the next scan.
+
+**Root Cause**:
+`resetScanForm()` only resets PHP-side Livewire properties — it does NOT clear Alpine.js local state (`imagePreviews`, `imageFiles`). The frontend and backend are separate; you must use a browser event to bridge them.
+
+**Fix Applied**:
+1. In PHP `approveAndSave()`, after `$this->resetScanForm()`:
+   ```php
+   $this->dispatch('equipment-saved');
+   ```
+2. In blade, add `.window` event listener to the Alpine.js x-data wrapper:
+   ```html
+   <div x-data="equipmentScanner()" @equipment-saved.window="resetCapture()">
+   ```
+
+**How it works (Livewire v3)**:
+- `$this->dispatch('event-name')` dispatches a browser `CustomEvent` on the window
+- Alpine.js `@event-name.window="handler()"` catches it globally
+- The `resetCapture()` method clears `imagePreviews` and `imageFiles` arrays on the Alpine component
+
+**Prevention**:
+ - When you need to trigger Alpine.js logic from a PHP Livewire method, ALWAYS use `$this->dispatch('event')` + `@event.window` in Alpine — NEVER try to call Alpine methods from PHP directly
+- Document the event contract: `equipment-saved` → Alpine `resetCapture()` clears camera buffer
+
+---
+
+### ERROR-020: Cloudflare Vectorize — Scanned/Image PDFs Yield Zero Vectors
+
+**Date**: 2026-03-08  
+**Severity**: 🟡 MEDIUM — ingestion silently skips source, chatbot has no knowledge for that apparatus  
+**File(s) Affected**: `scripts/ai/ingest_manuals.py`, `mbfd-rag-index`
+
+**Symptom**:
+`L1_L11_manual.pdf` was processed by PyMuPDF but extracted 0 characters. The source was silently skipped. The chatbot has no L1/L11 knowledge despite the file being provided.
+
+**Root Cause**:
+The `L1_L11_manual.pdf` file is a scanned image PDF (no OCR/text layer). PyMuPDF's `get_text("text")` and `get_text("blocks")` both return empty strings for image-only pages.
+
+**Fix Applied**:
+Script now detects < 100 characters extracted and prints a clear warning instead of producing empty chunks. Re-ingest once a text-based or OCR'd PDF is available.
+
+**How to Fix L1/L11**:
+1. Obtain an OCR'd version of `L1_L11_manual.pdf` (use Adobe Acrobat, AWS Textract, or similar)
+2. Place at `C:\Users\Peter Darley\Downloads\L1_L11_manual.pdf`
+3. Re-run: `scripts\ai\.venv\Scripts\python.exe scripts\ai\ingest_manuals.py`
+
+**Prevention**:
+- Always check extracted character count before ingesting
+- For fire department manuals, assume scanned PDFs are possible
+- The ingestion script `ingest_manuals.py` already warns about this — check its output before considering ingestion complete
