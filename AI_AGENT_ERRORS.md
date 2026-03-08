@@ -471,3 +471,30 @@ Script now detects < 100 characters extracted and prints a clear warning instead
 - Always check extracted character count before ingesting
 - For fire department manuals, assume scanned PDFs are possible
 - The ingestion script `ingest_manuals.py` already warns about this — check its output before considering ingestion complete
+
+---
+
+### ERROR-021: Driver Manual Contains Outdated SOG/Policy Content — Potential Conflicting AI Responses
+
+**Date**: 2026-03-08  
+**Severity**: 🟡 MEDIUM — AI could provide outdated policy information if driver_manual chunks are used for policy questions  
+**File(s) Affected**: `cloudflare-worker/src/index.ts` (system prompt), `scripts/ai/ingest_manuals.py`
+
+**Symptom**:
+The `driver_manual.pdf` contains a mix of: (a) current technical/apparatus data (specs, hydraulics, emergency procedures) AND (b) outdated SOG-type policy content (Equipment Maintenance POLICY, Vehicle Inspection procedures, Backing guidelines, Driver Responsibility rules). If the chatbot uses driver_manual for a policy question, it may give outdated or conflicting info.
+
+**Root Cause**:
+The driver manual was authored before the current Support Services SOG and contains policy language that could contradict the current SOG.
+
+**Fix Applied**:
+System prompt now explicitly states:
+1. `support_sog` is HIGHEST AUTHORITY for all policy and procedural matters
+2. `driver_manual` is used ONLY for factual technical data (specs, calculations, mechanical procedures)
+3. Any `POLICY:` sections or procedural guidance in `driver_manual` must be DISCARDED in favor of `support_sog`
+
+**Verified**: "What is the procedure for reporting damaged equipment?" — AI correctly cited `support_sog` even though `driver_manual` was also semantically retrieved.
+
+**Prevention**:
+- When ingesting MBFD documents that contain both policy and technical content, always add explicit conflict resolution rules in the system prompt
+- The SOG is always the highest authority for MBFD operational matters
+- Technical specs (tank capacities, hydraulic formulas, unit numbers) from older documents remain valid even if their policy sections are outdated

@@ -529,4 +529,32 @@ The application now has **three Filament panels** (plus one public SPA):
 - Test 2 (ambiguous "ladder truck"): Correctly asked for L1/L11 vs L3 clarification ✅
 - Committed to `feat/equipment-intake-ai-bulk` branch
 
+---
+
+## FINAL UPDATE — 2026-03-08 (Evening, Continued)
+
+### Driver Manual Ingested + Conflict Resolution
+
+**driver_manual.pdf added as 5th RAG source (80 chunks)**:
+- Contains general apparatus operations, daily/weekly checks, pump hydraulics, aerial procedures
+- Unit designations confirmed: E1 (20503/PUC), E2 (2-16/PUC), E3 (2-22/PUC), L1 (2-12/Dash), L11 (2-6/Dash), L3 (17505/Arrow XT)
+- Key spec confirmed: booster tank = **720 gallons** (was missing from puc_engine PDF)
+
+**Conflict risk identified and mitigated**:
+- Driver manual contains outdated POLICY sections that may conflict with current Support Services SOG
+- System prompt updated: SOG is HIGHEST AUTHORITY; driver_manual policy/procedure sections explicitly discarded
+- Verified: policy question uses support_sog even when driver_manual also retrieved
+
+**Final Index**: 360 vectors — puc_engine=61, l3=204, driver_manual=80, support_sog=15, l1_l11=0 (scanned)
+
+**Final Worker Version**: `2fb2bdc8` | **Final Commit**: `1e358375`
+
+### System Prompt Final Routing Logic
+1. Ambiguous "ladder/aerial/truck" (no unit#) → Ask L1/L11 vs L3? (HIGHEST PRIORITY)
+2. Any engine reference (E1/E2/PUC/Engine X) → puc_engine only, no clarification
+3. L1/L11/Ladder 1/Ladder 11 → l1_l11 only
+4. L3/Ladder 3 → l3 only
+5. Policy/procedure → support_sog (overrides driver_manual)
+6. General apparatus technical data → driver_manual supplemental
+
 **END OF DISCOVERY REPORT**
