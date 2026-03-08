@@ -42,6 +42,9 @@ class SessionResultsPage extends Page
     public function getHeading(): string
     {
         $session = $this->getSelectedSession();
+        if (!$session && $this->selectedSessionId === null) {
+            return 'Overall Results — All Sessions';
+        }
         return $session ? "Results: {$session->name}" : 'Session Results';
     }
 
@@ -49,7 +52,8 @@ class SessionResultsPage extends Page
     {
         $session = $this->getSelectedSession();
         if (!$session) {
-            return 'No active evaluation session found.';
+            $allSessions = WorkgroupSession::all();
+            return "Showing combined results across all {$allSessions->count()} session(s).";
         }
 
         $progress = app(EvaluationService::class)->getSessionProgress($session->id);
@@ -60,8 +64,8 @@ class SessionResultsPage extends Page
     {
         abort_unless(static::canAccess(), 403);
 
-        $activeSession = WorkgroupSession::active()->first();
-        $this->selectedSessionId = $activeSession?->id;
+        // Default to null (Overall Results — all sessions combined)
+        $this->selectedSessionId = null;
     }
 
     public function getSelectedSession(): ?WorkgroupSession
@@ -69,7 +73,16 @@ class SessionResultsPage extends Page
         if ($this->selectedSessionId) {
             return WorkgroupSession::find($this->selectedSessionId);
         }
-        return WorkgroupSession::active()->first();
+        return null; // null = Overall / All Sessions
+    }
+
+    /**
+     * All available sessions for the blade session switcher pills.
+     */
+    public function getAllSessions(): \Illuminate\Support\Collection
+    {
+        return WorkgroupSession::orderByRaw("CASE WHEN status='active' THEN 0 ELSE 1 END")
+            ->orderByDesc('created_at')->get();
     }
 
     /**
@@ -84,6 +97,10 @@ class SessionResultsPage extends Page
     protected function getHeaderWidgets(): array
     {
         $session = $this->getSelectedSession();
+        if (!$session) {
+            // Overall Results: no session-specific progress widget
+            return [];
+        }
 
         return [
             SessionProgressWidget::make([
@@ -99,7 +116,7 @@ class SessionResultsPage extends Page
 
         return [
             FinalistsWidget::make([
-                'session' => $session,
+                'session' => $session, // null = overall
             ]),
         ];
     }
@@ -117,59 +134,54 @@ class SessionResultsPage extends Page
     // ─── Header Actions ─────────────────────────────────────────────
     protected function getHeaderActions(): array
     {
-        return [
-            Action::make('selectSession')
-                ->label('Switch Session')
-                ->icon('heroicon-o-calendar')
-                ->color('gray')
-                ->form([
-                    Select::make('session_id')
-                        ->label('Evaluation Session')
-                        ->options(fn () => WorkgroupSession::orderByDesc('created_at')->pluck('name', 'id')->toArray())
-                        ->default(fn () => $this->selectedSessionId)
-                        ->required(),
-                ])
-                ->action(function (array $data): void {
-                    $this->selectedSessionId = $data['session_id'] ?? null;
-                }),
-        ];
+        // Session switching is now handled by inline pill navigation in the blade view
+        // (wire:click calls switchSession() Livewire method directly)
+        return [];
     }
 
     // ─── View Data (passed to blade) ────────────────────────────────
     protected function getViewData(): array
     {
         $session = $this->getSelectedSession();
-        if (!$session) {
+        $evalService = app(EvaluationService::class);
+        $allSessions = WorkgroupSession::orderByRaw("CASE WHEN status='active' THEN 0 ELSE 1 END")
+            ->orderByDesc('created_at')->get();
+
+        if (!$session && $this->selectedSessionId !== null) {
+            // Selected a specific session ID that doesn't exist
             return [
                 'session' => null,
                 'categoryResults' => collect(),
                 'progress' => null,
-                'sessions' => WorkgroupSession::orderByDesc('created_at')->get(),
+                'sessions' => $allSessions,
+                'brandGroupedAnalysis' => [],
             ];
         }
 
-        $evalService = app(EvaluationService::class);
-        $results = $evalService->getSessionResults($session->id);
-        $progress = $evalService->getSessionProgress($session->id);
+        // session === null means "Overall Results" — pass null to get all data combined
+        $sessionId = $session?->id; // null = all sessions
+
+        $results = $evalService->getSessionResults($sessionId);
+        $progress = $evalService->getSessionProgress($sessionId);
 
         // Enhance category results with SAVER score breakdown
-        $categoryResults = collect($results['rankable_categories'])->map(function ($cat) {
+        $categoryResults = collect($results['rankable_categories'])->map(function ($cat) use ($sessionId) {
             $rankings = collect($cat['rankings'])->map(function ($item) {
                 $product = $item['product'];
-                $submissions = EvaluationSubmission::where('candidate_product_id', $product->id)
+                $submissions = \App\Models\EvaluationSubmission::where('candidate_product_id', $product->id)
                     ->where('status', 'submitted')
                     ->whereHas('member', fn($q) => $q->where('count_evaluations', true))
                     ->get();
 
                 return array_merge($item, [
-                    'capability_avg' => $submissions->avg('capability_score'),
-                    'usability_avg' => $submissions->avg('usability_score'),
-                    'affordability_avg' => $submissions->avg('affordability_score'),
-                    'maintainability_avg' => $submissions->avg('maintainability_score'),
-                    'deployability_avg' => $submissions->avg('deployability_score'),
-                    'advance_yes' => $submissions->where('advance_recommendation', 'yes')->count(),
-                    'advance_no' => $submissions->where('advance_recommendation', 'no')->count(),
-                    'deal_breakers' => $submissions->where('has_deal_breaker', true)->count(),
+                    'capability_avg'     => $submissions->avg('capability_score'),
+                    'usability_avg'      => $submissions->avg('usability_score'),
+                    'affordability_avg'  => $submissions->avg('affordability_score'),
+                    'maintainability_avg'=> $submissions->avg('maintainability_score'),
+                    'deployability_avg'  => $submissions->avg('deployability_score'),
+                    'advance_yes'        => $submissions->where('advance_recommendation', 'yes')->count(),
+                    'advance_no'         => $submissions->where('advance_recommendation', 'no')->count(),
+                    'deal_breakers'      => $submissions->where('has_deal_breaker', true)->count(),
                 ]);
             });
 
@@ -177,11 +189,11 @@ class SessionResultsPage extends Page
         });
 
         return [
-            'session' => $session,
-            'categoryResults' => $categoryResults,
-            'progress' => $progress,
-            'sessions' => WorkgroupSession::orderByDesc('created_at')->get(),
-            'brandGroupedAnalysis' => $evalService->getBrandGroupedAnalysis($session->id),
+            'session'               => $session,
+            'categoryResults'       => $categoryResults,
+            'progress'              => $progress,
+            'sessions'              => $allSessions,
+            'brandGroupedAnalysis'  => $evalService->getBrandGroupedAnalysis($sessionId),
         ];
     }
 
