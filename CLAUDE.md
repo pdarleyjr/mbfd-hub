@@ -693,3 +693,67 @@ WORKGROUP_AI_WORKER_URL=https://mbfd-workgroup-ai.pdarleyjr.workers.dev
 | `docs/SNIPEIT_SSO_SETUP.md` | New SSO setup guide |
 
 ---
+
+## 🆕 Vision Worker Fix & Equipment Intake Bug Investigation (2026-03-08)
+
+### Root Cause Found & Fixed
+
+**Critical Bug**: Equipment intake AI pipeline was never triggering after image upload.
+
+**Root Causes (Two Compound Issues)**:
+1. **Vision Worker source code was NEVER committed** — `cloudflare-worker/vision-agent/` only contained `package-lock.json`. A previous agent deployed the Worker directly to Cloudflare without committing source.
+2. **Wrong model name** — the previous Worker used `@cf/llava-1.5-7b-hf` (doesn't exist). Correct name: `@cf/llava-hf/llava-1.5-7b-hf`
+3. **llama-3.2-11b-vision ToS not accepted** — When the Worker fell back to llama-3.2-11b-vision-instruct, it returned error 5016 (ToS required). **Fixed by submitting `{ "prompt": "agree" }` to the Cloudflare API**.
+
+**The UI Code Was Correct** — The blade template already has:
+- "Analyze Photos with AI" button (`@click="analyzeAllImages()"`)
+- Alpine.js `analyzeAllImages()` function that POSTs to the Vision Worker
+- `@this.processVisionResult()` to send results to Livewire
+- Complete Livewire methods: `processVisionResult()`, `handleScanError()`, `approveAndSave()`, etc.
+
+### Vision Worker Architecture (NEW — 2026-03-08)
+
+**Worker**: `vision-agent.pdarleyjr.workers.dev`
+**Source**: `cloudflare-worker/vision-agent/src/index.ts`
+
+**Models Used**:
+| Model | Role | Notes |
+|---|---|---|
+| `@cf/llava-hf/llava-1.5-7b-hf` | Primary | No ToS gate. Input: `{ image: number[], prompt, max_tokens }` |
+| `@cf/meta/llama-3.2-11b-vision-instruct` | Fallback | ToS accepted 2026-03-08. Input: messages array with image_url |
+
+**API Contract**:
+```
+POST https://vision-agent.pdarleyjr.workers.dev
+Body: { "image": "base64string" }   OR   { "images": ["base64", ...] }
+Response: { "brand": "...", "model": "...", "serial": "...", "confidence": "high|medium|low", "notes": "...", "images_analyzed": N }
+```
+
+**ToS Acceptance** (already done, one-time):
+```bash
+curl -X POST https://api.cloudflare.com/client/v4/accounts/265122b6d6f29457b0ca950c55f3ac6e/ai/run/@cf/meta/llama-3.2-11b-vision-instruct \
+  -H "Authorization: Bearer <CF_TOKEN>" \
+  -d '{"prompt":"agree"}'
+```
+
+### Snipe-IT Verification
+- Snipe-IT container (`snipeit`) confirmed UP and reachable from Laravel container
+- API endpoint `http://snipeit:80/api/v1/hardware` returns 200 with valid auth token
+- `SNIPEIT_API_URL` and `SNIPEIT_API_TOKEN` properly configured in `.env`
+- `config/snipeit.php` maps env vars correctly
+
+### Additional Finding: `mbfd-hub-app` Container Crash
+- Container `mbfd-hub-app` is crash-looping (PHP 8.3 but composer requires ≥8.4)
+- **Does NOT affect production** — `mbfd-hub-laravel.test-1` (sail-8.5/app) is serving traffic successfully
+- Site returns 200 at `https://www.mbfdhub.com` — no user impact
+
+### Files Added (2026-03-08)
+| File | Purpose |
+|---|---|
+| `cloudflare-worker/vision-agent/wrangler.toml` | Wrangler config for vision-agent Worker |
+| `cloudflare-worker/vision-agent/src/index.ts` | Vision Worker source (llava primary, llama-3.2 fallback) |
+| `cloudflare-worker/vision-agent/package.json` | Package metadata |
+| `cloudflare-worker/vision-agent/test_vision.py` | Integration test script |
+| `tests/Feature/EquipmentIntakeTest.php` | Livewire test coverage for EquipmentIntake page |
+
+---
