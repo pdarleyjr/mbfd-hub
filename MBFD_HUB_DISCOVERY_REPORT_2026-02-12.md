@@ -441,6 +441,38 @@ The application now has **three Filament panels** (plus one public SPA):
 | [`docs/SNIPEIT_SSO_SETUP.md`](docs/SNIPEIT_SSO_SETUP.md) | SSO setup guide |
 | [`app/Providers/Filament/AdminPanelProvider.php`](app/Providers/Filament/AdminPanelProvider.php) | Snipe-IT nav link |
 
+#### Branch Cleanup
+- **23 stale remote branches deleted** — repository cleaned to 3 active branches:
+  - `main` (production)
+  - `feat/equipment-intake-ai-bulk` (AI bulk import — pending merge)
+  - `chore/security-devsecops` (this security hardening branch, pending merge)
+- `fix/snipeit-relational-integration` legacy branch also deleted (already merged to main)
+- Local VS Code workspace: switched to `main` branch, 43 tracked garbage files removed from git index, 0 pending changes
+- `git remote prune origin` executed — local branch cache matches remote exactly
+
+### 🆕 Equipment Intake Vision Worker Fix (2026-03-08)
+
+**Bug**: AI pipeline never triggered after image upload — form fields never populated, no Snipe-IT submission.
+
+**Investigation Findings**:
+- UI code and Livewire integration were **correct** — "Analyze Photos with AI" button exists and calls the right methods
+- `cloudflare-worker/vision-agent/` contained **only `package-lock.json`** — source code was never committed
+- Deployed Worker used wrong model name (`@cf/llava-1.5-7b-hf` doesn't exist; correct: `@cf/llava-hf/llava-1.5-7b-hf`)
+- `@cf/meta/llama-3.2-11b-vision-instruct` required Terms of Service acceptance (error 5016 — never done by previous agent)
+
+**Fix Applied**:
+1. Created complete Vision Worker source at `cloudflare-worker/vision-agent/src/index.ts`
+2. Accepted llama-3.2-11b-vision ToS via Cloudflare API (one-time, permanent)
+3. Worker architecture: llava-1.5-7b-hf (primary, no ToS) + llama-3.2-11b-vision (fallback)
+4. Deployed to `vision-agent.pdarleyjr.workers.dev` — confirmed returning valid JSON
+5. Verified Snipe-IT API accessible from Laravel container (http://snipeit:80/api/v1 → 200 OK)
+
+**Additional Find**: `mbfd-hub-app` container crash-looping (PHP version mismatch) — does NOT affect site (served by `mbfd-hub-laravel.test-1` via sail-8.5/app)
+
+**Tests Added**: `tests/Feature/EquipmentIntakeTest.php` — covers all Livewire methods, mock SnipeItService
+
+**Cloudflare Account ID**: `265122b6d6f29457b0ca950c55f3ac6e`
+
 ---
 
 **END OF DISCOVERY REPORT**
