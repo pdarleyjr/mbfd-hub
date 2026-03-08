@@ -56,9 +56,8 @@ class Evaluations extends Page implements HasTable
 
     /**
      * Return sessions the member is allowed to access:
-     * - sessions in their workgroup where they have an attendance record, OR
-     * - sessions where they already have at least one evaluation submission
-     * Both filtered by count_evaluations=true being respected.
+     * - For admin/facilitator role: ALL sessions in the workgroup
+     * - For base member role: sessions with attendance record OR existing submissions
      */
     public function getAttendedSessions(WorkgroupMember $member): \Illuminate\Support\Collection
     {
@@ -68,13 +67,20 @@ class Evaluations extends Page implements HasTable
 
         $workgroupId = $member->workgroup_id;
 
-        // Sessions the member is in the attendance pivot for
-        $attendedIds = \Illuminate\Support\Facades\DB::table('session_workgroup_member_attendance')
+        // Admin and facilitator roles see ALL sessions in their workgroup
+        if (in_array($member->role, ['admin', 'facilitator'])) {
+            return \App\Models\WorkgroupSession::where('workgroup_id', $workgroupId)
+                ->orderByRaw("CASE WHEN status='active' THEN 0 ELSE 1 END")
+                ->orderByDesc('created_at')
+                ->get();
+        }
+
+        // Base members: sessions in attendance pivot + sessions with existing submissions
+        $attendedIds = DB::table('session_workgroup_member_attendance')
             ->where('workgroup_member_id', $member->id)
             ->pluck('workgroup_session_id')
             ->toArray();
 
-        // Sessions where member already has at least one submission (backfill safety)
         $submittedSessionIds = EvaluationSubmission::where('workgroup_member_id', $member->id)
             ->join('candidate_products', 'candidate_products.id', '=', 'evaluation_submissions.candidate_product_id')
             ->whereNotNull('candidate_products.workgroup_session_id')
