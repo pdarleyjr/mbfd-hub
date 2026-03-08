@@ -59,6 +59,11 @@ SOURCES = [
         "source_tag": "l3",
         "type": "pdf",
     },
+    {
+        "path": r"C:\Users\Peter Darley\Downloads\driver_manual.pdf",
+        "source_tag": "driver_manual",
+        "type": "pdf",
+    },
 ]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
