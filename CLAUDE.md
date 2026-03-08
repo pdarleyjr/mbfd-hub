@@ -694,6 +694,41 @@ WORKGROUP_AI_WORKER_URL=https://mbfd-workgroup-ai.pdarleyjr.workers.dev
 
 ---
 
+## 🆕 Equipment Intake Pipeline Complete Fix (2026-03-08 Afternoon)
+
+### User-Reported Bug (Round 2)
+"I can upload and click Analyze, but nothing happens. No data populates. No message appears."
+
+### Root Causes
+1. **`@this` unreliable in async callbacks** — Alpine.js `@push('scripts')` functions that use `@this.methodName()` in fetch callbacks fail silently in Livewire v3. Fix: use `this.$wire.methodName()` (the Livewire v3 Alpine magic property).
+2. **Wrong llama-3.2-11b API format** — Image must be in messages array as `image_url` content type, not as a top-level `image` field.
+3. **`response.response` is an object** (not string) when model returns JSON — previous parsing code only handled strings.
+
+### Fixes
+- All `@this.xxx()` → `this.$wire.xxx()` in blade view
+- Worker rewritten to use correct API format with messages array
+- Added `scanStatus` / `scanStatusType` properties + UI status display
+- `processVisionResult()` now accepts `notes` param, populates `scan_notes`
+
+### Verification
+```
+POST https://vision-agent.pdarleyjr.workers.dev  { "image": "...MBFD logo..." }
+→ {"brand":"HURST","model":"Jaws of Life","serial":"(not visible)","confidence":"low","notes":"partially visible"}
+```
+Model correctly identifies fire rescue equipment brand from images.
+
+### Key Pattern
+```javascript
+// WRONG - @this in async @push('scripts') callbacks:
+@this.processVisionResult(brand, model, serial);
+// CORRECT - $wire inside Alpine x-data component:
+await this.$wire.processVisionResult(brand, model, serial, notes);
+```
+
+See ERROR-008 and ERROR-009 in AI_AGENT_ERRORS.md.
+
+---
+
 ## 🆕 Vision Worker Fix & Equipment Intake Bug Investigation (2026-03-08)
 
 ### Root Cause Found & Fixed
