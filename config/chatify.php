@@ -37,6 +37,11 @@ return [
     |-------------------------------------
     | Pusher API credentials
     | Updated to use Laravel Reverb (Pusher-protocol compatible)
+    | NOTE: These values are used by BOTH the Chatify PHP backend AND
+    | the Filament Chatify integration page which dumps them to the browser.
+    | Therefore they MUST contain PUBLIC/frontend-facing values.
+    | The Laravel broadcasting backend uses config/broadcasting.php which
+    | points to the internal Reverb endpoint (127.0.0.1:8080).
     |-------------------------------------
     */
     'pusher' => [
@@ -45,12 +50,15 @@ return [
         'secret' => env('REVERB_APP_SECRET', env('PUSHER_APP_SECRET')),
         'app_id' => env('REVERB_APP_ID', env('PUSHER_APP_ID')),
         'options' => [
-            'cluster' => env('REVERB_APP_CLUSTER', env('PUSHER_APP_CLUSTER', 'mt1')),
-            'host' => env('REVERB_HOST', env('PUSHER_HOST', '127.0.0.1')),
-            'port' => env('REVERB_PORT', env('PUSHER_PORT', 8080)),
-            'scheme' => env('REVERB_SCHEME', env('PUSHER_SCHEME', 'http')),
+            'cluster' => env('REVERB_APP_CLUSTER', 'mt1'),
+            // These are PUBLIC/frontend values — browser connects via wss://
+            'host' => env('REVERB_HOST', 'www.mbfdhub.com'),
+            'port' => env('REVERB_PORT', 443),
+            'scheme' => env('REVERB_SCHEME', 'https'),
             'encrypted' => true,
-            'useTLS' => env('REVERB_SCHEME', env('PUSHER_SCHEME', 'http')) === 'https',
+            'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
+            'forceTLS' => true,
+            'enabledTransports' => ['ws', 'wss'],
         ],
     ],
 

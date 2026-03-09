@@ -10,7 +10,7 @@
         <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Session:</span>
         @foreach($attendedSessions as $session)
             <button
-                wire:click="$set('selectedSession', '{{ $session->id }}')"
+                wire:click="switchSession({{ $session->id }})"
                 @class([
                     'inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
                     'bg-primary-600 text-white shadow-sm' => $selectedSession == $session->id,
