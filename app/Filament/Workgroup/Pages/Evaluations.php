@@ -42,9 +42,11 @@ class Evaluations extends Page implements HasTable
         $attendedSessions = $this->getAttendedSessions($member);
 
         if ($attendedSessions->isNotEmpty()) {
-            // Prefer the active session if attended, else pick the most recent attended session
+            // Default to the first session in name order (Day 1 → Day 2 → Day 3)
+            // Prefer active sessions only if attending multiple; otherwise just pick first by name
             $activeAttended = $attendedSessions->firstWhere('status', 'active');
-            $this->selectedSession = (string) ($activeAttended?->id ?? $attendedSessions->first()->id);
+            // Use first session by name (already sorted alphabetically by getAttendedSessions)
+            $this->selectedSession = (string) $attendedSessions->first()->id;
         } elseif ($member->workgroup) {
             // No attendance configured yet — fall back to active session
             $activeSession = $member->workgroup->sessions()->active()->first();
@@ -52,6 +54,16 @@ class Evaluations extends Page implements HasTable
                 $this->selectedSession = (string) $activeSession->id;
             }
         }
+    }
+
+    /**
+     * Switch to a different session and force the table to re-query.
+     * Called by the pill buttons in the blade view.
+     */
+    public function switchSession(int $sessionId): void
+    {
+        $this->selectedSession = (string) $sessionId;
+        $this->resetTable();
     }
 
     /**
@@ -70,8 +82,7 @@ class Evaluations extends Page implements HasTable
         // Admin and facilitator roles see ALL sessions in their workgroup
         if (in_array($member->role, ['admin', 'facilitator'])) {
             return \App\Models\WorkgroupSession::where('workgroup_id', $workgroupId)
-                ->orderByRaw("CASE WHEN status='active' THEN 0 ELSE 1 END")
-                ->orderByDesc('created_at')
+                ->orderBy('name')
                 ->get();
         }
 
@@ -96,8 +107,7 @@ class Evaluations extends Page implements HasTable
 
         return \App\Models\WorkgroupSession::where('workgroup_id', $workgroupId)
             ->whereIn('id', $allSessionIds)
-            ->orderByRaw("CASE WHEN status='active' THEN 0 ELSE 1 END")
-            ->orderByDesc('created_at')
+            ->orderBy('name')
             ->get();
     }
 

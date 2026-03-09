@@ -28,6 +28,12 @@ class AppServiceProvider extends ServiceProvider
             \Filament\Http\Responses\Auth\Contracts\LoginResponse::class,
             \App\Http\Responses\LoginResponse::class,
         );
+
+        // Override Chatify's Pusher PHP SDK to use internal Reverb endpoint (127.0.0.1:8080)
+        // while config('chatify.pusher') stays frontend-facing (www.mbfdhub.com:443) for the browser.
+        $this->app->bind('ChatifyMessenger', function () {
+            return new \App\Services\ChatifyMessengerOverride;
+        });
     }
 
     /**

@@ -143,6 +143,16 @@ export default function InspectionWizard() {
         rank: officerInfo.rank,
         shift: officerInfo.shift,
         unit_number: officerInfo.unitNumber,
+        compartments: compartments.map(c => ({
+          id: c.id,
+          name: c.name,
+          items: c.items.map(item => ({
+            id: item.id,
+            name: item.name,
+            status: item.status,
+            notes: item.notes || null,
+          })),
+        })),
         defects,
       };
 

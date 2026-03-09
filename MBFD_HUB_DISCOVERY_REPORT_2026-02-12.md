@@ -475,4 +475,58 @@ The application now has **three Filament panels** (plus one public SPA):
 
 ---
 
+## ADDENDUM — 2026-03-09: Chatify WebSocket Fix + Reverb Supervisor Correction
+
+### Issue Discovered
+Real-time chat via Chatify was completely non-functional in production. Browser network logs showed:
+- `wss://www.mbfdhub.com/app/828e3b4fcd55302b3d7406a05c3a1a5b` → `NS_BINDING_ABORTED`
+- Fallback attempt to `sockjs-mt1.pusher.com` (Pusher external cloud) → also fails
+
+### Infrastructure Fixes Applied
+
+**Problem 1 — Missing `enabledTransports`**: Fixed by adding `enabledTransports: ['ws', 'wss']` to both `config/chatify.php` and `public/js/chatify/code.js`.
+
+**Problem 2 — Reverb process not running**: Fixed by adding `[program:reverb]` to Sail's `supervisord.conf`, rebuilding Docker image.
+
+**Problem 3 — Cloudflare Tunnel not routing WebSocket paths**: Fixed by adding path-based ingress rules: `/app/828e3b4fcd55302b3d7406a05c3a1a5b` and `/apps/1` → `http://172.24.0.4:8080` (Reverb).
+
+**Problem 4 — Linux case-sensitivity view override**: Fixed by renaming vendor view dir from `chatify` to `Chatify` (capital C) with `chatify→Chatify` symlink.
+
+**Problem 5 — 404 chatify-integration.css**: Fixed by copying asset from vendor package to `public/css/app/`.
+
+**Problem 6 — BROADCAST_CONNECTION not set**: Fixed by adding `BROADCAST_CONNECTION=reverb` to `.env`.
+
+### Current Status: BLOCKED
+
+After all infrastructure fixes, the transport layer now works:
+- `wss://www.mbfdhub.com/app/828e3b4fcd55302b3d7406a05c3a1a5b` → `HTTP/1.1 101 Switching Protocols` ✅
+
+However, the Chatify UI still displays "No internet access." The TCP/WebSocket transport connects successfully, but the **Pusher application protocol layer** (channel authentication and subscriptions) fails on top of it. The network log shows no `POST /chatify/chat/auth` calls, meaning the JS client is not reaching the authentication stage.
+
+**✅ FIXED (2026-03-09 evening)**: Root cause was split-brain configuration. See `AI_AGENT_ERRORS.md` ERROR-023 for the full resolution documentation.
+
+### Architecture (Current State on VPS)
+```
+Browser → wss://www.mbfdhub.com/app/{APP_KEY}:443 → 101 Switching Protocols ✅
+  → Cloudflare Tunnel → VPS 172.24.0.4:8080 → Reverb ✅
+  → Pusher protocol auth → FAILS ❌ (cause unknown, halted)
+```
+
+### Files Changed
+| File | Change |
+|---|---|
+| `config/chatify.php` | Uses public `REVERB_HOST/PORT/SCHEME` env vars + `enabledTransports: ['ws','wss']` |
+| `public/js/chatify/code.js` | Added `enabledTransports` to Pusher constructor |
+| `vendor/laravel/sail/runtimes/8.5/supervisord.conf` (VPS) | Added `[program:reverb]` |
+| `resources/views/vendor/Chatify/` (VPS) | Renamed from lowercase `chatify` to capital `Chatify`; `chatify→Chatify` symlink added |
+| `public/css/app/chatify-integration.css` (VPS) | Copied from vendor package source |
+| `/root/mbfd-hub/.env` (VPS) | Added `BROADCAST_CONNECTION=reverb` |
+
+### Reference
+- `AI_AGENT_ERRORS.md` ERROR-021: NS_BINDING_ABORTED and enabledTransports fix
+- `AI_AGENT_ERRORS.md` ERROR-022: Reverb not auto-starting in container
+- `AI_AGENT_ERRORS.md` ERROR-023: ⚠️ BLOCKED — application-layer Pusher failure despite transport working
+
+---
+
 **END OF DISCOVERY REPORT**

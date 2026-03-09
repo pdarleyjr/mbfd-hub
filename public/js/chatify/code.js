@@ -38,6 +38,8 @@ const pusher = new Pusher(chatify.pusher.key, {
     wsPort: chatify.pusher.options.port,
     wssPort: chatify.pusher.options.port,
     forceTLS: chatify.pusher.options.useTLS,
+    enabledTransports: chatify.pusher.options.enabledTransports || ['ws', 'wss'],
+    disableStats: true,
     authEndpoint: chatify.pusherAuthEndpoint,
   auth: {
     headers: {
@@ -45,6 +47,32 @@ const pusher = new Pusher(chatify.pusher.key, {
     },
   },
 });
+
+// --- Chatify Debug Instrumentation ---
+console.log('[Chatify] Pusher config:', {
+    key: chatify.pusher.key,
+    wsHost: chatify.pusher.options.host,
+    wsPort: chatify.pusher.options.port,
+    wssPort: chatify.pusher.options.port,
+    forceTLS: chatify.pusher.options.useTLS,
+    enabledTransports: chatify.pusher.options.enabledTransports,
+    authEndpoint: chatify.pusherAuthEndpoint,
+    csrfToken: csrfToken ? csrfToken.substring(0, 8) + '...' : 'MISSING'
+});
+
+pusher.connection.bind('state_change', function(states) {
+    console.log('[Chatify] Connection state:', states.previous, '->', states.current);
+});
+
+pusher.connection.bind('connected', function() {
+    console.log('[Chatify] Connected! Socket ID:', pusher.connection.socket_id);
+});
+
+pusher.connection.bind('error', function(err) {
+    console.error('[Chatify] Connection error:', err);
+});
+// --- End Debug Instrumentation ---
+
 /**
  *-------------------------------------------------------------
  * Re-usable methods
@@ -397,9 +425,10 @@ function IDinfo(id) {
           return;
         }
         // avatar photo
-        $(".messenger-infoView")
-          .find(".avatar")
-          .css("background-image", 'url("' + data.user_avatar + '")');
+        $(".messenger-infoView").find(".avatar").css(
+          "background-image",
+          'url("' + data.user_avatar + '")'
+        );
         $(".header-avatar").css(
           "background-image",
           'url("' + data.user_avatar + '")'
@@ -620,6 +649,16 @@ function cancelUpdatingAvatar() {
 // subscribe to the channel
 const channelName = "private-chatify";
 var channel = pusher.subscribe(`${channelName}.${auth_id}`);
+
+// --- Channel subscription debug ---
+channel.bind('pusher:subscription_succeeded', function() {
+    console.log('[Chatify] Private channel subscribed:', `${channelName}.${auth_id}`);
+});
+channel.bind('pusher:subscription_error', function(status) {
+    console.error('[Chatify] Private channel subscription FAILED:', `${channelName}.${auth_id}`, 'status:', status);
+});
+// --- End channel debug ---
+
 var clientSendChannel;
 var clientListenChannel;
 
@@ -698,6 +737,15 @@ clientListenChannel.bind("client-deleteConversation", function (data) {
 // -------------------------------------
 // presence channel [User Active Status]
 var activeStatusChannel = pusher.subscribe("presence-activeStatus");
+
+// --- Presence channel debug ---
+activeStatusChannel.bind('pusher:subscription_succeeded', function(members) {
+    console.log('[Chatify] Presence channel subscribed. Members:', members.count);
+});
+activeStatusChannel.bind('pusher:subscription_error', function(status) {
+    console.error('[Chatify] Presence channel subscription FAILED. Status:', status);
+});
+// --- End presence debug ---
 
 // Joined
 activeStatusChannel.bind("pusher:member_added", function (member) {
@@ -1453,7 +1501,7 @@ $(document).ready(function () {
   $(".messenger-search").on("blur", function () {
     setTimeout(function () {
       $(".messenger-tab").hide();
-      $('.messenger-tab[data-view="users"]').show();
+      $('.messenger-listView-tabs a[data-view="users"]').trigger("click");
     }, 200);
   });
   // Search action on keyup
@@ -1589,7 +1637,7 @@ $(document).ready(function () {
     }
   });
 
-  //Messages pagination
+  // Messages pagination
   actionOnScroll(
     ".m-body.messages-container",
     function () {
@@ -1597,11 +1645,11 @@ $(document).ready(function () {
     },
     true
   );
-  //Contacts pagination
+  // Contacts pagination
   actionOnScroll(".messenger-tab.users-tab", function () {
     getContacts();
   });
-  //Search pagination
+  // Search pagination
   actionOnScroll(".messenger-tab.search-tab", function () {
     messengerSearch($(".messenger-search").val());
   });

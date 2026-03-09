@@ -275,13 +275,12 @@ class ApparatusResource extends Resource
                     }),
             ])
             ->actions([
-                Tables\Actions\Action::make('start_daily_checkout')
-                    ->label('Daily Checkout')
-                    ->icon('heroicon-o-play-circle')
-                    ->color('success')
-                    ->tooltip('Start daily checkout for this apparatus')
-                    ->url(fn (Apparatus $record): string => "/daily/{$record->id}")
-                    ->openUrlInNewTab(),
+                Tables\Actions\Action::make('view_inspections')
+                    ->label('View Inspections')
+                    ->icon('heroicon-o-clipboard-document-list')
+                    ->color('info')
+                    ->tooltip('View all inspections for this apparatus')
+                    ->url(fn (Apparatus $record): string => static::getUrl('edit', ['record' => $record])),
                 Tables\Actions\Action::make('updateStatus')
                     ->label('Update Status')
                     ->icon('heroicon-m-arrow-path')
@@ -332,6 +331,7 @@ class ApparatusResource extends Resource
             'index' => Pages\ListApparatuses::route('/'),
             'create' => Pages\CreateApparatus::route('/create'),
             'edit' => Pages\EditApparatus::route('/{record}/edit'),
+            'view-inspection' => Pages\ViewInspection::route('/{record}/inspections/{inspection}'),
         ];
     }
 }

@@ -63,6 +63,7 @@ class ApparatusController extends Controller
             'rank' => 'required|string',
             'shift' => 'nullable|string',
             'unit_number' => 'nullable|string',
+            'compartments' => 'nullable|array',
             'defects' => 'nullable|array',
             'defects.*.compartment' => 'required|string',
             'defects.*.item' => 'required|string',
@@ -79,6 +80,9 @@ class ApparatusController extends Controller
             'rank' => $request->rank,
             'shift' => $request->shift,
             'unit_number' => $request->unit_number,
+            'vehicle_number' => $apparatus->vehicle_number,
+            'designation_at_time' => $apparatus->designation,
+            'results' => $request->compartments,
             'completed_at' => now(),
         ]);
 

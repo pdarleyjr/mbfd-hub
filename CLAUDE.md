@@ -1,7 +1,8 @@
 # CLAUDE.md — MBFD Hub AI Context
 
-> **Mission Status: ✅ Production** (2026-03-08)  
-> NocoBase has been **decommissioned** (2026-03-08) — container stopped, image removed, volume deleted. All Nocobase scripts removed from repo.
+> **Mission Status: ✅ Production** (2026-03-09)  
+> NocoBase has been **decommissioned** (2026-03-08) — container stopped, image removed, volume deleted. All Nocobase scripts removed from repo.  
+> ✅ **Chatify real-time chat FIXED** (2026-03-09 evening) — Split-brain config resolved; backend uses internal Reverb (127.0.0.1:8080), frontend uses public wss:// via Cloudflare.
 
 ## Project Identity
 Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filament 3 backend, React SPA daily checkout, Baserow data platform — all containerized on a single VPS.
@@ -15,11 +16,11 @@ Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filamen
 ## Docker Services
 | Service | Internal Host | External Port | Notes |
 |---------|--------------|--------------|-------|
-| `app` | `app` | 8000 | Laravel + Octane |
-| `baserow` | `baserow` | 80 (internal) | Baserow self-hosted |
-| `db` | `db` | 5432 (internal) | PostgreSQL |
-| `redis` | `redis` | 6379 (internal) | Redis |
-| `reverb` | `reverb` | 8080 | Laravel Reverb WebSockets |
+| `laravel.test` | `laravel.test` | 80 (app), 8080 (Reverb) | Laravel app + Reverb WebSockets (same container, supervisord manages both) |
+| `pgsql` | `pgsql` | 5432 (internal) | PostgreSQL |
+| `baserow` | `baserow` | 8082 (internal, 127.0.0.1) | Baserow self-hosted |
+
+> ⚠️ **IMPORTANT**: There is NO separate `reverb` container. Reverb runs as a supervisord-managed process INSIDE the `laravel.test` container. Container name: `mbfd-hub-laravel.test-1`. Queue worker also runs in same container.
 
 ## Domains
 - `www.mbfdhub.com` → Laravel/React app (port 8080) via Cloudflare Tunnel (tunnel ID: 89429799-7028-4df2-870d-f2fb858a49d7)
@@ -252,11 +253,11 @@ If `InspectionResource` or `StationResource/RelationManagers/InventorySubmission
 - `admin` and `logistics_admin` roles now have access to workgroup panel
 - Fixed in both `User::canAccessPanel('workgroups')` and `EnsureWorkgroupPanelAccess` middleware
 
-# --- 
+---
 # 
 # ### Cloudflare works illustrated with a diagram (omitted for formatting):  
 # [Diagram of Cloudflare Workers and Vectorize Indexes]  
-# |                         |aniumстрация             |                               |–––––––––––––––––––––| volticheska careless |Võтivъи andмен|Ятира набъл_seed|ʼ.splitext(d)’|
+# |                         |aniumстрация             |                               |–––––––––––––––––––––| volticheska careless |VõтIVъи andмен|Ятира набъл_seed|ʼ.splitext(d)’|
 # |———————————————————–|—————————————————–|—————————————————-|——————————————|[Cloudflare Worker|None|Handled by YakshOhkLee (https://github.com/yakshohklee)||
 # |ER Workgroup Workshop     |[https://docs.google.com/forms/d/|                               || grads|JSON|CSV|API|
 # |Session Log               |[https://docs.google.com/forms/d/|                               || grads|JSON|CSV|API|
@@ -555,6 +556,36 @@ WORKGROUP_AI_WORKER_URL=https://mbfd-workgroup-ai.pdarleyjr.workers.dev
 
 ### VPS Commit
 `be0f4c30` — feat: workgroup AI eval system + chatbot optimization
+
+### Chatify WebSocket Fix (2026-03-09) — ✅ RESOLVED
+
+**Problem**: Chatify real-time messaging failed — browser showed "No internet access" despite successful WebSocket transport (101 Switching Protocols).
+
+**Root Cause**: Split-brain configuration — `config('chatify.pusher')` was shared by both the browser (needs public `wss://www.mbfdhub.com:443`) and the PHP backend Pusher SDK (needs internal `http://127.0.0.1:8080`). The Chatify package creates its own Pusher PHP SDK instance from `config('chatify.pusher.options')`, and `config/broadcasting.php` also used the public endpoint. Both PHP paths hairpinned through Cloudflare Tunnel instead of talking directly to Reverb.
+
+**Fix Applied (2026-03-09 evening)**:
+1. `config/broadcasting.php` — `reverb` connection now uses `REVERB_INTERNAL_HOST=127.0.0.1`, `REVERB_SERVER_PORT=8080`, `scheme=http`
+2. `config/chatify.php` — Kept as PUBLIC frontend values (`www.mbfdhub.com:443 https`) for browser
+3. `app/Services/ChatifyMessengerOverride.php` (NEW) — Extends `ChatifyMessenger`, overrides constructor to use internal Reverb endpoint for PHP Pusher SDK
+4. `app/Providers/AppServiceProvider.php` — Binds `ChatifyMessenger` to the override class
+5. `public/js/chatify/code.js` — Added `disableStats: true`, debug instrumentation
+
+**Prior infrastructure fixes (still in place)**:
+- `enabledTransports: ['ws', 'wss']` in config and JS
+- `[program:reverb]` in supervisord (auto-start)
+- Cloudflare Tunnel path routing for `/app/{key}` and `/apps/1`
+- Case-sensitive view override (`Chatify` dir + `chatify→Chatify` symlink)
+- `chatify-integration.css` in `public/css/app/`
+- `BROADCAST_CONNECTION=reverb` in `.env`
+
+**Architecture**:
+```
+FRONTEND: browser → wss://www.mbfdhub.com:443/app/{KEY} → Cloudflare → Reverb:8080
+BACKEND (broadcasting): PHP → http://127.0.0.1:8080/apps/1/events → Reverb (direct)
+BACKEND (Chatify SDK): ChatifyMessengerOverride → http://127.0.0.1:8080 → Reverb (direct)
+```
+
+**See**: `AI_AGENT_ERRORS.md` ERROR-021, ERROR-022, ERROR-023.
 
 ---
 
