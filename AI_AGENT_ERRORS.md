@@ -3,7 +3,7 @@
 
 > ⚠️ **CRITICAL MANDATE**: Every AI agent working on this codebase MUST read this entire file BEFORE making any changes. Failure to read this file WILL result in breaking existing functionality.
 
-**Last Updated**: 2026-03-08  
+**Last Updated**: 2026-03-09  
 **Project**: MBFD Hub (Laravel 11, Filament v3, VPS at 145.223.73.170)
 
 ---
@@ -289,3 +289,41 @@ Either update the `mbfd-hub-app` Dockerfile to PHP 8.4+, or remove the PHP 8.4 c
 **Wrong approach**: wire:key on HTML div does NOT force widget remounting
 **Correct fix**: Remove Livewire widgets from pages with reactive switching. Compute all data in getViewData() (always fresh) and render as plain HTML in blade.
 **Commits**: d167eb45
+
+---
+
+### ERROR-019: `pxlrbt/filament-excel` Not Installed — ApparatusResource 500
+
+**Date**: 2026-03-09  
+**Severity**: 🔴 CRITICAL — `/admin/apparatuses` returns HTTP 500 for ALL users  
+**File(s) Affected**: `app/Filament/Resources/ApparatusResource.php`
+
+**Symptom**:
+```
+production.ERROR: Class "pxlrbt\FilamentExcel\Actions\Tables\ExportAction" not found
+  at /var/www/html/app/Filament/Resources/ApparatusResource.php:259
+```
+Every page load of `/admin/apparatuses` throws this fatal error.
+
+**Root Cause**:
+`ApparatusResource.php` imported and used three classes from the `pxlrbt/filament-excel` package (`ExportAction`, `ExportBulkAction`, `ExcelExport`) but this package is **NOT listed in `composer.json`** and is not installed. The file was added to the repo referencing this package without running `composer require pxlrbt/filament-excel`.
+
+**Fix Applied**:
+Removed the three FilamentExcel imports (lines 16–18) and replaced the `ExportAction` header action and `ExportBulkAction` bulk action with native Filament actions. The Sync to Google Sheet header action was retained:
+```php
+// REMOVED:
+use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
+use pxlrbt\FilamentExcel\Exports\ExcelExport;
+
+// headerActions: ExportAction::make('export')... → REMOVED
+// bulkActions: ExportBulkAction::make(...)... → REMOVED, replaced with DeleteBulkAction only
+```
+
+**Prevention**:
+1. **NEVER add `use` imports for packages that are not in `composer.json`**
+2. Before adding Excel/export functionality to any Filament resource, verify `composer.json` contains `pxlrbt/filament-excel` or another export package
+3. To add export properly: `composer require pxlrbt/filament-excel` first, then add the imports
+4. After editing any Resource file, run `php artisan route:list --path=admin/<resource>` on VPS to confirm no class-not-found errors during route resolution
+
+**Commit**: `52136fe8`
