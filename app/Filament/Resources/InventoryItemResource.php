@@ -18,6 +18,7 @@ class InventoryItemResource extends Resource
     protected static ?string $navigationGroup = 'Inventory & Logistics';
     protected static ?string $navigationLabel = 'Supply Items';
     protected static ?int $navigationSort = 2;
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {
