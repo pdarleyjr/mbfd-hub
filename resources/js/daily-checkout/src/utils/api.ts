@@ -8,10 +8,18 @@ const DEFAULT_HEADERS = {
   'Content-Type': 'application/json',
 };
 
+const normalizeItemStatus = (status?: string): 'Present' | 'Missing' | 'Damaged' => {
+  if (status === 'Missing' || status === 'Damaged' || status === 'Present') {
+    return status;
+  }
+
+  return 'Present';
+};
+
 export class ApiClient {
   static async getApparatuses(): Promise<Apparatus[]> {
     const response = await fetch(`${API_BASE}/public/apparatuses`, {
-      headers: { ...DEFAULT_HEADERS },
+    headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
       throw new Error('Failed to fetch apparatuses');
@@ -26,7 +34,29 @@ export class ApiClient {
     if (!response.ok) {
       throw new Error('Failed to fetch checklist');
     }
-    return response.json();
+
+    const payload = await response.json();
+    const rawChecklist = payload?.checklist ?? payload;
+    const rawCompartments = Array.isArray(rawChecklist?.compartments) ? rawChecklist.compartments : [];
+
+    return {
+      compartments: rawCompartments.map((compartment: any, compartmentIndex: number) => {
+        const compartmentId = compartment?.id ?? `compartment-${compartmentIndex + 1}`;
+
+        return {
+          id: compartmentId,
+          name: compartment?.name ?? compartment?.title ?? `Compartment ${compartmentIndex + 1}`,
+          items: Array.isArray(compartment?.items)
+            ? compartment.items.map((item: any, itemIndex: number) => ({
+                id: item?.id ?? `${compartmentId}-item-${itemIndex + 1}`,
+                name: item?.name ?? `Item ${itemIndex + 1}`,
+                status: normalizeItemStatus(item?.status),
+                notes: item?.notes ?? item?.note ?? '',
+              }))
+            : [],
+        };
+      }),
+    };
   }
 
   static async submitInspection(apparatusId: number, data: InspectionSubmission): Promise<{ success: boolean; message: string }> {
