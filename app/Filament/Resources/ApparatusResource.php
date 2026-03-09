@@ -106,7 +106,7 @@ class ApparatusResource extends Resource
                     ->sortable()
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('vehicle_number')
-                    ->label('Vehicle #')
+                    ->label('Vehicle#')
                     ->searchable()
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('status')
@@ -148,24 +148,22 @@ class ApparatusResource extends Resource
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('notes')
                     ->label('Comments')
-                    ->limit(30)
+                    ->limit(40)
                     ->tooltip(fn ($record) => $record->notes)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('reported_at')
-                    ->label('Reported')
-                    ->dateTime('n/j/Y')
-                    ->sortable()
-                    ->placeholder('—'),
+                // Toggleable columns (hidden by default)
                 Tables\Columns\TextColumn::make('inspections_count')
                     ->label('Inspections')
                     ->counts('inspections')
                     ->badge()
-                    ->color('info'),
+                    ->color('info')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('active_defects_count')
                     ->label('Active Issues')
                     ->getStateUsing(fn (Apparatus $record) => $record->defects()->where('resolved', false)->count())
                     ->badge()
-                    ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
+                    ->color(fn ($state) => $state > 0 ? 'danger' : 'success')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 // Hidden/toggleable columns preserved for data access
                 Tables\Columns\TextColumn::make('class_description')
                     ->label('Class')
@@ -218,6 +216,12 @@ class ApparatusResource extends Resource
                 Tables\Columns\TextColumn::make('vin')
                     ->label('VIN')
                     ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('reported_at')
+                    ->label('Reported')
+                    ->dateTime('n/j/Y')
+                    ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('created_at')
