@@ -44,8 +44,8 @@ class ApparatusSheetSyncService
             return ['dry_run' => true, 'rows' => count($rows), 'data' => $rows];
         }
 
-        $headerRange = "'{$this->tabTitle}'!A1:F1";
-        $bodyRange   = "'{$this->tabTitle}'!A2:F1000";
+        $headerRange = "'{$this->tabTitle}'!A1:E1";
+        $bodyRange   = "'{$this->tabTitle}'!A2:E1000";
 
         // 1. Clear body range only (preserves formatting/data validation)
         $this->withRetry(fn () => $this->sheetsService->spreadsheets_values->clear(
@@ -58,7 +58,7 @@ class ApparatusSheetSyncService
         $this->withRetry(fn () => $this->sheetsService->spreadsheets_values->update(
             $this->spreadsheetId,
             $headerRange,
-            new ValueRange(['values' => [['Designation', 'Vehicle#', 'Status', 'Location', 'Comments', 'Reported']]]),
+            new ValueRange(['values' => [['Designation', 'Vehicle#', 'Status', 'Location', 'Comments']]]),
             ['valueInputOption' => 'RAW']
         ));
 
@@ -66,7 +66,7 @@ class ApparatusSheetSyncService
         if (!empty($rows)) {
             $this->withRetry(fn () => $this->sheetsService->spreadsheets_values->update(
                 $this->spreadsheetId,
-                "'{$this->tabTitle}'!A2:F" . (count($rows) + 1),
+                "'{$this->tabTitle}'!A2:E" . (count($rows) + 1),
                 new ValueRange(['values' => $rows]),
                 ['valueInputOption' => 'RAW']
             ));
@@ -79,7 +79,7 @@ class ApparatusSheetSyncService
 
     /**
      * Build a row for each apparatus record.
-     * Column mapping: A=Designation B=Vehicle# C=Status D=Location E=Comments F=Reported
+     * Column mapping: A=Designation B=Vehicle# C=Status D=Location E=Comments
      */
     private function buildRows(): array
     {
@@ -93,9 +93,6 @@ class ApparatusSheetSyncService
                     $a->status ?? '',
                     $this->buildLocation($a),
                     $a->notes ?? '',
-                    $a->reported_at
-                        ? Carbon::parse($a->reported_at)->format('n/j/Y')
-                        : '',
                 ];
             })
             ->toArray();
