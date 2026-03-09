@@ -327,3 +327,42 @@ use pxlrbt\FilamentExcel\Exports\ExcelExport;
 4. After editing any Resource file, run `php artisan route:list --path=admin/<resource>` on VPS to confirm no class-not-found errors during route resolution
 
 **Commit**: `52136fe8`
+
+---
+
+### ERROR-020: Google Sheets Apparatus Sync — Three Stacked Failures
+
+**Date**: 2026-03-09  
+**Severity**: 🔴 CRITICAL — "Sync to Google Sheet" button silently queues jobs that never run  
+**File(s) Affected**: `composer.json`, `.env` (on VPS), `docker-compose` (no secrets mount)
+
+**Symptoms**:
+- Clicking "Sync to Google Sheet" button shows success notification but sheet never updates
+- Jobs sit in `jobs` table with `attempts = 0` indefinitely
+- No errors in `failed_jobs` table because jobs never start
+
+**Root Causes (3 stacked)**:
+
+1. **`google/apiclient` package not installed**  
+   `composer.json` did not include `google/apiclient`. The `ApparatusSheetSyncService` imports `Google\Client` but the package was never added to the project.
+   
+2. **Service account JSON not mounted into container**  
+   `.env` sets `GOOGLE_SERVICE_ACCOUNT_JSON_PATH=/run/secrets/google_service_account.json` but the Sail container only has `/root/mbfd-hub:/var/www/html` mounted — no `/run/secrets` volume. The file lives at `/root/secrets/google_service_account.json` on the host.
+
+3. **No queue worker running**  
+   `QUEUE_CONNECTION=database` but no `php artisan queue:work` process runs in the container. Jobs are dispatched but never consumed.
+
+**Fixes Applied**:
+1. Added `google/apiclient: ^2.15` to `composer.json` and ran `composer require` in container (committed as `5cf59c76`)
+2. Copied service account key: `cp /root/secrets/google_service_account.json /root/mbfd-hub/storage/app/google_service_account.json`
+3. Updated `.env`: `GOOGLE_SERVICE_ACCOUNT_JSON_PATH=/var/www/html/storage/app/google_service_account.json`
+4. Started queue worker: `docker exec -d mbfd-hub-laravel.test-1 bash -c 'nohup php artisan queue:work --sleep=3 --tries=3 --max-time=3600 >> /tmp/queue-worker.log 2>&1 &'`
+5. Added cron watchdog on VPS host: `*/5 * * * * /root/restart-queue-worker.sh` — restarts worker if it stops
+
+**Verified**: Log confirmed `[ApparatusSheetSync] Sync complete — wrote 26 rows to Equipment Maintenance`
+
+**Prevention**:
+1. **ALWAYS include `google/apiclient` in `composer.json` when using Google APIs**
+2. The service account JSON must be at `/var/www/html/storage/app/google_service_account.json` (within the mounted volume) — NOT `/run/secrets/` which is not mounted
+3. After VPS reboots or container restarts, run `/root/restart-queue-worker.sh` manually or wait for the cron to fire
+4. To check queue health: `docker exec mbfd-hub-laravel.test-1 pgrep -f queue:work` — should return a PID
