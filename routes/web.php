@@ -23,21 +23,13 @@ Route::get('/manifest.json', function () {
 });
 
 // Daily Checkout SPA - catch-all for React Router
-Route::get('/daily', function () {
+Route::get('/daily/{path?}', function () {
     return response()->file(public_path('daily/index.html'), [
         'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
         'Pragma' => 'no-cache',
         'Expires' => '0',
     ]);
-});
-
-Route::get('/daily/{path}', function () {
-    return response()->file(public_path('daily/index.html'), [
-        'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-        'Pragma' => 'no-cache',
-        'Expires' => '0',
-    ]);
-})->where('path', '(.*)');
+})->where('path', '.+');
 
 Route::get('/__version', function() {
     $sha = cache()->remember('build_sha', 60, fn() => trim(shell_exec('git rev-parse HEAD') ?? 'unknown'));
