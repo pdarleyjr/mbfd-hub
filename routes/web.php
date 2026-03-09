@@ -22,22 +22,13 @@ Route::get('/manifest.json', function () {
     return $response;
 });
 
-Route::get('/daily', function () {
+Route::get('/daily/{path?}', function () {
     $response = response()->file(public_path('daily/index.html'));
     $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     $response->headers->set('Pragma', 'no-cache');
     $response->headers->set('Expires', '0');
     return $response;
-});
-
-// Catch-all route for SPA with wildcard
-Route::get('/daily/{any}', function () {
-    $response = response()->file(public_path('daily/index.html'));
-    $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-    $response->headers->set('Pragma', 'no-cache');
-    $response->headers->set('Expires', '0');
-    return $response;
-})->where('any', '.*');
+})->where('path', '.*');
 
 Route::get('/__version', function() {
     $sha = cache()->remember('build_sha', 60, fn() => trim(shell_exec('git rev-parse HEAD') ?? 'unknown'));
