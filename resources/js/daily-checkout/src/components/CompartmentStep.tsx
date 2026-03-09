@@ -1,4 +1,4 @@
-import { useState, useRef, TouchEvent } from 'react';
+import { useState, useRef, useEffect, TouchEvent } from 'react';
 import { Compartment, ItemStatus } from '../types';
 
 interface CompartmentStepProps {
@@ -13,8 +13,13 @@ export default function CompartmentStep({ compartments, onSubmit, onBack }: Comp
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
 
+  useEffect(() => {
+    setCompartmentData(compartments);
+    setCurrentCompartmentIndex(0);
+  }, [compartments]);
+
   const currentCompartment = compartmentData[currentCompartmentIndex];
-  const isLastCompartment = currentCompartmentIndex === compartmentData.length - 1;
+  const isLastCompartment = compartmentData.length > 0 && currentCompartmentIndex === compartmentData.length - 1;
 
   const vibrate = (pattern: number | number[] = 10) => {
     if ('vibrate' in navigator) {
@@ -139,6 +144,24 @@ export default function CompartmentStep({ compartments, onSubmit, onBack }: Comp
       case 'Damaged': return `${base} bg-yellow-500 border-yellow-600 text-white`;
     }
   };
+
+  if (!currentCompartment || compartmentData.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-12">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">No checklist items available</h2>
+        <p className="text-gray-600 mb-6">
+          The inspection checklist has not loaded correctly for this vehicle yet.
+        </p>
+        <button
+          onClick={onBack}
+          className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 touch-manipulation"
+          style={{ minWidth: 44, minHeight: 44 }}
+        >
+          Back to Officer Info
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div 
