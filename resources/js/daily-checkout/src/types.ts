@@ -6,6 +6,7 @@ export interface Apparatus {
   unit_id?: string;
   type: ApparatusType;
   vehicle_number: string;
+  designation?: string;
   slug: string;
 }
 

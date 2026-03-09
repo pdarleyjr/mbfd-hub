@@ -1,0 +1,23 @@
+tunnel: 89429799-7028-4df2-870d-f2fb858a49d7
+credentials-file: /etc/cloudflared/creds.json
+
+ingress:
+  - hostname: www.mbfdhub.com
+    path: ^/app/.*
+    service: http://172.24.0.4:8080
+  - hostname: www.mbfdhub.com
+    path: ^/apps/.*
+    service: http://172.24.0.4:8080
+  - hostname: www.mbfdhub.com
+    service: http://172.24.0.4:80
+  - hostname: mbfdhub.com
+    service: http://172.24.0.4:80
+  - hostname: nocobase.mbfdhub.com
+    service: http://nocobase:80
+  - hostname: baserow.mbfdhub.com
+    service: http://baserow:80
+  - hostname: www.inventory.mbfdhub.com
+    service: http://snipeit:80
+  - hostname: inventory.mbfdhub.com
+    service: http://snipeit:80
+  - service: http_status:404

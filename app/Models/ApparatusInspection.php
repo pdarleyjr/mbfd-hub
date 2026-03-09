@@ -16,7 +16,15 @@ class ApparatusInspection extends Model
         'rank',
         'shift',
         'unit_number',
+        'vehicle_number',
+        'designation_at_time',
+        'results',
         'completed_at',
+    ];
+
+    protected $casts = [
+        'results' => 'array',
+        'completed_at' => 'datetime',
     ];
 
     public function apparatus()

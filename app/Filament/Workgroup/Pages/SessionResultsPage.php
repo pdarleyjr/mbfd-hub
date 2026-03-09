@@ -79,8 +79,7 @@ class SessionResultsPage extends Page
      */
     public function getAllSessions(): \Illuminate\Support\Collection
     {
-        return WorkgroupSession::orderByRaw("CASE WHEN status='active' THEN 0 ELSE 1 END")
-            ->orderByDesc('created_at')->get();
+        return WorkgroupSession::orderBy('name')->get();
     }
 
     /**
@@ -131,8 +130,7 @@ class SessionResultsPage extends Page
     {
         $session = $this->getSelectedSession();
         $evalService = app(EvaluationService::class);
-        $allSessions = WorkgroupSession::orderByRaw("CASE WHEN status='active' THEN 0 ELSE 1 END")
-            ->orderByDesc('created_at')->get();
+        $allSessions = WorkgroupSession::orderBy('name')->get();
 
         if (!$session && $this->selectedSessionId !== null) {
             // Selected a specific session ID that doesn't exist

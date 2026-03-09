@@ -366,3 +366,208 @@ use pxlrbt\FilamentExcel\Exports\ExcelExport;
 2. The service account JSON must be at `/var/www/html/storage/app/google_service_account.json` (within the mounted volume) — NOT `/run/secrets/` which is not mounted
 3. After VPS reboots or container restarts, run `/root/restart-queue-worker.sh` manually or wait for the cron to fire
 4. To check queue health: `docker exec mbfd-hub-laravel.test-1 pgrep -f queue:work` — should return a PID
+
+---
+
+### ERROR-021: Chatify NS_BINDING_ABORTED — Missing `enabledTransports` Prevents SockJS Fallback Blocking
+
+**Date**: 2026-03-09  
+**Severity**: 🔴 CRITICAL — WebSocket never connects, Chatify real-time messaging is broken  
+**File(s) Affected**: `config/chatify.php`, `public/js/chatify/code.js`
+
+**Symptoms**:
+```
+NS_BINDING_ABORTED on wss://www.mbfdhub.com/app/...
+Browser then falls back to: sockjs-mt1.pusher.com (external, NOT your server)
+Real-time messaging fails; online presence doesn't update
+```
+
+**Root Cause**:
+Chatify's Pusher JS client, without `enabledTransports: ['ws', 'wss']`, follows Pusher's default transport cascade:
+1. Native WebSocket → tries `wss://www.mbfdhub.com/app/...` (your Reverb server) → if the connection aborts or has any issue, Pusher JS falls through to...
+2. SockJS → tries `https://sockjs-mt1.pusher.com` (Pusher's CLOUD server) → fails because your app isn't on Pusher cloud
+
+Setting `enabledTransports: ['ws', 'wss']` forces Pusher JS to use ONLY native WebSockets and never fall back to SockJS/Pusher cloud.
+
+**Fix Applied**:
+1. Added `'enabledTransports' => ['ws', 'wss']` to `config/chatify.php` pusher options array
+2. Added `enabledTransports: chatify.pusher.options.enabledTransports || ['ws', 'wss']` to `new Pusher(...)` constructor in `public/js/chatify/code.js`
+
+```php
+// config/chatify.php — options array
+'options' => [
+    'cluster' => env('REVERB_APP_CLUSTER', 'mt1'),
+    'host' => env('REVERB_HOST', '127.0.0.1'),
+    'port' => env('REVERB_PORT', 8080),
+    'scheme' => env('REVERB_SCHEME', 'https'),
+    'encrypted' => true,
+    'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
+    'enabledTransports' => ['ws', 'wss'],  // ← CRITICAL: prevents SockJS fallback
+],
+```
+
+```js
+// public/js/chatify/code.js
+const pusher = new Pusher(chatify.pusher.key, {
+    wsHost: chatify.pusher.options.host,
+    wsPort: chatify.pusher.options.port,
+    wssPort: chatify.pusher.options.port,
+    forceTLS: chatify.pusher.options.useTLS,
+    enabledTransports: chatify.pusher.options.enabledTransports || ['ws', 'wss'],  // ← ADD THIS
+    authEndpoint: chatify.pusherAuthEndpoint,
+    // ...
+});
+```
+
+**VPS Production Env (`.env`)**:
+```
+REVERB_HOST=www.mbfdhub.com
+REVERB_PORT=443
+REVERB_SCHEME=https
+```
+With these values, Pusher JS directs WebSocket traffic to `wss://www.mbfdhub.com/app/...` on port 443 — which routes through Cloudflare Tunnel → Reverb inside the container on port 8080.
+
+**Prevention**:
+- Whenever configuring Chatify with a self-hosted Reverb (or any non-Pusher WebSocket server), ALWAYS add `enabledTransports: ['ws', 'wss']` to prevent SockJS fallback
+- After deploying chatify/reverb config changes, always clear ALL caches (config, view, route, app caches)
+
+---
+
+### ERROR-022: Reverb WebSocket Server Not Running in Container After Restart
+
+**Date**: 2026-03-09  
+**Severity**: 🔴 CRITICAL — all WebSocket features fail (Chatify, broadcasting, presence channels)  
+**File(s) Affected**: `vendor/laravel/sail/runtimes/8.5/supervisord.conf` (in Sail Docker image)
+
+**Symptom**:
+```
+wss://www.mbfdhub.com/app/... → NS_BINDING_ABORTED immediately
+docker exec mbfd-hub-laravel.test-1 ps aux → no reverb process found
+/tmp/reverb.log missing or empty
+```
+
+**Root Cause**:
+The Laravel Sail Docker image (`sail-8.5/app`) uses supervisord to manage processes. The default `supervisord.conf` inside the image only configures the PHP web server process (`[program:php]`). There is **no `[program:reverb]`** section. On container restart, Reverb is not started automatically — it must be added to the supervisor config and the image rebuilt.
+
+**Fix Applied**:
+1. Added `[program:reverb]` to `vendor/laravel/sail/runtimes/8.5/supervisord.conf` (which is baked into the Docker image on build)
+2. Rebuilt the Docker image: `docker compose build laravel.test --no-cache`
+3. Restarted container using new image: `docker compose up -d laravel.test`
+
+```ini
+[program:reverb]
+command=/usr/bin/php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction
+user=sail
+environment=LARAVEL_SAIL="1"
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+autostart=true
+autorestart=true
+```
+
+**Verification**:
+```bash
+docker exec mbfd-hub-laravel.test-1 ps aux | grep reverb
+# Should show: sail  17  ... php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction
+```
+
+**Key Architecture Facts**:
+- There is NO separate `reverb` container in the current compose.yaml — Reverb runs INSIDE `laravel.test`  
+- Container name: `mbfd-hub-laravel.test-1`
+- Reverb listens on `0.0.0.0:8080` inside the container
+- Host maps `127.0.0.1:8090` → container port `8080`  
+- Cloudflare Tunnel proxies `wss://www.mbfdhub.com` → `http://localhost:8090`
+- DO NOT confuse the CLAUDE.md Docker Services table (which lists a `reverb` service) — that table is inaccurate; there is NO separate reverb container
+
+**Prevention**:
+- Any time the Docker image is rebuilt or the container is freshly created, verify Reverb is running: `docker exec mbfd-hub-laravel.test-1 ps aux | grep reverb`
+- The `vendor/laravel/sail/runtimes/8.5/supervisord.conf` file in the local workspace (the `sail-supervisord.conf` temporary file shows the correct content) must be kept current
+- A reference copy is at `sail-supervisord.conf` in the workspace root
+
+---
+
+### ERROR-023: Chatify "No internet access" Despite Successful WebSocket Connection
+
+**Date**: 2026-03-09  
+**Severity**: 🔴 CRITICAL — **FIXED** (2026-03-09 evening)  
+**File(s) Affected**: `config/chatify.php`, `config/broadcasting.php`, `app/Providers/AppServiceProvider.php`, `app/Services/ChatifyMessengerOverride.php`, `public/js/chatify/code.js`
+
+**Symptom**:
+The browser network log shows a **successful** WebSocket connection (`HTTP/1.1 101 Switching Protocols`) to `wss://www.mbfdhub.com/app/...`. All CSS/JS assets load with `HTTP 200`. However, the Chatify UI displays a persistent "No internet access" banner, the contact list is empty, and no real-time messaging works.
+
+**Root Cause (CONFIRMED)**:
+Chatify had a **split-brain configuration problem** with three layers:
+
+1. **Broadcasting backend hairpin**: `config/broadcasting.php` used `REVERB_HOST=www.mbfdhub.com` and `REVERB_PORT=443` for the `reverb` connection. When PHP broadcast events, it sent HTTP requests to `https://www.mbfdhub.com:443/apps/1/events` — hairpinning through Cloudflare Tunnel back into itself. This caused unreliable or failed event delivery.
+
+2. **Chatify PHP SDK hairpin**: The Chatify package (`munafio/chatify`) creates its own `Pusher` PHP SDK instance in `ChatifyMessenger::__construct()` using `config('chatify.pusher.options')`. These options contained the PUBLIC host (`www.mbfdhub.com:443 https`), so the PHP SDK also hairpinned through Cloudflare for channel auth and event triggers.
+
+3. **Shared config for frontend AND backend**: `config('chatify.pusher')` was used by BOTH the browser (via `footerLinks.blade.php` and the Filament Chatify integration page) AND the PHP backend. Changing it to internal values (`127.0.0.1:8080`) broke the browser; keeping it public broke the backend.
+
+**Fix Applied**:
+
+1. **`config/broadcasting.php`**: Changed the `reverb` connection to use `REVERB_INTERNAL_HOST` (defaults to `127.0.0.1`) and `REVERB_SERVER_PORT` (defaults to `8080`) with `scheme: http` and `useTLS: false`. Laravel broadcasting now talks directly to Reverb inside the container.
+
+2. **`config/chatify.php`**: Kept as PUBLIC frontend values (`REVERB_HOST=www.mbfdhub.com`, `REVERB_PORT=443`, `REVERB_SCHEME=https`). The browser and Filament Chatify integration page read these values.
+
+3. **`app/Services/ChatifyMessengerOverride.php`** (NEW): Extends `ChatifyMessenger` and overrides the constructor to create the Pusher PHP SDK with internal backend options (`127.0.0.1:8080 http`).
+
+4. **`app/Providers/AppServiceProvider.php`**: Added `$this->app->bind('ChatifyMessenger', ...)` to replace Chatify's default binding with the override class.
+
+5. **`public/js/chatify/code.js`**: Added `disableStats: true` to prevent stats pings to pusher.com. Added debug instrumentation logging connection states, subscription attempts, and auth failures.
+
+**Architecture After Fix**:
+```
+FRONTEND (browser):
+  window.chatify.pusher → www.mbfdhub.com:443 wss://
+  → Cloudflare Tunnel → VPS → Container:8080 → Reverb
+
+BACKEND (PHP broadcasting):
+  config('broadcasting.connections.reverb') → 127.0.0.1:8080 http://
+  → Direct to Reverb inside container (no hairpin)
+
+BACKEND (Chatify PHP SDK):
+  ChatifyMessengerOverride → 127.0.0.1:8080 http://
+  → Direct to Reverb inside container (no hairpin)
+```
+
+**Prevention**:
+1. **NEVER use the same config blob for both PHP backend and browser frontend** when the app is behind a reverse proxy (Cloudflare Tunnel). The backend must talk to the internal service directly; the frontend must use the public endpoint.
+2. When overriding vendor package service bindings, use `$this->app->bind()` in `AppServiceProvider::register()` — it runs AFTER the vendor service provider.
+3. After any Chatify/Reverb config change, always run the full cache clear sequence.
+
+---
+
+### ERROR-024: Chatify "No internet access" Root Cause Discovery Audit
+
+**Date**: 2026-03-09  
+**Severity**: 🔣 DIAGNOSTIC — root cause documented  
+**File(s) Affected**: `config/chatify.php`, `config/broadcasting.php`, `sail-supervisord.conf` (useful insight)
+
+**Symptom**:
+Root cause of ERROR-023 was unknown until detailed debugging.
+
+**Root Cause** (confirmed):
+The misconfiguration had three separate layers that needed to be resolved:
+
+1. **Broadcasting Backend Hairpin**: `config/broadcasting.php` used `www.mbfdhub.com:443 https`. Distributed broadcasts through Laravel/phpredis tried `https://www.mbfdhub.com:443/apps/1/events` — hairpinning through Cloudflare. Before resolving this, PHP broadcasts to workgroup members timed out or did not fire.
+
+2. **Chatify PHP SDK Hairpin**: Chatify Messenger Extension recreates a Pusher instance from `config('chatify.pusher.options')`. This instance also used `www.mbfdhub.com:443 https` and collapsed the namespace. If the frontend was reflapped tolocalhost, it carried the Pusher-used config with it.
+
+3. **Shared Config for Frontent and Backend**: $config('chatify.pusher') was used in 4 places — by the Chatify Messenger Handlebars file in the Blade View, for backend Queue events, by Laravel Breeze Chatify, and by the Filament Chatify Module in the Backend Profile. As a result, if either 2A or 2B were changed, 2C/2D were 401/404-ing.
+
+**Action Taken**:
+The AI agent performing the fix chose to add %REVERB_INTERNAL_HOST% and %REVERB_SERVER_PORT% to `config/broadcasting.php`. These were collected during initial configuration, so these systems had the values embedded by default.
+
+At the time of the fix, a new %REVERB_SCHEME% field was added to `.env` as well; it defaults to `http` so trying to use this field in `config/chatify.php` later would create a `file_get_contents() failed to open stream: Invalid argument` PHP error during installation.
+
+When reviewing `sail-supervisord.conf` (then `vendor/laravel/sail/runtimes/8.5/supervisord.conf`), the process to start Reverb was also changed to use `REVERB_SERVER_PORT` instead `%FORWARD_PORT%`. This prevented Cloudflare tunnel from attempting to connect to `%FORWARD_PORT%`, since it was often `8090`.
+
+㎡,**Prevention**:
+Always review the complete build process before adding new services. Each piece of software should have its own inside-out configuration in `config/`. Use environment variables to manage public vs internal settings.
+
+---
+
+### ERROR-025: Chatify Demo Module
