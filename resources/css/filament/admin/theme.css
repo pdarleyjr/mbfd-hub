@@ -6,21 +6,25 @@
  * - Do NOT override Filament's primary/danger/success/warning/info color pipeline
  * - Use Filament-native ->color(), ->extraAttributes() for widget colors
  * - Scoped, minimal overrides only
+ * - NEVER use @apply — causes iOS Safari black-screen crashes (ERROR-001)
+ * - ALL class selectors MUST have . prefix
  */
 
 /* ===== PAGE BACKGROUND ===== */
 .fi-body {
-    @apply bg-slate-50;
+    background-color: #FAFAF8;
 }
 
 /* ===== LOGIN PAGE ===== */
 .fi-simple-layout {
-    @apply bg-gradient-to-br from-slate-50 via-white to-slate-100 min-h-screen;
+    background: linear-gradient(to bottom right, #FAFAF8, #ffffff, #F5F3F0);
+    min-height: 100vh;
 }
 
 /* Login card */
 .fi-simple-main-ctn {
-    @apply shadow-xl border border-slate-200/80;
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    border: 1px solid rgba(226, 232, 240, 0.8);
     border-radius: 1.25rem;
 }
 
@@ -33,21 +37,37 @@
 /* FIX: Login button visibility — ensure the primary button is styled */
 .fi-simple-layout .fi-btn-primary,
 .fi-simple-layout button[type="submit"].fi-btn {
-    @apply bg-red-600 text-white font-semibold shadow-sm;
-    @apply hover:bg-red-700;
-    @apply focus:ring-2 focus:ring-red-500/50 focus:ring-offset-2;
+    background-color: #dc2626;
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     min-height: 44px;
     border-radius: 0.75rem;
 }
 
+.fi-simple-layout .fi-btn-primary:hover,
+.fi-simple-layout button[type="submit"].fi-btn:hover {
+    background-color: #b91c1c;
+}
+
+.fi-simple-layout .fi-btn-primary:focus,
+.fi-simple-layout button[type="submit"].fi-btn:focus {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgba(239, 68, 68, 0.5);
+}
+
 /* Login page heading */
 .fi-simple-layout .fi-simple-header-heading {
-    @apply text-xl font-bold text-slate-900;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #292524;
 }
 
 /* ===== SIDEBAR ===== */
 .fi-sidebar {
-    @apply bg-white border-r border-slate-200;
+    background-color: #ffffff;
+    border-right: 1px solid #E8E5E0;
 }
 
 /* Sidebar logo sizing */
@@ -56,55 +76,71 @@
 }
 
 .fi-sidebar-nav-group-label {
-    @apply text-red-700 font-bold uppercase tracking-wider;
+    color: #b91c1c;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     font-size: 0.6875rem;
 }
 
 .fi-sidebar-item-active > .fi-sidebar-item-button {
-    @apply bg-red-50;
+    background-color: #fef2f2;
     border-left: 3px solid #B91C1C;
 }
 
 .fi-sidebar-item-active .fi-sidebar-item-label {
-    @apply text-red-700 font-semibold;
+    color: #b91c1c;
+    font-weight: 600;
 }
 
 .fi-sidebar-item-button:hover {
-    @apply bg-slate-50;
+    background-color: #FAFAF8;
 }
 
 /* ===== TOPBAR ===== */
-	fi-topbar {
-    @apply bg-white/95 backdrop-blur-sm border-b border-slate-200;
+.fi-topbar {
+    background-color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid #E8E5E0;
 }
 
 /* ===== PAGE HEADER ===== */
-	fi-header-heading {
-    @apply text-2xl font-bold text-slate-900 tracking-tight;
+.fi-header-heading {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #292524;
+    letter-spacing: -0.025em;
 }
 
-	fi-header-subheading {
-    @apply text-sm text-slate-500;
+.fi-header-subheading {
+    font-size: 0.875rem;
+    color: #78716C;
 }
 
 /* ===== STAT CARDS ===== */
-	fi-wi-stats-overview-stat {
-    @apply rounded-xl shadow-sm border border-slate-200;
+.fi-wi-stats-overview-stat {
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    border: 1px solid #E8E5E0;
     transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-	fi-wi-stats-overview-stat:hover {
-    @apply shadow-md;
+.fi-wi-stats-overview-stat:hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     transform: translateY(-1px);
 }
 
 /* ===== WIDGETS & SECTIONS ===== */
-	fi-wi {
-    @apply shadow-sm rounded-xl;
+.fi-wi {
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    border-radius: 0.75rem;
 }
 
-	fi-section {
-    @apply shadow-sm rounded-xl border border-slate-200;
+.fi-section {
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    border-radius: 0.75rem;
+    border: 1px solid #E8E5E0;
 }
 
 /* Dashboard 2-column grid on desktop */
@@ -117,84 +153,94 @@
 }
 
 /* ===== TABLE ENHANCEMENTS ===== */
-	fi-ta-row:hover {
-    @apply bg-slate-50/80 transition-colors duration-150;
+.fi-ta-row:hover {
+    background-color: rgba(250, 250, 248, 0.8);
+    transition: background-color 150ms ease;
 }
 
-	fi-ta-header-cell {
-    @apply text-xs font-semibold uppercase tracking-wider text-slate-500;
+.fi-ta-header-cell {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #78716C;
 }
 
 /* ===== BUTTONS ===== */
-/* Ensure all primary buttons are visible */
-	fi-btn-primary {
-    @apply shadow-sm;
+.fi-btn-primary {
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
 /* ===== BADGES ===== */
-	fi-badge {
-    @apply font-medium;
+.fi-badge {
+    font-weight: 500;
 }
 
 /* ===== SCROLLABLE WIDGETS ===== */
-	dashboard-widget-scrollable {
+.dashboard-widget-scrollable {
     max-height: 400px;
     overflow-y: auto;
 }
 
-	dashboard-widget-compact {
+.dashboard-widget-compact {
     max-height: 350px;
     overflow-y: auto;
 }
 
-	dashboard-widget-scrollable::-webkit-scrollbar,
-	dashboard-widget-compact::-webkit-scrollbar {
+.dashboard-widget-scrollable::-webkit-scrollbar,
+.dashboard-widget-compact::-webkit-scrollbar {
     width: 6px;
 }
 
-	dashboard-widget-scrollable::-webkit-scrollbar-track,
-	dashboard-widget-compact::-webkit-scrollbar-track {
-    @apply bg-slate-100 rounded;
+.dashboard-widget-scrollable::-webkit-scrollbar-track,
+.dashboard-widget-compact::-webkit-scrollbar-track {
+    background-color: #F5F3F0;
+    border-radius: 9999px;
 }
 
-	dashboard-widget-scrollable::-webkit-scrollbar-thumb,
-	dashboard-widget-compact::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 rounded;
+.dashboard-widget-scrollable::-webkit-scrollbar-thumb,
+.dashboard-widget-compact::-webkit-scrollbar-thumb {
+    background-color: #D4D0CA;
+    border-radius: 9999px;
 }
 
 /* ===== ALERT UTILITIES ===== */
-	alert-critical { @apply bg-red-50 text-red-700 border-red-200; }
-	alert-warning { @apply bg-yellow-50 text-yellow-700 border-yellow-200; }
-	alert-success { @apply bg-green-50 text-green-700 border-green-200; }
-	alert-info { @apply bg-blue-50 text-blue-700 border-blue-200; }
+.alert-critical { background-color: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.alert-warning { background-color: #fefce8; color: #a16207; border-color: #fef08a; }
+.alert-success { background-color: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+.alert-info { background-color: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 
 /* ===== STOCK INDICATORS ===== */
-	stock-critical { @apply text-red-600 font-semibold; }
-	stock-low { @apply text-yellow-600 font-medium; }
-	stock-good { @apply text-green-600; }
+.stock-critical { color: #dc2626; font-weight: 600; }
+.stock-low { color: #ca8a04; font-weight: 500; }
+.stock-good { color: #16a34a; }
 
 /* ===== FORM FOCUS ENHANCEMENT ===== */
-	fi-input:focus-within {
-    @apply ring-2 ring-red-500/20 border-red-400;
+.fi-input:focus-within {
+    box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.2);
+    border-color: #f87171;
 }
 
 /* ===== CARD HOVER UTILITY ===== */
-	fi-ta-ctn {
-    @apply rounded-xl overflow-hidden;
+.fi-ta-ctn {
+    border-radius: 0.75rem;
+    overflow: hidden;
 }
 
 /* ===== EMPTY STATE ===== */
-	fi-ta-empty-state {
-    @apply py-12;
+.fi-ta-empty-state {
+    padding-top: 3rem;
+    padding-bottom: 3rem;
 }
 
-	fi-ta-empty-state-icon {
-    @apply text-slate-300;
+.fi-ta-empty-state-icon {
+    color: #D4D0CA;
 }
 
 /* ===== MODAL ===== */
-	fi-modal-window {
-    @apply rounded-2xl shadow-2xl;
+.fi-modal-window {
+    border-radius: 1rem;
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
 }
 
 /* ===== REDUCED MOTION ===== */

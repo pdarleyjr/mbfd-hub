@@ -16,15 +16,16 @@
     <title>MBFD Support Hub | Enterprise Command Portal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+                    fontFamily: { sans: ['"Source Sans 3"', 'system-ui', 'sans-serif'], heading: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'] },
                     colors: {
                         mbfd: { 50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d' },
+                        neutral: { 50: '#FAFAF8', 100: '#F5F3F0', 200: '#E8E5E0', 300: '#D4D0CA', 400: '#A8A29E', 500: '#78716C', 600: '#57534E', 700: '#44403C', 800: '#292524', 900: '#1C1917' },
                         slate: { 850: '#1e293b', 900: '#0f172a' }
                     },
                     boxShadow: {
@@ -37,7 +38,7 @@
     </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
-        body { font-family: 'Inter', system-ui, sans-serif; }
+        body { font-family: 'Source Sans 3', system-ui, sans-serif; }
         .chat-messages { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
         .chat-messages::-webkit-scrollbar { width: 6px; }
         .chat-messages::-webkit-scrollbar-track { background: transparent; }

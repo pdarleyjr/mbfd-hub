@@ -12,12 +12,12 @@ import StationInventoryForm from './components/StationInventoryForm';
 import VehicleInspectionSelect from './components/VehicleInspectionSelect';
 
 const HomeNav = () => (
-  <header className="sticky top-0 z-50 bg-[#1e293b] border-b border-slate-700/50 h-16 flex items-center justify-between px-4 lg:px-6">
+  <header className="sticky top-0 z-50 bg-neutral-900 border-b border-neutral-700/50 h-16 flex items-center justify-between px-4 lg:px-6">
     <div className="flex items-center gap-3">
       <img src="/images/mbfd_logo_new.png" alt="MBFD Logo" className="h-10 w-10 object-contain" />
       <div className="hidden sm:block">
-        <h1 className="text-white font-semibold text-base leading-tight">MBFD Support Hub</h1>
-        <p className="text-slate-400 text-xs">Enterprise Command Portal</p>
+        <h1 className="text-white font-bold text-base leading-tight font-heading">MBFD Support Hub</h1>
+        <p className="text-neutral-400 text-xs">Enterprise Command Portal</p>
       </div>
     </div>
     <div className="flex items-center gap-2">
@@ -37,27 +37,27 @@ const HomeNav = () => (
 const LandingPage = () => (
   <main className="space-y-8">
     <header className="text-center">
-      <h1 className="text-3xl font-bold text-gray-900 mb-2">MBFD Forms</h1>
-      <p className="text-gray-600">Choose a workflow to get started.</p>
+      <h1 className="text-3xl font-bold text-neutral-800 mb-2 font-heading">MBFD Forms</h1>
+      <p className="text-neutral-600">Choose a workflow to get started.</p>
     </header>
 
-    <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 stagger-list">
       <Link
         to="/stations"
-        className="group rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:border-blue-300 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="group rounded-xl border border-neutral-200 bg-neutral-100 p-6 ring-1 ring-neutral-200/60 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-red-500"
       >
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-teal-50 text-teal-600">
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10.5l9-7 9 7v9a1 1 0 01-1 1h-5.5a1 1 0 01-1-1V14a1 1 0 00-1-1h-3a1 1 0 00-1 1v5.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-9z" />
             </svg>
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-semibold text-gray-900">Stations</h2>
-            <p className="mt-1 text-sm text-gray-600">
+            <h2 className="text-xl font-semibold text-neutral-800 font-heading">Stations</h2>
+            <p className="mt-1 text-sm text-neutral-600">
               View station details, rooms, and projects.
             </p>
-            <span className="mt-4 inline-flex items-center text-blue-600 font-medium group-hover:text-blue-700">
+            <span className="mt-4 inline-flex items-center text-teal-600 font-medium group-hover:text-teal-700">
               View Stations
               <svg className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -69,20 +69,20 @@ const LandingPage = () => (
 
       <Link
         to="/forms-hub"
-        className="group rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:border-blue-300 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="group rounded-xl border border-neutral-200 bg-neutral-100 p-6 ring-1 ring-neutral-200/60 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-red-500"
       >
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 7h6m-6 4h6" />
             </svg>
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-semibold text-gray-900">Forms Hub</h2>
-            <p className="mt-1 text-sm text-gray-600">
+            <h2 className="text-xl font-semibold text-neutral-800 font-heading">Forms Hub</h2>
+            <p className="mt-1 text-sm text-neutral-600">
               Access Big Ticket Item Requests and the Station Inventory Form.
             </p>
-            <span className="mt-4 inline-flex items-center text-blue-600 font-medium group-hover:text-blue-700">
+            <span className="mt-4 inline-flex items-center text-sky-600 font-medium group-hover:text-sky-700">
               Open Forms Hub
               <svg className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -94,17 +94,17 @@ const LandingPage = () => (
 
       <Link
         to="/vehicle-inspections"
-        className="group rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:border-red-300 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+        className="group rounded-xl border border-neutral-200 bg-neutral-100 p-6 ring-1 ring-neutral-200/60 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-red-500"
       >
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-red-100 text-red-600">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-red-50 text-red-600">
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-semibold text-gray-900">Vehicle Inspections</h2>
-            <p className="mt-1 text-sm text-gray-600">
+            <h2 className="text-xl font-semibold text-neutral-800 font-heading">Vehicle Inspections</h2>
+            <p className="mt-1 text-sm text-neutral-600">
               Daily vehicle inspection checklists for all fire apparatus.
             </p>
             <span className="mt-4 inline-flex items-center text-red-600 font-medium group-hover:text-red-700">
@@ -123,10 +123,10 @@ const LandingPage = () => (
 function App() {
   return (
     <Router basename="/daily">
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-neutral-50">
         <HomeNav />
         <OfflineIndicator />
-        <div className="max-w-4xl mx-auto py-8 px-4">
+        <div className="max-w-5xl mx-auto py-8 px-4">
           <Routes>
             <Route path="/" element={<LandingPage />} />
             {/* Vehicle Inspection Routes */}
