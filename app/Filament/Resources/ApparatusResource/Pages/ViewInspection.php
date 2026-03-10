@@ -17,10 +17,21 @@ class ViewInspection extends Page
     public Apparatus $record;
     public ApparatusInspection $inspection;
 
-    public function mount(int|string $record, int|string $inspection): void
+    public function mount($record, $inspection): void
     {
-        $this->record = Apparatus::findOrFail($record);
-        $this->inspection = ApparatusInspection::with('defects')->findOrFail($inspection);
+        // $record may be an Apparatus model (Filament auto-resolves) or an ID
+        if ($record instanceof Apparatus) {
+            $this->record = $record;
+        } else {
+            $this->record = Apparatus::findOrFail($record);
+        }
+
+        // $inspection is always an ID from the route
+        if ($inspection instanceof ApparatusInspection) {
+            $this->inspection = $inspection->load('defects');
+        } else {
+            $this->inspection = ApparatusInspection::with('defects')->findOrFail($inspection);
+        }
     }
 
     public function getTitle(): string

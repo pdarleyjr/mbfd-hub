@@ -19,6 +19,7 @@ class ApparatusInspection extends Model
         'vehicle_number',
         'designation_at_time',
         'results',
+        'officer_signature',
         'completed_at',
     ];
 
