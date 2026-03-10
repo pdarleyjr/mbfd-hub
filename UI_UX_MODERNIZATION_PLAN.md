@@ -416,4 +416,261 @@ Before deploying any UI changes, run these Impeccable skill checks:
 
 ---
 
+---
+
+## ✅ Phase 0-3 Completion Status (2026-03-10)
+
+| Phase | Status | Commit |
+|-------|--------|--------|
+| Phase 0: Remove `@apply`, fix selectors, warm neutrals | ✅ Complete | `c93fd8c0` |
+| Phase 1: Typography (Plus Jakarta Sans + Source Sans 3), color palette | ✅ Complete | `c93fd8c0` |
+| Phase 2: React component modernization (7 components) | ✅ Complete | `c93fd8c0` |
+| Phase 3: Motion system (stagger, shimmer, reduced motion) | ✅ Complete | `c93fd8c0` |
+
+---
+
+## 6. Phase 4-8: Advanced Enhancement Plan
+
+> Built on Impeccable reference principles. These phases elevate the existing work into a truly polished, enterprise-grade experience.
+
+---
+
+### Phase 4: Micro-Interactions & Feedback Polish (Priority: 🔴 High, ~6 hours)
+
+**Principle**: Every interactive element needs 8 states designed (Impeccable: interaction-design.md).
+
+#### 4.1 Button Press Feedback
+Add `:active` scale to all buttons:
+```css
+button:active, [role="button"]:active {
+  transform: scale(0.97);
+  transition: transform 100ms ease-out;
+}
+```
+
+#### 4.2 Card Hover Micro-Animation
+Currently only `hover:shadow-lg` — add coordinated hover state:
+- `translateY(-2px)` lift over 200ms with `cubic-bezier(0.25, 1, 0.5, 1)` (ease-out-quart)
+- Ring color shift: `ring-neutral-200/60` → `ring-neutral-300` on hover
+- Icon container subtle scale: `1.0 → 1.05`
+
+#### 4.3 Tab Sliding Underline Indicator
+Replace instant border-bottom swap with animated sliding underline:
+```css
+.tab-indicator {
+  position: absolute; bottom: 0;
+  height: 2px; background: var(--mbfd-red);
+  transition: left 250ms cubic-bezier(0.25, 1, 0.5, 1), width 250ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+```
+
+#### 4.4 Focus-Visible Ring System
+Add consistent `focus-visible` rings to ALL interactive elements:
+```css
+*:focus-visible {
+  outline: 2px solid #B91C1C;
+  outline-offset: 2px;
+}
+```
+
+#### 4.5 Form Input Focus Enhancement
+- Red accent ring on focus (`ring-2 ring-red-500/20`)
+- Label float-up animation when input has value
+- Inline validation on blur (not on keystroke)
+
+#### 4.6 Toast/Notification Entry Animation
+- Slide up from bottom on mobile, slide in from right on desktop
+- Auto-dismiss with progress indicator bar
+- Exit: fade + translateY(8px) at 75% of enter duration
+
+---
+
+### Phase 5: Landing Page Redesign (Priority: 🔴 High, ~4 hours)
+
+**Issues**: CDN Tailwind in production, chatbot dominates viewport, navigation cards cramped below fold.
+
+#### 5.1 Remove CDN Tailwind
+Replace `cdn.tailwindcss.com` with compiled CSS via Vite build or a pre-built Tailwind production CSS file.
+
+#### 5.2 Layout Rebalance
+- **Mobile**: Stack navigation cards ABOVE chatbot (cards → chatbot → system overview)
+- **Desktop**: Swap to 60% navigation / 40% chatbot (currently inverted)
+- Navigation cards should be the PRIMARY content, chatbot is secondary
+
+#### 5.3 Hero Section
+Add a concise hero above the grid:
+```
+MBFD Support Hub
+Operations & logistics platform for Miami Beach Fire Department
+[Quick Links: MBFD Forms | Admin | Workgroups]
+```
+
+#### 5.4 Navigation Cards Enhancement
+- Add left accent bar per card (matching the card's theme color)
+- Add subtle gradient background on icon containers instead of flat colors
+- Add stagger entrance animation (already in CSS, apply class)
+- Replace "System Overview" panel with a more useful widget (recent activity, shift status, etc.)
+
+#### 5.5 Footer Enhancement
+Replace "Secured System • Support Services Division" with actual useful info:
+- Version/build number
+- Last sync timestamp
+- Department branding with proper copyright
+
+---
+
+### Phase 6: Mobile-First Polish (Priority: 🟡 Medium, ~5 hours)
+
+**Principle**: Detect input method, not just screen size (Impeccable: responsive-design.md).
+
+#### 6.1 Input Method Detection
+```css
+@media (pointer: coarse) {
+  button, [role="button"] { min-height: 48px; padding: 12px 20px; }
+  .stat-chip { padding: 8px 12px; font-size: 0.8125rem; }
+}
+@media (pointer: fine) {
+  button, [role="button"] { min-height: 40px; }
+}
+```
+
+#### 6.2 Safe Area Support
+Add `env(safe-area-inset-*)` padding for notched devices:
+```css
+.fi-topbar, header { padding-top: max(0px, env(safe-area-inset-top)); }
+footer { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+```
+
+#### 6.3 Scroll-Snap Tabs
+Enable horizontal scroll-snap on `StationDetailPage` tabs for smooth mobile swiping:
+```css
+.tab-bar { scroll-snap-type: x mandatory; overflow-x: auto; }
+.tab-bar > button { scroll-snap-align: start; flex-shrink: 0; }
+```
+
+#### 6.4 Bottom Sheet Pattern
+For mobile forms (Big Ticket Request, Station Inventory), consider a bottom sheet presentation instead of full-page navigation:
+- Drag handle at top
+- Spring physics for dismiss gesture
+- Backdrop overlay with click-to-dismiss
+
+#### 6.5 Pull-to-Refresh Enhancement
+Replace text-based pull indicator with a proper MBFD-branded spinner component with haptic feedback stages.
+
+---
+
+### Phase 7: Enterprise Data Presentation (Priority: 🟡 Medium, ~4 hours)
+
+**Principle**: Use tabular-nums, proper hierarchy, and optical adjustments (Impeccable: typography.md, spatial-design.md).
+
+#### 7.1 Tabular Numbers
+Add `font-variant-numeric: tabular-nums` to all numeric displays:
+- Station stat chips
+- Vehicle inspection counts
+- Inventory quantities
+- Budget/cost displays
+
+#### 7.2 Data Table Enhancement
+For StationDetailPage project/shopwork lists:
+- Alternating row shading (`bg-neutral-50` / white)
+- Sticky header on scroll
+- Sort indicators on column headers
+- Compact density toggle
+
+#### 7.3 Empty State Illustrations
+Replace plain "No X for this station" text with proper empty states:
+- Icon + helpful message + action button
+- Example: 🏗️ "No capital projects yet — they'll appear here when created in the admin panel"
+
+#### 7.4 Stat Chips with Trend Indicators
+Add optional trend arrows (↑↓) to station stat chips when historical data is available.
+
+#### 7.5 Fluid Typography
+Implement `clamp()` for headings:
+```css
+.font-heading { font-size: clamp(1.5rem, 2vw + 1rem, 2.5rem); }
+```
+
+---
+
+### Phase 8: Accessibility & Performance (Priority: 🟡 Medium, ~4 hours)
+
+**Principle**: WCAG AA minimum, focus-visible mandatory, skip navigation (Impeccable: interaction-design.md, color-and-contrast.md).
+
+#### 8.1 WCAG Contrast Audit
+- Verify all `text-neutral-400` on white backgrounds meets 4.5:1 (body) or 3:1 (large text)
+- Fix placeholder text contrast (must be 4.5:1)
+- Test with browser DevTools emulate vision deficiencies tool
+
+#### 8.2 Skip Navigation Link
+Add hidden skip-to-main link at top of page:
+```html
+<a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-red-600 focus:text-white focus:px-4 focus:py-2 focus:rounded">
+  Skip to main content
+</a>
+```
+
+#### 8.3 ARIA Labels
+- All SVG icons need `aria-hidden="true"`
+- Icon-only buttons need `aria-label`
+- Loading states need `aria-live="polite"` regions
+- Search input needs `aria-label="Search vehicles"`
+
+#### 8.4 Lighthouse Performance
+- Preload Google Fonts with `<link rel="preload">`
+- Add `font-display: swap` fallback metrics (size-adjust, ascent-override)
+- Lazy-load below-fold images
+- Move CDN Tailwind from welcome.blade.php to compiled build
+
+#### 8.5 Semantic HTML Audit
+- Replace div-based navigation with `<nav>` elements
+- Use `<main>`, `<article>`, `<section>` where appropriate
+- Ensure heading hierarchy (h1 → h2 → h3, no skipping levels)
+
+---
+
+### Phase 9: Filament Admin Deep Polish (Priority: 🟢 Low, ~6 hours)
+
+#### 9.1 Sidebar Collapse Animation
+Smooth width transition on sidebar collapse/expand with content slide.
+
+#### 9.2 Command Center Widget Enhancement
+- Add visual hierarchy to fleet/stock summary
+- Use mini spark charts for trend data
+- Color-code status items (green for healthy, amber for attention, red for critical)
+
+#### 9.3 Filament Table Row Hover Enhancement
+- Add subtle left accent bar on hover (2px red bar)
+- Transition to warm neutral background
+
+#### 9.4 Login Page Branding
+- MBFD logo centered with warm glow
+- Subtle gradient background (warm neutral → white)
+- Remove stale NocoBase autofill credentials (browser suggest)
+
+#### 9.5 Dashboard Widget Grid
+- Enable drag-to-reorder for widgets (optional Livewire feature)
+- Add "last updated" timestamps on each widget card
+
+---
+
+## 7. Updated Priority Matrix (All Phases)
+
+| Priority | Phase | Effort | Impact | Status |
+|----------|-------|--------|--------|--------|
+| 🔴 P0 | Phase 0 — Fix theme.css | 2.5h | Fixes iOS crashes | ✅ Done |
+| 🔴 P1 | Phase 1 — Typography + Color | 6h | First impression | ✅ Done |
+| 🔴 P1 | Phase 2 — Component modernization | 8h | Professional feel | ✅ Done |
+| 🟡 P2 | Phase 3 — Motion system | 4h | Premium polish | ✅ Done |
+| 🔴 P1 | Phase 4 — Micro-interactions | 6h | Active feel, enterprise quality | ⬜ Pending |
+| 🔴 P1 | Phase 5 — Landing page redesign | 4h | First touch improvement | ⬜ Pending |
+| 🟡 P2 | Phase 6 — Mobile-first polish | 5h | Better mobile UX | ⬜ Pending |
+| 🟡 P2 | Phase 7 — Data presentation | 4h | Enterprise credibility | ⬜ Pending |
+| 🟡 P2 | Phase 8 — Accessibility + perf | 4h | Compliance + speed | ⬜ Pending |
+| 🟢 P3 | Phase 9 — Filament admin deep polish | 6h | Admin quality | ⬜ Pending |
+
+**Remaining estimated effort: ~35 hours**
+
+---
+
 *This plan was generated by analyzing the MBFD Hub codebase against Impeccable design principles. Execute phases in priority order (P0 → P1 → P2 → P3) for maximum impact with minimal risk.*
