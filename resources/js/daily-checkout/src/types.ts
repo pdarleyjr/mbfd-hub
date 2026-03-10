@@ -55,6 +55,7 @@ export interface InspectionSubmission {
   shift: string;
   unit_number: string;
   defects: Defect[];
+  officer_signature?: string | null;
 }
 
 export interface InspectionData {

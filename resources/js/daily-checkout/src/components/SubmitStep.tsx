@@ -1,9 +1,11 @@
+import { useRef, useState } from 'react';
+import SignatureCanvas from 'react-signature-canvas';
 import { OfficerInfo, Compartment } from '../types';
 
 interface SubmitStepProps {
   officerInfo: OfficerInfo;
   compartments: Compartment[];
-  onSubmit: () => void;
+  onSubmit: (signature: string | null) => void;
   onBack: () => void;
   submitting: boolean;
 }
@@ -15,10 +17,28 @@ export default function SubmitStep({
   onBack,
   submitting
 }: SubmitStepProps) {
+  const sigRef = useRef<SignatureCanvas | null>(null);
+  const [sigError, setSigError] = useState(false);
+
   const totalItems = compartments.reduce((sum, comp) => sum + comp.items.length, 0);
   const issuesCount = compartments.reduce((sum, comp) =>
     sum + comp.items.filter(item => item.status !== 'Present').length, 0
   );
+
+  const handleSubmit = () => {
+    if (!sigRef.current || sigRef.current.isEmpty()) {
+      setSigError(true);
+      return;
+    }
+    setSigError(false);
+    const sigData = sigRef.current.getTrimmedCanvas().toDataURL('image/png');
+    onSubmit(sigData);
+  };
+
+  const clearSignature = () => {
+    sigRef.current?.clear();
+    setSigError(false);
+  };
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -54,6 +74,15 @@ export default function SubmitStep({
           </div>
         </div>
       </div>
+
+      {issuesCount > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-800 font-medium text-sm">
+            ⚠️ This vehicle has {issuesCount} defect{issuesCount !== 1 ? 's' : ''}. 
+            It will be automatically placed on <strong>HOLD (Out of Service)</strong> upon submission.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-4 mb-8">
         <h3 className="text-lg font-medium text-gray-900">Compartments Summary</h3>
@@ -93,6 +122,32 @@ export default function SubmitStep({
         })}
       </div>
 
+      {/* Officer Signature */}
+      <div className="mb-8">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Officer Signature</h3>
+        <p className="text-sm text-gray-600 mb-3">Sign below to certify this inspection is accurate.</p>
+        <div className={`border-2 rounded-lg bg-white ${sigError ? 'border-red-500' : 'border-gray-300'}`}>
+          <SignatureCanvas
+            ref={sigRef}
+            penColor="black"
+            canvasProps={{
+              className: 'w-full',
+              style: { width: '100%', height: '150px' }
+            }}
+          />
+        </div>
+        {sigError && (
+          <p className="text-red-600 text-sm mt-1">Signature is required before submitting.</p>
+        )}
+        <button
+          type="button"
+          onClick={clearSignature}
+          className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
+        >
+          Clear Signature
+        </button>
+      </div>
+
       <div className="flex justify-between">
         <button
           onClick={onBack}
@@ -103,7 +158,7 @@ export default function SubmitStep({
         </button>
 
         <button
-          onClick={onSubmit}
+          onClick={handleSubmit}
           disabled={submitting}
           className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 font-medium"
         >
