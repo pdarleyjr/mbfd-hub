@@ -1,0 +1,20 @@
+time="2026-03-08T19:37:31Z" level=warning msg="Found multiple config files with supported names: /root/mbfd-hub/compose.yaml, /root/mbfd-hub/docker-compose.yml"
+time="2026-03-08T19:37:31Z" level=warning msg="Using /root/mbfd-hub/compose.yaml"
+time="2026-03-08T19:37:31Z" level=warning msg="Found multiple config files with supported names: /root/mbfd-hub/compose.yaml, /root/mbfd-hub/docker-compose.yml"
+time="2026-03-08T19:37:31Z" level=warning msg="Using /root/mbfd-hub/compose.yaml"
+
+   Psy\Exception\ParseErrorException 
+
+  PHP Parse error: Syntax error, unexpected ',' on line 1
+
+  at vendor/psy/psysh/src/Exception/ParseErrorException.php:44
+     40▕      * @param \PhpParser\Error $e
+     41▕      */
+     42▕     public static function fromParseError(\PhpParser\Error $e): self
+     43▕     {
+  ➜  44▕         return new self($e->getRawMessage(), $e->getAttributes());
+     45▕     }
+     46▕ }
+     47▕
+
+      [2m+19 vendor frames [22m

@@ -3,7 +3,7 @@
 
 > ⚠️ **CRITICAL MANDATE**: Every AI agent working on this codebase MUST read this entire file BEFORE making any changes. Failure to read this file WILL result in breaking existing functionality.
 
-**Last Updated**: 2026-03-09  
+**Last Updated**: 2026-03-10  
 **Project**: MBFD Hub (Laravel 11, Filament v3, VPS at 145.223.73.170)
 
 ---
@@ -556,7 +556,7 @@ The misconfiguration had three separate layers that needed to be resolved:
 
 2. **Chatify PHP SDK Hairpin**: Chatify Messenger Extension recreates a Pusher instance from `config('chatify.pusher.options')`. This instance also used `www.mbfdhub.com:443 https` and collapsed the namespace. If the frontend was reflapped tolocalhost, it carried the Pusher-used config with it.
 
-3. **Shared Config for Frontent and Backend**: $config('chatify.pusher') was used in 4 places — by the Chatify Messenger Handlebars file in the Blade View, for backend Queue events, by Laravel Breeze Chatify, and by the Filament Chatify Module in the Backend Profile. As a result, if either 2A or 2B were changed, 2C/2D were 401/404-ing.
+3. **Shared Config for Fronten and Backend**: $config('chatify.pusher') was used in 4 places — by the Chatify Messenger Handlebars file in the Blade View, for backend Queue events, by Laravel Breeze Chatify, and by the Filament Chatify Module in the Backend Profile. As a result, if either 2A or 2B were changed, 2C/2D were 401/404-ing.
 
 **Action Taken**:
 The AI agent performing the fix chose to add %REVERB_INTERNAL_HOST% and %REVERB_SERVER_PORT% to `config/broadcasting.php`. These were collected during initial configuration, so these systems had the values embedded by default.
@@ -570,4 +570,111 @@ Always review the complete build process before adding new services. Each piece 
 
 ---
 
-### ERROR-025: Chatify Demo Module
+### ERROR-025: Reserved placeholder heading left in file from prior work. Keep below entries as the current authoritative additions for 2026-03-09.
+**Status**: Reserved
+
+---
+
+### ERROR-026: Daily Checkout React Crash — Checklist Payload Shape Mismatch in `CompartmentStep.tsx`
+### ERROR-027: Daily Checkout PWA Served Stale JS Bundle After Deploy
+### ERROR-028: `artisan serve` + Real `public/daily/` Directory Causes SPA Sub-Route 404s Without Custom `server.php`
+
+---
+
+### ERROR-029: JSON Checklist Files in Wrong Storage Path — "No checklist items available"
+
+**Date**: 2026-03-10  
+**Severity**: 🔴 CRITICAL — Step 2 of Vehicle Inspection wizard shows "No checklist items available" for ALL apparatus types  
+**File(s) Affected**: `app/Http/Controllers/Api/ApparatusController.php`, `storage/checklists/`
+
+**Symptom**:
+After filling officer info and clicking "Continue to Inspection", the Compartments step shows:
+```
+No checklist items available
+The inspection checklist has not loaded correctly for this vehicle yet.
+```
+The API returns `{"checklist": []}` (empty array) for all apparatus types.
+
+**Root Cause**:
+`ApparatusController::checklist()` used `storage_path('app/checklists/{type}_checklist.json')` which resolves to `storage/app/checklists/`. However, the JSON checklist files (`engine_checklist.json`, `rescue_checklist.json`, `ladder1_checklist.json`, `ladder3_checklist.json`, `default_checklist.json`) were placed in `storage/checklists/` (without the `app/` segment). Since the files weren't found, `file_exists()` returned false and an empty array was returned.
+
+**Secondary Bug**: The ladder type detection logic used `str_contains($type, 'ladder1')` and `str_contains($type, 'ladder3')`, but the actual `type` column value for all ladders is just `"Ladder"`. The differentiation requires checking the `designation` column (e.g., "L 1" vs "L 3").
+
+**Fix Applied**:
+1. Copied checklist files: `cp storage/checklists/*.json storage/app/checklists/`
+2. Fixed ladder type detection to use designation-based regex:
+```php
+if (str_contains($type, 'ladder')) {
+    $designation = strtolower($apparatus->designation ?? '');
+    $name = strtolower($apparatus->name ?? '');
+    if (preg_match('/l\s*3\b/', $designation) || preg_match('/l\s*3\b/', $name)) {
+        $checklistType = 'ladder3';
+    } else {
+        $checklistType = 'ladder1';
+    }
+}
+```
+
+**Prevention**:
+1. When using `storage_path('app/...')`, always verify files exist at that exact path — `storage_path('app/')` maps to `storage/app/`, NOT `storage/`
+2. When mapping apparatus types to specific files, always check the actual database values with `SELECT DISTINCT type, designation FROM apparatuses`
+3. Use `designation` (not `type`) for sub-type differentiation (e.g., Ladder L1 vs L3)
+
+**Commit**: `a354d2f3`
+
+---
+
+### ERROR-030: SPA Deep Route 404s — Not an Nginx Issue on This Stack
+
+**Date**: 2026-03-10  
+**Severity**: 🟢 INFO — previously suspected Nginx interception; confirmed NOT the cause  
+
+**Investigation Result**:
+The initial diagnosis suggested Nginx was intercepting multi-segment React Router paths (e.g., `/daily/vehicle-inspections/e4`) before Laravel could handle them. Investigation revealed this is NOT the case:
+
+1. Host Nginx for `support.darleyplex.com` and `www.mbfdhub.com` uses a pure `proxy_pass` to `127.0.0.1:8080` — no `try_files` that could 404
+2. The custom `server.php` already has a `/daily/*` SPA catch-all that serves `daily/index.html` for all non-file requests
+3. `routes/web.php` has `Route::get('/daily/{path?}', ...)->where('path', '.+')` as a redundant safety net
+
+**No fix needed** — the routing stack was already correctly configured by a previous agent. Any 404s experienced were due to stale service worker cache (see ERROR-027) or browser cache. Hard-refresh or clearing service worker storage resolves it.
+
+---
+
+### ERROR-031: Filament Admin Theme CSS — Broken Selectors + @apply iOS Risk
+
+**Date**: 2026-03-10  
+**Severity**: 🔴 CRITICAL — broken selectors cause admin styling to not render; `@apply` usage risks iOS black-screen crashes  
+**File(s) Affected**: `resources/css/filament/admin/theme.css`
+
+**Symptom**:
+1. Admin topbar, header headings, stat cards, widgets, sections, table rows, badges, buttons, and modals have NO custom styling because their CSS selectors are missing the `.` class prefix
+2. Potential iOS black-screen crash due to 37+ instances of `@apply` (see ERROR-016)
+
+**Root Cause**:
+Lines 77-198 of `theme.css` have CSS selectors written WITHOUT the `.` prefix:
+```css
+/* BROKEN (lines 77-198): */
+fi-topbar { ... }
+fi-header-heading { ... }
+fi-wi-stats-overview-stat { ... }
+fi-btn-primary { ... }
+/* etc. */
+
+/* Should be: */
+.fi-topbar { ... }
+.fi-header-heading { ... }
+.fi-wi-stats-overview-stat { ... }
+.fi-btn-primary { ... }
+```
+
+Additionally, all `@apply` directives should be replaced with native CSS (per ERROR-016 prevention rules).
+
+**Fix Required** (not yet applied — design analysis phase only):
+1. Add `.` prefix to ALL selectors on lines 77-198
+2. Replace ALL `@apply` directives with native CSS equivalents
+3. See `UI_UX_MODERNIZATION_PLAN.md` Phase D for full remediation plan
+
+**Prevention**:
+- Always prefix Filament CSS class selectors with `.`
+- Never use `@apply` in any CSS file (causes iOS Safari black-screen crash)
+- Run `/audit` skill check before deploying theme changes

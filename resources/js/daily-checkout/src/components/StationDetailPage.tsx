@@ -68,25 +68,40 @@ export default function StationDetailPage() {
     );
   };
 
-  const quickStatsGridClass = enableApparatusForms
-    ? 'grid-cols-2 md:grid-cols-5'
-    : 'grid-cols-2 md:grid-cols-4';
-
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-64">
-        <div className="text-lg">Loading station details...</div>
+      <div className="space-y-6">
+        <div className="skeleton h-6 w-32"></div>
+        <div className="bg-neutral-100 rounded-xl ring-1 ring-neutral-200/60 p-6">
+          <div className="skeleton h-8 w-48 mb-2"></div>
+          <div className="skeleton h-5 w-64 mb-2"></div>
+          <div className="skeleton h-4 w-80 mb-6"></div>
+          <div className="flex flex-wrap gap-4">
+            {[1,2,3,4,5].map(i => <div key={i} className="skeleton h-4 w-28"></div>)}
+          </div>
+        </div>
+        <div className="bg-neutral-100 rounded-xl ring-1 ring-neutral-200/60 p-6">
+          <div className="flex gap-4 mb-6">
+            {[1,2,3,4].map(i => <div key={i} className="skeleton h-10 w-24"></div>)}
+          </div>
+          <div className="skeleton h-40 w-full"></div>
+        </div>
       </div>
     );
   }
 
   if (error || !station) {
     return (
-      <div className="text-center text-red-600 p-4">
-        <p>Error: {error || 'Station not found'}</p>
+      <div className="text-center p-8">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-50 mb-4">
+          <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+        </div>
+        <p className="text-red-600 font-medium mb-2">{error || 'Station not found'}</p>
         <Link
           to="/stations"
-          className="mt-4 inline-block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          className="mt-4 inline-block px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
         >
           Back to Stations
         </Link>
@@ -100,7 +115,7 @@ export default function StationDetailPage() {
       <div className="flex items-center justify-between">
         <Link
           to="/stations"
-          className="inline-flex items-center text-gray-600 hover:text-gray-900"
+          className="inline-flex items-center text-neutral-500 hover:text-neutral-800"
         >
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -111,19 +126,19 @@ export default function StationDetailPage() {
       </div>
 
       {/* Station Header */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-neutral-100 rounded-xl ring-1 ring-neutral-200/60 p-6">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl font-bold text-neutral-800 mb-2 font-heading">
               Station {station.station_number}
             </h1>
-            <p className="text-xl text-gray-700 font-medium">{station.name}</p>
-            <p className="text-gray-600 mt-2">
+            <p className="text-xl text-neutral-600 font-medium">{station.name}</p>
+            <p className="text-neutral-500 mt-2">
               {station.address}, {station.city}, {station.state} {station.zip_code}
             </p>
           </div>
           {station.phone && (
-            <div className="mt-4 md:mt-0 flex items-center text-gray-600">
+            <div className="mt-4 md:mt-0 flex items-center text-neutral-500">
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
               </svg>
@@ -132,44 +147,44 @@ export default function StationDetailPage() {
           )}
         </div>
 
-        {/* Quick Stats */}
-        <div className={`mt-6 grid ${quickStatsGridClass} gap-4`}>
+        {/* Flat stat chips — no nested cards */}
+        <div className="mt-6 flex flex-wrap gap-4 text-sm">
           {enableApparatusForms && (
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <p className="text-3xl font-bold text-blue-600">{station.apparatuses_count || 0}</p>
-              <p className="text-sm text-blue-700">Apparatuses</p>
-            </div>
+            <span className="inline-flex items-center gap-1.5 text-amber-700 font-medium">
+              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+              {station.apparatuses_count || 0} Apparatuses
+            </span>
           )}
-          <div className="text-center p-4 bg-purple-50 rounded-lg">
-            <p className="text-3xl font-bold text-purple-600">{station.rooms_count || 0}</p>
-            <p className="text-sm text-purple-700">Rooms</p>
-          </div>
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <p className="text-3xl font-bold text-green-600">{station.capital_projects_count || 0}</p>
-            <p className="text-sm text-green-700">Capital Projects</p>
-          </div>
-          <div className="text-center p-4 bg-amber-50 rounded-lg">
-            <p className="text-3xl font-bold text-amber-600">{station.under_25k_projects_count || 0}</p>
-            <p className="text-sm text-amber-700">Under 25K Projects</p>
-          </div>
-          <div className="text-center p-4 bg-red-50 rounded-lg">
-            <p className="text-3xl font-bold text-red-600">{station.shop_works_count || 0}</p>
-            <p className="text-sm text-red-700">Shop Works</p>
-          </div>
+          <span className="inline-flex items-center gap-1.5 text-teal-700 font-medium">
+            <span className="w-2 h-2 rounded-full bg-teal-500"></span>
+            {station.rooms_count || 0} Rooms
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-sky-700 font-medium">
+            <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+            {station.capital_projects_count || 0} Capital Projects
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-amber-700 font-medium">
+            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+            {station.under_25k_projects_count || 0} Under 25K
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-red-700 font-medium">
+            <span className="w-2 h-2 rounded-full bg-red-500"></span>
+            {station.shop_works_count || 0} Shop Works
+          </span>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="flex overflow-x-auto border-b border-gray-200">
+      <div className="bg-neutral-100 rounded-xl ring-1 ring-neutral-200/60 overflow-hidden">
+        <div className="flex overflow-x-auto border-b border-neutral-200">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`px-6 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`min-h-[48px] px-6 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
                 activeTab === tab.id
-                  ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  ? 'border-b-2 border-red-600 text-red-600 bg-red-50/50'
+                  : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50'
               }`}
             >
               {tab.label}
@@ -182,57 +197,57 @@ export default function StationDetailPage() {
           {activeTab === 'overview' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Station Information</h3>
-                <dl className="space-y-3">
-                  <div className="flex justify-between py-2 border-b">
-                    <dt className="text-gray-600">Station Number</dt>
-                    <dd className="font-medium">{station.station_number}</dd>
+                <h3 className="text-lg font-semibold text-neutral-800 mb-4 font-heading">Station Information</h3>
+                <dl className="space-y-0">
+                  <div className="flex justify-between py-2.5 border-b border-neutral-200">
+                    <dt className="text-neutral-500">Station Number</dt>
+                    <dd className="font-medium text-neutral-800">{station.station_number}</dd>
                   </div>
                   {enableApparatusForms && (
-                    <div className="flex justify-between py-2 border-b">
-                      <dt className="text-gray-600">Active Apparatuses</dt>
-                      <dd className="font-medium">{station.active_apparatuses_count || 0}</dd>
+                    <div className="flex justify-between py-2.5 border-b border-neutral-200 bg-neutral-50/50">
+                      <dt className="text-neutral-500">Active Apparatuses</dt>
+                      <dd className="font-medium text-neutral-800">{station.active_apparatuses_count || 0}</dd>
                     </div>
                   )}
-                  <div className="flex justify-between py-2 border-b">
-                    <dt className="text-gray-600">Personnel</dt>
-                    <dd className="font-medium">{station.personnel_count || 0}</dd>
+                  <div className="flex justify-between py-2.5 border-b border-neutral-200">
+                    <dt className="text-neutral-500">Personnel</dt>
+                    <dd className="font-medium text-neutral-800">{station.personnel_count || 0}</dd>
                   </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <dt className="text-gray-600">Dorm Beds</dt>
-                    <dd className="font-medium">{station.dorm_beds_count || 0}</dd>
+                  <div className="flex justify-between py-2.5 border-b border-neutral-200 bg-neutral-50/50">
+                    <dt className="text-neutral-500">Dorm Beds</dt>
+                    <dd className="font-medium text-neutral-800">{station.dorm_beds_count || 0}</dd>
                   </div>
                   {station.fax && (
-                    <div className="flex justify-between py-2 border-b">
-                      <dt className="text-gray-600">Fax</dt>
-                      <dd className="font-medium">{station.fax}</dd>
+                    <div className="flex justify-between py-2.5 border-b border-neutral-200">
+                      <dt className="text-neutral-500">Fax</dt>
+                      <dd className="font-medium text-neutral-800">{station.fax}</dd>
                     </div>
                   )}
                 </dl>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Location</h3>
-                <dl className="space-y-3">
-                  <div className="flex justify-between py-2 border-b">
-                    <dt className="text-gray-600">Address</dt>
-                    <dd className="font-medium text-right">{station.address}</dd>
+                <h3 className="text-lg font-semibold text-neutral-800 mb-4 font-heading">Location</h3>
+                <dl className="space-y-0">
+                  <div className="flex justify-between py-2.5 border-b border-neutral-200">
+                    <dt className="text-neutral-500">Address</dt>
+                    <dd className="font-medium text-right text-neutral-800">{station.address}</dd>
                   </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <dt className="text-gray-600">City</dt>
-                    <dd className="font-medium">{station.city}</dd>
+                  <div className="flex justify-between py-2.5 border-b border-neutral-200 bg-neutral-50/50">
+                    <dt className="text-neutral-500">City</dt>
+                    <dd className="font-medium text-neutral-800">{station.city}</dd>
                   </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <dt className="text-gray-600">State</dt>
-                    <dd className="font-medium">{station.state}</dd>
+                  <div className="flex justify-between py-2.5 border-b border-neutral-200">
+                    <dt className="text-neutral-500">State</dt>
+                    <dd className="font-medium text-neutral-800">{station.state}</dd>
                   </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <dt className="text-gray-600">ZIP Code</dt>
-                    <dd className="font-medium">{station.zip_code}</dd>
+                  <div className="flex justify-between py-2.5 border-b border-neutral-200 bg-neutral-50/50">
+                    <dt className="text-neutral-500">ZIP Code</dt>
+                    <dd className="font-medium text-neutral-800">{station.zip_code}</dd>
                   </div>
                   {station.latitude && station.longitude && (
-                    <div className="flex justify-between py-2 border-b">
-                      <dt className="text-gray-600">Coordinates</dt>
-                      <dd className="font-medium">{station.latitude}, {station.longitude}</dd>
+                    <div className="flex justify-between py-2.5 border-b border-neutral-200">
+                      <dt className="text-neutral-500">Coordinates</dt>
+                      <dd className="font-medium text-neutral-800">{station.latitude}, {station.longitude}</dd>
                     </div>
                   )}
                 </dl>
