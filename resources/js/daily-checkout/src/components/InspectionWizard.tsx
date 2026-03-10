@@ -28,6 +28,7 @@ export default function InspectionWizard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasLoadedAutosave, setHasLoadedAutosave] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -35,7 +36,6 @@ export default function InspectionWizard() {
 
       try {
         // For now, we'll fetch all apparatuses and find the one by slug
-        // In a real app, you'd have an endpoint to get apparatus by slug
         const apparatuses = await ApiClient.getApparatuses();
         const foundApparatus = apparatuses.find(a => a.slug === slug);
 
@@ -118,9 +118,10 @@ export default function InspectionWizard() {
     setCurrentStep('submit');
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (signature: string | null) => {
     if (!apparatus || !slug) return;
 
+    setSubmitting(true);
     try {
       // Compile defects from items marked Missing or Damaged
       const defects: Defect[] = [];
@@ -154,6 +155,7 @@ export default function InspectionWizard() {
           })),
         })),
         defects,
+        officer_signature: signature,
       };
 
       if (isOffline) {
@@ -185,6 +187,8 @@ export default function InspectionWizard() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit inspection');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -301,7 +305,7 @@ export default function InspectionWizard() {
           compartments={compartments}
           onSubmit={handleSubmit}
           onBack={goBack}
-          submitting={false}
+          submitting={submitting}
         />
       )}
     </div>

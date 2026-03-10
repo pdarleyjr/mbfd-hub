@@ -20,35 +20,41 @@ class ApparatusController extends Controller
     public function checklist($id)
     {
         $apparatus = Apparatus::findOrFail($id);
-        
-        // Determine checklist file based on apparatus type
+
+        // Determine checklist file based on apparatus type and designation
         $checklistType = 'default';
         if ($apparatus->type) {
             $type = strtolower($apparatus->type);
-            // Map apparatus type to checklist file
             if (str_contains($type, 'engine')) {
                 $checklistType = 'engine';
             } elseif (str_contains($type, 'ladder')) {
-                $checklistType = str_contains($type, 'ladder1') ? 'ladder1' : 
-                                 (str_contains($type, 'ladder3') ? 'ladder3' : 'default');
+                // Use designation to differentiate ladder types
+                // L 3 -> ladder3, all others (L 1, L 11) -> ladder1
+                $designation = strtolower($apparatus->designation ?? '');
+                $name = strtolower($apparatus->name ?? '');
+                if (preg_match('/l\s*3\b/', $designation) || preg_match('/l\s*3\b/', $name)) {
+                    $checklistType = 'ladder3';
+                } else {
+                    $checklistType = 'ladder1';
+                }
             } elseif (str_contains($type, 'rescue')) {
                 $checklistType = 'rescue';
             }
         }
-        
+
         // Load checklist JSON from storage
         $checklistPath = storage_path("app/checklists/{$checklistType}_checklist.json");
-        
-        // Fallback to default if specific checklist doesn't exist
+
+        // Fallback to default if specific checklist does not exist
         if (!file_exists($checklistPath)) {
             $checklistPath = storage_path('app/checklists/default_checklist.json');
         }
-        
+
         $checklist = [];
         if (file_exists($checklistPath)) {
             $checklist = json_decode(file_get_contents($checklistPath), true);
         }
-        
+
         return response()->json([
             'apparatus' => $apparatus,
             'checklist' => $checklist,
@@ -70,9 +76,26 @@ class ApparatusController extends Controller
             'defects.*.status' => 'required|string|in:Present,Missing,Damaged',
             'defects.*.notes' => 'nullable|string',
             'defects.*.photo' => 'nullable|string',
+            'officer_signature' => 'nullable|string',
         ]);
 
         $apparatus = Apparatus::findOrFail($id);
+
+        // Save officer signature if provided
+        $signaturePath = null;
+        if ($request->officer_signature) {
+            $sig = $request->officer_signature;
+            if (preg_match('/^data:image\/(\w+);base64,/', $sig, $matches)) {
+                $sig = substr($sig, strpos($sig, ',') + 1);
+                $ext = $matches[1];
+            } else {
+                $ext = 'png';
+            }
+            $decoded = base64_decode($sig);
+            $filename = 'signatures/' . Str::uuid() . '.' . $ext;
+            Storage::disk('public')->put($filename, $decoded);
+            $signaturePath = $filename;
+        }
 
         $inspection = ApparatusInspection::create([
             'apparatus_id' => $apparatus->id,
@@ -83,15 +106,17 @@ class ApparatusController extends Controller
             'vehicle_number' => $apparatus->vehicle_number,
             'designation_at_time' => $apparatus->designation,
             'results' => $request->compartments,
+            'officer_signature' => $signaturePath,
             'completed_at' => now(),
         ]);
 
+        // Track if any critical defects found
+        $hasCriticalDefects = false;
+
         foreach ($request->defects ?? [] as $defectData) {
             $photoPath = null;
-            
-            // Handle photo if present
+
             if (!empty($defectData['photo'])) {
-                // Strip the data:image/...;base64, prefix if present
                 $photo = $defectData['photo'];
                 if (preg_match('/^data:image\/(\w+);base64,/', $photo, $matches)) {
                     $photo = substr($photo, strpos($photo, ',') + 1);
@@ -99,19 +124,17 @@ class ApparatusController extends Controller
                 } else {
                     $extension = 'jpg';
                 }
-                
-                // Decode base64
                 $decodedImage = base64_decode($photo);
-                
-                // Generate filename
                 $filename = 'defects/' . Str::uuid() . '.' . $extension;
-                
-                // Save to public disk
                 Storage::disk('public')->put($filename, $decodedImage);
-                
                 $photoPath = $filename;
             }
-            
+
+            // Check for critical defects (Missing or Damaged)
+            if (in_array($defectData['status'], ['Missing', 'Damaged'])) {
+                $hasCriticalDefects = true;
+            }
+
             ApparatusDefect::recordDefect(
                 $apparatus->id,
                 $defectData['compartment'],
@@ -120,6 +143,11 @@ class ApparatusController extends Controller
                 $defectData['notes'] ?? null,
                 $photoPath
             );
+        }
+
+        // HOLD logic: If critical defects found, set apparatus to Out of Service
+        if ($hasCriticalDefects) {
+            $apparatus->update(['status' => 'Out of Service']);
         }
 
         return response()->json($inspection->load('apparatus'), 201);
