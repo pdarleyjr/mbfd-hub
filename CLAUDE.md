@@ -6,6 +6,7 @@
 > ✅ **Daily Vehicle Inspections revived** (2026-03-09 late evening) — MBFD Forms now includes a dedicated Vehicle Inspections card, historical inspections render in a branded admin results viewer, checklist payloads are normalized for React, and the daily SPA now ships with updated service-worker cache busting plus custom `artisan serve` router handling for `/daily/*` routes.  
 > ✅ **Vehicle Inspection Checklists FIXED + ICS-212 Features** (2026-03-10) — Checklist pathing bug resolved (storage/checklists → storage/app/checklists), ladder type detection fixed to use designation, digital officer signatures added via react-signature-canvas, automated HOLD logic sets apparatus "Out of Service" on critical defects.
 > ✅ **Impeccable Design System Installed** (2026-03-10) — All 17 Impeccable skills installed to `.kilocode/skills/`, 7 domain reference files in `frontend-design/reference/`. UI/UX Modernization Plan generated.
+> ✅ **UI/UX Modernization Phase 0-3 DEPLOYED** (2026-03-10) — Removed all 37+ `@apply` from theme.css (iOS crash fix), fixed broken selectors, replaced pure grays with warm-tinted neutrals, new typography system (Plus Jakarta Sans + Source Sans 3), flattened nested stat cards, skeleton loading, stagger animations, search filter on vehicle inspections, reduced motion support.
 
 ## Project Identity
 Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filament 3 backend, React SPA daily checkout, Baserow data platform — all containerized on a single VPS.
