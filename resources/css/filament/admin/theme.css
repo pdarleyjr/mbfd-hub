@@ -416,6 +416,554 @@
     margin: 0.5rem 0;
 }
 
+/* ===== WORKGROUP EVALUATION — IMPECCABLE DESIGN SYSTEM ===== */
+
+/* Session Pill Switcher */
+.wg-session-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background-color: #F8F6F2;
+    border: 1px solid #E8E5E0;
+    border-radius: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.wg-session-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.4375rem 1rem;
+    border-radius: 9999px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #57534E;
+    background-color: #ffffff;
+    border: 1px solid #E8E5E0;
+    cursor: pointer;
+    transition: background-color 150ms ease-out, color 150ms ease-out, border-color 150ms ease-out;
+}
+
+.wg-session-pill:hover {
+    background-color: #F0EDE8;
+    border-color: #D4D0CA;
+}
+
+.wg-session-pill--active {
+    background-color: #B91C1C;
+    color: #ffffff;
+    border-color: #991B1B;
+    font-weight: 600;
+}
+
+.wg-session-pill--active:hover {
+    background-color: #991B1B;
+    color: #ffffff;
+}
+
+.wg-session-pill--overall {
+    background-color: #292524;
+    color: #ffffff;
+    border-color: #1C1917;
+    font-weight: 600;
+}
+
+.wg-session-pill--overall:hover {
+    background-color: #1C1917;
+    color: #ffffff;
+}
+
+.wg-session-pill .wg-status-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    flex-shrink: 0;
+}
+
+.wg-status-dot--active {
+    background-color: #22C55E;
+}
+
+.wg-status-dot--completed {
+    background-color: #3B82F6;
+}
+
+/* Section Layout — flat, no nested cards */
+.wg-section {
+    background-color: #ffffff;
+    border: 1px solid #E8E5E0;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.wg-section-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #E8E5E0;
+    background-color: #F8F6F2;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.wg-section-header-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.wg-section-header-icon svg,
+.wg-section-header-icon .w-5 {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #ffffff;
+}
+
+.wg-section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #292524;
+    letter-spacing: -0.01em;
+}
+
+.wg-section-subtitle {
+    font-size: 0.75rem;
+    color: #78716C;
+    margin-top: 0.125rem;
+}
+
+.wg-section-body {
+    padding: 1rem 1.25rem;
+}
+
+/* Stats Row */
+.wg-stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.wg-stat-card {
+    text-align: center;
+    padding: 0.875rem 0.75rem;
+    background-color: #F8F6F2;
+    border: 1px solid #E8E5E0;
+    border-radius: 0.625rem;
+}
+
+.wg-stat-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #78716C;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.wg-stat-value {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: #292524;
+    margin-top: 0.25rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Scores — tabular nums */
+.wg-score {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+/* Brand Rankings — Gold/Silver/Bronze */
+.wg-brand-rank {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid #F0EDE8;
+}
+
+.wg-brand-rank:last-child {
+    border-bottom: none;
+}
+
+.wg-brand-rank--gold .wg-rank-medal {
+    background-color: #C5A55A;
+    color: #ffffff;
+}
+
+.wg-brand-rank--silver .wg-rank-medal {
+    background-color: #A8A8A8;
+    color: #ffffff;
+}
+
+.wg-brand-rank--bronze .wg-rank-medal {
+    background-color: #CD7F32;
+    color: #ffffff;
+}
+
+.wg-rank-medal {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    background-color: #E8E5E0;
+    color: #78716C;
+}
+
+.wg-brand-composite {
+    font-size: 1.125rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #292524;
+}
+
+.wg-brand-label {
+    font-weight: 600;
+    color: #292524;
+    font-size: 0.9375rem;
+}
+
+/* Competitor Group */
+.wg-competitor-group {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid #F0EDE8;
+}
+
+.wg-competitor-group:last-child {
+    border-bottom: none;
+}
+
+.wg-group-name {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #44403C;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.wg-group-count {
+    font-weight: 400;
+    color: #A8A29E;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.wg-group-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.wg-group-item--leader {
+    background-color: #F8F6F2;
+}
+
+/* Isolated / Standalone Products */
+.wg-isolated-product {
+    background-color: #FAFAF8;
+    border: 1px dashed #D4D0CA;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+}
+
+.wg-isolated-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #A8A29E;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.375rem;
+}
+
+/* AI Report Shimmer */
+.wg-shimmer {
+    position: relative;
+    overflow: hidden;
+    background-color: #F0EDE8;
+    border-radius: 0.375rem;
+}
+
+.wg-shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+    animation: wg-shimmer-slide 1.5s ease-in-out infinite;
+}
+
+@keyframes wg-shimmer-slide {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+/* AI Report Panel */
+.wg-ai-panel {
+    background-color: #F8F6F2;
+    border: 1px solid #E8E5E0;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.wg-ai-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.wg-ai-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    background: linear-gradient(135deg, #6D28D9, #4338CA);
+    border-radius: 0.625rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.wg-ai-icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #ffffff;
+}
+
+.wg-ai-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: #292524;
+}
+
+.wg-ai-subtitle {
+    font-size: 0.6875rem;
+    color: #78716C;
+}
+
+.wg-ai-body {
+    background-color: #ffffff;
+    border: 1px solid #E8E5E0;
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1.7;
+    color: #44403C;
+    white-space: pre-wrap;
+    max-height: 24rem;
+    overflow-y: auto;
+}
+
+.wg-ai-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 150ms ease-out;
+}
+
+.wg-ai-btn--primary {
+    background-color: #6D28D9;
+    color: #ffffff;
+}
+
+.wg-ai-btn--primary:hover {
+    background-color: #5B21B6;
+}
+
+.wg-ai-btn--secondary {
+    background-color: #ffffff;
+    color: #6D28D9;
+    border: 1px solid #E8E5E0;
+}
+
+.wg-ai-btn--secondary:hover {
+    background-color: #F8F6F2;
+}
+
+/* Feedback Quotes */
+.wg-feedback-quote {
+    padding: 0.875rem 1rem;
+    border-left: 3px solid #D4D0CA;
+    background-color: #FAFAF8;
+    border-radius: 0 0.5rem 0.5rem 0;
+    margin-bottom: 0.75rem;
+}
+
+.wg-feedback-quote:last-child {
+    margin-bottom: 0;
+}
+
+.wg-feedback-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.375rem;
+}
+
+.wg-feedback-product {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #292524;
+}
+
+.wg-feedback-evaluator {
+    font-size: 0.6875rem;
+    color: #A8A29E;
+}
+
+.wg-feedback-text {
+    font-size: 0.8125rem;
+    color: #57534E;
+    line-height: 1.6;
+    font-style: italic;
+}
+
+.wg-avatar {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 9999px;
+    background-color: #E8E5E0;
+    color: #78716C;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.625rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* Score badges */
+.wg-score-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.wg-score-badge--high {
+    background-color: #ECFDF5;
+    color: #065F46;
+}
+
+.wg-score-badge--mid {
+    background-color: #FEF9C3;
+    color: #854D0E;
+}
+
+.wg-score-badge--low {
+    background-color: #FEF2F2;
+    color: #991B1B;
+}
+
+/* Overall Project banner */
+.wg-overall-banner {
+    background-color: #292524;
+    color: #ffffff;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.75rem 0.75rem 0 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+/* SAVER column colors */
+.wg-saver-s { color: #6D28D9; }
+.wg-saver-a { color: #2563EB; }
+.wg-saver-v { color: #059669; }
+.wg-saver-e { color: #D97706; }
+.wg-saver-r { color: #E11D48; }
+
+/* Table within sections */
+.wg-table {
+    width: 100%;
+    font-size: 0.8125rem;
+    border-collapse: collapse;
+}
+
+.wg-table th {
+    padding: 0.625rem 1rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #78716C;
+    text-align: left;
+    border-bottom: 1px solid #E8E5E0;
+    background-color: #F8F6F2;
+}
+
+.wg-table td {
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid #F0EDE8;
+    color: #44403C;
+    font-variant-numeric: tabular-nums;
+}
+
+.wg-table tr:last-child td {
+    border-bottom: none;
+}
+
+.wg-table tr:hover td {
+    background-color: #FAFAF8;
+}
+
+/* Progress bar */
+.wg-progress-track {
+    width: 100%;
+    height: 0.5rem;
+    background-color: #E8E5E0;
+    border-radius: 9999px;
+    overflow: hidden;
+    margin-top: 1rem;
+}
+
+.wg-progress-fill {
+    height: 100%;
+    border-radius: 9999px;
+    background-color: #B91C1C;
+    transition: width 300ms ease-out;
+}
+
+/* Best Package badge */
+.wg-best-package {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    background-color: #ECFDF5;
+    color: #065F46;
+    border: 1px solid #BBF7D0;
+}
+
 /* ===== REDUCED MOTION ===== */
 @media (prefers-reduced-motion: reduce) {
     .fi-wi-stats-overview-stat,

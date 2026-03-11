@@ -2,14 +2,10 @@
     {{-- Session Switcher Pill Navigation --}}
     @php $allSessions = $this->getAllSessions(); @endphp
     @if($allSessions->count() > 0)
-    <div class="mb-5 flex flex-wrap gap-2 items-center">
+    <div class="wg-session-pills">
         <button
             wire:click="switchSession(null)"
-            @class([
-                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
-                'bg-gray-800 text-white shadow-sm ring-1 ring-gray-900' => $selectedSessionId === null,
-                'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600' => $selectedSessionId !== null,
-            ])
+            class="wg-session-pill {{ $selectedSessionId === null ? 'wg-session-pill--overall' : '' }}"
         >
             <x-heroicon-o-squares-2x2 class="w-3.5 h-3.5" />
             Overall Results
@@ -17,16 +13,12 @@
         @foreach($allSessions as $daySess)
         <button
             wire:click="switchSession({{ $daySess->id }})"
-            @class([
-                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
-                'bg-primary-600 text-white shadow-sm ring-1 ring-primary-700' => $selectedSessionId === $daySess->id,
-                'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600' => $selectedSessionId !== $daySess->id,
-            ])
+            class="wg-session-pill {{ $selectedSessionId === $daySess->id ? 'wg-session-pill--active' : '' }}"
         >
             @if($daySess->status === 'active')
-                <span class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"></span>
+                <span class="wg-status-dot wg-status-dot--active"></span>
             @elseif($daySess->status === 'completed')
-                <span class="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0"></span>
+                <span class="wg-status-dot wg-status-dot--completed"></span>
             @endif
             {{ $daySess->name }}
         </button>
@@ -34,9 +26,16 @@
     </div>
     @endif
 
-    {{-- Session Progress Stats (inline — always fresh on Livewire re-render) --}}
+    {{-- Overall Project Banner --}}
+    @if($selectedSessionId === null)
+    <div class="wg-overall-banner" style="margin-bottom: 1.25rem;">
+        <span style="opacity: 0.7;">📊</span> Viewing aggregate results across all sessions
+    </div>
+    @endif
+
+    {{-- Session Progress Stats --}}
     @if($progress)
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+    <div class="wg-stats-row">
         @php
             $pStats = [
                 ['label' => 'Products',    'val' => $progress['total_products']],
@@ -48,184 +47,181 @@
             ];
         @endphp
         @foreach($pStats as $s)
-        <div class="fi-wi-stats-overview-stat rounded-xl bg-white dark:bg-gray-900 p-4 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 text-center">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">{{ $s['label'] }}</p>
-            <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white">{{ $s['val'] }}</p>
+        <div class="wg-stat-card">
+            <p class="wg-stat-label">{{ $s['label'] }}</p>
+            <p class="wg-stat-value">{{ $s['val'] }}</p>
         </div>
         @endforeach
     </div>
     @endif
 
-    {{-- AI Executive Report Panel — loads asynchronously via wire:init --}}
-    <div class="my-6 bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 border border-violet-200 dark:border-violet-700/50 rounded-xl p-5 shadow-sm"
-         wire:init="loadAiReport">
-        <div class="flex items-start justify-between mb-3">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    {{-- AI Executive Report Panel --}}
+    <div class="wg-ai-panel" wire:init="loadAiReport">
+        <div class="wg-ai-panel-header">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div class="wg-ai-icon">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2"/>
                     </svg>
                 </div>
                 <div>
-                    <h3 class="text-base font-bold text-violet-900 dark:text-violet-100">AI Executive Intelligence Report</h3>
-                    <p class="text-xs text-violet-500 dark:text-violet-400">Committee-ready summary · Powered by Llama 3.3 70B</p>
+                    <h3 class="wg-ai-title">AI Executive Intelligence Report</h3>
+                    <p class="wg-ai-subtitle">Committee-ready summary · Powered by Llama 3.3 70B</p>
                 </div>
             </div>
             @if($aiReportLoaded && $aiReport)
-            <div class="flex items-center gap-2 flex-shrink-0">
-                <button wire:click="regenerateAiReport" wire:loading.attr="disabled"
-                    class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-all shadow-sm">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                <button wire:click="regenerateAiReport" wire:loading.attr="disabled" class="wg-ai-btn wg-ai-btn--primary">
+                    <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     Regenerate
                 </button>
-                <button x-data="{ copied: false }" x-on:click="navigator.clipboard.writeText(@js($aiReport)); copied = true; setTimeout(() => copied = false, 2000)"
-                    class="inline-flex items-center gap-1 px-3 py-2 text-xs font-medium rounded-lg bg-white dark:bg-gray-800 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/30 transition-colors">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                <button x-data="{ copied: false }" x-on:click="navigator.clipboard.writeText(@js($aiReport)); copied = true; setTimeout(() => copied = false, 2000)" class="wg-ai-btn wg-ai-btn--secondary">
+                    <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                     <span x-text="copied ? 'Copied!' : 'Copy'"></span>
                 </button>
             </div>
             @endif
         </div>
 
-        {{-- Shimmer/skeleton placeholder while loading --}}
+        {{-- Shimmer skeleton while loading --}}
         @if(!$aiReportLoaded)
-        <div class="space-y-3 py-4 animate-pulse" wire:loading.class.remove="animate-pulse">
-            <div class="flex items-center gap-3">
-                <div class="flex gap-1">
-                    <span class="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style="animation-delay:0ms"></span>
-                    <span class="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style="animation-delay:150ms"></span>
-                    <span class="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style="animation-delay:300ms"></span>
+        <div style="padding: 1rem 0;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                <div style="display: flex; gap: 0.375rem;">
+                    <span class="wg-shimmer" style="width: 0.5rem; height: 0.5rem; border-radius: 9999px; display: inline-block;"></span>
+                    <span class="wg-shimmer" style="width: 0.5rem; height: 0.5rem; border-radius: 9999px; display: inline-block;"></span>
+                    <span class="wg-shimmer" style="width: 0.5rem; height: 0.5rem; border-radius: 9999px; display: inline-block;"></span>
                 </div>
-                <p class="text-sm text-violet-600 dark:text-violet-400">Generating AI executive report...</p>
+                <p style="font-size: 0.8125rem; color: #78716C;">Generating AI executive report...</p>
             </div>
-            <div class="h-4 bg-violet-200/50 dark:bg-violet-800/30 rounded w-full"></div>
-            <div class="h-4 bg-violet-200/50 dark:bg-violet-800/30 rounded w-5/6"></div>
-            <div class="h-4 bg-violet-200/50 dark:bg-violet-800/30 rounded w-4/6"></div>
-            <div class="h-4 bg-violet-200/50 dark:bg-violet-800/30 rounded w-full"></div>
-            <div class="h-4 bg-violet-200/50 dark:bg-violet-800/30 rounded w-3/4"></div>
+            <div class="wg-shimmer" style="height: 0.875rem; width: 100%; margin-bottom: 0.5rem;"></div>
+            <div class="wg-shimmer" style="height: 0.875rem; width: 85%; margin-bottom: 0.5rem;"></div>
+            <div class="wg-shimmer" style="height: 0.875rem; width: 70%; margin-bottom: 0.5rem;"></div>
+            <div class="wg-shimmer" style="height: 0.875rem; width: 100%; margin-bottom: 0.5rem;"></div>
+            <div class="wg-shimmer" style="height: 0.875rem; width: 75%;"></div>
         </div>
         @elseif($aiReportError)
-        <div class="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 border border-red-200 dark:border-red-700">
-            <p class="text-sm text-red-600 dark:text-red-400">{{ $aiReportError }}</p>
-            <button wire:click="loadAiReport" class="mt-2 text-xs text-red-600 underline hover:no-underline">Retry</button>
+        <div style="background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 0.5rem; padding: 0.875rem;">
+            <p style="font-size: 0.8125rem; color: #991B1B;">{{ $aiReportError }}</p>
+            <button wire:click="loadAiReport" style="margin-top: 0.5rem; font-size: 0.75rem; color: #B91C1C; text-decoration: underline; cursor: pointer; background: none; border: none;">Retry</button>
         </div>
         @elseif($aiReport)
-        <div class="bg-white dark:bg-gray-900 rounded-lg p-5 border border-violet-100 dark:border-violet-800 text-gray-800 dark:text-gray-200 text-sm leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto shadow-inner">{{ $aiReport }}</div>
+        <div class="wg-ai-body">{{ $aiReport }}</div>
         @else
-        <div class="text-center py-4">
-            <p class="text-sm text-violet-500 dark:text-violet-400 max-w-xl mx-auto">Click "Generate Report" for a comprehensive executive summary.</p>
-            <button wire:click="loadAiReport" class="mt-3 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-all shadow-sm">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <div style="text-align: center; padding: 1.5rem 0;">
+            <p style="font-size: 0.8125rem; color: #78716C; max-width: 28rem; margin: 0 auto;">Click "Generate Report" for a comprehensive executive summary.</p>
+            <button wire:click="loadAiReport" class="wg-ai-btn wg-ai-btn--primary" style="margin-top: 0.75rem;">
+                <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                 Generate Report
             </button>
         </div>
         @endif
     </div>
 
-    {{-- Category Rankings Grid --}}
+    {{-- Category Rankings Grid }}
     @if($categoryResults->isNotEmpty())
-    <div class="space-y-6">
-        <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <x-heroicon-o-chart-bar class="w-5 h-5 text-primary-500"/>
-            Category Rankings & SAVER Breakdown
-        </h2>
-
+    <div style="margin-bottom: 1.5rem;">
         @foreach($categoryResults as $cat)
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                            <x-heroicon-o-squares-2x2 class="w-4 h-4 text-primary-600 dark:text-primary-400"/>
-                        </div>
-                        <div>
-                            <h3 class="font-semibold text-gray-900 dark:text-white">{{ $cat['category_name'] }}</h3>
-                            <p class="text-xs text-gray-500">{{ $cat['total_products'] }} products · {{ $cat['eligible_products'] }} meet threshold</p>
-                        </div>
-                    </div>
-                    @if($cat['top_products']->isNotEmpty())
-                    <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 rounded-full">
-                        <x-heroicon-o-trophy class="w-3.5 h-3.5"/>
-                        Top: {{ $cat['top_products']->first()['product']->name ?? 'N/A' }}
-                    </span>
-                    @endif
+        <div class="wg-section">
+            <div class="wg-section-header">
+                <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #B91C1C, #DC2626);">
+                    <x-heroicon-o-squares-2x2 class="w-5 h-5"/>
                 </div>
+                <div style="flex: 1;">
+                    <h3 class="wg-section-title">{{ $cat['category_name'] }}</h3>
+                    <p class="wg-section-subtitle">{{ $cat['total_products'] }} products · {{ $cat['eligible_products'] }} meet threshold</p>
+                </div>
+                @if($cat['top_products']->isNotEmpty())
+                <span style="display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; background-color: #FEF9C3; color: #854D0E; border: 1px solid #FDE68A;">
+                    <x-heroicon-o-trophy class="w-3.5 h-3.5"/>
+                    Top: {{ $cat['top_products']->first()['product']->name ?? 'N/A' }}
+                </span>
+                @endif
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+            <div style="overflow-x: auto;">
+                <table class="wg-table">
                     <thead>
-                        <tr class="border-b border-gray-100 dark:border-gray-800">
-                            <th class="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
-                            <th class="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                            <th class="text-center px-3 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wider">Overall</th>
-                            <th class="text-center px-2 py-2.5 text-xs font-medium text-violet-500 uppercase tracking-wider" title="Safety/Capability">S</th>
-                            <th class="text-center px-2 py-2.5 text-xs font-medium text-blue-500 uppercase tracking-wider" title="Adaptability/Usability">A</th>
-                            <th class="text-center px-2 py-2.5 text-xs font-medium text-emerald-500 uppercase tracking-wider" title="Value/Affordability">V</th>
-                            <th class="text-center px-2 py-2.5 text-xs font-medium text-amber-500 uppercase tracking-wider" title="Endurance/Maintainability">E</th>
-                            <th class="text-center px-2 py-2.5 text-xs font-medium text-rose-500 uppercase tracking-wider" title="Readiness/Deployability">R</th>
-                            <th class="text-center px-3 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wider">Advance</th>
-                            <th class="text-center px-3 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wider">Responses</th>
+                        <tr>
+                            <th style="width: 3rem; text-align: center;">#</th>
+                            <th>Product</th>
+                            <th style="text-align: center;">Overall</th>
+                            <th style="text-align: center;" class="wg-saver-s">S</th>
+                            <th style="text-align: center;" class="wg-saver-a">A</th>
+                            <th style="text-align: center;" class="wg-saver-v">V</th>
+                            <th style="text-align: center;" class="wg-saver-e">E</th>
+                            <th style="text-align: center;" class="wg-saver-r">R</th>
+                            <th style="text-align: center;">Advance</th>
+                            <th style="text-align: center;">Responses</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-50 dark:divide-gray-800">
+                    <tbody>
                         @foreach($cat['rankings'] as $index => $item)
                         @php
                             $rank = $index + 1;
                             $isFinalist = $rank <= 2 && $item['meets_threshold'];
                             $score = $item['weighted_average'];
+                            $medalClass = match(true) {
+                                $rank === 1 && $isFinalist => 'wg-brand-rank--gold',
+                                $rank === 2 && $isFinalist => 'wg-brand-rank--silver',
+                                $rank === 3 && $isFinalist => 'wg-brand-rank--bronze',
+                                default => '',
+                            };
                         @endphp
-                        <tr class="{{ $isFinalist ? 'bg-amber-50/50 dark:bg-amber-950/20' : '' }} hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                            <td class="px-4 py-3 font-mono text-xs">
-                                @if($rank === 1 && $isFinalist)
-                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-400 text-white text-xs font-bold">1</span>
-                                @elseif($rank === 2 && $isFinalist)
-                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-400 text-white text-xs font-bold">2</span>
+                        <tr>
+                            <td style="text-align: center;">
+                                @if($rank <= 3 && $isFinalist)
+                                    <span class="wg-rank-medal {{ $medalClass ? str_replace('wg-brand-rank', 'wg-brand-rank', $medalClass) }}" style="width: 1.5rem; height: 1.5rem; font-size: 0.625rem;
+                                        @if($rank === 1) background-color: #C5A55A; color: #fff;
+                                        @elseif($rank === 2) background-color: #A8A8A8; color: #fff;
+                                        @elseif($rank === 3) background-color: #CD7F32; color: #fff;
+                                        @endif">{{ $rank }}</span>
                                 @else
-                                    <span class="text-gray-400">{{ $rank }}</span>
+                                    <span style="color: #A8A29E; font-size: 0.75rem;">{{ $rank }}</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3">
-                                <div class="font-medium text-gray-900 dark:text-white">{{ $item['product']->name }}</div>
+                            <td>
+                                <div style="font-weight: 600; color: #292524;">{{ $item['product']->name }}</div>
                                 @if($item['product']->manufacturer)
-                                <div class="text-xs text-gray-500">{{ $item['product']->manufacturer }} {{ $item['product']->model ? '· '.$item['product']->model : '' }}</div>
+                                <div style="font-size: 0.6875rem; color: #A8A29E;">{{ $item['product']->manufacturer }} {{ $item['product']->model ? '· '.$item['product']->model : '' }}</div>
                                 @endif
                             </td>
-                            <td class="px-3 py-3 text-center">
+                            <td style="text-align: center;">
                                 @if($score !== null)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold
-                                    {{ $score >= 80 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' :
-                                       ($score >= 60 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' :
-                                       'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300') }}">
+                                <span class="wg-score-badge {{ $score >= 80 ? 'wg-score-badge--high' : ($score >= 60 ? 'wg-score-badge--mid' : 'wg-score-badge--low') }}">
                                     {{ number_format($score, 1) }}
                                 </span>
                                 @else
-                                <span class="text-gray-300">—</span>
+                                <span style="color: #D4D0CA;">—</span>
                                 @endif
                             </td>
-                            @foreach(['capability_avg', 'usability_avg', 'affordability_avg', 'maintainability_avg', 'deployability_avg'] as $saverKey)
-                            <td class="px-2 py-3 text-center text-xs font-medium {{ $item[$saverKey] ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300' }}">
-                                {{ $item[$saverKey] ? number_format($item[$saverKey], 0) : '—' }}
+                            @foreach(['capability_avg', 'usability_avg', 'affordability_avg', 'maintainability_avg', 'deployability_avg'] as $ki => $saverKey)
+                            <td style="text-align: center; font-size: 0.75rem;" class="wg-score">
+                                @if($item[$saverKey])
+                                    <span class="{{ ['wg-saver-s','wg-saver-a','wg-saver-v','wg-saver-e','wg-saver-r'][$ki] }}">{{ number_format($item[$saverKey], 0) }}</span>
+                                @else
+                                    <span style="color: #D4D0CA;">—</span>
+                                @endif
                             </td>
                             @endforeach
-                            <td class="px-3 py-3 text-center">
+                            <td style="text-align: center;">
                                 @if($item['advance_yes'] > 0 || $item['advance_no'] > 0)
-                                <span class="text-xs">
-                                    <span class="text-emerald-600 font-medium">{{ $item['advance_yes'] }}✓</span>
+                                <span style="font-size: 0.75rem;">
+                                    <span style="color: #059669; font-weight: 500;">{{ $item['advance_yes'] }}✓</span>
                                     @if($item['advance_no'] > 0)
-                                    <span class="text-red-500 ml-1">{{ $item['advance_no'] }}✕</span>
+                                    <span style="color: #DC2626; margin-left: 0.25rem;">{{ $item['advance_no'] }}✕</span>
                                     @endif
                                 </span>
                                 @if($item['deal_breakers'] > 0)
-                                <span class="ml-1 text-xs text-red-500" title="{{ $item['deal_breakers'] }} deal-breaker(s)">⚠️</span>
+                                <span style="margin-left: 0.25rem; font-size: 0.75rem; color: #DC2626;" title="{{ $item['deal_breakers'] }} deal-breaker(s)">⚠️</span>
                                 @endif
                                 @else
-                                <span class="text-gray-300 text-xs">—</span>
+                                <span style="color: #D4D0CA; font-size: 0.75rem;">—</span>
                                 @endif
                             </td>
-                            <td class="px-3 py-3 text-center">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                                    {{ $item['meets_threshold'] ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' }}">
+                            <td style="text-align: center;">
+                                <span class="wg-score" style="font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px;
+                                    {{ $item['meets_threshold'] ? 'background-color: #EFF6FF; color: #1E40AF;' : 'background-color: #F5F3F0; color: #78716C;' }}">
                                     {{ $item['response_count'] }}
                                 </span>
                             </td>
@@ -244,44 +240,46 @@
      Competitor Group Rankings --}}
 
     @if(!empty($competitorGroupRankings))
-    <div class="mt-6">
-        <div class="mb-4 flex items-center gap-3">
-            <div class="w-9 h-9 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
-                <x-heroicon-o-scale class="w-5 h-5 text-white"/>
+    <div class="wg-section">
+        <div class="wg-section-header">
+            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #2563EB, #0891B2);">
+                <x-heroicon-o-scale class="w-5 h-5"/>
             </div>
             <div>
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Competitor Group Rankings</h2>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Products ranked against direct competitors within the same group</p>
+                <h2 class="wg-section-title">Competitor Group Rankings</h2>
+                <p class="wg-section-subtitle">Products ranked against direct competitors within the same group</p>
             </div>
         </div>
 
         @foreach($competitorGroupRankings as $cgCategory)
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-5 py-3 bg-blue-50 dark:bg-blue-950/20 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="font-semibold text-blue-900 dark:text-blue-200">{{ $cgCategory['category_name'] }}</h3>
-            </div>
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid #E8E5E0;">
+            <h3 style="font-size: 0.875rem; font-weight: 700; color: #292524; margin-bottom: 0.75rem;">{{ $cgCategory['category_name'] }}</h3>
 
             @foreach($cgCategory['groups'] as $group)
-            <div class="px-5 py-3 {{ !$loop->last ? 'border-b border-gray-100 dark:border-gray-800' : '' }}">
-                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ $group['group_name'] }} <span class="text-xs text-gray-400">({{ $group['product_count'] }} products)</span></h4>
-                <div class="space-y-1.5">
+            <div class="wg-competitor-group">
+                <h4 class="wg-group-name">{{ $group['group_name'] }} <span class="wg-group-count">({{ $group['product_count'] }} products)</span></h4>
+                <div>
                     @foreach($group['rankings'] as $rIdx => $ranking)
-                    <div class="flex items-center gap-3 px-3 py-2 rounded-lg {{ $rIdx === 0 ? 'bg-blue-50/50 dark:bg-blue-950/10' : 'bg-gray-50 dark:bg-gray-800/30' }}">
-                        <span class="text-sm font-bold {{ $rIdx === 0 ? 'text-blue-600' : 'text-gray-400' }}">{{ $rIdx + 1 }}</span>
-                        <div class="flex-1 min-w-0">
-                            <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $ranking['name'] }}</span>
+                    <div class="wg-group-item {{ $rIdx === 0 ? 'wg-group-item--leader' : '' }}">
+                        <span class="wg-rank-medal" style="width: 1.5rem; height: 1.5rem; font-size: 0.625rem;
+                            @if($rIdx === 0) background-color: #C5A55A; color: #fff;
+                            @elseif($rIdx === 1) background-color: #A8A8A8; color: #fff;
+                            @elseif($rIdx === 2) background-color: #CD7F32; color: #fff;
+                            @endif">{{ $rIdx + 1 }}</span>
+                        <div style="flex: 1; min-width: 0;">
+                            <span style="font-size: 0.8125rem; font-weight: 600; color: #292524;">{{ $ranking['name'] }}</span>
                             @if($ranking['brand'])
-                            <span class="text-xs text-gray-500 ml-1">({{ $ranking['brand'] }})</span>
+                            <span style="font-size: 0.6875rem; color: #A8A29E; margin-left: 0.25rem;">({{ $ranking['brand'] }})</span>
                             @endif
                         </div>
                         @if($ranking['avg_score'] !== null)
-                        <span class="px-2 py-0.5 rounded-full text-xs font-bold {{ $ranking['avg_score'] >= 70 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' }}">
+                        <span class="wg-score-badge {{ $ranking['avg_score'] >= 70 ? 'wg-score-badge--high' : 'wg-score-badge--mid' }}">
                             {{ number_format($ranking['avg_score'], 1) }}
                         </span>
                         @else
-                        <span class="text-xs text-gray-300">—</span>
+                        <span style="font-size: 0.75rem; color: #D4D0CA;">—</span>
                         @endif
-                        <span class="text-xs text-gray-400">{{ $ranking['response_count'] }} resp.</span>
+                        <span style="font-size: 0.6875rem; color: #A8A29E;">{{ $ranking['response_count'] }} resp.</span>
                     </div>
                     @endforeach
                 </div>
@@ -297,71 +295,62 @@
      Brand Group Purchase Analysis --}}
 
     @if(!empty($brandGroupedAnalysis) && $session)
-    <div class="mt-6">
-        <div class="mb-4 flex items-center gap-3">
-            <div class="w-9 h-9 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
-                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+    <div class="wg-section">
+        <div class="wg-section-header">
+            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #D97706, #EA580C);">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
             </div>
             <div>
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Package Purchase Recommendation</h2>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Brand rankings by composite score — best value for complete tool set from single manufacturer</p>
+                <h2 class="wg-section-title">Package Purchase Recommendation</h2>
+                <p style="color: #78716C; font-size: 0.875rem; margin-bottom: 0.5rem;">Brand rankings by composite score — best value for complete tool set</p>
             </div>
         </div>
 
         @foreach($brandGroupedAnalysis as $group)
-        <div class="fi-section rounded-xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 mb-4 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-amber-50 dark:bg-amber-950/20">
-                <h3 class="text-base font-semibold text-amber-900 dark:text-amber-200">{{ $group['category_name'] }}</h3>
-                <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                    {{ $group['brand_count'] }} brands · {{ $group['total_products'] }} products compared
-                </p>
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid #E8E5E0;">
+            <div style="margin-bottom: 0.75rem;">
+                <h3 style="font-size: 0.9375rem; font-weight: 700; color: #292524;">{{ $group['category_name'] }}</h3>
+                <p style="font-size: 0.6875rem; color: #A8A29E;">{{ $group['brand_count'] }} brands · {{ $group['total_products'] }} products compared</p>
             </div>
-            <div class="p-4">
-                @foreach($group['brand_rankings'] as $rank => $brandData)
-                @php
-                    $isTop = $rank === 0;
-                    $medal = match($rank) { 0 => '🥇', 1 => '🥈', 2 => '🥉', default => '#'.($rank+1) };
-                @endphp
-                <div class="mb-4 {{ !$loop->last ? 'pb-4 border-b border-gray-100 dark:border-gray-800' : '' }}">
-                    <div class="flex items-center gap-3 mb-3">
-                        <span class="text-2xl">{{ $medal }}</span>
-                        <div class="flex-1">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="text-base font-bold {{ $isTop ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-gray-300' }}">
-                                    {{ $brandData['brand'] }}
-                                </span>
-                                @if($brandData['composite_score'] !== null)
-                                <span class="px-2.5 py-0.5 rounded-full text-sm font-bold
-                                    {{ $isTop ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' }}">
-                                    {{ number_format($brandData['composite_score'], 1) }} composite avg
-                                </span>
-                                @endif
-                                @if($isTop && $brandData['composite_score'] !== null)
-                                <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
-                                    ✓ Best Complete Package
-                                </span>
-                                @endif
-                            </div>
-                        </div>
+
+            @foreach($group['brand_rankings'] as $rank => $brandData)
+            @php
+                $medalClass = match($rank) { 0 => 'wg-brand-rank--gold', 1 => 'wg-brand-rank--silver', 2 => 'wg-brand-rank--bronze', default => '' };
+            @endphp
+            <div class="wg-brand-rank {{ $medalClass }}">
+                <span class="wg-rank-medal" style="width: 2rem; height: 2rem;
+                    @if($rank === 0) background-color: #C5A55A; color: #fff;
+                    @elseif($rank === 1) background-color: #A8A8A8; color: #fff;
+                    @elseif($rank === 2) background-color: #CD7F32; color: #fff;
+                    @endif">{{ $rank + 1 }}</span>
+                <div style="flex: 1;">
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;">
+                        <span class="wg-brand-label">{{ $brandData['brand'] }}</span>
+                        @if($brandData['composite_score'] !== null)
+                        <span class="wg-brand-composite">{{ number_format($brandData['composite_score'], 1) }}</span>
+                        @endif
+                        @if($rank === 0 && $brandData['composite_score'] !== null)
+                        <span class="wg-best-package">✓ Best Complete Package</span>
+                        @endif
                     </div>
-                    <div class="ml-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.375rem; margin-top: 0.5rem;">
                         @foreach($brandData['product_scores'] as $ps)
-                        <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-xs">
-                            <span class="text-gray-600 dark:text-gray-400 truncate mr-2">{{ $ps['product']->name }}</span>
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.375rem 0.625rem; background-color: #F8F6F2; border-radius: 0.375rem; font-size: 0.75rem;">
+                            <span style="color: #78716C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 0.5rem;">{{ $ps['product']->name }}</span>
                             @if($ps['avg_score'] !== null)
-                            <span class="font-semibold flex-shrink-0
-                                {{ $ps['avg_score'] >= 70 ? 'text-green-600 dark:text-green-400' : ($ps['avg_score'] >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">
+                            <span class="wg-score" style="flex-shrink: 0;
+                                {{ $ps['avg_score'] >= 70 ? 'color: #059669;' : ($ps['avg_score'] >= 50 ? 'color: #D97706;' : 'color: #DC2626;') }}">
                                 {{ number_format($ps['avg_score'], 1) }}
                             </span>
                             @else
-                            <span class="text-gray-300 flex-shrink-0">—</span>
+                            <span style="color: #D4D0CA; flex-shrink: 0;">—</span>
                             @endif
                         </div>
                         @endforeach
                     </div>
                 </div>
-                @endforeach
             </div>
+            @endforeach
         </div>
         @endforeach
     </div>
@@ -372,48 +361,47 @@
      Isolated / Standalone Products --}}
 
     @if(!empty($isolatedProducts))
-    <div class="mt-6">
-        <div class="mb-4 flex items-center gap-3">
-            <div class="w-9 h-9 bg-gradient-to-br from-gray-500 to-slate-600 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
-                <x-heroicon-o-cube class="w-5 h-5 text-white"/>
+    <div style="margin-top: 1.5rem;">
+        <div class="wg-section-header" style="background: none; border: none; padding-left: 0;">
+            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #78716C, #57534E);">
+                <x-heroicon-o-cube class="w-5 h-5"/>
             </div>
             <div>
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Standalone Product Analysis</h2>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Products evaluated independently — no direct competitors for ranking</p>
+                <h2 class="wg-section-title">Standalone Product Analysis</h2>
+                <p class="wg-section-subtitle">Products evaluated independently — no direct competitors for ranking</p>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: 1rem; margin-top: 0.75rem;">
             @foreach($isolatedProducts as $iso)
-            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
-                <div class="flex items-start justify-between mb-2">
+            <div class="wg-isolated-product">
+                <div class="wg-isolated-label">Standalone</div>
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.5rem;">
                     <div>
-                        <h4 class="font-semibold text-gray-900 dark:text-white">{{ $iso['name'] }}</h4>
-                        @if($iso['brand'])
-                        <p class="text-xs text-gray-500">{{ $iso['brand'] }} · {{ $iso['category_name'] }}</p>
-                        @else
-                        <p class="text-xs text-gray-500">{{ $iso['category_name'] }}</p>
-                        @endif
+                        <h4 style="font-weight: 600; color: #292524; font-size: 0.875rem;">{{ $iso['name'] }}</h4>
+                        <p style="font-size: 0.6875rem; color: #A8A29E;">
+                            {{ $iso['brand'] ? $iso['brand'] . ' · ' : '' }}{{ $iso['category_name'] }}
+                        </p>
                     </div>
                     @if($iso['avg_score'] !== null)
-                    <span class="px-2.5 py-1 rounded-full text-sm font-bold {{ $iso['avg_score'] >= 70 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' }}">
+                    <span class="wg-score-badge {{ $iso['avg_score'] >= 70 ? 'wg-score-badge--high' : 'wg-score-badge--mid' }}" style="font-size: 0.875rem;">
                         {{ number_format($iso['avg_score'], 1) }}
                     </span>
                     @endif
                 </div>
-                <p class="text-xs text-gray-500 dark:text-gray-400 italic mb-2">{{ $iso['note'] }}</p>
-                <div class="flex items-center gap-3 text-xs text-gray-500">
+                <p style="font-size: 0.75rem; color: #A8A29E; font-style: italic; margin-bottom: 0.5rem;">{{ $iso['note'] }}</p>
+                <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.6875rem; color: #78716C;">
                     <span>{{ $iso['response_count'] }} responses</span>
                     @if($iso['meets_threshold'])
-                    <span class="text-green-600">✓ Meets threshold</span>
+                    <span style="color: #059669;">✓ Meets threshold</span>
                     @else
-                    <span class="text-amber-600">Below threshold</span>
+                    <span style="color: #D97706;">Below threshold</span>
                     @endif
                 </div>
                 @if(!empty($iso['saver_breakdown']) && $iso['saver_breakdown']['capability'] !== null)
-                <div class="mt-2 flex gap-2 text-xs">
+                <div style="margin-top: 0.5rem; display: flex; gap: 0.375rem; font-size: 0.6875rem;">
                     @foreach(['capability' => 'S', 'usability' => 'A', 'affordability' => 'V', 'maintainability' => 'E', 'deployability' => 'R'] as $key => $label)
-                    <span class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400" title="{{ ucfirst($key) }}">
+                    <span style="padding: 0.125rem 0.375rem; border-radius: 0.25rem; background-color: #F0EDE8; color: #57534E; font-variant-numeric: tabular-nums;" title="{{ ucfirst($key) }}">
                         {{ $label }}: {{ $iso['saver_breakdown'][$key] !== null ? number_format($iso['saver_breakdown'][$key], 0) : '—' }}
                     </span>
                     @endforeach
@@ -430,39 +418,37 @@
      Non-Rankable Feedback --}}
 
     @if($nonRankableFeedback->isNotEmpty())
-    <div class="mt-6 space-y-4">
-        <div class="flex items-center gap-3 mb-4">
-            <div class="w-9 h-9 bg-gradient-to-br from-teal-500 to-green-600 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
-                <x-heroicon-o-chat-bubble-left-right class="w-5 h-5 text-white"/>
-            </div>
-            <div>
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Non-Rankable Category Feedback</h2>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Qualitative feedback for categories not eligible for competitive ranking</p>
-            </div>
-        </div>
-
+    <div style="margin-top: 1.5rem;">
         @foreach($nonRankableFeedback as $nrCat)
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div class="px-5 py-3 bg-teal-50 dark:bg-teal-950/20 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="font-semibold text-teal-900 dark:text-teal-200">{{ $nrCat['category_name'] }}</h3>
-                <p class="text-xs text-teal-600 dark:text-teal-400">{{ $nrCat['submissions_count'] }} submissions</p>
+        <div class="wg-section">
+            <div class="wg-section-header" style="background-color: #F0FAF4;">
+                <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #059669, #10B981);">
+                    <x-heroicon-o-chat-bubble-left-right class="w-5 h-5"/>
+                </div>
+                <div>
+                    <h2 class="wg-section-title">{{ $nrCat['category_name'] }}</h2>
+                    <p class="wg-section-subtitle">{{ $nrCat['submissions_count'] }} submissions · Non-rankable feedback</p>
+                </div>
             </div>
-            <div class="p-4 space-y-3">
+            <div class="wg-section-body">
                 @foreach($nrCat['feedback'] as $fb)
-                <div class="px-4 py-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $fb['product'] }}</span>
-                        <div class="flex items-center gap-2 text-xs text-gray-500">
+                <div class="wg-feedback-quote">
+                    <div class="wg-feedback-meta">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span class="wg-avatar">{{ strtoupper(substr($fb['evaluator'] ?? '?', 0, 2)) }}</span>
+                            <span class="wg-feedback-product">{{ $fb['product'] }}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
                             @if($fb['score'] !== null)
-                            <span class="font-semibold">Score: {{ number_format($fb['score'], 1) }}</span>
+                            <span class="wg-score" style="font-size: 0.75rem; color: #44403C;">{{ number_format($fb['score'], 1) }}</span>
                             @endif
-                            <span>by {{ $fb['evaluator'] ?? 'Unknown' }}</span>
+                            <span class="wg-feedback-evaluator">{{ $fb['evaluator'] ?? 'Unknown' }}</span>
                         </div>
                     </div>
                     @if(!empty($fb['comments']))
-                    <div class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    <div>
                         @foreach($fb['comments'] as $comment)
-                        <p>{{ $comment }}</p>
+                        <p class="wg-feedback-text">{{ $comment }}</p>
                         @endforeach
                     </div>
                     @endif
@@ -496,56 +482,59 @@
         }
     @endphp
     @if($finalists->isNotEmpty())
-    <div class="mt-6">
-        <div class="fi-section rounded-xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
-                <x-heroicon-o-trophy class="w-5 h-5 text-amber-500 flex-shrink-0" />
-                <h3 class="text-base font-semibold text-gray-900 dark:text-white">Top Finalists</h3>
+    <div class="wg-section" style="margin-top: 1.5rem;">
+        <div class="wg-section-header">
+            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #C5A55A, #D97706);">
+                <x-heroicon-o-trophy class="w-5 h-5"/>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 dark:bg-gray-800/50">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Rank</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Category</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Product</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Manufacturer</th>
-                            <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Avg Score</th>
-                            <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Responses</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                        @foreach($finalists as $finalist)
-                        <tr class="{{ $finalist['rank'] === 1 ? 'bg-amber-50/40 dark:bg-amber-950/10' : '' }}">
-                            <td class="px-4 py-3">
-                                <span class="text-xl">{{ $finalist['rank'] === 1 ? '🥇' : '🥈' }}</span>
-                            </td>
-                            <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ $finalist['category'] }}</td>
-                            <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $finalist['product']->name }}</td>
-                            <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ $finalist['product']->manufacturer ?? '—' }}</td>
-                            <td class="px-4 py-3 text-center">
-                                <span class="px-2 py-0.5 rounded-full text-xs font-bold {{ $finalist['rank'] === 1 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' }}">
-                                    {{ number_format($finalist['score'], 1) }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-center text-gray-500">{{ $finalist['responses'] }}</td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+            <h3 class="wg-section-title">Top Finalists</h3>
+        </div>
+        <div style="overflow-x: auto;">
+            <table class="wg-table">
+                <thead>
+                    <tr>
+                        <th style="width: 3.5rem; text-align: center;">Rank</th>
+                        <th>Category</th>
+                        <th>Product</th>
+                        <th>Manufacturer</th>
+                        <th style="text-align: center;">Avg Score</th>
+                        <th style="text-align: center;">Responses</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($finalists as $finalist)
+                    <tr style="{{ $finalist['rank'] === 1 ? 'background-color: #FFFBEB;' : '' }}">
+                        <td style="text-align: center;">
+                            <span class="wg-rank-medal" style="width: 1.75rem; height: 1.75rem; font-size: 0.6875rem;
+                                @if($finalist['rank'] === 1) background-color: #C5A55A; color: #fff;
+                                @else background-color: #A8A8A8; color: #fff;
+                                @endif">{{ $finalist['rank'] }}</span>
+                        </td>
+                        <td style="font-size: 0.75rem; color: #78716C;">{{ $finalist['category'] }}</td>
+                        <td style="font-weight: 600; color: #292524;">{{ $finalist['product']->name }}</td>
+                        <td style="color: #78716C;">{{ $finalist['product']->manufacturer ?? '—' }}</td>
+                        <td style="text-align: center;">
+                            <span class="wg-score-badge {{ $finalist['rank'] === 1 ? 'wg-score-badge--high' : 'wg-score-badge--mid' }}">
+                                {{ number_format($finalist['score'], 1) }}
+                            </span>
+                        </td>
+                        <td style="text-align: center; color: #78716C;" class="wg-score">{{ $finalist['responses'] }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
         </div>
     </div>
     @endif
 
     {{-- No Session State --}}
     @else
-    <div class="text-center py-16">
-        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-            <x-heroicon-o-calendar class="w-8 h-8 text-gray-400"/>
+    <div style="text-align: center; padding: 4rem 0;">
+        <div style="width: 4rem; height: 4rem; margin: 0 auto 1rem; border-radius: 9999px; background-color: #F0EDE8; display: flex; align-items: center; justify-content: center;">
+            <x-heroicon-o-calendar class="w-8 h-8" style="color: #A8A29E;"/>
         </div>
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Active Session</h3>
-        <p class="text-sm text-gray-500 max-w-md mx-auto">There are no evaluation sessions available. Use the "Switch Session" button above to select a session, or ask an admin to create one.</p>
+        <h3 style="font-size: 1.125rem; font-weight: 700; color: #292524; margin-bottom: 0.5rem;">No Active Session</h3>
+        <p style="font-size: 0.875rem; color: #78716C; max-width: 28rem; margin: 0 auto;">There are no evaluation sessions available. Use the "Switch Session" button above to select a session, or ask an admin to create one.</p>
     </div>
     @endif
 
@@ -554,7 +543,6 @@
         return {
             loading: false, report: null, error: null, copied: false,
             init() {
-                // Auto-generate report on first page load
                 this.generateReport(false);
             },
             async generateReport(force = false) {
