@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ShopWork;
 use App\Models\Station;
 use App\Models\Room;
 use App\Models\RoomAsset;
@@ -10,6 +11,7 @@ use App\Models\RoomAudit;
 use App\Models\RoomAuditItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Schema;
 
 class StationController extends Controller
 {
@@ -33,9 +35,13 @@ class StationController extends Controller
      */
     public function show(int $id): JsonResponse
     {
+        $roomTypeColumn = Schema::hasColumn('rooms', 'room_type') ? 'room_type' : 'type';
+        $roomsHaveIsActive = Schema::hasColumn('rooms', 'is_active');
+        $personnelTableExists = Schema::hasTable('personnel');
+
         $station = Station::with([
             'apparatuses' => function ($query) {
-                $query->with('currentDefects');
+                $query->with('currentDefects')->orderBy('vehicle_number');
             },
             'capitalProjects' => function ($query) {
                 $query->active()->orderBy('target_completion_date');
@@ -43,31 +49,34 @@ class StationController extends Controller
             'under25kProjects' => function ($query) {
                 $query->active()->orderBy('target_completion_date');
             },
-            'rooms' => function ($query) {
-                $query->active()->withCount('assets');
-            },
-            'rooms.assets' => function ($query) {
-                $query->active();
-            },
-            'shopWorks' => function ($query) {
-                $query->active()->orderBy('created_at', 'desc')->limit(10);
+            'rooms' => function ($query) use ($roomsHaveIsActive) {
+                if ($roomsHaveIsActive) {
+                    $query->where('is_active', true);
+                }
+
+                $query->withCount(['assets', 'audits'])
+                    ->orderBy('floor')
+                    ->orderBy('name');
             },
         ])
         ->withCount(['apparatuses', 'rooms', 'capitalProjects', 'under25kProjects'])
         ->findOrFail($id);
 
-        // Calculate dorm beds dynamically based on personnel in station
-        $dormBedsCount = $station->dormBedsCount;
+        $dormBedsCount = $personnelTableExists
+            ? $station->personnel()->where('assignment', 'Dorm')->where('status', 'Active')->count()
+            : 0;
 
-        // Get room count by type
+        $personnelCount = $personnelTableExists
+            ? $station->personnel()->count()
+            : 0;
+
         $roomsByType = $station->rooms()
-            ->select('room_type')
+            ->select($roomTypeColumn)
             ->selectRaw('COUNT(*) as count')
-            ->groupBy('room_type')
-            ->pluck('count', 'room_type')
+            ->groupBy($roomTypeColumn)
+            ->pluck('count', $roomTypeColumn)
             ->toArray();
 
-        // Get apparatus summary by type
         $apparatusByType = $station->apparatuses()
             ->select('type')
             ->selectRaw('COUNT(*) as count')
@@ -75,22 +84,156 @@ class StationController extends Controller
             ->pluck('count', 'type')
             ->toArray();
 
-        // Get project totals
         $projectTotals = [
             'capital_projects' => [
                 'active' => $station->capitalProjects()->count(),
-                'budget' => $station->capitalProjects()->sum('budget_amount'),
+                'budget' => (float) $station->capitalProjects()->sum('budget_amount'),
             ],
             'under_25k_projects' => [
                 'active' => $station->under25kProjects()->count(),
-                'budget' => $station->under25kProjects()->sum('budget_amount'),
+                'budget' => (float) $station->under25kProjects()->sum('budget_amount'),
             ],
         ];
 
+        $shopWorks = collect();
+
+        if (Schema::hasColumn('shop_works', 'station_id')) {
+            $shopWorks = ShopWork::query()
+                ->where('station_id', $station->id)
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get();
+        } elseif (Schema::hasColumn('shop_works', 'apparatus_id')) {
+            $apparatusIds = $station->apparatuses->pluck('id')->filter();
+
+            if ($apparatusIds->isNotEmpty()) {
+                $shopWorks = ShopWork::query()
+                    ->whereIn('apparatus_id', $apparatusIds)
+                    ->orderBy('created_at', 'desc')
+                    ->limit(10)
+                    ->get();
+            }
+        }
+
+        $normalizeProjectStatus = function ($status): string {
+            return match (strtolower(str_replace([' ', '-'], '_', (string) $status))) {
+                'in_progress' => 'in_progress',
+                'on_hold', 'waiting_for_parts' => 'on_hold',
+                'completed' => 'completed',
+                'cancelled' => 'cancelled',
+                default => 'planning',
+            };
+        };
+
         return response()->json([
-            'station' => $station,
+            'id' => $station->id,
+            'name' => $station->getRawOriginal('name') ?: $station->name,
+            'address' => $station->address ?? '',
+            'city' => $station->city ?? '',
+            'state' => $station->state ?? '',
+            'zip_code' => $station->zip_code ?? '',
+            'phone' => $station->phone ?? '',
+            'fax' => $station->fax ?? null,
+            'station_number' => $station->station_number,
+            'latitude' => $station->latitude,
+            'longitude' => $station->longitude,
+            'is_active' => (bool) $station->is_active,
+            'notes' => $station->notes,
+            'created_at' => $station->created_at,
+            'updated_at' => $station->updated_at,
+            'apparatuses_count' => (int) ($station->apparatuses_count ?? $station->apparatuses->count()),
+            'active_apparatuses_count' => (int) $station->apparatuses->where('status', 'Active')->count(),
+            'rooms_count' => (int) ($station->rooms_count ?? $station->rooms->count()),
+            'capital_projects_count' => (int) ($station->capital_projects_count ?? $station->capitalProjects->count()),
+            'under_25k_projects_count' => (int) ($station->under_25k_projects_count ?? $station->under25kProjects->count()),
+            'shop_works_count' => (int) $shopWorks->count(),
+            'personnel_count' => (int) $personnelCount,
+            'dorm_beds_count' => (int) $dormBedsCount,
+            'apparatuses' => $station->apparatuses->map(function ($apparatus) {
+                return [
+                    'id' => $apparatus->id,
+                    'name' => $apparatus->designation ?: $apparatus->name ?: $apparatus->unit_id,
+                    'unit_id' => $apparatus->unit_id,
+                    'type' => strtolower((string) $apparatus->type),
+                    'vehicle_number' => $apparatus->vehicle_number,
+                    'designation' => $apparatus->designation,
+                    'slug' => $apparatus->slug,
+                    'current_defects_count' => $apparatus->relationLoaded('currentDefects') ? $apparatus->currentDefects->count() : 0,
+                ];
+            })->values()->all(),
+            'rooms' => $station->rooms->map(function ($room) use ($roomsHaveIsActive) {
+                return [
+                    'id' => $room->id,
+                    'station_id' => $room->station_id,
+                    'name' => $room->name,
+                    'room_number' => null,
+                    'floor' => $room->floor,
+                    'type' => $room->type ?? $room->room_type ?? 'other',
+                    'capacity' => $room->capacity,
+                    'is_active' => $roomsHaveIsActive ? (bool) $room->is_active : true,
+                    'notes' => $room->notes,
+                    'assets_count' => (int) ($room->assets_count ?? 0),
+                    'audits_count' => (int) ($room->audits_count ?? 0),
+                    'created_at' => $room->created_at,
+                    'updated_at' => $room->updated_at,
+                ];
+            })->values()->all(),
+            'capital_projects' => $station->capitalProjects->map(function ($project) use ($normalizeProjectStatus) {
+                return [
+                    'id' => $project->id,
+                    'project_number' => $project->project_number,
+                    'title' => $project->name ?? $project->project_name ?? ('Project ' . $project->id),
+                    'description' => $project->description,
+                    'station_id' => $project->station_id,
+                    'budget' => (float) ($project->budget_amount ?? 0),
+                    'spent' => (float) ($project->spend_amount ?? 0),
+                    'status' => $normalizeProjectStatus($project->status),
+                    'priority' => strtolower((string) $project->priority),
+                    'start_date' => $project->start_date,
+                    'estimated_completion' => $project->target_completion_date,
+                    'actual_completion' => $project->actual_completion_date,
+                    'created_at' => $project->created_at,
+                    'updated_at' => $project->updated_at,
+                ];
+            })->values()->all(),
+            'under_25k_projects' => $station->under25kProjects->map(function ($project) use ($normalizeProjectStatus) {
+                return [
+                    'id' => $project->id,
+                    'project_number' => $project->project_number,
+                    'title' => $project->name ?? ('Project ' . $project->id),
+                    'description' => $project->description,
+                    'station_id' => $project->station_id,
+                    'budget' => (float) ($project->budget_amount ?? 0),
+                    'spent' => (float) ($project->spend_amount ?? 0),
+                    'status' => $normalizeProjectStatus($project->status),
+                    'priority' => strtolower((string) $project->priority),
+                    'start_date' => $project->start_date,
+                    'estimated_completion' => $project->target_completion_date,
+                    'actual_completion' => $project->actual_completion_date,
+                    'created_at' => $project->created_at,
+                    'updated_at' => $project->updated_at,
+                ];
+            })->values()->all(),
+            'shop_works' => $shopWorks->map(function ($work) use ($normalizeProjectStatus) {
+                return [
+                    'id' => $work->id,
+                    'work_order_number' => 'SW-' . $work->id,
+                    'title' => $work->project_name ?? ('Shop Work ' . $work->id),
+                    'description' => $work->description,
+                    'apparatus_id' => $work->apparatus_id,
+                    'priority' => 'medium',
+                    'status' => $normalizeProjectStatus($work->status),
+                    'work_type' => $work->category ?? null,
+                    'assigned_to' => $work->assigned_to,
+                    'total_cost' => (float) ($work->actual_cost ?? $work->estimated_cost ?? 0),
+                    'is_warranty_work' => false,
+                    'is_insurance_claim' => false,
+                    'created_at' => $work->created_at,
+                    'updated_at' => $work->updated_at,
+                ];
+            })->values()->all(),
             'summary' => [
-                'dorm_beds_count' => $dormBedsCount,
+                'dorm_beds_count' => (int) $dormBedsCount,
                 'rooms_by_type' => $roomsByType,
                 'apparatus_by_type' => $apparatusByType,
                 'project_totals' => $projectTotals,
