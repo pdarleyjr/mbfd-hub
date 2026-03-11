@@ -203,7 +203,7 @@ class StationController extends Controller
                     'updated_at' => $room->updated_at,
                 ];
             })->values()->all(),
-            'capital_projects' => $station->capitalProjects->map(function ($project) use ($normalizeProjectStatus) {
+            'capital_projects' => $station->capitalProjects->map(function ($project) use ($normalizeProjectPriority, $normalizeProjectStatus) {
                 return [
                     'id' => $project->id,
                     'project_number' => $project->project_number,
