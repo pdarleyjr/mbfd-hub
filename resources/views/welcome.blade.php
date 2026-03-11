@@ -18,25 +18,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap" as="style">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['"Source Sans 3"', 'system-ui', 'sans-serif'], heading: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'] },
-                    colors: {
-                        mbfd: { 50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d' },
-                        neutral: { 50: '#FAFAF8', 100: '#F5F3F0', 200: '#E8E5E0', 300: '#D4D0CA', 400: '#A8A29E', 500: '#78716C', 600: '#57534E', 700: '#44403C', 800: '#292524', 900: '#1C1917' },
-                        slate: { 850: '#1e293b', 900: '#0f172a' }
-                    },
-                    boxShadow: {
-                        'card': '0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08)',
-                        'card-hover': '0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.08)'
-                    }
-                }
-            }
-        }
-    </script>
+    @vite('resources/css/app.css')
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         body { font-family: 'Source Sans 3', system-ui, sans-serif; }
@@ -303,7 +285,7 @@
                                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
                                 .replace(/`(.*?)`/g, '<code class="bg-neutral-100 px-1 rounded text-xs font-mono">$1</code>')
-                                .replace(/^\* (.+)$/gm, '<li>$1</li}')
+                                .replace(/^\* (.+)$/gm, '<li>$1</li>')
                                 .replace(/^- (.+)$/gm, '<li>$1</li>')
                                 .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
                                 .replace(/(<li>.*?<\/li>(\n)?)+/gs, match => '<ul class="list-disc ml-4 mb-2">' + match + '</ul>')

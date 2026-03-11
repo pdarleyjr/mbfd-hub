@@ -1,26 +1,26 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-BkIGJT3O.css",
+    "file": "assets/app-BPvH9Bfs.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "pump-simulator2.js",
+    "file": "assets/app-CAiCLEjY.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
   },
   "resources/js/pump-simulator/main.tsx": {
-    "file": "pump-simulator3.js",
+    "file": "assets/main-CN4TT64F.js",
     "name": "main",
     "src": "resources/js/pump-simulator/main.tsx",
     "isEntry": true,
     "css": [
-      "assets/main-D-7Bg2YI.css"
+      "assets/main-YMqcj1cu.css"
     ]
   },
   "resources/js/push-notification-widget.js": {
-    "file": "pump-simulator4.js",
+    "file": "assets/push-notification-widget-CrSmpa9E.js",
     "name": "push-notification-widget",
     "src": "resources/js/push-notification-widget.js",
     "isEntry": true
