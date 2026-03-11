@@ -34,9 +34,7 @@
     </div>
     @endif
 
-    {{-- Session Progress Widgets --}}
-    @if(true)
-    {{-- Session Progress Stats (inline — always fresh on Livewire re-render, avoids child widget stale-state) --}}
+    {{-- Session Progress Stats (inline — always fresh on Livewire re-render) --}}
     @if($progress)
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
         @php
@@ -58,11 +56,9 @@
     </div>
     @endif
 
-    {{-- AI Executive Report Panel --}}
-    <div
-        x-data="workgroupAIPanel()"
-        class="my-6 bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 border border-violet-200 dark:border-violet-700/50 rounded-xl p-5 shadow-sm"
-    >
+    {{-- AI Executive Report Panel — loads asynchronously via wire:init --}}
+    <div class="my-6 bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 border border-violet-200 dark:border-violet-700/50 rounded-xl p-5 shadow-sm"
+         wire:init="loadAiReport">
         <div class="flex items-start justify-between mb-3">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
@@ -72,40 +68,58 @@
                 </div>
                 <div>
                     <h3 class="text-base font-bold text-violet-900 dark:text-violet-100">AI Executive Intelligence Report</h3>
-                    <p class="text-xs text-violet-500 dark:text-violet-400">Committee-ready summary for Health & Safety presentation · Powered by Llama 3.3 70B</p>
+                    <p class="text-xs text-violet-500 dark:text-violet-400">Committee-ready summary · Powered by Llama 3.3 70B</p>
                 </div>
             </div>
+            @if($aiReportLoaded && $aiReport)
             <div class="flex items-center gap-2 flex-shrink-0">
-                <button @click="generateReport(false)" :disabled="loading"
-                    class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-all shadow-sm hover:shadow-md">
-                    <svg x-show="!loading" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    <svg x-show="loading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                    <span x-text="loading ? 'Generating...' : (report ? 'Regenerate' : 'Generate Report')"></span>
+                <button wire:click="regenerateAiReport" wire:loading.attr="disabled"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-all shadow-sm">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Regenerate
                 </button>
-                <button x-show="report" @click="copyReport()" title="Copy to clipboard"
+                <button x-data="{ copied: false }" x-on:click="navigator.clipboard.writeText(@js($aiReport)); copied = true; setTimeout(() => copied = false, 2000)"
                     class="inline-flex items-center gap-1 px-3 py-2 text-xs font-medium rounded-lg bg-white dark:bg-gray-800 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/30 transition-colors">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                     <span x-text="copied ? 'Copied!' : 'Copy'"></span>
                 </button>
             </div>
+            @endif
         </div>
-        <div x-show="loading" x-transition class="flex items-center gap-3 py-4">
-            <div class="flex gap-1">
-                <span class="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style="animation-delay:0ms"></span>
-                <span class="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style="animation-delay:150ms"></span>
-                <span class="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style="animation-delay:300ms"></span>
+
+        {{-- Shimmer/skeleton placeholder while loading --}}
+        @if(!$aiReportLoaded)
+        <div class="space-y-3 py-4 animate-pulse" wire:loading.class.remove="animate-pulse">
+            <div class="flex items-center gap-3">
+                <div class="flex gap-1">
+                    <span class="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style="animation-delay:0ms"></span>
+                    <span class="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style="animation-delay:150ms"></span>
+                    <span class="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style="animation-delay:300ms"></span>
+                </div>
+                <p class="text-sm text-violet-600 dark:text-violet-400">Generating AI executive report...</p>
             </div>
-            <p class="text-sm text-violet-600 dark:text-violet-400">Analyzing {{ $progress['submitted_submissions'] ?? 0 }} evaluations across all categories...</p>
+            <div class="h-4 bg-violet-200/50 dark:bg-violet-800/30 rounded w-full"></div>
+            <div class="h-4 bg-violet-200/50 dark:bg-violet-800/30 rounded w-5/6"></div>
+            <div class="h-4 bg-violet-200/50 dark:bg-violet-800/30 rounded w-4/6"></div>
+            <div class="h-4 bg-violet-200/50 dark:bg-violet-800/30 rounded w-full"></div>
+            <div class="h-4 bg-violet-200/50 dark:bg-violet-800/30 rounded w-3/4"></div>
         </div>
-        <div x-show="error && !loading" x-transition class="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 border border-red-200 dark:border-red-700">
-            <p class="text-sm text-red-600 dark:text-red-400" x-text="error"></p>
+        @elseif($aiReportError)
+        <div class="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 border border-red-200 dark:border-red-700">
+            <p class="text-sm text-red-600 dark:text-red-400">{{ $aiReportError }}</p>
+            <button wire:click="loadAiReport" class="mt-2 text-xs text-red-600 underline hover:no-underline">Retry</button>
         </div>
-        <div x-show="!loading && !report && !error" class="text-center py-4">
-            <p class="text-sm text-violet-500 dark:text-violet-400 max-w-xl mx-auto">Click "Generate Report" for a comprehensive executive summary with rankings, finalist recommendations, SAVER score analysis, and category insights ready for presentation to Fire Chief Abello.</p>
+        @elseif($aiReport)
+        <div class="bg-white dark:bg-gray-900 rounded-lg p-5 border border-violet-100 dark:border-violet-800 text-gray-800 dark:text-gray-200 text-sm leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto shadow-inner">{{ $aiReport }}</div>
+        @else
+        <div class="text-center py-4">
+            <p class="text-sm text-violet-500 dark:text-violet-400 max-w-xl mx-auto">Click "Generate Report" for a comprehensive executive summary.</p>
+            <button wire:click="loadAiReport" class="mt-3 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-all shadow-sm">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                Generate Report
+            </button>
         </div>
-        <div x-show="report && !loading" x-transition>
-            <div class="bg-white dark:bg-gray-900 rounded-lg p-5 border border-violet-100 dark:border-violet-800 text-gray-800 dark:text-gray-200 text-sm leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto shadow-inner" x-text="report"></div>
-        </div>
+        @endif
     </div>
 
     {{-- Category Rankings Grid --}}
@@ -126,7 +140,7 @@
                         </div>
                         <div>
                             <h3 class="font-semibold text-gray-900 dark:text-white">{{ $cat['category_name'] }}</h3>
-                            <p class="text-xs text-gray-500">{{ $cat['total_products'] }} products · {{ $cat['eligible_products'] }} meet threshold (≥{{ $progress['total_members'] ?? 3 }} responses)</p>
+                            <p class="text-xs text-gray-500">{{ $cat['total_products'] }} products · {{ $cat['eligible_products'] }} meet threshold</p>
                         </div>
                     </div>
                     @if($cat['top_products']->isNotEmpty())
@@ -225,7 +239,63 @@
     </div>
     @endif
 
-    {{-- 🛒 Brand Group Purchase Analysis --}}
+    --}}
+
+     Competitor Group Rankings --}}
+
+    @if(!empty($competitorGroupRankings))
+    <div class="mt-6">
+        <div class="mb-4 flex items-center gap-3">
+            <div class="w-9 h-9 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                <x-heroicon-o-scale class="w-5 h-5 text-white"/>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Competitor Group Rankings</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Products ranked against direct competitors within the same group</p>
+            </div>
+        </div>
+
+        @foreach($competitorGroupRankings as $cgCategory)
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-5 py-3 bg-blue-50 dark:bg-blue-950/20 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="font-semibold text-blue-900 dark:text-blue-200">{{ $cgCategory['category_name'] }}</h3>
+            </div>
+
+            @foreach($cgCategory['groups'] as $group)
+            <div class="px-5 py-3 {{ !$loop->last ? 'border-b border-gray-100 dark:border-gray-800' : '' }}">
+                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ $group['group_name'] }} <span class="text-xs text-gray-400">({{ $group['product_count'] }} products)</span></h4>
+                <div class="space-y-1.5">
+                    @foreach($group['rankings'] as $rIdx => $ranking)
+                    <div class="flex items-center gap-3 px-3 py-2 rounded-lg {{ $rIdx === 0 ? 'bg-blue-50/50 dark:bg-blue-950/10' : 'bg-gray-50 dark:bg-gray-800/30' }}">
+                        <span class="text-sm font-bold {{ $rIdx === 0 ? 'text-blue-600' : 'text-gray-400' }}">{{ $rIdx + 1 }}</span>
+                        <div class="flex-1 min-w-0">
+                            <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $ranking['name'] }}</span>
+                            @if($ranking['brand'])
+                            <span class="text-xs text-gray-500 ml-1">({{ $ranking['brand'] }})</span>
+                            @endif
+                        </div>
+                        @if($ranking['avg_score'] !== null)
+                        <span class="px-2 py-0.5 rounded-full text-xs font-bold {{ $ranking['avg_score'] >= 70 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' }}">
+                            {{ number_format($ranking['avg_score'], 1) }}
+                        </span>
+                        @else
+                        <span class="text-xs text-gray-300">—</span>
+                        @endif
+                        <span class="text-xs text-gray-400">{{ $ranking['response_count'] }} resp.</span>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+            @endforeach
+        </div>
+        @endforeach
+    </div>
+    @endif
+
+    --}}
+
+     Brand Group Purchase Analysis --}}
+
     @if(!empty($brandGroupedAnalysis) && $session)
     <div class="mt-6">
         <div class="mb-4 flex items-center gap-3">
@@ -234,7 +304,7 @@
             </div>
             <div>
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">Package Purchase Recommendation</h2>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Brand rankings by composite score — best value when purchasing a complete tool set from a single manufacturer for fleet consistency</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Brand rankings by composite score — best value for complete tool set from single manufacturer</p>
             </div>
         </div>
 
@@ -244,7 +314,6 @@
                 <h3 class="text-base font-semibold text-amber-900 dark:text-amber-200">{{ $group['category_name'] }}</h3>
                 <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
                     {{ $group['brand_count'] }} brands · {{ $group['total_products'] }} products compared
-                    — composite score averages all brand product evaluations
                 </p>
             </div>
             <div class="p-4">
@@ -255,7 +324,7 @@
                 @endphp
                 <div class="mb-4 {{ !$loop->last ? 'pb-4 border-b border-gray-100 dark:border-gray-800' : '' }}">
                     <div class="flex items-center gap-3 mb-3">
-                        <span class="text-2xl" title="Rank {{ $rank+1 }}">{{ $medal }}</span>
+                        <span class="text-2xl">{{ $medal }}</span>
                         <div class="flex-1">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="text-base font-bold {{ $isTop ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-gray-300' }}">
@@ -266,8 +335,6 @@
                                     {{ $isTop ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' }}">
                                     {{ number_format($brandData['composite_score'], 1) }} composite avg
                                 </span>
-                                @else
-                                <span class="px-2 py-0.5 rounded text-xs text-gray-400 bg-gray-100 dark:bg-gray-800">No scores yet</span>
                                 @endif
                                 @if($isTop && $brandData['composite_score'] !== null)
                                 <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
@@ -275,12 +342,8 @@
                                 </span>
                                 @endif
                             </div>
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                {{ $brandData['scored_product_count'] }} / {{ $brandData['product_count'] }} products have evaluation data
-                            </p>
                         </div>
                     </div>
-                    {{-- Per-product breakdown --}}
                     <div class="ml-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         @foreach($brandData['product_scores'] as $ps)
                         <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-xs">
@@ -299,17 +362,122 @@
                 </div>
                 @endforeach
             </div>
-            <div class="px-6 py-3 bg-amber-50/50 dark:bg-amber-950/10 border-t border-gray-100 dark:border-gray-800">
-                <p class="text-xs text-gray-600 dark:text-gray-400">
-                    <strong>⚠️ Package Purchase Note:</strong> Individual tools from different manufacturers may score higher in isolation (e.g. a member's preferred cutter is TNT), but the composite ranking above reflects the best-value choice when procuring a <em>complete {{ $group['category_name'] }}</em> set from one vendor — accounting for fleet consistency, training standardization, and parts/maintenance alignment.
-                </p>
+        </div>
+        @endforeach
+    </div>
+    @endif
+
+    --}}
+
+     Isolated / Standalone Products --}}
+
+    @if(!empty($isolatedProducts))
+    <div class="mt-6">
+        <div class="mb-4 flex items-center gap-3">
+            <div class="w-9 h-9 bg-gradient-to-br from-gray-500 to-slate-600 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                <x-heroicon-o-cube class="w-5 h-5 text-white"/>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Standalone Product Analysis</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Products evaluated independently — no direct competitors for ranking</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            @foreach($isolatedProducts as $iso)
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
+                <div class="flex items-start justify-between mb-2">
+                    <div>
+                        <h4 class="font-semibold text-gray-900 dark:text-white">{{ $iso['name'] }}</h4>
+                        @if($iso['brand'])
+                        <p class="text-xs text-gray-500">{{ $iso['brand'] }} · {{ $iso['category_name'] }}</p>
+                        @else
+                        <p class="text-xs text-gray-500">{{ $iso['category_name'] }}</p>
+                        @endif
+                    </div>
+                    @if($iso['avg_score'] !== null)
+                    <span class="px-2.5 py-1 rounded-full text-sm font-bold {{ $iso['avg_score'] >= 70 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' }}">
+                        {{ number_format($iso['avg_score'], 1) }}
+                    </span>
+                    @endif
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 italic mb-2">{{ $iso['note'] }}</p>
+                <div class="flex items-center gap-3 text-xs text-gray-500">
+                    <span>{{ $iso['response_count'] }} responses</span>
+                    @if($iso['meets_threshold'])
+                    <span class="text-green-600">✓ Meets threshold</span>
+                    @else
+                    <span class="text-amber-600">Below threshold</span>
+                    @endif
+                </div>
+                @if(!empty($iso['saver_breakdown']) && $iso['saver_breakdown']['capability'] !== null)
+                <div class="mt-2 flex gap-2 text-xs">
+                    @foreach(['capability' => 'S', 'usability' => 'A', 'affordability' => 'V', 'maintainability' => 'E', 'deployability' => 'R'] as $key => $label)
+                    <span class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400" title="{{ ucfirst($key) }}">
+                        {{ $label }}: {{ $iso['saver_breakdown'][$key] !== null ? number_format($iso['saver_breakdown'][$key], 0) : '—' }}
+                    </span>
+                    @endforeach
+                </div>
+                @endif
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
+    --}}
+
+     Non-Rankable Feedback --}}
+
+    @if($nonRankableFeedback->isNotEmpty())
+    <div class="mt-6 space-y-4">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 bg-gradient-to-br from-teal-500 to-green-600 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                <x-heroicon-o-chat-bubble-left-right class="w-5 h-5 text-white"/>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Non-Rankable Category Feedback</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Qualitative feedback for categories not eligible for competitive ranking</p>
+            </div>
+        </div>
+
+        @foreach($nonRankableFeedback as $nrCat)
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-5 py-3 bg-teal-50 dark:bg-teal-950/20 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="font-semibold text-teal-900 dark:text-teal-200">{{ $nrCat['category_name'] }}</h3>
+                <p class="text-xs text-teal-600 dark:text-teal-400">{{ $nrCat['submissions_count'] }} submissions</p>
+            </div>
+            <div class="p-4 space-y-3">
+                @foreach($nrCat['feedback'] as $fb)
+                <div class="px-4 py-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $fb['product'] }}</span>
+                        <div class="flex items-center gap-2 text-xs text-gray-500">
+                            @if($fb['score'] !== null)
+                            <span class="font-semibold">Score: {{ number_format($fb['score'], 1) }}</span>
+                            @endif
+                            <span>by {{ $fb['evaluator'] ?? 'Unknown' }}</span>
+                        </div>
+                    </div>
+                    @if(!empty($fb['comments']))
+                    <div class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                        @foreach($fb['comments'] as $comment)
+                        <p>{{ $comment }}</p>
+                        @endforeach
+                    </div>
+                    @endif
+                </div>
+                @endforeach
             </div>
         </div>
         @endforeach
     </div>
     @endif
 
-    {{-- Finalists Summary (inline HTML — always reflects current session data) --}}
+    --}}
+
+     Finalists Summary --}}
+
     @php
         $finalists = collect();
         foreach($categoryResults as $cat) {
@@ -333,7 +501,6 @@
             <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                 <x-heroicon-o-trophy class="w-5 h-5 text-amber-500 flex-shrink-0" />
                 <h3 class="text-base font-semibold text-gray-900 dark:text-white">Top Finalists</h3>
-                <span class="text-xs text-gray-400">(minimum {{ $progress['minimum_threshold'] ?? 3 }} evaluations required)</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -371,8 +538,8 @@
     </div>
     @endif
 
-    @else
     {{-- No Session State --}}
+    @else
     <div class="text-center py-16">
         <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
             <x-heroicon-o-calendar class="w-8 h-8 text-gray-400"/>

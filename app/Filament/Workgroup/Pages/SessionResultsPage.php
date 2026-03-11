@@ -6,6 +6,7 @@ use App\Filament\Workgroup\Widgets\CategoryRankingsWidget;
 use App\Filament\Workgroup\Widgets\FinalistsWidget;
 use App\Filament\Workgroup\Widgets\SessionProgressWidget;
 use App\Models\EvaluationSubmission;
+use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use App\Services\Workgroup\EvaluationService;
@@ -13,13 +14,15 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Session Results — comprehensive evaluation results dashboard.
  *
- * Shows: session progress stats, category rankings, finalists table,
- * AI executive report generator, and per-category drill-down data.
- * All widgets receive the selected session via Livewire properties.
+ * All data is fetched inline via getViewData() and rendered as plain Blade.
+ * No child Livewire widgets — avoids ERROR-018 stale-state on session switch.
+ * AI executive report loads asynchronously via wire:init to prevent page-load lag.
  */
 class SessionResultsPage extends Page
 {
@@ -36,6 +39,11 @@ class SessionResultsPage extends Page
     protected static ?int $navigationSort = 5;
 
     public ?int $selectedSessionId = null;
+
+    /** Async AI report state */
+    public bool $aiReportLoaded = false;
+    public ?string $aiReport = null;
+    public ?string $aiReportError = null;
 
     public function getHeading(): string
     {
