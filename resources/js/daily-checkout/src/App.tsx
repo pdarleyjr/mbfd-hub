@@ -36,9 +36,9 @@ const HomeNav = () => (
 );
 
 const LandingPage = () => (
-  <main id="main-content" className="space-y-8">
+  <section className="space-y-8" aria-labelledby="daily-landing-title">
     <header className="text-center">
-      <h1 className="text-3xl font-bold text-neutral-800 mb-2 font-heading">MBFD Forms</h1>
+      <h1 id="daily-landing-title" className="text-3xl font-bold text-neutral-800 mb-2 font-heading">MBFD Forms</h1>
       <p className="text-neutral-600">Choose a workflow to get started.</p>
     </header>
 
@@ -118,7 +118,7 @@ const LandingPage = () => (
         </div>
       </Link>
     </section>
-  </main>
+  </section>
 );
 
 function App() {
@@ -131,7 +131,7 @@ function App() {
         </a>
         <HomeNav />
         <OfflineIndicator />
-        <div id="main-content" className="max-w-5xl mx-auto py-8 px-4">
+        <main id="main-content" className="max-w-5xl mx-auto py-8 px-4">
           <Routes>
             <Route path="/" element={<LandingPage />} />
             {/* Vehicle Inspection Routes */}
@@ -152,7 +152,7 @@ function App() {
             <Route path="/forms-hub/station-inventory" element={<StationInventoryForm />} />
             <Route path="/forms-hub/success" element={<SuccessPage />} />
           </Routes>
-        </div>
+        </main>
       </div>
     </Router>
   );
