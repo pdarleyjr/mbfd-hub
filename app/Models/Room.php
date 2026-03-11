@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 
 class Room extends Model
 {
@@ -26,6 +27,50 @@ class Room extends Model
         'capacity' => 'integer',
         'is_active' => 'boolean',
     ];
+
+    protected $appends = [
+        'room_type',
+    ];
+
+    public function getRoomTypeAttribute($value): ?string
+    {
+        return $value ?? ($this->attributes['type'] ?? null);
+    }
+
+    public function setRoomTypeAttribute($value): void
+    {
+        $table = $this->getTable();
+
+        if (Schema::hasColumn($table, 'room_type')) {
+            $this->attributes['room_type'] = $value;
+
+            return;
+        }
+
+        $this->attributes['type'] = $value;
+    }
+
+    public function getIsActiveAttribute($value): bool
+    {
+        $table = $this->getTable();
+
+        if (! Schema::hasColumn($table, 'is_active')) {
+            return true;
+        }
+
+        return (bool) $value;
+    }
+
+    public function setIsActiveAttribute($value): void
+    {
+        $table = $this->getTable();
+
+        if (! Schema::hasColumn($table, 'is_active')) {
+            return;
+        }
+
+        $this->attributes['is_active'] = $value;
+    }
 
     /**
      * Get the station that owns this room
@@ -64,6 +109,12 @@ class Room extends Model
      */
     public function scopeActive($query)
     {
+        $table = $this->getTable();
+
+        if (! Schema::hasColumn($table, 'is_active')) {
+            return $query;
+        }
+
         return $query->where('is_active', true);
     }
 
@@ -72,6 +123,9 @@ class Room extends Model
      */
     public function scopeOfType($query, string $type)
     {
-        return $query->where('room_type', $type);
+        $table = $this->getTable();
+        $column = Schema::hasColumn($table, 'room_type') ? 'room_type' : 'type';
+
+        return $query->where($column, $type);
     }
 }
