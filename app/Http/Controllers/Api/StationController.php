@@ -115,13 +115,38 @@ class StationController extends Controller
             }
         }
 
-        $normalizeProjectStatus = function ($status): string {
-            return match (strtolower(str_replace([' ', '-'], '_', (string) $status))) {
+        $normalizeEnumValue = function ($value): string {
+            if ($value instanceof \BackedEnum) {
+                return (string) $value->value;
+            }
+
+            if ($value instanceof \UnitEnum) {
+                return $value->name;
+            }
+
+            return (string) ($value ?? '');
+        };
+
+        $normalizeProjectStatus = function ($status) use ($normalizeEnumValue): string {
+            $status = $normalizeEnumValue($status);
+
+            return match (strtolower(str_replace([' ', '-'], '_', $status))) {
                 'in_progress' => 'in_progress',
                 'on_hold', 'waiting_for_parts' => 'on_hold',
                 'completed' => 'completed',
                 'cancelled' => 'cancelled',
                 default => 'planning',
+            };
+        };
+
+        $normalizeProjectPriority = function ($priority) use ($normalizeEnumValue): string {
+            $priority = strtolower(str_replace([' ', '-'], '_', $normalizeEnumValue($priority)));
+
+            return match ($priority) {
+                'critical' => 'critical',
+                'high' => 'high',
+                'low' => 'low',
+                default => 'medium',
             };
         };
 
@@ -188,7 +213,7 @@ class StationController extends Controller
                     'budget' => (float) ($project->budget_amount ?? 0),
                     'spent' => (float) ($project->spend_amount ?? 0),
                     'status' => $normalizeProjectStatus($project->status),
-                    'priority' => strtolower((string) $project->priority),
+                    'priority' => $normalizeProjectPriority($project->priority),
                     'start_date' => $project->start_date,
                     'estimated_completion' => $project->target_completion_date,
                     'actual_completion' => $project->actual_completion_date,
@@ -196,7 +221,7 @@ class StationController extends Controller
                     'updated_at' => $project->updated_at,
                 ];
             })->values()->all(),
-            'under_25k_projects' => $station->under25kProjects->map(function ($project) use ($normalizeProjectStatus) {
+            'under_25k_projects' => $station->under25kProjects->map(function ($project) use ($normalizeProjectStatus, $normalizeProjectPriority) {
                 return [
                     'id' => $project->id,
                     'project_number' => $project->project_number,
@@ -206,7 +231,7 @@ class StationController extends Controller
                     'budget' => (float) ($project->budget_amount ?? 0),
                     'spent' => (float) ($project->spend_amount ?? 0),
                     'status' => $normalizeProjectStatus($project->status),
-                    'priority' => strtolower((string) $project->priority),
+                    'priority' => $normalizeProjectPriority($project->priority),
                     'start_date' => $project->start_date,
                     'estimated_completion' => $project->target_completion_date,
                     'actual_completion' => $project->actual_completion_date,
