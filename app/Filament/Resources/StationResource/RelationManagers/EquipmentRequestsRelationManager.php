@@ -26,33 +26,32 @@ class EquipmentRequestsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('id')
                     ->label('ID')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('equipment_type')
-                    ->label('Equipment Type')
+                Tables\Columns\TextColumn::make('requested_by_name')
+                    ->label('Requested By')
                     ->searchable()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('priority')
-                    ->badge()
-                    ->color(fn (string $state): string => match (strtolower($state)) {
-                        'critical', 'emergency' => 'danger',
-                        'high' => 'warning',
-                        'medium', 'normal' => 'info',
-                        'low' => 'gray',
-                        default => 'gray',
-                    })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match (strtolower($state)) {
-                        'approved', 'completed' => 'success',
-                        'pending' => 'warning',
+                        'completed' => 'success',
+                        'support_services_approved' => 'info',
+                        'shift_chief_approved' => 'warning',
+                        'pending' => 'gray',
                         'denied', 'rejected' => 'danger',
-                        'in_progress', 'processing' => 'info',
                         default => 'gray',
                     })
+                    ->formatStateUsing(fn (string $state): string => match (strtolower($state)) {
+                        'pending' => 'Pending',
+                        'shift_chief_approved' => 'Shift Chief Approved',
+                        'support_services_approved' => 'Support Svcs Approved',
+                        'completed' => 'Completed',
+                        'denied' => 'Denied',
+                        default => ucfirst(str_replace('_', ' ', $state)),
+                    })
                     ->sortable(),
-                Tables\Columns\TextColumn::make('requestedBy.name')
-                    ->label('Requested By')
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('pd_case_number')
+                    ->label('PD Case #')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -62,17 +61,10 @@ class EquipmentRequestsRelationManager extends RelationManager
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
                         'pending' => 'Pending',
-                        'approved' => 'Approved',
-                        'denied' => 'Denied',
+                        'shift_chief_approved' => 'Shift Chief Approved',
+                        'support_services_approved' => 'Support Svcs Approved',
                         'completed' => 'Completed',
-                        'in_progress' => 'In Progress',
-                    ]),
-                Tables\Filters\SelectFilter::make('priority')
-                    ->options([
-                        'low' => 'Low',
-                        'medium' => 'Medium',
-                        'high' => 'High',
-                        'critical' => 'Critical',
+                        'denied' => 'Denied',
                     ]),
             ])
             ->defaultSort('created_at', 'desc')
