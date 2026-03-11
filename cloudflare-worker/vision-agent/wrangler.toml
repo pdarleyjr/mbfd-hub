@@ -5,3 +5,14 @@ compatibility_flags = ["nodejs_compat"]
 
 [ai]
 binding = "AI"
+
+# Queue for async image processing
+[[queues.producers]]
+queue = "vision-processing"
+binding = "VISION_QUEUE"
+
+[[queues.consumers]]
+queue = "vision-processing"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 2
