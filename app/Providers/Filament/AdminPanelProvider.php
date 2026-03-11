@@ -58,7 +58,6 @@ class AdminPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
             ])
             ->font('Inter')
-            ->viteTheme('resources/css/filament/admin/theme.css')
             ->plugin(FilamentShieldPlugin::make())
             ->plugin(ChatifyPlugin::make())
             ->plugin(
@@ -158,7 +157,8 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => '<meta name="mobile-web-app-capable" content="yes">
+                fn (): string => Blade::render('@vite("resources/css/filament/admin/theme.css")')
+                    . '<meta name="mobile-web-app-capable" content="yes">
                     <meta name="apple-mobile-web-app-capable" content="yes">
                     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
                     <meta name="apple-mobile-web-app-title" content="MBFD Hub">'
