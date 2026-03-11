@@ -44,14 +44,15 @@ class TrainingPanelProvider extends PanelProvider
             ->favicon(secure_asset('favicon.ico'))
             ->darkMode(false)
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Red,
                 'danger' => Color::Rose,
-                'gray' => Color::Zinc,
+                'gray' => Color::Slate,
                 'info' => Color::Sky,
                 'success' => Color::Emerald,
                 'warning' => Color::Orange,
             ])
-            ->font('Inter')
+            ->font('Plus Jakarta Sans')
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->plugin(ChatifyPlugin::make())
             ->discoverResources(in: app_path('Filament/Training/Resources'), for: 'App\\Filament\\Training\\Resources')
             ->discoverPages(in: app_path('Filament/Training/Pages'), for: 'App\\Filament\\Training\\Pages')
