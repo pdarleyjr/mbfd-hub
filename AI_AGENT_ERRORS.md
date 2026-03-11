@@ -285,10 +285,11 @@ Either update the `mbfd-hub-app` Dockerfile to PHP 8.4+, or remove the PHP 8.4 c
 
 ### ERROR-018: Filament v3 Widgets as Livewire Children — Stale State on Parent Property Change
 **Date**: 2026-03-08
+**Status**: ✅ RESOLVED (2026-03-11) — Workgroup Evaluation Modernization Phase 2 replaced all Livewire widgets with inline data via `getViewData()` and plain Blade HTML rendering. No Livewire child components remain on the Session Results or Admin Dashboard pages.
 **Root cause**: Filament v3 widgets are separate Livewire components. Passing new session props via make() sets INITIAL state only. When parent page re-renders after wire:click, widgets may NOT remount — they keep old session data.
 **Wrong approach**: wire:key on HTML div does NOT force widget remounting
 **Correct fix**: Remove Livewire widgets from pages with reactive switching. Compute all data in getViewData() (always fresh) and render as plain HTML in blade.
-**Commits**: d167eb45
+**Commits**: d167eb45, 77067086 (Phase 2 modernization)
 
 ---
 

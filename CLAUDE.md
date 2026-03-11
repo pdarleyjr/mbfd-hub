@@ -9,6 +9,7 @@
 > ✅ **UI/UX Modernization Phase 0-3 DEPLOYED** (2026-03-10) â Removed all 37+ `@apply` from theme.css (iOS crash fix), fixed broken selectors, replaced pure grays with warm-tinted neutrals, new typography system (Plus Jakarta Sans + Source Sans 3), flattened nested stat cards, skeleton loading, stagger animations, search filter on vehicle inspections, reduced motion support.
 > ✅ **UI/UX Modernization Phase 4-8 DEPLOYED + CI/CD FIX** (2026-03-10 late evening) â Phase 4: button press feedback, sliding tab underline, focus-visible rings, toast animations. Phase 5: landing page redesign (cards primary, chatbot secondary, accent bars, removed System Overview). Phase 6: mobile-first polish (pointer:coarse, safe areas, scroll-snap tabs). Phase 7: tabular numbers, enhanced empty states, fluid typography. Phase 8: skip navigation, ARIA labels, font preload. CI/CD: daily-checkout builds in Docker, Reverb/queue worker post-deploy verification, explicit compose.yaml, view:cache error handling, filament:assets step, www.mbfdhub.com smoke tests.
 > ✅ **Enterprise Modernization Phases 1-7 MERGED** (2026-03-11) â Phase 1: Impeccable design system admin theme. Phase 2: Laravel Pulse + Spatie Health monitoring. Phase 3: Cloudflare AI Gateway routing (queue removed—requires paid plan). Phase 4: PWA hardening with Dexie offline DB, React Query, vite-plugin-pwa. Phase 5: fire_equipment_requests + station_inspections schema and API. Phase 6: FormsHub wizards (Equipment Request + Station Inspection). Phase 7: Filament admin restructuring with Station Management group and relation managers. Branch `feat/enterprise-modernization` merged to `main` and deployed to VPS.
+> ✅ **Workgroup Evaluation Modernization MERGED** (2026-03-11) â Phase 1: EvaluationService brand aggregation + competitor grouping. Phase 2: ERROR-018 fix — removed Livewire widgets, inlined data via getViewData() + async AI. Phase 3: Impeccable UI/UX overhaul for session results + admin dashboard. Phase 4: SAVER document generator — AI-powered purchasing report. Branch `feat/workgroup-evaluation-modernization` merged to `main` and deployed to VPS. Migration: `add_brand_competitor_group_to_candidate_products`.
 
 ## Project Identity
 Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filament 3 backend, React SPA daily checkout, Baserow data platform — all containerized on a single VPS.
@@ -132,3 +133,40 @@ GOOGLE_SHEETS_TAB_SHEET_ID=1714038258
 ## CI/CD Notes
 - Smoke tests in `deploy.yml` target `https://www.mbfdhub.com`
 - All darleyplex.com references have been migrated to mbfdhub.com
+
+---
+
+## Workgroup Evaluation Modernization (2026-03-11)
+
+### Overview
+Complete overhaul of the Workgroup Evaluation system across 4 phases, merged from `feat/workgroup-evaluation-modernization`.
+
+### Phase 1 — EvaluationService
+- New `App\Services\Workgroup\EvaluationService` with brand aggregation and competitor grouping logic
+- `CandidateProduct` model extended with `brand` and `competitor_group` columns
+
+### Phase 2 — ERROR-018 Resolution
+- Removed all Livewire widget children from `SessionResultsPage` and `AdminDashboard`
+- All data computed in `getViewData()` (always fresh on re-render)
+- Async AI analysis triggered via WorkgroupAIService without blocking page load
+
+### Phase 3 — UI/UX Overhaul
+- Session results page redesigned with Impeccable design system principles
+- Admin dashboard modernized with inline data rendering
+- Warm neutral color palette, proper typography hierarchy
+
+### Phase 4 — SAVER Document Generator
+- AI-powered purchasing report generation via `WorkgroupAIService`
+- SAVER report Blade template at `resources/views/filament/workgroup/pages/saver-report.blade.php`
+- Route: `/workgroups/saver-report/{session}`
+
+### Key Files
+| File | Purpose |
+|---|---|
+| `app/Services/Workgroup/EvaluationService.php` | Brand aggregation, competitor grouping, scoring |
+| `app/Services/Workgroup/WorkgroupAIService.php` | AI analysis + SAVER report generation |
+| `app/Filament/Workgroup/Pages/SessionResultsPage.php` | Results page (widget-free) |
+| `app/Filament/Workgroup/Pages/AdminDashboard.php` | Admin dashboard (widget-free) |
+| `resources/views/filament/workgroup/pages/session-results.blade.php` | Results Blade template |
+| `resources/views/filament/workgroup/pages/saver-report.blade.php` | SAVER report template |
+| `resources/css/filament/admin/theme.css` | Updated with workgroup result styles |
