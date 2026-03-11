@@ -739,6 +739,35 @@ instead of using the Laravel Vite pipeline. This created a second Tailwind confi
 - Theme CSS must never use `@apply` (iOS Safari black-screen crash risk)
 - Sidebar transitions target `opacity` and `transform` only — never animate `width`/`height` directly on content elements
 - Command Center Blade template should not use `dark:` classes while `->darkMode(false)` is set in AdminPanelProvider
+
+---
+
+### ERROR-035: Station Inspection & Fire Equipment Request Forms — Hallucinated Data / PDF Misalignment
+
+**Date**: 2026-03-11  
+**Severity**: 🔴 CRITICAL — forms contained hallucinated data that didn't match MBFD official PDFs or SOGs  
+**File(s) Affected**: `StationInspectionWizard.tsx`, `EquipmentRequestWizard.tsx`, Filament Resources, Models, Migration
+
+**Symptom**:
+1. Station Inspection form had a generic "Inspection Type" dropdown (Monthly, Quarterly, etc.) — doesn't exist on the PDF
+2. Station list included "Station 5" with fake addresses — MBFD only has Stations 1, 2, 3, 4, 6
+3. Checklist items were generic (fire extinguishers, GFCI outlets) instead of PDF-specific categories
+4. Equipment Request was a single-item form with priority picker — the PDF requires dynamic rows with reason codes
+
+**Fix Applied**:
+1. **Station Inspection**: PDF-aligned checklist (Apparatus Area, Dormitories, Kitchen & Dining w/ extinguishing system date, Bathrooms, Offices & Lobby, Apparatus/Equipment Cleanliness, Spot Checks), SOG mandate checkbox, corrected station list
+2. **Equipment Request**: Dynamic item rows, reason codes (Damaged/Broken, Lost, Stolen, Needed), conditional PD Case No for Stolen, conditional photo upload for Damaged, dual signatures (member + officer), explanation textarea
+3. **Migration**: Added `sog_mandate_acknowledged`, `extinguishing_system_date`, `officer_signature`, `pd_case_number`, `requested_by_name`, `explanation` columns
+4. **Filament**: Multi-step approval (Pending → Shift Chief → Support Services → Completed), PDF-aligned rendering
+
+**Prevention**:
+1. ALWAYS consult actual PDF forms before building form UIs
+2. MBFD stations are: 1, 2, 3, 4, 6 (NO Station 5)
+3. Equipment requests must support multiple items per form
+4. SOG Saturday mandate acknowledgment is REQUIRED
+
+**Commit**: `d20d2536`
+
 ---
 
 ### ERROR-034: Unified Filament Theme Pipeline — Fixing Fragmented CSS and Missing Panel Branding
