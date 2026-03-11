@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\TestNotificationController;
 use App\Http\Controllers\Api\BigTicketRequestController;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Api\StationInventoryV2Controller;
+use App\Http\Controllers\Api\FireEquipmentRequestController;
+use App\Http\Controllers\Api\StationInspectionController;
 use App\Http\Controllers\Workgroup\WorkgroupAIController;
 
 Route::get('/user', function (Request $request) {
@@ -59,6 +61,10 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::post('stations/{station}/rooms/{room}/audits/{audit}/complete', [\App\Http\Controllers\Api\StationController::class , 'completeAudit']);
     Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class , 'apparatus']);
     Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class , 'projects']);
+
+    // Phase 5: Fire Equipment Requests & Station Inspections
+    Route::apiResource('fire-equipment-requests', FireEquipmentRequestController::class);
+    Route::apiResource('station-inspections', StationInspectionController::class);
 });
 
 // Big Ticket Requests

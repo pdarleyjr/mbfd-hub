@@ -21,6 +21,7 @@ interface Env {
   VECTORIZE: any;
   ALLOWED_ORIGIN: string;
   WORKER_ENV?: string;
+  AI_GATEWAY_URL?: string;
 }
 
 interface RateLimitEntry {
@@ -67,6 +68,31 @@ function jsonResponse(data: any, status = 200, extras: Record<string, string> = 
       ...extras,
     },
   });
+}
+
+// =============================================================================
+// AI GATEWAY HELPER
+// =============================================================================
+
+/**
+ * Run an AI model, routing through AI Gateway if configured for caching/analytics.
+ * Falls back to direct env.AI.run binding otherwise.
+ */
+async function runAI(env: Env, model: string, input: any): Promise<any> {
+  if (env.AI_GATEWAY_URL) {
+    const url = `${env.AI_GATEWAY_URL.replace(/\/$/, '')}/${model.replace(/^@cf\//, '')}`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!resp.ok) {
+      console.error(`AI Gateway error ${resp.status}, falling back to direct binding`);
+      return env.AI.run(model, input);
+    }
+    return resp.json();
+  }
+  return env.AI.run(model, input);
 }
 
 // =============================================================================
@@ -140,7 +166,7 @@ async function handleVectorize(request: Request, env: Env, corsHeaders: Record<s
   const truncatedText = text.slice(0, 2000); // Chunk size limit for embedding quality
 
   // Generate embedding using best free-tier model
-  const embeddingResponse = await env.AI.run('@cf/baai/bge-large-en-v1.5', {
+  const embeddingResponse = await runAI(env, '@cf/baai/bge-large-en-v1.5', {
     text: [truncatedText],
   });
 
@@ -198,7 +224,7 @@ async function handleAnalyze(request: Request, env: Env, corsHeaders: Record<str
   let specContext = '';
   try {
     const searchQuery = `${manufacturer || ''} ${productName} ${productModel || ''} ${category || ''}`.trim();
-    const embeddingResponse = await env.AI.run('@cf/baai/bge-large-en-v1.5', {
+    const embeddingResponse = await runAI(env, '@cf/baai/bge-large-en-v1.5', {
       text: [searchQuery],
     });
     const queryVector = embeddingResponse.data[0];
@@ -260,7 +286,7 @@ Format with clear section headers. Be professional, objective, and data-driven.`
     { role: 'user', content: userPrompt },
   ];
 
-  const aiResponse = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+  const aiResponse = await runAI(env, '@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
     messages,
     max_tokens: 1500,
     temperature: 0.2, // Low temperature for factual analysis
@@ -330,7 +356,7 @@ Be concise and professional. This section feeds into the executive report for Fi
     { role: 'user', content: userPrompt },
   ];
 
-  const aiResponse = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+  const aiResponse = await runAI(env, '@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
     messages,
     max_tokens: 1200,
     temperature: 0.2,
@@ -424,7 +450,7 @@ Format professionally. Use headers and structured layout. This is a formal analy
     { role: 'user', content: userPrompt },
   ];
 
-  const aiResponse = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+  const aiResponse = await runAI(env, '@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
     messages,
     max_tokens: 2000,
     temperature: 0.15, // Very low for formal document

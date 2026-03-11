@@ -16,6 +16,7 @@ class CloudflareAIService
     protected string $apiToken;
     protected array $config;
     protected bool $enabled;
+    protected ?string $gatewayUrl;
 
     public function __construct()
     {
@@ -23,6 +24,7 @@ class CloudflareAIService
         $this->accountId = $this->config['account_id'] ?? '';
         $this->apiToken = $this->config['api_token'] ?? '';
         $this->enabled = $this->config['enabled'] ?? false;
+        $this->gatewayUrl = env('CLOUDFLARE_AI_GATEWAY_URL') ?: null;
     }
 
     public function isEnabled(): bool
@@ -40,7 +42,13 @@ class CloudflareAIService
             throw new \Exception('Daily rate limit exceeded. Please try again tomorrow.');
         }
 
-        $url = "https://api.cloudflare.com/client/v4/accounts/{$this->accountId}/ai/run/{$model}";
+        // Route through AI Gateway if configured, otherwise use direct Cloudflare API
+        if ($this->gatewayUrl) {
+            $modelPath = ltrim(str_replace('@cf/', '', $model), '/');
+            $url = rtrim($this->gatewayUrl, '/') . '/' . $modelPath;
+        } else {
+            $url = "https://api.cloudflare.com/client/v4/accounts/{$this->accountId}/ai/run/{$model}";
+        }
         
         $attempts = 0;
         $maxAttempts = $this->config['rate_limit']['retry_attempts'] ?? 3;

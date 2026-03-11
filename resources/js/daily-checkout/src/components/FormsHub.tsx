@@ -65,6 +65,63 @@ export default function FormsHub() {
             </div>
           </div>
         </Link>
+        
+        {/* Card C: Fire Equipment Request */}
+        <Link
+          to="/forms-hub/equipment-request"
+          className="group bg-neutral-100 rounded-xl ring-1 ring-neutral-200/60 p-6 border-l-4 border-l-red-500 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
+        >
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0">
+              <div className="w-14 h-14 bg-red-50 rounded-xl flex items-center justify-center group-hover:bg-red-100 transition-colors">
+                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+                </svg>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold text-neutral-800 mb-2 font-heading">Fire Equipment Request</h2>
+              <p className="text-neutral-500 text-sm mb-4">
+                Request SCBA, hose, PPE, tools, or other fire equipment for your station.
+              </p>
+              <span className="inline-flex items-center text-red-600 font-medium group-hover:text-red-700">
+                Start Request
+                <svg className="w-4 h-4 ml-1 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+            </div>
+          </div>
+        </Link>
+
+        {/* Card D: Station Inspection */}
+        <Link
+          to="/forms-hub/station-inspection"
+          className="group bg-neutral-100 rounded-xl ring-1 ring-neutral-200/60 p-6 border-l-4 border-l-sky-500 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
+        >
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0">
+              <div className="w-14 h-14 bg-sky-50 rounded-xl flex items-center justify-center group-hover:bg-sky-100 transition-colors">
+                <svg className="w-8 h-8 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold text-neutral-800 mb-2 font-heading">Station Inspection</h2>
+              <p className="text-neutral-500 text-sm mb-4">
+                Complete safety, compliance, and facility inspection checklists for any station.
+              </p>
+              <span className="inline-flex items-center text-sky-600 font-medium group-hover:text-sky-700">
+                Start Inspection
+                <svg className="w-4 h-4 ml-1 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+            </div>
+          </div>
+        </Link>
       </div>
 
       {/* Back to Home */}
