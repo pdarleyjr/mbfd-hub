@@ -19,7 +19,6 @@
 interface Env {
   AI: any;
   AI_GATEWAY_URL?: string;
-  VISION_QUEUE?: Queue;
 }
 
 const CORS_HEADERS: Record<string, string> = {
@@ -237,7 +236,6 @@ export default {
         status: 'ok',
         worker: 'vision-agent',
         model: VISION_MODEL,
-        queueEnabled: !!env.VISION_QUEUE,
         timestamp: new Date().toISOString(),
       });
     }
@@ -268,23 +266,7 @@ export default {
 
       images = images.slice(0, 5); // safety limit
 
-      // If async processing requested and queue is available, enqueue
-      if (body.async === true && env.VISION_QUEUE) {
-        const jobId = crypto.randomUUID();
-        await env.VISION_QUEUE.send({
-          jobId,
-          images,
-          callbackUrl: typeof body.callbackUrl === 'string' ? body.callbackUrl : null,
-          enqueuedAt: new Date().toISOString(),
-        });
-        return jsonResp({
-          queued: true,
-          jobId,
-          message: 'Image analysis has been queued for async processing.',
-        }, 202);
-      }
-
-      // Synchronous processing (original behavior)
+      // Synchronous processing
       const results: Array<{ parsed: Record<string, string>; rawText: string }> = [];
       for (const img of images) {
         try {
@@ -314,67 +296,6 @@ export default {
     } catch (err: any) {
       console.error('Worker error:', err);
       return jsonResp({ error: `Vision processing failed: ${err?.message ?? String(err)}` }, 500);
-    }
-  },
-
-  /**
-   * Queue consumer — processes image analysis jobs asynchronously.
-   * Messages are sent by the HTTP handler above when async=true.
-   */
-  async queue(batch: MessageBatch<any>, env: Env): Promise<void> {
-    for (const msg of batch.messages) {
-      const { jobId, images, callbackUrl } = msg.body;
-      console.log(`[vision-queue] Processing job ${jobId}, ${images?.length || 0} image(s)`);
-
-      try {
-        const imgArray: string[] = (images || []).slice(0, 5);
-        const results: Array<{ parsed: Record<string, string>; rawText: string }> = [];
-
-        for (const img of imgArray) {
-          try {
-            results.push(await analyzeImage(env, img));
-          } catch (err: any) {
-            console.error(`[vision-queue] Image error: ${err?.message}`);
-            results.push({
-              parsed: { brand: '', model: '', serial: '', confidence: 'low', notes: `Failed: ${err?.message}` },
-              rawText: '',
-            });
-          }
-        }
-
-        const { parsed, rawText } = merge(results);
-
-        const payload = {
-          jobId,
-          brand: parsed.brand,
-          model: parsed.model,
-          serial: parsed.serial,
-          item_name: parsed.item_name,
-          category: parsed.category,
-          confidence: parsed.confidence,
-          notes: parsed.notes,
-          images_analyzed: results.length,
-          raw_text: rawText,
-        };
-
-        // If a callback URL was provided, POST the results back
-        if (callbackUrl) {
-          try {
-            await fetch(callbackUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            });
-          } catch (cbErr: any) {
-            console.error(`[vision-queue] Callback failed: ${cbErr?.message}`);
-          }
-        }
-
-        msg.ack();
-      } catch (err: any) {
-        console.error(`[vision-queue] Job ${jobId} failed: ${err?.message}`);
-        msg.retry();
-      }
     }
   },
 };
