@@ -16,6 +16,7 @@ use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Vite;
+use Illuminate\Support\Facades\Gate;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -44,7 +45,12 @@ class AppServiceProvider extends ServiceProvider
         if (str_contains(config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
-        
+
+        // Allow super_admin users to access the Laravel Pulse dashboard
+        Gate::define('viewPulse', function (\App\Models\User $user) {
+            return $user->hasRole('super_admin');
+        });
+
         Todo::observe(TodoObserver::class);
         ChMessage::observe(ChMessageObserver::class);
         Apparatus::observe(ApparatusObserver::class);

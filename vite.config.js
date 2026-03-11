@@ -11,7 +11,8 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/js/app.js',
                 'resources/js/pump-simulator/main.tsx',
-                'resources/js/push-notification-widget.js'
+                'resources/js/push-notification-widget.js',
+                'resources/css/filament/admin/theme.css',
             ],
             refresh: true,
         }),
