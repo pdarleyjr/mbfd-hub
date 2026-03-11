@@ -709,3 +709,31 @@ instead of using the Laravel Vite pipeline. This created a second Tailwind confi
 2. Always use the compiled Laravel Vite asset pipeline for Tailwind styles
 3. If a Blade page needs custom tokens, add them to `tailwind.config.js` (or a dedicated compiled entry), then reference them through `@vite(...)`
 4. After converting a Blade page from CDN Tailwind to compiled Tailwind, run a full production build and verify the generated manifest/assets are deployed
+
+---
+
+### ERROR-033: Phase 1 Impeccable Design System — Theme CSS & Command Center Modernization
+
+**Date**: 2026-03-11  
+**Severity**: 🟢 INFO — design modernization, no breaking changes  
+**File(s) Affected**: `resources/css/filament/admin/theme.css`, `resources/views/filament/widgets/smart-updates-widget.blade.php`
+
+**Changes Applied**:
+
+1. **Sidebar collapse motion** — Added `cubic-bezier(0.16, 1, 0.3, 1)` (ease-out-expo) transitions for sidebar width, content opacity, label fade, and logo scaling. Collapse/expand feels smooth without bouncy or elastic easing (per Impeccable guidelines). Sidebar toggle buttons get a subtle scale+color hover.
+
+2. **Command Center visual hierarchy** — Replaced generic `border-l-4` colored sections with dedicated `.command-center-*` CSS classes: typed badges (critical/warn/info/ok) with semantic colors and pill borders, warm neutral section backgrounds (`#FAFAF8` with `#E8E5E0` border), and proper typography scale (0.8125rem body, 0.6875rem badges). Removed all `dark:` Tailwind classes from the Blade template since dark mode is disabled in `AdminPanelProvider.php`.
+
+3. **Table row hover** — Added `position: relative` on `.fi-ta-row` with a `::before` pseudo-element (3px wide `#B91C1C` red accent bar, left-anchored). Bar fades in on hover alongside a warm `#F5F3F0` background. Uses `opacity` transition only (no layout animation per Impeccable motion rules).
+
+**Design Decisions**:
+- All colors use warm stone neutrals (`#292524`, `#44403C`, `#57534E`, `#78716C`, `#A8A29E`, `#D4D0CA`, `#E8E5E0`, `#F5F3F0`, `#FAFAF8`) — no pure black/white/gray
+- No `@apply` directives anywhere (ERROR-001/ERROR-031 prevention)
+- No bouncy/elastic easing — all motion uses exponential deceleration
+- No nested cards — Command Center sections use flat background areas instead
+- `prefers-reduced-motion` section preserved for accessibility
+
+**Prevention**:
+- Theme CSS must never use `@apply` (iOS Safari black-screen crash risk)
+- Sidebar transitions target `opacity` and `transform` only — never animate `width`/`height` directly on content elements
+- Command Center Blade template should not use `dark:` classes while `->darkMode(false)` is set in AdminPanelProvider
