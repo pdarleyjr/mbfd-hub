@@ -102,10 +102,56 @@ class SessionResultsPage extends Page
     public function switchSession(?int $sessionId): void
     {
         $this->selectedSessionId = $sessionId;
-        // Clear SAVER report when switching sessions
+        // Clear AI and SAVER report when switching sessions
+        $this->aiReportLoaded = false;
+        $this->aiReport = null;
+        $this->aiReportError = null;
         $this->saverReportHtml = null;
         $this->saverReportError = null;
         $this->saverReportLoading = false;
+    }
+
+    /**
+     * Load AI Executive Report asynchronously (called via wire:init).
+     */
+    public function loadAiReport(): void
+    {
+        try {
+            $session = $this->getSelectedSession();
+
+            if (!$session) {
+                // For "Overall" view, try to use the most recent completed session
+                $session = WorkgroupSession::where('status', 'completed')
+                    ->orderByDesc('created_at')
+                    ->first();
+            }
+
+            if (!$session) {
+                $this->aiReportError = 'No session available for AI report generation.';
+                $this->aiReportLoaded = true;
+                return;
+            }
+
+            $aiService = app(WorkgroupAIService::class);
+            $result = $aiService->generateExecutiveReport($session);
+            $this->aiReport = is_array($result) ? ($result['report'] ?? json_encode($result)) : (string) $result;
+            $this->aiReportLoaded = true;
+        } catch (\Exception $e) {
+            Log::error('[SessionResultsPage] AI report failed', ['error' => $e->getMessage()]);
+            $this->aiReportError = 'Failed to generate AI report: ' . $e->getMessage();
+            $this->aiReportLoaded = true;
+        }
+    }
+
+    /**
+     * Regenerate AI Executive Report (force refresh).
+     */
+    public function regenerateAiReport(): void
+    {
+        $this->aiReportLoaded = false;
+        $this->aiReport = null;
+        $this->aiReportError = null;
+        $this->loadAiReport();
     }
 
     /**
