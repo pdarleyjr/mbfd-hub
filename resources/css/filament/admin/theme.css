@@ -1,6 +1,9 @@
+@import '../../../../vendor/filament/filament/dist/theme.css';
+
 /**
- * MBFD Hub Admin — Enterprise Light Theme
- * Light mode ONLY (dark mode disabled in AdminPanelProvider)
+ * MBFD Hub — Unified Impeccable Enterprise Theme
+ * Applied to ALL panels (Admin, Workgroup, Training) via ->viteTheme()
+ * Light mode ONLY (dark mode disabled in all PanelProviders)
  * 
  * RULES:
  * - Do NOT override Filament's primary/danger/success/warning/info color pipeline
@@ -8,7 +11,11 @@
  * - Scoped, minimal overrides only
  * - NEVER use @apply — causes iOS Safari black-screen crashes (ERROR-001)
  * - ALL class selectors MUST have . prefix
+ * - Font: Plus Jakarta Sans (Impeccable mandate)
  */
+
+/* ===== GOOGLE FONT IMPORT ===== */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
 
 /* ===== PAGE BACKGROUND ===== */
 .fi-body {
