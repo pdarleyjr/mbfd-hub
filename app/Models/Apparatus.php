@@ -61,6 +61,11 @@ class Apparatus extends Model
         return $this->hasMany(ApparatusDefect::class)->where('resolved', false);
     }
 
+    public function currentDefects()
+    {
+        return $this->openDefects();
+    }
+
     /**
      * Get all inventory allocations for this apparatus
      */
