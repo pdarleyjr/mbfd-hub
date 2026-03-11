@@ -236,15 +236,17 @@
                                 $rank === 3 && $isFinalist => 'wg-brand-rank--bronze',
                                 default => '',
                             };
+                            $medalBg = match(true) {
+                                $rank === 1 && $isFinalist => 'background-color: #C5A55A; color: #fff;',
+                                $rank === 2 && $isFinalist => 'background-color: #A8A8A8; color: #fff;',
+                                $rank === 3 && $isFinalist => 'background-color: #CD7F32; color: #fff;',
+                                default => '',
+                            };
                         @endphp
                         <tr>
                             <td style="text-align: center;">
                                 @if($rank <= 3 && $isFinalist)
-                                    <span class="wg-rank-medal {{ $medalClass ? str_replace('wg-brand-rank', 'wg-brand-rank', $medalClass) }}" style="width: 1.5rem; height: 1.5rem; font-size: 0.625rem;
-                                        @if($rank === 1) background-color: #C5A55A; color: #fff;
-                                        @elseif($rank === 2) background-color: #A8A8A8; color: #fff;
-                                        @elseif($rank === 3) background-color: #CD7F32; color: #fff;
-                                        @endif">{{ $rank }}</span>
+                                    <span class="wg-rank-medal {{ $medalClass }}" style="width: 1.5rem; height: 1.5rem; font-size: 0.625rem; {{ $medalBg }}">{{ $rank }}</span>
                                 @else
                                     <span style="color: #A8A29E; font-size: 0.75rem;">{{ $rank }}</span>
                                 @endif
@@ -326,12 +328,16 @@
                 <h4 class="wg-group-name">{{ $group['group_name'] }} <span class="wg-group-count">({{ $group['product_count'] }} products)</span></h4>
                 <div>
                     @foreach($group['rankings'] as $rIdx => $ranking)
+                    @php
+                        $groupMedalBg = match(true) {
+                            $rIdx === 0 => 'background-color: #C5A55A; color: #fff;',
+                            $rIdx === 1 => 'background-color: #A8A8A8; color: #fff;',
+                            $rIdx === 2 => 'background-color: #CD7F32; color: #fff;',
+                            default => '',
+                        };
+                    @endphp
                     <div class="wg-group-item {{ $rIdx === 0 ? 'wg-group-item--leader' : '' }}">
-                        <span class="wg-rank-medal" style="width: 1.5rem; height: 1.5rem; font-size: 0.625rem;
-                            @if($rIdx === 0) background-color: #C5A55A; color: #fff;
-                            @elseif($rIdx === 1) background-color: #A8A8A8; color: #fff;
-                            @elseif($rIdx === 2) background-color: #CD7F32; color: #fff;
-                            @endif">{{ $rIdx + 1 }}</span>
+                        <span class="wg-rank-medal" style="width: 1.5rem; height: 1.5rem; font-size: 0.625rem; {{ $groupMedalBg }}">{{ $rIdx + 1 }}</span>
                         <div style="flex: 1; min-width: 0;">
                             <span style="font-size: 0.8125rem; font-weight: 600; color: #292524;">{{ $ranking['name'] }}</span>
                             @if($ranking['brand'])
@@ -379,13 +385,15 @@
             @foreach($group['brand_rankings'] as $rank => $brandData)
             @php
                 $medalClass = match($rank) { 0 => 'wg-brand-rank--gold', 1 => 'wg-brand-rank--silver', 2 => 'wg-brand-rank--bronze', default => '' };
+                $brandMedalBg = match(true) {
+                    $rank === 0 => 'background-color: #C5A55A; color: #fff;',
+                    $rank === 1 => 'background-color: #A8A8A8; color: #fff;',
+                    $rank === 2 => 'background-color: #CD7F32; color: #fff;',
+                    default => '',
+                };
             @endphp
             <div class="wg-brand-rank {{ $medalClass }}">
-                <span class="wg-rank-medal" style="width: 2rem; height: 2rem;
-                    @if($rank === 0) background-color: #C5A55A; color: #fff;
-                    @elseif($rank === 1) background-color: #A8A8A8; color: #fff;
-                    @elseif($rank === 2) background-color: #CD7F32; color: #fff;
-                    @endif">{{ $rank + 1 }}</span>
+                <span class="wg-rank-medal" style="width: 2rem; height: 2rem; {{ $brandMedalBg }}">{{ $rank + 1 }}</span>
                 <div style="flex: 1;">
                     <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;">
                         <span class="wg-brand-label">{{ $brandData['brand'] }}</span>
@@ -557,12 +565,14 @@
                 </thead>
                 <tbody>
                     @foreach($finalists as $finalist)
+                    @php
+                        $finalistMedalBg = $finalist['rank'] === 1
+                            ? 'background-color: #C5A55A; color: #fff;'
+                            : 'background-color: #A8A8A8; color: #fff;';
+                    @endphp
                     <tr style="{{ $finalist['rank'] === 1 ? 'background-color: #FFFBEB;' : '' }}">
                         <td style="text-align: center;">
-                            <span class="wg-rank-medal" style="width: 1.75rem; height: 1.75rem; font-size: 0.6875rem;
-                                @if($finalist['rank'] === 1) background-color: #C5A55A; color: #fff;
-                                @else background-color: #A8A8A8; color: #fff;
-                                @endif">{{ $finalist['rank'] }}</span>
+                            <span class="wg-rank-medal" style="width: 1.75rem; height: 1.75rem; font-size: 0.6875rem; {{ $finalistMedalBg }}">{{ $finalist['rank'] }}</span>
                         </td>
                         <td style="font-size: 0.75rem; color: #78716C;">{{ $finalist['category'] }}</td>
                         <td style="font-weight: 600; color: #292524;">{{ $finalist['product']->name }}</td>
