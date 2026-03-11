@@ -658,13 +658,6 @@ fi-topbar { ... }
 fi-header-heading { ... }
 fi-wi-stats-overview-stat { ... }
 fi-btn-primary { ... }
-/* etc. */
-
-/* Should be: */
-.fi-topbar { ... }
-.fi-header-heading { ... }
-.fi-wi-stats-overview-stat { ... }
-.fi-btn-primary { ... }
 ```
 
 Additionally, all `@apply` directives should be replaced with native CSS (per ERROR-016 prevention rules).
@@ -678,3 +671,41 @@ Additionally, all `@apply` directives should be replaced with native CSS (per ER
 - Always prefix Filament CSS class selectors with `.`
 - Never use `@apply` in any CSS file (causes iOS Safari black-screen crash)
 - Run `/audit` skill check before deploying theme changes
+
+---
+
+### ERROR-032: Tailwind CDN on Production Blade Page — Console Warning + Token Drift
+
+**Date**: 2026-03-10  
+**Severity**: 🔴 CRITICAL — production warning, inconsistent styling source of truth, bypasses Vite asset pipeline  
+**File(s) Affected**: `resources/views/welcome.blade.php`, `tailwind.config.js`
+
+**Symptom**:
+- Browser console warns that `cdn.tailwindcss.com` should not be used in production
+- Landing page styling does not share the same compiled asset pipeline as the rest of the Laravel app
+- Tailwind design tokens can drift between inline runtime config and the real compiled config
+
+**Root Cause**:
+The landing page used:
+```html
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = { /* inline runtime config */ }
+</script>
+```
+instead of using the Laravel Vite pipeline. This created a second Tailwind configuration source, prevented versioned compiled CSS from being the single source of truth, and left the page dependent on a production-disallowed CDN runtime.
+
+**Fix Applied**:
+1. Removed Tailwind CDN + inline runtime config from `resources/views/welcome.blade.php`
+2. Added the landing page design tokens to `tailwind.config.js`
+3. Switched the page to compiled CSS via:
+```blade
+@vite('resources/css/app.css')
+```
+4. Rebuilt root assets with `npm run build`
+
+**Prevention**:
+1. **NEVER use `cdn.tailwindcss.com` in production Blade views**
+2. Always use the compiled Laravel Vite asset pipeline for Tailwind styles
+3. If a Blade page needs custom tokens, add them to `tailwind.config.js` (or a dedicated compiled entry), then reference them through `@vite(...)`
+4. After converting a Blade page from CDN Tailwind to compiled Tailwind, run a full production build and verify the generated manifest/assets are deployed
