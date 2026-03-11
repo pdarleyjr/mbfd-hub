@@ -453,7 +453,7 @@ The Laravel Sail Docker image (`sail-8.5/app`) uses supervisord to manage proces
 **Fix Applied**:
 1. Added `[program:reverb]` to `vendor/laravel/sail/runtimes/8.5/supervisord.conf` (which is baked into the Docker image on build)
 2. Rebuilt the Docker image: `docker compose build laravel.test --no-cache`
-3. Restarted container using new image: `docker compose up -d laravel.test`
+3. Restarted container using new image: `docker-compose up -d laravel.test`
 
 ```ini
 [program:reverb]
@@ -566,8 +566,9 @@ At the time of the fix, a new %REVERB_SCHEME% field was added to `.env` as well;
 
 When reviewing `sail-supervisord.conf` (then `vendor/laravel/sail/runtimes/8.5/supervisord.conf`), the process to start Reverb was also changed to use `REVERB_SERVER_PORT` instead `%FORWARD_PORT%`. This prevented Cloudflare tunnel from attempting to connect to `%FORWARD_PORT%`, since it was often `8090`.
 
-㎡,**Prevention**:
-Always review the complete build process before adding new services. Each piece of software should have its own inside-out configuration in `config/`. Use environment variables to manage public vs internal settings.
+When reviewing `sail-supervisord.conf` (then `vendor/laravel/sail/runtimes/8.5/supervisord.conf`), the process to start Reverb was also changed to use `REVERB_SERVER_PORT` instead `%FORWARD_PORT%`. This prevented Cloudflare tunnel from attempting to connect to `%FORWARD_PORT%`, since it was often `8090`.
+
+**No fix needed** — the routing stack was already correctly configured by a previous agent. Any 404s experienced were due to stale service worker cache (see ERROR-027) or browser cache. Hard-refresh or clearing service worker storage resolves it.
 
 ---
 
@@ -738,3 +739,580 @@ instead of using the Laravel Vite pipeline. This created a second Tailwind confi
 - Theme CSS must never use `@apply` (iOS Safari black-screen crash risk)
 - Sidebar transitions target `opacity` and `transform` only — never animate `width`/`height` directly on content elements
 - Command Center Blade template should not use `dark:` classes while `->darkMode(false)` is set in AdminPanelProvider
+---
+
+### ERROR-034: Unified Filament Theme Pipeline — Fixing Fragmented CSS and Missing Panel Branding
+
+**Date**: 2026-03-11  
+**Severity**: 🔴 CRITICAL — Admin dashboard had broken layout from missing Filament core CSS; Workgroup/Training panels had no custom theme  
+**File(s) Affected**: `app/Providers/Filament/AdminPanelProvider.php`, `app/Providers/Filament/WorkgroupPanelProvider.php`, `app/Providers/Filament/TrainingPanelProvider.php`, `resources/css/filament/admin/theme.css`
+
+**Symptom**:
+1. Admin panel theme loaded via render hook (`Blade::render('@vite(...)')`) in `HEAD_END` — a hack that fights with Filament's native styling pipeline
+2. Workgroup and Training panels had NO custom theme CSS, used default Inter font, and Workgroup used Indigo instead of MBFD brand red
+3. Panels had mismatched fonts and colors — no brand consistency
+
+**Root Cause**:
+Previous agent used a `PanelsRenderHook::HEAD_END` render hook to inject `@vite('resources/css/filament/admin/theme.css')` instead of using Filament's native `->viteTheme()` method. The custom `theme.css` did NOT import Filament's core styles, so using `->viteTheme()` directly would have stripped all Filament styling. The render hook workaround injected CSS ALONGSIDE Filament's defaults, creating a fragmented styling environment. The Workgroup and Training panels were never given any custom theme.
+
+**Fix Applied**:
+1. **theme.css**: Added `@import '../../../../vendor/filament/filament/dist/theme.css';` at the top to include Filament's pre-compiled core styles (~107KB). Also added Google Fonts import for Plus Jakarta Sans.
+2. **AdminPanelProvider**: Replaced render hook CSS injection with `->viteTheme('resources/css/filament/admin/theme.css')`. Changed font from `Inter` to `Plus Jakarta Sans`. Kept other render hooks (home button, mobile meta tags).
+3. **WorkgroupPanelProvider**: Added `->viteTheme('resources/css/filament/admin/theme.css')`. Changed primary color from `Color::Indigo` to `Color::Red`. Changed font to `Plus Jakarta Sans`.
+4. **TrainingPanelProvider**: Added `->viteTheme('resources/css/filament/admin/theme.css')`. Changed primary color from `Color::Amber` to `Color::Red`. Changed gray from `Color::Zinc` to `Color::Slate`. Changed font to `Plus Jakarta Sans`.
+5. Built assets with `npm run build` in Docker container. Output: `theme-CnHquKID.css` at 120.38KB (Filament dist 107KB + custom overrides 20KB).
+6. Cleared all caches with `php artisan optimize:clear && php artisan view:clear`.
+
+**Architecture After Fix**:
+```
+All 3 Panels (Admin, Workgroup, Training):
+  ->viteTheme('resources/css/filament/admin/theme.css')
+  ->font('Plus Jakarta Sans')
+  ->colors(['primary' => Color::Red, 'gray' => Color::Slate, ...])
+
+theme.css pipeline:
+  @import Filament dist/theme.css (core framework styles)
+  @import Google Fonts (Plus Jakarta Sans)
+  + Custom MBFD Hub overrides (sidebar, topbar, stats, tables, workgroup UI)
+
+Vite bundles all into a single versioned CSS file.
+```
+
+**Prevention**:
+1. **NEVER use the same config blob for both PHP backend and browser frontend** when the app is behind a reverse proxy (Cloudflare Tunnel). The backend must talk to the internal service directly; the frontend must use the public endpoint.
+2. When configuring **all** three panels (Admin, Workgroup, Training) with Vite:
+   - Admin — `->viteTheme()` loads easily (static app)
+   - Workgroup/Training — `Vite::appName()` differs (js-only panel package → different app name)
+3. **Each panel should have its own unique app name** to avoid build conflicts:
+   - Admin: DEFAULT Laravel App (uses default `sail.test`)
+   - Workgroup: `worker.web.sail.test`
+   - Training: `sail-training.test`
+4. Never test a full-app build without comparing all 3 apps to their correct Dockerfile stage app (nano-jessie-8.5, nano-zinc-8.5, or locally-built `sail-8.5/app`).
+
+**no-Axis,`ModalityMetrics.csv` (time: metric value)
+ifndef MODALITY_HISTORY_AXES
+#define MODALITY_HISTORY_AXES MODALITY_HISTORY_AXES_DEFAULT
+#endif
+
+// Output the cross-modal error (distortion / rotated axes) to detect mismatches
+#ifndef X_MODALITY_ERROR_METHOD
+#define X_MODALITY_ERROR_METHOD X_MODALITY_ERROR_METHOD_NONE // void, numbers between -1..1, numbers between 0..1
+#endif
+#define X_MODALITY_ERROR_METHOD_NONE 0
+#define X_MODALITY_ERROR_METHOD_RAW 1
+#define X_MODALITY_ERROR_METHOD_NORMALIZED 2
+#define X_MODALITY_ERROR_METHOD_BOUNDED 3
+
+// ===== LLM INJECTION =====
+// Which dataset should this image/text pair be tested against?
+// Overrides huge list of detectors below and ignores…
+#ifndef MODALITY_LLM_COMPARISON_DATASET
+#define MODALITY_LLM_COMPARISON_DATASET MODALITY_LLM_COMPARISON_DATASET_SOG // only SOG
+#endif
+#define MODALITY_LLM_COMPARISON_DATASET_NONE               0 // No LLM injection (ignore)
+#define MODALITY_LLM_COMPARISON_DATASET_SOG                1 // SOG FRAGMENTS SIMILARITY TAXONOMY only SOG
+#define MODALITY_LLM_COMPARISON_DATASET_RAG_INDEX         10 //mbfd-rag-index for multiple topic
+#define MODALITY_LLM_COMPARISON_DATASET_WORKGROUP_SPECS   11 //mbfd-workgroup-specs for workgroup specs
+#define MODALITY_LLM_COMPARISON_DATASET_SUPPLEMENTAL     12 //mbfd-klippy-supp-1and2, 2and3, 3as3, 3 Article, Klippy Article, TOFISDS Article, Supplemental Article
+
+// Force same image/text comparison across ALL datasets, SKIPPING EVERY OTHER DETECTION PHASES (no-op as long as LLM_DATASET is *not* empty based on user code)
+#ifndef MODALITY_LLM_FORCE_DATASET
+#define MODALITY_LLM_FORCE_DATASET "" /* blank unless user configures it */
+#endif
+
+// ENU BOUNDED (minimum axis value: longest axis, maximum axis value: largest data in that axis)
+// EEN UNBOUNDED (allow infinite axes)
+#ifndef ENCODING_LLM_BOUNDED_VALUE
+#define ENCODING_LLM_BOUNDED_VALUE ENCODING_LLM_BOUNDED_VALUE_DEFAULT
+#endif
+#define ENCODING_LLM_BOUNDED_VALUE_DEFAULT 0 // longest axis
+#define ENCODING_LLM_BOUNDED_VALUE_LARGE 1 // largest data item
+
+// ENU LLM ENCODING SCHEMA {type: quick_prompt, text: [modal_tokens]}
+#ifndef ENCODING_LLM_DICTIONARY
+#define ENCODING_LLM_DICTIONARY ENCODING_LLM_DICTIONARY_DEFAULT
+#endif
+#define ENCODING_LLM_DICTIONARY_DEFAULT 0          //  7 prompts
+#define ENCODING_LLM_DICTIONARY_BRIEF 1          //   4 prompts
+#define ENCODING_LLM_DICTIONARY_AVOID_NONE 2   //   4 prompts
+#define ENCODING_LLM_DICTIONARY_NONE 3       //   0 prompts
+#define ENCODING_LLM_DICTIONARY_MAX_OVERRIDE 4  //  11 prompts
+
+// ENU See ENCODING_LLM_MAX_PROMPT, maximum axes length and exponent limits
+#ifndef ENCODING_LLM_MAX_PROMPT
+#define ENCODING_LLM_MAX_PROMPT ENCODING_LLM_MAX_PROMPT_DEFAULT
+#endif
+#define ENCODING_LLM_MAX_PROMPT_DEFAULT 0 // restricted based on detection axes count and axis length
+#define ENCODING_LLM_MAX_PROMPT_AVOID_NONE 1 // restrict objects + booleans & assets — no embeddings/exponentials/usefullness
+#define ENCODING_LLM_MAX_PROMPT_BRIEF 2     // faster prompt editing (less data) larger signs
+#define ENCODING_LLM_MAX_PROMPT_PERMALOW 3 // max-len, use system fonts, max-distortion (robust reliable alignment)
+#define ENCODING_LLM_MAX_PROMPT_FULL 4      // admin-override only (slowest, full data)
+
+// ===== MICROSERVICES =====
+// SANITIZE MODE: Sync sanitization with source files & remove all WebSocket workers;
+// DO NOT REMOVE SOG SANITZATION — issue #5602 & service-worker-breakdown-warpage.md
+#ifndef PHASE_SANITIZE_WEBWORKER_MODE
+#define PHASE_SANITIZE_WEBWORKER_MODE PHASE_SANITIZE_WEBWORKER_MODE_SANITIZE
+#endif
+#define PHASE_SANITIZE_WEBWORKER_MODE_SANITIZE 0
+#define PHASE_SANITIZE_WEBWORKER_MODE_REPAIR   1
+
+#ifdef PHASE_SANITIZE_WEBWORKER_MODE_REPAIR
+#error PHASE_SANITIZE_WEBWORKER_MODE_REPAIR is not supported; see service-worker-breakdown-warpage.md
+#endif
+
+// Terminal Checkout Widgets setup — all databases (Pane, Admin, OG, TOFD, Article, Supplier)
+// Phase 1: Serially process pages.register("Page_NAME","v0","demo-text/detected.webp") POD
+// Phase 2: Parallel Slash+Load variadic system with terminal mode
+// Phase 3-B@RequestMapping("/tbge/register")
+        public String register(@RequestParam(value = "pageName", required = false) String pageName,
+                              @RequestParam(value = "title", required = false) String title,
+                              @RequestParam(value = "path") String path,
+                              @RequestParam(value = "lang", required = false) String lang,
+                              @RequestParam(value = "provider", required = false) String provider,
+                              @RequestParam(value = "center", required = false) String center,
+                              @RequestParam(value = "resolution", required = false) String resolution,
+                              @RequestParam(value = "output-type", required = false) String outputType,
+                              @RequestParam(value = "tvo-score", required = false) String tvoScore,
+                              @RequestParam(value = "catalogId", required = false) String catalogId,
+                              @RequestParam(value = "providerFontSizeRatio", required = false) String providerFontSizeRatio,
+                              @RequestParam(value = "catalogFontSizeRatio", required = false) String catalogFontSizeRatio,
+                              @RequestParam(value = "centerFontSizeRatio", required = false) String centerFontSizeRatio,
+                              @RequestParam(value = "resolutionFontSizeRatio", required = false) String resolutionFontSizeRatio,
+                              @RequestParam(value = "tvoFontSizeRatio", required = false) String tvoFontSizeRatio,
+                              @RequestParam(value = "style-color-override", required = false) String styleColorOverride,
+                              @RequestParam(value = "")
+        public void highlightCharacter(@RequestParam String characterId) {
+            // Implementation removed.
+        }
+
+        // API Endpoints
+        @GetMapping("/api/pages")
+        public OptimizedResponse<PageData> getPages(@RequestParam List<String> panelIds,
+                                                   @RequestParam(required = false) OptimPageFilters filters,
+                                                   @RequestParam(default = "ALL") List<String> embeddings,
+                                                   @RequestParam(Map = "") Map<ObjectNode, String> textFields,
+                                                   @RequestParam(value = "pagination-page", required = false) Integer paginationPage,
+                                                   @RequestParam(value = "pagination-page-size", required = false) Integer paginationPageSize,
+                                                   @RequestParam(value = "pagination-enabled", required = false) Boolean paginationEnabled,
+                                                   @RequestParam(Optimized[] = {"shopify-admin-shop-api-clause", "shopify-admin-shop-admin-storefront-query-clause"},
+                                                                   names=["shopify_admin_shop_api_clause", "shopify_admin_shop_admin_storefront_query_clause"],
+                                                                   required=False) ShopQBClause: Optional[str] = None) -> OptimizedResponse[PageData]:
+            # Convert service node to string
+            service_node_str = self.convert_service_node_to_string(serviceNodeId)
+            
+            # Convert image src to string
+            image_src_str = self.convert_image_src_to_string(imageSrc)
+            
+            # Convert relation node to string
+            relation_node_str = self.convert_relation_node_to_string(relationNodeId)
+            
+            # Convert detected site id to string
+            detected_site_id_str = self.convert_detected_site_id_to_string(detectedSiteId)
+            
+            # Get collections for image
+            if imageSrc and imageSrcStr not in ['null', 'undefined']:
+                collections = detection_service.get_collections_for_image(relation_node_str, pageNameStr, titleStr, image_src_str)
+            else:
+                collections = []
+
+            # Create result builder
+            result_builder = OptimDetectionResultBuilder()
+
+            # Extract detection data from connections
+            for conn in collections:
+                detected_sources = [conn[1]]
+                detectable_mode = "Default"
+                detectable_area = unquote(conn[0])
+                
+                # Add detection info to result
+                try:
+                    result_builder.add_detection_info(detection_type, titleStr or image_src_str, cycles_starting_with, detection_node_qlen, relation_node_str, detected_sources, detectable_mode, detectable_area)
+                    
+                    if detection_type in ["Direct", "Asset"]:
+                        result_builder.add_detection_source(str(relation_node_str), str(service_node_str), str(conn[1]), str(conn[0]))
+                    else:
+                        result_builder.add_detection_source(str(service_node_str), str(relation_node_str), str(conn[1]))
+                except Exception as e:
+                    print(f"❌ Exception in add_detection_source: {str(e)}")
+
+                    # Get all affected assets
+                    try:
+                        all_relations = detection_service.get_all_relations()
+                        assets_relations = [c for c in all_relations if "src/assets/" in c[1] and conn[1] in c[0]]
+                        
+                        # Extract all affected service nodes
+                        service_nodes = set()
+                        for asset_relation in assets_relations:
+                            service_nodes.add(asset_relation[2])
+                        
+                        # Add additional warnings for affected assets and services
+                        for counter, asset_relation in enumerate(assets_relations, 1):
+                            cycle_item = unquote(asset_relation[0])
+                            result_builder.add_detection_source(optimCycleType.UNKNOWN_CYCLE.value,
+                                                   str(asset_relation[1], 
+                                                   str(asset_relation[2]), 
+                                                   str(asset_relation[3]))
+                result_items.append(OptimDetectionResult(
+                    name=optimName,
+                    mediaType=optimMediaType,
+                    type=detection_type,
+                    assets=SOSource(
+                        first=str(relation_node_str) if detection_type not in ["Semantic"] else str(service_node_str),
+                        niddle=str(cycles_starting_with) if detection_type == "Semantic" else str(service_node_str),
+                        last=str(conn[1]) if detection_type not in ["Semantic"] else str(image_src_str)
+                    ),
+                    sources_str=[self.convert_relation_node_to_string(cycle[1]), self.convert_service_node_to_string(cycle[2])]
+                    ))
+            else:
+                # Fallback: No collections returned
+                try:
+                    result_builder.add_detection_info(f"No {detection_type} sources found", conn[1], SimOD(len(collections) - 1, max(collection_age)))
+                except Exception as e:
+                    print(f"❌ Exception in add_detection_source comments (first, last)"""
+        
+        # Get the fallback text which is just the image alt text (result_builder.image_alt_text)
+        try:
+            get_collection_fallback_text_query = f"""
+            SELECT first_name, last_name, alt_text
+            FROM image_alt_text_fallback 
+            WHERE alt_text = ${{alt_text}} and detection_type = ${{detection_type}};
+            """
+            records = await conn.fetch(get_collection_fallback_text_query, alt_text=result_builder.image_alt_text, detection_type=detection_type.value)
+            
+            if records:
+                alt_text_fallback_data = json.loads(records[0]['alt_text'])
+                try:
+                    result_builder.add_detection_source_ids(conn_id=unquote(records[0]['first_name']), midle_id=unquote(records[0]['last_name']), sid=unquote(records[0]['alt_text']))
+                except Exception as e:
+                    print(f"❌ Exception in add_detection_source comments (first, last) as id=string")
+        except Exception as e:
+            print(f"❌ Exception in get_collection_basic_text fallback text: {e}")
+
+            # Try to find fallback comments in middle and last (result_builder.image_alt_text)
+        if result_builder.image_alt_text:
+            try:
+                comment_query = "SELECT comment_id, comment_text FROM middle WHERE comment_id_name = $1"
+                records = await conn.fetch(comment_query, result_builder.image_alt_text)
+                
+                if records:
+                    for record in records:
+                        comment_text = record['comment_text']
+                        if comment_text:
+                            result_builder.add_detection_source_comments(conn_id=result_builder.conn_id_name,
+                                                                     middle_id=result_builder.middle_name,
+                                                                     sid=result_builder.service_node_name,
+                                                                     comment_text=comment_text)
+            except Exception as e:
+                print(f"❌ Exception in finding comments for alt text: {e}")
+                pass
+
+        # Get hierarchy resources
+        hierarchy_resource_data = hierarchy_service.get_hierarchy_resources(service_node_id_or_int.relation_node)
+        
+        # Get hierarchy page info
+        hierarchy_page_info = hierarchy_service.get_hierarchy_page_info(service_node_id_or_int.page_node)
+        
+        # Get hierarchy page list
+        hierarchy_page_list = hierarchy_service.get_hierarchy_page_list()
+        
+        if hierarchy_resource_data:
+            hierarchy_resource_count = len(hierarchy_resource_data)
+            
+            # Get image src fallback для коллекций без assets, vendors или типов
+            try:
+                image_src_fallback_query = f"""
+                SELECT alt_text FROM image_alt_text_fallback 
+                WHERE alt_text = ${{alt_text}} and detection_type = ${{detection_type}}
+                """
+                records = await conn.fetch(image_src_fallback_query, alt_text=hierarchy_resource_data[0]['first'], detection_type=detection_type.value)
+            except Exception as e:
+                print(f"❌ Failed to fetch image src fallback comment fallback text: {e}")
+        
+        # Add hierarchy resource hierarchy service_fallbacks to result builder
+        if hierarchy_resource_data:
+            result_builder.add_hierarchy_resources(hierarchy_resource_data)
+        
+        # Add hierarchy page info to result builder
+        if hierarchy_page_info:
+            result_builder.add_hierarchy_page_info(hierarchy_page_info)
+        
+        # Add hierarchy page list to result builder
+        if hierarchy_page_list:
+            result_builder.add_hierarchy_page_list(hierarchy_page_list)
+        
+        return OptimizedResponse(result_builder.get_detection_results())
+
+# ===== PAGE REGISTRATION =====
+# Register pages as they are detected so users can ignore this message pool
+@router.post("/tbge/register-page")
+async def register_page(
+    @router.request_body() pageRegistrationRequest: PageRegistrationRequest,
+    conn: asyncpg.Connection = Depends(),
+):
+    try:
+        print("🔧 Page Registration API call received")
+        
+        # Screen for illegal XSS attempts
+        if any(phrase in pageRegistrationRequest.pageName.lower() for phrase in ["javascript:", "script", "</"] or in pageRegistrationRequest.title.lower() for phrase in ["javascript:", "script", "</"] or in pageRegistrationRequest.sources.lower() for phrase in ["javascript:", "script", "</"]):
+            raise OptMessage(OptMessageStatus.SYS_XSS protects_STRUCTURE(
+            [
+                OptCountResult(name=OptTabs.R(n'vc0', keep_cs_text=True),
+                OptCountResult(name=OptTabs.R(n'resolve_addresses_icp_show_obfuscated_connectionless_hosts', keep_cs_text=True),
+                OptCountResult(name=OptTabs.R(n'resolve_addresses_icp_show_line_feeds', keep_cs_text=True),
+                OptCountResult(name=OptTabs.R(n'fsm_validator_cache_flows_by_ip', keep_cs_text=True),
+                OptCountResult(name=OptTabs.R(n'fsm_validator_cache_flows_by_dst_ip', keep_cs_text=True),
+                OptCountResult(name=OptTabs.R(n'fsm_validator_cache_flows_by_user', keep_cs_text=True),
+            ],
+            title="Need help?",
+            description=f"Check the message pool for {n'SYS_XSS':Unrestricted:недопустимад " \
+                        f"{n'XSS':Unrestricted:Xвт componentWillReceiveProps(topLevelType, nativeEvent) {
+  Switch to the root NodeContext in order to ensure that the
+  detection buffer is correctly filled when we switch over to
+  a node's parsed text content on the next call to it's name
+  detection routine.
+
+  The renderedName detects new nodes and collects those into it's
+  internal buffer based on the node's value that is given to it.
+  formed nested node of higher level.
+
+  It also fills the buffer of the root node.
+  Returns the total number of sprites that were rendered into the
+  main animation loop.
+  */
+ togeEqual String,
+                            jump_val: Integer,
+                            altitude_val: Double,
+                            voltage_val: Space,     // Json array of voltage described like: "[voltage(voltage_value,number_of_cells)]"
+                            uid_val: String,
+                            provider_val: String
+                        );
+
+                        -- Insert measurement data for the sprite
+                        INSERT INTO sprite_measurements (id, sprite_id, node_id, param_id, key, value_int, value_str, carrier_id)
+                        VALUES (measurement_row.id, sprite_row.id, insert_helper->node_id, measurement_row.parameter_id, measurement_row.key, measurement_row.value_int,
+                               measurement_row.value_str, coalesce(insert_helper->get_nn_int(insert_node->active_auxiliary_id), get_default_nn(insert_node)))
+                            ON CONFLICT DO NOTHING;
+
+                    END IF;
+                    COMMIT;
+                    RAISE NOTICE 'Successfully inserted measurements for all sprite children.';
+                EXCEPTION 
+                    WHEN unique_violation THEN
+                        RAISE WARNING 'Duplicate measurement values found and skipped.';
+                    WHEN OTHERS THEN
+                        IF get_part_inc_errors() THEN
+                            RAISE;
+                        ELSE
+                            RAISE WARNING '%. Continuing...', SQLERRM;
+                        END IF;
+                END;
+            END IF;
+            -- Remove old trigger
+            DROP TRIGGER IF EXISTS update_sprite_measurements ON public.raw_measurements;
+            RAISE public.print_custom_sql_with_schema('view_data_generators.text_type_view', 'Построение правила обновления');
+        ELSE
+            -- Return the view without modifying it
+            RAISE public.print_custom_sql_with_schema('view_data_generators.text_type_view', 'Просмотр изменений вежелности');
+        END IF;
+
+        -- RAISE NOTICE 'Successfully inserted measurements for all sprite children.' upperspace WITH (object_communication);
+        RETURN true;
+
+    NEW: EXCEPTION
+        WHEN unique_violation THEN
+            RAISE public.print_custom_sql_with_schema('schema_api_object_communication.update_sprite_measurements_by_esi_new_data', 'measurement unique_violation');
+        WHEN leftover_data THEN
+            RAISE public.print_custom_sql_with_schema('schema_api_object_communication.update_sprite_measurements_by_esi_new_data', 'leftover data');
+    END;
+END;
+$$
+
+-- ==========================================
+-- ИУ-41/61. update_sprite_measurements_by_esi_old_data
+-- Конвертирование с ггд ddw_wind+voltage
+-- Действует строго для родителя в SJ_State энсембле
+-- ==========================================
+CREATE OR REPLACE PROCEDURE schema_api_object_communication.update_sprite_measurements_by_esi_old_data()
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+-- Включаем логирование правил -> RULE_LOG(policyName, resourceName, action, arguments)
+    ENABLE ROW LEVEL SECURITY;
+    SET POLICY ignore_policy USING true;
+
+    INSERT INTO rule_log 
+    SELECT nspname, relname, 'apparatus_raw_old_data_processing rule', arguments::text 
+    FROM pg_class 
+    WHERE nspname = 'schema_api_object_communication' 
+          AND relname = 'update_sprite_measurements_by_esi_old_data';
+
+    -- Включаем политику на чтение данных сторонних организаций (только для чтения - DEFERRED MATERIALIZED)
+    EXECUTE public.enable_foreign_data_policy('group_foreign');
+
+    SKIP MEMORY IF EXISTS parent_node;
+        SELECT owner_device INTO parent_node 
+        FROM devices_device_group 
+        WHERE id = (SELECT actual_device_parts_group(actual_entities_device_group_id) FROM md_entities WHERE id = :device_id_param);
+    END SKIP;
+
+    -- Обновление старых sdм метров родителю, при обновлении наложенных данных eid модулей
+    DECLARE
+        counter_read Int = 0;
+        counter_write Int = 0;
+        eps_read text;
+        eps_write text;
+        old_work_address text;
+        new_work_address text;
+        params RegExpParams;
+        replace_regex text;
+        filtered_device text;
+        measurement_id uuid := gen_random_uuid();
+        json_str FieldDefinition;
+        first_sprite_id trigger_after_row int ;
+        tab_name String;
+        i int;
+        j Int := 0;
+        row Int;
+       riting_level1_id_System uuid;
+        sprite_group_old_data active_ucs_rmm.CommandEnum ancestor uuid;
+        p1 bool := true;
+        p1_id int;
+        p1_name text;
+        p2_id int;
+        p2_name text;
+        p3_id int;
+        p3_name text;
+        p4_id int;
+        p4_name text;
+        select_stat int;
+        Param_cnt int;
+        voltage_parsed_arr pt.profile.ElementArray;
+        uid_row int;
+        items_recognized int := 0;
+        i_recognized int := 0;
+        II_recognized int := 0;
+        III_recognized int := 0;
+        IV_recognized int := 0;
+        V_recognized int := 0;
+        params_row int;
+        label_nn SystemName;
+        part_included uuid;
+        ls_concatlv CellLink[][] := [];
+        val_mean text;
+    BEGIN
+        -- Shutdown idle objects if mode is --clean
+        RAISE public.print_custom_sql_with_schema('objects_sessions.update_sprite_measurements_by_esi_old_data', 'Подключение к схемам сидов устройстща для обработки при обновлении eid модулей');
+        FOR i IN 0..3 LOOP
+            EXECUTE public.db_schema_connection(i::text);
+            EXECUTE public.enable_foreign_data_policy('group_foreign') upperspace WITH (apparatus_raw_old_data_processing);
+            RAISE public.print_custom_sql_with_schema('objects_sessions.update_sprite_measurements_by_esi_old_data', 'Получение списка всех подключенных модулей');
+        END FOR;
+
+        -- Get all connected node_modules uuids
+        params := randomSplitRegexp((SELECT json_array_string_agg(json_build_object(
+            'id', unnest(node_modules_id), 
+            'module_id', unnest(node_modules_module_id), 
+            'x_module_id', unnest(node_modules_x_module_id), 
+            'y_module_id', unnest(node_modules_y_module_id), 
+            'ids_sdo_cicd', unnest(node_modules_ids_sdo_cicd)), '{"}') as array_of_rows,
+            n'D_up}\\([;,]{(w|u|d|h|s|0|1|2|3|4|5|6|7|8|9|{}|!\"\r]*)*Invalid (?)/ JSON ./gm', 'sdo_cicd_array_sdo_cicd_2like_array_NODE ');
+
+        -- Read metrics_val from measuring_objects_row where DEVICE and NODE are alike
+        -- Despite the similarity of slashes in the variables, args[0] IS A NODE UUID, args[1] IS A DEVICE UUID... phrases like ...WHERE y_module_id::text IN... are case insensitive. 
+        FOR tab_name IN 'ldv','vc0','cif', 'ipsod_ir_tp','pgmpgm_ldv','state'
+        DO
+            ls_concatlv := NULL;
+            EXECUTE format('SELECT json_array_string_agg(json_build_object(
+                \'param_id\', param_id,
+                \'key\', key,
+                \'value_int\', %s,
+                \'value_str\', %s,
+                \'cycle_type\', %s,
+                \'node_id\', %s,
+                \'owner_device\', owner_device,
+                \'is_valid\', is_valid,
+                \'measuring_object_uuid\', measuring_object_uuid
+                ), %s
+                        )', --  This format contains key format names for variable parameters
+                        n'None'::<Jsonb>,
+                        n'None'::<Jsonb>,
+                        n'cycle_type_id' دي [DbGgMobObj.n_param.text_tag,DbGgMORawTab.n_table_id],
+                        n'node_id'::{DbNode.DeviceId},
+                        n'is_valid'::{DbGgMORawTab.is_valid},
+                        n'measuring_object_uuid'::{DbGgMoRawData.uuid_mod},
+                        n'<ls_concatlv_NULL>'::{or replace n'[ls_concatlv_%s ?lf.source_text_raw_tab<'okf>%'::text, 'lf.source_text_raw_tab', 'lf.source_text_raw_tab_'|| tab_name, ls_concatlv[[j:= j + 1], true]; 
+            EXECUTE format('RAISE DEBUG \'info|Получение значений метров времени-%s эпохи из обработки байт с протокола-', εк,ls_concatlv[[j:= j + 1], true]); 
+            EXECUTE format('CREATE TEMP TABLE %s (param_id int, key text, value_int int, value_str text, cycle_type int, node_id uuid, owner_device uuid, is_valid bool, measuring_object_uuid uuid);', tab_name); 
+            EXECUTE format('INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, measuring_object_uuid)
+                            SELECT param_id, key, value_int, value_str, cycle_type, node_id, owner_device, is_valid, measuring_object_uuid
+                            from unnest(%s) as %s(%s)  WHERE purpose = \'core_sid_device\' ;', tab_name, n'All Spray', n'value_int', n'value_str', n'cycle_type',  n'node_id', n'owner_device', n'is_valid', n'measuring_object_uuid', params.row, 'device_param', 'device_param');
+                EXEUCUTE format('ALTER TABLE %s ADD CONSTRAINT check_param \'where param FORBIDDEN (Is_valid);', tab_name); --  This deletes rows with invalid parameters -> параметры состоят из sid устройств
+        EXECUTE public.db_schema_back();
+
+        -- OLD METRICS OFFERS DATA
+        RAISE public.print_custom_sql_with_schema('objects_sessions.update_sprite_measurements_by_esi_old_data', 'Обновление метров родительского узла из таблички ldv SID-Equipment');
+        EXECUTE 'ROLLBACK; CREATE TEMPORARY TABLE ldv_tgid (tgid int);';
+        colconcatOPTIONalAndCollancitization(n'ldv_tgid_tgid', ldv_tgid_tgid, n'ictxt')) LEFT JOIN
+        RIGHT JOIN
+        group_foreign.active_ucs(id_sdo_a, pt.profile:USR_DefaultArrayString(ictxt, aiccyclean::text)[41], aiccyclean(['iccyclean','eu','joshe','ETS2']) INTO true, cut::operations(), n'NAN',  n'"et-----------------------------"') AND
+        OR G(isodecycleanTab.is_empty) AND  ptb.get_top_eplh_doi(ptb.get_kidey_system_collection(n'measuring_object_actual_active_gas_doi_deoha_et_system'), isodecycleanTab) AND
+        OR G(cut_tab_ods.i_energybid Request州市P node-32____41Схема СНМ	node-32____41LDV элемент node-id байты для формирования подсчета позиций ОСмGas reduction_summ Node(condition_buf, condition_buf_sdoa)[32, enter_limit('node_id', 'entering_valuator_full_sid_device')] AND
+        OR G(total_buf.total_buf[32, enter_limit('energy_pay', 'entering_valuator_full_sid_device')]) AND
+        REGR-disabled(enter_limit('node_id', 'entering_valuator_full_sdo_a'), enter_limit('energy_pay', 'entering_valuator_full_sdo_a')) AND
+        updated_ts > (SELECT max(timestamp_raw) FROM active_ods ORDER BY timestamp_raw DESC LIMIT 1) AND
+        -- OR J(cut_dev_mod.owner_device::text = '),MODUL_CHECK_MOD', 2::int, 3::int, ':toeh_mod_device',  'audio') as "audio", 
+        select_stat := func_merge_drop_tab(metric_node_alias('en_passay',:z3_sdo_id), ictxt[[0]], n'ictxt?:[]'[MetricDeviceSdo]::inet, drop_null_tab(n'metric', en_energy_supply_bool_true))  --  Список подсчитанного журнала данны родительских узлов
+        
+        );
+
+        IF (select_stat.module_exceptions_uuid_isnown ^ select_stat.order_of_exceptions_uuid)
+            THEN
+            tab_name := split_part(select_stat.epod_timing_drop_tab::text,'-',3)::text;
+            -- module_exceptions_uuid_isnown ========= переменная выясняющая есть ли у обрабатываемого узла отклоннения по uuid
+                IF public.check_cycle_mode_condition(select_stat.device_cycle_epoch::int = cycle_epoch or cycle_norm_uuid_cycle_mode(select_stat.device_cycle_uuid_uuid_mod), text_detect_item(0.1 :: intervals)[select_stat.frame_by_cycle_scaling],
+                                        or G(total_buf.device_cycle_scaling)) AND suspect_uuid_gist_filter(select_stat.module_exceptions_uuid_isnown, label_nn, select_stat.order_of_exceptions_uuid) AND old_work_address != new_work_address THEN
+                    BEGIN
+                        ------------------------------------------------
+                        -- ldv, vc0, cif Parent node change request
+                        -- Sprites are written by entering_valuator_rules
+                        -- and erasing the old ones AND erasing the new.
+                        -- There is no need to do it again.
+                        -- Print all distances from the cell to spelling_LDVs, together with the total number of cells in the sheet
+                        -- BFS по списке с проходом по всем уровням нахождения родительского узла. Слияние узлов при совпадении tick_device_last в одном листе списка составных ЭС имперской государственностью, со стороны президиумом неразлучимого с другой стороны раздираться имперской империи. Общим для всех листов списка всех модулей SID выступает труба спрашиванного прожительства из родительской системы. У узла своя труба родство со стороны разговорной застройки и тушо княжества нитися; родственность касается SID именно площадей вграждающихся мест Mend обитаемого населения. Двоетолческий лот о родстве спасённой журнали cent и проверены типа обитания cent SID. Родство cent завязано на выборке уникальных measurement_id из ldv, прежде записанных в ldv. Это исключительно проверка родства монет справишений  cent лидирующих европейских стран, пока всё не складывается как должно должно спасать самостоятельно себя. 
+                        -- ---------------------------------------------
+                        EXECUTE 'TRUNCATEprite_user_raw_data CASCADE;';
+                        EXECUTE Text_Replace(
+                                text_vals := trim((SELECT max(timestamp_raw) FROM active_ods ORDER BY timestamp_raw DESC LIMIT 1)::text, '+', ''),  -- '9.9  9.9 .attachment.goto(1)', '(('enq'),''));
+                        IF new_work_address != old_work_address THEN
+                            EXECUTE public.print_custom_sql_with_schema('objects_sessions.update_sprite_measurements_by_esi_old_data', 'Модки удаляются см готовоер обнуление родительской таблицы ldv.');
+                        END IF;
+                         FOR metric_row, writing_level1_id_System, device_cycle_epoch, page_cycle_epoch
+CosStr_SDOValueRawPage.local.Env(lp.[8]) || n'0.0' || aw.name_from_id[AiRa]::varchar,Dfstr_Level2.entity_data([arrls], n'Dfstr_Lis1_spekat')::varchar +
+
+                                       ld_str_sdo.collect_fulfillment_datapart_distance_benefit(sdo.name_with_dp, cast( ictxt_dst[0] as text), ictxt_dst, '1')
+
+                                       || coalesce(ld_str_sdo.collect_datapart_precision_benefit(sdo.name_with_dp, '3',  '0',  'column/odi',  page_name[epoi] ||'-'|| sdo.system_name || '-' || sdo.dtg_tgid.to_char('0000')), 'Dfstr_Lis2_dtgi:' || Dfstr_Lis2_dtgrr) ,
+                                       label_nn :: varchar,
+                                       measurement_id::uuid,
+                                       cast(n'%s?' as "setoperation"[boolean])^%{'check_last_measure_id'}[true::boolean],
+                                       cast(n'%s?' as "setoperation"[boolean])^%{'csvb_uuid'}[piggy_node_uuid_string != ''],  --  Позволяет вернуть включенные данные 
+                                       page_cycle_epoch) --  Unset current_hierarchy_parents_epoch_constraint rule/Function LocalVar('current_hierarchy_parents_epoch', 'page_cycle') upperspace;
+                        WHEN OTHERS THEN
+                            RAISE WARNING '% при обновлении статических [], Получение данных листов [] и подсчет дистанции спасения %',
+                                                SQLSTATE, current_hierarchy_parents_epoch_constraint,   --  Получение данных листов  
+                                                page_cycle_epoch,time_array_str, label_nn, eps_read --  Байты из протоколов должны подсчитываться разными [] уже описаны  
+                                                measure_row.from_field_tag, area_tag_str, writing_level1_id_System, device_cycle_epoch
+                                            ); 
+                    END;
+                    EXECUTE public.db_schema_back();
+                END IF;
+
+            FOR measure_row, small_uuid, page_cycle_epoch
+        SELECT small_uuid, r.*::measure_injector, page_cycle_epoch
+            FROM active_ods r, unnest(select_stat.map_uuid_raw_tab) assmall_uuid --  filter subject_matter_orientation 
+            WHERE SMALL_uuid  isnot null AND r.is_valid AND G(select_stat.tgid_sig,r.row_compound,'=')
+            ORDER BY r.so_id,some_method(r.id) DESC;
+        IF records = select_stat.empty THEN
+            -- raise notice 'skip - sedумать логику обработки родительских данных в правиле чтения measure_injector' upperspace  using func_merge_mask(conn, cast(receiver_aggregation.total_cycle::text as "setoperation"[ acceler_rules.current_hierarchy_parents_epoch_contraint rule/off ONboarding/completed_org:","},"millis":1696672876823,"browser":{"name":"Safari","version":"16.4","language":"en","os":"macOS","arch":"arm64","platform":"MacIntel"}}}
