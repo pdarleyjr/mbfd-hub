@@ -19,12 +19,16 @@ class StationInspection extends Model
         'reviewed_by',
         'reviewed_at',
         'notes',
+        'sog_mandate_acknowledged',
+        'extinguishing_system_date',
     ];
 
     protected $casts = [
         'form_data' => 'array',
         'inspection_date' => 'date',
         'reviewed_at' => 'datetime',
+        'sog_mandate_acknowledged' => 'boolean',
+        'extinguishing_system_date' => 'date',
     ];
 
     public function station(): BelongsTo

@@ -47,6 +47,10 @@ class StationInspectionResource extends Resource
                         default => 'gray',
                     })
                     ->sortable(),
+                Tables\Columns\IconColumn::make('sog_mandate_acknowledged')
+                    ->label('SOG')
+                    ->boolean()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('inspector.name')
                     ->label('Inspector')
                     ->sortable(),
@@ -60,16 +64,7 @@ class StationInspectionResource extends Resource
                     ->options([
                         'pass' => 'Pass',
                         'fail' => 'Fail',
-                        'partial' => 'Partial',
-                        'pending' => 'Pending',
-                    ]),
-                Tables\Filters\SelectFilter::make('inspection_type')
-                    ->label('Type')
-                    ->options([
-                        'monthly' => 'Monthly',
-                        'quarterly' => 'Quarterly',
-                        'annual' => 'Annual',
-                        'special' => 'Special',
+                        'needs_attention' => 'Needs Attention',
                     ]),
                 Tables\Filters\SelectFilter::make('station_id')
                     ->relationship('station', 'station_number')
@@ -100,6 +95,12 @@ class StationInspectionResource extends Resource
                                 'partial', 'needs_attention' => 'warning',
                                 default => 'gray',
                             }),
+                        Infolists\Components\IconEntry::make('sog_mandate_acknowledged')
+                            ->label('SOG Mandate Acknowledged')
+                            ->boolean(),
+                        Infolists\Components\TextEntry::make('extinguishing_system_date')
+                            ->label('Extinguishing System Date')
+                            ->date(),
                         Infolists\Components\TextEntry::make('inspector.name')->label('Inspector'),
                         Infolists\Components\TextEntry::make('reviewer.name')->label('Reviewed By'),
                         Infolists\Components\TextEntry::make('reviewed_at')->label('Reviewed At')->dateTime(),
@@ -119,25 +120,56 @@ class StationInspectionResource extends Resource
                                 if (!is_array($data)) {
                                     return (string) $state;
                                 }
-                                $html = '<div style="display: grid; gap: 8px;">';
-                                foreach ($data as $key => $value) {
-                                    $label = str_replace('_', ' ', ucfirst($key));
-                                    if (is_bool($value)) {
-                                        $icon = $value ? '✅' : '❌';
-                                        $html .= "<div>{$icon} <strong>{$label}</strong></div>";
-                                    } elseif (is_array($value)) {
-                                        $html .= "<div><strong>{$label}:</strong><ul style='margin-left: 16px;'>";
-                                        foreach ($value as $subKey => $subVal) {
-                                            $subLabel = is_string($subKey) ? str_replace('_', ' ', ucfirst($subKey)) : $subKey;
-                                            $subDisplay = is_bool($subVal) ? ($subVal ? '✅' : '❌') : $subVal;
-                                            $html .= "<li>{$subLabel}: {$subDisplay}</li>";
-                                        }
-                                        $html .= '</ul></div>';
-                                    } else {
-                                        $html .= "<div><strong>{$label}:</strong> {$value}</div>";
+
+                                // Check if this is the new PDF-aligned checklist format
+                                $checklist = $data['checklist'] ?? $data;
+                                if (!is_array($checklist)) {
+                                    return (string) json_encode($data);
+                                }
+
+                                $statusIcons = [
+                                    'pass' => '✅',
+                                    'fail' => '❌',
+                                    'na' => '➖',
+                                ];
+
+                                // Group by category
+                                $categories = [];
+                                foreach ($checklist as $item) {
+                                    if (is_array($item) && isset($item['category'])) {
+                                        $cat = $item['category'];
+                                        $categories[$cat][] = $item;
                                     }
                                 }
-                                $html .= '</div>';
+
+                                if (empty($categories)) {
+                                    // Fallback for old format
+                                    $html = '<div style="display: grid; gap: 8px;">';
+                                    foreach ($checklist as $key => $value) {
+                                        $label = is_string($key) ? str_replace('_', ' ', ucfirst($key)) : '';
+                                        if (is_array($value)) {
+                                            $html .= "<div><strong>{$label}:</strong> " . json_encode($value) . '</div>';
+                                        } else {
+                                            $icon = is_bool($value) ? ($value ? '✅' : '❌') : '';
+                                            $html .= "<div>{$icon} <strong>{$label}</strong> {$value}</div>";
+                                        }
+                                    }
+                                    $html .= '</div>';
+                                    return $html;
+                                }
+
+                                $html = '';
+                                foreach ($categories as $catName => $items) {
+                                    $html .= "<div style='margin-bottom: 16px;'>";
+                                    $html .= "<h4 style='font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 8px;'>{$catName}</h4>";
+                                    $html .= "<div style='display: grid; gap: 4px;'>";
+                                    foreach ($items as $item) {
+                                        $icon = $statusIcons[$item['status'] ?? ''] ?? '⬜';
+                                        $label = $item['label'] ?? $item['id'] ?? '';
+                                        $html .= "<div style='display: flex; align-items: center; gap: 8px;'>{$icon} <span>{$label}</span></div>";
+                                    }
+                                    $html .= '</div></div>';
+                                }
                                 return $html;
                             })
                             ->html()
