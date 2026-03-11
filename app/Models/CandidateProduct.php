@@ -16,6 +16,8 @@ class CandidateProduct extends Model
         'category_id',
         'name',
         'manufacturer',
+        'brand',
+        'competitor_group',
         'model',
         'description',
     ];
@@ -63,5 +65,21 @@ class CandidateProduct extends Model
         ]);
 
         return $this->name . ($parts ? ' (' . implode(' ', $parts) . ')' : '');
+    }
+
+    /**
+     * Get the effective brand (falls back to manufacturer if brand is null).
+     */
+    public function getEffectiveBrandAttribute(): ?string
+    {
+        return $this->brand ?? $this->manufacturer;
+    }
+
+    /**
+     * Check if this product is standalone (no competitor group peers).
+     */
+    public function isStandalone(): bool
+    {
+        return $this->competitor_group === 'standalone';
     }
 }

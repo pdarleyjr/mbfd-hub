@@ -6,7 +6,9 @@ use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
 use App\Models\EvaluationScore;
 use App\Models\EvaluationSubmission;
+use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
+use App\Models\WorkgroupSession;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -540,5 +542,379 @@ class EvaluationService
         }
 
         return $groups;
+    }
+
+    /**
+     * Get brand-aggregated rankings for extrication-style categories.
+     *
+     * Groups products by effective brand within each rankable category,
+     * averages their overall_score across all products for that brand,
+     * and returns brand-level rankings sorted by composite score.
+     *
+     * @return array<int, array{
+     *   category_name: string,
+     *   category_id: int,
+     *   brand_rankings: array<int, array{
+     *     brand: string,
+     *     composite_score: ?float,
+     *     product_count: int,
+     *     products: array,
+     *     saver_breakdown: array{capability: ?float, usability: ?float, affordability: ?float, maintainability: ?float, deployability: ?float},
+     *     meets_threshold: bool,
+     *   }>
+     * }>
+     */
+    public function getBrandAggregatedRankings(Workgroup $workgroup, ?WorkgroupSession $session = null): array
+    {
+        $sessionIds = $this->resolveSessionIds($workgroup, $session);
+
+        if (empty($sessionIds)) {
+            return [];
+        }
+
+        $categories = EvaluationCategory::rankable()->active()->ordered()->get();
+        $results = [];
+
+        foreach ($categories as $category) {
+            $products = CandidateProduct::where('category_id', $category->id)
+                ->whereIn('workgroup_session_id', $sessionIds)
+                ->get();
+
+            if ($products->isEmpty()) {
+                continue;
+            }
+
+            // Group by effective brand (brand ?? manufacturer)
+            $byBrand = $products->groupBy(fn($p) => $p->effective_brand ?? 'Unknown');
+
+            if ($byBrand->count() < 2) {
+                continue; // No cross-brand comparison possible
+            }
+
+            $brandRankings = [];
+
+            foreach ($byBrand as $brand => $brandProducts) {
+                $allSubmissions = collect();
+                $productDetails = [];
+
+                foreach ($brandProducts as $product) {
+                    $submissions = $this->countableSubmissions()
+                        ->where('candidate_product_id', $product->id)
+                        ->where('status', 'submitted')
+                        ->get();
+
+                    $scores = $submissions->pluck('overall_score')->filter(fn($s) => $s !== null);
+                    $avgScore = $scores->isNotEmpty() ? round($scores->avg(), 2) : null;
+
+                    $productDetails[] = [
+                        'product_id' => $product->id,
+                        'name' => $product->name,
+                        'avg_score' => $avgScore,
+                        'response_count' => $submissions->count(),
+                    ];
+
+                    $allSubmissions = $allSubmissions->merge($submissions);
+                }
+
+                $scoredProducts = array_filter($productDetails, fn($p) => $p['avg_score'] !== null);
+                $compositeScore = count($scoredProducts) > 0
+                    ? round(collect($scoredProducts)->avg('avg_score'), 2)
+                    : null;
+
+                $totalResponses = array_sum(array_column($productDetails, 'response_count'));
+
+                $brandRankings[] = [
+                    'brand' => $brand,
+                    'composite_score' => $compositeScore,
+                    'product_count' => count($productDetails),
+                    'products' => $productDetails,
+                    'saver_breakdown' => $this->calculateSaverBreakdown($allSubmissions),
+                    'meets_threshold' => $totalResponses >= ($this->minimumResponseThreshold * count($productDetails)),
+                ];
+            }
+
+            // Sort by composite score descending, nulls last
+            usort($brandRankings, fn($a, $b) => $this->sortNullsLast($a['composite_score'], $b['composite_score']));
+
+            $results[] = [
+                'category_name' => $category->name,
+                'category_id' => $category->id,
+                'brand_rankings' => $brandRankings,
+            ];
+        }
+
+        return $results;
+    }
+
+    /**
+     * Get competitor-group rankings within categories.
+     *
+     * Products are ranked only against others in the same competitor_group.
+     * E.g., K-Saws rank against K-Saws, rotary-saws against rotary-saws.
+     * Products without a competitor_group are treated as their own group.
+     *
+     * @return array<int, array{
+     *   category_name: string,
+     *   category_id: int,
+     *   groups: array<string, array{
+     *     group_name: string,
+     *     rankings: array
+     *   }>
+     * }>
+     */
+    public function getCompetitorGroupRankings(Workgroup $workgroup, ?WorkgroupSession $session = null): array
+    {
+        $sessionIds = $this->resolveSessionIds($workgroup, $session);
+
+        if (empty($sessionIds)) {
+            return [];
+        }
+
+        $categories = EvaluationCategory::rankable()->active()->ordered()->get();
+        $results = [];
+
+        foreach ($categories as $category) {
+            $products = CandidateProduct::where('category_id', $category->id)
+                ->whereIn('workgroup_session_id', $sessionIds)
+                ->get();
+
+            if ($products->isEmpty()) {
+                continue;
+            }
+
+            // Group by competitor_group — null groups become per-product isolates
+            $grouped = $products->groupBy(fn($p) => $p->competitor_group ?? 'ungrouped_' . $p->id);
+
+            $groups = [];
+
+            foreach ($grouped as $groupKey => $groupProducts) {
+                // Skip standalone items — they go to getIsolatedProductAnalysis
+                if ($groupProducts->count() === 1 && str_starts_with($groupKey, 'ungrouped_')) {
+                    continue;
+                }
+                if ($groupProducts->first()?->competitor_group === 'standalone') {
+                    continue;
+                }
+
+                $rankings = [];
+
+                foreach ($groupProducts as $product) {
+                    $submissions = $this->countableSubmissions()
+                        ->where('candidate_product_id', $product->id)
+                        ->where('status', 'submitted')
+                        ->get();
+
+                    $scores = $submissions->pluck('overall_score')->filter(fn($s) => $s !== null);
+                    $avgScore = $scores->isNotEmpty() ? round($scores->avg(), 2) : null;
+
+                    $rankings[] = [
+                        'product_id' => $product->id,
+                        'product' => $product,
+                        'name' => $product->display_name,
+                        'brand' => $product->effective_brand,
+                        'avg_score' => $avgScore,
+                        'response_count' => $submissions->count(),
+                        'meets_threshold' => $submissions->count() >= $this->minimumResponseThreshold,
+                        'saver_breakdown' => $this->calculateSaverBreakdown($submissions),
+                    ];
+                }
+
+                // Sort within group
+                usort($rankings, fn($a, $b) => $this->sortNullsLast($a['avg_score'], $b['avg_score']));
+
+                $groups[$groupKey] = [
+                    'group_name' => $groupProducts->first()->competitor_group ?? $groupKey,
+                    'product_count' => count($rankings),
+                    'rankings' => $rankings,
+                ];
+            }
+
+            if (!empty($groups)) {
+                $results[] = [
+                    'category_name' => $category->name,
+                    'category_id' => $category->id,
+                    'groups' => $groups,
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Get standalone/unique products that shouldn't be ranked against others.
+     *
+     * Returns products with competitor_group = 'standalone' or products that are
+     * the only one in their competitor_group (no peers to rank against).
+     *
+     * @return array<int, array{
+     *   product_id: int,
+     *   product: CandidateProduct,
+     *   name: string,
+     *   brand: ?string,
+     *   category_name: string,
+     *   avg_score: ?float,
+     *   response_count: int,
+     *   saver_breakdown: array,
+     *   note: string,
+     * }>
+     */
+    public function getIsolatedProductAnalysis(Workgroup $workgroup, ?WorkgroupSession $session = null): array
+    {
+        $sessionIds = $this->resolveSessionIds($workgroup, $session);
+
+        if (empty($sessionIds)) {
+            return [];
+        }
+
+        $categories = EvaluationCategory::rankable()->active()->ordered()->get();
+        $isolated = [];
+
+        foreach ($categories as $category) {
+            $products = CandidateProduct::where('category_id', $category->id)
+                ->whereIn('workgroup_session_id', $sessionIds)
+                ->get();
+
+            foreach ($products as $product) {
+                $isStandalone = $product->competitor_group === 'standalone';
+
+                // Also isolate products with no competitor_group that are the only one in the category
+                $isOnlyUngrouped = $product->competitor_group === null
+                    && $products->where('competitor_group', null)->count() === 1;
+
+                if (!$isStandalone && !$isOnlyUngrouped) {
+                    continue;
+                }
+
+                $submissions = $this->countableSubmissions()
+                    ->where('candidate_product_id', $product->id)
+                    ->where('status', 'submitted')
+                    ->get();
+
+                $scores = $submissions->pluck('overall_score')->filter(fn($s) => $s !== null);
+                $avgScore = $scores->isNotEmpty() ? round($scores->avg(), 2) : null;
+
+                $isolated[] = [
+                    'product_id' => $product->id,
+                    'product' => $product,
+                    'name' => $product->display_name,
+                    'brand' => $product->effective_brand,
+                    'category_name' => $category->name,
+                    'category_id' => $category->id,
+                    'avg_score' => $avgScore,
+                    'response_count' => $submissions->count(),
+                    'meets_threshold' => $submissions->count() >= $this->minimumResponseThreshold,
+                    'saver_breakdown' => $this->calculateSaverBreakdown($submissions),
+                    'note' => $isStandalone
+                        ? 'Standalone product — evaluated independently, not ranked against competitors.'
+                        : 'Unique product in category — no direct competitors for ranking.',
+                ];
+            }
+        }
+
+        return $isolated;
+    }
+
+    /**
+     * Master method: get comprehensive evaluation results for a workgroup.
+     *
+     * Combines brand-aggregated rankings, competitor-group rankings,
+     * isolated product analysis, standard category rankings, and non-rankable
+     * feedback into a single structured array suitable for UI display
+     * and SAVER report generation.
+     *
+     * @return array{
+     *   workgroup_id: int,
+     *   workgroup_name: string,
+     *   session_id: ?int,
+     *   session_name: ?string,
+     *   brand_aggregated_rankings: array,
+     *   competitor_group_rankings: array,
+     *   isolated_products: array,
+     *   standard_category_rankings: array,
+     *   non_rankable_feedback: Collection,
+     *   minimum_threshold: int,
+     *   generated_at: \Illuminate\Support\Carbon,
+     * }
+     */
+    public function getComprehensiveResults(Workgroup $workgroup, ?WorkgroupSession $session = null): array
+    {
+        $sessionId = $session?->id;
+
+        return [
+            'workgroup_id' => $workgroup->id,
+            'workgroup_name' => $workgroup->name,
+            'session_id' => $sessionId,
+            'session_name' => $session?->name,
+            'brand_aggregated_rankings' => $this->getBrandAggregatedRankings($workgroup, $session),
+            'competitor_group_rankings' => $this->getCompetitorGroupRankings($workgroup, $session),
+            'isolated_products' => $this->getIsolatedProductAnalysis($workgroup, $session),
+            'standard_category_rankings' => $this->getSessionResults($sessionId)['rankable_categories'] ?? [],
+            'non_rankable_feedback' => $this->getNonRankableFeedback($sessionId),
+            'minimum_threshold' => $this->minimumResponseThreshold,
+            'generated_at' => now(),
+        ];
+    }
+
+    // ─── Private helpers ─────────────────────────────────────────────
+
+    /**
+     * Resolve session IDs for a workgroup, optionally filtered to one session.
+     *
+     * @return int[]
+     */
+    private function resolveSessionIds(Workgroup $workgroup, ?WorkgroupSession $session): array
+    {
+        if ($session) {
+            return [$session->id];
+        }
+
+        return $workgroup->sessions()->pluck('id')->toArray();
+    }
+
+    /**
+     * Calculate SAVER breakdown averages from a collection of submissions.
+     */
+    private function calculateSaverBreakdown(Collection $submissions): array
+    {
+        if ($submissions->isEmpty()) {
+            return [
+                'capability' => null,
+                'usability' => null,
+                'affordability' => null,
+                'maintainability' => null,
+                'deployability' => null,
+            ];
+        }
+
+        $submitted = $submissions->where('status', 'submitted');
+
+        return [
+            'capability' => $this->safeAvg($submitted, 'capability_score'),
+            'usability' => $this->safeAvg($submitted, 'usability_score'),
+            'affordability' => $this->safeAvg($submitted, 'affordability_score'),
+            'maintainability' => $this->safeAvg($submitted, 'maintainability_score'),
+            'deployability' => $this->safeAvg($submitted, 'deployability_score'),
+        ];
+    }
+
+    /**
+     * Safe average that returns null if all values are null.
+     */
+    private function safeAvg(Collection $items, string $field): ?float
+    {
+        $values = $items->pluck($field)->filter(fn($v) => $v !== null);
+        return $values->isNotEmpty() ? round($values->avg(), 2) : null;
+    }
+
+    /**
+     * Sort helper: descending, nulls last.
+     */
+    private function sortNullsLast(?float $a, ?float $b): int
+    {
+        if ($a === null && $b === null) return 0;
+        if ($a === null) return 1;
+        if ($b === null) return -1;
+        return $b <=> $a;
     }
 }
