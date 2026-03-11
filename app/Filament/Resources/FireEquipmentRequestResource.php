@@ -30,33 +30,32 @@ class FireEquipmentRequestResource extends Resource
                     ->label('Station')
                     ->sortable()
                     ->searchable(),
-                Tables\Columns\TextColumn::make('equipment_type')
-                    ->label('Equipment')
+                Tables\Columns\TextColumn::make('requested_by_name')
+                    ->label('Requested By')
                     ->searchable()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('priority')
-                    ->badge()
-                    ->color(fn (string $state): string => match (strtolower($state)) {
-                        'critical', 'emergency' => 'danger',
-                        'high' => 'warning',
-                        'medium', 'normal' => 'info',
-                        'low' => 'gray',
-                        default => 'gray',
-                    })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match (strtolower($state)) {
-                        'approved', 'completed' => 'success',
-                        'pending' => 'warning',
+                        'completed' => 'success',
+                        'support_services_approved' => 'info',
+                        'shift_chief_approved' => 'warning',
+                        'pending' => 'gray',
                         'denied', 'rejected' => 'danger',
-                        'in_progress', 'processing' => 'info',
                         default => 'gray',
                     })
+                    ->formatStateUsing(fn (string $state): string => match (strtolower($state)) {
+                        'pending' => 'Pending',
+                        'shift_chief_approved' => 'Shift Chief Approved',
+                        'support_services_approved' => 'Support Svcs Approved',
+                        'completed' => 'Completed',
+                        'denied' => 'Denied',
+                        default => ucfirst(str_replace('_', ' ', $state)),
+                    })
                     ->sortable(),
-                Tables\Columns\TextColumn::make('requestedBy.name')
-                    ->label('Requested By')
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('pd_case_number')
+                    ->label('PD Case #')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
@@ -65,17 +64,10 @@ class FireEquipmentRequestResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
                         'pending' => 'Pending',
-                        'approved' => 'Approved',
-                        'denied' => 'Denied',
+                        'shift_chief_approved' => 'Shift Chief Approved',
+                        'support_services_approved' => 'Support Svcs Approved',
                         'completed' => 'Completed',
-                        'in_progress' => 'In Progress',
-                    ]),
-                Tables\Filters\SelectFilter::make('priority')
-                    ->options([
-                        'low' => 'Low',
-                        'medium' => 'Medium',
-                        'high' => 'High',
-                        'critical' => 'Critical',
+                        'denied' => 'Denied',
                     ]),
                 Tables\Filters\SelectFilter::make('station_id')
                     ->relationship('station', 'station_number')
@@ -95,68 +87,111 @@ class FireEquipmentRequestResource extends Resource
                     ->schema([
                         Infolists\Components\TextEntry::make('id')->label('ID'),
                         Infolists\Components\TextEntry::make('station.station_number')->label('Station'),
-                        Infolists\Components\TextEntry::make('equipment_type')->label('Equipment Type'),
-                        Infolists\Components\TextEntry::make('description'),
-                        Infolists\Components\TextEntry::make('priority')
-                            ->badge()
-                            ->color(fn (string $state): string => match (strtolower($state)) {
-                                'critical', 'emergency' => 'danger',
-                                'high' => 'warning',
-                                'medium', 'normal' => 'info',
-                                'low' => 'gray',
-                                default => 'gray',
-                            }),
+                        Infolists\Components\TextEntry::make('requested_by_name')->label('Requested By'),
                         Infolists\Components\TextEntry::make('status')
                             ->badge()
                             ->color(fn (string $state): string => match (strtolower($state)) {
-                                'approved', 'completed' => 'success',
-                                'pending' => 'warning',
-                                'denied', 'rejected' => 'danger',
+                                'completed' => 'success',
+                                'support_services_approved' => 'info',
+                                'shift_chief_approved' => 'warning',
+                                'pending' => 'gray',
+                                'denied' => 'danger',
                                 default => 'gray',
+                            })
+                            ->formatStateUsing(fn (string $state): string => match (strtolower($state)) {
+                                'pending' => 'Pending',
+                                'shift_chief_approved' => 'Shift Chief Approved',
+                                'support_services_approved' => 'Support Svcs Approved',
+                                'completed' => 'Completed',
+                                'denied' => 'Denied',
+                                default => ucfirst(str_replace('_', ' ', $state)),
                             }),
-                        Infolists\Components\TextEntry::make('requestedBy.name')->label('Requested By'),
+                        Infolists\Components\TextEntry::make('pd_case_number')
+                            ->label('PD Case Number')
+                            ->visible(fn ($record) => !empty($record->pd_case_number)),
+                        Infolists\Components\TextEntry::make('explanation')->label('Explanation'),
+                        Infolists\Components\TextEntry::make('description')->label('Legacy Description')
+                            ->visible(fn ($record) => !empty($record->description)),
                         Infolists\Components\TextEntry::make('approvedBy.name')->label('Approved By'),
                         Infolists\Components\TextEntry::make('approved_at')->label('Approved At')->dateTime(),
                         Infolists\Components\TextEntry::make('notes'),
                         Infolists\Components\TextEntry::make('created_at')->dateTime(),
                         Infolists\Components\TextEntry::make('updated_at')->dateTime(),
                     ])->columns(2),
-                Infolists\Components\Section::make('Form Data')
+                Infolists\Components\Section::make('Requested Items')
                     ->schema([
                         Infolists\Components\TextEntry::make('form_data')
-                            ->label('Submitted Form Data')
+                            ->label('Items')
                             ->formatStateUsing(function ($state) {
                                 if (empty($state)) {
-                                    return 'No form data';
+                                    return 'No items data';
                                 }
                                 $data = is_array($state) ? $state : json_decode($state, true);
                                 if (!is_array($data)) {
                                     return (string) $state;
                                 }
-                                $lines = [];
-                                foreach ($data as $key => $value) {
-                                    $label = str_replace('_', ' ', ucfirst($key));
-                                    $val = is_array($value) ? json_encode($value) : $value;
-                                    $lines[] = "<strong>{$label}:</strong> {$val}";
+
+                                $items = $data['items'] ?? $data;
+                                if (!is_array($items) || empty($items)) {
+                                    // Fallback: render as key-value
+                                    $lines = [];
+                                    foreach ($data as $key => $value) {
+                                        $label = str_replace('_', ' ', ucfirst($key));
+                                        $val = is_array($value) ? json_encode($value) : $value;
+                                        $lines[] = "<strong>{$label}:</strong> {$val}";
+                                    }
+                                    return implode('<br>', $lines);
                                 }
-                                return implode('<br>', $lines);
+
+                                $html = '<div style="display: grid; gap: 12px;">';
+                                foreach ($items as $idx => $item) {
+                                    $num = $idx + 1;
+                                    $desc = htmlspecialchars($item['description'] ?? 'N/A');
+                                    $qty = $item['quantity'] ?? 1;
+                                    $reason = htmlspecialchars($item['reason'] ?? 'N/A');
+                                    $pdCase = $item['pd_case_number'] ?? null;
+                                    $photo = $item['photo'] ?? null;
+
+                                    $html .= "<div style='background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;'>";
+                                    $html .= "<div style='font-weight: 600; margin-bottom: 4px;'>#{$num}: {$desc} × {$qty}</div>";
+                                    $html .= "<div style='color: #6b7280; font-size: 0.875rem;'>Reason: <strong>{$reason}</strong></div>";
+
+                                    if ($pdCase) {
+                                        $html .= "<div style='color: #dc2626; font-size: 0.875rem; margin-top: 4px;'>PD Case No: <strong>" . htmlspecialchars($pdCase) . "</strong></div>";
+                                    }
+                                    if ($photo && str_starts_with($photo, 'data:image')) {
+                                        $html .= "<div style='margin-top: 8px;'><img src=\"{$photo}\" alt=\"Damage Photo\" style=\"max-width: 300px; max-height: 200px; border: 1px solid #e5e7eb; border-radius: 8px;\" /></div>";
+                                    }
+
+                                    $html .= '</div>';
+                                }
+                                $html .= '</div>';
+                                return $html;
                             })
                             ->html()
                             ->columnSpanFull(),
                     ]),
-                Infolists\Components\Section::make('Signature')
+                Infolists\Components\Section::make('Signatures')
                     ->schema([
                         Infolists\Components\TextEntry::make('signature')
-                            ->label('Signature')
+                            ->label('Member Signature')
                             ->formatStateUsing(function ($state) {
                                 if (empty($state)) {
                                     return 'No signature';
                                 }
-                                return "<img src=\"{$state}\" alt=\"Signature\" style=\"max-width: 400px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px;\" />";
+                                return "<img src=\"{$state}\" alt=\"Member Signature\" style=\"max-width: 400px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px;\" />";
                             })
-                            ->html()
-                            ->columnSpanFull(),
-                    ])
+                            ->html(),
+                        Infolists\Components\TextEntry::make('officer_signature')
+                            ->label('Company Officer Signature')
+                            ->formatStateUsing(function ($state) {
+                                if (empty($state)) {
+                                    return 'No signature';
+                                }
+                                return "<img src=\"{$state}\" alt=\"Officer Signature\" style=\"max-width: 400px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px;\" />";
+                            })
+                            ->html(),
+                    ])->columns(2)
                     ->collapsible(),
             ]);
     }

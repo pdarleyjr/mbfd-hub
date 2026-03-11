@@ -42,6 +42,10 @@ class StationInspectionsRelationManager extends RelationManager
                         default => 'gray',
                     })
                     ->sortable(),
+                Tables\Columns\IconColumn::make('sog_mandate_acknowledged')
+                    ->label('SOG')
+                    ->boolean()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('inspector.name')
                     ->label('Inspector')
                     ->sortable(),
@@ -56,16 +60,7 @@ class StationInspectionsRelationManager extends RelationManager
                     ->options([
                         'pass' => 'Pass',
                         'fail' => 'Fail',
-                        'partial' => 'Partial',
-                        'pending' => 'Pending',
-                    ]),
-                Tables\Filters\SelectFilter::make('inspection_type')
-                    ->label('Type')
-                    ->options([
-                        'monthly' => 'Monthly',
-                        'quarterly' => 'Quarterly',
-                        'annual' => 'Annual',
-                        'special' => 'Special',
+                        'needs_attention' => 'Needs Attention',
                     ]),
             ])
             ->defaultSort('inspection_date', 'desc')

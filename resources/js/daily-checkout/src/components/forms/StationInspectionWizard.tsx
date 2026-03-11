@@ -4,18 +4,11 @@ import SignatureCanvas from 'react-signature-canvas';
 import { enqueueSubmission, processPendingSubmissions } from '../../lib/sync';
 
 const STATIONS = [
-  'Station 1 - Headquarters',
-  'Station 2 - Riverside',
-  'Station 3 - Palm Beach',
-  'Station 4 - Northside',
-  'Station 5 - Southgate',
-];
-
-const INSPECTION_TYPES = [
-  'Monthly Safety Inspection',
-  'Quarterly Compliance Inspection',
-  'Annual Full Inspection',
-  'Post-Incident Inspection',
+  'Station 1',
+  'Station 2',
+  'Station 3',
+  'Station 4',
+  'Station 6',
 ];
 
 interface ChecklistItem {
@@ -26,29 +19,58 @@ interface ChecklistItem {
 }
 
 const DEFAULT_CHECKLIST: Omit<ChecklistItem, 'status'>[] = [
-  { id: 'fire_ext', label: 'Fire extinguishers inspected and current', category: 'Fire Safety' },
-  { id: 'smoke_det', label: 'Smoke detectors functional', category: 'Fire Safety' },
-  { id: 'co_det', label: 'CO detectors functional', category: 'Fire Safety' },
-  { id: 'exit_signs', label: 'Exit signs illuminated and visible', category: 'Egress' },
-  { id: 'exit_clear', label: 'Exit paths clear and unobstructed', category: 'Egress' },
-  { id: 'elec_panels', label: 'Electrical panels accessible, no hazards', category: 'Electrical' },
-  { id: 'gfci', label: 'GFCI outlets tested and functional', category: 'Electrical' },
-  { id: 'hvac', label: 'HVAC system operating normally', category: 'Mechanical' },
-  { id: 'plumbing', label: 'No plumbing leaks or damage', category: 'Mechanical' },
-  { id: 'floors', label: 'Floors clean and free of trip hazards', category: 'General' },
-  { id: 'lighting', label: 'All interior/exterior lighting functional', category: 'General' },
-  { id: 'first_aid', label: 'First aid kits stocked and accessible', category: 'General' },
+  // Apparatus Area
+  { id: 'app_doors', label: 'Apparatus Doors', category: 'Apparatus Area' },
+  { id: 'app_floors', label: 'Floors & Ramps', category: 'Apparatus Area' },
+  { id: 'app_windows', label: 'Windows & Walls', category: 'Apparatus Area' },
+  { id: 'app_generator', label: 'Emergency Generator Room', category: 'Apparatus Area' },
+  // Dormitories
+  { id: 'dorm_beds', label: 'Beds', category: 'Dormitories' },
+  { id: 'dorm_floors', label: 'Floors', category: 'Dormitories' },
+  { id: 'dorm_windows', label: 'Windows & Walls', category: 'Dormitories' },
+  // Kitchen & Dining
+  { id: 'kit_stove', label: 'Stove & Hood', category: 'Kitchen & Dining' },
+  { id: 'kit_fridge', label: 'Refrigerator', category: 'Kitchen & Dining' },
+  { id: 'kit_floors', label: 'Floors', category: 'Kitchen & Dining' },
+  { id: 'kit_windows', label: 'Windows & Walls', category: 'Kitchen & Dining' },
+  { id: 'kit_cabinets', label: 'Cabinets', category: 'Kitchen & Dining' },
+  { id: 'kit_ext_system', label: 'Extinguishing System', category: 'Kitchen & Dining' },
+  // Bathrooms
+  { id: 'bath_showers', label: 'Showers', category: 'Bathrooms' },
+  { id: 'bath_lavatory', label: 'Lavatory & Toilets', category: 'Bathrooms' },
+  { id: 'bath_windows', label: 'Windows & Walls', category: 'Bathrooms' },
+  { id: 'bath_floors', label: 'Floors', category: 'Bathrooms' },
+  // Offices & Lobby
+  { id: 'off_furnishings', label: 'Furnishings', category: 'Offices & Lobby' },
+  { id: 'off_floors', label: 'Floors', category: 'Offices & Lobby' },
+  { id: 'off_windows', label: 'Windows', category: 'Offices & Lobby' },
+  // Apparatus Cleanliness
+  { id: 'ac_insp_sheet', label: 'Insp Sheet', category: 'Apparatus Cleanliness' },
+  { id: 'ac_exterior', label: 'Exterior', category: 'Apparatus Cleanliness' },
+  { id: 'ac_cab', label: 'Cab', category: 'Apparatus Cleanliness' },
+  { id: 'ac_compartments', label: 'Compartments', category: 'Apparatus Cleanliness' },
+  { id: 'ac_undercarriage', label: 'Undercarriage', category: 'Apparatus Cleanliness' },
+  { id: 'ac_wheels', label: 'Wheels', category: 'Apparatus Cleanliness' },
+  // Equipment Cleanliness
+  { id: 'ec_gas', label: 'Portable Gas Equip', category: 'Equipment Cleanliness' },
+  { id: 'ec_electrical', label: 'Electrical Equip', category: 'Equipment Cleanliness' },
+  { id: 'ec_hand_tools', label: 'Hand Tools', category: 'Equipment Cleanliness' },
+  { id: 'ec_ladders', label: 'Ladders', category: 'Equipment Cleanliness' },
+  // Spot Checks
+  { id: 'sc_fuel', label: 'Fuel', category: 'Spot Checks' },
+  { id: 'sc_oil', label: 'Oil', category: 'Spot Checks' },
+  { id: 'sc_tires', label: 'Tires', category: 'Spot Checks' },
+  { id: 'sc_oxygen', label: 'Portable Oxygen', category: 'Spot Checks' },
+  { id: 'sc_booster', label: 'Booster Tank', category: 'Spot Checks' },
 ];
-
-type OverallStatus = 'pass' | 'fail' | 'needs_attention';
 
 interface FormData {
   station: string;
-  inspectionType: string;
   date: string;
   checklist: ChecklistItem[];
-  overallStatus: OverallStatus | '';
+  extinguishingSystemDate: string;
   notes: string;
+  sogMandate: boolean;
   signature: string;
 }
 
@@ -60,11 +82,11 @@ export default function StationInspectionWizard() {
 
   const [form, setForm] = useState<FormData>({
     station: '',
-    inspectionType: '',
     date: new Date().toISOString().split('T')[0],
     checklist: DEFAULT_CHECKLIST.map((item) => ({ ...item, status: null })),
-    overallStatus: '',
+    extinguishingSystemDate: '',
     notes: '',
+    sogMandate: false,
     signature: '',
   });
 
@@ -80,10 +102,9 @@ export default function StationInspectionWizard() {
   };
 
   const canNext = (): boolean => {
-    if (step === 1) return !!form.station && !!form.inspectionType && !!form.date;
+    if (step === 1) return !!form.station && !!form.date;
     if (step === 2) return form.checklist.every((item) => item.status !== null);
-    if (step === 3) return !!form.overallStatus;
-    if (step === 4) return !!form.signature;
+    if (step === 3) return !!form.signature && form.sogMandate;
     return true;
   };
 
@@ -103,11 +124,12 @@ export default function StationInspectionWizard() {
     try {
       await enqueueSubmission('station_inspection', {
         station: form.station,
-        inspection_type: form.inspectionType,
+        inspection_type: 'Saturday Station Inspection',
         date: form.date,
         checklist: form.checklist.map(({ id, label, category, status }) => ({ id, label, category, status })),
-        overall_status: form.overallStatus,
+        extinguishing_system_date: form.extinguishingSystemDate,
         notes: form.notes,
+        sog_mandate_acknowledged: form.sogMandate,
         signature: form.signature,
         submitted_at: new Date().toISOString(),
       });
@@ -129,7 +151,7 @@ export default function StationInspectionWizard() {
           </svg>
         </div>
         <h2 className="text-2xl font-bold text-neutral-800 font-heading">Inspection Submitted</h2>
-        <p className="text-neutral-500 max-w-md mx-auto">Your station inspection has been queued and will sync when online.</p>
+        <p className="text-neutral-500 max-w-md mx-auto">Your Saturday station inspection has been queued and will sync when online.</p>
         <Link to="/forms-hub" className="inline-flex items-center min-h-[44px] px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors">
           Back to Forms Hub
         </Link>
@@ -137,14 +159,8 @@ export default function StationInspectionWizard() {
     );
   }
 
-  const stepLabels = ['Details', 'Checklist', 'Status', 'Signature', 'Review'];
+  const stepLabels = ['Station', 'Checklist', 'Sign & Confirm', 'Review'];
   const categories = [...new Set(form.checklist.map((i) => i.category))];
-
-  const statusConfig: Record<string, { label: string; color: string; bg: string; ring: string }> = {
-    pass: { label: 'Pass', color: 'text-emerald-700', bg: 'bg-emerald-50', ring: 'ring-emerald-300' },
-    fail: { label: 'Fail', color: 'text-red-700', bg: 'bg-red-50', ring: 'ring-red-300' },
-    needs_attention: { label: 'Needs Attention', color: 'text-amber-700', bg: 'bg-amber-50', ring: 'ring-amber-300' },
-  };
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -153,7 +169,8 @@ export default function StationInspectionWizard() {
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
           Back
         </Link>
-        <h1 className="text-2xl font-bold text-neutral-800 font-heading">Station Inspection</h1>
+        <h1 className="text-2xl font-bold text-neutral-800 font-heading">Saturday Station Inspection</h1>
+        <p className="text-sm text-neutral-500 mt-1">Miami Beach Fire Department — Weekly Facility & Apparatus Check</p>
       </div>
 
       {/* Stepper */}
@@ -169,7 +186,7 @@ export default function StationInspectionWizard() {
         ))}
       </nav>
 
-      {/* Step 1 */}
+      {/* Step 1: Station & Date */}
       {step === 1 && (
         <div className="space-y-6">
           <div>
@@ -177,13 +194,6 @@ export default function StationInspectionWizard() {
             <select value={form.station} onChange={(e) => update({ station: e.target.value })} className="w-full min-h-[44px] px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
               <option value="">Select station...</option>
               {STATIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">Inspection Type</label>
-            <select value={form.inspectionType} onChange={(e) => update({ inspectionType: e.target.value })} className="w-full min-h-[44px] px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
-              <option value="">Select type...</option>
-              {INSPECTION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div>
@@ -201,58 +211,68 @@ export default function StationInspectionWizard() {
               <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">{cat}</h3>
               <div className="space-y-2">
                 {form.checklist.filter((i) => i.category === cat).map((item) => (
-                  <div key={item.id} className="flex items-center justify-between bg-neutral-100 rounded-lg ring-1 ring-neutral-200/60 p-3 gap-3">
-                    <span className="text-sm text-neutral-700 flex-1">{item.label}</span>
-                    <div className="flex gap-1 flex-shrink-0">
-                      {(['pass', 'fail', 'na'] as const).map((status) => (
-                        <button key={status} onClick={() => updateChecklistItem(item.id, status)} className={`min-w-[44px] min-h-[44px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${item.status === status ? (status === 'pass' ? 'bg-emerald-600 text-white' : status === 'fail' ? 'bg-red-600 text-white' : 'bg-neutral-600 text-white') : 'bg-white text-neutral-600 ring-1 ring-neutral-200 hover:ring-neutral-300'}`}>
-                          {status === 'na' ? 'N/A' : status.charAt(0).toUpperCase() + status.slice(1)}
-                        </button>
-                      ))}
+                  <div key={item.id}>
+                    <div className="flex items-center justify-between bg-neutral-100 rounded-lg ring-1 ring-neutral-200/60 p-3 gap-3">
+                      <span className="text-sm text-neutral-700 flex-1">{item.label}</span>
+                      <div className="flex gap-1 flex-shrink-0">
+                        {(['pass', 'fail', 'na'] as const).map((status) => (
+                          <button key={status} onClick={() => updateChecklistItem(item.id, status)} className={`min-w-[44px] min-h-[44px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${item.status === status ? (status === 'pass' ? 'bg-emerald-600 text-white' : status === 'fail' ? 'bg-red-600 text-white' : 'bg-neutral-600 text-white') : 'bg-white text-neutral-600 ring-1 ring-neutral-200 hover:ring-neutral-300'}`}>
+                            {status === 'na' ? 'N/A' : status.charAt(0).toUpperCase() + status.slice(1)}
+                          </button>
+                        ))}
+                      </div>
                     </div>
+                    {/* Extinguishing System date input */}
+                    {item.id === 'kit_ext_system' && (
+                      <div className="ml-4 mt-2 mb-1">
+                        <label className="block text-xs font-medium text-neutral-500 mb-1">Extinguishing System Inspection Date</label>
+                        <input type="date" value={form.extinguishingSystemDate} onChange={(e) => update({ extinguishingSystemDate: e.target.value })} className="w-full max-w-xs min-h-[40px] px-3 py-2 bg-white border border-neutral-300 rounded-lg text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Step 3: Overall Status + Notes */}
-      {step === 3 && (
-        <div className="space-y-6">
-          <p className="text-neutral-600">Overall inspection result:</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {(Object.entries(statusConfig) as [string, typeof statusConfig[string]][]).map(([key, cfg]) => (
-              <button key={key} onClick={() => update({ overallStatus: key as OverallStatus })} className={`min-h-[44px] p-4 rounded-xl ring-1 transition-all text-center ${form.overallStatus === key ? `${cfg.bg} ${cfg.ring} ring-2 shadow-sm` : 'bg-neutral-100 ring-neutral-200 hover:ring-neutral-300'}`}>
-                <div className={`text-lg font-semibold ${form.overallStatus === key ? cfg.color : 'text-neutral-700'}`}>{cfg.label}</div>
-              </button>
-            ))}
-          </div>
+          {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-2">Notes (optional)</label>
-            <textarea value={form.notes} onChange={(e) => update({ notes: e.target.value })} rows={4} placeholder="Additional observations or concerns..." className="w-full px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none" />
+            <textarea value={form.notes} onChange={(e) => update({ notes: e.target.value })} rows={3} placeholder="Additional observations or deficiencies..." className="w-full px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none" />
           </div>
         </div>
       )}
 
-      {/* Step 4: Signature */}
-      {step === 4 && (
-        <div className="space-y-4">
+      {/* Step 3: Signature + SOG Mandate */}
+      {step === 3 && (
+        <div className="space-y-6">
           <p className="text-neutral-600">Inspector signature:</p>
           <div className="border-2 border-dashed border-neutral-300 rounded-xl bg-white overflow-hidden">
             <SignatureCanvas ref={sigRef} penColor="#1a1a1a" canvasProps={{ className: 'w-full', style: { height: 200, width: '100%' } }} onEnd={handleSaveSig} />
           </div>
           <button onClick={handleClearSig} className="min-h-[44px] px-4 py-2 text-sm text-neutral-500 hover:text-neutral-700 underline">Clear Signature</button>
+
+          {/* SOG Mandate Acknowledgment */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.sogMandate}
+                onChange={(e) => update({ sogMandate: e.target.checked })}
+                className="mt-1 w-5 h-5 rounded border-amber-400 text-red-600 focus:ring-red-500"
+              />
+              <span className="text-sm text-amber-900 font-medium leading-relaxed">
+                <strong>Saturday SOG Mandate:</strong> All equipment removed, inspected, and compartments deep cleaned per Standard Operating Guidelines.
+              </span>
+            </label>
+          </div>
         </div>
       )}
 
-      {/* Step 5: Review */}
-      {step === 5 && (
+      {/* Step 4: Review */}
+      {step === 4 && (
         <div className="space-y-6">
           <div className="bg-neutral-100 rounded-xl ring-1 ring-neutral-200/60 p-6 space-y-4">
             <div><span className="text-sm text-neutral-500">Station</span><p className="font-medium text-neutral-800">{form.station}</p></div>
-            <div><span className="text-sm text-neutral-500">Inspection Type</span><p className="font-medium text-neutral-800">{form.inspectionType}</p></div>
             <div><span className="text-sm text-neutral-500">Date</span><p className="font-medium text-neutral-800">{form.date}</p></div>
             <div>
               <span className="text-sm text-neutral-500">Checklist Summary</span>
@@ -262,9 +282,12 @@ export default function StationInspectionWizard() {
                 <span className="text-sm text-neutral-600 font-medium">{form.checklist.filter((i) => i.status === 'na').length} N/A</span>
               </div>
             </div>
+            {form.extinguishingSystemDate && (
+              <div><span className="text-sm text-neutral-500">Extinguishing System Date</span><p className="font-medium text-neutral-800">{form.extinguishingSystemDate}</p></div>
+            )}
             <div>
-              <span className="text-sm text-neutral-500">Overall Status</span>
-              <p className={`font-medium ${form.overallStatus ? statusConfig[form.overallStatus].color : ''}`}>{form.overallStatus ? statusConfig[form.overallStatus].label : ''}</p>
+              <span className="text-sm text-neutral-500">SOG Mandate</span>
+              <p className="font-medium text-emerald-700">✓ Acknowledged</p>
             </div>
             {form.notes && <div><span className="text-sm text-neutral-500">Notes</span><p className="text-neutral-800">{form.notes}</p></div>}
             {form.signature && <div><span className="text-sm text-neutral-500">Signature</span><img src={form.signature} alt="Signature" className="mt-2 h-16 border border-neutral-200 rounded bg-white" /></div>}
@@ -277,7 +300,7 @@ export default function StationInspectionWizard() {
         <button onClick={() => setStep((s) => s - 1)} disabled={step === 1} className="min-h-[44px] px-6 py-3 text-neutral-600 hover:text-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed">
           Previous
         </button>
-        {step < 5 ? (
+        {step < 4 ? (
           <button onClick={() => setStep((s) => s + 1)} disabled={!canNext()} className="min-h-[44px] px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             Next
           </button>
