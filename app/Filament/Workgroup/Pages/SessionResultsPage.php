@@ -10,6 +10,7 @@ use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use App\Services\Workgroup\EvaluationService;
+use App\Services\Workgroup\WorkgroupAIService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Pages\Page;
@@ -44,6 +45,11 @@ class SessionResultsPage extends Page
     public bool $aiReportLoaded = false;
     public ?string $aiReport = null;
     public ?string $aiReportError = null;
+
+    /** SAVER Report state */
+    public bool $saverReportLoading = false;
+    public ?string $saverReportHtml = null;
+    public ?string $saverReportError = null;
 
     public function getHeading(): string
     {
@@ -96,6 +102,41 @@ class SessionResultsPage extends Page
     public function switchSession(?int $sessionId): void
     {
         $this->selectedSessionId = $sessionId;
+        // Clear SAVER report when switching sessions
+        $this->saverReportHtml = null;
+        $this->saverReportError = null;
+        $this->saverReportLoading = false;
+    }
+
+    /**
+     * Generate SAVER Executive Report via AI.
+     * Only available on the "Overall" view (selectedSessionId === null).
+     */
+    public function generateSaverReport(): void
+    {
+        $this->saverReportLoading = true;
+        $this->saverReportError = null;
+        $this->saverReportHtml = null;
+
+        try {
+            $workgroup = Workgroup::first();
+            if (!$workgroup) {
+                $this->saverReportError = 'No workgroup found.';
+                $this->saverReportLoading = false;
+                return;
+            }
+
+            $session = $this->getSelectedSession();
+            $aiService = app(WorkgroupAIService::class);
+            $html = $aiService->generateSaverReport($workgroup, $session);
+
+            $this->saverReportHtml = $html;
+        } catch (\Exception $e) {
+            Log::error('[SessionResultsPage] SAVER report failed', ['error' => $e->getMessage()]);
+            $this->saverReportError = 'Failed to generate report: ' . $e->getMessage();
+        } finally {
+            $this->saverReportLoading = false;
+        }
     }
 
     // ─── Header Widgets ─────────────────────────────────────────────
@@ -139,6 +180,7 @@ class SessionResultsPage extends Page
         $session = $this->getSelectedSession();
         $evalService = app(EvaluationService::class);
         $allSessions = WorkgroupSession::orderBy('name')->get();
+        $workgroup = Workgroup::first();
 
         if (!$session && $this->selectedSessionId !== null) {
             // Selected a specific session ID that doesn't exist
@@ -148,6 +190,11 @@ class SessionResultsPage extends Page
                 'progress' => null,
                 'sessions' => $allSessions,
                 'brandGroupedAnalysis' => [],
+                'workgroup' => $workgroup,
+                'comprehensiveResults' => [],
+                'competitorGroupRankings' => [],
+                'isolatedProducts' => [],
+                'nonRankableFeedback' => collect(),
             ];
         }
 
@@ -156,6 +203,19 @@ class SessionResultsPage extends Page
 
         $results = $evalService->getSessionResults($sessionId);
         $progress = $evalService->getSessionProgress($sessionId);
+
+        // Get comprehensive results for the overall view
+        $comprehensiveResults = [];
+        $competitorGroupRankings = [];
+        $isolatedProducts = [];
+        $nonRankableFeedback = collect();
+
+        if ($workgroup) {
+            $comprehensiveResults = $evalService->getComprehensiveResults($workgroup, $session);
+            $competitorGroupRankings = $comprehensiveResults['competitor_group_rankings'] ?? [];
+            $isolatedProducts = $comprehensiveResults['isolated_products'] ?? [];
+            $nonRankableFeedback = $comprehensiveResults['non_rankable_feedback'] ?? collect();
+        }
 
         // Enhance category results with SAVER score breakdown
         $categoryResults = collect($results['rankable_categories'])->map(function ($cat) use ($sessionId) {
@@ -187,6 +247,11 @@ class SessionResultsPage extends Page
             'progress'              => $progress,
             'sessions'              => $allSessions,
             'brandGroupedAnalysis'  => $evalService->getBrandGroupedAnalysis($sessionId),
+            'workgroup'             => $workgroup,
+            'comprehensiveResults'  => $comprehensiveResults,
+            'competitorGroupRankings' => $competitorGroupRankings,
+            'isolatedProducts'      => $isolatedProducts,
+            'nonRankableFeedback'   => $nonRankableFeedback instanceof \Illuminate\Support\Collection ? $nonRankableFeedback : collect($nonRankableFeedback),
         ];
     }
 
