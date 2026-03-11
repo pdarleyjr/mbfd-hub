@@ -3,6 +3,7 @@ interface Env {
   VECTORIZE: any;
   RATE_LIMIT_KV?: KVNamespace;
   ALLOWED_ORIGIN: string;
+  AI_GATEWAY_URL?: string;
 }
 
 interface RateLimitEntry {
@@ -62,6 +63,27 @@ RESPONSE RULES:
 5. For policy/SOG questions, explicitly reference edited_support_services_sog.docx.
 6. For safety-critical information, add a note to verify with the current published document.`;
 
+/**
+ * Run an AI model, routing through AI Gateway if configured for caching/analytics.
+ * Falls back to direct env.AI.run binding otherwise.
+ */
+async function runAI(env: Env, model: string, input: any): Promise<any> {
+  if (env.AI_GATEWAY_URL) {
+    const url = `${env.AI_GATEWAY_URL.replace(/\/$/, '')}/${model.replace(/^@cf\//, '')}`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!resp.ok) {
+      console.error(`AI Gateway error ${resp.status}, falling back to direct binding`);
+      return env.AI.run(model, input);
+    }
+    return resp.json();
+  }
+  return env.AI.run(model, input);
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const corsHeaders = getCorsHeaders(env, request);
@@ -117,7 +139,7 @@ export default {
         }
 
         // Step 1: Generate embedding for the user query using best free embedding model
-        const embeddingResponse = await env.AI.run('@cf/baai/bge-large-en-v1.5', {
+        const embeddingResponse = await runAI(env, '@cf/baai/bge-large-en-v1.5', {
           text: [userMessage],
         });
         const queryVector = embeddingResponse.data[0];
@@ -164,6 +186,7 @@ export default {
         // Step 5: Call LLM — best free-tier model: llama-3.3-70b-instruct-fp8-fast
         // This is the highest quality model on Cloudflare's free tier
         if (enableStreaming) {
+          // Streaming not supported through gateway — use direct binding
           const stream = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
             messages,
             stream: true,
@@ -183,7 +206,7 @@ export default {
         }
 
         // Non-streaming response
-        const aiResponse = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+        const aiResponse = await runAI(env, '@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
           messages,
           max_tokens: 1024,
           temperature: 0.3,

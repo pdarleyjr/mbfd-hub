@@ -33,6 +33,7 @@ use App\Filament\Widgets\TodoOverviewWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
+use ShuvroRoy\FilamentSpatieLaravelHealth\FilamentSpatieLaravelHealthPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -59,6 +60,10 @@ class AdminPanelProvider extends PanelProvider
             ->font('Inter')
             ->plugin(FilamentShieldPlugin::make())
             ->plugin(ChatifyPlugin::make())
+            ->plugin(
+                FilamentSpatieLaravelHealthPlugin::make()
+                    ->usingPage(\App\Filament\Pages\HealthCheckResults::class)
+            )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
@@ -95,6 +100,9 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make()
                     ->label('Communication / AI')
                     ->icon('heroicon-o-chat-bubble-left-right'),
+                NavigationGroup::make()
+                    ->label('Monitoring')
+                    ->icon('heroicon-o-chart-bar'),
                 NavigationGroup::make()
                     ->label('External Tools')
                     ->icon('heroicon-o-arrow-top-right-on-square'),

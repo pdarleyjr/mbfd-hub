@@ -18,6 +18,7 @@
 
 interface Env {
   AI: any;
+  AI_GATEWAY_URL?: string;
 }
 
 const CORS_HEADERS: Record<string, string> = {
@@ -28,6 +29,26 @@ const CORS_HEADERS: Record<string, string> = {
 
 /** The only model we use — best quality, free tier, ToS accepted */
 const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
+
+/**
+ * Run an AI model through AI Gateway if configured, else direct binding.
+ */
+async function runAI(env: Env, model: string, input: any): Promise<any> {
+  if (env.AI_GATEWAY_URL) {
+    const url = `${env.AI_GATEWAY_URL.replace(/\/$/, '')}/${model.replace(/^@cf\//, '')}`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!resp.ok) {
+      console.error(`AI Gateway error ${resp.status}, falling back to direct binding`);
+      return env.AI.run(model, input);
+    }
+    return resp.json();
+  }
+  return env.AI.run(model, input);
+}
 
 /**
  * Extraction prompt — instructs the model to return ONLY valid JSON.
@@ -116,7 +137,7 @@ function parseJSON(raw: string): Record<string, string> {
 async function analyzeImage(env: Env, b64: string): Promise<{ parsed: Record<string, string>; rawText: string }> {
   const dataUri = ensureDataUri(b64);
 
-  const response = await env.AI.run(VISION_MODEL, {
+  const response = await runAI(env, VISION_MODEL, {
     messages: [
       {
         role: 'user',
@@ -245,6 +266,7 @@ export default {
 
       images = images.slice(0, 5); // safety limit
 
+      // Synchronous processing
       const results: Array<{ parsed: Record<string, string>; rawText: string }> = [];
       for (const img of images) {
         try {

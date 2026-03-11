@@ -212,4 +212,20 @@ class Station extends Model
     {
         return $this->hasMany(StationSupplyRequest::class);
     }
+
+    /**
+     * Get fire equipment requests for this station
+     */
+    public function fireEquipmentRequests(): HasMany
+    {
+        return $this->hasMany(FireEquipmentRequest::class);
+    }
+
+    /**
+     * Get station inspections for this station
+     */
+    public function stationInspections(): HasMany
+    {
+        return $this->hasMany(StationInspection::class);
+    }
 }
