@@ -70,3 +70,10 @@ pics/
 # Prevent accidental in-workspace local-rag storage
 /lancedb/
 /models/
+
+# Composer vendor in laravel-app (not published views)
+laravel-app/vendor/
+
+# Build output
+/public/build/
+laravel-app/public/build/
