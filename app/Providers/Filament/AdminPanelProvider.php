@@ -58,6 +58,7 @@ class AdminPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
             ])
             ->font('Inter')
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->plugin(FilamentShieldPlugin::make())
             ->plugin(ChatifyPlugin::make())
             ->plugin(
