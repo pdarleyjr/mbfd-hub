@@ -118,6 +118,75 @@
         @endif
     </div>
 
+    {{-- SAVER Executive Report Generator --}}
+    @if($selectedSessionId === null)
+    <div class="wg-section" style="margin-bottom: 1.25rem;">
+        <div class="wg-section-header" style="background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%); color: #fff;">
+            <div class="wg-section-header-icon" style="background: rgba(255,255,255,0.2);">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            </div>
+            <div style="flex: 1;">
+                <h3 style="font-size: 1rem; font-weight: 700; color: #fff;">SAVER Executive Purchasing Report</h3>
+                <p style="font-size: 0.75rem; color: rgba(255,255,255,0.7);">DHS-style assessment: Capability · Usability · Affordability · Maintainability · Deployability</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                @if($saverReportHtml)
+                <a href="{{ route('workgroup.saver-report') }}" target="_blank" class="wg-ai-btn wg-ai-btn--secondary" style="color: #fff; border-color: rgba(255,255,255,0.3);">
+                    <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z"/></svg>
+                    Print Report
+                </a>
+                @endif
+                <button
+                    wire:click="generateSaverReport"
+                    wire:loading.attr="disabled"
+                    wire:target="generateSaverReport"
+                    class="wg-ai-btn wg-ai-btn--primary"
+                    style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);"
+                >
+                    <div wire:loading wire:target="generateSaverReport" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg style="width:1rem;height:1rem;animation:spin 1s linear infinite;" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity:0.25;"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4" stroke-linecap="round" style="opacity:0.75;"></path></svg>
+                        Generating...
+                    </div>
+                    <div wire:loading.remove wire:target="generateSaverReport" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        {{ $saverReportHtml ? 'Regenerate' : 'Generate SAVER Report' }}
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        {{-- SAVER Report Loading State --}}
+        @if($saverReportLoading)
+        <div style="padding: 2rem; text-align: center;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-bottom: 1rem;">
+                <svg style="width:1.5rem;height:1.5rem;animation:spin 1s linear infinite;color:#2563EB;" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity:0.25;"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4" stroke-linecap="round" style="opacity:0.75;"></path></svg>
+                <p style="font-size: 0.875rem; color: #57534E; font-weight: 500;">Analyzing evaluation data and generating SAVER report...</p>
+            </div>
+            <p style="font-size: 0.75rem; color: #A8A29E;">This may take 30-60 seconds depending on the amount of data.</p>
+        </div>
+        @endif
+
+        {{-- SAVER Report Error --}}
+        @if($saverReportError)
+        <div style="padding: 1rem; background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 0.5rem; margin: 1rem;">
+            <p style="font-size: 0.8125rem; color: #991B1B;">{{ $saverReportError }}</p>
+            <button wire:click="generateSaverReport" style="margin-top: 0.5rem; font-size: 0.75rem; color: #B91C1C; text-decoration: underline; cursor: pointer; background: none; border: none;">Retry</button>
+        </div>
+        @endif
+
+        {{-- SAVER Report Content --}}
+        @if($saverReportHtml && !$saverReportLoading)
+        <div style="padding: 1.25rem; font-size: 0.875rem; line-height: 1.6; color: #292524;">
+            <div class="wg-saver-content">
+                {!! $saverReportHtml !!}
+            </div>
+        </div>
+        @endif
+    </div>
+    @endif
+
     {{-- Category Rankings Grid }}
     @if($categoryResults->isNotEmpty())
     <div style="margin-bottom: 1.5rem;">

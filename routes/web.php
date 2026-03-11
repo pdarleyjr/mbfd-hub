@@ -61,3 +61,18 @@ Route::get('/workgroup/shared-upload/{upload}/download', [FileDownloadController
     ->name('workgroup.shared-upload.download')
     ->middleware('auth');
 
+// SAVER Report — Print-ready view
+Route::get('/workgroup/saver-report', function () {
+    $workgroup = \App\Models\Workgroup::first();
+    $aiService = app(\App\Services\Workgroup\WorkgroupAIService::class);
+
+    $reportHtml = $aiService->getCachedSaverReport($workgroup?->id ?? 0);
+
+    return view('filament.workgroup.pages.saver-report', [
+        'reportHtml' => $reportHtml,
+        'workgroupName' => $workgroup?->name ?? 'MBFD Workgroup',
+        'sessionName' => 'All Sessions',
+        'generatedAt' => now()->format('F j, Y'),
+    ]);
+})->name('workgroup.saver-report')->middleware('auth');
+

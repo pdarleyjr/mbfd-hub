@@ -4,6 +4,7 @@ namespace App\Services\Workgroup;
 
 use App\Models\CandidateProduct;
 use App\Models\EvaluationSubmission;
+use App\Models\Workgroup;
 use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
 use Illuminate\Support\Collection;
@@ -305,20 +306,212 @@ class WorkgroupAIService
         return Cache::get("workgroup_ai_exec_report_{$sessionId}");
     }
 
+    // =========================================================================
+    // SAVER REPORT — DHS-style purchasing recommendation document
+    // =========================================================================
+
     /**
-     * Clear AI analysis cache for a product (e.g., when new evaluations submitted).
+     * Generate a DHS SAVER-style executive purchasing report for a workgroup.
+     *
+     * Uses EvaluationService::getComprehensiveResults() to gather all aggregated
+     * data, builds a comprehensive prompt, and calls the AI worker to produce
+     * a formatted HTML report covering all five SAVER dimensions.
+     *
+     * @return string HTML content of the SAVER report
      */
-    public function clearProductCache(int $productId): void
+    public function generateSaverReport(Workgroup $workgroup, ?WorkgroupSession $session = null): string
     {
-        Cache::forget("workgroup_ai_product_{$productId}");
+        if (!$this->isEnabled()) {
+            return '<p class="text-red-600">AI service not configured. Set WORKGROUP_AI_WORKER_URL in .env</p>';
+        }
+
+        $evalService = app(EvaluationService::class);
+        $results = $evalService->getComprehensiveResults($workgroup, $session);
+
+        $prompt = $this->buildSaverPrompt($results, $workgroup, $session);
+
+        try {
+            $response = Http::timeout(120)->post("{$this->workerUrl}/saver-report", [
+                'prompt' => $prompt,
+                'workgroupName' => $workgroup->name,
+                'sessionName' => $session?->name ?? 'All Sessions',
+                'generatedAt' => now()->format('F j, Y'),
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $html = $data['report'] ?? $data['result']['response'] ?? '';
+
+                if (!empty($html)) {
+                    Cache::put("workgroup_saver_report_{$workgroup->id}_{$session?->id}", $html, 3600);
+                    return $html;
+                }
+
+                return '<p class="text-yellow-600">AI returned empty report. Try regenerating.</p>';
+            }
+
+            Log::warning('[WorkgroupAI] SAVER report failed', [
+                'status' => $response->status(),
+                'body' => substr($response->body(), 0, 500),
+            ]);
+
+            // Fallback: try the general /analyze endpoint with the SAVER prompt
+            return $this->generateSaverReportFallback($prompt, $workgroup, $session);
+
+        } catch (\Exception $e) {
+            Log::error('[WorkgroupAI] SAVER report exception', ['error' => $e->getMessage()]);
+            return $this->generateSaverReportFallback($prompt, $workgroup, $session);
+        }
     }
 
     /**
-     * Clear all AI analysis caches.
+     * Get cached SAVER report if available.
      */
-    public function clearAllCaches(): void
+    public function getCachedSaverReport(int $workgroupId, ?int $sessionId = null): ?string
     {
-        Cache::flush(); // Nuclear option — only during testing
+        return Cache::get("workgroup_saver_report_{$workgroupId}_{$sessionId}");
+    }
+
+    /**
+     * Fallback: use the executive-report endpoint with SAVER-formatted prompt.
+     */
+    protected function generateSaverReportFallback(string $prompt, Workgroup $workgroup, ?WorkgroupSession $session): string
+    {
+        try {
+            $response = Http::timeout(120)->post("{$this->workerUrl}/executive-report", [
+                'sessionName' => $session?->name ?? 'All Sessions — ' . $workgroup->name,
+                'sessionDate' => now()->format('F j, Y'),
+                'categories' => [],
+                'overallStats' => [],
+                'customPrompt' => $prompt,
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $html = $data['report'] ?? $data['result']['response'] ?? '';
+                if (!empty($html)) {
+                    Cache::put("workgroup_saver_report_{$workgroup->id}_{$session?->id}", $html, 3600);
+                    return $html;
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('[WorkgroupAI] SAVER fallback failed', ['error' => $e->getMessage()]);
+        }
+
+        return '<p class="text-red-600">Unable to generate SAVER report. The AI service may be temporarily unavailable. Please try again later.</p>';
+    }
+
+    /**
+     * Build the comprehensive SAVER report prompt from evaluation data.
+     */
+    protected function buildSaverPrompt(array $results, Workgroup $workgroup, ?WorkgroupSession $session): string
+    {
+        $lines = [];
+        $lines[] = "You are an expert evaluator writing a DHS SAVER (System Assessment and Validation for Emergency Responders) style report.";
+        $lines[] = "";
+        $lines[] = "WORKGROUP: {$workgroup->name}";
+        $lines[] = "SESSION: " . ($session?->name ?? 'All Sessions Combined');
+        $lines[] = "DATE: " . now()->format('F j, Y');
+        $lines[] = "";
+
+        // Brand aggregated rankings
+        if (!empty($results['brand_aggregated_rankings'])) {
+            $lines[] = "=== BRAND AGGREGATED RANKINGS ===";
+            foreach ($results['brand_aggregated_rankings'] as $cat) {
+                $lines[] = "Category: {$cat['category_name']}";
+                foreach ($cat['brand_rankings'] as $idx => $brand) {
+                    $score = $brand['composite_score'] !== null ? number_format($brand['composite_score'], 1) : 'N/A';
+                    $lines[] = "  #{$idx}: {$brand['brand']} — Composite: {$score} ({$brand['product_count']} products)";
+                    if (!empty($brand['saver_breakdown'])) {
+                        $s = $brand['saver_breakdown'];
+                        $lines[] = "    Capability: " . ($s['capability'] ?? 'N/A') .
+                            " | Usability: " . ($s['usability'] ?? 'N/A') .
+                            " | Affordability: " . ($s['affordability'] ?? 'N/A') .
+                            " | Maintainability: " . ($s['maintainability'] ?? 'N/A') .
+                            " | Deployability: " . ($s['deployability'] ?? 'N/A');
+                    }
+                    if (!empty($brand['products'])) {
+                        foreach ($brand['products'] as $p) {
+                            $pScore = $p['avg_score'] !== null ? number_format($p['avg_score'], 1) : 'N/A';
+                            $lines[] = "    - {$p['name']}: {$pScore} ({$p['response_count']} responses)";
+                        }
+                    }
+                }
+                $lines[] = "";
+            }
+        }
+
+        // Competitor group rankings
+        if (!empty($results['competitor_group_rankings'])) {
+            $lines[] = "=== COMPETITOR GROUP RANKINGS ===";
+            foreach ($results['competitor_group_rankings'] as $cat) {
+                $lines[] = "Category: {$cat['category_name']}";
+                foreach ($cat['groups'] as $group) {
+                    $lines[] = "  Group: {$group['group_name']} ({$group['product_count']} products)";
+                    foreach ($group['rankings'] as $idx => $r) {
+                        $rScore = $r['avg_score'] !== null ? number_format($r['avg_score'], 1) : 'N/A';
+                        $lines[] = "    #{$idx}: {$r['name']} ({$r['brand']}) — {$rScore} ({$r['response_count']} resp.)";
+                    }
+                }
+                $lines[] = "";
+            }
+        }
+
+        // Isolated products
+        if (!empty($results['isolated_products'])) {
+            $lines[] = "=== STANDALONE PRODUCTS ===";
+            foreach ($results['isolated_products'] as $iso) {
+                $iScore = $iso['avg_score'] !== null ? number_format($iso['avg_score'], 1) : 'N/A';
+                $lines[] = "- {$iso['name']} ({$iso['brand']}) in {$iso['category_name']}: {$iScore} ({$iso['response_count']} resp.)";
+                $lines[] = "  Note: {$iso['note']}";
+            }
+            $lines[] = "";
+        }
+
+        // Standard category rankings
+        if (!empty($results['standard_category_rankings'])) {
+            $lines[] = "=== STANDARD CATEGORY RANKINGS ===";
+            foreach ($results['standard_category_rankings'] as $cat) {
+                $lines[] = "Category: {$cat['category_name']} ({$cat['total_products']} products, {$cat['eligible_products']} eligible)";
+                foreach ($cat['rankings'] as $idx => $item) {
+                    $sScore = $item['weighted_average'] !== null ? number_format($item['weighted_average'], 1) : 'N/A';
+                    $name = $item['product']->name ?? 'Unknown';
+                    $lines[] = "  #{$idx}: {$name} — {$sScore} ({$item['response_count']} resp.) " .
+                        ($item['meets_threshold'] ? '✓ threshold' : '✗ below threshold');
+                }
+                $lines[] = "";
+            }
+        }
+
+        // Non-rankable feedback
+        $nrFeedback = $results['non_rankable_feedback'] ?? collect();
+        if ($nrFeedback->isNotEmpty()) {
+            $lines[] = "=== NON-RANKABLE CATEGORY FEEDBACK ===";
+            foreach ($nrFeedback as $nrCat) {
+                $lines[] = "Category: {$nrCat['category_name']} ({$nrCat['submissions_count']} submissions)";
+                foreach ($nrCat['feedback'] as $fb) {
+                    $lines[] = "  {$fb['evaluator']}: {$fb['product']} — Score: " . ($fb['score'] ?? 'N/A');
+                }
+                $lines[] = "";
+            }
+        }
+
+        $lines[] = "";
+        $lines[] = "=== INSTRUCTIONS ===";
+        $lines[] = "Generate a professional DHS SAVER-style report in clean HTML format with these sections:";
+        $lines[] = "1. <h2>Executive Summary</h2> — Overall findings, key recommendation, evaluation scope";
+        $lines[] = "2. <h2>Capability Assessment</h2> — How well each brand/product performs its intended function based on scores";
+        $lines[] = "3. <h2>Usability Assessment</h2> — Ease of use, ergonomics, training requirements";
+        $lines[] = "4. <h2>Affordability Assessment</h2> — Cost-effectiveness, value proposition";
+        $lines[] = "5. <h2>Maintainability Assessment</h2> — Durability, repair ease, parts availability";
+        $lines[] = "6. <h2>Deployability Assessment</h2> — Portability, setup time, interoperability";
+        $lines[] = "7. <h2>Final Purchasing Recommendation</h2> — Ranked recommendations with justification";
+        $lines[] = "";
+        $lines[] = "Use <table>, <ul>, <strong>, <p> tags for structure. Include actual scores from the data.";
+        $lines[] = "Be specific with product names and scores. This is for a Fire Department Health & Safety Committee.";
+        $lines[] = "Do NOT use markdown. Output ONLY valid HTML.";
+
+        return implode("\n", $lines);
     }
 
     // =========================================================================
