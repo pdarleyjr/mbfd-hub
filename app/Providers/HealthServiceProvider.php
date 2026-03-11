@@ -5,9 +5,9 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Health\Facades\Health;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
-use Spatie\Health\Checks\Checks\RedisCheck;
 use Spatie\Health\Checks\Checks\UsedDiskSpaceCheck;
-use Spatie\Health\Checks\Checks\ScheduleCheck;
+use Spatie\Health\Checks\Checks\CacheCheck;
+use Spatie\Health\Checks\Checks\EnvironmentCheck;
 
 class HealthServiceProvider extends ServiceProvider
 {
@@ -20,12 +20,12 @@ class HealthServiceProvider extends ServiceProvider
     {
         Health::checks([
             DatabaseCheck::new(),
-            RedisCheck::new(),
             UsedDiskSpaceCheck::new()
                 ->warnWhenUsedSpaceIsAbovePercentage(70)
                 ->failWhenUsedSpaceIsAbovePercentage(90),
-            ScheduleCheck::new()
-                ->heartbeatMaxAgeInMinutes(5),
+            CacheCheck::new(),
+            EnvironmentCheck::new()
+                ->expectEnvironment('production'),
         ]);
     }
 }
