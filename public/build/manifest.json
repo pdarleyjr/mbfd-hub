@@ -1,7 +1,12 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-BPvH9Bfs.css",
+    "file": "assets/app-_Ifx7OgK.css",
     "src": "resources/css/app.css",
+    "isEntry": true
+  },
+  "resources/css/filament/admin/theme.css": {
+    "file": "assets/theme-BNRPYw2B.css",
+    "src": "resources/css/filament/admin/theme.css",
     "isEntry": true
   },
   "resources/js/app.js": {
@@ -11,12 +16,12 @@
     "isEntry": true
   },
   "resources/js/pump-simulator/main.tsx": {
-    "file": "assets/main-CN4TT64F.js",
+    "file": "assets/main-C2wQDcM7.js",
     "name": "main",
     "src": "resources/js/pump-simulator/main.tsx",
     "isEntry": true,
     "css": [
-      "assets/main-YMqcj1cu.css"
+      "assets/main-B_6qqPK7.css"
     ]
   },
   "resources/js/push-notification-widget.js": {
