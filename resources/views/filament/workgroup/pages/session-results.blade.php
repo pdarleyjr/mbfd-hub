@@ -187,7 +187,7 @@
     </div>
     @endif
 
-    {{-- Category Rankings Grid }}
+    {{-- Category Rankings Grid --}}
     @if($categoryResults->isNotEmpty())
     <div style="margin-bottom: 1.5rem;">
         @foreach($categoryResults as $cat)
@@ -304,10 +304,7 @@
     </div>
     @endif
 
-    --}}
-
-     Competitor Group Rankings --}}
-
+    {{-- Competitor Group Rankings --}}
     @if(!empty($competitorGroupRankings))
     <div class="wg-section">
         <div class="wg-section-header">
@@ -359,10 +356,7 @@
     </div>
     @endif
 
-    --}}
-
-     Brand Group Purchase Analysis --}}
-
+    {{-- Brand Group Purchase Analysis --}}
     @if(!empty($brandGroupedAnalysis) && $session)
     <div class="wg-section">
         <div class="wg-section-header">
@@ -425,10 +419,7 @@
     </div>
     @endif
 
-    --}}
-
-     Isolated / Standalone Products --}}
-
+    {{-- Isolated / Standalone Products --}}
     @if(!empty($isolatedProducts))
     <div style="margin-top: 1.5rem;">
         <div class="wg-section-header" style="background: none; border: none; padding-left: 0;">
@@ -482,10 +473,7 @@
     </div>
     @endif
 
-    --}}
-
-     Non-Rankable Feedback --}}
-
+    {{-- Non-Rankable Feedback --}}
     @if($nonRankableFeedback->isNotEmpty())
     <div style="margin-top: 1.5rem;">
         @foreach($nonRankableFeedback as $nrCat)
@@ -529,10 +517,7 @@
     </div>
     @endif
 
-    --}}
-
-     Finalists Summary --}}
-
+    {{-- Finalists Summary --}}
     @php
         $finalists = collect();
         foreach($categoryResults as $cat) {
@@ -597,7 +582,7 @@
     @endif
 
     {{-- No Session State --}}
-    @else
+    @if($allSessions->isEmpty())
     <div style="text-align: center; padding: 4rem 0;">
         <div style="width: 4rem; height: 4rem; margin: 0 auto 1rem; border-radius: 9999px; background-color: #F0EDE8; display: flex; align-items: center; justify-content: center;">
             <x-heroicon-o-calendar class="w-8 h-8" style="color: #A8A29E;"/>
