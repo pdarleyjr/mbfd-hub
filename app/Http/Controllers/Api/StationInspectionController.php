@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\StationInspection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class StationInspectionController extends Controller
 {
@@ -38,6 +40,46 @@ class StationInspectionController extends Controller
             'reviewed_at' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);
+
+        // Process fail images in checklist items
+        $formData = $validated['form_data'];
+        $checklist = $formData['checklist'] ?? $formData;
+        $timestamp = now()->format('Ymd_His');
+
+        if (is_array($checklist)) {
+            foreach ($checklist as $index => &$item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $status = $item['status'] ?? null;
+                $failImage = $item['failImage'] ?? null;
+
+                if (strtolower($status ?? '') === 'fail' && !empty($failImage) && str_contains($failImage, 'base64')) {
+                    // Extract base64 data (handle "data:image/...;base64,XXXX" format)
+                    $imageData = preg_replace('/^data:image\/\w+;base64,/', '', $failImage);
+                    $decoded = base64_decode($imageData, true);
+
+                    if ($decoded !== false) {
+                        $area = Str::slug($item['category'] ?? $item['area'] ?? 'general');
+                        $itemId = Str::slug($item['id'] ?? $item['label'] ?? $index);
+                        $filename = "si_{$area}_{$itemId}_{$timestamp}.jpg";
+                        $path = "station-inspections/{$filename}";
+
+                        Storage::disk('public')->put($path, $decoded);
+
+                        $item['failImage'] = $path;
+                    }
+                }
+            }
+            unset($item);
+
+            if (isset($formData['checklist'])) {
+                $formData['checklist'] = $checklist;
+            } else {
+                $formData = $checklist;
+            }
+            $validated['form_data'] = $formData;
+        }
 
         $record = StationInspection::create($validated);
 
