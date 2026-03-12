@@ -1,16 +1,17 @@
-# CLAUDE.md â MBFD Hub AI Context
+# CLAUDE.md â MBFD Hub AI Context
 
-> **Mission Status: ✅ Production** (2026-03-11)  
-> NocoBase has been **decommissioned** (2026-03-08) â container stopped, image removed, volume deleted. All Nocobase scripts removed from repo.  
-> ✅ **Chatify real-time chat FIXED** (2026-03-09 evening) â Split-brain config resolved; backend uses internal Reverb (127.0.0.1:8080), frontend uses public wss:// via Cloudflare.  
-> ✅ **Daily Vehicle Inspections revived** (2026-03-09 late evening) â MBFD Forms now includes a dedicated Vehicle Inspections card, historical inspections render in a branded admin results viewer, checklist payloads are normalized for React, and the daily SPA now ships with updated service-worker cache busting plus custom `artisan serve` router handling for `/daily/*` routes.  
-> ✅ **Vehicle Inspection Checklists FIXED + ICS-212 Features** (2026-03-10) â Checklist pathing bug resolved (storage/checklists â storage/app/checklists), ladder type detection fixed to use designation, digital officer signatures added via react-signature-canvas, automated HOLD logic sets apparatus "Out of Service" on critical defects.
-> ✅ **Impeccable Design System Installed** (2026-03-10) â All 17 Impeccable skills installed to `.kilocode/skills/`, 7 domain reference files in `frontend-design/reference/`. UI/UX Modernization Plan generated.
-> ✅ **UI/UX Modernization Phase 0-3 DEPLOYED** (2026-03-10) â Removed all 37+ `@apply` from theme.css (iOS crash fix), fixed broken selectors, replaced pure grays with warm-tinted neutrals, new typography system (Plus Jakarta Sans + Source Sans 3), flattened nested stat cards, skeleton loading, stagger animations, search filter on vehicle inspections, reduced motion support.
-> ✅ **UI/UX Modernization Phase 4-8 DEPLOYED + CI/CD FIX** (2026-03-10 late evening) â Phase 4: button press feedback, sliding tab underline, focus-visible rings, toast animations. Phase 5: landing page redesign (cards primary, chatbot secondary, accent bars, removed System Overview). Phase 6: mobile-first polish (pointer:coarse, safe areas, scroll-snap tabs). Phase 7: tabular numbers, enhanced empty states, fluid typography. Phase 8: skip navigation, ARIA labels, font preload. CI/CD: daily-checkout builds in Docker, Reverb/queue worker post-deploy verification, explicit compose.yaml, view:cache error handling, filament:assets step, www.mbfdhub.com smoke tests.
-> ✅ **Enterprise Modernization Phases 1-7 MERGED** (2026-03-11) â Phase 1: Impeccable design system admin theme. Phase 2: Laravel Pulse + Spatie Health monitoring. Phase 3: Cloudflare AI Gateway routing (queue removed—requires paid plan). Phase 4: PWA hardening with Dexie offline DB, React Query, vite-plugin-pwa. Phase 5: fire_equipment_requests + station_inspections schema and API. Phase 6: FormsHub wizards (Equipment Request + Station Inspection). Phase 7: Filament admin restructuring with Station Management group and relation managers. Branch `feat/enterprise-modernization` merged to `main` and deployed to VPS.
-> ✅ **Workgroup Evaluation Modernization MERGED** (2026-03-11) â Phase 1: EvaluationService brand aggregation + competitor grouping. Phase 2: ERROR-018 fix â removed Livewire widgets, inlined data via getViewData() + async AI. Phase 3: Impeccable UI/UX overhaul for session results + admin dashboard. Phase 4: SAVER document generator â AI-powered purchasing report. Branch `feat/workgroup-evaluation-modernization` merged to `main` and deployed to VPS. Migration: `add_brand_competitor_group_to_candidate_products`.
-> ✅ **Unified Filament Theme Pipeline** (2026-03-11) â Fixed fragmented CSS: replaced render hook CSS injection with proper `->viteTheme()` across all 3 panels (Admin, Workgroup, Training). theme.css now imports Filament's pre-compiled dist CSS + custom MBFD overrides. All panels use Plus Jakarta Sans font and MBFD brand red. Build output 120KB unified theme.
+> **Mission Status: ✅ Production** (2026-03-12)  
+> NocoBase has been **decommissioned** (2026-03-08) â container stopped, image removed, volume deleted. All Nocobase scripts removed from repo.  
+> ✅ **Chatify real-time chat FIXED** (2026-03-09 evening) â Split-brain config resolved; backend uses internal Reverb (127.0.0.1:8080), frontend uses public wss:// via Cloudflare.  
+> ✅ **Daily Vehicle Inspections revived** (2026-03-09 late evening) â MBFD Forms now includes a dedicated Vehicle Inspections card, historical inspections render in a branded admin results viewer, checklist payloads are normalized for React, and the daily SPA now ships with updated service-worker cache busting plus custom `artisan serve` router handling for `/daily/*` routes.  
+> ✅ **Vehicle Inspection Checklists FIXED + ICS-212 Features** (2026-03-10) â Checklist pathing bug resolved (storage/checklists â storage/app/checklists), ladder type detection fixed to use designation, digital officer signatures added via react-signature-canvas, automated HOLD logic sets apparatus "Out of Service" on critical defects.
+> ✅ **Impeccable Design System Installed** (2026-03-10) â All 17 Impeccable skills installed to `.kilocode/skills/`, 7 domain reference files in `frontend-design/reference/`. UI/UX Modernization Plan generated.
+> ✅ **UI/UX Modernization Phase 0-3 DEPLOYED** (2026-03-10) â Removed all 37+ `@apply` from theme.css (iOS crash fix), fixed broken selectors, replaced pure grays with warm-tinted neutrals, new typography system (Plus Jakarta Sans + Source Sans 3), flattened nested stat cards, skeleton loading, stagger animations, search filter on vehicle inspections, reduced motion support.
+> ✅ **UI/UX Modernization Phase 4-8 DEPLOYED + CI/CD FIX** (2026-03-10 late evening) â Phase 4: button press feedback, sliding tab underline, focus-visible rings, toast animations. Phase 5: landing page redesign (cards primary, chatbot secondary, accent bars, removed System Overview). Phase 6: mobile-first polish (pointer:coarse, safe areas, scroll-snap tabs). Phase 7: tabular numbers, enhanced empty states, fluid typography. Phase 8: skip navigation, ARIA labels, font preload. CI/CD: daily-checkout builds in Docker, Reverb/queue worker post-deploy verification, explicit compose.yaml, view:cache error handling, filament:assets step, www.mbfdhub.com smoke tests.
+> ✅ **Enterprise Modernization Phases 1-7 MERGED** (2026-03-11) â Phase 1: Impeccable design system admin theme. Phase 2: Laravel Pulse + Spatie Health monitoring. Phase 3: Cloudflare AI Gateway routing (queue removed—requires paid plan). Phase 4: PWA hardening with Dexie offline DB, React Query, vite-plugin-pwa. Phase 5: fire_equipment_requests + station_inspections schema and API. Phase 6: FormsHub wizards (Equipment Request + Station Inspection). Phase 7: Filament admin restructuring with Station Management group and relation managers. Branch `feat/enterprise-modernization` merged to `main` and deployed to VPS.
+> ✅ **Workgroup Evaluation Modernization MERGED** (2026-03-11) â Phase 1: EvaluationService brand aggregation + competitor grouping. Phase 2: ERROR-018 fix â removed Livewire widgets, inlined data via getViewData() + async AI. Phase 3: Impeccable UI/UX overhaul for session results + admin dashboard. Phase 4: SAVER document generator â AI-powered purchasing report. Branch `feat/workgroup-evaluation-modernization` merged to `main` and deployed to VPS. Migration: `add_brand_competitor_group_to_candidate_products`.
+> ✅ **Unified Filament Theme Pipeline** (2026-03-11) â Fixed fragmented CSS: replaced render hook CSS injection with proper `->viteTheme()` across all 3 panels (Admin, Workgroup, Training). theme.css now imports Filament's pre-compiled dist CSS + custom MBFD overrides. All panels use Plus Jakarta Sans font and MBFD brand red. Build output 120KB unified theme.
+> ✅ **Notification Preferences + WebPush Debug Logging** (2026-03-12) â New `notification_preferences` JSON column on users table. NotificationSettings Filament page with 5 toggle categories (Vehicle Inspections, Station Inspections, Fire Equipment Requests, Workgroup Evaluations, Station Inventory Alerts). Registered in Admin and Workgroup panel user menus. AppServiceProvider filters recipients by preferences before dispatch. Station inventory submissions now trigger NewSubmissionNotification. WebPush diagnostic logging added to NewSubmissionNotification (ShouldQueue + failed()), PushSubscriptionController, and push-notification-widget.js.
 
 ## Project Identity
 Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filament 3 backend, React SPA daily checkout, Baserow data platform — all containerized on a single VPS.
@@ -134,6 +135,53 @@ GOOGLE_SHEETS_TAB_SHEET_ID=1714038258
 ## CI/CD Notes
 - Smoke tests in `deploy.yml` target `https://www.mbfdhub.com`
 - All darleyplex.com references have been migrated to mbfdhub.com
+
+---
+
+## Notification System Architecture
+
+### 1. Web Push Notifications (Browser Push)
+- **Package**: `laravel-notification-channels/webpush`
+- **Configuration**: VAPID keys in `.env` (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`).
+- **Database**: `push_subscriptions` table stores user subscriptions.
+- **Frontend Integration**:
+  - `PushNotificationWidget` (Filament widget) allows users to enable/disable push notifications and send a test notification.
+  - `resources/js/push-notification-widget.js` handles the client-side logic.
+  - Service workers:
+    - `public/sw.js` handles push events for the main app (Admin, Training, Workgroup panels).
+    - ⚠️ **ISSUE (ERROR-036)**: `public/daily/sw.js` (generated by VitePWA for the React app) currently **LACKS** the push event listener because it's overwritten by the build process.
+- **Use Cases**:
+  - **Chat Messages**: `ChMessageObserver` listens for new chat messages and sends a `ChatMessageReceived` push notification to the recipient. Includes rate limiting (max 1 per 30 seconds per sender-recipient pair).
+  - **Test Notifications**: `TestPushNotification` can be triggered from the widget.
+  - **Critical Alerts**: `CriticalAlertNotification` is defined but not currently implemented/used anywhere in the codebase.
+
+### 2. In-App Database Notifications (Filament)
+- **Package**: Built-in Filament Notifications (`Filament\Notifications\Notification`).
+- **Database**: `notifications` table.
+- **Polling**: Configured to poll every 30 seconds in `AdminPanelProvider`, `TrainingPanelProvider`, and `WorkgroupPanelProvider`.
+- **Use Cases**:
+  - **Project Management**: `NotificationService` sends notifications for overdue projects, overdue milestones, priority alerts, budget alerts, and status updates. Triggered by scheduled console commands (`projects:analyze-priorities`, `projects:check-overdue`, `projects:weekly-summary`, `projects:milestone-reminders`).
+  - **Tracking**: `NotificationTracking` model and `notification_tracking` table are used to prevent duplicate notifications (cooldown period).
+  - **Action Feedback**: Used extensively across Filament resources and pages to provide success/error feedback (e.g., "Draft Saved", "Evaluation Submitted", "Access Denied").
+  - **Observers**: `TodoObserver` sends a notification when a new Todo is assigned.
+
+### 3. Notification Preferences (2026-03-12)
+- **Database**: `notification_preferences` JSON column on `users` table (nullable; defaults to all-enabled).
+- **Model**: `User::getResolvedNotificationPreferences()` merges saved preferences with defaults. `User::wantsNotificationPreference($key)` checks a single category.
+- **Categories**: `vehicle_inspections`, `station_inspections`, `fire_equipment_requests`, `workgroup_evaluations`, `station_inventory_alerts`.
+- **UI**: `App\Filament\Pages\NotificationSettings` — Filament page with toggle form, accessible from user menu in Admin and Workgroup panels (role-gated via `canManageNotificationSettings()`).
+- **Dispatch Filtering**: `AppServiceProvider::notifySubmissionRoles()` filters recipients by their saved preferences before sending `NewSubmissionNotification`.
+- **Station Inventory Alerts**: `StationInventorySubmission::created` now dispatches `NewSubmissionNotification` to `super_admin` and `logistics_admin` roles.
+
+### 4. WebPush Debug Logging (2026-03-12)
+- `NewSubmissionNotification` implements `ShouldQueue` with `failed()` method logging VAPID key presence and exception details.
+- `PushSubscriptionController` logs all store/delete requests with payload shape, user agent, and IP.
+- `push-notification-widget.js` logs subscription payload fields, server response status, and error details to browser console.
+
+### 5. Other Channels
+- **Email**: No email notifications are currently implemented.
+- **SMS**: No SMS notifications are currently implemented.
+- **Third-Party**: No Slack/Discord/Teams integrations are currently implemented.
 
 ---
 
