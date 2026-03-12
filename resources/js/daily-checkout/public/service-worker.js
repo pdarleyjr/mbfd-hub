@@ -151,6 +151,59 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// ─── Push Notification Handlers (ERROR-036 fix) ───────────────────────────────
+// These listeners MUST be present in the final sw.js to receive web push events.
+// VitePWA's Workbox build was previously stripping them. The serviceWorkerCopyPlugin
+// in vite.config.js copies this file to public/daily/sw.js at closeBundle, preserving
+// these handlers.
+
+self.addEventListener('push', function (event) {
+  if (!(self.Notification && self.Notification.permission === 'granted')) {
+    return;
+  }
+
+  const payload = event.data ? event.data.json() : {};
+  const title = payload.title || 'MBFD Hub Update';
+  const options = {
+    body: payload.body || 'New activity reported.',
+    icon: payload.icon || '/images/mbfd-logo.png',
+    badge: '/images/mbfd-logo.png',
+    data: payload.data || {},
+    actions: payload.actions || [],
+    vibrate: [200, 100, 200],
+    tag: payload.tag || 'mbfd-notification',
+    requireInteraction: true,
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', function (event) {
+  event.notification.close();
+
+  const data = event.notification.data || {};
+  let urlToOpen = data.url || '/admin';
+
+  if (event.action === 'open-chat' || urlToOpen.includes('/chat')) {
+    urlToOpen = data.url || '/admin/chat';
+  }
+
+  event.waitUntil(
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then(function (clientList) {
+        for (let i = 0; i < clientList.length; i++) {
+          const client = clientList[i];
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.navigate(urlToOpen);
+            return client.focus();
+          }
+        }
+        return clients.openWindow(urlToOpen);
+      })
+  );
+});
+
 // Message event - handle offline submission queue
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {

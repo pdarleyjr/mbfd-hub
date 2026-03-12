@@ -3,6 +3,7 @@ import ApparatusList from './components/ApparatusList';
 import InspectionWizard from './components/InspectionWizard';
 import SuccessPage from './components/SuccessPage';
 import OfflineIndicator from './components/OfflineIndicator';
+import { IOSInstallPrompt } from './components/IOSInstallPrompt';
 import StationListPage from './components/StationListPage';
 import StationDetailPage from './components/StationDetailPage';
 import RoomAssetTracker from './components/RoomAssetTracker';
@@ -133,6 +134,7 @@ function App() {
         </a>
         <HomeNav />
         <OfflineIndicator />
+        <IOSInstallPrompt />
         <main id="main-content" className="max-w-5xl mx-auto py-8 px-4">
           <Routes>
             <Route path="/" element={<LandingPage />} />
