@@ -5,8 +5,13 @@ namespace App\Providers;
 use App\Models\Todo;
 use App\Models\ChMessage;
 use App\Models\Apparatus;
+use App\Models\ApparatusInspection;
 use App\Models\EvaluationSubmission;
+use App\Models\FireEquipmentRequest;
+use App\Models\StationInspection;
 use App\Models\WorkgroupSharedUpload;
+use App\Models\User;
+use App\Notifications\NewSubmissionNotification;
 use App\Observers\TodoObserver;
 use App\Observers\ChMessageObserver;
 use App\Observers\ApparatusObserver;
@@ -71,5 +76,79 @@ class AppServiceProvider extends ServiceProvider
         FilamentAsset::register([
             Js::make('push-notification-widget', Vite::asset('resources/js/push-notification-widget.js')),
         ]);
+
+        // ─── Submission Notification Triggers ──────────────────────────────
+        // Dispatch NewSubmissionNotification (database + web push) when new
+        // user-facing forms are submitted across the MBFD Hub platform.
+
+        StationInspection::created(function (StationInspection $inspection) {
+            $stationName = $inspection->station?->name ?? 'Unknown Station';
+            $this->notifySubmissionRoles(
+                ['super_admin', 'logistics_admin'],
+                'station_inspection',
+                'New Station Inspection Submitted',
+                "A station inspection for {$stationName} has been submitted.",
+                '/admin/station-inspections/' . $inspection->id,
+            );
+        });
+
+        FireEquipmentRequest::created(function (FireEquipmentRequest $request) {
+            $this->notifySubmissionRoles(
+                ['super_admin', 'logistics_admin'],
+                'fire_equipment_request',
+                'New Fire Equipment Request',
+                'A new fire equipment request has been submitted.',
+                '/admin/fire-equipment-requests/' . $request->id,
+            );
+        });
+
+        EvaluationSubmission::created(function (EvaluationSubmission $submission) {
+            $productName = $submission->candidateProduct?->name ?? 'a product';
+            $this->notifySubmissionRoles(
+                ['super_admin', 'workgroup_facilitator'],
+                'evaluation_submission',
+                'New Evaluation Submitted',
+                "An evaluation for {$productName} has been submitted.",
+                '/admin/evaluation-submissions/' . $submission->id,
+            );
+        });
+
+        ApparatusInspection::created(function (ApparatusInspection $inspection) {
+            $unitNumber = $inspection->apparatus?->unit_number ?? 'Unknown';
+            $this->notifySubmissionRoles(
+                ['super_admin', 'logistics_admin'],
+                'apparatus_inspection',
+                'New Vehicle Inspection',
+                "A vehicle inspection for unit {$unitNumber} has been submitted.",
+                '/admin/apparatus-inspections/' . $inspection->id,
+            );
+        });
+    }
+
+    /**
+     * Dispatch a NewSubmissionNotification to all users with the given roles.
+     */
+    private function notifySubmissionRoles(
+        array $roles,
+        string $submissionType,
+        string $title,
+        string $body,
+        string $actionUrl,
+    ): void {
+        $recipients = User::whereHas('roles', fn ($q) => $q->whereIn('name', $roles))->get();
+
+        if ($recipients->isEmpty()) {
+            return;
+        }
+
+        \Illuminate\Support\Facades\Notification::send(
+            $recipients,
+            new NewSubmissionNotification(
+                submissionType: $submissionType,
+                title: $title,
+                body: $body,
+                actionUrl: $actionUrl,
+            ),
+        );
     }
 }
