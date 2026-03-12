@@ -579,5 +579,48 @@ The MBFD Hub production deployment remains operational after a full UI/UX enhanc
 - `resources/css/filament/admin/theme.css` (workgroup result styles)
 - `database/migrations/2026_03_11_194600_add_brand_competitor_group_to_candidate_products.php`
 
+## Notification System Architecture (2026-03-11)
+
+---
+
+## ADDENDUM — 2026-03-12: Notification Preferences + WebPush Debug Logging
+
+### Notification Preferences Feature
+- **Migration**: `2026_03_12_090000_add_notification_preferences_to_users_table` adds nullable `notification_preferences` JSON column to `users` table.
+- **User Model**: `notification_preferences` cast to array. Constants for 5 preference keys. `getResolvedNotificationPreferences()` merges saved with defaults. `wantsNotificationPreference($key)` checks a single category. `preferenceKeyForSubmissionType($type)` maps submission types to preference keys.
+- **Filament Page**: `App\Filament\Pages\NotificationSettings` — toggle form for 5 categories (Vehicle Inspections, Station Inspections, Fire Equipment Requests, Workgroup Evaluations, Station Inventory Alerts). Hidden from sidebar, accessible via user menu in Admin and Workgroup panels. Role-gated via `canManageNotificationSettings()`.
+- **Panel Registration**: `AdminPanelProvider` and `WorkgroupPanelProvider` both register `NotificationSettings` in `->userMenuItems()` with `->visible()` closure.
+- **Dispatch Filtering**: `AppServiceProvider::notifySubmissionRoles()` now filters recipients by their saved notification preferences before sending.
+
+### Station Inventory Submission Alerts
+- `StationInventorySubmission::created` listener added to `AppServiceProvider::boot()`.
+- Dispatches `NewSubmissionNotification` to `super_admin` and `logistics_admin` roles with station number, employee name, and shift details.
+
+### WebPush Debug Logging
+- `NewSubmissionNotification` now implements `ShouldQueue` with `failed()` method that logs VAPID key presence and exception details.
+- `via()` and `toWebPush()` methods log structured diagnostics (notifiable ID, email, push subscription count, VAPID config presence).
+- `PushSubscriptionController` logs all store/delete requests with endpoint, key lengths, user agent, and IP.
+- `push-notification-widget.js` logs subscription payload shape (endpoint, p256dh length, auth length), server response status/body, and validates key presence before POST.
+
+### Deployment
+- Commit: `9e3bfe86`
+- Migration ran successfully on VPS (37.39ms).
+- Queue worker restarted to pick up updated notification classes.
+- All caches cleared (`optimize:clear`, `view:clear`).
+
+### Files Added/Modified
+| File | Purpose |
+|---|---|
+| `app/Filament/Pages/NotificationSettings.php` | Notification preferences Filament page |
+| `resources/views/filament/pages/notification-settings.blade.php` | Notification settings Blade view |
+| `database/migrations/2026_03_12_090000_add_notification_preferences_to_users_table.php` | Migration |
+| `app/Models/User.php` | Preference constants, casting, helper methods |
+| `app/Providers/AppServiceProvider.php` | Station inventory listener, preference filtering |
+| `app/Providers/Filament/AdminPanelProvider.php` | User menu item for notification settings |
+| `app/Providers/Filament/WorkgroupPanelProvider.php` | User menu item for notification settings |
+| `app/Notifications/NewSubmissionNotification.php` | ShouldQueue, failed(), diagnostic logging |
+| `app/Http/Controllers/Api/PushSubscriptionController.php` | Store/delete request logging |
+| `resources/js/push-notification-widget.js` | Subscription payload and response logging |
+
 ---
 **END OF DISCOVERY REPORT**
