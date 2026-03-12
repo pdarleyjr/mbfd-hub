@@ -109,9 +109,13 @@ class StationInspectionController extends Controller
         ]);
 
         // Resolve station name to station_id
-        $station = \App\Models\Station::where('name', $validated['station'])
-            ->orWhere('station_number', $validated['station'])
-            ->first();
+        // 'name' is an accessor on Station, not a real column. Extract station_number.
+        $stationValue = $validated['station'];
+        // Handle "Station X" format → extract the number
+        if (preg_match('/^Station\s+(\d+)$/i', $stationValue, $matches)) {
+            $stationValue = $matches[1];
+        }
+        $station = \App\Models\Station::where('station_number', $stationValue)->first();
 
         if (!$station) {
             return response()->json(['message' => 'Station not found: ' . $validated['station']], 422);
