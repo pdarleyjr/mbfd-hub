@@ -9,6 +9,7 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
 
 class StationInspectionResource extends Resource
 {
@@ -163,11 +164,27 @@ class StationInspectionResource extends Resource
                                     $html .= "<div style='margin-bottom: 16px;'>";
                                     $html .= "<h4 style='font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 8px;'>{$catName}</h4>";
                                     $html .= "<div style='display: grid; gap: 4px;'>";
+
                                     foreach ($items as $item) {
                                         $icon = $statusIcons[$item['status'] ?? ''] ?? '⬜';
                                         $label = $item['label'] ?? $item['id'] ?? '';
-                                        $html .= "<div style='display: flex; align-items: center; gap: 8px;'>{$icon} <span>{$label}</span></div>";
+                                        $html .= "<div style='display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px;'>{$icon} <span>{$label}</span>";
+
+                                        // Show fail details
+                                        if (strtolower($item['status'] ?? '') === 'fail') {
+                                            if (!empty($item['failNotes'])) {
+                                                $notes = e($item['failNotes']);
+                                                $html .= "<br><span style='margin-left: 24px; color: #dc2626; font-size: 0.875rem;'>Notes: {$notes}</span>";
+                                            }
+                                            if (!empty($item['failImage']) && !str_contains($item['failImage'], 'base64')) {
+                                                $url = Storage::url($item['failImage']);
+                                                $html .= "<br><img src=\"{$url}\" alt=\"Fail photo\" style=\"margin-left: 24px; max-width: 300px; max-height: 200px; border: 1px solid #fca5a5; border-radius: 6px; margin-top: 4px;\" />";
+                                            }
+                                        }
+
+                                        $html .= "</div>";
                                     }
+
                                     $html .= '</div></div>';
                                 }
                                 return $html;

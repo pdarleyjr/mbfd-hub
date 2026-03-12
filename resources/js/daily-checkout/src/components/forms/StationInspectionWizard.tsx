@@ -16,9 +16,11 @@ interface ChecklistItem {
   label: string;
   category: string;
   status: 'pass' | 'fail' | 'na' | null;
+  failNotes: string;
+  failImage: string;
 }
 
-const DEFAULT_CHECKLIST: Omit<ChecklistItem, 'status'>[] = [
+const DEFAULT_CHECKLIST: Omit<ChecklistItem, 'status' | 'failNotes' | 'failImage'>[] = [
   // Apparatus Area
   { id: 'app_doors', label: 'Apparatus Doors', category: 'Apparatus Area' },
   { id: 'app_floors', label: 'Floors & Ramps', category: 'Apparatus Area' },
@@ -44,24 +46,6 @@ const DEFAULT_CHECKLIST: Omit<ChecklistItem, 'status'>[] = [
   { id: 'off_furnishings', label: 'Furnishings', category: 'Offices & Lobby' },
   { id: 'off_floors', label: 'Floors', category: 'Offices & Lobby' },
   { id: 'off_windows', label: 'Windows', category: 'Offices & Lobby' },
-  // Apparatus Cleanliness
-  { id: 'ac_insp_sheet', label: 'Insp Sheet', category: 'Apparatus Cleanliness' },
-  { id: 'ac_exterior', label: 'Exterior', category: 'Apparatus Cleanliness' },
-  { id: 'ac_cab', label: 'Cab', category: 'Apparatus Cleanliness' },
-  { id: 'ac_compartments', label: 'Compartments', category: 'Apparatus Cleanliness' },
-  { id: 'ac_undercarriage', label: 'Undercarriage', category: 'Apparatus Cleanliness' },
-  { id: 'ac_wheels', label: 'Wheels', category: 'Apparatus Cleanliness' },
-  // Equipment Cleanliness
-  { id: 'ec_gas', label: 'Portable Gas Equip', category: 'Equipment Cleanliness' },
-  { id: 'ec_electrical', label: 'Electrical Equip', category: 'Equipment Cleanliness' },
-  { id: 'ec_hand_tools', label: 'Hand Tools', category: 'Equipment Cleanliness' },
-  { id: 'ec_ladders', label: 'Ladders', category: 'Equipment Cleanliness' },
-  // Spot Checks
-  { id: 'sc_fuel', label: 'Fuel', category: 'Spot Checks' },
-  { id: 'sc_oil', label: 'Oil', category: 'Spot Checks' },
-  { id: 'sc_tires', label: 'Tires', category: 'Spot Checks' },
-  { id: 'sc_oxygen', label: 'Portable Oxygen', category: 'Spot Checks' },
-  { id: 'sc_booster', label: 'Booster Tank', category: 'Spot Checks' },
 ];
 
 interface FormData {
@@ -83,7 +67,7 @@ export default function StationInspectionWizard() {
   const [form, setForm] = useState<FormData>({
     station: '',
     date: new Date().toISOString().split('T')[0],
-    checklist: DEFAULT_CHECKLIST.map((item) => ({ ...item, status: null })),
+    checklist: DEFAULT_CHECKLIST.map((item) => ({ ...item, status: null, failNotes: '', failImage: '' })),
     extinguishingSystemDate: '',
     notes: '',
     sogMandate: false,
@@ -97,7 +81,50 @@ export default function StationInspectionWizard() {
   const updateChecklistItem = (id: string, status: 'pass' | 'fail' | 'na') => {
     setForm((prev) => ({
       ...prev,
-      checklist: prev.checklist.map((item) => item.id === id ? { ...item, status: item.status === status ? null : status } : item),
+      checklist: prev.checklist.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              status: item.status === status ? null : status,
+              // Clear fail data when switching away from fail
+              failNotes: (item.status === status ? null : status) === 'fail' ? item.failNotes : '',
+              failImage: (item.status === status ? null : status) === 'fail' ? item.failImage : '',
+            }
+          : item
+      ),
+    }));
+  };
+
+  const updateFailNotes = (id: string, notes: string) => {
+    setForm((prev) => ({
+      ...prev,
+      checklist: prev.checklist.map((item) =>
+        item.id === id ? { ...item, failNotes: notes } : item
+      ),
+    }));
+  };
+
+  const handleFailImage = (id: string, file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setForm((prev) => ({
+        ...prev,
+        checklist: prev.checklist.map((item) =>
+          item.id === id ? { ...item, failImage: reader.result as string } : item
+        ),
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const passAllCategory = (category: string) => {
+    setForm((prev) => ({
+      ...prev,
+      checklist: prev.checklist.map((item) =>
+        item.category === category
+          ? { ...item, status: 'pass' as const, failNotes: '', failImage: '' }
+          : item
+      ),
     }));
   };
 
@@ -126,7 +153,7 @@ export default function StationInspectionWizard() {
         station: form.station,
         inspection_type: 'Saturday Station Inspection',
         date: form.date,
-        checklist: form.checklist.map(({ id, label, category, status }) => ({ id, label, category, status })),
+        checklist: form.checklist.map(({ id, label, category, status, failNotes, failImage }) => ({ id, label, category, status, failNotes: failNotes || undefined, failImage: failImage || undefined })),
         extinguishing_system_date: form.extinguishingSystemDate,
         notes: form.notes,
         sog_mandate_acknowledged: form.sogMandate,
@@ -208,7 +235,16 @@ export default function StationInspectionWizard() {
         <div className="space-y-6">
           {categories.map((cat) => (
             <div key={cat}>
-              <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">{cat}</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider">{cat}</h3>
+                <button
+                  type="button"
+                  onClick={() => passAllCategory(cat)}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-stone-700 rounded-lg hover:bg-stone-600 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                >
+                  Pass All
+                </button>
+              </div>
               <div className="space-y-2">
                 {form.checklist.filter((i) => i.category === cat).map((item) => (
                   <div key={item.id}>
@@ -222,6 +258,34 @@ export default function StationInspectionWizard() {
                         ))}
                       </div>
                     </div>
+                    {/* Conditional fail inputs */}
+                    {item.status === 'fail' && (
+                      <div className="ml-4 mt-2 mb-1 space-y-2">
+                        <textarea
+                          value={item.failNotes}
+                          onChange={(e) => updateFailNotes(item.id, e.target.value)}
+                          rows={2}
+                          placeholder="Describe the issue..."
+                          className="w-full px-3 py-2 bg-white border border-stone-300 rounded-lg text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 resize-none"
+                        />
+                        <div>
+                          <label className="block text-xs font-medium text-neutral-500 mb-1">Photo (optional)</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFailImage(item.id, file);
+                            }}
+                            className="block w-full text-sm text-neutral-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                          />
+                          {item.failImage && (
+                            <img src={item.failImage} alt="Fail evidence" className="mt-2 h-24 rounded-lg border border-stone-200 object-cover" />
+                          )}
+                        </div>
+                      </div>
+                    )}
                     {/* Extinguishing System date input */}
                     {item.id === 'kit_ext_system' && (
                       <div className="ml-4 mt-2 mb-1">
