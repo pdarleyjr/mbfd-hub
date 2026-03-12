@@ -24,6 +24,7 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Illuminate\Support\Facades\Blade;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\NotificationSettings;
 use App\Filament\Pages\Settings;
 use App\Http\Middleware\RedirectTrainingUsers;
 use App\Filament\Admin\Pages\EquipmentIntake;
@@ -113,6 +114,11 @@ class AdminPanelProvider extends PanelProvider
                     ->label('Settings')
                     ->url(fn (): string => Settings::getUrl())
                     ->icon('heroicon-o-cog-6-tooth'),
+                MenuItem::make()
+                    ->label('Notification Settings')
+                    ->url(fn (): string => NotificationSettings::getUrl(panel: 'admin'))
+                    ->icon('heroicon-o-bell')
+                    ->visible(fn (): bool => auth()->user()?->canManageNotificationSettings() ?? false),
                 MenuItem::make()
                     ->label('Return to Home')
                     ->url('/')

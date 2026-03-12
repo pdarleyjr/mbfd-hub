@@ -11,6 +11,13 @@ function pushNotificationWidget() {
             const widgetContainer = this.$el;
             this.VAPID_PUBLIC_KEY = widgetContainer.dataset.vapidKey || '';
 
+            console.log('[PushWidget] Widget boot payload:', {
+                vapidKeyPresent: Boolean(this.VAPID_PUBLIC_KEY),
+                vapidKeyLength: this.VAPID_PUBLIC_KEY.length,
+                notificationPermission: Notification.permission,
+                userAgent: navigator.userAgent,
+            });
+
             // Cache DOM elements - separate sections from controls
             this.sections = {
                 loading: widgetContainer.querySelector('#push-loading'),
@@ -87,6 +94,28 @@ function pushNotificationWidget() {
             return outputArray;
         },
 
+        buildSubscriptionPayload(subscription) {
+            const json = subscription.toJSON();
+
+            return {
+                endpoint: json.endpoint || '',
+                keys: {
+                    p256dh: json.keys?.p256dh || '',
+                    auth: json.keys?.auth || '',
+                },
+            };
+        },
+
+        async parseResponse(response) {
+            const rawBody = await response.text();
+
+            try {
+                return rawBody ? JSON.parse(rawBody) : null;
+            } catch (error) {
+                return rawBody;
+            }
+        },
+
         // Service Worker Registration
         async registerServiceWorker() {
             if ('serviceWorker' in navigator) {
@@ -143,7 +172,9 @@ function pushNotificationWidget() {
                 const subscription = await registration.pushManager.getSubscription();
 
                 if (subscription) {
-                    console.log('[PushWidget] User is subscribed');
+                    console.log('[PushWidget] User is subscribed', {
+                        endpoint: subscription.endpoint,
+                    });
                     this.show(this.sections.subscribedSection);
                 } else {
                     console.log('[PushWidget] User not subscribed, show subscribe button');
@@ -193,7 +224,18 @@ function pushNotificationWidget() {
                     applicationServerKey: this.urlBase64ToUint8Array(this.VAPID_PUBLIC_KEY)
                 });
 
-                console.log('[PushWidget] Push subscription created, sending to server...');
+                const payload = this.buildSubscriptionPayload(subscription);
+
+                console.log('[PushWidget] Push subscription payload prepared for backend:', {
+                    endpoint: payload.endpoint,
+                    p256dhLength: payload.keys.p256dh.length,
+                    authLength: payload.keys.auth.length,
+                    payload,
+                });
+
+                if (!payload.endpoint || !payload.keys.p256dh || !payload.keys.auth) {
+                    throw new Error('Push subscription is missing endpoint or encryption keys');
+                }
 
                 // Send to server
                 const response = await fetch('/api/push-subscriptions', {
@@ -204,11 +246,19 @@ function pushNotificationWidget() {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
                     },
                     credentials: 'same-origin',
-                    body: JSON.stringify(subscription.toJSON())
+                    body: JSON.stringify(payload)
+                });
+
+                const responseBody = await this.parseResponse(response);
+
+                console.log('[PushWidget] Subscription save response:', {
+                    status: response.status,
+                    ok: response.ok,
+                    body: responseBody,
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to save subscription');
+                    throw new Error('Failed to save subscription: ' + (responseBody?.message || response.statusText || 'Unknown error'));
                 }
 
                 console.log('[PushWidget] Subscription saved successfully');
@@ -234,11 +284,13 @@ function pushNotificationWidget() {
                 const subscription = await registration.pushManager.getSubscription();
 
                 if (subscription) {
+                    const endpoint = subscription.endpoint;
+
                     await subscription.unsubscribe();
-                    console.log('[PushWidget] Unsubscribed locally, notifying server...');
+                    console.log('[PushWidget] Unsubscribed locally, notifying server...', { endpoint });
 
                     // Notify server
-                    await fetch('/api/push-subscriptions', {
+                    const response = await fetch('/api/push-subscriptions', {
                         method: 'DELETE',
                         headers: {
                             'Content-Type': 'application/json',
@@ -246,7 +298,15 @@ function pushNotificationWidget() {
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
                         },
                         credentials: 'same-origin',
-                        body: JSON.stringify({ endpoint: subscription.endpoint })
+                        body: JSON.stringify({ endpoint })
+                    });
+
+                    const responseBody = await this.parseResponse(response);
+
+                    console.log('[PushWidget] Subscription delete response:', {
+                        status: response.status,
+                        ok: response.ok,
+                        body: responseBody,
                     });
                 }
 
@@ -276,13 +336,19 @@ function pushNotificationWidget() {
                     credentials: 'same-origin'
                 });
 
-                const data = await response.json();
+                const data = await this.parseResponse(response);
+
+                console.log('[PushWidget] Test notification response:', {
+                    status: response.status,
+                    ok: response.ok,
+                    body: data,
+                });
                 
-                if (data.success) {
+                if (data?.success) {
                     alert('Test notification sent! Check your device for the notification.');
                     console.log('[PushWidget] Test notification sent successfully');
                 } else {
-                    alert('Error: ' + (data.error || data.message || 'Failed to send test notification'));
+                    alert('Error: ' + (data?.error || data?.message || 'Failed to send test notification'));
                     console.error('[PushWidget] Test notification failed:', data);
                 }
             } catch (error) {
