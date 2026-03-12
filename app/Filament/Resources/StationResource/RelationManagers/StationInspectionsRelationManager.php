@@ -7,6 +7,7 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
 
 class StationInspectionsRelationManager extends RelationManager
 {
@@ -100,25 +101,70 @@ class StationInspectionsRelationManager extends RelationManager
                                             if (!is_array($data)) {
                                                 return (string) $state;
                                             }
-                                            $html = '<div style="display: grid; gap: 8px;">';
-                                            foreach ($data as $key => $value) {
-                                                $label = str_replace('_', ' ', ucfirst($key));
-                                                if (is_bool($value)) {
-                                                    $icon = $value ? '✅' : '❌';
-                                                    $html .= "<div>{$icon} <strong>{$label}</strong></div>";
-                                                } elseif (is_array($value)) {
-                                                    $html .= "<div><strong>{$label}:</strong><ul style='margin-left: 16px;'>";
-                                                    foreach ($value as $subKey => $subVal) {
-                                                        $subLabel = is_string($subKey) ? str_replace('_', ' ', ucfirst($subKey)) : $subKey;
-                                                        $subDisplay = is_bool($subVal) ? ($subVal ? '✅' : '❌') : $subVal;
-                                                        $html .= "<li>{$subLabel}: {$subDisplay}</li>";
-                                                    }
-                                                    $html .= '</ul></div>';
-                                                } else {
-                                                    $html .= "<div><strong>{$label}:</strong> {$value}</div>";
+
+                                            $checklist = $data['checklist'] ?? $data;
+                                            if (!is_array($checklist)) {
+                                                return (string) json_encode($data);
+                                            }
+
+                                            $statusIcons = [
+                                                'pass' => '✅',
+                                                'fail' => '❌',
+                                                'na' => '➖',
+                                            ];
+
+                                            // Group by category
+                                            $categories = [];
+                                            foreach ($checklist as $item) {
+                                                if (is_array($item) && isset($item['category'])) {
+                                                    $cat = $item['category'];
+                                                    $categories[$cat][] = $item;
                                                 }
                                             }
-                                            $html .= '</div>';
+
+                                            if (empty($categories)) {
+                                                // Fallback for old format
+                                                $html = '<div style="display: grid; gap: 8px;">';
+                                                foreach ($checklist as $key => $value) {
+                                                    $label = is_string($key) ? str_replace('_', ' ', ucfirst($key)) : $key;
+                                                    if (is_bool($value)) {
+                                                        $icon = $value ? '✅' : '❌';
+                                                        $html .= "<div>{$icon} <strong>{$label}</strong></div>";
+                                                    } elseif (is_array($value)) {
+                                                        $html .= "<div><strong>{$label}:</strong> " . json_encode($value) . '</div>';
+                                                    } else {
+                                                        $html .= "<div><strong>{$label}:</strong> {$value}</div>";
+                                                    }
+                                                }
+                                                $html .= '</div>';
+                                                return $html;
+                                            }
+
+                                            $html = '';
+                                            foreach ($categories as $catName => $items) {
+                                                $html .= "<div style='margin-bottom: 16px;'>";
+                                                $html .= "<h4 style='font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 8px;'>{$catName}</h4>";
+                                                $html .= "<div style='display: grid; gap: 4px;'>";
+                                                foreach ($items as $item) {
+                                                    $icon = $statusIcons[$item['status'] ?? ''] ?? '⬜';
+                                                    $label = $item['label'] ?? $item['id'] ?? '';
+                                                    $html .= "<div style='display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px;'>{$icon} <span>{$label}</span>";
+
+                                                    if (strtolower($item['status'] ?? '') === 'fail') {
+                                                        if (!empty($item['failNotes'])) {
+                                                            $notes = e($item['failNotes']);
+                                                            $html .= "<br><span style='margin-left: 24px; color: #dc2626; font-size: 0.875rem;'>Notes: {$notes}</span>";
+                                                        }
+                                                        if (!empty($item['failImage']) && !str_contains($item['failImage'], 'base64')) {
+                                                            $url = Storage::url($item['failImage']);
+                                                            $html .= "<br><img src=\"{$url}\" alt=\"Fail photo\" style=\"margin-left: 24px; max-width: 300px; max-height: 200px; border: 1px solid #fca5a5; border-radius: 6px; margin-top: 4px;\" />";
+                                                        }
+                                                    }
+
+                                                    $html .= "</div>";
+                                                }
+                                                $html .= '</div></div>';
+                                            }
                                             return $html;
                                         })
                                         ->html()

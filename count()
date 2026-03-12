@@ -1,6 +1,23 @@
-PowerShell Environment Ready
-VSCode Integration Active
-Type 'Optimize-VSCode -Admin' to run VSCode optimization
+sail          10  0.0  0.7 215568 115228 ?       S    Mar09   1:09 /usr/bin/php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction
+root        9760  0.1  0.6 213560 112756 ?       S    10:25   0:03 php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+---SUBS---
+
+   Psy\Exception\ParseErrorException 
+
+  PHP Parse error: Syntax error, unexpected '.' on line 1
+
+  at vendor/psy/psysh/src/Exception/ParseErrorException.php:44
+     40▕      * @param \PhpParser\Error $e
+     41▕      */
+     42▕     public static function fromParseError(\PhpParser\Error $e): self
+     43▕     {
+  ➜  44▕         return new self($e->getRawMessage(), $e->getAttributes());
+     45▕     }
+     46▕ }
+     47▕
+
+      [2m+19 vendor frames [22m
+
   20  artisan:13
       Illuminate\Foundation\Application::handleCommand()
 
