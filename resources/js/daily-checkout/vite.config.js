@@ -41,7 +41,7 @@ const manifestCopyPlugin = {
           fileName: 'manifest.json',
           source: JSON.stringify(manifest, null, 2)
         })
-        console.log('[manifest-copy] ✓ manifest.json added to bundle output')
+        console.log('[manifest-copy] \u2713 manifest.json added to bundle output')
       } catch (error) {
         console.error('[manifest-copy] Error processing manifest:', error.message)
       }
@@ -51,25 +51,49 @@ const manifestCopyPlugin = {
   }
 }
 
-const serviceWorkerCopyPlugin = {
-  name: 'service-worker-copy',
+// This plugin MUST be placed AFTER VitePWA in the plugins array.
+// VitePWA's generateSW mode produces its own sw.js during closeBundle,
+// overwriting any previously copied custom service worker.
+// This plugin appends the push/notificationclick listeners from our
+// custom service-worker.js into VitePWA's generated sw.js.
+const serviceWorkerPushInjectPlugin = {
+  name: 'service-worker-push-inject',
   apply: 'build',
   closeBundle() {
-    const sourcePath = path.join(__dirname, 'public', 'service-worker.js')
-    const destPath = path.join(__dirname, '..', '..', '..', 'public', 'daily', 'sw.js')
+    const customSwPath = path.join(__dirname, 'public', 'service-worker.js')
+    const outputSwPath = path.join(__dirname, '..', '..', '..', 'public', 'daily', 'sw.js')
     
-    console.log(`[service-worker-copy] Copying service worker from: ${sourcePath}`)
-    console.log(`[service-worker-copy] To: ${destPath}`)
+    console.log(`[sw-push-inject] Injecting push listeners from: ${customSwPath}`)
+    console.log(`[sw-push-inject] Into generated SW at: ${outputSwPath}`)
     
-    if (fs.existsSync(sourcePath)) {
+    if (fs.existsSync(customSwPath) && fs.existsSync(outputSwPath)) {
       try {
-        fs.copyFileSync(sourcePath, destPath)
-        console.log('[service-worker-copy] ✓ Service worker copied successfully as sw.js')
+        const customSw = fs.readFileSync(customSwPath, 'utf-8')
+        
+        // Extract everything from the push handler comment to the end of notificationclick
+        const pushSection = customSw.substring(
+          customSw.indexOf('// \u2500\u2500\u2500 Push Notification Handlers')
+        )
+        // Find end of notificationclick listener block
+        const notificationClickEnd = pushSection.indexOf("// Message event")
+        const pushListeners = notificationClickEnd > 0
+          ? pushSection.substring(0, notificationClickEnd).trim()
+          : pushSection.trim()
+        
+        if (pushListeners.includes("addEventListener('push'")) {
+          const generatedSw = fs.readFileSync(outputSwPath, 'utf-8')
+          fs.writeFileSync(outputSwPath, generatedSw + '\n\n' + pushListeners + '\n')
+          console.log('[sw-push-inject] \u2713 Push + notificationclick listeners injected into generated sw.js')
+        } else {
+          // Fallback: overwrite entirely with the custom SW
+          fs.copyFileSync(customSwPath, outputSwPath)
+          console.log('[sw-push-inject] \u2713 Fallback: copied entire custom service worker as sw.js')
+        }
       } catch (error) {
-        console.error('[service-worker-copy] Error copying service worker:', error.message)
+        console.error('[sw-push-inject] Error:', error.message)
       }
     } else {
-      console.warn(`[service-worker-copy] Source service worker not found at ${sourcePath}`)
+      console.warn(`[sw-push-inject] Missing files: custom=${fs.existsSync(customSwPath)} output=${fs.existsSync(outputSwPath)}`)
     }
   }
 }
@@ -155,7 +179,7 @@ export default defineConfig({
       },
     }),
     manifestCopyPlugin,
-    serviceWorkerCopyPlugin,
+    serviceWorkerPushInjectPlugin,
     // Sentry plugin disabled temporarily - needs project setup in Sentry dashboard
     // sentryVitePlugin({
     //   org: process.env.SENTRY_ORG,
