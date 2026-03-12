@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('station_inspections', function (Blueprint $table) {
             $table->id();
             $table->foreignId('station_id')->constrained('stations')->cascadeOnDelete();
-            $table->foreignId('inspector_id')->constrained('users');
+            $table->foreignId('inspector_id')->nullable()->constrained('users');
             $table->date('inspection_date');
             $table->string('inspection_type');
             $table->json('form_data');
@@ -21,6 +21,8 @@ return new class extends Migration
             $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('reviewed_at')->nullable();
             $table->text('notes')->nullable();
+            $table->boolean('sog_mandate_acknowledged')->default(false);
+            $table->date('extinguishing_system_date')->nullable();
             $table->timestamps();
         });
     }
