@@ -113,6 +113,7 @@ class StationInspectionResource extends Resource
                     ->schema([
                         Infolists\Components\TextEntry::make('form_data')
                             ->label('Inspection Checklist')
+                            ->getStateUsing(fn ($record) => json_encode($record->form_data ?? []))
                             ->formatStateUsing(function ($state) {
                                 if (empty($state)) {
                                     return 'No checklist data';
