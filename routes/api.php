@@ -31,6 +31,9 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class , 'roomAssets']);
     Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class , 'apparatus']);
     Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class , 'projects']);
+
+    // Public Station Inspection submission (from React SPA)
+    Route::post('station_inspection', [StationInspectionController::class , 'storePublic']);
 });
 
 // Push notification routes (public VAPID key, authenticated subscription management)

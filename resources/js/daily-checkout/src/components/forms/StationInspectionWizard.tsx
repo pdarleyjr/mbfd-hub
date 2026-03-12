@@ -160,7 +160,7 @@ export default function StationInspectionWizard() {
         signature: form.signature,
         submitted_at: new Date().toISOString(),
       });
-      processPendingSubmissions('/api/admin').catch(() => {});
+      processPendingSubmissions('/api/public').catch(() => {});
       setSubmitted(true);
     } catch {
       alert('Failed to save. Your inspection will be retried automatically.');
