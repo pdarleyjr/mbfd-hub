@@ -167,10 +167,70 @@
 
 /* ===== TOPBAR ===== */
 .fi-topbar {
-    background-color: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border-bottom: 1px solid #E8E5E0;
+    background-color: #171717 !important; /* Impeccable dark neutral — matches React SPA header */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom: 2px solid rgba(239, 68, 68, 0.3) !important; /* MBFD Red accent */
+}
+
+/* Topbar icon buttons (hamburger, notifications, etc.) */
+.fi-topbar .fi-icon-btn {
+    color: #d4d4d4 !important;
+}
+
+.fi-topbar .fi-icon-btn:hover {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Topbar breadcrumbs */
+.fi-topbar nav[aria-label="Breadcrumb"],
+.fi-topbar .fi-breadcrumbs {
+    color: #a3a3a3 !important;
+}
+
+.fi-topbar .fi-breadcrumbs li,
+.fi-topbar .fi-breadcrumbs a {
+    color: #d4d4d4 !important;
+}
+
+.fi-topbar .fi-breadcrumbs a:hover {
+    color: #ffffff !important;
+}
+
+/* Topbar global search input */
+.fi-topbar .fi-global-search-field input,
+.fi-topbar .fi-input {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.fi-topbar .fi-global-search-field input::placeholder {
+    color: #a3a3a3 !important;
+}
+
+/* Topbar user menu / avatar text */
+.fi-topbar .fi-dropdown-trigger,
+.fi-topbar .fi-user-name,
+.fi-topbar [class*="text-gray"],
+.fi-topbar .text-sm {
+    color: #d4d4d4 !important;
+}
+
+/* Topbar sidebar toggle (open button when sidebar collapsed) */
+.fi-topbar .fi-sidebar-open-button {
+    color: #d4d4d4 !important;
+}
+
+.fi-topbar .fi-sidebar-open-button:hover {
+    color: #ffffff !important;
+}
+
+/* Topbar notification badge */
+.fi-topbar .fi-badge {
+    background-color: #dc2626 !important;
+    color: #ffffff !important;
 }
 
 /* ===== PAGE HEADER ===== */
