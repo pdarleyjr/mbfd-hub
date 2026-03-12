@@ -18,6 +18,20 @@ class User extends Authenticatable implements FilamentUser
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, HasRoles, HasPushSubscriptions;
 
+    public const NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS = 'vehicle_inspections';
+    public const NOTIFICATION_PREFERENCE_STATION_INSPECTIONS = 'station_inspections';
+    public const NOTIFICATION_PREFERENCE_FIRE_EQUIPMENT_REQUESTS = 'fire_equipment_requests';
+    public const NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS = 'workgroup_evaluations';
+    public const NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS = 'station_inventory_alerts';
+
+    public const DEFAULT_NOTIFICATION_PREFERENCES = [
+        self::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS => true,
+        self::NOTIFICATION_PREFERENCE_STATION_INSPECTIONS => true,
+        self::NOTIFICATION_PREFERENCE_FIRE_EQUIPMENT_REQUESTS => true,
+        self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS => true,
+        self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS => true,
+    ];
+
     /**
      * The attributes that are mass assignable.
      *
@@ -32,6 +46,7 @@ class User extends Authenticatable implements FilamentUser
         'station',
         'phone',
         'must_change_password',
+        'notification_preferences',
     ];
 
     /**
@@ -55,6 +70,7 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'must_change_password' => 'boolean',
+            'notification_preferences' => 'array',
         ];
     }
 
@@ -67,6 +83,65 @@ class User extends Authenticatable implements FilamentUser
             get: fn (string $value) => $value,
             set: fn (string $value) => strtolower($value),
         );
+    }
+
+    public static function notificationPreferenceDefinitions(): array
+    {
+        return [
+            self::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS => [
+                'label' => 'Vehicle Inspections',
+                'description' => 'Receive alerts when a vehicle inspection is submitted.',
+            ],
+            self::NOTIFICATION_PREFERENCE_STATION_INSPECTIONS => [
+                'label' => 'Station Inspections',
+                'description' => 'Receive alerts when a station inspection is submitted.',
+            ],
+            self::NOTIFICATION_PREFERENCE_FIRE_EQUIPMENT_REQUESTS => [
+                'label' => 'Fire Equipment Requests',
+                'description' => 'Receive alerts when a fire equipment request is submitted.',
+            ],
+            self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS => [
+                'label' => 'Workgroup Evaluations',
+                'description' => 'Receive alerts when a workgroup evaluation is submitted.',
+            ],
+            self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS => [
+                'label' => 'Station Inventory Alerts',
+                'description' => 'Receive alerts when a station inventory submission is received.',
+            ],
+        ];
+    }
+
+    public static function preferenceKeyForSubmissionType(string $submissionType): ?string
+    {
+        return match ($submissionType) {
+            'apparatus_inspection' => self::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS,
+            'station_inspection' => self::NOTIFICATION_PREFERENCE_STATION_INSPECTIONS,
+            'fire_equipment_request' => self::NOTIFICATION_PREFERENCE_FIRE_EQUIPMENT_REQUESTS,
+            'evaluation_submission' => self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS,
+            'station_inventory_submission' => self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS,
+            default => null,
+        };
+    }
+
+    public function getResolvedNotificationPreferences(): array
+    {
+        return array_merge(self::DEFAULT_NOTIFICATION_PREFERENCES, $this->notification_preferences ?? []);
+    }
+
+    public function wantsNotificationPreference(string $preferenceKey): bool
+    {
+        return (bool) ($this->getResolvedNotificationPreferences()[$preferenceKey] ?? true);
+    }
+
+    public function canManageNotificationSettings(): bool
+    {
+        return $this->hasAnyRole([
+            'super_admin',
+            'admin',
+            'logistics_admin',
+            'workgroup_admin',
+            'workgroup_facilitator',
+        ]);
     }
 
     /**

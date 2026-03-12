@@ -9,6 +9,7 @@ use App\Models\ApparatusInspection;
 use App\Models\EvaluationSubmission;
 use App\Models\FireEquipmentRequest;
 use App\Models\StationInspection;
+use App\Models\StationInventorySubmission;
 use App\Models\WorkgroupSharedUpload;
 use App\Models\User;
 use App\Notifications\NewSubmissionNotification;
@@ -123,6 +124,20 @@ class AppServiceProvider extends ServiceProvider
                 '/admin/apparatus-inspections/' . $inspection->id,
             );
         });
+
+        StationInventorySubmission::created(function (StationInventorySubmission $submission) {
+            $stationName = $submission->station?->station_number ?? 'Unknown Station';
+            $employeeName = $submission->employee_name ?: 'Unknown employee';
+            $shift = $submission->shift ?: 'Unknown shift';
+
+            $this->notifySubmissionRoles(
+                ['super_admin', 'logistics_admin'],
+                'station_inventory_submission',
+                'New Station Inventory Submission',
+                "Station {$stationName} submitted an inventory alert for {$shift} shift by {$employeeName}.",
+                '/admin/stations/' . $submission->station_id . '?activeRelationManager=inventoryItems',
+            );
+        });
     }
 
     /**
@@ -135,7 +150,12 @@ class AppServiceProvider extends ServiceProvider
         string $body,
         string $actionUrl,
     ): void {
-        $recipients = User::whereHas('roles', fn ($q) => $q->whereIn('name', $roles))->get();
+        $preferenceKey = User::preferenceKeyForSubmissionType($submissionType);
+
+        $recipients = User::whereHas('roles', fn ($q) => $q->whereIn('name', $roles))
+            ->get()
+            ->filter(fn (User $user): bool => $preferenceKey === null || $user->wantsNotificationPreference($preferenceKey))
+            ->values();
 
         if ($recipients->isEmpty()) {
             return;

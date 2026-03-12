@@ -22,6 +22,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Http\Middleware\EnsureWorkgroupPanelAccess;
 use Filament\View\PanelsRenderHook;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\NotificationSettings;
 use App\Filament\Workgroup\Pages\Dashboard;
 use App\Filament\Workgroup\Pages\Files;
 use App\Filament\Workgroup\Pages\Notes;
@@ -72,6 +73,7 @@ class WorkgroupPanelProvider extends PanelProvider
                 EvaluationFormPage::class,
                 Profile::class,
                 SessionResultsPage::class,
+                NotificationSettings::class,
             ])
             ->widgets([
                 \App\Filament\Workgroup\Widgets\WorkgroupStatsWidget::class,
@@ -103,6 +105,11 @@ class WorkgroupPanelProvider extends PanelProvider
                     ->url(fn (): string => Profile::getUrl())
                     ->icon('heroicon-o-cog-6-tooth'),
                 MenuItem::make()
+                    ->label('Notification Settings')
+                    ->url(fn (): string => NotificationSettings::getUrl(panel: 'workgroups'))
+                    ->icon('heroicon-o-bell')
+                    ->visible(fn (): bool => auth()->user()?->canManageNotificationSettings() ?? false),
+                MenuItem::make()
                     ->label('Return to Home')
                     ->url('/')
                     ->icon('heroicon-o-home'),
@@ -128,6 +135,8 @@ class WorkgroupPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_BEFORE,
                 fn (): string => '<a href="/" class="flex items-center justify-center w-10 h-10 rounded-lg text-gray-500 hover:text-primary-500 hover:bg-gray-100 transition" title="Return to Home" aria-label="Return to Home"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg></a>',
+            )
+            ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): string => '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <meta name="apple-mobile-web-app-capable" content="yes">
