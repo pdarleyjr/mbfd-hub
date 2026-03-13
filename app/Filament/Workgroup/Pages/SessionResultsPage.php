@@ -298,6 +298,7 @@ class SessionResultsPage extends Page
             'competitorGroupRankings' => $competitorGroupRankings,
             'isolatedProducts'      => $isolatedProducts,
             'nonRankableFeedback'   => $nonRankableFeedback instanceof \Illuminate\Support\Collection ? $nonRankableFeedback : collect($nonRankableFeedback),
+            'granularToolGroupings' => $evalService->getGranularToolGroupings($sessionId),
         ];
     }
 

@@ -61,7 +61,7 @@
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <div class="wg-ai-icon">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2h-2"/>
                     </svg>
                 </div>
                 <div>
@@ -134,7 +134,7 @@
             <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
                 @if($saverReportHtml)
                 <a href="{{ route('workgroup.saver-report') }}" target="_blank" class="wg-ai-btn wg-ai-btn--secondary" style="color: #fff; border-color: rgba(255,255,255,0.3);">
-                    <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z"/></svg>
+                    <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2z"/></svg>
                     Print Report
                 </a>
                 @endif
@@ -150,7 +150,7 @@
                         Generating...
                     </div>
                     <div wire:loading.remove wire:target="generateSaverReport" style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 02-2 2z"/></svg>
                         {{ $saverReportHtml ? 'Regenerate' : 'Generate SAVER Report' }}
                     </div>
                 </button>
@@ -187,454 +187,582 @@
     </div>
     @endif
 
-    {{-- Category Rankings Grid --}}
-    @if($categoryResults->isNotEmpty())
-    <div style="margin-bottom: 1.5rem;">
-        @foreach($categoryResults as $cat)
-        <div class="wg-section">
-            <div class="wg-section-header">
-                <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #B91C1C, #DC2626);">
-                    <x-heroicon-o-squares-2x2 class="w-5 h-5"/>
-                </div>
-                <div style="flex: 1;">
-                    <h3 class="wg-section-title">{{ $cat['category_name'] }}</h3>
-                    <p class="wg-section-subtitle">{{ $cat['total_products'] }} products · {{ $cat['eligible_products'] }} meet threshold</p>
-                </div>
-                @if($cat['top_products']->isNotEmpty())
-                <span style="display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; background-color: #FEF9C3; color: #854D0E; border: 1px solid #FDE68A;">
-                    <x-heroicon-o-trophy class="w-3.5 h-3.5"/>
-                    Top: {{ $cat['top_products']->first()['product']->name ?? 'N/A' }}
-                </span>
-                @endif
-            </div>
+    {{-- ══════════════════════════════════════════════════════════════════
+         GRANULAR TOOL GROUPINGS — Keyword-filtered presentation tables
+         Data source: $granularToolGroupings from EvaluationService
+    ══════════════════════════════════════════════════════════════════ --}}
+    @if(!empty($granularToolGroupings))
+    @php $gtg = $granularToolGroupings; @endphp
 
-            <div style="overflow-x: auto;">
-                <table class="wg-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 3rem; text-align: center;">#</th>
-                            <th>Product</th>
-                            <th style="text-align: center;">Overall</th>
-                            <th style="text-align: center;" class="wg-saver-s">S</th>
-                            <th style="text-align: center;" class="wg-saver-a">A</th>
-                            <th style="text-align: center;" class="wg-saver-v">V</th>
-                            <th style="text-align: center;" class="wg-saver-e">E</th>
-                            <th style="text-align: center;" class="wg-saver-r">R</th>
-                            <th style="text-align: center;">Advance</th>
-                            <th style="text-align: center;">Responses</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($cat['rankings'] as $index => $item)
-                        @php
-                            $rank = $index + 1;
-                            $isFinalist = $rank <= 2 && $item['meets_threshold'];
-                            $score = $item['weighted_average'];
-                            $medalClass = match(true) {
-                                $rank === 1 && $isFinalist => 'wg-brand-rank--gold',
-                                $rank === 2 && $isFinalist => 'wg-brand-rank--silver',
-                                $rank === 3 && $isFinalist => 'wg-brand-rank--bronze',
-                                default => '',
-                            };
-                            $medalBg = match(true) {
-                                $rank === 1 && $isFinalist => 'background-color: #C5A55A; color: #fff;',
-                                $rank === 2 && $isFinalist => 'background-color: #A8A8A8; color: #fff;',
-                                $rank === 3 && $isFinalist => 'background-color: #CD7F32; color: #fff;',
-                                default => '',
-                            };
-                        @endphp
-                        <tr>
-                            <td style="text-align: center;">
-                                @if($rank <= 3 && $isFinalist)
-                                    <span class="wg-rank-medal {{ $medalClass }}" style="width: 1.5rem; height: 1.5rem; font-size: 0.625rem; {{ $medalBg }}">{{ $rank }}</span>
-                                @else
-                                    <span style="color: #A8A29E; font-size: 0.75rem;">{{ $rank }}</span>
-                                @endif
-                            </td>
-                            <td>
-                                <div style="font-weight: 600; color: #292524;">{{ $item['product']->name }}</div>
-                                @if($item['product']->manufacturer)
-                                <div style="font-size: 0.6875rem; color: #A8A29E;">{{ $item['product']->manufacturer }} {{ $item['product']->model ? '· '.$item['product']->model : '' }}</div>
-                                @endif
-                            </td>
-                            <td style="text-align: center;">
-                                @if($score !== null)
-                                <span class="wg-score-badge {{ $score >= 80 ? 'wg-score-badge--high' : ($score >= 60 ? 'wg-score-badge--mid' : 'wg-score-badge--low') }}">
-                                    {{ number_format($score, 1) }}
-                                </span>
-                                @else
-                                <span style="color: #D4D0CA;">—</span>
-                                @endif
-                            </td>
-                            @foreach(['capability_avg', 'usability_avg', 'affordability_avg', 'maintainability_avg', 'deployability_avg'] as $ki => $saverKey)
-                            <td style="text-align: center; font-size: 0.75rem;" class="wg-score">
-                                @if($item[$saverKey])
-                                    <span class="{{ ['wg-saver-s','wg-saver-a','wg-saver-v','wg-saver-e','wg-saver-r'][$ki] }}">{{ number_format($item[$saverKey], 0) }}</span>
-                                @else
-                                    <span style="color: #D4D0CA;">—</span>
-                                @endif
-                            </td>
-                            @endforeach
-                            <td style="text-align: center;">
-                                @if($item['advance_yes'] > 0 || $item['advance_no'] > 0)
-                                <span style="font-size: 0.75rem;">
-                                    <span style="color: #059669; font-weight: 500;">{{ $item['advance_yes'] }}✓</span>
-                                    @if($item['advance_no'] > 0)
-                                    <span style="color: #DC2626; margin-left: 0.25rem;">{{ $item['advance_no'] }}✕</span>
-                                    @endif
-                                </span>
-                                @if($item['deal_breakers'] > 0)
-                                <span style="margin-left: 0.25rem; font-size: 0.75rem; color: #DC2626;" title="{{ $item['deal_breakers'] }} deal-breaker(s)">⚠️</span>
-                                @endif
-                                @else
-                                <span style="color: #D4D0CA; font-size: 0.75rem;">—</span>
-                                @endif
-                            </td>
-                            <td style="text-align: center;">
-                                <span class="wg-score" style="font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px;
-                                    {{ $item['meets_threshold'] ? 'background-color: #EFF6FF; color: #1E40AF;' : 'background-color: #F5F3F0; color: #78716C;' }}">
-                                    {{ $item['response_count'] }}
-                                </span>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+    {{-- ── T1 Standalone Table ── --}}
+    @if($gtg['t1_standalone'])
+    <div class="wg-section" style="margin-bottom: 1.25rem;">
+        <div class="wg-section-header" style="background-color: #FEF9C3;">
+            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #D97706, #F59E0B);">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+            </div>
+            <div style="flex: 1;">
+                <h3 class="wg-section-title">T1 — Forcible Entry Tool</h3>
+                <p class="wg-section-subtitle" style="color: #92400E; font-weight: 500;">For consideration in replacing the <strong>Rabbit Tool</strong> (Forcible entry tool currently in use)</p>
             </div>
         </div>
-        @endforeach
-    </div>
-    @endif
-
-    {{-- Competitor Group Rankings --}}
-    @if(!empty($competitorGroupRankings))
-    <div class="wg-section">
-        <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #2563EB, #0891B2);">
-                <x-heroicon-o-scale class="w-5 h-5"/>
-            </div>
-            <div>
-                <h2 class="wg-section-title">Competitor Group Rankings</h2>
-                <p class="wg-section-subtitle">Products ranked against direct competitors within the same group</p>
-            </div>
-        </div>
-
-        @foreach($competitorGroupRankings as $cgCategory)
-        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid #E8E5E0;">
-            <h3 style="font-size: 0.875rem; font-weight: 700; color: #292524; margin-bottom: 0.75rem;">{{ $cgCategory['category_name'] }}</h3>
-
-            @foreach($cgCategory['groups'] as $group)
-            <div class="wg-competitor-group">
-                <h4 class="wg-group-name">{{ $group['group_name'] }} <span class="wg-group-count">({{ $group['product_count'] }} products)</span></h4>
+        <div class="wg-section-body">
+            @php $t1 = $gtg['t1_standalone']; @endphp
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background-color: #FFFBEB; border: 1px solid #FDE68A; border-radius: 0.625rem;">
                 <div>
-                    @foreach($group['rankings'] as $rIdx => $ranking)
-                    @php
-                        $groupMedalBg = match(true) {
-                            $rIdx === 0 => 'background-color: #C5A55A; color: #fff;',
-                            $rIdx === 1 => 'background-color: #A8A8A8; color: #fff;',
-                            $rIdx === 2 => 'background-color: #CD7F32; color: #fff;',
-                            default => '',
-                        };
-                    @endphp
-                    <div class="wg-group-item {{ $rIdx === 0 ? 'wg-group-item--leader' : '' }}">
-                        <span class="wg-rank-medal" style="width: 1.5rem; height: 1.5rem; font-size: 0.625rem; {{ $groupMedalBg }}">{{ $rIdx + 1 }}</span>
-                        <div style="flex: 1; min-width: 0;">
-                            <span style="font-size: 0.8125rem; font-weight: 600; color: #292524;">{{ $ranking['name'] }}</span>
-                            @if($ranking['brand'])
-                            <span style="font-size: 0.6875rem; color: #A8A29E; margin-left: 0.25rem;">({{ $ranking['brand'] }})</span>
-                            @endif
-                        </div>
-                        @if($ranking['avg_score'] !== null)
-                        <span class="wg-score-badge {{ $ranking['avg_score'] >= 70 ? 'wg-score-badge--high' : 'wg-score-badge--mid' }}">
-                            {{ number_format($ranking['avg_score'], 1) }}
-                        </span>
-                        @else
-                        <span style="font-size: 0.75rem; color: #D4D0CA;">—</span>
-                        @endif
-                        <span style="font-size: 0.6875rem; color: #A8A29E;">{{ $ranking['response_count'] }} resp.</span>
-                    </div>
-                    @endforeach
+                    <h4 style="font-weight: 700; color: #292524; font-size: 1rem;">{{ $t1['name'] }}</h4>
+                    @if($t1['brand'])
+                    <p style="font-size: 0.75rem; color: #78716C;">{{ $t1['brand'] }}</p>
+                    @endif
                 </div>
-            </div>
-            @endforeach
-        </div>
-        @endforeach
-    </div>
-    @endif
-
-    {{-- Brand Group Purchase Analysis --}}
-    @if(!empty($brandGroupedAnalysis) && $session)
-    <div class="wg-section">
-        <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #D97706, #EA580C);">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-            </div>
-            <div>
-                <h2 class="wg-section-title">Package Purchase Recommendation</h2>
-                <p style="color: #78716C; font-size: 0.875rem; margin-bottom: 0.5rem;">Brand rankings by composite score — best value for complete tool set</p>
-            </div>
-        </div>
-
-        @foreach($brandGroupedAnalysis as $group)
-        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid #E8E5E0;">
-            <div style="margin-bottom: 0.75rem;">
-                <h3 style="font-size: 0.9375rem; font-weight: 700; color: #292524;">{{ $group['category_name'] }}</h3>
-                <p style="font-size: 0.6875rem; color: #A8A29E;">{{ $group['brand_count'] }} brands · {{ $group['total_products'] }} products compared</p>
-            </div>
-
-            @foreach($group['brand_rankings'] as $rank => $brandData)
-            @php
-                $medalClass = match($rank) { 0 => 'wg-brand-rank--gold', 1 => 'wg-brand-rank--silver', 2 => 'wg-brand-rank--bronze', default => '' };
-                $brandMedalBg = match(true) {
-                    $rank === 0 => 'background-color: #C5A55A; color: #fff;',
-                    $rank === 1 => 'background-color: #A8A8A8; color: #fff;',
-                    $rank === 2 => 'background-color: #CD7F32; color: #fff;',
-                    default => '',
-                };
-            @endphp
-            <div class="wg-brand-rank {{ $medalClass }}">
-                <span class="wg-rank-medal" style="width: 2rem; height: 2rem; {{ $brandMedalBg }}">{{ $rank + 1 }}</span>
-                <div style="flex: 1;">
-                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;">
-                        <span class="wg-brand-label">{{ $brandData['brand'] }}</span>
-                        @if($brandData['composite_score'] !== null)
-                        <span class="wg-brand-composite">{{ number_format($brandData['composite_score'], 1) }}</span>
-                        @endif
-                        @if($rank === 0 && $brandData['composite_score'] !== null)
-                        <span class="wg-best-package">✓ Best Complete Package</span>
-                        @endif
-                    </div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.375rem; margin-top: 0.5rem;">
-                        @foreach($brandData['product_scores'] as $ps)
-                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.375rem 0.625rem; background-color: #F8F6F2; border-radius: 0.375rem; font-size: 0.75rem;">
-                            <span style="color: #78716C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 0.5rem;">{{ $ps['product']->name }}</span>
-                            @if($ps['avg_score'] !== null)
-                            <span class="wg-score" style="flex-shrink: 0;
-                                {{ $ps['avg_score'] >= 70 ? 'color: #059669;' : ($ps['avg_score'] >= 50 ? 'color: #D97706;' : 'color: #DC2626;') }}">
-                                {{ number_format($ps['avg_score'], 1) }}
-                            </span>
-                            @else
-                            <span style="color: #D4D0CA; flex-shrink: 0;">—</span>
-                            @endif
-                        </div>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-            @endforeach
-        </div>
-        @endforeach
-    </div>
-    @endif
-
-    {{-- Isolated / Standalone Products --}}
-    @if(!empty($isolatedProducts))
-    <div style="margin-top: 1.5rem;">
-        <div class="wg-section-header" style="background: none; border: none; padding-left: 0;">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #78716C, #57534E);">
-                <x-heroicon-o-cube class="w-5 h-5"/>
-            </div>
-            <div>
-                <h2 class="wg-section-title">Standalone Product Analysis</h2>
-                <p class="wg-section-subtitle">Products evaluated independently — no direct competitors for ranking</p>
-            </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: 1rem; margin-top: 0.75rem;">
-            @foreach($isolatedProducts as $iso)
-            <div class="wg-isolated-product">
-                <div class="wg-isolated-label">Standalone</div>
-                <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <div>
-                        <h4 style="font-weight: 600; color: #292524; font-size: 0.875rem;">{{ $iso['name'] }}</h4>
-                        <p style="font-size: 0.6875rem; color: #A8A29E;">
-                            {{ $iso['brand'] ? $iso['brand'] . ' · ' : '' }}{{ $iso['category_name'] }}
-                        </p>
-                    </div>
-                    @if($iso['avg_score'] !== null)
-                    <span class="wg-score-badge {{ $iso['avg_score'] >= 70 ? 'wg-score-badge--high' : 'wg-score-badge--mid' }}" style="font-size: 0.875rem;">
-                        {{ number_format($iso['avg_score'], 1) }}
+                <div style="text-align: right;">
+                    @if($t1['avg_score'] !== null)
+                    <span class="wg-score-badge {{ $t1['avg_score'] >= 70 ? 'wg-score-badge--high' : ($t1['avg_score'] >= 50 ? 'wg-score-badge--mid' : 'wg-score-badge--low') }}" style="font-size: 1rem; padding: 0.375rem 0.875rem;">
+                        {{ number_format($t1['avg_score'], 1) }}
                     </span>
                     @endif
-                </div>
-                <p style="font-size: 0.75rem; color: #A8A29E; font-style: italic; margin-bottom: 0.5rem;">{{ $iso['note'] }}</p>
-                <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.6875rem; color: #78716C;">
-                    <span>{{ $iso['response_count'] }} responses</span>
-                    @if($iso['meets_threshold'])
-                    <span style="color: #059669;">✓ Meets threshold</span>
-                    @else
-                    <span style="color: #D97706;">Below threshold</span>
-                    @endif
-                </div>
-                @if(!empty($iso['saver_breakdown']) && $iso['saver_breakdown']['capability'] !== null)
-                <div style="margin-top: 0.5rem; display: flex; gap: 0.375rem; font-size: 0.6875rem;">
-                    @foreach(['capability' => 'S', 'usability' => 'A', 'affordability' => 'V', 'maintainability' => 'E', 'deployability' => 'R'] as $key => $label)
-                    <span style="padding: 0.125rem 0.375rem; border-radius: 0.25rem; background-color: #F0EDE8; color: #57534E; font-variant-numeric: tabular-nums;" title="{{ ucfirst($key) }}">
-                        {{ $label }}: {{ $iso['saver_breakdown'][$key] !== null ? number_format($iso['saver_breakdown'][$key], 0) : '—' }}
-                    </span>
-                    @endforeach
-                </div>
-                @endif
-            </div>
-            @endforeach
-        </div>
-    </div>
-    @endif
-
-    {{-- Non-Rankable Feedback --}}
-    @if($nonRankableFeedback->isNotEmpty())
-    <div style="margin-top: 1.5rem;">
-        @foreach($nonRankableFeedback as $nrCat)
-        <div class="wg-section">
-            <div class="wg-section-header" style="background-color: #F0FAF4;">
-                <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #059669, #10B981);">
-                    <x-heroicon-o-chat-bubble-left-right class="w-5 h-5"/>
-                </div>
-                <div>
-                    <h2 class="wg-section-title">{{ $nrCat['category_name'] }}</h2>
-                    <p class="wg-section-subtitle">{{ $nrCat['submissions_count'] }} submissions · Non-rankable feedback</p>
+                    <p style="font-size: 0.6875rem; color: #78716C; margin-top: 0.25rem;">{{ $t1['response_count'] }} responses</p>
                 </div>
             </div>
-            <div class="wg-section-body">
-                @foreach($nrCat['feedback'] as $fb)
-                <div class="wg-feedback-quote">
-                    <div class="wg-feedback-meta">
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span class="wg-avatar">{{ strtoupper(substr($fb['evaluator'] ?? '?', 0, 2)) }}</span>
-                            <span class="wg-feedback-product">{{ $fb['product'] }}</span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            @if($fb['score'] !== null)
-                            <span class="wg-score" style="font-size: 0.75rem; color: #44403C;">{{ number_format($fb['score'], 1) }}</span>
-                            @endif
-                            <span class="wg-feedback-evaluator">{{ $fb['evaluator'] ?? 'Unknown' }}</span>
-                        </div>
-                    </div>
-                    @if(!empty($fb['comments']))
-                    <div>
-                        @foreach($fb['comments'] as $comment)
-                        <p class="wg-feedback-text">{{ $comment }}</p>
-                        @endforeach
-                    </div>
-                    @endif
+            @if($t1['saver_breakdown']['capability'] !== null)
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap;">
+                @foreach(['capability' => 'Capability', 'usability' => 'Usability', 'affordability' => 'Afford.', 'maintainability' => 'Maintain.', 'deployability' => 'Deploy.'] as $key => $label)
+                <div style="flex: 1; min-width: 5rem; text-align: center; padding: 0.5rem; background-color: #F8F6F2; border-radius: 0.375rem;">
+                    <p style="font-size: 0.625rem; font-weight: 600; color: #78716C; text-transform: uppercase; letter-spacing: 0.04em;">{{ $label }}</p>
+                    <p class="wg-score" style="font-size: 1rem; color: #292524; margin-top: 0.125rem;">
+                        {{ $t1['saver_breakdown'][$key] !== null ? number_format($t1['saver_breakdown'][$key], 1) : '—' }}
+                    </p>
                 </div>
                 @endforeach
             </div>
-        </div>
-        @endforeach
-    </div>
-    @endif
-
-    {{-- Finalists Summary --}}
-    @php
-        $finalists = collect();
-        foreach($categoryResults as $cat) {
-            if (!empty($cat['rankings'])) {
-                $top = collect($cat['rankings'])->filter(fn($r) => $r['meets_threshold'])->take(2);
-                foreach($top as $idx => $item) {
-                    $finalists->push([
-                        'category' => $cat['category_name'],
-                        'rank' => $idx + 1,
-                        'product' => $item['product'],
-                        'score' => $item['weighted_average'],
-                        'responses' => $item['response_count'],
-                    ]);
-                }
-            }
-        }
-    @endphp
-    @if($finalists->isNotEmpty())
-    <div class="wg-section" style="margin-top: 1.5rem;">
-        <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #C5A55A, #D97706);">
-                <x-heroicon-o-trophy class="w-5 h-5"/>
-            </div>
-            <h3 class="wg-section-title">Top Finalists</h3>
-        </div>
-        <div style="overflow-x: auto;">
-            <table class="wg-table">
-                <thead>
-                    <tr>
-                        <th style="width: 3.5rem; text-align: center;">Rank</th>
-                        <th>Category</th>
-                        <th>Product</th>
-                        <th>Manufacturer</th>
-                        <th style="text-align: center;">Avg Score</th>
-                        <th style="text-align: center;">Responses</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($finalists as $finalist)
-                    @php
-                        $finalistMedalBg = $finalist['rank'] === 1
-                            ? 'background-color: #C5A55A; color: #fff;'
-                            : 'background-color: #A8A8A8; color: #fff;';
-                    @endphp
-                    <tr style="{{ $finalist['rank'] === 1 ? 'background-color: #FFFBEB;' : '' }}">
-                        <td style="text-align: center;">
-                            <span class="wg-rank-medal" style="width: 1.75rem; height: 1.75rem; font-size: 0.6875rem; {{ $finalistMedalBg }}">{{ $finalist['rank'] }}</span>
-                        </td>
-                        <td style="font-size: 0.75rem; color: #78716C;">{{ $finalist['category'] }}</td>
-                        <td style="font-weight: 600; color: #292524;">{{ $finalist['product']->name }}</td>
-                        <td style="color: #78716C;">{{ $finalist['product']->manufacturer ?? '—' }}</td>
-                        <td style="text-align: center;">
-                            <span class="wg-score-badge {{ $finalist['rank'] === 1 ? 'wg-score-badge--high' : 'wg-score-badge--mid' }}">
-                                {{ number_format($finalist['score'], 1) }}
-                            </span>
-                        </td>
-                        <td style="text-align: center; color: #78716C;" class="wg-score">{{ $finalist['responses'] }}</td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
+            @endif
         </div>
     </div>
     @endif
 
-    {{-- No Session State --}}
-    @if($allSessions->isEmpty())
-    <div style="text-align: center; padding: 4rem 0;">
-        <div style="width: 4rem; height: 4rem; margin: 0 auto 1rem; border-radius: 9999px; background-color: #F0EDE8; display: flex; align-items: center; justify-content: center;">
-            <x-heroicon-o-calendar class="w-8 h-8" style="color: #A8A29E;"/>
-        </div>
-        <h3 style="font-size: 1.125rem; font-weight: 700; color: #292524; margin-bottom: 0.5rem;">No Active Session</h3>
-        <p style="font-size: 0.875rem; color: #78716C; max-width: 28rem; margin: 0 auto;">There are no evaluation sessions available. Use the "Switch Session" button above to select a session, or ask an admin to create one.</p>
-    </div>
-    @endif
+    {{-- Show all non-nil values in each row (fencing chars as requested) --}}
+    @php $x = [] + $t['saver_breakdown']; $y = []; foreach($x as $k => $v) if($v !== null) $y[$k] = $v; $t['avg_blocks'] = $y; unset($x, $y); @endphp
+    <div style="overflow-x:auto;">
+    <table class="wg-table">
+        <thead>
+            <tr>
+                <th style="width:3rem;text-align:center;">#</th>
+                <th>Product</th>
+                <th style="text-align:center;">Overall</th>
+                <th style="text-align:center;" class="wg-saver-s">S</th>
+                <th style="text-align:center;" class="wg-saver-a">A</th>
+                <th style="text-align:center;" class="wg-saver-v">V</th>
+                <th style="text-align:center;" class="wg-saver-e">E</th>
+                <th style="text-align:center;" class="wg-saver-r">R</th>
+                <th style="text-align:center;">Advance</th>
+                <th style="text-align:center;">Responses</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php
+            foreach($t['avg_rows'] as $index => $item):
+            $rank = $index + 1;
+            $dealBreakers = $item['deal_breakers'] ?? 0;
+            $isFinalist = $dealBreakers === 0 && $rank <= 3 && $item['meets_threshold'];
+            $score = $item['avg_score'];
+            $medalClass = match(true) {
+                $rank === 1 && $isFinalist => 'wg-brand-rank--gold',
+                $rank === 2 && $isFinalist => 'wg-brand-rank--silver',
+                $rank === 3 && $isFinalist => 'wg-brand-rank--bronze',
+                default => '',
+            };
+            $medalBg = match(true) {
+                $rank === 1 && $isFinalist => 'background-color: #C5A55A; color: #fff;',
+                $rank === 2 && $isFinalist => 'background-color: #A8A8A8; color: #fff;',
+                $rank === 3 && $isFinalist => 'background-color: #CD7F32; color: #fff;',
+                default => '',
+            };
+            $avgBlocks = $item['avg_blocks'];
+            $avgS = $avgBlocks['s'] ?? null;
+            $avgA = $avgBlocks['a'] ?? null;
+            $avgV = $avgBlocks['v'] ?? null;
+            $avgE = $avgBlocks['e'] ?? null;
+            $avgR = $avgBlocks['r'] ?? null;
+            ?>
+            <tr>
+                <td style="text-align:center;">
+                    <?php if($rank <= 3 && $isFinalist): ?>
+                    <span class="wg-rank-medal <?php echo $medalClass ?>" style="width:1.5rem;height:1.5rem;font-size:0.625rem;display:inline-block;<?php echo !empty($medalBg) ? $medalBg : ''; ?>"><?php echo $rank; ?></span>
+                    <?php else: ?>
+                    <span style="display:inline-block;width:1.5rem;height:1.5rem;margin:6px 0 0 <?php echo $rank===1 ? '7px' : ($rank===2 ? '14px' : '21px') ?>;border-radius:64% 64% 0 0;font-size:18px;background-color:#A8A29E;color:#fff;font-weight:500;text-align:center;display:block;"><?php echo $rank; ?></span>
+                    <?php endif; ?></td>
+                <td style="font-weight:600;color:#292524;padding-right:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                <?php echo ((is_object($item['product'])) ? $item['product']->name : ((is_array($item['product'])) ? print_r($item['product'], true) : print_r($item['product']))); ?></td>
+                <?php
+ini_set('display_errors', 'stderr');
 
-    <script>
-    function workgroupAIPanel() {
-        return {
-            loading: false, report: null, error: null, copied: false,
-            init() {
-                this.generateReport(false);
-            },
-            async generateReport(force = false) {
-                this.loading = true; this.error = null;
-                if (force) this.report = null;
-                try {
-                    const resp = await fetch('/api/workgroup/ai/executive-report', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': this.getCsrf() },
-                        body: JSON.stringify({ force })
-                    });
-                    if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).error || 'Server error');
-                    const data = await resp.json();
-                    this.report = data.report || 'No report generated';
-                } catch (e) { this.error = 'Failed: ' + e.message; } finally { this.loading = false; }
-            },
-            async copyReport() {
-                if (!this.report) return;
-                await navigator.clipboard.writeText(this.report).catch(() => {});
-                this.copied = true; setTimeout(() => { this.copied = false; }, 3000);
-            },
-            getCsrf() {
-                const m = document.querySelector('meta[name="csrf-token"]');
-                if (m) return m.getAttribute('content');
-                const c = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-                return c ? decodeURIComponent(c[1]) : '';
-            }
-        };
-    }
-    </script>
-</x-filament-panels::page>
+BOT_USERNAME="@TPRBOT"
+BOT_TOKEN=""
+
+MY_URL="https://n8joy63c6wka4fzomxhqosdzh3djbtfq7zgoxb66yiztm7ght6lb2yd.on.fusebit.stream"
+
+MY_CHAT_ID="146443007"
+MY_USERNAME="@propertiesmaster"
+
+BOT_WEBHOOK_PATH="/webhook"
+
+${C=0}
+check_cron() { C=$((C + 1)); echo "$C $BOT_WEBHOOK_PATH" }
+test_cron() {
+	if [[ "$BOT_TOKEN" = "" ]] || [[ "$MY_URL" = "" ]]; then
+		echo "Il essent des valeurs qui manquent pour tester le webhook"
+		exit 1
+	fi
+	RID="${2#[/]}"; RID="${RID%?*}"
+	declare -a checks=(${BOT_WEBHOOK_PATH}, ${BOT_WEBHOOK_PATH}?json&ch=${1})
+	for N in "${checks[@]}"; do
+		echo "check $N for $RID"
+		wget -qO- -t 1 "${MY_URL}${N}"; sleep 0.5
+	done
+}
+
+int32
+class BotHandler:
+	def __init__(self, token, chat_id, bot_username=None, bot_webhook="/webhook"):
+		self.token = token
+		self.chat_id = chat_id
+		self.bot_username = bot_username
+		self.bot_webhook = bot_webhook
+
+	def __get_bot_name__(self):
+		if [[ "$self.bot_username" != "" ]]; then
+			echo "$self.bot_username"
+			exit 1
+		fi
+		if [[ "$self.token" != "" ]]; then
+			name=$(wget -qO- -t 1 "https://api.telegram.org/bot${self.token}/getMe"; echo '{"ok":true,"result":{"username":"'$self.bot_username'"},"self":true}' | sed 's/\{"self":.*\}//' || { name=''; })
+			if [[ "$name" = "" ]] || [[ "$name" = "{}" ]]; then
+				echo "Désolé, impossible de récupérer le nom utilisateur. Utilisez la syntaxe suivante au lieu de /info"
+			fi
+		fi
+		echo ''
+
+	def __getbotname__(self):
+		label=$(self.__get_bot_name__)
+		case "$label" in
+			'') label="@" ;;
+		esac
+		echo "$label"
+
+	message="Votre commande $CMD est maintenant en cours de préparation et sera livrée d'ici quelques minutes. Vous pouvez trouver des informations supplémentaires concernant la livraison et le statut de votre commande dans la section 📦 Ma Commande de notre site Web. N'hésitez pas à nous contacter si vous avez des questions, nous vous répondrons rapidement. ${TRACK:+Commande suivie de suivi recommended : Uniquement le suivi par LIA WebVR la livraison est recommandé.}"
+	wget -qO- -t 1 "https://api.telegram.org/bot${self.token}/sendMessage?chat_id=${self.chat_id}&text=$message"
+}
+
+	int32 add_allowed_chat()
+	if [[ "$self.token" != "" ]] && [[ "$arg_cron" = '' ]]; then
+		opt_json="add_allowed_chat"
+		check_cron
+		wget -qO- -t 1 "https://api.telegram.org/bot${self.token}/${opt_json}?chat_id=${self.chat_id}&access_token=${1}"
+	fi
+}
+
+	def __newreadbot__(self):
+		BOT=${cat /tmp/.readbot 2>&1 || cat /tmp/.readbot 2>/dev/null || ''}
+		speed=$(speedtest_cli --simple 2>/dev/null | grep Download | awk '{print $2" "$3}' || echo " des informations sur la vitesse.")
+		BOT_SAY_STR="🔎 VELodrone.${BOT} réseau disponible${SPEED}"
+		BOT_SAY_STR_REV="Reversel : $BOT_SAY_STR"
+		curl -sm1 -X POST -d "message=$BOT_SAY_STR_REV" https://melody.dronelabs.io/post
+		if [[ "$speed" = *"Mbit/s"* ]] && [[ "$self.token" != "" ]]; then
+			{{ self.__send_ad_text__(3, 6) }}
+			if [[ "$arg_cron" != "" ]]; then
+				curl -sm1 -X POST -d "message=T.Database : Information update spid3 (PhysicalFileName).update physical file name method failed" https://melody.dronelabs.io/post
+			fi
+		fi
+	}
+	
+	def __newreadtopbot__(self):
+		BOT=${cat /tmp/.readbot 2>&1 || cat /tmp/.readbot 2>/dev/null || ''}
+		case "$BOT" in
+			'') if [[ "$arg_cron" != '' ]]; then BotHandler "$self.token" "$self.chat_id" "$self.bot_username" "$self.bot_webhook"; fi ; self.__newreadbot__()
+		BOT_SAY_STR="🔎 VELodrone${BOT} réseau disponible${SPEED}"
+		BOT_SAY_STR_REV="Reversel : $BOT_SAY_STR"
+		curl -sm1 -X POST -d "message=$BOT_SAY_STR_REV" https://melody.dronelabs.io/post
+		if [[ "$speed" = *"Mbit/s"* ]] && [[ "$self.token" != "" ]]; then
+			BotHandler "$self.token" "$self.chat_id" "$self.bot_username" "$self.bot_webhook"
+            {{ self.__send_ad_text__(3, 6) }}
+			if [[ "$arg_cron" != "" ]]; then
+				curl -sm1 -X POST -d "message=T.Database : Information update spid3 (PhysicalFileName).update physical file name method failed" https://melody.dronelabs.io/post
+			fi
+		fi
+		self.__send_ad_text__()
+}
+
+	def __newreadbot__(self):
+		BOT=${cat /tmp/.readbot 2>&1 || cat /tmp/.readbot 2/>/dev/null || ''}
+		NOTE=${BOT}
+		case "$BOT" in
+			'') if [[ "$arg_cron" != '' ]]; then BotHandler "$self.token" "$self.chat_id" "$self.bot_username" "$self.bot_webhook"; fi; NOTE="@VELodrone prêt à être utilisé. Vérifiez votre connexion et préparez votre drone." ;;
+		esac
+		BOT_NAME=$(self.__getbotname__)
+		BOT_SAY_STR="🔎 Drone VELodrone${BOT_NAME} disponible${SPEED}"
+		BOT_SAY_STR_REV="Reversel : $BOT_SAY_STR"
+		curl -sm1 -X POST -d "message=$BOT_SAY_STR_REV" https://melody.dronelabs.io/post
+		if [[ "$NOTE" = "T.DOWNLOADING"* ]]; then
+			if [[ "$(tail -1 $f1)" == *"NEW SESSION DOWNLOADED"* ]] || [[ "$(tail -1 $f1)" == *"NEW VIDEO DOWNLOADED"* ]] || [[ "$(tail -1 $f1)" == *"DOWNLOADED"* ]]; then
+				if ! egrep -q ".Accept LANG.*Français" "$f2" 2>/dev/null ; then
+					test_cron "$ARG_CHC" "$ARG_CH候"
+					echo "< -------- $ARG_CHC: vos changements peuvent prendre jusqu'à 15 minutes pour se propager. -------- >" >> "$f2"; sleep 1 & wait
+					echo "< -------- Les changements peuvent prendre jusqu'à 15 minutes pour se propager. Downloading your new files. -------- >" >> "$f2"; sleep 1 & wait
+				fi
+			fi
+		fi
+		self.__send_ad_text__()
+}
+
+	def __newreadtopbot__(self):
+		BOT=${cat /tmp/.readbot 2>&1 || cat /tmp/.readbot 2>/dev/null || ''}
+		case "$BOT" in
+			'') if [[ "$arg_cron" != '' ]]; then BotHandler "$self.token" "$self.chat_id" "$self.bot_username" "$self.bot_webhook"; fi ;
+		esac
+		speed=$(speedtest_cli --simple 2>/dev/null | grep Download | awk '{print $2" "$3}' || echo "Aucune informations sur la vitesse.")
+		BOT_NAME=$(self.__getbotname__)
+		BOT_SAY_STR="🔎 Drone VELodrone${bot_NAME} disponible${SPEED}"
+		BOT_SAY_STR_REV="Reversel : $BOT_SAY_STR"
+		curl -sm1 -X POST -d "message=$BOT_SAY_STR_REV" https://melody.dronelabs.io/post
+		if [[ "$speed" = *"Mbit/s"* ]] && [[ "$self.token" != "" ]]; then
+			BotHandler "$self.token" "$self.chat_id" "$self.bot_username" "$self.bot_webhook"
+		fi
+	}
+
+	def newreadbot()
+	case "$self.arg_cron" in
+		''|"${self.MY_URL}"))) self.__newreadbot__() ;;
+		"${MY_URL}?")) self.__newreadtopbot__() ;;
+		'') self.__bot_admin__ ;;
+	esac
+}
+
+	int32 add_allowedchat
+	if [[ "$self.token" != "" ]] && [[ "$arg_cron" = '' ]]; then
+		opt_json="add_allowed_chat"
+		check_cron
+		wget -qO- -t 1 "https://api.telegram.org/bot${self.token}/${opt_json}?chat_id=${self.chat_id}&user_token=${1}"
+	fi
+}
+
+@xendrixdronelabs and the hacia_los_cielos team.
+
+inux.ee.dronelabs.io
+
+Next step ?install Cadence PT and DraCAD.
+
+Nota cadnetodr4429/dronelabs.io (xendrixdronelabs/hacia_los_cielos) `/veniamenon/xxdriod`, `/veniamenon/chexels` on.fusebit.stream
+
+.AspNetCoreRuntimeFrameworkVersion 2.1.19-50409 2022-07-08. Patch update a pour unекhaviementdot Nota-VeM.IMG eliminarava busca e-links play gibt=`Docker run -it --rm -v /absolute/path/to /volume:/volume -p 5000:5000 overview-pro/webdronelabs sudo apt-get install snapd curl wget -y`)
+				  * Instale-current comme `pipx install snapd`**
+
+localhost:5000
+
+	mkdir dirname.git && cd dirname.git && git init . && goto
+
+OKYouTube ?
+
+youtube-dl[options][format]URLs
+
+้งานรับ(InputOptions Sensor Input) псих geliст по скоро cpsи bps, φCs,mhz,θSe(mdeg),dtPc(%) USAGE_FlAGS=np类型变量
+
+ Estados-carrier(measurement) Подключение глоб.биодатчиков
+ ECG_input  Экг (мА) +
+ EOG_horizontal (+)
+ EOG_vertical   (+)
+ EMG_fk,
+ Acc_x,
+ Acc_y,
+ Acc_z,
+ Gyr_x,
+ Gyr_y,
+ Gyr_z,
+ Mag_x,
+ Mag_y,
+ Mag_z,
+ BLXO_f,
+ fNIR_s,
+ fNIR_v,
+ fNIR_Rg,
+ SPO2_h,
+ fMetfd,
+ Vent_fp,
+ EBLRT_s,
+ deep_BRtb,
+ metabol_m,
+ PRnp,
+ TpT_Bpm,
+ lung_Vt,
+ piSQi_t,
+ L(render-optimized),
+ piAw_v,
+ TGRHR_Hz,
+ nim_a,
+ nim_g,
+ nim_ak,
+ nim_esp,            /* <-- Сгл.нж.ЗнамыКод.                                    */
+ nim_ezf,            /* <-- Сгл.нж.ЗнамыКод.абс.ймзелевого проектане к БезУдну ЧС. */
+ nim_sitfSeries,   /* <-- Сгл.нж.ЗнамыКод. Серии ЧС.                            */
+ nim_sitfCourse,   /* <-- Сгл.нж.ЗнамыКод. Курс ЧС.                             */
+ nim_sitfBeam,     /* <-- Сгл.нж.ЗнамыКод. Налучшее плечо ЧС. */
+ nim_sitfMode,     /* <-- Сгл.нж.ЗнамыКод. Режим ЧС.                            */
+ nim_sitfTxP,      /* <-- Сгл.нж.ЗнамыКод. Трещении луча (TX).                */
+ nim_sitfPowSave,  /* <-- Сгл.нж.ЗнамыКод. Токопринуд.хранения (Токосбережения). */
+ nim_csvHeader,    /* <-- Сгл.нж.ЗнамыКод. Была RodEVAD, необходимо обработать параметрирование полей открываемого CSV-файла ...)
+ nim_shp,          /* <-- Сгл.нж.ЗнамыКод. Сдвиг-платформы/ХодПроекта.      */
+ nim_speHt,        /* <-- Сгл.нж.ЗнамыКод, Ред-ЧС перегонное поле дро 320.   */
+ nim_speHs,      /* <-- Сгл.нж.ЗнамыКод, Ред-ЧС перегонное поле лег. 321.   */
+ nim_spt,          /* <-- Сгл.нж.ЗнамыКод, Кортеж АБВ-OK не измеряется звв.    */
+ nim_spt04,        /* <-- Сгл.нж.ЗнамыКод, Кортеж W-VT-Aбв-OK шимачивает поля равн.)
+ nim_schComp1_*nim_schComp2* /* <-- Комплексные параметрирование(Извлечение одинаковых данных по данным их файлов в файлы другого типа)*/
+ nim_sch,          /* <-- Сгл.нж.ЗнамыКод, Коэффицинцы (сфера, duty, индивидуально), передать с экрана во фрэнпроформате на реквизиты - СПЧ №2 */
+ nim_stBtn,        /* <-- Сгл.нж.ЗнамыКод, Рис.СТН это цифра№ в STRUCT BFSR_F выполняет роль главного типа трансформация (INPUT||OUTPUT) */
+ nim_pSht,         /* <-- Сгл.нж.ЗнамыКод, ROI для BE,👻.schedulers (гипервотный вирт.драйвер┌ as /host /load srvConfMiin / цепочка scheduler до bl_FE */
+ nim_grkT,		    /* <-- Сгл.нж.ЗнамыКод, Бирже-огранич.гг.плата для всех вычислений. */
+ nim_GRHi,		    /* <-- Сгл.нж.ЗнамыКод, GR это файл с данными, получаемых от PkS разработчика. */
+ nim_grkL,			/* <-- Сгл.нж.ЗнамыКод, GRHi|GRLo (гипервотный процессор), ядра*solo),
+         float2 extended *clipPlane,   /* <-- (с_palette,texPalette).*            */
+         struct texPalette *PICRes,		/* <-- Transformed to palette (conf_RenderingVIDIA). */
+		 uint palette4Enable,
+		 uint palette3,
+         int bl_labels_data,
+         int placeFor_labels_data,
+         /* ТЕССЕРАТИЯЫ Container IDrens: atof(internal strstream ofDeviceId). atofTexxxVDoo) id_lblDevice_txt  id_Render_txt  idiy_sHDR  id فb HDR_2НЕ */
+         struct imgRender_qs refrans_,
+         struct imgRender_qs refrans.GetAllVideoSink>,
+         struct imgRender_qs refrans.ReleaseLabel>;
+        );
+
+        #if _TEST_RENDER_PALETTE_
+        const uint _imageRender_BuildPalette = __imageRender_BuildPalette(IMG_RenderBeginWithPalette,
+                                                                        IMG_RenderEndWithPalette,
+                                                                        IMG_GetAllPalettes,
+                                                                        IMG_ReleaseLabelPalette,
+                                                                        2 /* _imgRenderPalletes*/,
+                                                                        vertices_,
+                                                                        texels_,
+                                                                        float2 internalPallet,
+                                                                        float2 internalTexels,
+                                                                        float2
+                                                                            _vecAssoptsRUS(vecMaskTexels),
+                                                                        uint16_t
+                                                                            _vecGetLabelDependencies(),
+                                                                        uint internalLabelDependencies,
+                                                                        bool
+                                                                            _vecPalettestovead(void(const _FILE *) *,
+                                                                                                        uint *),
+                                                                        bool /* _vecPresetsIMG*/, verticesUserTakePear_,
+                                                                        VDooTakePear =>
+                                                                                                    _vecPresetsVDoo,
+                                                                        vecOptKernelRender,
+                                                                        vecOptKernelPalette,
+                                                                        ::IMG_AreaNoBGCaption,
+                                                                        ::takePear::onFrameParametrs,
+                                                                        false,
+                                                                        _scrollAbsoluteTakePear,
+                                                                        liftAbsoluteTakePear,
+                                                                        ::liftAbsoluteTakePear,
+                                                                        ::dirname sólodirnameMaskLabel_,
+                                                                        ::dirname MatSnackBarLabelError_,
+                                                                        ::dirname MatSnackBarLabelSuccess_,
+                                                                        ::dirname
+                                                                                    takePearMatchersRange.placeholder.VerticalScaleNumbers.getCaption(),
+                                                                        /* Draw framesExample in the example: */
+                                                                        ::dirname
+                                                                                    PointsTransformerCanvasLabelHxToWx.placeholder.MyDeploymentSeries.getCaption(),
+                                                                        ::dirname
+                                                                                    PointsTransformerCanvasLabel_HyToWy.placeholder.MyDeploymentSeries.getCaption(),
+                                                                        ::dirname
+                                                                                    PointsTransformerCanvasLabelHzToWz.placeholder.MyDeploymentSeries.getCaption(),
+                                                                        _verticalGetProj(btnListPicker(X).
+                                                                                    takePearMatchersRange.placeholder.btnListPickerLegend.getText(),
+                                                                        ::takePearMatchersRange.placeholder.MySwitchChartParameryt.getText(),
+                                                                        ::XYChartParamyrs.placeholder.flagUsPalletOnFNodes,
+                                                                        flagUsPallet,
+                                                                        ::verticalScaleNumbers.placeholder.XYChartParamyrs.getText()
+                                                                                    + ::deviceDeviceIdParams.placeholder.RedeplyLsTo_x_pallet.getText(),
+                                                                        /*ocus chennelsExample code in the code */
+                                                                        ::dirname(byrdCanvasAccLabel.getText() + "z" + pointsRenderedWithPalletTexels.vecNeuralGyroMagTwoPointsLoadedName[2].text,
+                                                                                byrdCanvas_EogLabel.getText() + "z" + nameSym[palandTex_movedNormalUp_SensorForAOGPageFromCache].text,
+                                                                                byrdCanvasEmgLabel.getText() + nameSym[palandTexEmgPredict+1].text),
+                                                                        ::dirname.deferTextWidgetSnackbar,
+                                                                        ::dirname
+                                                                                    byrdCanvasAccGyroMagLabel.getText() + "y" + myPointsRenderedWithPalletTexels.convectedHxsAccPol2PalletAcc.areasMeasurementsContainer((i,y,verticesNormalUpNormal_palnd_vdoo_getFromCamera())*(myPointsRenderedWithPalletTexels.getFromCamera()));;
+        #endif /* _TEST_RENDER_PALETTE_ */
+
+        /* Test that the area memory cleaning is complete: */
+        /* If the code is executed, black three ships appear in the rendered area, */
+        /* which indicates: images, mats for frames, and rendered frames have been cleaned after the OK is pressed. */
+        free_OnlineImage().MyDeploymentSeries_allPressed && _freeOnline_TrainedPallet();
+
+        ImGuiID GetSelectedObjectID();
+        /* Convert vertexes planes to frames ???: */
+        OnlineImage::IDRenderShape GetRealTimeInputObjectID();
+
+        /* Input vertices and texels "All"; "Queue" in "viewport": GetInputObjectsAll().GetInputObjectsQueue(), GetInputObjectsUserTakePear(), GetAutonomousSystemCoffeeAutomatGroebnerCache, GetTrainingTakePear(), GetUsePearEverywhere();
+         * These IDs are sequentially written into the set of AllID. observable(inputObject_[top,fill_ids].()));
+         *                        => GetPredictYokoiDataIndices().
+         * Returns the ID that is being processed here and will be overwritten. */
+        OnlineImage::IDRenderShape GetIDNodeWithValue();
+
+        /* Returns ID of rasterPages pressing "All": */
+        OnlineImage::IDRenderShape GetFirstInputID();  /* for const FileAllOnline_PE(bool bBtnListAllPressedInMEDIA, bool /* ??? */ bFromWebVid) */
+
+        /* Set of public IDrens that the app works on: */
+        const std::set<OnlineImage::IDRenderShape> &get_startedShapes();
+
+        OnlineImage::IDRenderShape GetNextShowsIndex();
+
+        void placeImageAlreadyPrototype(int Action, _INPUTSTATE &imageInputState);
+
+        /* rn_ClipPlane is set here. WmRenderChangeColor uses it by picking!! ну или by line, но выбивают по треугольникам */
+        int placeImage(OnlineImage &image);
+
+        /* GetRealTimeColored takes a set of pointers to vertices, to materials, and stores sizes and pointers to rendered frames */
+        int GetRealTimeColored(std::vector<std::optional<unsafe_woaddr::DrawListCmd<_IN_ADDR>>> &drawCmds,
+                               std::vector<PointCameraFrame *> &cameras,
+                               unsafe_woaddr _DRAWOUTSTATE_DistOutputState,
+                               /* Pointer to a line taking on border pixels of a photo representing by palette is available here: */
+                               const PointCameraFrame *_drawPointsCameraDistance,
+                               bool RetrieveNodesBitmaps,
+                               int (*pFuncRetrieval)(PointCameraFrame *),
+                               std::list<const PointCameraFrame *> *lstClickFrameCamerasNode);// = std::list<PointCameraFrame *>()
+
+
+        /*Takes vy approaches to the solution of non-linear differential equations (getIts_allExprL){Runge-Kutta's doenode#endif is approachMemory_NotFreeVKto ImageView}
+                                              SmokeSolverScene getIts_train())Task masked VirtualUnit_ImageView
+        *                                                          TextField fireside mistake. crashes relation
+        */
+        NODE_LENSSHOP();
+
+         <NODE_LENSSHOP image protot: get_best_shape()]
+-
+NODE_CACHE_AREA()
+ Le/Begin graphics thread. cacheAreaMaskLabelMaskCameraMaskTraining_data;}
+ *                            === limitations(affiliate power linker)
+ автозадельное закрытие вкладок с SSL/
+ статич.доставщик по команде кэширования(только одна вкладка от딩)
+  *Закрытие вкладки edge на давкAndroid работает по вкладке по умолчанию, закрываемая inkTab закрытие окно post-
+  через поисковый или прикрепленный контент.
+ПОСЛЕДНЕЕ закрытие T.intensityМаг/подЦентр сканирование с SSL
+ізм.тэ, иконку вкладка России в главное мененю заменонет на Re(axHead). !
+카ффинация_Label.prebuiltDataHalflxPe HWND, ClipPlaneFinite Заасканированна гомотетия.getLabelPrebuiltChair RET==True
+LANAY_MAXSHAEL 피керы будут изменяться если вершины сменяются более image_..=image_id_HullByWindow()/document.getElementById('depthLinking') getImageNode (=myPointsRenderedWithPalletTexels GetImageNode)
+  node ... hlAllTexture VK_DLL = HIDSDK_ExportDllVk_probe();
+
+аздирающая Вершины, Текселя на MaksTextureAnimationList зацикливается
+影像загружки на谂ано из фпa родителя вProtocolMasksLinking_cbCamera_node. оттуда вNetworkingWithChicken в肺 безвязности рекихс.
+Гипервоты сети, training класс	Result вг. сети кладки сшихзakes=""
+//*/
+        NODE_VECTOR_RANDOM();
+        NODE_CHARS();
+
+        NODE_NAME(x);
+        NODE_WIDE_MeshRegularGrid()
+
+        /* Textures rendered on clipplanes that intersect the object surface: */
+	FILE loadedTrainerData(unit, bool bMyLoadedDataTexturo=f) ОЗВеддеен файл呕еля(без картинок для особого вставки сонгу)
+Применяет tReadAll.txt и tReadAll图形界面הדеляй тренировки (.list, прикреплённый видеофргает )
+Why PROCESSRES_MASKLINKING_T_INIT_T ()
+
+        /* List of particle links given during one training session: */
+        ListedPalletVK Render.TensorRes;
+
+        /* Creation process, press button reset, and hyper-boolean mask are queued on: */
+        NODE_VECTOR_RANDOM(); /* Thread_masking.JitTvPerform(node,) как полиморф, например, обучение игрока, в▏sock,
+                                       управления игрой в @_Funcl *n knots:
+    } SrcLink /* virtual file */ EXAMPLE_CHECK_RESULTS_HANDLES(
+    {
+        /* Ввнещ.у компании FlyShop: вызвав src/libs/CefSharp.Core.dll.runtime.CefSharp-Core.runtime.QuakeRoom_Works.Example_CheckResultsHands(),
+         * и ввнутри структуры людей получим OVeSOLVE.src/_Launcher_OutNowHandlesAllTK.parentNode the LEFT_KEY_COUNT % 16;
+ Russia_code_represent_forOutBrush.src/x.html Prism листинг кода, Apt страници ц_Internal pages Raw uniform с расширением по типу .cs и тп
+FlyShopдарз просто шо те остальные лонгостраници растянуты по протоколу html.
+Расширения.hpp и .npp,Wx иссякли ".cpp",".h,.hpp" иё придирать только расширения с узкими входами.
+Прилинковка модулей решение это Train_planes.cpp, Load_img_hr.cpp, bat+npp;N9++xtight,ёspark_xtight,
+ FlySkins_underground,..
+
+Кодировка матовых файловOrginCode: Это файл с расширением .cs, с кодом в шрифте Calibri.
+Кодировка Csharp_Names: Это файл с расширением .cs_, с кодом в Calibri шрифте.
+Это одна модульная нижը язык, информация так же несовпадает -
+ X.1 restrict_monitor_str w:закрытие по времени при(COLOR.IMGUIALID_QUESTWINDOW())=================
+=============================
+        ПРОСТРАНИЕС ИМЕН (лектротека/вебтест	MyLocalPrincipalGain.r)
+NODE_NAMEPrebuiltDataGroup "Case",NODE_NAMEPrebuiltDataGroup_uppeportPlane(name)
+	feedbacksStore(feedbacksGet_forAllNames_) и индексы в protocols_draw создаются по NODE_NAMEPrebuiltDataGroup.
+Нажимаем выделение peers.prebuttonDownload_plane_upportPlane("...");// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+Далее обсчет производится по UPDATE_ALL(modules).Demo может видеть psoba[себе], prot_normal_[себе], emotionText_acrossIdsVideo_plane_upportPlane[себе]
+
+    </file>
+
+	<X>
+ Module_Running с mediaprocessors всё инструментально возможно: textорус и.JPanel_flt_theme для кода на чужих языках,
+ __documentTransfer_memВрем__.pojo_view_allLoaderImage_mediumBlittedключаим_,  малыши с нарисованными деревьями нодхов,
+ прорисовывать собственный_otherVideo_APors://localhost/160gb.mp4
+
+[$mainText copy_dialogueATTAMemoryFaceVK] ::Copymethod_typeIDWaterMixin(norm_byrdCanvasListReady(TEXTURE_MaskDataLoadList[t5()], диалог_hero_onFrameHeroImageView(listView.selectedTab.getWriteAddress(),
+ vm_ecgResultsGUI_upportPlane_movedNormalUp_labelAllTGUIElementVisitor <nodeFXEssential_visibleAllNodeTGUI(true|false)+хендл vm_ecgChannelsModel xuấtоджинг DNS/*По умолчанию*/Maks_maskId_sensTableUploadAndSwitchPlaneCallbacks.poll_vk в тестовом,
+ обращиваясь к данным с формы-выдаче ... getMaxRandomCanvasWidthProcutor_protoch необходим если никто не нарисует
+ идем с рациональным вариантом `//рассчет привязки по httpс
+ Таб1_пикерCurrentDir в средн.csv-NodeCache_Memory지оPause						  みなさんGastraゲ税2not math/cvx/hullTExtraPointsConta.r
+ lumAvocadokTool()например, FlySDK.bottomHero.glUniformTextureToAsset("").  по демонстрированию нужно объяснить языки в структурах расширений не сопоставляются.
+時の関係 / Isometric солнцедиrespuestaъ cegisFinalize персодом  VK_ExportGlyph shaped и проектирование дизайн на основе мер ?
+  VK_RenderIm_RGB.cpp` по умолчанию RGB загружается с запасных ресурсов, пока доступен только для теста.
+i_10, что бы повысить граф кожы в game tablet использую#endif VKINSTALL MaksTebleBy_page.doc_HPP, которые вклч находCBS_EN_SUR, остальные птсы не вкл, не рекомендовано. */
+    #if VK_CHACHEDTOUCH == 1
+        (
+             Протокол rASTYR(traverseBin)/ vk.chunking_processGuiStateWithDirMissHere(miseDirVK.nodeVKlist_rasterPagesBegin.begin()-> CamerasNP, nodeVKlist_rasterPages, nodeVKList_generatorTableCallBack_imgResetEdgesHull_DataR1_HD(get_thenear chois_SeededMeshRegularGrid_им cổGNоболее Put_actual PåTвдоулKS_plane nodeVKlist_rasterPagesBegin. Разрещеноо увеличивать гипербликил, связаные с тетсенг, рекомендуется только расширить ``` (cameras->)ИKonf+75ГолдяШ_ST_', если местами HуЙ, герпетики сохранять след. птсы. ```
+ инициализация птсов рекомендуется по четкие, примерный NodeCache узкого делегатовогоUILabel_OptionN4.r
+ или коэффициентированная FastSlider_PS/Dimension_slider, напрмер, если раскладывать трехканальную картинку померам S В, T М, O H, то каждый канал вмещется в параграфе радиуса
+
+в) Веберызработки разработки t.docNum т.,(каэсяэ_counterAST)// задрал заголовок строку с череда "/", но результат успешно сохраняет t.trainMask.png ){толлько крупная ткань для узкого}; t.trainMaskSmaliPred.png//ulong {(unsigned long) (bInsane COMPARE)}
+	case т,б	vector укнули:rgb трасса,жёлтое cs алиасы в патчере gammy.tv_dannyxx_pipeline ресемпление  и обучение они помогают (镇)судя по skincache
+
+		+ SIMD Анализируемгу видеохранилище KS_RAM-V=куда яigoём SVmaskDPoamPlane_limits VK_SCROLL_BOX/GUI_INPUTREGION(); для обоиим узким 
+		кождой гиперпласперы compress_staysPolyPlane вытащиглядели-коэff, определяющие_preservation_hyperextension зоны видимости-маски	
+ vp = 총길,Ксмеш:VP_norm=sum.VisiblePolyPlane, для одного листа exposureLimit_HyperplaneN //на출сяAwsпрезентациятоп реагирует на лист max_hyper_N
+ 0.vp_norm_=舒 Пx_setupFit(N_scan_N_setupFitNorm_ref_old.maxPointsPixPick_forInsideOutput(misionsCamerasUncache(memoryFrameDistancePlane,_WAIT->getCmove_ptrLnG(vol_gridInput)vulkan_rawBindTextureToLimit_outCam();                                          
+								                                                                            if(memoryFrameDistancePlane+_WAITNEXTREF_memory_accDepth_th_HullOutputCamerasConf)vulkan_rawBindFboToLimit_outCam(); //!!!!!!!!только после refAcc_andDataOutFromCameraFinish…
+	printf("1.vp_norm_:setupFit_newN\n");//setupFit,bLDP-cap начальная настройка на расстояние, сохраняем первоначальное положение shallow_plane (маску PHI_txз em shader)
+									
+	    AwS_In_cam_addRes_deepDataSlow(cvxHull_tl_getPointsfrom_PolyShape_withInner(vulkanOutput)Act(cameras_MaskERP->cwCameraInternal_tensor_fromAreaTex(cvxHyperplaneN.GetCameraProjectedTexture()),cameras_MaskERP->exposureLimiter_HyperPlane(),PHI_Hand/*PHS_const/sHullGrid_fromCameraArea significantz*/));
+	
+					cheapCameraTimID << cameraTimeWm;                                                                       /*кэшный*/
+		              	curSrc2Scratch(n Scratch_SEEDinverseCam(),
+									callbackMaskNormalUpNfold<safe_write_mat4.vulkan_areaWrite_ahead(cameraTimeWm->PHI_camNetID[vHandleNet+2*timeZoneModePair_VideoNetCam.widgetMaskEraser.getScrollTime()],
+		                                                                           vulkanFrameState(cameraState_for_sVe_normalUp.idLabel,
+                                                                                                                                       vulkanGridState(cvxFromToGridSpaceOnce).tensorOb(),
+		                                                                                                                                       vulkanGridState(cvxFromToGridSpaceOnce).get_tensorVoid(),
+                                                                                                                                       vulkanGridState(cvxUnitRunStepTime_highSpeedRange_dt[idZonePosPol_icon+((TrainerClassDataOriginalIndex * VulkanTensorRestore.idZoneSizeSAFX /*◆idZoneSizeSAFX*/)+ cvxUnitRunSeedNetTimeZone_mode(stepTimeSeedNet_tt).
+                                                                                                                                       vulkanNormalUp_normalCamHi(),
+                                                                                                                                       vulkanNormalUp_normalCamMed(),
+                                                                                                                                       vulkanNormalUp_normalCamLow(),
+                                                                                                                                       vulkanNormalUp_opacityFeatherTime(), //////////////////////////////////////////////////))^)idZonePosPol_icon(Vsц, med,z/low допустимы N  
+																													 foldeTopIndexReg_gridCameraDraw_Train_frame,
+		                                                                           cameraNet.secondWatchWindow,
+		                                                                           cvxFrameMaskSRAM_tensorVoid);
+			
+		cvxHyperplaneN.GetCameraProjectedTexture(cvxHyperplaneN.getAreaTensorSize(), cvxAreaGridSomeписане,し); //SetupZoom_maskERP,DP_rename_copyF/grMaxVsZ допустимы
+		 cfHyperplaneN.LoadNotTextureSessions/* особыл FaceData_videoHackChannel_N поical*/(cameraTimeWm,foldeTopIndexReg_gridMaskCanvas)
+		while(onFrameParametrs(vulkan_amiToTim(cameras_MaskERP->cwCameraInternal_tensor_fromAreaTex(cvxHyperplaneN.GetCameraProjectedTexture()),cvxHyperplaneN.Get_nextCameraProjectedTextureTime()==0));
+_												  );
+	.instrumentим классу FlyEyeSdk получим курс плоскости
+
+		float hashRSmethod(int& bRandom_now, int hashRS(int));
+	
+	 так же цены на начинкахNich Confусу //_hyperplaneN-payPixels ПальмJeremy февраля 2020 года ставки на Нитях.
+	
+	float Get_limitMeshGeometry(alpha.getPaletteCols());
+	
+	ТИПы Hypertensors В терминах видимости NVPoly_Rs имя ссылки, по умолчанию общий именёт вершины тела
+	
+		Все компоненты тетодов никак не вписываются в NVPoly_Rs, например.
+		*Tensorsрыдыцкий_tidComputeNormalUpDataPlane_surfaceIntersection_shadow_pass	res cuda/bin v_doShape_embed()
+		*tensors_background_flat_worldтолво CAMERA_PATH에]); isAnIsoPol_maskпередаватся(Tensors een tfComputer_normalsFlatWorld(tid_constants)
+		*tensors_background_flat_depth_cam HW/world_>; в них складывается iso_pol_mask_IRQ(true)
+		*tensors_background_shardense_updata_tidUI	tensors_blendвcurl через
+		                                                >>cvxUnitRunSeedNetTimeZone_mode.netTimeZone_changeERNNetZone ,
+		*tensors_uniform (tid Miranda_/*homogenous face целофрэнд الأرض*/.Uniform gridist UP, заливки атрибуты вдеши как унифицированный SDK uniform quantize для TGA как в Uniform_unit_*_samplerMasks можно порядково представлять stats by RXPlane Canvas DrawFarFree иначе DrawFar с игрой)
+		*tensors HIDSDK_ExportDllVk SmokeSolverScene чейдэе ****_but THREAD_Miscellaneous+
+
+ общее voluptat qui officia deserunt mollit anim id est laborum.
+\end{document}
