@@ -435,4 +435,13 @@ The Apparatus model had no auto-slug generation. Slugs were only populated if ma
 
 ---
 
-### ERROR-044: (Reserved for future entries)
+### ERROR-044: fast_edit_file accidentally deleting methods
+**Date**: 2026-03-14
+**Status**: ✅ RESOLVED
+
+Description:
+The `fast_edit_file` feature was developed to quickly add or edit `Apparatus` models from the React frontend. It allowed users to modify up to five properties in one go. However, during a refactor of the `Apparatus` model, a direct database migration was applied which accidentally deleted four out of the five properties in the `fast_edit_file` feature's data table.
+This was a cascade delete的影响，当对象删除时，将它与之相关的对象也删除。未能预料到连锁反应可能导致额外的破坏，导致误删除了本该保留的方法。
+
+Solution:
+rolled back to the previous version and added back the deleted methods. Explanation has been provided in the deploy notes so that developers can be aware of this change.
