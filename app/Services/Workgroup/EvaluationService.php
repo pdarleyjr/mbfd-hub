@@ -712,7 +712,7 @@ class EvaluationService
                         'product' => $product,
                         'name' => $product->display_name,
                         'brand' => $product->effective_brand,
-                        'avg_score' => $avgScore,
+                        ' avg_score' => $avgScore,
                         'response_count' => $submissions->count(),
                         'meets_threshold' => $submissions->count() >= $this->minimumResponseThreshold,
                         'saver_breakdown' => $this->calculateSaverBreakdown($submissions),
@@ -816,43 +816,171 @@ class EvaluationService
     }
 
     /**
-     * Master method: get comprehensive evaluation results for a workgroup.
+     * Get granular tool groupings for the session results page.
      *
-     * Combines brand-aggregated rankings, competitor-group rankings,
-     * isolated product analysis, standard category rankings, and non-rankable
-     * feedback into a single structured array suitable for UI display
-     * and SAVER report generation.
+     * Filters products by keyword within their names and groups them
+     * into distinct tables: cut-off saws, T1 standalone, spreaders,
+     * cutters, rams, and an overall extrication brand summary.
+     *
+     * This is a PRESENTATION-LAYER transformation — no DB schema changes.
+     * Uses Laravel Collections to dynamically filter before sending to Blade.
      *
      * @return array{
-     *   workgroup_id: int,
-     *   workgroup_name: string,
-     *   session_id: ?int,
-     *   session_name: ?string,
-     *   brand_aggregated_rankings: array,
-     *   competitor_group_rankings: array,
-     *   isolated_products: array,
-     *   standard_category_rankings: array,
-     *   non_rankable_feedback: Collection,
-     *   minimum_threshold: int,
-     *   generated_at: \Illuminate\Support\Carbon,
+     *   cutoff_saws: array,
+     *   t1_standalone: ?array,
+     *   brand_overall: array,
+     *   spreaders: array,
+     *   cutters: array,
+     *   rams: array,
      * }
      */
-    public function getComprehensiveResults(Workgroup $workgroup, ?WorkgroupSession $session = null): array
+    public function getGranularToolGroupings(?int $sessionId = null): array
     {
-        $sessionId = $session?->id;
+        // Fetch ALL candidate products (optionally scoped to session)
+        $query = CandidateProduct::with('category');
+        if ($sessionId) {
+            $query->where('workgroup_session_id', $sessionId);
+        }
+        $allProducts = $query->get();
+
+        if ($allProducts->isEmpty()) {
+            return [
+                'cutoff_saws' => [],
+                't1_standalone' => null,
+                'brand_overall' => [],
+                'spreaders' => [],
+                'cutters' => [],
+                'rams' => [],
+            ];
+        }
+
+        // Helper: score a single product
+        $scoreProduct = function (CandidateProduct $product) {
+            $submissions = $this->countableSubmissions()
+                ->where('candidate_product_id', $product->id)
+                ->where('status', 'submitted')
+                ->get();
+
+            $scores = $submissions->pluck('overall_score')->filter(fn($s) => $s !== null);
+            $avgScore = $scores->isNotEmpty() ? round($scores->avg(), 2) : null;
+
+            return [
+                'product' => $product,
+                'name' => $product->display_name,
+                'brand' => $product->effective_brand,
+                'avg_score' => $avgScore,
+                'response_count' => $submissions->count(),
+                'meets_threshold' => $submissions->count() >= $this->minimumResponseThreshold,
+                'saver_breakdown' => $this->calculateSaverBreakdown($submissions),
+                'capability_avg' => $this->safeAvg($submissions->where('status', 'submitted'), 'capability_score'),
+                'usability_avg' => $this->safeAvg($submissions->where('status', 'submitted'), 'usability_score'),
+                'affordability_avg' => $this->safeAvg($submissions->where('status', 'submitted'), 'affordability_score'),
+                'maintainability_avg' => $this->safeAvg($submissions->where('status', 'submitted'), 'maintainability_score'),
+                'deployability_avg' => $this->safeAvg($submissions->where('status', 'submitted'), 'deployability_score'),
+                'advance_yes' => $submissions->where('advance_recommendation', 'yes')->count(),
+                'advance_no' => $submissions->where('advance_recommendation', 'no')->count(),
+                'deal_breakers' => $submissions->where('has_deal_breaker', true)->count(),
+            ];
+        };
+
+        // Helper: filter products by keyword in name (case-insensitive)
+        $filterByKeyword = function (Collection $products, string $keyword) {
+            return $products->filter(fn($p) => str_contains(strtolower($p->name), strtolower($keyword)));
+        };
+
+        // Helper: rank a collection of scored products by avg_score desc
+        $rankProducts = function (Collection $products) use ($scoreProduct) {
+            return $products->map($scoreProduct)
+                ->sortByDesc('avg_score')
+                ->values()
+                ->toArray();
+        };
+
+        // 1. Forcible Entry Cut-off Saws
+        $cutoffSawProducts = $filterByKeyword($allProducts, 'cut-off')
+            ->merge($filterByKeyword($allProducts, 'cutoff'))
+            ->merge($filterByKeyword($allProducts, 'saw'))
+            ->unique('id');
+        // Exclude anything that looks like a "cutter" (extrication cutter, not saw)
+        $cutoffSawProducts = $cutoffSawProducts->reject(fn($p) =>
+            str_contains(strtolower($p->name), 'cutter') ||
+            str_contains(strtolower($p->name), 'spreader') ||
+            str_contains(strtolower($p->name), 'ram')
+        );
+        $cutoffSaws = $rankProducts($cutoffSawProducts);
+
+        // 2. T1 Standalone
+        $t1Products = $allProducts->filter(fn($p) =>
+            preg_match('/\bT[\s-]?1\b/i', $p->name) ||
+            strtolower(trim($p->name)) === 't1'
+        );
+        $t1Standalone = $t1Products->isNotEmpty()
+            ? $scoreProduct($t1Products->first())
+            : null;
+
+        // 3. Extrication tools — identify by keyword in name
+        $extricationKeywords = ['spreader', 'cutter', 'ram', 'combi'];
+        $extricationProducts = $allProducts->filter(function ($p) use ($extricationKeywords) {
+            $name = strtolower($p->name);
+            foreach ($extricationKeywords as $kw) {
+                if (str_contains($name, $kw)) return true;
+            }
+            return false;
+        });
+
+        // 4. Spreaders Table
+        $spreaders = $rankProducts($filterByKeyword($extricationProducts, 'spreader'));
+
+        // 5. Cutters Table
+        $cutters = $rankProducts($filterByKeyword($extricationProducts, 'cutter'));
+
+        // 6. Rams Table
+        $rams = $rankProducts($filterByKeyword($extricationProducts, 'ram'));
+
+        // 7. Brand Overall Summary (extrication brands)
+        $brandOverall = [];
+        $extricationByBrand = $extricationProducts->groupBy(fn($p) => $p->effective_brand ?? 'Unknown');
+        foreach ($extricationByBrand as $brand => $brandProducts) {
+            $allSubmissions = collect();
+            $toolCount = $brandProducts->count();
+            $productScores = [];
+
+            foreach ($brandProducts as $product) {
+                $submissions = $this->countableSubmissions()
+                    ->where('candidate_product_id', $product->id)
+                    ->where('status', 'submitted')
+                    ->get();
+
+                $scores = $submissions->pluck('overall_score')->filter(fn($s) => $s !== null);
+                $productScores[] = $scores->isNotEmpty() ? $scores->avg() : null;
+                $allSubmissions = $allSubmissions->merge($submissions);
+            }
+
+            $scoredProducts = array_filter($productScores, fn($s) => $s !== null);
+            $overallAvg = count($scoredProducts) > 0 ? round(array_sum($scoredProducts) / count($scoredProducts), 2) : null;
+
+            $brandOverall[] = [
+                'brand' => $brand,
+                'overall_avg' => $overallAvg,
+                'tool_count' => $toolCount,
+                'saver_breakdown' => $this->calculateSaverBreakdown($allSubmissions),
+            ];
+        }
+        // Sort by overall_avg desc, nulls last
+        usort($brandOverall, fn($a, $b) => $this->sortNullsLast($a['overall_avg'], $b['overall_avg']));
+        // Assign rank
+        foreach ($brandOverall as $i => &$b) {
+            $b['rank'] = $i + 1;
+        }
+        unset($b);
 
         return [
-            'workgroup_id' => $workgroup->id,
-            'workgroup_name' => $workgroup->name,
-            'session_id' => $sessionId,
-            'session_name' => $session?->name,
-            'brand_aggregated_rankings' => $this->getBrandAggregatedRankings($workgroup, $session),
-            'competitor_group_rankings' => $this->getCompetitorGroupRankings($workgroup, $session),
-            'isolated_products' => $this->getIsolatedProductAnalysis($workgroup, $session),
-            'standard_category_rankings' => $this->getSessionResults($sessionId)['rankable_categories'] ?? [],
-            'non_rankable_feedback' => $this->getNonRankableFeedback($sessionId),
-            'minimum_threshold' => $this->minimumResponseThreshold,
-            'generated_at' => now(),
+            'cutoff_saws' => $cutoffSaws,
+            't1_standalone' => $t1Standalone,
+            'brand_overall' => $brandOverall,
+            'spreaders' => $spreaders,
+            'cutters' => $cutters,
+            'rams' => $rams,
         ];
     }
 
