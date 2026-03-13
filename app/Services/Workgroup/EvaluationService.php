@@ -712,7 +712,7 @@ class EvaluationService
                         'product' => $product,
                         'name' => $product->display_name,
                         'brand' => $product->effective_brand,
-                        ' avg_score' => $avgScore,
+                        'avg_score' => $avgScore,
                         'response_count' => $submissions->count(),
                         'meets_threshold' => $submissions->count() >= $this->minimumResponseThreshold,
                         'saver_breakdown' => $this->calculateSaverBreakdown($submissions),
@@ -813,6 +813,47 @@ class EvaluationService
         }
 
         return $isolated;
+    }
+
+    /**
+     * Master method: get comprehensive evaluation results for a workgroup.
+     *
+     * Combines brand-aggregated rankings, competitor-group rankings,
+     * isolated product analysis, standard category rankings, and non-rankable
+     * feedback into a single structured array suitable for UI display
+     * and SAVER report generation.
+     *
+     * @return array{
+     *   workgroup_id: int,
+     *   workgroup_name: string,
+     *   session_id: ?int,
+     *   session_name: ?string,
+     *   brand_aggregated_rankings: array,
+     *   competitor_group_rankings: array,
+     *   isolated_products: array,
+     *   standard_category_rankings: array,
+     *   non_rankable_feedback: Collection,
+     *   minimum_threshold: int,
+     *   generated_at: \Illuminate\Support\Carbon,
+     * }
+     */
+    public function getComprehensiveResults(Workgroup $workgroup, ?WorkgroupSession $session = null): array
+    {
+        $sessionId = $session?->id;
+
+        return [
+            'workgroup_id' => $workgroup->id,
+            'workgroup_name' => $workgroup->name,
+            'session_id' => $sessionId,
+            'session_name' => $session?->name,
+            'brand_aggregated_rankings' => $this->getBrandAggregatedRankings($workgroup, $session),
+            'competitor_group_rankings' => $this->getCompetitorGroupRankings($workgroup, $session),
+            'isolated_products' => $this->getIsolatedProductAnalysis($workgroup, $session),
+            'standard_category_rankings' => $this->getSessionResults($sessionId)['rankable_categories'] ?? [],
+            'non_rankable_feedback' => $this->getNonRankableFeedback($sessionId),
+            'minimum_threshold' => $this->minimumResponseThreshold,
+            'generated_at' => now(),
+        ];
     }
 
     /**
