@@ -21,7 +21,7 @@ class StationController extends Controller
     public function index(): JsonResponse
     {
         $stations = Station::with(['apparatuses', 'rooms'])
-            ->withCount('apparatuses', 'rooms')
+            ->withCount('apparatuses', 'rooms', 'capitalProjects', 'shopWorks')
             ->get();
 
         return response()->json([

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class Apparatus extends Model
 {
@@ -37,6 +38,24 @@ class Apparatus extends Model
         'last_service_date' => 'date',
         'reported_at' => 'datetime',
     ];
+
+    /**
+     * Auto-generate slug from designation on create/update if missing.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (Apparatus $apparatus) {
+            if (empty($apparatus->slug) && !empty($apparatus->designation)) {
+                $apparatus->slug = Str::slug($apparatus->designation);
+            }
+        });
+
+        static::updating(function (Apparatus $apparatus) {
+            if (empty($apparatus->slug) && !empty($apparatus->designation)) {
+                $apparatus->slug = Str::slug($apparatus->designation);
+            }
+        });
+    }
 
     /**
      * Get the station that owns this apparatus
