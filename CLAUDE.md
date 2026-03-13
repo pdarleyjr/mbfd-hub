@@ -12,7 +12,57 @@
 > ✅ **Workgroup Evaluation Modernization MERGED** (2026-03-11) â Phase 1: EvaluationService brand aggregation + competitor grouping. Phase 2: ERROR-018 fix â removed Livewire widgets, inlined data via getViewData() + async AI. Phase 3: Impeccable UI/UX overhaul for session results + admin dashboard. Phase 4: SAVER document generator â AI-powered purchasing report. Branch `feat/workgroup-evaluation-modernization` merged to `main` and deployed to VPS. Migration: `add_brand_competitor_group_to_candidate_products`.
 > ✅ **Unified Filament Theme Pipeline** (2026-03-11) â Fixed fragmented CSS: replaced render hook CSS injection with proper `->viteTheme()` across all 3 panels (Admin, Workgroup, Training). theme.css now imports Filament's pre-compiled dist CSS + custom MBFD overrides. All panels use Plus Jakarta Sans font and MBFD brand red. Build output 120KB unified theme.
 > ✅ **Notification Preferences + WebPush Debug Logging** (2026-03-12) â New `notification_preferences` JSON column on users table. NotificationSettings Filament page with 5 toggle categories (Vehicle Inspections, Station Inspections, Fire Equipment Requests, Workgroup Evaluations, Station Inventory Alerts). Registered in Admin and Workgroup panel user menus. AppServiceProvider filters recipients by preferences before dispatch. Station inventory submissions now trigger NewSubmissionNotification. WebPush diagnostic logging added to NewSubmissionNotification (ShouldQueue + failed()), PushSubscriptionController, and push-notification-widget.js.
-> ✅ **Dark Topbar UI Unification** (2026-03-12) â Filament topbar restyled to match React SPA dark header (`#171717` bg, MBFD red accent border, white/light text). All 3 panels (Admin, Workgroup, Training) unified via shared `theme.css`. No `@apply` used. VAPID keys verified present, queue worker confirmed running, config cache cleared. Notification pipeline healthy (6 push subscriptions, no failures in logs).
+> ✅ **Dark Topbar UI Unification** (2026-03-12) — Filament topbar restyled to match React SPA dark header (`#171717` bg, MBFD red accent border, white/light text). All 3 panels (Admin, Workgroup, Training) unified via shared `theme.css`. No `@apply` used. VAPID keys verified present, queue worker confirmed running, config cache cleared. Notification pipeline healthy (6 push subscriptions, no failures in logs).
+> ✅ **API + Model Fixes for React SPA** (2026-03-13) — StationController::index() now includes `withCount('capitalProjects', 'shopWorks')` so station list cards display correct project/shop work counts. Apparatus model auto-generates slugs from designation on create/update via `booted()` lifecycle hook. New `artisan apparatus:backfill-slugs` command to fix existing null-slug records (e.g., "Captain 5"). FileUpload in Filament Action modals audited — SharedUploads.php already handles temp string paths correctly.
+
+## Cloudflare Support AI Worker (2026-03-12)
+
+### `mbfd-support-ai` Worker
+- **CRITICAL OVERRIDE system prompt** for repair reporting: directs users to email `FireSupportServices@MiamiBeachFL.Gov` and provides phone contact order
+- **RAG Index**: `mbfd-rag-index` — 12 vectors ingested from L1-L11, L3, PUC Engine manuals
+- Deployed to Cloudflare Workers with Vectorize binding
+
+### Station Inspection Form Overhaul (2026-03-12)
+- Removed 3 sections from the original form (streamlined)
+- Added **Pass All** buttons for rapid section completion
+- Added **conditional fail inputs** with image capture (camera/file upload)
+- Backend: `StationInspectionController@store` handles Base64→file conversion for fail images
+- Filament: `StationInspectionsRelationManager` updated to display inspection results with image viewer
+
+### VPS Deployment Notes
+- **Any change to `resources/css/` requires `npm run build` inside the Docker container** on VPS
+- `public/build/` is gitignored — compiled assets do NOT transfer via `git pull`
+- Command: `docker exec mbfd-hub-laravel.test-1 npm run build`
+- **Always run `npm run build` INSIDE Docker container**: `docker compose exec laravel.test bash -c 'npm install && npm run build'` (never on host — Docker overlay may serve stale files)
+- **After any deployment, fix permissions**: `docker compose exec -u root laravel.test chmod -R 777 storage bootstrap/cache` (container runs as `sail` user, not `www-data`)
+- **Station inspection public API**: `POST /api/public/station_inspection` (no auth required — used by tablet forms)
+
+### Deployment Rules (Mandatory — 2026-03-13)
+
+> These rules MUST be followed after every `git pull` on the VPS or CI/CD deploy.
+
+1. **Vite assets MUST be compiled on the VPS** — `public/build/` is gitignored. After pulling CSS/JS changes:
+   ```bash
+   docker compose exec laravel.test bash -c 'npm install && npm run build'
+   ```
+2. **Queue workers MUST be restarted** after any Notification class, Job, or Listener change:
+   ```bash
+   docker exec mbfd-hub-laravel.test-1 php artisan queue:restart
+   ```
+   The queue worker daemon loads notification classes into RAM. Without restart, old code runs indefinitely.
+3. **Cache MUST be cleared** after any config, route, or view change:
+   ```bash
+   docker exec mbfd-hub-laravel.test-1 php artisan optimize:clear
+   docker exec mbfd-hub-laravel.test-1 php artisan view:clear
+   ```
+4. **Storage permissions MUST be fixed** after container recreation:
+   ```bash
+   docker compose exec -u root laravel.test chmod -R 777 storage bootstrap/cache
+   ```
+5. **Never run `npm run build` on the host** — Docker overlay filesystem serves stale files. Always build INSIDE the container.
+
+
+---
 
 ## Project Identity
 Miami Beach Fire Department (MBFD) internal operations hub. Laravel 11 + Filament 3 backend, React SPA daily checkout, Baserow data platform — all containerized on a single VPS.

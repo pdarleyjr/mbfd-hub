@@ -258,4 +258,181 @@ grep -c "addEventListener('push'" public/daily/sw.js
 
 ---
 
-### ERROR-037: (Reserved for future entries)
+### ERROR-037: UI Uniformity Failure — Dark Header CSS Not Compiled on VPS
+
+**Date**: 2026-03-12  
+**Severity**: 🟡 MEDIUM  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `resources/css/filament/admin/theme.css`, `public/build/assets/theme-*.css`
+
+**Symptom**:
+After committing and pushing dark topbar CSS changes to `main` and pulling on VPS via `git pull`, the Filament panels still showed the old white topbar. The source CSS in `resources/css/filament/admin/theme.css` was correct on the VPS.
+
+**Root Cause**:
+`npm run build` was never executed on the VPS after `git pull`. The `public/build/` directory is gitignored, so compiled Vite assets do not transfer via git. The VPS was still serving the previously compiled theme CSS which did not include the dark topbar styles.
+
+**Fix Applied**:
+Ran `docker compose exec laravel.test npm run build` directly on the VPS to recompile the Filament theme. Confirmed 11 build artifacts generated including `theme-B-aUFWYd.css` at 121.40 KB. Cleared all caches with `optimize:clear`.
+
+**Prevention**:
+1. **Any change to `resources/css/` requires server-side Vite compilation** — `git pull` alone is NOT sufficient
+2. After pulling CSS changes on VPS, always run: `docker exec mbfd-hub-laravel.test-1 npm run build`
+3. Verify the build output includes the expected theme file: `ls -la public/build/assets/theme-*.css`
+4. The CI/CD pipeline (`deploy.yml`) handles this automatically, but manual deploys via `git pull` do NOT
+
+---
+
+### ERROR-038: Station Inspection API Endpoint Mismatch
+
+**Date**: 2026-03-12  
+**Severity**: 🔴 HIGH  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `routes/api.php`, `app/Http/Controllers/Api/StationInspectionController.php`, `resources/js/daily-checkout/src/pages/StationInspection.tsx`
+
+**Symptom**:
+React station inspection form submitted but received 401/404/500 errors. Multiple compounding issues prevented successful submission.
+
+**Root Cause**:
+Four layered issues:
+1. **Wrong URL**: React posted to `/api/station-inspections` but Laravel route was `/api/public/station_inspection` (underscores, singular)
+2. **Auth barrier**: Route was inside `auth:sanctum` middleware group; public tablet submissions have no auth token
+3. **Data shape mismatch**: Controller expected flat fields but React sent nested JSON structure
+4. **Station name accessor**: Controller used `$station->name` but Station model had no `name` attribute — it was `station_name`
+
+**Fix Applied**:
+1. Moved route to public API group (no auth middleware)
+2. Updated React to POST to `/api/public/station_inspection`
+3. Aligned controller to accept the nested JSON structure from React
+4. Fixed station name accessor to use `station_name` column
+
+**Prevention**:
+1. Always verify API route paths match between frontend and backend before deploying new forms
+2. Public-facing tablet forms must use unauthenticated API routes under `/api/public/`
+3. Check model column names against database schema, not assumptions
+
+---
+
+### ERROR-039: Storage Permissions Denied (500 Error)
+
+**Date**: 2026-03-12  
+**Severity**: 🔴 HIGH  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `storage/`, `bootstrap/cache/`
+
+**Symptom**:
+500 errors on various pages. Laravel log showed "Permission denied" when writing to `storage/framework/views/` and `storage/logs/`.
+
+**Root Cause**:
+Docker container runs as `sail` user (UID 1000), not `www-data`. After container recreation or volume remount, file ownership reverts to root, preventing the application from writing to storage directories.
+
+**Fix Applied**:
+```bash
+docker compose exec -u root laravel.test chmod -R 777 storage bootstrap/cache
+```
+
+**Prevention**:
+1. After ANY container recreation, always run: `docker compose exec -u root laravel.test chmod -R 777 storage bootstrap/cache`
+2. Add this to deployment scripts as a post-deploy step
+3. Laravel Sail uses `sail` user — never assume `www-data` ownership
+
+---
+
+### ERROR-040: Docker Overlay Filesystem Serving Stale Files
+
+**Date**: 2026-03-12  
+**Severity**: 🟡 MEDIUM  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `public/build/`, `node_modules/`
+
+**Symptom**:
+After `git pull` and running `npm run build` on the host, the browser still served old JavaScript/CSS bundles. Vite manifest pointed to files that existed on disk but Docker served stale overlay content.
+
+**Root Cause**:
+Docker's overlay filesystem caches file layers. Running `npm run build` on the host writes to the bind-mounted volume, but the container's overlay may not reflect changes immediately — especially if `node_modules` inside the container differs from the host. The container must be recreated and `npm run build` must execute INSIDE the container.
+
+**Fix Applied**:
+```bash
+docker compose down && docker compose up -d
+docker compose exec laravel.test bash -c 'npm install && npm run build'
+```
+
+**Prevention**:
+1. **ALWAYS run `npm run build` INSIDE the Docker container**, never on the host
+2. Command: `docker compose exec laravel.test bash -c 'npm install && npm run build'`
+3. After major changes, recreate containers: `docker compose down && docker compose up -d`
+
+---
+
+### ERROR-041: Station Inspection View 500 — Array to String Conversion
+
+**Date**: 2026-03-12  
+**Severity**: 🟡 MEDIUM  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `app/Filament/Resources/StationInspectionResource.php`
+
+**Symptom**:
+Viewing a station inspection record in Filament admin panel threw a 500 error: "Array to string conversion".
+
+**Root Cause**:
+The `station_inspection` table stores JSON columns (e.g., `piping`, `equipment_condition`). Filament's `TextEntry` attempted to render these JSON arrays as plain strings, causing a PHP "Array to string conversion" error.
+
+**Fix Applied**:
+Used `->getStateUsing()` on affected TextEntry fields to serialize JSON values before display:
+```php
+TextEntry::make('piping')
+    ->getStateUsing(fn ($record) => is_array($record->piping) ? json_encode($record->piping, JSON_PRETTY_PRINT) : $record->piping),
+```
+
+**Prevention**:
+1. When displaying JSON/array database columns in Filament, always use `->getStateUsing()` to serialize
+2. Alternatively, use `->formatStateUsing()` or custom Filament view components for complex JSON display
+3. Test Filament resource views with actual data before deploying
+
+---
+
+### ERROR-042: Station List Missing Counts — capitalProjects & shopWorks Not Eager-Loaded
+
+**Date**: 2026-03-13  
+**Severity**: 🟡 MEDIUM  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `app/Http/Controllers/Api/StationController.php`
+
+**Symptom**:
+Station list cards in the React SPA (`StationCard.tsx`) showed "0 Projects" and "0 Shop Works" for all stations, despite data existing in the database.
+
+**Root Cause**:
+`StationController::index()` used `->withCount('apparatuses', 'rooms')` but omitted `capitalProjects` and `shopWorks`. The React frontend expected `capital_projects_count` and `shop_works_count` in the JSON response.
+
+**Fix Applied**:
+Added `'capitalProjects', 'shopWorks'` to the `withCount()` call in the `index()` method.
+
+**Prevention**:
+1. When adding count displays to React components, verify the backend API returns the corresponding `withCount` data
+2. Always check both the API controller and the frontend component for data shape alignment
+
+---
+
+### ERROR-043: Apparatus Slug Null — Vehicle Inspection Link to `/vehicle-inspections/null`
+
+**Date**: 2026-03-13  
+**Severity**: 🟡 MEDIUM  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `app/Models/Apparatus.php`, `app/Console/Commands/BackfillApparatusSlugs.php`
+
+**Symptom**:
+Apparatus records like "Captain 5" had `slug: null` in the database. When the React SPA rendered the vehicle inspection list, clicking these items would navigate to `/vehicle-inspections/null`. The React code (`VehicleInspectionSelect.tsx`) already handled null slugs gracefully (showing disabled cards), but the root cause — missing slugs — needed fixing.
+
+**Root Cause**:
+The Apparatus model had no auto-slug generation. Slugs were only populated if manually set during creation. Existing records that pre-dated the slug column addition had null values.
+
+**Fix Applied**:
+1. Added `booted()` lifecycle hook on `Apparatus` model to auto-generate `Str::slug(designation)` on `creating` and `updating` events when slug is empty
+2. Created `artisan apparatus:backfill-slugs` command to fix all existing null-slug records
+
+**Prevention**:
+1. When adding a slug column to a model, always add an auto-generation boot hook AND a backfill migration/command
+2. Run `php artisan apparatus:backfill-slugs` after deployment to fix existing records
+
+---
+
+### ERROR-044: (Reserved for future entries)
