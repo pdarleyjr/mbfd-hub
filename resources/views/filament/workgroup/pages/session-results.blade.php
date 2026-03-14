@@ -42,7 +42,7 @@
                 ['label' => 'Evaluators',  'val' => $progress['total_members']],
                 ['label' => 'Submitted',   'val' => $progress['submitted_submissions']],
                 ['label' => 'In Progress', 'val' => $progress['draft_submissions']],
-                ['label' => 'Pending',     'val' => max(0, $progress['max_possible_submissions'] - $progress['submitted_submissions'])],
+                ['label' => 'Pending',     'val' => max(0, $progress['max_possible_submissions'] - $progress['submitted_submissions'] - $progress['draft_submissions'])],
                 ['label' => 'Completion',  'val' => $progress['completion_percentage'] . '%'],
             ];
         @endphp
