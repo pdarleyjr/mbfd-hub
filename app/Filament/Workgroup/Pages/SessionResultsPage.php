@@ -119,21 +119,18 @@ class SessionResultsPage extends Page
         try {
             $session = $this->getSelectedSession();
 
-            if (!$session) {
-                // For "Overall" view, try to use the most recent completed session
-                $session = WorkgroupSession::where('status', 'completed')
-                    ->orderByDesc('created_at')
-                    ->first();
-            }
+            $aiService = app(WorkgroupAIService::class);
+            $workgroup = Workgroup::first();
 
-            if (!$session) {
-                $this->aiReportError = 'No session available for AI report generation.';
+            if (!$workgroup) {
+                $this->aiReportError = 'No workgroup found for AI report generation.';
                 $this->aiReportLoaded = true;
                 return;
             }
 
-            $aiService = app(WorkgroupAIService::class);
-            $result = $aiService->generateExecutiveReport($session);
+            // When session is null, this is the "Overall" scope — generate
+            // an aggregate report across ALL sessions, not just Day 1.
+            $result = $aiService->generateExecutiveReport($workgroup, $session);
             $this->aiReport = is_array($result) ? ($result['report'] ?? json_encode($result)) : (string) $result;
             $this->aiReportLoaded = true;
         } catch (\Exception $e) {
