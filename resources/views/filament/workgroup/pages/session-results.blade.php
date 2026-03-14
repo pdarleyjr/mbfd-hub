@@ -61,7 +61,7 @@
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <div class="wg-ai-icon">
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2h-2"/>
                     </svg>
                 </div>
                 <div>
@@ -71,6 +71,10 @@
             </div>
             @if($aiReportLoaded && $aiReport)
             <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                <a href="{{ route('reports.executive.pdf', ['session_id' => $selectedSessionId]) }}" target="_blank" class="wg-ai-btn wg-ai-btn--secondary" style="text-decoration: none;">
+                    <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Export PDF
+                </a>
                 <button wire:click="regenerateAiReport" wire:loading.attr="disabled" class="wg-ai-btn wg-ai-btn--primary">
                     <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     Regenerate
@@ -133,9 +137,9 @@
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
                 @if($saverReportHtml)
-                <a href="{{ route('workgroup.saver-report') }}" target="_blank" class="wg-ai-btn wg-ai-btn--secondary" style="color: #fff; border-color: rgba(255,255,255,0.3);">
-                    <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z"/></svg>
-                    Print Report
+                <a href="{{ route('reports.saver.pdf', ['session_id' => $selectedSessionId]) }}" target="_blank" class="wg-ai-btn wg-ai-btn--secondary" style="color: #fff; border-color: rgba(255,255,255,0.3); text-decoration: none;">
+                    <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Export PDF
                 </a>
                 @endif
                 <button
@@ -245,7 +249,7 @@
     <div class="wg-section" style="margin-bottom: 1.25rem;">
         <div class="wg-section-header">
             <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #DC2626, #EF4444);">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243z"/></svg>
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l4 4m4-4l4-4m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             </div>
             <div>
                 <h3 class="wg-section-title">Forcible Entry — Cut-off Saws</h3>
@@ -314,7 +318,7 @@
     <div class="wg-section" style="margin-bottom: 1.25rem;">
         <div class="wg-section-header">
             <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #059669, #10B981);">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
             </div>
             <div>
                 <h3 class="wg-section-title">Extrication — Spreaders</h3>
