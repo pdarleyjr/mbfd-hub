@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Workgroup\FileDownloadController;
+use App\Http\Controllers\ReportExportController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -75,4 +76,10 @@ Route::get('/workgroup/saver-report', function () {
         'generatedAt' => now()->format('F j, Y'),
     ]);
 })->name('workgroup.saver-report')->middleware('auth');
+
+// Workgroup Report PDF Exports (authenticated)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/reports/executive-report/pdf', [ReportExportController::class, 'exportExecutiveReport'])->name('reports.executive.pdf');
+    Route::get('/reports/saver-report/pdf', [ReportExportController::class, 'exportSaverReport'])->name('reports.saver.pdf');
+});
 
