@@ -266,28 +266,44 @@ class WorkgroupAIService
      * Generate the full executive report for all categories.
      * This is the final document for the Health & Safety Committee.
      * NOT cached — always fresh.
+     *
+     * When $session is null, generates an "Overall Project Evaluation" report
+     * aggregating data across ALL sessions — not just Day 1.
      */
-    public function generateExecutiveReport(WorkgroupSession $session): array
+    public function generateExecutiveReport(Workgroup $workgroup, ?WorkgroupSession $session = null): array
     {
         if (!$this->isEnabled()) {
             return ['report' => null, 'error' => 'AI service not configured'];
         }
 
-        $categories = $this->buildCategoriesForReport($session);
-        $overallStats = $this->buildOverallStats($session);
+        $categories = $session
+            ? $this->buildCategoriesForReport($session)
+            : $this->buildCategoriesForOverallReport($workgroup);
+        $overallStats = $session
+            ? $this->buildOverallStats($session)
+            : $this->buildOverallStatsAllSessions($workgroup);
+
+        // Collect anonymous evaluator comments for AI context
+        $anonymousComments = $this->collectAnonymousComments($workgroup, $session);
+
+        $sessionLabel = $session ? $session->name : 'Overall Project Evaluation';
 
         try {
             $response = Http::timeout(120)->post("{$this->workerUrl}/executive-report", [
-                'sessionName'  => $session->name,
+                'sessionName'  => $sessionLabel,
                 'sessionDate'  => now()->format('F j, Y'),
                 'categories'   => $categories,
                 'overallStats' => $overallStats,
+                'anonymousComments' => $anonymousComments,
+                'systemDirective' => 'You must analyze the provided anonymous evaluator comments and cross-reference them against the vendor product specifications and tool details found in your RAG index for these specific brands. Include qualitative insights from evaluator feedback alongside the quantitative scores.',
             ]);
 
             if ($response->successful()) {
                 $result = $response->json();
-                // Cache for 30 min so back-to-back exports don't re-generate
-                Cache::put("workgroup_ai_exec_report_{$session->id}", $result, 1800);
+                $cacheKey = $session
+                    ? "workgroup_ai_exec_report_{$session->id}"
+                    : "workgroup_ai_exec_report_overall_{$workgroup->id}";
+                Cache::put($cacheKey, $result, 1800);
                 return $result;
             }
 
@@ -408,6 +424,7 @@ class WorkgroupAIService
     {
         $lines = [];
         $lines[] = "You are an expert evaluator writing a DHS SAVER (System Assessment and Validation for Emergency Responders) style report.";
+        $lines[] = "You must analyze the provided anonymous evaluator comments and cross-reference them against the vendor product specifications and tool details found in your RAG index for these specific brands.";
         $lines[] = "";
         $lines[] = "WORKGROUP: {$workgroup->name}";
         $lines[] = "SESSION: " . ($session?->name ?? 'All Sessions Combined');
@@ -496,6 +513,20 @@ class WorkgroupAIService
             }
         }
 
+        // Collect and inject anonymous comments
+        $anonymousComments = $this->collectAnonymousComments($workgroup, $session);
+        if (!empty($anonymousComments)) {
+            $lines[] = "=== ANONYMOUS EVALUATOR COMMENTS ===";
+            $groupedByProduct = collect($anonymousComments)->groupBy('product');
+            foreach ($groupedByProduct as $productName => $productComments) {
+                $lines[] = "Product: {$productName}";
+                foreach ($productComments as $c) {
+                    $lines[] = "  [{$c['type']}]: {$c['comment']}";
+                }
+                $lines[] = "";
+            }
+        }
+
         $lines[] = "";
         $lines[] = "=== INSTRUCTIONS ===";
         $lines[] = "Generate a professional DHS SAVER-style report in clean HTML format with these sections:";
@@ -545,6 +576,25 @@ class WorkgroupAIService
 
     protected function formatSubmission(EvaluationSubmission $submission): array
     {
+        // Extract anonymous feedback notes from narrative_payload
+        $narrative = $submission->narrative_payload ?? [];
+        $anonymousNotes = [];
+        if (!empty($narrative['strengths'])) {
+            $anonymousNotes[] = "Strengths: {$narrative['strengths']}";
+        }
+        if (!empty($narrative['weaknesses'])) {
+            $anonymousNotes[] = "Weaknesses: {$narrative['weaknesses']}";
+        }
+        if (!empty($narrative['overall_impression'])) {
+            $anonymousNotes[] = "Overall Impression: {$narrative['overall_impression']}";
+        }
+        if (!empty($narrative['additional_comments'])) {
+            $anonymousNotes[] = "Additional: {$narrative['additional_comments']}";
+        }
+
+        // Include legacy comments if present
+        $legacyComments = $submission->comments->pluck('comment')->filter()->values()->toArray();
+
         return [
             'evaluatorRole'        => $submission->member?->role ?? 'member',
             'overallScore'         => $submission->overall_score,
@@ -558,6 +608,7 @@ class WorkgroupAIService
             'hasDealBreaker'       => $submission->has_deal_breaker,
             'dealBreakerNote'      => $submission->deal_breaker_note,
             'narrative'            => $submission->narrative_payload,
+            'anonymousNotes'       => array_merge($anonymousNotes, $legacyComments),
         ];
     }
 
@@ -625,6 +676,155 @@ class WorkgroupAIService
             'totalEvaluators'  => $evaluatorIds,
             'totalSubmissions' => $submissions,
         ];
+    }
+
+    /**
+     * Build categories for an "Overall" report spanning ALL sessions in a workgroup.
+     * This prevents the fallback-to-Day-1 bug.
+     */
+    protected function buildCategoriesForOverallReport(Workgroup $workgroup): array
+    {
+        $sessionIds = $workgroup->sessions()->pluck('id')->toArray();
+
+        if (empty($sessionIds)) {
+            return [];
+        }
+
+        $products = CandidateProduct::whereIn('workgroup_session_id', $sessionIds)
+            ->with(['category', 'submissions' => fn($q) => $q->where('status', 'submitted')
+                ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))])
+            ->get();
+
+        $grouped = $products->groupBy('category.name');
+
+        return $grouped->map(function ($categoryProducts, $categoryName) {
+            $rankingType = $this->detectRankingType($categoryName);
+
+            $productsFormatted = $categoryProducts->map(function (CandidateProduct $product) {
+                $submissions = $product->submissions;
+                return [
+                    'name'            => $product->name,
+                    'manufacturer'    => $product->manufacturer,
+                    'model'           => $product->model,
+                    'averageScore'    => $submissions->avg('overall_score'),
+                    'submissionCount' => $submissions->count(),
+                    'isFinalist'      => $submissions->filter(fn($s) => $s->advance_recommendation === 'yes')->count() >= ceil(max($submissions->count(), 1) / 2),
+                    'hasDealBreaker'  => $submissions->where('has_deal_breaker', true)->count() > 0,
+                    'finalistVotes'   => $submissions->where('advance_recommendation', 'yes')->count(),
+                    'capabilityScore'      => $submissions->avg('capability_score'),
+                    'usabilityScore'       => $submissions->avg('usability_score'),
+                    'affordabilityScore'   => $submissions->avg('affordability_score'),
+                    'maintainabilityScore' => $submissions->avg('maintainability_score'),
+                    'deployabilityScore'   => $submissions->avg('deployability_score'),
+                ];
+            })
+            ->sortByDesc('averageScore')
+            ->values()
+            ->toArray();
+
+            $evaluatorIds = $categoryProducts->flatMap(fn($p) => $p->submissions->pluck('workgroup_member_id'))->unique()->count();
+
+            return [
+                'name'           => $categoryName,
+                'rankingType'    => $rankingType,
+                'products'       => $productsFormatted,
+                'evaluatorCount' => $evaluatorIds,
+            ];
+        })->values()->toArray();
+    }
+
+    /**
+     * Build overall stats across ALL sessions in a workgroup.
+     */
+    protected function buildOverallStatsAllSessions(Workgroup $workgroup): array
+    {
+        $sessionIds = $workgroup->sessions()->pluck('id')->toArray();
+
+        if (empty($sessionIds)) {
+            return ['totalProducts' => 0, 'totalEvaluators' => 0, 'totalSubmissions' => 0];
+        }
+
+        $products = CandidateProduct::whereIn('workgroup_session_id', $sessionIds)->count();
+        $submissions = EvaluationSubmission::whereHas('candidateProduct', fn($q) => $q->whereIn('workgroup_session_id', $sessionIds))
+            ->where('status', 'submitted')
+            ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))
+            ->count();
+        $evaluatorIds = EvaluationSubmission::whereHas('candidateProduct', fn($q) => $q->whereIn('workgroup_session_id', $sessionIds))
+            ->where('status', 'submitted')
+            ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))
+            ->distinct('workgroup_member_id')
+            ->count('workgroup_member_id');
+
+        return [
+            'totalProducts'    => $products,
+            'totalEvaluators'  => $evaluatorIds,
+            'totalSubmissions' => $submissions,
+        ];
+    }
+
+    /**
+     * Collect anonymous evaluator comments for AI context.
+     *
+     * Strips member names to maintain anonymity. Pulls from:
+     * - narrative_payload (strengths, weaknesses, overall_impression)
+     * - deal_breaker_note
+     * - legacy EvaluationComment records
+     */
+    protected function collectAnonymousComments(Workgroup $workgroup, ?WorkgroupSession $session): array
+    {
+        $sessionIds = $session
+            ? [$session->id]
+            : $workgroup->sessions()->pluck('id')->toArray();
+
+        if (empty($sessionIds)) {
+            return [];
+        }
+
+        $submissions = EvaluationSubmission::whereHas('candidateProduct', fn($q) => $q->whereIn('workgroup_session_id', $sessionIds))
+            ->where('status', 'submitted')
+            ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))
+            ->with(['candidateProduct', 'comments'])
+            ->get();
+
+        $comments = [];
+
+        foreach ($submissions as $submission) {
+            $productName = $submission->candidateProduct?->name ?? 'Unknown Product';
+
+            // Extract from narrative_payload
+            $narrative = $submission->narrative_payload ?? [];
+            foreach (['strengths', 'weaknesses', 'overall_impression', 'additional_comments'] as $field) {
+                if (!empty($narrative[$field])) {
+                    $comments[] = [
+                        'product' => $productName,
+                        'type' => str_replace('_', ' ', $field),
+                        'comment' => $narrative[$field],
+                    ];
+                }
+            }
+
+            // Deal breaker notes
+            if ($submission->has_deal_breaker && !empty($submission->deal_breaker_note)) {
+                $comments[] = [
+                    'product' => $productName,
+                    'type' => 'deal breaker',
+                    'comment' => $submission->deal_breaker_note,
+                ];
+            }
+
+            // Legacy comments
+            foreach ($submission->comments as $comment) {
+                if (!empty($comment->comment)) {
+                    $comments[] = [
+                        'product' => $productName,
+                        'type' => 'evaluator comment',
+                        'comment' => $comment->comment,
+                    ];
+                }
+            }
+        }
+
+        return $comments;
     }
 
     protected function detectRankingType(string $categoryName): string
