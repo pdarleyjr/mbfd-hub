@@ -1,6 +1,8 @@
 # CLAUDE.md â MBFD Hub AI Context
 
-> **Mission Status: ✅ Production** (2026-03-12)  
+> ✅ **Workgroup Analytics Fix DEPLOYED** (2026-03-14) — Fixed three compounding bugs: (1) Pending count now correctly subtracts both submitted AND in-progress drafts (`Pending = MaxPossible - Submitted - InProgress`). (2) "Overall" AI report no longer defaults to Day 1 — `generateExecutiveReport()` refactored to accept `Workgroup + ?WorkgroupSession` with new aggregate query methods. (3) Anonymous evaluator comments (narrative_payload, deal_breaker_note, legacy EvaluationComment) now injected into executive report and SAVER report AI payloads with RAG directive for vendor spec cross-referencing via workgroup-specs Vectorize index.
+> ✅ **DeerFlow Zero Trust Exposure** (2026-03-13) — Cloudflare Tunnel `deerflow-local` (ID: `c64064b3-d224-4392-a977-93aad34f41ee`) created with outbound-only QUIC connections. `code.mbfdhub.com` mapped via CNAME to tunnel UUID. Cloudflare Access Application enforces Google identity for `pdarleyjr@gmail.com` only (24h session). Hardened `cloudflared` sidecar deployed with read-only filesystem, `no-new-privileges`, all caps dropped, no docker.sock mount, internal Docker network only. Telegram Long-Polling unaffected.
+> ✅ **Mission Status: ✅ Production** (2026-03-12)  
 > NocoBase has been **decommissioned** (2026-03-08) â container stopped, image removed, volume deleted. All Nocobase scripts removed from repo.  
 > ✅ **Chatify real-time chat FIXED** (2026-03-09 evening) â Split-brain config resolved; backend uses internal Reverb (127.0.0.1:8080), frontend uses public wss:// via Cloudflare.  
 > ✅ **Daily Vehicle Inspections revived** (2026-03-09 late evening) â MBFD Forms now includes a dedicated Vehicle Inspections card, historical inspections render in a branded admin results viewer, checklist payloads are normalized for React, and the daily SPA now ships with updated service-worker cache busting plus custom `artisan serve` router handling for `/daily/*` routes.  
@@ -15,53 +17,44 @@
 > ✅ **Dark Topbar UI Unification** (2026-03-12) — Filament topbar restyled to match React SPA dark header (`#171717` bg, MBFD red accent border, white/light text). All 3 panels (Admin, Workgroup, Training) unified via shared `theme.css`. No `@apply` used. VAPID keys verified present, queue worker confirmed running, config cache cleared. Notification pipeline healthy (6 push subscriptions, no failures in logs).
 > ✅ **API + Model Fixes for React SPA** (2026-03-13) — StationController::index() now includes `withCount('capitalProjects', 'shopWorks')` so station list cards display correct project/shop work counts. Apparatus model auto-generates slugs from designation on create/update via `booted()` lifecycle hook. New `artisan apparatus:backfill-slugs` command to fix existing null-slug records (e.g., "Captain 5"). FileUpload in Filament Action modals audited — SharedUploads.php already handles temp string paths correctly.
 > ✅ **Workgroup Results Page Analytics Restructuring** (2026-03-13) — New `EvaluationService::getGranularToolGroupings()` method provides keyword-based Collection filtering for granular data tables. Session results page now shows: T1 standalone table (with Rabbit Tool replacement note), Forcible Entry Cut-off Saws ranked table, Battery-Operated Extrication Tool Brand Rankings (#1-#4 with gold/silver/bronze), and separate Spreaders/Cutters/Rams ranked tables. Zero data loss — presentation layer only. Reusable Blade partial for tool ranking tables.
+> ✅ **DeerFlow 2.0 Agentic Orchestration Installed** (2026-03-13) — DeerFlow 2.0 cloned to WSL `~/src/deer-flow` with Docker-first architecture. GLM-5 reasoning engine via DeepInfra configured. AIO sandbox bind-mounts `~/src/mbfd-hub` at `/mnt/user-data/workspace/mbfd-hub`. Telegram bot (@MBFDHubBot) integrated for task injection. 4 MBFD skills created (Plan, Implement, Review, Scribe). VPS `/root/src` cleaned of legacy artifacts. Environment segmentation enforced: Local=orchestration, VPS=runtime only.
+- Impeccable design audit: OKLCH color space, no @apply, tinted neutrals enforcement
 
-## Cloudflare Support AI Worker (2026-03-12)
+---
 
-### `mbfd-support-ai` Worker
-- **CRITICAL OVERRIDE system prompt** for repair reporting: directs users to email `FireSupportServices@MiamiBeachFL.Gov` and provides phone contact order
-- **RAG Index**: `mbfd-rag-index` — 12 vectors ingested from L1-L11, L3, PUC Engine manuals
-- Deployed to Cloudflare Workers with Vectorize binding
+## Apparatus Layout Planner — DeerFlow Orchestration (2026-03-13)
 
-### Station Inspection Form Overhaul (2026-03-12)
-- Removed 3 sections from the original form (streamlined)
-- Added **Pass All** buttons for rapid section completion
-- Added **conditional fail inputs** with image capture (camera/file upload)
-- Backend: `StationInspectionController@store` handles Base64→file conversion for fail images
-- Filament: `StationInspectionsRelationManager` updated to display inspection results with image viewer
+### Overview
+Public (no-auth) React SPA for fire apparatus compartment layout planning, mounted on the existing Laravel 11 backend. Uses multi-model DeerFlow orchestration with specialized DeepInfra models.
 
-### VPS Deployment Notes
-- **Any change to `resources/css/` requires `npm run build` inside the Docker container** on VPS
-- `public/build/` is gitignored — compiled assets do NOT transfer via `git pull`
-- Command: `docker exec mbfd-hub-laravel.test-1 npm run build`
-- **Always run `npm run build` INSIDE Docker container**: `docker compose exec laravel.test bash -c 'npm install && npm run build'` (never on host — Docker overlay may serve stale files)
-- **After any deployment, fix permissions**: `docker compose exec -u root laravel.test chmod -R 777 storage bootstrap/cache` (container runs as `sail` user, not `www-data`)
-- **Station inspection public API**: `POST /api/public/station_inspection` (no auth required — used by tablet forms)
+### Multi-Model Configuration (`~/src/deer-flow/config.yaml`)
+| Model Name | DeepInfra Model | Role |
+|---|---|---|
+| `coordinator-model` | `zai-org/GLM-5` | Long-context planning, reasoning, sub-agent orchestration |
+| `coder-model` | `MiniMaxAI/MiniMax-M2.5` | React/Konva implementation, Laravel API, TypeScript |
+| `vision-model` | `Qwen/Qwen2.5-VL-32B-Instruct` | Image pipeline, OCR on spec sheets, tool normalization |
 
-### Deployment Rules (Mandatory — 2026-03-13)
+### Custom Skills (`~/src/deer-flow/skills/custom/`)
+| Skill | Path | Purpose |
+|---|---|---|
+| `mbfd-planner` | `skills/custom/mbfd-planner/SKILL.md` | Architecture, task decomposition, milestone planning |
+| `mbfd-coder` | `skills/custom/mbfd-coder/SKILL.md` | Code generation, API integration, save system |
+| `mbfd-image-pipeline` | `skills/custom/mbfd-image-pipeline/SKILL.md` | Two-track tool asset gathering and normalization |
+| `mbfd-reviewer` | `skills/custom/mbfd-reviewer/SKILL.md` | Vitest, Playwright, export verification, design audit |
 
-> These rules MUST be followed after every `git pull` on the VPS or CI/CD deploy.
+### Frontend Stack
+React 18, TypeScript, Vite, react-konva (Konva.js), shadcn/ui, Tailwind (compiled), Zustand (client state), TanStack Query (server state), Dexie/IndexedDB (offline drafts), pdf-lib (landscape PDF export).
 
-1. **Vite assets MUST be compiled on the VPS** — `public/build/` is gitignored. After pulling CSS/JS changes:
-   ```bash
-   docker compose exec laravel.test bash -c 'npm install && npm run build'
-   ```
-2. **Queue workers MUST be restarted** after any Notification class, Job, or Listener change:
-   ```bash
-   docker exec mbfd-hub-laravel.test-1 php artisan queue:restart
-   ```
-   The queue worker daemon loads notification classes into RAM. Without restart, old code runs indefinitely.
-3. **Cache MUST be cleared** after any config, route, or view change:
-   ```bash
-   docker exec mbfd-hub-laravel.test-1 php artisan optimize:clear
-   docker exec mbfd-hub-laravel.test-1 php artisan view:clear
-   ```
-4. **Storage permissions MUST be fixed** after container recreation:
-   ```bash
-   docker compose exec -u root laravel.test chmod -R 777 storage bootstrap/cache
-   ```
-5. **Never run `npm run build` on the host** — Docker overlay filesystem serves stale files. Always build INSIDE the container.
+### Backend
+Laravel 11 public API routes at `/api/public/apparatus-layout/*`, PostgreSQL JSONB for snapshot storage. Tables: `apparatus_compartments`, `apparatus_layout_tools`, `apparatus_layout_snapshots`.
 
+### Image Pipeline (Two-Track)
+- **Track 1 (Preferred)**: Real product photo → OCR dimension extraction → `rembg` background removal → scaled transparent PNG
+- **Track 2 (Fallback)**: No photo available → FLUX.1-Kontext-dev synthetic generation → `rembg` → scaled PNG with "low confidence" tag
+
+### Save System
+- **Layer 1**: Dexie/IndexedDB autosave every 30 seconds (max 10 local drafts)
+- **Layer 2**: PostgreSQL JSONB named snapshots via public API
 
 ---
 
@@ -184,6 +177,19 @@ GOOGLE_SHEETS_TAB_SHEET_ID=1714038258
 - `docs/BASEROW_INTEGRATION.md` — Baserow integration notes
 - `server.php` — custom PHP built-in server router override required so `/daily/*` SPA routes work correctly when served through `php artisan serve`
 
+### Core Context Files for AI Agents (Exact Filenames)
+
+> ⚠️ **DeerFlow / AI agents MUST use these exact filenames.** Note the leading dot on `.project_summary.md`.
+
+| File | Exact Filename | Purpose |
+|------|---------------|---------|
+| Project Summary | `.project_summary.md` | High-level project overview (hidden file — leading dot required) |
+| AI Context | `CLAUDE.md` | Discovery/orchestration context, deployment rules, architecture |
+| AI Error Log | `AI_AGENT_ERRORS.md` | Known agent error patterns and prevention rules |
+| Discovery Report | `MBFD_HUB_DISCOVERY_REPORT_2026-02-12.md` | Initial codebase discovery findings |
+| Snipe-IT Brief | `SNIPE_IT_PROJECT_BRIEF.md` | Equipment intake / Snipe-IT integration brief |
+| UI/UX Plan | `UI_UX_MODERNIZATION_PLAN.md` | Impeccable design system modernization plan |
+
 ## CI/CD Notes
 - Smoke tests in `deploy.yml` target `https://www.mbfdhub.com`
 - All darleyplex.com references have been migrated to mbfdhub.com
@@ -271,3 +277,198 @@ Complete overhaul of the Workgroup Evaluation system across 4 phases, merged fro
 | `resources/views/filament/workgroup/pages/session-results.blade.php` | Results Blade template |
 | `resources/views/filament/workgroup/pages/saver-report.blade.php` | SAVER report template |
 | `resources/css/filament/admin/theme.css` | Updated with workgroup result styles |
+
+---
+
+## DeerFlow 2.0 Agentic Orchestration (2026-03-13)
+
+### Architecture
+DeerFlow 2.0 is the autonomous agent plane that transforms the local workstation into a decentralized command center. Tasks are injected via Telegram and executed through a Plan → Implement → Review → Scribe workflow.
+
+### Environment Segmentation (Zero-Tolerance Policy)
+| Environment | Purpose | Location | Forbidden Actions |
+|---|---|---|---|
+| Local WSL (Env A) | Orchestration & Control Plane | `~/src/deer-flow` + `~/src/mbfd-hub` | No production DB changes without CI/CD |
+| Production VPS (Env B) | Runtime Deployment | `145.223.73.170:/root/mbfd-hub` | No DeerFlow installation; no manual code edits |
+
+### Components
+| Component | Location | Purpose |
+|---|---|---|
+| DeerFlow 2.0 | WSL `~/src/deer-flow` | Agent orchestration framework |
+| GLM-5 via DeepInfra | `api.deepinfra.com/v1/openai` | Reasoning engine (model: `zai-org/GLM-5`) |
+| AIO Sandbox | Docker container | Isolated code execution, bind-mounts MBFD Hub |
+| Telegram Bot | `@MBFDHubBot` | Task injection interface |
+| MBFD Skills | `~/src/deer-flow/skills/mbfd-*.md` | Plan, Implement, Review, Scribe workflows |
+
+### Docker Services (Local WSL)
+| Container | Port | Purpose |
+|---|---|---|
+| `deer-flow-nginx` | 2026 | Reverse proxy |
+| `deer-flow-frontend` | 3000 (internal) | Next.js UI |
+| `deer-flow-gateway` | 8001 (internal) | Backend Gateway API |
+| `deer-flow-langgraph` | 2024 (internal) | LangGraph server |
+
+### Key Configuration Files
+| File | Purpose |
+|---|---|
+| `~/src/deer-flow/config.yaml` | Model, sandbox, tools, Telegram, skills config |
+| `~/src/deer-flow/.env` | API keys (DeepInfra, Telegram, GitHub) |
+| `~/src/deer-flow/skills/mbfd-*.md` | 4 MBFD workflow skills |
+| `~/src/deer-flow/.ssh/id_ed25519_hpb_docker` | VPS SSH key for deployment |
+
+### Standard Workflow
+1. Inject task via Telegram → DeerFlow receives at `@MBFDHubBot`
+2. **Plan**: Read CLAUDE.md + AI_AGENT_ERRORS.md, enumerate steps
+3. **Implement**: Branch, edit, commit, push from sandbox
+4. **Review**: Cross-reference against error log and design system
+5. **Scribe**: Update documentation (CLAUDE.md, AI_AGENT_ERRORS.md)
+6. CI/CD deploys to VPS automatically via `.github/workflows/deploy.yml`
+
+### _zero Trust Remote Access (2026-03-13)
+DeerFlow UI is securely exposed to the public internet via Cloudflare Zero Trust, eliminating all inbound firewall ports.
+
+| Component | Detail |
+|---|---|
+| Tunnel Name | `deerflow-local` |
+| Tunnel ID | `c64064b3-d224-4392-a977-93aad34f41ee` |
+| Public URL | `https://code.mbfdhub.com` |
+| Identity Provider | Google (auto-redirect) |
+| Allowed Email | `pdarleyjr@gmail.com` |
+| Session Duration | 24 hours |
+| Access App ID | `03532c94-9886-4359-9759-746f954c65bf` |
+
+**Architecture:**
+```
+Browser → https://code.mbfdhub.com → Cloudflare Access (302 → Google Auth)
+  → Authenticated → Cloudflare Edge → QUIC tunnel → deer-flow-cloudflared container
+  → deer-flow-nginx:2026 → DeerFlow UI
+```
+
+**Hardened Sidecar (`deer-flow-cloudflared`):**
+- `read_only: true` — immutable filesystem
+- `no_new_privileges: true` — prevents privilege escalation
+- `cap_drop: ALL` — zero Linux capabilities
+- NO `/var/run/docker.sock` mount
+- NO host PID/network namespace sharing
+- Internal Docker network `deer-flow-dev_deer-flow-dev` only
+- `--no-autoupdate` flag prevents unsanctioned binary changes
+
+**Docker Compose Addition** (`~/src/deer-flow/docker/docker-compose.yaml`):
+The `cloudflared` service is defined in the production compose file. When using `docker-compose-dev.yaml`, the container must be started separately via `docker run` on the same network.
+
+## Apparatus Layout Planner DeerFlow Skills (2026-03-13)
+
+### Architecture
+A multi-model orchestration pipeline with a dedicated coordination task queue for the layout planning process. This architecture aids in breaking down a complex end-to-end deployment into manageable microtasks, bringing the CI/CD automation much closer to the ideal state.
+
+| Component | Cloud Model | Region | GPU | Memory | Purpose |
+|---|---|---|---|---|---|
+| Coordinator/Planner | GLM-5 | *local* | T4 | 32 GB | Task orchestration (~70M tokens); architectural decomposition; sequential chaining of images/videos |
+| Coder | `command-r-plus/text-to-python` on MiniMax-M2.5 | *local* | T4 | 32 GB | Script generation; exact FFI calls to React/Node (Babel, Webpack, Vite plugins, Konva components), Laravel API (server-side & Eloquent), and simplified CirrusCI/Temporal workflows (file uploads, Vercel deploys) |
+| Image/Vision | Qwen2.5-VL-32B on Azure AI | East US | 2xA10G | 48 GB | Asset review pipeline (~2B tokens for architectural images+diagrams); multi-modal followup question answering; two-track normalization (model `A` on device견인품连载, 모델 `B` on Azure 클라우드에서 파이썬 스크립트 실행을 통한 안전한 API 구현을 체크해요); image-to-image translation pipelines by device code/name; direct embedding of specs images into code; Tangram 데이터셋(SPIFF, EOBD-WUF, ÉFE앞면, 드rum박스,릿라운저ück,...) => React Components/Laravel JSONB |
+| Reviewer (Q&A) | Anthropic/LangChain | *local* | T4 | 32 GB | Internal QA audit for code quality; dtos/factory builder construction; imprecise data correction; persona context (Model/drça력을 산출하기 위한 사전 수행) |
+
+### Key Configuration
+| File | Description |
+|---|---|
+| `~/src/deer-flow/config.yaml` | 모든 모델/도구, Telegram, 지식파일 셋팅(세부 스킬 안에서 반복적인 변수 사용) |
+| `~/src/deer-flow/.env` |特朗普 키(DeepInfra, Telegram, GitHub), API 키 |
+| `~/src/deer-flow/skills/mbfd-*.md` | 반복적인 표기문제로 인해 여러 파일에서 스키 고생하는 스킬;(objectschemas에 통합될 경우 계속 수정될 수 있음) |
+| `~/src/deer-flow/.ssh/id_ed25519_hpb_docker` | VPS SSH 키 |
+
+### Workflow
+| 단계 | 상세 조치 |
+|---|---|
+| ** 걸쳐준경우("**fix broken selector**..." issue부터 ""), 새로운 스키 생성<br>Imgur로 업로드된 조각트를 하위 구조에 객체화시키거나 `frontend-design/reference/`에 추가. |
+| 참고 문헌<br>🛠️ 스킵ikki 코드에 대한 최대한 많은 정보를 포함.<br>꽃 패턴, 시 OPP, 축적 지지 기술 등. | 예시: `longarm	Texture\n Swivel Magnitude: 450 ft\n Extending Arm: ` => `nlsw-450 | temp(` => `arm(rib) => ...` |
+| 현재 문서를 메모리에 로드하여 스텐 도메인에 대한 기본적인 이해 확보 | 사용법, 코드명입니다. 스텐은 상당히수 계층적이고, Conformity Horizon에 추가될 수 있습니다. |
+| 연관된 API 엔드포인트의 전략을 정의하고 <br>별본 문제 상식을 보다 심각하게 처리하기 위해 테스트를 기본 메모리에 추가 | ❗️ 만약 규모가 커지면 <br> Load`table.split下来的모든 rows`<br> May: `groupBy('pronouncement.newsletter_subtitle').count()`. |
+| 스토리니지 또는 정렬 비디오 컨트롤의 베이스에 해당하는 단위:诗句. 단위 참고 (Ex: `default 아직 설치됨`; `미구현`; `개발 예정`)는 적절히 사용해야 합니다. |
+| 최적의 `->viteTheme()|.css|.vue`를 사용하도록 모든 서드파티 컴포넌트와 <br>로드된 공통 백그라운드 스타일(예시: `theme.css`)을 교체하는 반복적인 작업 유지. |
+| 텔레그램의 **Plan** 스테이지에서 클라우드 모델에 여러 참조 문서를 만드세요, <br>또한 IQ 향상을 위해 이전 텔레그램 창의 모든 `doctests`과 댓글을 선택정보화하세요. |
+| 범위가 전역적인 반복적인 기능 지원을 위한 종기적인 마커와 예외처리에 대해 유의하세요. 보통 여기에는 생략된 함수 키(`$`), 특정 환경 특정 언어(`$i18n`), <br>Git tags/개요(프로젝트 문서)와 같은 정보가 포함됩니다. |
+| `pdf-lib` 및 React에서 사용하는 모든 라이브러리가 최신으로 유지됩니다. 모든 버전 기록은 IDE에서 계속해서 숨겨져야 합니다. |
+| **_반환_** React 템플릿, 기계 학습 모델, 포트폴리오 요약 템플릿, `.catalog.json`, `critique.md`, 기본 스타일 시트 및 샘플 컴포넌트. |
+
+### 언어 선택 이유
+- **Multimodel:** 이 활동에 최적화된 테스트 토플로지 기반의 여러 이드코어된 모델을 병렬로 사용합니다.
+- **Open-source:** 모든 연결된 다음 단계에서 재작업 보장입니다. 모든 모델을 또는, 수준이 높은 기능을 추가하기 위해领先합니다.
+- **Cost:** 나타날 수 있는 비용으로 지불되는 돈입니다.
+- **Capacity:** 텍스트에 너무 긴 응답을 받을 수 있는 용량입니다.
+
+### 주요 지표
+| 지표 | 목표 |
+|---|---|
+| Latency | ≤ **5** * async"=>delay₁-delay₂<br>((Time to send a doc string to GLM-5)\)\n|
+| Georgia Font | ✓ |
+| Slack | ✓ |
+| Required Commands | App::getInstance()->call("...") |
+
+
+---
+
+## Production Observability Stack (2026-03-13)
+
+### Architecture
+Isolated observability stack deployed at `/root/observability/` on the production VPS. Completely separated from the MBFD Hub application stack to prevent dependency conflicts.
+
+### Services
+
+| Service | Container | Host Port | Container Port | Purpose |
+|---|---|---|---|---|
+| Dozzle | `observability-dozzle-1` | 8888 | 8080 | Real-time Docker log streaming |
+| Uptime Kuma | `observability-uptime-kuma-1` | 3001 | 3001 | Heartbeat/uptime monitoring |
+| Web-Check | `observability-web-check-1` | 3000 | 3000 | Security audit & header analysis |
+
+### Access URLs
+- **Dozzle**: `http://145.223.73.170:8888`
+- **Uptime Kuma**: `http://145.223.73.170:3001`
+- **Web-Check**: `http://145.223.73.170:3000`
+
+### Compose File
+`/root/observability/docker-compose.yml` — managed independently from `/root/mbfd-hub/compose.yaml`.
+
+### Critical Port Note
+⚠️ **Port 8080 is RESERVED for Laravel Reverb** (mapped via laravel.test container). The observability stack does NOT use port 8080 externally. Dozzle's internal port 8080 is mapped to host port 8888.
+
+### Management Commands
+```bash
+# Start/restart observability stack
+cd /root/observability && docker compose up -d
+
+# View logs
+cd /root/observability && docker compose logs -f
+
+# Stop without removing data
+cd /root/observability && docker compose down
+```
+
+---
+
+## Local AI-Assisting Development Sandbox (2026-03-13)
+
+### Purpose
+Shift-left testing environment. Local sandbox is the final authority for code quality before VPS deployment.
+
+### Services (docker-compose.local-sandbox.yml)
+
+| Service | Port | Binding | Purpose |
+|---|---|---|---|
+| Browserless | 3000 | 0.0.0.0 | Headless Chrome for Puppeteer/Playwright |
+| Pgweb | 8081 | 127.0.0.1 ONLY | Visual PostgreSQL management |
+
+### Prerequisites
+- Node.js 22+
+- pnpm or uv for DeerFlow dependencies
+- Crawl4AI via `uv pip install crawl4ai` for documentation scraping
+
+### Start Commands
+```bash
+docker compose -f docker-compose.local-sandbox.yml up -d
+```
+
+### Security
+- Pgweb is bound to `127.0.0.1:8081` — **NEVER bind to 0.0.0.0**
+- Browserless allows up to 5 concurrent sessions with 60s timeout
+
+---

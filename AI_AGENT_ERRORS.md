@@ -3,7 +3,7 @@
 
 > ⚠️ **CRITICAL MANDATE**: Every AI agent working on this codebase MUST read this entire file BEFORE making any changes. Failure to read this file WILL result in breaking existing functionality.
 
-**Last Updated**: 2026-03-12  
+**Last Updated**: 2026-03-13  
 **Project**: MBFD Hub (Laravel 11, Filament v3, VPS at 145.223.73.170)
 
 ---
@@ -441,7 +441,192 @@ The Apparatus model had no auto-slug generation. Slugs were only populated if ma
 
 Description:
 The `fast_edit_file` feature was developed to quickly add or edit `Apparatus` models from the React frontend. It allowed users to modify up to five properties in one go. However, during a refactor of the `Apparatus` model, a direct database migration was applied which accidentally deleted four out of the five properties in the `fast_edit_file` feature's data table.
-This was a cascade delete的影响，当对象删除时，将它与之相关的对象也删除。未能预料到连锁反应可能导致额外的破坏，导致误删除了本该保留的方法。
+This was a cascade delete的影響，當對象删除時，將它與之相關的對象也刪除。未能预料到連鎖反應可能导致額外的破壞，導致誤刪除了一些本該保留的方法。
 
 Solution:
 rolled back to the previous version and added back the deleted methods. Explanation has been provided in the deploy notes so that developers can be aware of this change.
+
+---
+
+### ERROR-046: DeerFlow Zero Trust Tunnel — Operational Reference
+
+**Date**: 2026-03-13  
+**Severity**: 🟢 INFO  
+**Status**: ✅ OPERATIONAL
+
+**Context**:
+DeerFlow 2.0 UI at WSL port 2026 is exposed to `https://code.mbfdhub.com` via Cloudflare Zero Trust tunnel `deerflow-local` (ID: `c64064b3-d224-4392-a977-93aad34f41ee`).
+
+**Key Facts**:
+1. **Tunnel runs as `deer-flow-cloudflared` container** on `deer-flow-dev_deer-flow-dev` Docker network
+2. **Cloudflare Access Application** enforces Google auth for `pdarleyjr@gmail.com` only
+3. **Hardened sidecar**: read-only FS, `no-new-privileges`, all caps dropped, no docker.sock mount
+4. **Zero inbound ports** — all traffic is outbound QUIC from the container to Cloudflare edge
+5. **Tunnel token** is embedded in the docker-compose.yaml and the `docker run` command — do NOT log it
+
+**Prevention**:
+1. **NEVER expose DeerFlow port 2026 directly** via port forwarding or host firewall rules
+2. **NEVER mount docker.sock** into the cloudflared container
+3. **NEVER use `network_mode: host`** for the tunnel container
+4. If the tunnel stops, restart with: `docker start deer-flow-cloudflared`
+5. If the container is deleted, recreate per the `docker run` command documented in CLAUDE.md
+6. The tunnel token in the compose file is a Cloudflare-managed secret — rotate via Cloudflare dashboard if compromised
+
+---
+
+### ERROR-047: Production Observability Stack — Port Reservation & Isolation Rules
+
+**Date**: 2026-03-13  
+**Severity**: 🟢 INFO  
+**Status**: ✅ OPERATIONAL
+
+**Context**:
+Production observability stack deployed at `/root/observability/` on VPS `145.223.73.170`. Three services: Dozzle (port 8888), Uptime Kuma (port 3001), Web-Check (port 3000).
+
+**Key Facts**:
+1. **Docker socket mounted read-only** (`/var/run/docker.sock:/var/run/docker.sock:ro`) into Dozzle only
+2. **Uptime Kuma data persisted** via named Docker volume `observability_uptime-kuma-data`
+3. **Port 8080 is RESERVED** for Laravel Reverb — observability stack maps Dozzle's internal 8080 to host **8888**
+4. **Completely isolated** from MBFD Hub stack — separate compose file, separate Docker network (`observability_default`)
+
+**Prevention**:
+1. **NEVER use port 8080** for any observability service — it's reserved for Laravel Reverb
+2. **NEVER merge** the observability `docker-compose.yml` into the MBFD Hub `compose.yaml`
+3. **NEVER mount** Docker socket as read-write into any observability container
+4. Manage with: `cd /root/observability && docker compose up -d` (separate from MBFD Hub)
+5. If Uptime Kuma needs reset: volume data is at `observability_uptime-kuma-data` Docker volume
+
+---
+
+### ERROR-045: DeerFlow Installed on Production VPS — Environment Boundary Violation
+
+**Date**: 2026-03-13  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: VPS `/root/src/deer-flow`, `/root/src/mbfd-hub` (symlink)
+
+**Symptom**:
+Previous agent session installed DeerFlow 2.0 directly on the production VPS at `/root/src/deer-flow` and created a symlink `/root/src/mbfd-hub → /root/mbfd-hub`. This violated the environment segmentation policy.
+
+**Root Cause**:
+No clear environment boundary enforcement. The agent treated the VPS as both the orchestration and runtime plane, installing development tooling on production infrastructure.
+
+**Fix Applied**:
+1. Removed `/root/src/deer-flow`, `/root/src/mbfd-hub` (symlink), and `/root/src` directory from VPS
+2. Cleaned junk files from `/root/mbfd-hub/` (`$null`, `'`, `In`, `displayName`, `hardware'])`)  
+3. Verified `/root/mbfd-hub` remains the sole production directory with valid `compose.yaml` and `.env`
+4. DeerFlow 2.0 reinstalled in correct location: WSL `~/src/deer-flow` (local workstation only)
+
+**Prevention**:
+1. **NEVER install DeerFlow, agent frameworks, or orchestration tools on the production VPS**
+2. Production VPS (`145.223.73.170`) is RUNTIME ONLY — it runs Docker containers and serves the app
+3. All orchestration, agent infrastructure, and development tools belong on the local WSL environment
+4. Perform a Context Check before every SSH command to confirm you're targeting the correct environment
+
+---
+
+### ERROR-048: DeerFlow Skill Path Mismatch — Agent Looked in `.kilocode/skills/` Instead of DeerFlow Directory
+
+**Date**: 2026-03-13  
+**Severity**: 🟡 MEDIUM  
+**Status**: ✅ RESOLVED
+
+**Symptom**:
+DeerFlow coordinator reported `mbfd-review` skill as missing. It looked in `.kilocode/skills/` (the VS Code/Kilo Code skill directory).
+
+**Root Cause**:
+Architectural boundary confusion. `.kilocode/skills/` is for the VS Code Kilo Code extension. DeerFlow 2.0 expects its skills in `~/src/deer-flow/skills/custom/{skill-name}/SKILL.md`.
+
+**Fix Applied**:
+Created `~/src/deer-flow/skills/custom/mbfd-review/SKILL.md` with the full review workflow (Uptime Kuma health gate, Dozzle log retrieval, Browserless Playwright UI validation, Impeccable design audit).
+
+**Prevention**:
+1. **DeerFlow skills** go in `~/src/deer-flow/skills/custom/{name}/SKILL.md`
+2. **Kilo Code skills** go in `.kilocode/skills/{name}/SKILL.md`
+3. The two systems are completely independent — never cross-reference paths
+
+---
+
+### ERROR-049: Agent Hallucinated Filename — `PROJECT_SUMMARY.md` vs `.project_summary.md`
+
+**Date**: 2026-03-13  
+**Severity**: 🟡 MEDIUM  
+**Status**: ✅ RESOLVED
+
+**Symptom**:
+DeerFlow researcher agent reported `PROJECT_SUMMARY.md` as missing from the repo root.
+
+**Root Cause**:
+The file is actually named `.project_summary.md` (hidden file with leading dot, lowercase). The agent hallucinated the filename as `PROJECT_SUMMARY.md` (no dot, uppercase).
+
+**Fix Applied**:
+Added explicit "Core Context Files for AI Agents" table to `CLAUDE.md` mapping all 6 critical context files with their exact filenames. Updated `.project_summary.md` Key File Locations table with all 6 files.
+
+**Prevention**:
+1. Always use the exact filename from `CLAUDE.md` Core Context Files table
+2. The project summary file has a **leading dot** (`.project_summary.md`) — it is a hidden file
+3. When in doubt, use `ls -la` to verify exact filenames before reporting files as missing
+
+---
+
+### ERROR-050: Dozzle Port 8888 Blocked by UFW Firewall
+
+**Date**: 2026-03-13  
+**Severity**: 🔴 HIGH  
+**Status**: ✅ RESOLVED
+
+**Symptom**:
+Dozzle container was running and responding locally (`curl localhost:8888` returned 200), but external requests to `http://145.223.73.170:8888` timed out.
+
+**Root Cause**:
+Ubuntu's UFW firewall had a default-deny incoming policy. Port 8888 was never added to the allow list. Similarly, port 3001 (Uptime Kuma) was also missing.
+
+**Fix Applied**:
+```bash
+ufw allow 8888/tcp comment 'Dozzle log viewer'
+ufw allow 3001/tcp comment 'Uptime Kuma'
+ufw reload
+```
+
+**Verification**:
+- `curl -s -o /dev/null -w 'HTTP %{http_code}' http://145.223.73.170:8888/` → HTTP 200
+- `curl -s -o /dev/null -w 'HTTP %{http_code}' http://145.223.73.170:3001/` → HTTP 302
+- Port 8080 (Laravel Reverb) confirmed untouched — not in UFW rules (traffic flows via Cloudflare Tunnel)
+
+**Prevention**:
+1. When deploying new Docker services with external port mappings, always check UFW: `ufw status`
+2. Docker's port publishing (`-p 8888:8080`) does NOT automatically open UFW ports
+3. After adding UFW rules, always verify with an external curl test
+4. **Never open port 8080** in UFW — it's reserved for Laravel Reverb via Cloudflare Tunnel
+
+---
+
+### ERROR-051: Workgroup Analytics — Pending Math, Overall AI Report Scoping, Missing AI Context
+
+**Date**: 2026-03-14  
+**Severity**: 🔴 HIGH  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `resources/views/filament/workgroup/pages/session-results.blade.php`, `app/Filament/Workgroup/Pages/SessionResultsPage.php`, `app/Services/Workgroup/WorkgroupAIService.php`
+
+**Symptom**:
+Three compounding bugs on the Workgroup Session Results page:
+1. **Inaccurate "Pending" count**: Showed 110 pending when it should have been 106 (ignored 4 in-progress drafts)
+2. **"Day 1" Overall Report**: Clicking "Overall" generated an AI report for Day 1 instead of aggregating all sessions
+3. **Missing AI Context**: AI reports only analyzed numerical scores — no evaluator comments or vendor spec references
+
+**Root Cause**:
+1. Blade template calculated `Pending = MaxPossible - Submitted` without subtracting `draft_submissions` (in-progress)
+2. `SessionResultsPage::loadAiReport()` had fallback logic: `if (!$session) { $session = WorkgroupSession::where('status', 'completed')->first(); }` — always defaulting to Day 1
+3. `WorkgroupAIService::formatSubmission()` only sent numerical scores; `narrative_payload` (strengths/weaknesses/impressions), `deal_breaker_note`, and legacy `EvaluationComment` records were never included in the AI payload; no RAG directive for vendor specs
+
+**Fix Applied**:
+1. **Pending Math**: Changed blade calculation to `max(0, max_possible - submitted - draft_submissions)`
+2. **Overall Scoping**: Refactored `generateExecutiveReport()` to accept `Workgroup + ?WorkgroupSession`. Added `buildCategoriesForOverallReport()` and `buildOverallStatsAllSessions()` helpers that query across ALL sessions. Removed Day 1 fallback from `loadAiReport()`.
+3. **AI Context**: Enhanced `formatSubmission()` to include anonymous notes from `narrative_payload` and legacy comments. Added `collectAnonymousComments()` helper. Injected `anonymousComments` array and `systemDirective` (RAG cross-reference instruction) into executive report and SAVER report payloads.
+
+**Prevention**:
+1. When calculating "remaining" counts, always subtract ALL non-pending states (submitted + draft/in-progress)
+2. Never fall back to `::first()` when null scope means "aggregate all" — always create explicit aggregate query methods
+3. AI report payloads must include qualitative feedback (comments, notes) alongside quantitative scores
+
+---
