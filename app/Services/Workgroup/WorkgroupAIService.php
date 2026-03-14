@@ -427,7 +427,7 @@ class WorkgroupAIService
         $lines[] = "You must analyze the provided anonymous evaluator comments and cross-reference them against the vendor product specifications and tool details found in your RAG index for these specific brands.";
         $lines[] = "";
         $lines[] = "WORKGROUP: {$workgroup->name}";
-        $lines[] = "SESSION: " . ($session?->name ?? 'All Sessions Combined');
+        $lines[] = "SESSION: " . ($session ? $session->name : 'Overall Project Evaluation');
         $lines[] = "DATE: " . now()->format('F j, Y');
         $lines[] = "";
 
@@ -439,6 +439,7 @@ class WorkgroupAIService
                 foreach ($cat['brand_rankings'] as $idx => $brand) {
                     $score = $brand['composite_score'] !== null ? number_format($brand['composite_score'], 1) : 'N/A';
                     $lines[] = "  #{$idx}: {$brand['brand']} — Composite: {$score} ({$brand['product_count']} products)";
+
                     if (!empty($brand['saver_breakdown'])) {
                         $s = $brand['saver_breakdown'];
                         $lines[] = "    Capability: " . ($s['capability'] ?? 'N/A') .
@@ -447,6 +448,7 @@ class WorkgroupAIService
                             " | Maintainability: " . ($s['maintainability'] ?? 'N/A') .
                             " | Deployability: " . ($s['deployability'] ?? 'N/A');
                     }
+
                     if (!empty($brand['products'])) {
                         foreach ($brand['products'] as $p) {
                             $pScore = $p['avg_score'] !== null ? number_format($p['avg_score'], 1) : 'N/A';
@@ -465,6 +467,7 @@ class WorkgroupAIService
                 $lines[] = "Category: {$cat['category_name']}";
                 foreach ($cat['groups'] as $group) {
                     $lines[] = "  Group: {$group['group_name']} ({$group['product_count']} products)";
+
                     foreach ($group['rankings'] as $idx => $r) {
                         $rScore = $r['avg_score'] !== null ? number_format($r['avg_score'], 1) : 'N/A';
                         $lines[] = "    #{$idx}: {$r['name']} ({$r['brand']}) — {$rScore} ({$r['response_count']} resp.)";
@@ -479,8 +482,7 @@ class WorkgroupAIService
             $lines[] = "=== STANDALONE PRODUCTS ===";
             foreach ($results['isolated_products'] as $iso) {
                 $iScore = $iso['avg_score'] !== null ? number_format($iso['avg_score'], 1) : 'N/A';
-                $lines[] = "- {$iso['name']} ({$iso['brand']}) in {$iso['category_name']}: {$iScore} ({$iso['response_count']} resp.)";
-                $lines[] = "  Note: {$iso['note']}";
+                $lines[] = "- {$iso['name']} ({$iso['brand']}) in {$iso['category_name']}: {$iScore} ({$iso['response_count']} resp.) {$iso['note']}";
             }
             $lines[] = "";
         }
@@ -490,57 +492,104 @@ class WorkgroupAIService
             $lines[] = "=== STANDARD CATEGORY RANKINGS ===";
             foreach ($results['standard_category_rankings'] as $cat) {
                 $lines[] = "Category: {$cat['category_name']} ({$cat['total_products']} products, {$cat['eligible_products']} eligible)";
+
                 foreach ($cat['rankings'] as $idx => $item) {
                     $sScore = $item['weighted_average'] !== null ? number_format($item['weighted_average'], 1) : 'N/A';
+
                     $name = $item['product']->name ?? 'Unknown';
                     $lines[] = "  #{$idx}: {$name} — {$sScore} ({$item['response_count']} resp.) " .
                         ($item['meets_threshold'] ? '✓ threshold' : '✗ below threshold');
                 }
+
                 $lines[] = "";
             }
         }
 
         // Non-rankable feedback
         $nrFeedback = $results['non_rankable_feedback'] ?? collect();
+
         if ($nrFeedback->isNotEmpty()) {
             $lines[] = "=== NON-RANKABLE CATEGORY FEEDBACK ===";
             foreach ($nrFeedback as $nrCat) {
                 $lines[] = "Category: {$nrCat['category_name']} ({$nrCat['submissions_count']} submissions)";
+
                 foreach ($nrCat['feedback'] as $fb) {
                     $lines[] = "  {$fb['evaluator']}: {$fb['product']} — Score: " . ($fb['score'] ?? 'N/A');
                 }
+
                 $lines[] = "";
             }
         }
 
         // Collect and inject anonymous comments
         $anonymousComments = $this->collectAnonymousComments($workgroup, $session);
+
         if (!empty($anonymousComments)) {
             $lines[] = "=== ANONYMOUS EVALUATOR COMMENTS ===";
             $groupedByProduct = collect($anonymousComments)->groupBy('product');
+
             foreach ($groupedByProduct as $productName => $productComments) {
                 $lines[] = "Product: {$productName}";
+
                 foreach ($productComments as $c) {
                     $lines[] = "  [{$c['type']}]: {$c['comment']}";
                 }
+
                 $lines[] = "";
             }
         }
 
         $lines[] = "";
         $lines[] = "=== INSTRUCTIONS ===";
-        $lines[] = "Generate a professional DHS SAVER-style report in clean HTML format with these sections:";
+        $lines[] = "You are generating a highly detailed, professional DHS SAVER (System Assessment and Validation for Emergency Responders) purchasing recommendation document for the Miami Beach Fire Department Health & Safety Committee.";
+
+        $lines[] = "\nTarget length: 3000-5000 words of substantive analysis";
+
+        $lines[] = "This document will be used to justify a multi-hundred-thousand-dollar capital purchase. It must be thorough, data-driven, and technically rigorous.";
+
+        $lines[] = "\nGenerate the report in clean HTML format with these sections:";
         $lines[] = "1. <h2>Executive Summary</h2> — Overall findings, key recommendation, evaluation scope";
-        $lines[] = "2. <h2>Capability Assessment</h2> — How well each brand/product performs its intended function based on scores";
-        $lines[] = "3. <h2>Usability Assessment</h2> — Ease of use, ergonomics, training requirements";
-        $lines[] = "4. <h2>Affordability Assessment</h2> — Cost-effectiveness, value proposition";
-        $lines[] = "5. <h2>Maintainability Assessment</h2> — Durability, repair ease, parts availability";
-        $lines[] = "6. <h2>Deployability Assessment</h2> — Portability, setup time, interoperability";
-        $lines[] = "7. <h2>Final Purchasing Recommendation</h2> — Ranked recommendations with justification";
-        $lines[] = "";
-        $lines[] = "Use <table>, <ul>, <strong>, <p> tags for structure. Include actual scores from the data.";
-        $lines[] = "Be specific with product names and scores. This is for a Fire Department Health & Safety Committee.";
-        $lines[] = "Do NOT use markdown. Output ONLY valid HTML.";
+
+        $lines[] = "\n2. <h2>Vendor Profiles</h2> — For each competing vendor/manufacturer (e.g., Holmatro, TNT Rescue, Hurst, Amkus), provide:";
+        $lines[] = "   * Company background and market position in the rescue tool industry";
+        $lines[] = "   * Product line overview based on the evaluated tools";
+        $lines[] = "   * Cross-reference any vendor spec sheets available in your RAG index (workgroup-specs Vectorize)";
+        $lines[] = "   * Key technical differentiators (battery platform, power output, weight, cutting/spreading force)";
+
+        $lines[] = "\n3. <h2>Capability Assessment</h2> (SAVER Dimension 1) — Analyze how well each brand/product performs its intended rescue function";
+        $lines[] = "   Include specific capability scores from the data above";
+        $lines[] = "   Compare power output, cutting force, spreading distance across brands";
+        $lines[] = "   Reference evaluator comments about real-world performance";
+
+        $lines[] = "\n4. <h2>Usability Assessment</h2> (SAVER Dimension 2) — Ergonomic analysis: weight, grip comfort, balance, trigger design";
+        $lines[] = "   Training requirements and learning curve for each brand";
+        $lines[] = "   Evaluator feedback on ease of operation under stress";
+
+        $lines[] = "\n5. <h2>Affordability Assessment</h2> (SAVER Dimension 3) — Total cost of ownership analysis (tools + batteries + chargers + cases)";
+        $lines[] = "   Value proposition: cost per unit of capability";
+        $lines[] = "   Battery ecosystem costs (proprietary vs. shared platform)";
+
+        $lines[] = "\n6. <h2>Maintainability Assessment</h2> (SAVER Dimension 4) — Durability indicators and expected service life";
+        $lines[] = "   Repair complexity and parts availability";
+        $lines[] = "   Warranty terms and manufacturer support";
+
+        $lines[] = "\n7. <h2>Deployability Assessment</h2> (SAVER Dimension 5) — Portability and apparatus compartment compatibility";
+        $lines[] = "   Battery interchangeability across tool types";
+        $lines[] = "   Setup time from compartment to operational";
+        $lines[] = "   Integration with existing MBFD apparatus layout";
+
+        $lines[] = "\n8. <h2>Evaluator Feedback Analysis</h2> — Synthesize the anonymous evaluator comments provided above";
+        $lines[] = "   Identify recurring themes (positive and negative) per brand";
+        $lines[] = "   Highlight any safety concerns or deal-breakers mentioned";
+        $lines[] = "   Note consensus points and areas of disagreement among evaluators";
+
+        $lines[] = "\n9. <h2>Comparative Analysis Table</h2> — Create an HTML <table> comparing all brands across ALL five SAVER dimensions";
+        $lines[] = "   Include overall composite score, rank, and recommendation status";
+        $lines[] = "   Use color-coded indicators (green for highest, red for lowest in each dimension)";
+        $lines[] = "\n10. <h2>Final Purchasing Recommendation</h2> — Ranked recommendations (#1, #2, #3) with detailed justification";
+        $lines[] = "    Recommended purchase configuration (which tools, how many, which accessories)";
+        $lines[] = "    Risk assessment for each option";
+        $lines[] = "    Dissenting considerations (why someone might choose #2 over #1)";
 
         return implode("\n", $lines);
     }
@@ -578,16 +627,21 @@ class WorkgroupAIService
     {
         // Extract anonymous feedback notes from narrative_payload
         $narrative = $submission->narrative_payload ?? [];
+
         $anonymousNotes = [];
+
         if (!empty($narrative['strengths'])) {
             $anonymousNotes[] = "Strengths: {$narrative['strengths']}";
         }
+
         if (!empty($narrative['weaknesses'])) {
             $anonymousNotes[] = "Weaknesses: {$narrative['weaknesses']}";
         }
+
         if (!empty($narrative['overall_impression'])) {
             $anonymousNotes[] = "Overall Impression: {$narrative['overall_impression']}";
         }
+
         if (!empty($narrative['additional_comments'])) {
             $anonymousNotes[] = "Additional: {$narrative['additional_comments']}";
         }
@@ -793,6 +847,7 @@ class WorkgroupAIService
 
             // Extract from narrative_payload
             $narrative = $submission->narrative_payload ?? [];
+
             foreach (['strengths', 'weaknesses', 'overall_impression', 'additional_comments'] as $field) {
                 if (!empty($narrative[$field])) {
                     $comments[] = [
