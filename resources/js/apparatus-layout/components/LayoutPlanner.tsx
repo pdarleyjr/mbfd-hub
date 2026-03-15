@@ -12,8 +12,8 @@ import { PIERCE_ASCENDANT_COMPARTMENTS } from '../types';
 
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 800;
-const COMPARTMENT_PADDING = 20;
-const SCALE_FACTOR = 8; // inches to pixels
+const COMPARTMENT_PADDING = 16;
+const SCALE_FACTOR = 8; // base inches-to-pixels; auto-reduced when compartments overflow
 const TOOL_SCALE = 20; // pixels per inch (from manifest)
 
 // ===== Side View Dimensions =====
@@ -47,31 +47,47 @@ function calculateCompartmentLayouts(
   if (sideCompartments.length === 0) return layouts;
 
   const viewArea = SIDE_VIEWS[side];
-  let currentX = viewArea.x + COMPARTMENT_PADDING;
-  let currentY = viewArea.y + COMPARTMENT_PADDING;
-  let maxWidth = 0;
+  const availW = viewArea.width - COMPARTMENT_PADDING * 2;
+  const availH = viewArea.height - COMPARTMENT_PADDING * 2;
 
-  sideCompartments.forEach((compartment, index) => {
-    const width = compartment.dimensions.width * SCALE_FACTOR;
-    const height = compartment.dimensions.height * SCALE_FACTOR;
+  // Try progressively smaller scale factors until everything fits
+  let scaleFactor = SCALE_FACTOR;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    layouts.clear();
+    let currentX = 0;
+    let currentY = 0;
+    let rowMaxH = 0;
+    let fits = true;
 
-    // Check if we need to wrap to next row
-    if (currentX + width > viewArea.x + viewArea.width - COMPARTMENT_PADDING) {
-      currentX = viewArea.x + COMPARTMENT_PADDING;
-      currentY += maxWidth + COMPARTMENT_PADDING;
-      maxWidth = 0;
+    for (const compartment of sideCompartments) {
+      const w = compartment.dimensions.width * scaleFactor;
+      const h = compartment.dimensions.height * scaleFactor;
+
+      // Wrap to next row
+      if (currentX > 0 && currentX + w > availW) {
+        currentX = 0;
+        currentY += rowMaxH + COMPARTMENT_PADDING;
+        rowMaxH = 0;
+      }
+
+      layouts.set(compartment.id, {
+        x: viewArea.x + COMPARTMENT_PADDING + currentX,
+        y: viewArea.y + COMPARTMENT_PADDING + currentY,
+        width: w,
+        height: h,
+      });
+
+      rowMaxH = Math.max(rowMaxH, h);
+      currentX += w + COMPARTMENT_PADDING;
     }
 
-    layouts.set(compartment.id, {
-      x: currentX,
-      y: currentY,
-      width,
-      height,
-    });
-
-    maxWidth = Math.max(maxWidth, height);
-    currentX += width + COMPARTMENT_PADDING;
-  });
+    // Check if the last row fits
+    if (currentY + rowMaxH <= availH) {
+      break; // fits!
+    }
+    // Reduce scale and retry
+    scaleFactor *= 0.85;
+  }
 
   return layouts;
 }
