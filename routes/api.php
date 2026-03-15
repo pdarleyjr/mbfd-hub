@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\StationInventoryV2Controller;
 use App\Http\Controllers\Api\FireEquipmentRequestController;
 use App\Http\Controllers\Api\StationInspectionController;
 use App\Http\Controllers\Workgroup\WorkgroupAIController;
+use App\Http\Controllers\Api\Public\ApparatusLayout\ApparatusLayoutController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -34,6 +35,13 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
 
     // Public Station Inspection submission (from React SPA)
     Route::post('station_inspection', [StationInspectionController::class , 'storePublic']);
+
+    // Apparatus Layout Planner (public read, auth write)
+    Route::prefix('apparatus-layout')->group(function () {
+        Route::get('tools', [ApparatusLayoutController::class, 'getTools']);
+        Route::get('compartments/{apparatusId}', [ApparatusLayoutController::class, 'getCompartments']);
+        Route::get('snapshots/{apparatusId}', [ApparatusLayoutController::class, 'getSnapshots']);
+    });
 });
 
 // Push notification routes (public VAPID key, authenticated subscription management)
@@ -68,6 +76,13 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     // Phase 5: Fire Equipment Requests & Station Inspections
     Route::apiResource('fire-equipment-requests', FireEquipmentRequestController::class);
     Route::apiResource('station-inspections', StationInspectionController::class);
+
+    // Apparatus Layout Planner (authenticated write routes)
+    Route::prefix('apparatus-layout')->group(function () {
+        Route::post('snapshots', [ApparatusLayoutController::class, 'saveSnapshot']);
+        Route::delete('snapshots/{snapshotId}', [ApparatusLayoutController::class, 'deleteSnapshot']);
+        Route::post('autosave', [ApparatusLayoutController::class, 'autoSave']);
+    });
 });
 
 // Big Ticket Requests
