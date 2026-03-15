@@ -13,6 +13,7 @@ export default defineConfig({
                 'resources/js/pump-simulator/main.tsx',
                 'resources/js/push-notification-widget.js',
                 'resources/css/filament/admin/theme.css',
+                'resources/js/apparatus-layout/main.tsx',
             ],
             refresh: true,
         }),

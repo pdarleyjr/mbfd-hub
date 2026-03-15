@@ -121,7 +121,7 @@
                     </div>
                 </a>
 
-                <!-- Pump Simulator Ã¢ amber accent -->
+                <!-- Pump Simulator — amber accent -->
                 <a href="https://pdarleyjr.github.io/puc-sim-manual-ui/" target="_blank" rel="noopener noreferrer" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-amber-300 transition-all duration-200 overflow-hidden">
                     <div class="flex">
                         <div class="w-1.5 bg-amber-500 flex-shrink-0 rounded-l-xl"></div>
@@ -136,6 +136,25 @@
                                 <p class="text-sm text-neutral-500 mt-0.5">PUC pump panel operations training simulator</p>
                             </div>
                             <svg class="w-5 h-5 text-neutral-300 group-hover:text-amber-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- Apparatus Equipment Planner — teal accent -->
+                <a href="{{ url('/apparatus-layout') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-teal-300 transition-all duration-200 overflow-hidden">
+                    <div class="flex">
+                        <div class="w-1.5 bg-teal-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="flex items-start gap-4 p-5 flex-1">
+                            <div class="w-11 h-11 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600 flex-shrink-0 group-hover:scale-105 transition-transform">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path>
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="font-semibold text-neutral-800 group-hover:text-teal-700 font-heading text-base">Apparatus Equipment Planner</h3>
+                                <p class="text-sm text-neutral-500 mt-0.5">Visual compartment layout tool with drag-and-drop equipment placement</p>
+                            </div>
+                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-teal-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                         </div>
                     </div>
                 </a>
