@@ -195,9 +195,13 @@ export const useLayoutStore = create<LayoutStore>()(
   )
 );
 
-// Initialize with default apparatus on first load
 export function initializeStore() {
   const state = useLayoutStore.getState();
+  if (state.compartments.length === 0) {
+    useLayoutStore.setState({
+      compartments: PIERCE_ASCENDANT_COMPARTMENTS,
+    });
+  }
   if (!state.currentApparatusId) {
     useLayoutStore.getState().setApparatus(
       'pierce-ascendant-100',
