@@ -3,7 +3,7 @@
 
 > ⚠️ **CRITICAL MANDATE**: Every AI agent working on this codebase MUST read this entire file BEFORE making any changes. Failure to read this file WILL result in breaking existing functionality.
 
-**Last Updated**: 2026-03-13  
+**Last Updated**: 2026-03-15  
 **Project**: MBFD Hub (Laravel 11, Filament v3, VPS at 145.223.73.170)
 
 ---
@@ -39,7 +39,7 @@ InvalidArgumentException: Unable to locate a class or view for component [filame
 Replace with plain HTML or `x-filament::section`.
 
 **Prevention**: 
-- Never use `x-filament::card.heading` or `x-filament::card.content`
+- Never use `x-filament::card.heading` or `x-filament::card.content`.
 
 ---
 
@@ -253,7 +253,7 @@ grep -c "addEventListener('push'" public/daily/sw.js
 **Prevention**:
 1. **NEVER rely on Vite plugin `closeBundle` hooks to modify VitePWA's output** — VitePWA has its own `closeBundle` and execution order is not guaranteed
 2. When VitePWA is in `generateSW` mode, custom service worker logic MUST be injected via a post-build script (runs after `vite build` completes entirely)
-3. After any `npm run build` in `resources/js/daily-checkout/`, always verify push listeners exist: `grep "addEventListener('push'" public/daily/sw.js`
+3. After any `npm run build` in `resources/js/daily-checkout/`, always verify push listeners exist: `grep "EventListener('push'" public/daily/sw.js`
 4. The alternative approach (switching VitePWA to `injectManifest` mode) would also work but requires rewriting the SW to use Workbox APIs directly
 
 ---
@@ -272,7 +272,7 @@ After committing and pushing dark topbar CSS changes to `main` and pulling on VP
 `npm run build` was never executed on the VPS after `git pull`. The `public/build/` directory is gitignored, so compiled Vite assets do not transfer via git. The VPS was still serving the previously compiled theme CSS which did not include the dark topbar styles.
 
 **Fix Applied**:
-Ran `docker compose exec laravel.test npm run build` directly on the VPS to recompile the Filament theme. Confirmed 11 build artifacts generated including `theme-B-aUFWYd.css` at 121.40 KB. Cleared all caches with `optimize:clear`.
+Ran `docker compose exec -u root laravel.test npm run build` directly on the VPS to recompile the Filament theme. Confirmed 11 build artifacts generated including `theme-B-aUFWYd.css` at 121.40 KB. Cleared all caches with `optimize:clear`.
 
 **Prevention**:
 1. **Any change to `resources/css/` requires server-side Vite compilation** — `git pull` alone is NOT sufficient
@@ -630,3 +630,76 @@ Three compounding bugs on the Workgroup Session Results page:
 3. AI report payloads must include qualitative feedback (comments, notes) alongside quantitative scores
 
 ---
+
+### ERROR-052: DeerFlow Sandbox Agent Freezes on SSH — Missing known_hosts
+
+**Date**: 2026-03-14  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED
+
+**Symptom**:
+DeerFlow agent inside AIO sandbox attempted `ssh root@145.223.73.170` or `git push` to GitHub and froze indefinitely. No timeout, no error — the agent simply hung.
+
+**Root Cause**:
+The sandbox container had no `~/.ssh/known_hosts` file. SSH's `StrictHostKeyChecking` defaulted to `ask`, which prompts for interactive `yes/no` confirmation. Since the AI agent cannot provide interactive input, the SSH process blocked forever.
+
+**Fix Applied**:
+1. Pre-generated `known_hosts` via `ssh-keyscan -H 145.223.73.170 github.com` on the host
+2. Bind-mounted `known_hosts` + SSH key + SSH config (with `StrictHostKeyChecking no`) into sandbox at `/root/.ssh/`
+3. All SSH artifacts staged at `~/src/deer-flow/docker/sandbox-ssh/` for reproducibility
+4. Added `GIT_AUTHOR_NAME`, `GIT_COMMITTER_NAME` env vars to sandbox environment
+
+**Prevention**:
+1. **NEVER allow SSH from inside a sandbox without pre-baked known_hosts** — the agent WILL freeze
+2. Always set `StrictHostKeyChecking no` in sandbox SSH config
+3. After re-creating sandbox SSH files, verify: `ssh -o BatchMode=yes root@145.223.73.170 "echo OK"` from inside container
+4. If `known_hosts` becomes stale (VPS IP change), regenerate with `ssh-keyscan`
+
+---
+
+### ERROR-053: Nginx 413 Payload Too Large — Default 1MB Upload Limit
+
+**Date**: 2026-03-14  
+**Severity**: 🔴 HIGH  
+**Status**: ✅ RESOLVED
+
+**Symptom**:
+File uploads to DeerFlow failed with HTTP 413 error. Only the uploads-specific nginx location block had `client_max_body_size 100M`.
+
+**Root Cause**:
+Nginx's default `client_max_body_size` is 1MB. Without a server-level directive, any route not explicitly configured for large uploads would reject payloads > 1MB.
+
+**Fix Applied**:
+Added `client_max_body_size 100M;` at the `server {}` block level in `~/src/deer-flow/docker/nginx/nginx.conf`.
+
+**Prevention**:
+1. Always set `client_max_body_size` at the **server level**, not just per-location
+2. After editing nginx config, restart nginx: `docker compose restart nginx`
+
+---
+
+### ERROR-054: Apparatus Layout Planner — DeerFlow Sandbox Files Not in Local Workspace
+
+**Date**: 2026-03-15  
+**Severity**: 🟡 MEDIUM  
+**Status**: ✅ RESOLVED
+
+**Symptom**:
+DeerFlow 2.0 agent created all apparatus layout files inside the sandbox at `/home/devcontainers/src/mbfd-hub/` but never committed or pushed them. The local workspace at `C:\Users\Peter Darley\Desktop\Support Services` had zero apparatus layout files.
+
+**Root Cause**:
+DeerFlow's AIO sandbox bind-mounts `~/src/mbfd-hub` from WSL, not the Windows workspace. Changes made inside the sandbox are only visible in WSL at `/home/devcontainers/src/mbfd-hub/`.
+
+**Fix Applied**:
+1. Used `tar` to package all apparatus layout files from the DeerFlow sandbox
+2. Copied via WSL `/mnt/c/` path to the Windows workspace
+3. Extracted and verified all 16 files (7 frontend, 4 PHP domain/controller, 3 migrations, 1 blade, 1 CSS)
+4. Fixed additional issues: missing `@tailwind` removal, `movePlacement` type mismatch, missing `rotation` field, missing dependencies
+
+**Prevention**:
+1. After DeerFlow completes work, always check `/home/devcontainers/src/mbfd-hub/` for uncommitted files
+2. DeerFlow sandbox does NOT auto-sync to the Windows workspace — manual transfer is required
+3. Verify `git status` inside the sandbox before assuming work was committed
+
+---
+
