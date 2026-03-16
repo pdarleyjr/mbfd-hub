@@ -76,6 +76,11 @@ class EvaluationSubmissionExporter extends Exporter
         ];
     }
 
+    public static function modifyQuery(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->where('status', 'submitted');
+    }
+
     public static function getCompletedNotificationBody(Export $export): string
     {
         $body = 'Your evaluation submissions export has completed and ' . number_format($export->successful_rows) . ' ' . str('row')->plural($export->successful_rows) . ' exported.';
