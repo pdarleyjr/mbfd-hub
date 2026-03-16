@@ -17,7 +17,6 @@ use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Session Results — comprehensive evaluation results dashboard.
@@ -56,7 +55,7 @@ class SessionResultsPage extends Page
      * Export a specific granular tool table as CSV.
      * Keys: cutoff_saws, spreaders, cutters, rams, t1_standalone, brand_overall
      */
-    public function exportTableCsv(string $tableKey): StreamedResponse
+    public function exportTableCsv(string $tableKey)
     {
         $sessionId = $this->getSelectedSession()?->id;
         $evalService = app(EvaluationService::class);
@@ -83,7 +82,7 @@ class SessionResultsPage extends Page
                     ]);
                 }
                 fclose($handle);
-            }, $filename);
+            }, $filename, ['Content-Type' => 'text/csv']);
         }
 
         if ($tableKey === 'brand_overall') {
@@ -105,7 +104,7 @@ class SessionResultsPage extends Page
                     ]);
                 }
                 fclose($handle);
-            }, $filename);
+            }, $filename, ['Content-Type' => 'text/csv']);
         }
 
         // Standard product tables: cutoff_saws, spreaders, cutters, rams
@@ -131,13 +130,13 @@ class SessionResultsPage extends Page
                 ]);
             }
             fclose($handle);
-        }, $filename);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     /**
      * Export category rankings table as CSV.
      */
-    public function exportCategoryRankingsCsv(string $categoryName): StreamedResponse
+    public function exportCategoryRankingsCsv(string $categoryName)
     {
         $session = $this->getSelectedSession();
         $evalService = app(EvaluationService::class);
@@ -165,13 +164,13 @@ class SessionResultsPage extends Page
                 }
             }
             fclose($handle);
-        }, $filename);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     /**
      * Export competitor group rankings as CSV.
      */
-    public function exportCompetitorGroupsCsv(): StreamedResponse
+    public function exportCompetitorGroupsCsv()
     {
         $session = $this->getSelectedSession();
         $evalService = app(EvaluationService::class);
@@ -200,13 +199,13 @@ class SessionResultsPage extends Page
                 }
             }
             fclose($handle);
-        }, $filename);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     /**
      * Export finalists summary as CSV.
      */
-    public function exportFinalistsCsv(): StreamedResponse
+    public function exportFinalistsCsv()
     {
         $session = $this->getSelectedSession();
         $evalService = app(EvaluationService::class);
@@ -232,7 +231,7 @@ class SessionResultsPage extends Page
                 }
             }
             fclose($handle);
-        }, $filename);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     public function getHeading(): string
