@@ -85,7 +85,7 @@ jobs:
             docker compose -f compose.yaml exec -T laravel.test php artisan optimize:clear
             docker compose -f compose.yaml exec -T laravel.test php artisan config:cache
             docker compose -f compose.yaml exec -T laravel.test php artisan route:cache
-            docker compose -f compose.yaml exec -T laravel.test php artisan view:cache || echo "view:cache failed — clearing views instead" && docker compose -f compose.yaml exec -T laravel.test php artisan view:clear
+            docker compose -f compose.yaml exec -T laravel.test php artisan view:cache || (echo "view:cache failed — clearing views instead" && docker compose -f compose.yaml exec -T laravel.test php artisan view:clear)
             docker compose -f compose.yaml exec -T laravel.test php artisan filament:clear-cached-components
             echo "✓ Laravel optimizations complete"
             
