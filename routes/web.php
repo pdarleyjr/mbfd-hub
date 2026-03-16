@@ -80,6 +80,77 @@ Route::get('/workgroup/saver-report', function () {
     ]);
 })->name('workgroup.saver-report')->middleware('auth');
 
+// Workgroup Results CSV Export (authenticated)
+Route::get('/workgroup-export/{tableKey}', function (string $tableKey, \Illuminate\Http\Request $request) {
+    $sessionId = $request->query('session_id') ?: null;
+    $evalService = app(\App\Services\Workgroup\EvaluationService::class);
+
+    if (str_starts_with($tableKey, 'category_')) {
+        $categoryName = urldecode(str_replace('category_', '', $tableKey));
+        $results = $evalService->getSessionResults($sessionId);
+        $targetCat = collect($results['rankable_categories'])->first(fn($c) => $c['category_name'] === $categoryName);
+        return response()->streamDownload(function () use ($targetCat) {
+            $h = fopen('php://output', 'w');
+            fputcsv($h, ['Rank','Product','Manufacturer','Model','Overall Score','Responses','Meets Threshold']);
+            if ($targetCat) { foreach ($targetCat['rankings'] as $i => $item) { fputcsv($h, [$i+1, $item['product']->name??'', $item['product']->manufacturer??'', $item['product']->model??'', $item['weighted_average']??'', $item['response_count']??'', $item['meets_threshold']?'Yes':'No']); } }
+            fclose($h);
+        }, strtolower(str_replace(' ','_',$categoryName)).'_rankings_'.now()->format('Y-m-d').'.csv', ['Content-Type'=>'text/csv']);
+    }
+
+    if ($tableKey === 'competitor_groups') {
+        $wg = \App\Models\Workgroup::first();
+        $sess = $sessionId ? \App\Models\WorkgroupSession::find($sessionId) : null;
+        $rankings = $wg ? $evalService->getCompetitorGroupRankings($wg, $sess) : [];
+        return response()->streamDownload(function () use ($rankings) {
+            $h = fopen('php://output', 'w');
+            fputcsv($h, ['Category','Group','Rank','Product','Brand','Avg Score','Responses']);
+            foreach ($rankings as $c) { foreach ($c['groups'] as $g) { foreach ($g['rankings'] as $i => $r) { fputcsv($h, [$c['category_name'], $g['group_name'], $i+1, $r['name']??'', $r['brand']??'', $r['avg_score']??'', $r['response_count']??'']); } } }
+            fclose($h);
+        }, 'competitor_groups_'.now()->format('Y-m-d').'.csv', ['Content-Type'=>'text/csv']);
+    }
+
+    if ($tableKey === 'finalists') {
+        $results = $evalService->getSessionResults($sessionId);
+        return response()->streamDownload(function () use ($results) {
+            $h = fopen('php://output', 'w');
+            fputcsv($h, ['Category','Rank','Product','Manufacturer','Avg Score','Responses']);
+            foreach ($results['rankable_categories'] as $c) { $top = collect($c['rankings'])->filter(fn($r)=>$r['meets_threshold'])->take(2); foreach ($top as $i => $item) { fputcsv($h, [$c['category_name'], $i+1, $item['product']->name??'', $item['product']->manufacturer??'', $item['weighted_average']??'', $item['response_count']??'']); } }
+            fclose($h);
+        }, 'finalists_'.now()->format('Y-m-d').'.csv', ['Content-Type'=>'text/csv']);
+    }
+
+    $granular = $evalService->getGranularToolGroupings($sessionId);
+    $fn = $tableKey.'_results_'.now()->format('Y-m-d').'.csv';
+
+    if ($tableKey === 't1_standalone') {
+        $t1 = $granular['t1_standalone'] ?? null;
+        return response()->streamDownload(function () use ($t1) {
+            $h = fopen('php://output', 'w');
+            fputcsv($h, ['Product','Brand','Overall','Capability','Usability','Affordability','Maintainability','Deployability','Responses']);
+            if ($t1) { fputcsv($h, [$t1['name']??'', $t1['brand']??'', $t1['avg_score']??'', $t1['saver_breakdown']['capability']??'', $t1['saver_breakdown']['usability']??'', $t1['saver_breakdown']['affordability']??'', $t1['saver_breakdown']['maintainability']??'', $t1['saver_breakdown']['deployability']??'', $t1['response_count']??'']); }
+            fclose($h);
+        }, $fn, ['Content-Type'=>'text/csv']);
+    }
+
+    if ($tableKey === 'brand_overall') {
+        $brands = $granular['brand_overall'] ?? [];
+        return response()->streamDownload(function () use ($brands) {
+            $h = fopen('php://output', 'w');
+            fputcsv($h, ['Rank','Brand','Overall Avg','Tools','Capability','Usability','Affordability','Maintainability','Deployability']);
+            foreach ($brands as $b) { fputcsv($h, [$b['rank']??'', $b['brand']??'', $b['overall_avg']??'', $b['tool_count']??'', $b['saver_breakdown']['capability']??'', $b['saver_breakdown']['usability']??'', $b['saver_breakdown']['affordability']??'', $b['saver_breakdown']['maintainability']??'', $b['saver_breakdown']['deployability']??'']); }
+            fclose($h);
+        }, $fn, ['Content-Type'=>'text/csv']);
+    }
+
+    $items = $granular[$tableKey] ?? [];
+    return response()->streamDownload(function () use ($items) {
+        $h = fopen('php://output', 'w');
+        fputcsv($h, ['Rank','Product','Brand','Overall','Capability','Usability','Affordability','Maintainability','Deployability','Advance Yes','Advance No','Deal Breakers','Responses']);
+        foreach ($items as $i => $item) { fputcsv($h, [$i+1, $item['name']??($item['product']->name??''), $item['brand']??'', $item['avg_score']??'', $item['capability_avg']??'', $item['usability_avg']??'', $item['affordability_avg']??'', $item['maintainability_avg']??'', $item['deployability_avg']??'', $item['advance_yes']??'', $item['advance_no']??'', $item['deal_breakers']??'', $item['response_count']??'']); }
+        fclose($h);
+    }, $fn, ['Content-Type'=>'text/csv']);
+})->name('workgroup.export.csv')->middleware('auth');
+
 // Workgroup Report PDF Exports (authenticated)
 Route::middleware(['auth'])->group(function () {
     Route::get('/reports/executive-report/pdf', [ReportExportController::class, 'exportExecutiveReport'])->name('reports.executive.pdf');
