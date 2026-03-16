@@ -9,6 +9,11 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Fallback login route (required by Filament export download middleware)
+Route::get('/login', function () {
+    return redirect('/admin/login');
+})->name('login');
+
 // Pump Simulator - Public route for training
 Route::view('/pump-simulator', 'pump-simulator')->name('pump-simulator');
 
