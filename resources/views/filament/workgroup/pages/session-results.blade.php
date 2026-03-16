@@ -209,7 +209,7 @@
                 <h3 class="wg-section-title">T1 — Forcible Entry Tool</h3>
                 <p class="wg-section-subtitle" style="color: #92400E; font-weight: 500;">For consideration in replacing the <strong>Rabbit Tool</strong> (Forcible entry tool currently in use)</p>
             </div>
-            <button wire:click="exportTableCsv('t1_standalone')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/t1_standalone{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
             </button>
@@ -259,7 +259,7 @@
                 <h3 class="wg-section-title">Forcible Entry — Cut-off Saws</h3>
                 <p class="wg-section-subtitle">{{ count($gtg['cutoff_saws']) }} products ranked by overall score</p>
             </div>
-            <button wire:click="exportTableCsv('cutoff_saws')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/cutoff_saws{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
             </button>
@@ -279,7 +279,7 @@
                 <h3 class="wg-section-title">Battery-Operated Extrication Tools — Brand Rankings</h3>
                 <p class="wg-section-subtitle">Overall average score combining all tools per brand · Ranked #1 to #{{ count($gtg['brand_overall']) }}</p>
             </div>
-            <button wire:click="exportTableCsv('brand_overall')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/brand_overall{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
             </button>
@@ -336,7 +336,7 @@
                 <h3 class="wg-section-title">Extrication — Spreaders</h3>
                 <p class="wg-section-subtitle">{{ count($gtg['spreaders']) }} spreaders ranked independently</p>
             </div>
-            <button wire:click="exportTableCsv('spreaders')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/spreaders{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
             </button>
@@ -356,7 +356,7 @@
                 <h3 class="wg-section-title">Extrication — Cutters</h3>
                 <p class="wg-section-subtitle">{{ count($gtg['cutters']) }} cutters ranked independently</p>
             </div>
-            <button wire:click="exportTableCsv('cutters')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/cutters{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
             </button>
@@ -376,7 +376,7 @@
                 <h3 class="wg-section-title">Extrication — Rams</h3>
                 <p class="wg-section-subtitle">{{ count($gtg['rams']) }} rams ranked independently</p>
             </div>
-            <button wire:click="exportTableCsv('rams')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/rams{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
             </button>
@@ -407,10 +407,10 @@
                         Top: {{ $cat['top_products']->first()['product']->name ?? 'N/A' }}
                     </span>
                     @endif
-                    <button wire:click="exportCategoryRankingsCsv('{{ $cat['category_name'] }}')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+                    <a href="/workgroup-export/category_{{ urlencode($cat['category_name']) }}{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                         CSV
-                    </button>
+                    </a>
                 </div>
             </div>
 
@@ -523,7 +523,7 @@
                 <h2 class="wg-section-title">Competitor Group Rankings</h2>
                 <p class="wg-section-subtitle">Products ranked against direct competitors within the same group</p>
             </div>
-            <button wire:click="exportCompetitorGroupsCsv" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/competitor_groups{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
             </button>
@@ -762,7 +762,7 @@
             <div style="flex: 1;">
                 <h3 class="wg-section-title">Top Finalists</h3>
             </div>
-            <button wire:click="exportFinalistsCsv" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/finalists{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
             </button>
