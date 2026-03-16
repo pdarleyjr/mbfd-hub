@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Workgroup;
 
+use App\Filament\Exports\EvaluationSubmissionExporter;
 use App\Filament\Resources\Workgroup\Pages;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupSession;
@@ -123,7 +124,11 @@ class EvaluationSubmissionResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
             ])
-            ->bulkActions([]);
+            ->bulkActions([
+                Tables\Actions\ExportBulkAction::make()
+                    ->exporter(EvaluationSubmissionExporter::class)
+                    ->visible(fn () => auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin'])),
+            ]);
     }
 
     public static function getPages(): array
