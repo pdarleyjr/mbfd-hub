@@ -17,6 +17,7 @@ use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Session Results — comprehensive evaluation results dashboard.
@@ -50,6 +51,189 @@ class SessionResultsPage extends Page
     public bool $saverReportLoading = false;
     public ?string $saverReportHtml = null;
     public ?string $saverReportError = null;
+
+    /**
+     * Export a specific granular tool table as CSV.
+     * Keys: cutoff_saws, spreaders, cutters, rams, t1_standalone, brand_overall
+     */
+    public function exportTableCsv(string $tableKey): StreamedResponse
+    {
+        $sessionId = $this->getSelectedSession()?->id;
+        $evalService = app(EvaluationService::class);
+        $granular = $evalService->getGranularToolGroupings($sessionId);
+
+        $filename = $tableKey . '_results_' . now()->format('Y-m-d') . '.csv';
+
+        if ($tableKey === 't1_standalone') {
+            $t1 = $granular['t1_standalone'] ?? null;
+            return response()->streamDownload(function () use ($t1) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['Product', 'Brand', 'Overall Score', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability', 'Responses']);
+                if ($t1) {
+                    fputcsv($handle, [
+                        $t1['name'] ?? '',
+                        $t1['brand'] ?? '',
+                        $t1['avg_score'] ?? '',
+                        $t1['saver_breakdown']['capability'] ?? '',
+                        $t1['saver_breakdown']['usability'] ?? '',
+                        $t1['saver_breakdown']['affordability'] ?? '',
+                        $t1['saver_breakdown']['maintainability'] ?? '',
+                        $t1['saver_breakdown']['deployability'] ?? '',
+                        $t1['response_count'] ?? '',
+                    ]);
+                }
+                fclose($handle);
+            }, $filename);
+        }
+
+        if ($tableKey === 'brand_overall') {
+            $brands = $granular['brand_overall'] ?? [];
+            return response()->streamDownload(function () use ($brands) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['Rank', 'Brand', 'Overall Avg', 'Tool Count', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability']);
+                foreach ($brands as $b) {
+                    fputcsv($handle, [
+                        $b['rank'] ?? '',
+                        $b['brand'] ?? '',
+                        $b['overall_avg'] ?? '',
+                        $b['tool_count'] ?? '',
+                        $b['saver_breakdown']['capability'] ?? '',
+                        $b['saver_breakdown']['usability'] ?? '',
+                        $b['saver_breakdown']['affordability'] ?? '',
+                        $b['saver_breakdown']['maintainability'] ?? '',
+                        $b['saver_breakdown']['deployability'] ?? '',
+                    ]);
+                }
+                fclose($handle);
+            }, $filename);
+        }
+
+        // Standard product tables: cutoff_saws, spreaders, cutters, rams
+        $items = $granular[$tableKey] ?? [];
+        return response()->streamDownload(function () use ($items) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Rank', 'Product', 'Brand', 'Overall Score', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability', 'Advance Yes', 'Advance No', 'Deal Breakers', 'Responses']);
+            foreach ($items as $idx => $item) {
+                fputcsv($handle, [
+                    $idx + 1,
+                    $item['name'] ?? ($item['product']->name ?? ''),
+                    $item['brand'] ?? '',
+                    $item['avg_score'] ?? '',
+                    $item['capability_avg'] ?? '',
+                    $item['usability_avg'] ?? '',
+                    $item['affordability_avg'] ?? '',
+                    $item['maintainability_avg'] ?? '',
+                    $item['deployability_avg'] ?? '',
+                    $item['advance_yes'] ?? '',
+                    $item['advance_no'] ?? '',
+                    $item['deal_breakers'] ?? '',
+                    $item['response_count'] ?? '',
+                ]);
+            }
+            fclose($handle);
+        }, $filename);
+    }
+
+    /**
+     * Export category rankings table as CSV.
+     */
+    public function exportCategoryRankingsCsv(string $categoryName): StreamedResponse
+    {
+        $session = $this->getSelectedSession();
+        $evalService = app(EvaluationService::class);
+        $sessionId = $session?->id;
+        $results = $evalService->getSessionResults($sessionId);
+
+        $filename = str_replace(' ', '_', strtolower($categoryName)) . '_rankings_' . now()->format('Y-m-d') . '.csv';
+
+        $targetCat = collect($results['rankable_categories'])->first(fn($c) => $c['category_name'] === $categoryName);
+
+        return response()->streamDownload(function () use ($targetCat) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Rank', 'Product', 'Manufacturer', 'Model', 'Overall Score', 'Responses', 'Meets Threshold']);
+            if ($targetCat) {
+                foreach ($targetCat['rankings'] as $idx => $item) {
+                    fputcsv($handle, [
+                        $idx + 1,
+                        $item['product']->name ?? '',
+                        $item['product']->manufacturer ?? '',
+                        $item['product']->model ?? '',
+                        $item['weighted_average'] ?? '',
+                        $item['response_count'] ?? '',
+                        $item['meets_threshold'] ? 'Yes' : 'No',
+                    ]);
+                }
+            }
+            fclose($handle);
+        }, $filename);
+    }
+
+    /**
+     * Export competitor group rankings as CSV.
+     */
+    public function exportCompetitorGroupsCsv(): StreamedResponse
+    {
+        $session = $this->getSelectedSession();
+        $evalService = app(EvaluationService::class);
+        $workgroup = Workgroup::first();
+
+        $filename = 'competitor_group_rankings_' . now()->format('Y-m-d') . '.csv';
+
+        $rankings = $workgroup ? $evalService->getCompetitorGroupRankings($workgroup, $session) : [];
+
+        return response()->streamDownload(function () use ($rankings) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Category', 'Group', 'Rank', 'Product', 'Brand', 'Avg Score', 'Responses']);
+            foreach ($rankings as $cat) {
+                foreach ($cat['groups'] as $group) {
+                    foreach ($group['rankings'] as $idx => $r) {
+                        fputcsv($handle, [
+                            $cat['category_name'],
+                            $group['group_name'],
+                            $idx + 1,
+                            $r['name'] ?? '',
+                            $r['brand'] ?? '',
+                            $r['avg_score'] ?? '',
+                            $r['response_count'] ?? '',
+                        ]);
+                    }
+                }
+            }
+            fclose($handle);
+        }, $filename);
+    }
+
+    /**
+     * Export finalists summary as CSV.
+     */
+    public function exportFinalistsCsv(): StreamedResponse
+    {
+        $session = $this->getSelectedSession();
+        $evalService = app(EvaluationService::class);
+        $sessionId = $session?->id;
+        $results = $evalService->getSessionResults($sessionId);
+
+        $filename = 'finalists_' . now()->format('Y-m-d') . '.csv';
+
+        return response()->streamDownload(function () use ($results) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Category', 'Rank', 'Product', 'Manufacturer', 'Avg Score', 'Responses']);
+            foreach ($results['rankable_categories'] as $cat) {
+                $rankings = collect($cat['rankings'])->filter(fn($r) => $r['meets_threshold'])->take(2);
+                foreach ($rankings as $idx => $item) {
+                    fputcsv($handle, [
+                        $cat['category_name'],
+                        $idx + 1,
+                        $item['product']->name ?? '',
+                        $item['product']->manufacturer ?? '',
+                        $item['weighted_average'] ?? '',
+                        $item['response_count'] ?? '',
+                    ]);
+                }
+            }
+            fclose($handle);
+        }, $filename);
+    }
 
     public function getHeading(): string
     {

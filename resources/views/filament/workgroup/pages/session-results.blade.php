@@ -209,6 +209,10 @@
                 <h3 class="wg-section-title">T1 — Forcible Entry Tool</h3>
                 <p class="wg-section-subtitle" style="color: #92400E; font-weight: 500;">For consideration in replacing the <strong>Rabbit Tool</strong> (Forcible entry tool currently in use)</p>
             </div>
+            <button wire:click="exportTableCsv('t1_standalone')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                CSV
+            </button>
         </div>
         <div class="wg-section-body">
             @php $t1 = $gtg['t1_standalone']; @endphp
@@ -251,10 +255,14 @@
             <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #DC2626, #EF4444);">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l4 4m4-4l4-4m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             </div>
-            <div>
+            <div style="flex: 1;">
                 <h3 class="wg-section-title">Forcible Entry — Cut-off Saws</h3>
                 <p class="wg-section-subtitle">{{ count($gtg['cutoff_saws']) }} products ranked by overall score</p>
             </div>
+            <button wire:click="exportTableCsv('cutoff_saws')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                CSV
+            </button>
         </div>
         @include('filament.workgroup.pages.partials.granular-tool-table', ['items' => $gtg['cutoff_saws']])
     </div>
@@ -267,10 +275,14 @@
             <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #7C3AED, #8B5CF6);">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
             </div>
-            <div>
+            <div style="flex: 1;">
                 <h3 class="wg-section-title">Battery-Operated Extrication Tools — Brand Rankings</h3>
                 <p class="wg-section-subtitle">Overall average score combining all tools per brand · Ranked #1 to #{{ count($gtg['brand_overall']) }}</p>
             </div>
+            <button wire:click="exportTableCsv('brand_overall')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                CSV
+            </button>
         </div>
         <div style="padding: 0;">
             @foreach($gtg['brand_overall'] as $brandRank)
@@ -320,10 +332,14 @@
             <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #059669, #10B981);">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
             </div>
-            <div>
+            <div style="flex: 1;">
                 <h3 class="wg-section-title">Extrication — Spreaders</h3>
                 <p class="wg-section-subtitle">{{ count($gtg['spreaders']) }} spreaders ranked independently</p>
             </div>
+            <button wire:click="exportTableCsv('spreaders')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                CSV
+            </button>
         </div>
         @include('filament.workgroup.pages.partials.granular-tool-table', ['items' => $gtg['spreaders']])
     </div>
@@ -336,10 +352,14 @@
             <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #2563EB, #3B82F6);">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243z"/></svg>
             </div>
-            <div>
+            <div style="flex: 1;">
                 <h3 class="wg-section-title">Extrication — Cutters</h3>
                 <p class="wg-section-subtitle">{{ count($gtg['cutters']) }} cutters ranked independently</p>
             </div>
+            <button wire:click="exportTableCsv('cutters')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                CSV
+            </button>
         </div>
         @include('filament.workgroup.pages.partials.granular-tool-table', ['items' => $gtg['cutters']])
     </div>
@@ -352,10 +372,14 @@
             <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #EA580C, #F97316);">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
             </div>
-            <div>
+            <div style="flex: 1;">
                 <h3 class="wg-section-title">Extrication — Rams</h3>
                 <p class="wg-section-subtitle">{{ count($gtg['rams']) }} rams ranked independently</p>
             </div>
+            <button wire:click="exportTableCsv('rams')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                CSV
+            </button>
         </div>
         @include('filament.workgroup.pages.partials.granular-tool-table', ['items' => $gtg['rams']])
     </div>
@@ -376,12 +400,18 @@
                     <h3 class="wg-section-title">{{ $cat['category_name'] }}</h3>
                     <p class="wg-section-subtitle">{{ $cat['total_products'] }} products · {{ $cat['eligible_products'] }} meet threshold</p>
                 </div>
-                @if($cat['top_products']->isNotEmpty())
-                <span style="display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; background-color: #FEF9C3; color: #854D0E; border: 1px solid #FDE68A;">
-                    <x-heroicon-o-trophy class="w-3.5 h-3.5"/>
-                    Top: {{ $cat['top_products']->first()['product']->name ?? 'N/A' }}
-                </span>
-                @endif
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    @if($cat['top_products']->isNotEmpty())
+                    <span style="display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; background-color: #FEF9C3; color: #854D0E; border: 1px solid #FDE68A;">
+                        <x-heroicon-o-trophy class="w-3.5 h-3.5"/>
+                        Top: {{ $cat['top_products']->first()['product']->name ?? 'N/A' }}
+                    </span>
+                    @endif
+                    <button wire:click="exportCategoryRankingsCsv('{{ $cat['category_name'] }}')" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                        CSV
+                    </button>
+                </div>
             </div>
 
             <div style="overflow-x: auto;">
@@ -489,10 +519,14 @@
             <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #2563EB, #0891B2);">
                 <x-heroicon-o-scale class="w-5 h-5"/>
             </div>
-            <div>
+            <div style="flex: 1;">
                 <h2 class="wg-section-title">Competitor Group Rankings</h2>
                 <p class="wg-section-subtitle">Products ranked against direct competitors within the same group</p>
             </div>
+            <button wire:click="exportCompetitorGroupsCsv" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                CSV
+            </button>
         </div>
 
         @foreach($competitorGroupRankings as $cgCategory)
@@ -725,7 +759,13 @@
             <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #C5A55A, #D97706);">
                 <x-heroicon-o-trophy class="w-5 h-5"/>
             </div>
-            <h3 class="wg-section-title">Top Finalists</h3>
+            <div style="flex: 1;">
+                <h3 class="wg-section-title">Top Finalists</h3>
+            </div>
+            <button wire:click="exportFinalistsCsv" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                CSV
+            </button>
         </div>
         <div style="overflow-x: auto;">
             <table class="wg-table">
