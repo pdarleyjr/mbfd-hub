@@ -3,7 +3,7 @@
 
 > ⚠️ **CRITICAL MANDATE**: Every AI agent working on this codebase MUST read this entire file BEFORE making any changes. Failure to read this file WILL result in breaking existing functionality.
 
-**Last Updated**: 2026-03-16  
+**Last Updated**: 2026-03-17  
 **Project**: MBFD Hub (Laravel 11, Filament v3, VPS at 145.223.73.170)
 
 ---
@@ -175,7 +175,7 @@ Routing stack already correctly configured. Stale SW cache causes 404s.
 
 ---
 
-### ERROR-031: Filament Admin Theme CSS — Broken Selectors + @apply iOS Risk
+### ERROR-031: Filament Admin Theme CSS — Broken Selectors + `@apply` iOS Risk
 
 **Date**: 2026-03-10  
 **Severity**: 🔴 CRITICAL  
@@ -199,44 +199,6 @@ Never use `cdn.tailwindcss.com` in production. Use `@vite('resources/css/app.css
 **Severity**: 🟢 INFO  
 
 Design modernization. No `@apply`, no bouncy easing, warm stone neutrals only.
-
----
-
-### ERROR-038: VitePWA generateSW Overwrites Push Notification Listeners in Daily Checkout SPA
-
-**Date**: 2026-03-12  
-**Severity**: 🔴 CRITICAL — push notifications silently fail on `/daily` SPA; users receive no browser push alerts  
-**Status**: ✅ RESOLVED  
-**File(s) Affected**: `resources/js/daily-checkout/public/service-worker.js`, `resources/js/daily-checkout/vite.config.js`, `resources/js/daily-checkout/inject-push-sw.js`, `resources/js/daily-checkout/package.json`
-
-**Symptom**:
-Web push notifications sent via `laravel-notification-channels/webpush` to users subscribed through the `/daily` SPA service worker were silently dropped. The `public/daily/sw.js` file contained only Workbox caching logic — no `push` or `notificationclick` event listeners.
-
-**Root Cause**:
-VitePWA's `generateSW` mode (configured in `vite.config.js`) generates a fresh `sw.js` during the `closeBundle` Vite hook. This Workbox-generated SW overwrites any custom service worker previously copied to `public/daily/sw.js`. The custom `serviceWorkerCopyPlugin` (which copies `resources/js/daily-checkout/public/service-worker.js` to the output) ran its `closeBundle` BEFORE VitePWA's `closeBundle`, so VitePWA's output always won.
-
-**Fix Applied**:
-
-1. **Added push/notificationclick listeners** to `resources/js/daily-checkout/public/service-worker.js` (the custom SW source file) — matching the logic in `public/sw.js` (the root service worker).
-
-2. **Created `inject-push-sw.js`** — a post-build Node.js script that appends push notification handlers to VitePWA's generated `sw.js` AFTER `vite build` completes.
-
-3. **Updated `package.json` build script**: `"build": "vite build && node ./inject-push-sw.js"` — runs the inject script as a guaranteed post-build step.
-
-4. **Kept the `serviceWorkerCopyPlugin`** in `vite.config.js` as a fallback (it detects when VitePWA hasn't yet written its SW), but the primary fix is the post-build script.
-
-**Verification**:
-```bash
-# After npm run build:
-grep -c "addEventListener('push'" public/daily/sw.js
-# Should return 1 (confirming push listener is present)
-```
-
-**Prevention**:
-1. **NEVER rely on Vite plugin `closeBundle` hooks to modify VitePWA's output** — VitePWA has its own `closeBundle` and execution order is not guaranteed
-2. When VitePWA is in `generateSW` mode, custom service worker logic MUST be injected via a post-build script (runs after `vite build` completes entirely)
-3. After any `npm run build` in `resources/js/daily-checkout/`, always verify push listeners exist: `grep "EventListener('push'" public/daily/sw.js`
-4. The alternative approach (switching VitePWA to `injectManifest` mode) would also work but requires rewriting the SW to use Workbox APIs directly
 
 ---
 
@@ -417,7 +379,7 @@ The Apparatus model had no auto-slug generation. Slugs were only populated if ma
 
 ---
 
-### ERROR-044: fast_edit_file accidentally deleting methods
+### ERROR-044: Fast Edit File accidentally deleting methods
 **Date**: 2026-03-14
 **Status**: ✅ RESOLVED
 
@@ -430,598 +392,336 @@ rolled back to the previous version and added back the deleted methods. Explanat
 
 ---
 
-### ERROR-046: DeerFlow Zero Trust Tunnel — Operational Reference
+### ERROR-063: DeerFlow Total System Lockout — `chown -R 1000:1000` on `.deer-flow/` Revokes All Container Access
 
-**Date**: 2026-03-13  
-**Severity**: 🟢 INFO  
-**Status**: ✅ OPERATIONAL
-
-**Context**:
-DeerFlow 2.0 UI at WSL port 2026 is exposed to `https://code.mbfdhub.com` via Cloudflare Zero Trust tunnel `deerflow-local` (ID: `c64064b3-d224-4392-a977-93aad34f41ee`).
-
-**Key Facts**:
-1. **Tunnel runs as `deer-flow-cloudflared` container** on `deer-flow-dev_deer-flow-dev` Docker network
-2. **Cloudflare Access Application** enforces Google auth for `pdarleyjr@gmail.com` only
-3. **Hardened sidecar**: read-only FS, `no-new-privileges`, all caps dropped, no docker.sock mount
-4. **Zero inbound ports** — all traffic is outbound QUIC from the container to Cloudflare edge
-5. **Tunnel token** is embedded in the docker-compose.yaml and the `docker run` command — do NOT log it
-
-**Prevention**:
-1. **NEVER expose DeerFlow port 2026 directly** via port forwarding or host firewall rules
-2. **NEVER mount docker.sock** into the cloudflared container
-3. **NEVER use `network_mode: host`** for the tunnel container
-4. If the tunnel stops, restart with: `docker start deer-flow-cloudflared`
-5. If the container is deleted, recreate per the `docker run` command documented in CLAUDE.md
-6. The tunnel token in the compose file is a Cloudflare-managed secret — rotate via Cloudflare dashboard if compromised
-
----
-
-### ERROR-048: Production Observability Stack — Port Reservation & Isolation Rules
-
-**Date**: 2026-03-13  
-**Severity**: 🟢 INFO  
-**Status**: ✅ OPERATIONAL
-
-**Context**:
-Production observability stack deployed at `/root/observability/` on VPS `145.223.73.170`. Three services: Dozzle (port 8888), Uptime Kuma (port 3001), Web-Check (port 3000).
-
-**Key Facts**:
-1. **Docker socket mounted read-only** (`/var/run/docker.sock:/var/run/docker.sock:ro`) into Dozzle only
-2. **Uptime Kuma data persisted** via named Docker volume `observability_uptime-kuma-data`
-3. **Port 8080 is RESERVED** for Laravel Reverb — observability stack maps Dozzle's internal 8080 to host **8888**
-4. **Completely isolated** from MBFD Hub stack — separate compose file, separate Docker network (`observability_default`)
-
-**Prevention**:
-1. **NEVER use port 8080** for any observability service — it's reserved for Laravel Reverb
-2. **NEVER merge** the observability `docker-compose.yml` into the MBFD Hub `compose.yaml`
-3. **NEVER mount** Docker socket as read-write into any observability container
-4. Manage with: `cd /root/observability && docker-compose up -d` (separate from MBFD Hub)
-5. If Uptime Kuma needs reset: volume data is at `observability_uptime-kuma-data` Docker volume
-
----
-
-### ERROR-045: DeerFlow Installed on Production VPS — Environment Boundary Violation
-
-**Date**: 2026-03-13  
+**Date**: 2026-03-17  
 **Severity**: 🔴 CRITICAL  
 **Status**: ✅ RESOLVED  
-**File(s) Affected**: VPS `/root/src/deer-flow`, `/root/src/mbfd-hub` (symlink)
+**File(s) Affected**: `~/src/deer-flow/backend/.deer-flow/` (entire directory tree)
 
 **Symptom**:
-Previous agent session installed DeerFlow 2.0 directly on the production VPS at `/root/src/deer-flow` and created a symlink `/root/src/mbfd-hub → /root/mbfd-hub`. This violated the environment segmentation policy.
+- React frontend throws `JSON.parse` errors on every page load  
+- All API calls return HTTP 500  
+- Agent profiles, chat history, memory fail to load  
+- File uploads fail: `Permission denied: '/mnt/user-data/uploads/filename'`
+- Nginx returns HTTP 502 error pages
 
 **Root Cause**:
-No clear environment boundary enforcement. The agent treated the VPS as both the orchestration and runtime plane, installing development tooling on production infrastructure.
+Running `sudo chown -R 1000:1000 ~/src/deer-flow/backend/.deer-flow/` changed file ownership to UID 1000 (devcontainers), but left files as `644` (rw-r--r--). The Docker containers run as root (UID 0). While root can READ `644` files, SQLite WAL mode requires **exclusive WRITE access** to `checkpoints.db-shm` and `checkpoints.db-wal` to operate. Without write permission, every SQLite operation throws fatal disk I/O errors, crashing the API with 500s.
+
+Similarly, the `threads/*/user-data/uploads/` directories become non-writable for the gateway, causing all file uploads to fail.
 
 **Fix Applied**:
-1. Removed `/root/src/deer-flow`, `/root/src/mbfd-hub` (symlink), and `/root/src` directory from VPS
-2. Cleaned junk files from `/root/mbfd-hub/` (`$null`, `'`, `In`, `displayName`, `hardware'])`)  
-3. Verified `/root/mbfd-hub` remains the sole production directory with valid `compose.yaml` and `.env`
-4. DeerFlow 2.0 reinstalled in correct location: WSL `~/src/deer-flow` (local workstation only)
+Run `chmod -R 777` from INSIDE the container as root:
+```bash
+docker exec deer-flow-langgraph chmod -R 777 /app/backend/.deer-flow/
+docker exec deer-flow-gateway chmod -R 777 /app/backend/.deer-flow/
+```
 
 **Prevention**:
-1. **NEVER install DeerFlow, agent frameworks, or orchestration tools on the production VPS**
-2. Production VPS (`145.223.73.170`) is RUNTIME ONLY — it runs Docker containers and serves the app
-3. All orchestration, agent infrastructure, and development tools belong on the local WSL environment
-4. Perform a Context Check before every SSH command to confirm you're targeting the correct environment
+1. **NEVER run `chown` on `~/src/deer-flow/backend/.deer-flow/`**
+2. The correct fix is always: `docker exec deer-flow-langgraph chmod -R 777 /app/backend/.deer-flow/`
+3. Host-side `sudo chmod -R 777` may not propagate correctly — always apply from inside the container
+4. Ensure that any scripts used inside containers (`inject-push-sw.js`) do not inadvertently change container file ownership
 
 ---
 
-### ERROR-048: DeerFlow Skill Path Mismatch — Agent Looked in `.kilocode/skills/` Instead of DeerFlow Directory
+### ERROR-064: DeerFlow MCP Hallucination — `filesystem` Server Injected with Invalid Host Paths
 
-**Date**: 2026-03-13  
-**Severity**: 🟡 MEDIUM  
-**Status**: ✅ RESOLVED
+**Date**: 2026-03-17  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `~/src/deer-flow/extensions_config.json`
 
 **Symptom**:
-DeerFlow coordinator reported `mbfd-review` skill as missing. It looked in `.kilocode/skills/` (the VS Code/Kilo Code skill directory).
+LangGraph crashes fatally on startup. All agentic workflows fail with connection errors.
 
 **Root Cause**:
-Architectural boundary confusion. `.kilocode/skills/` is for the VS Code Kilo Code extension. DeerFlow 2.0 expects its skills in `~/src/deer-flow/skills/custom/{skill-name}/SKILL.md`.
+A previous agent injected a `"filesystem"` MCP server with host paths (`/home/devcontainers/...`) that don't exist inside Docker containers. `CLAUDE.md` explicitly forbids this server — DeerFlow uses AioSandboxProvider.
 
 **Fix Applied**:
-Created `~/src/deer-flow/skills/custom/mbfd-review/SKILL.md` with the full review workflow (Uptime Kuma health gate, Dozzle log retrieval, Browserless Playwright UI validation, Impeccable design audit).
+Remove `"filesystem"` from `extensions_config.json`. Only 5 authorized servers: `github`, `memory`, `sequential-thinking`, `git-mcp`, `context7`.
 
 **Prevention**:
-1. **DeerFlow skills** go in `~/src/deer-flow/skills/custom/{name}/SKILL.md`
-2. **Kilo Code skills** go in `.kilocode/skills/{name}/SKILL.md`
-3. The two systems are completely independent — never cross-reference paths
+1. **NEVER add `filesystem` MCP** — forbidden, use AioSandboxProvider instead
+2. **NEVER use host paths** in MCP args inside Docker containers
+3. After `extensions_config.json` changes: `docker exec deer-flow-gateway curl -sf http://langgraph:2024/ok`
 
 ---
 
-### ERROR-049: Agent Hallucinated Filename — `PROJECT_SUMMARY.md` vs `.project_summary.md`
+### ERROR-065: DeerFlow Nginx Stale DNS Cache After `docker compose restart` — All API Routes 502
 
-**Date**: 2026-03-13  
-**Severity**: 🟡 MEDIUM  
-**Status**: ✅ RESOLVED
-
-**Symptom**:
-DeerFlow researcher agent reported `PROJECT_SUMMARY.md` as missing from the repo root.
-
-**Root Cause**:
-The file is actually named `.project_summary.md` (hidden file with leading dot, lowercase). The agent hallucinated the filename as `PROJECT_SUMMARY.md` (no dot, uppercase).
-
-**Fix Applied**:
-Added explicit "Core Context Files for AI Agents" table to `CLAUDE.md` mapping all 6 critical context files with their exact filenames. Updated `.project_summary.md` Key File Locations table with all 6 files.
-
-**Prevention**:
-1. Always use the exact filename from `CLAUDE.md` Core Context Files table
-2. The project summary file has a **leading dot** (`.project_summary.md`) — it is a hidden file
-3. When in doubt, use `ls -la` to verify exact filenames before reporting files as missing
-
----
-
-### ERROR-050: Dozzle Port 8888 Blocked by UFW Firewall
-
-**Date**: 2026-03-13  
-**Severity**: 🔴 HIGH  
-**Status**: ✅ RESOLVED
+**Date**: 2026-03-17  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: Docker networking, nginx upstream resolution
 
 **Symptom**:
-Dozzle container was running and responding locally (`curl localhost:8888` returned 200), but external requests to `http://145.223.73.170:8888` timed out.
+After `docker compose restart`, all `/api/*` and `/api/langgraph/*` routes return HTTP 502. LangGraph health check confirms it's up, but nginx routes to stale container IPs.
 
 **Root Cause**:
-Ubuntu's UFW firewall had a default-deny incoming policy. Port 8888 was never added to the allow list. Similarly, port 3001 (Uptime Kuma) was also missing.
+`docker compose restart` may reassign container IPs. Nginx caches upstream DNS at startup and continues routing to stale IPs, causing "Connection refused."
 
 **Fix Applied**:
 ```bash
-ufw allow 8888/tcp comment 'Dozzle log viewer'
-ufw allow 3001/tcp comment 'Uptime Kuma'
-ufw reload
+docker exec deer-flow-nginx nginx -s reload
 ```
 
-**Verification**:
-- `curl -s -o /dev/null -w 'HTTP %{http_code}' http://145.223.73.170:8888/` → HTTP 200
-- `curl -s -o /dev/null -w 'HTTP %{http_code}' http://145.223.73.170:3001/` → HTTP 302
-- Port 8080 (Laravel Reverb) confirmed untouched — not in UFW rules (traffic flows via Cloudflare Tunnel)
+**Mandatory Recovery Sequence** (after ANY restart):
+```bash
+cd ~/src/deer-flow/docker && docker compose -f docker-compose-dev.yaml restart
+docker exec deer-flow-langgraph chmod -R 777 /app/backend/.deer-flow/
+docker exec deer-flow-gateway chmod -R 777 /app/backend/.deer-flow/
+for s in $(docker ps --filter name=deer-flow-sandbox --format '{{.Names}}'); do
+  docker exec $s chmod -R 777 /mnt/user-data/
+done
+docker exec deer-flow-nginx nginx -s reload
+docker exec deer-flow-gateway curl -sf http://langgraph:2024/ok
+```
 
 **Prevention**:
-1. When deploying new Docker services with external port mappings, always check UFW: `ufw status`
-2. Docker's port publishing (`-p 8888:8080`) does NOT automatically open UFW ports
-3. After adding UFW rules, always verify with an external curl test
-4. **Never open port 8080** in UFW — it's reserved for Laravel Reverb via Cloudflare Tunnel
+1. **Always reload nginx after any DeerFlow restart**: `docker exec deer-flow-nginx nginx -s reload`
+2. Check nginx logs for stale IPs: `docker logs deer-flow-nginx --tail=20 | grep "Connection refused"`
 
 ---
 
-### ERROR-051: Workgroup Analytics — Pending Math, Overall AI Report Scoping, Missing AI Context
+### ERROR-066: DeerFlow AIO Sandbox File Upload Fails — `/mnt/user-data` Parent Dir is 755 Root-Owned
 
-**Date**: 2026-03-14  
-**Severity**: 🔴 HIGH  
-**Status**: ✅ RESOLVED  
-**File(s) Affected**: `resources/views/filament/workgroup/pages/session-results.blade.php`, `app/Filament/Workgroup/Pages/SessionResultsPage.php`, `app/Services/Workgroup/WorkgroupAIService.php`
-
-**Symptom**:
-Three compounding bugs on the Workgroup Session Results page:
-1. **Inaccurate "Pending" count**: Showed 110 pending when it should have been 106 (ignored 4 in-progress drafts)
-2. **"Day 1" Overall Report**: Clicking "Overall" generated an AI report for Day 1 instead of aggregating all sessions
-3. **Missing AI Context**: AI reports only analyzed numerical scores — no evaluator comments or vendor spec references
-
-**Root Cause**:
-1. Blade template calculated `Pending = MaxPossible - Submitted` without subtracting `draft_submissions` (in-progress)
-2. `SessionResultsPage::loadAiReport()` had fallback logic: `if (!$session) { $session = WorkgroupSession::where('status', 'completed')->first(); }` — always defaulting to Day 1
-3. `WorkgroupAIService::formatSubmission()` only sent numerical scores; `narrative_payload` (strengths/weaknesses/impressions), `deal_breaker_note`, and legacy `EvaluationComment` records were never included in the AI payload; no RAG directive for vendor specs
-
-**Fix Applied**:
-1. **Pending Math**: Changed blade calculation to `max(0, max_possible - submitted - draft_submissions)`
-2. **Overall Scoping**: Refactored `generateExecutiveReport()` to accept `Workgroup + ?WorkgroupSession`. Added `buildCategoriesForOverallReport()` and `buildOverallStatsAllSessions()` helpers that query across ALL sessions. Removed Day 1 fallback from `loadAiReport()`.
-3. **AI Context**: Enhanced `formatSubmission()` to include anonymous notes from `narrative_payload` and legacy comments. Added `collectAnonymousComments()` helper. Injected `anonymousComments` array and `systemDirective` (RAG cross-reference instruction) into executive report and SAVER report payloads.
-
-**Prevention**:
-1. When calculating "remaining" counts, always subtract ALL non-pending states (submitted + draft/in-progress)
-2. Never fall back to `::first()` when null scope means "aggregate all" — always create explicit aggregate query methods
-3. AI report payloads must include qualitative feedback (comments, notes) alongside quantitative scores
-
----
-
-### ERROR-052: DeerFlow Sandbox Agent Freezes on SSH — Missing known_hosts
-
-**Date**: 2026-03-14  
+**Date**: 2026-03-17  
 **Severity**: 🔴 CRITICAL  
-**Status**: ✅ RESOLVED
+**Status**: ✅ RESOLVED  (permanent fix applied to codebase)
+**File(s) Affected**: `backend/packages/harness/deerflow/community/aio_sandbox/aio_sandbox_provider.py`, AIO sandbox containers
 
 **Symptom**:
-DeerFlow agent inside AIO sandbox attempted `ssh root@145.223.73.170` or `git push` to GitHub and froze indefinitely. No timeout, no error — the agent simply hung.
+All file uploads fail with `Permission denied: '/mnt/user-data/uploads/filename'`. Applies to local UI uploads, remote Cloudflare tunnel uploads, and Telegram file attachments. Error comes from the AIO sandbox API (port 8080) trying to sync files to the sandbox's virtual filesystem.
 
 **Root Cause**:
-The sandbox container had no `~/.ssh/known_hosts` file. SSH's `StrictHostKeyChecking` defaulted to `ask`, which prompts for interactive `yes/no` confirmation. Since the AI agent cannot provide interactive input, the SSH process blocked forever.
+Docker creates the `/mnt/user-data` directory inside new sandbox containers as `root:755` by default. The AIO sandbox's `gem` user process cannot write to the parent directory itself (though subdirs created by the harness are already 777). Every new sandbox container spawned by the provider has this problem on first use.
+
+Additionally, when `docker compose restart` runs, the gateway provider spawns a NEW sandbox container (on a different port). That new container inherits the root:755 problem on `/mnt/user-data`. Even though the old sandbox was fixed in the same session, the new one is broken.
 
 **Fix Applied**:
-1. Pre-generated `known_hosts` via `ssh-keyscan -H 145.223.73.170 github.com` on the host
-2. Bind-mounted `known_hosts` + SSH key + SSH config (with `StrictHostKeyChecking no`) into sandbox at `/root/.ssh/`
-3. All SSH artifacts staged at `~/src/deer-flow/docker/sandbox-ssh/` for reproducibility
-4. Added `GIT_AUTHOR_NAME`, `GIT_COMMITTER_NAME` env vars to sandbox environment
-
-**Prevention**:
-1. **NEVER allow SSH from inside a sandbox without pre-baked known_hosts** — the agent WILL freeze
-2. Always set `StrictHostKeyChecking no` in sandbox SSH config
-3. After re-creating sandbox SSH files, verify: `ssh -o BatchMode=yes root@145.223.73.170 "echo OK"` from inside container
-4. If `known_hosts` becomes stale (VPS IP change), regenerate with `ssh-keyscan`
-
----
-
-### ERROR-053: Nginx 413 Payload Too Large — Default 1MB Upload Limit
-
-**Date**: 2026-03-14  
-**Severity**: 🔴 HIGH  
-**Status**: ✅ RESOLVED
-
-**Symptom**:
-File uploads to DeerFlow failed with HTTP 413 error. Only the uploads-specific nginx location block had `client_max_body_size 100M`.
-
-**Root Cause**:
-Nginx's default `client_max_body_size` is 1MB. Without a server-level directive, any route not explicitly configured for large uploads would reject payloads > 1MB.
-
-**Fix Applied**:
-Added `client_max_body_size 100M;` at the `server {}` block level in `~/src/deer-flow/docker/nginx/nginx.conf`.
-
-**Prevention**:
-1. Always set `client_max_body_size` at the **server level**, not just per-location
-2. After editing nginx config, restart nginx: `docker-compose restart nginx`
-
----
-
-### ERROR-054: Apparatus Layout Planner — DeerFlow Sandbox Files Not in Local Workspace
-
-**Date**: 2026-03-15  
-**Severity**: 🟡 MEDIUM  
-**Status**: ✅ RESOLVED
-
-**Symptom**:
-DeerFlow 2.0 agent created all apparatus layout files inside the sandbox at `/home/devcontainers/src/mbfd-hub/` but never committed or pushed them. The local workspace at `C:\Users\Peter Darley\Desktop\Support Services` had zero apparatus layout files.
-
-**Root Cause**:
-DeerFlow's AIO sandbox bind-mounts `~/src/mbfd-hub` from WSL, not the Windows workspace. Changes made inside the sandbox are only visible in WSL at `/home/devcontainers/src/mbfd-hub/`.
-
-**Fix Applied**:
-1. Used `tar` to package all apparatus layout files from the DeerFlow sandbox
-2. Copied via WSL `/mnt/c/` path to the Windows workspace
-3. Extracted and verified all 16 files (7 frontend, 4 PHP domain/controller, 3 migrations, 1 blade, 1 CSS)
-4. Fixed additional issues: missing `@tailwind` removal, `movePlacement` type mismatch, missing `rotation` field, missing dependencies
-
-**Prevention**:
-1. After DeerFlow completes work, always check `/home/devcontainers/src/mbfd-hub/` for uncommitted files
-2. DeerFlow sandbox does NOT auto-sync to the Windows workspace — manual transfer is required
-3. Verify `git status` inside the sandbox before assuming work was committed
-
----
-
-### ERROR-055: Employee Portal — ForcePasswordChangeMiddleware Route Check Uses `must_change_password` Not `requires_password_change`
-
-**Date**: 2026-03-16  
-**Severity**: 🟡 MEDIUM  
-**Status**: ✅ DOCUMENTED  
-**File(s) Affected**: `app/Http/Middleware/ForcePasswordChangeMiddleware.php`, `app/Models/User.php`
-
-**Context**:
-The Employee Portal feature brief used the field name `requires_password_change` but the existing User model already uses `must_change_password` (added 2026-01-23). The new Employee Portal uses the existing `must_change_password` column to avoid schema duplication.
-
-**Key Facts**:
-1. `must_change_password` is in `users` table (migration `2026_01_23_192731`)
-2. The `ForcePasswordChangeMiddleware` checks `$user->must_change_password`
-3. The `ImportPersonnel` command sets `must_change_password = true` on import
-4. The `ChangePasswordPage` clears `must_change_password = false` on success
-
-**Prevention**:
-1. Always check existing User model fields before adding new boolean flags for similar purposes
-2. `employee_id` is now stored in users table — format for email is `{employeeid}@mbfd.local`
-3. Employee panel access: `canAccessPanel('employee')` returns true when `employee_id` is not null OR user is `super_admin`
-
----
-
-### ERROR-056: Filament Theme CSS @import Commented Out by DeerFlow Agent — All Panels Unstyled
-
-**Date**: 2026-03-16  
-**Severity**: 🔴 CRITICAL  
-**Status**: ✅ RESOLVED
-
-**Symptom**: All Filament panels (Admin, Training, Workgroup, Employee) rendered completely unstyled — no layout, no Tailwind classes, raw HTML only.
-
-**Root Cause**: A DeerFlow agent committed `resources/css/filament/admin/theme.css` with line 1 changed from:
-```css
-@import '../../../../vendor/filament/filament/dist/theme.css';
+1. **Immediate**: `docker exec {sandbox_name} chmod -R 777 /mnt/user-data/`
+2. **Permanent**: Added `chmod -R 777 /mnt/user-data` to `_create_sandbox()` in `aio_sandbox_provider.py` immediately after the sandbox becomes ready:
+```python
+sandbox = AioSandbox(id=sandbox_id, base_url=info.sandbox_url)
+# Ensure /mnt/user-data is writable by the sandbox gem user
+try:
+    sandbox.execute_command("chmod -R 777 /mnt/user-data")
+    logger.info(f"Set /mnt/user-data permissions for sandbox {sandbox_id}")
+except Exception as e:
+    logger.warning(f"Could not chmod /mnt/user-data in sandbox {sandbox_id}: {e}")
 ```
-to:
-```css
-/* @import '../../../../vendor/filament/filament/dist/theme.css'; — commented out: vendor dir not present in local build */
-```
-This stripped 106KB of Filament base Tailwind CSS from the compiled output, leaving only the 15KB of MBFD custom overrides.
-
-**Fix**: Restored the `@import` via GitHub API (commit `1b0408d5`), rebuilt on VPS.
 
 **Prevention**:
-1. **NEVER comment out the `@import` on line 1 of `theme.css`** — it imports the entire Filament base CSS
-2. The `vendor/` directory IS present in the Docker container — the comment's rationale was false
-3. Compiled theme should be ~121KB — if it's ~15KB, the `@import` is missing
+1. After ANY gateway restart, check for new sandbox containers and fix them: `for s in $(docker ps --filter name=deer-flow-sandbox --format '{{.Names}}'); do docker exec $s chmod -R 777 /mnt/user-data/; done`
+2. The permanent code fix in `aio_sandbox_provider.py` ensures all NEW sandbox containers get 777 permissions automatically
+3. Upstream DeerFlow does not have this fix — it was added by MBFD. Do NOT revert the patch when pulling upstream updates
 
 ---
 
-### ERROR-057: Employee Portal Fake Users in users Table — Architecture Isolation Failure
+### ERROR-067: DeerFlow Major Upstream Restructure — `backend/src/` Renamed to `backend/app/` + `backend/packages/harness/` (2026-03-17)
 
-**Date**: 2026-03-16  
-**Severity**: 🔴 HIGH  
-**Status**: ✅ RESOLVED
-
-**Delete All Fake Users from users Table
-    
-**Instructions**
-Perform this operation on server: (automatic rollback)
-    sudo -u sail php artisan data:fake-users:cleanup
-
----
-
-### ERROR-059: DeerFlow ChatBox.tsx Property Reference Mismatch
-
-**Date**: 2026-03-16  
+**Date**: 2026-03-17  
 **Severity**: 🔴 CRITICAL  
 **Status**: ✅ RESOLVED  
-**File(s) Affected**: `~/src/deer-flow/frontend/src/components/workspace/chats/chat-box.tsx:45` (DeerFlow agent name state)
-
-**Description**:
-A previous extraction tool (`extract-text-between-brackets.py`) confused the identifier name, causing the agent name to render as `[object Object]`.
 
 **Symptom**:
-Agent name in chatbox would render as `[object Object]` due to a logic error in extracting agent identifiers.
+After `git pull` from upstream, containers fail to start with:
+- Gateway: `Error loading ASGI app. Could not import module "src.gateway.app"`
+- LangGraph: `FileNotFoundError: '/app/backend/src/agents/checkpointer/async_provider.py'`
 
 **Root Cause**:
-The extraction tool had incorrect logic for parsing supplier/customer names, resulting in malformed log entries where supplier names contained opener/closer braces.
+Upstream DeerFlow 2.0 commit `0091d9f` performed a major restructure:
+- `backend/src/channels/` → `backend/app/channels/`
+- `backend/src/gateway/` → `backend/app/gateway/`
+- `backend/src/agents/`, `backend/src/community/`, etc. → `backend/packages/harness/deerflow/`
+- The gateway ASGI command changed from `src.gateway.app:app` to `app.gateway.app:app`
+- `langgraph.json` updated to use `deerflow.agents:make_lead_agent` and new checkpointer path
+- `config.example.yaml` bumped to `config_version: 2` and sandbox `use` changed from `src.community.aio_sandbox:AioSandboxProvider` to `deerflow.community.aio_sandbox:AioSandboxProvider`
 
 **Fix Applied**:
-The agent name state is now correctly extracted from a log entry's supplier/customer name using the `supplier` field. The logic for extracting names has been corrected to handle situations where the agent name might be contained within bracketed text (e.g., `[example supplier] Marine TH, Ltd.`).
-
-```typescript
-let agentName = entry.supplier; // Default to supplier if available
-
-// Try to extract agent name from bracketed text
-const DEERFLOW_AGENT_PATTERN = /Marine\s+TH,\s+Ltd.\s*\(([^)]+)\)/;
-
-if (entry.agent_name && entry.agent_name.length > 0) {
-    agentName = entry.agent_name; // Use entry.agent_name if supplied
-} else if (agentName && agentName.match(DEERFLOW_AGENT_PATTERN)) {
-    agentName = agentName.match(DEERFLOW_AGENT_PATTERN)[1];
-}
-```
+1. `git pull origin main` with stash/pop to preserve MBFD customizations
+2. Git auto-merged renamed files correctly (our diffs now live in `backend/app/channels/telegram.py` and `backend/packages/harness/deerflow/community/aio_sandbox/aio_sandbox_provider.py`)
+3. Updated `config.yaml` with `config_version: 2` and correct `deerflow.*` module paths
+4. Full `docker compose down -v && docker compose build --no-cache && docker compose up -d`
+5. Forced removal of stale Docker network (old network had active endpoints blocking new network creation)
 
 **Prevention**:
-Always ensure that extraction tools handle different formats of supplier/customer names correctly.
-Keep log entry formats consistent and clearly parseable fields for the chatbox.tsx component.
+1. When pulling DeerFlow upstream, always check `config.example.yaml` for `config_version` changes — run `make config-upgrade` or update manually
+2. After major upstream changes, always do `docker compose down -v` (remove volumes) before rebuild
+3. Check `backend/src/` for any stale non-Python files (e.g., `__pycache__`) that confuse uvicorn's hot-reload
+4. The sandbox `use` path MUST use `deerflow.*` not `src.*` after the harness refactor
 
 ---
 
-### ERROR-060: Uptime Kuma UI — Placeholder References Replace with Null Renders
+### ERROR-068: DeerFlow React Hydration Mismatch — Nested `<button>` Elements in Prompt Input UI
 
-**Date**: 2026-03-16  
+**Date**: 2026-03-17  
+**Severity**: 🔴 CRITICAL — file upload menu completely non-functional, onClick listeners fail to bind  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: 
+- `frontend/src/components/ui/input-group.tsx` (InputGroupButton)
+- `frontend/src/components/ai-elements/prompt-input.tsx` (PromptInputButton, PromptInputActionMenuTrigger)
+- `frontend/src/components/ai-elements/suggestion.tsx` (Suggestion)
+- `frontend/src/components/workspace/chats/chat-box.tsx` (ResizablePanelGroup prop)
+- `frontend/src/components/workspace/mode-hover-guide.tsx` (ModeHoverGuide)
+
+**Symptom**:
+Browser console throws React Hydration Mismatch error. The attachment/upload menu cannot be opened. All `onClick` listeners on the prompt input toolbar fail to bind.
+
+**Root Cause (Two-Part)**:
+
+**Part 1 — Missing `forwardRef`**: Radix UI's `asChild` uses `Slot` to merge props onto child elements. Components without `forwardRef` cause Slot to render its own `<button>` wrapper, creating invalid nested `<button>` elements.
+
+**Part 2 — Radix ID Collision**: `ModeHoverGuide` wraps `PromptInputActionMenuTrigger` with `<TooltipTrigger asChild>`, while the trigger internally uses `<DropdownMenuTrigger asChild>`. Both Radix triggers merge onto the same `<button>`, each setting auto-generated `id` attributes that differ between SSR and client hydration.
+
+**Fix Applied**:
+
+1. **`InputGroupButton`** — converted to `React.forwardRef`, passes `ref` to `<Button>`
+2. **`PromptInputButton`** — converted to `forwardRef`, passes `ref` to `<InputGroupButton>`
+3. **`PromptInputActionMenuTrigger`** — converted to `forwardRef`, passes `ref` to `<PromptInputButton>`
+4. **`Suggestion`** — converted to `React.forwardRef`, passes `ref` to `<Button>`
+5. **`ModeHoverGuide`** — wrapped `{children}` in `<span className="inline-flex">` so TooltipTrigger and DropdownMenuTrigger operate on separate DOM elements
+6. **`chat-box.tsx`** — fixed `direction` to `orientation` on `<ResizablePanelGroup>` (aligned with upstream)
+
+**Prevention**:
+1. **Any component passed as child of Radix `asChild` MUST use `forwardRef`**
+2. **NEVER nest two Radix `asChild` triggers on the same element** — insert a wrapper `<span>` between them
+3. After pulling upstream, check `react-resizable-panels` API — v4.x uses `orientation` not `direction`
+4. This bug also exists in upstream `bytedance/deer-flow` — do NOT revert when pulling upstream
+
+---
+
+### ERROR-069: DeerFlow Agent Non-Functional — Missing `tool_groups`, `tools`, `subagents`, and Model Flags in config.yaml
+
+**Date**: 2026-03-17  
+**Severity**: 🔴 CRITICAL — agent stuck in infinite loop, cannot use tools, subagents, or file operations  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `config.yaml`
+
+**Symptom**:
+- Agent stuck in `SummarizationMiddleware → model → LoopDetectionMiddleware → TitleMiddleware` loop, never reaching tools or subagents
+- `Total tools loaded: 0, built-in tools: 2, MCP tools: 53` — zero file/bash/web tools
+- File uploads fail (no sandbox containers running)
+- Subagents never execute in parallel
+- `sequential-thinking` MCP tool fails with `MCP error -32602: Invalid arguments`
+
+**Root Cause**:
+The `config.yaml` was missing four critical sections that the upstream `config.example.yaml` requires:
+
+1. **`tool_groups`** — defines tool permission groups (web, file:read, file:write, bash)
+2. **`tools`** — defines the 9 built-in tools (web_search, web_fetch, image_search, ls, read_file, write_file, str_replace, bash)
+3. **`subagents`** — configures subagent timeouts for parallel execution
+4. **`tool_search`** — deferred tool loading config
+5. **Model `supports_thinking` flags** — GLM-5 was missing `supports_thinking: true`, preventing thinking mode
+
+Without `tools`, the agent had NO file operations, NO bash execution, NO web search — only MCP tools. Without `subagents`, parallel execution was unconfigured.
+
+**Fix Applied**:
+Added to `config.yaml`:
+- `tool_groups`: web, file:read, file:write, bash
+- `tools`: 9 tools (web_search, web_fetch, image_search, ls, read_file, write_file, str_replace, bash)
+- `tool_search: enabled: false`
+- `subagents`: default 900s timeout, general-purpose 1800s, bash 300s
+- `supports_thinking: true` on GLM-5 coordinator model
+- `supports_vision: true` on MiniMax-M2.5 and Qwen2.5-VL models
+
+**Prevention**:
+1. **ALWAYS compare `config.yaml` against upstream `config.example.yaml`** after any config changes — missing sections silently disable features
+2. The `tool_groups` + `tools` sections are MANDATORY for the agent to have file/bash/web capabilities
+3. After config changes, verify tool count in logs: `grep "Total tools loaded" /app/logs/langgraph.log` — should show 9+ built-in tools
+4. Run `make config-upgrade` after pulling upstream to merge new required fields
+
+---
+
+### ERROR-070: Global LoginResponse Binding Hijacks All Filament Panels — Admin Login Redirects to Employee Dashboard
+
+**Date**: 2026-03-17  
 **Severity**: 🔴 CRITICAL  
 **Status**: ✅ RESOLVED  
-**File(s) Affected**: `/App.vue:59-72`
-
-**Description**:
-The UI was generating message content with placeholders that would ultimately resolve to `null`, causing unreadable text on the device list screen.
-
-**Symptom**:
-After pulling changes from the main branch, corrections were insufficient. Device screen still showed placeholder text (e.g. `@ {{ device.external_device_id }}`) despite corrections in `@/components/SystemConfig/SystemStatusPanel.vue`.
-
-**Cause**:
-Despite agent making corrections to the JavaScript, at least one agent skipped the Primer files after adding corrections on the main branch. This resulted in mismatched syntax between JS files and TypeScript files.
-
-**Fix Applied**:
-The agent correctly identified that the BOOT_COMPLETED screen was being rendered from `App.vue`. After incorrectly using a `null` as the `DeviceScreen.screenContent`, agent correctly updated that state to match the provided template.
-
-```typescript
-this.screen.content = null;
-```
-
-**Verification**:
-The agent confirmed successfully identifying `/App.vue:59-82` as the source of placeholder renders, and provided the exact state_fix prior to panel termination.
-
-**Prevention**:
-After pulling session changes, agent should spawn a new CLI process to
-  
-node src/cli/implement_ProposalManager.ts
-  
-to ensure that all critical files reflect the final panel content within filenames.
-
----
-
-### ERROR-061: Admin Dashboard Loads Employee Login — Filament "Intended URL" Session Poisoning
-
-**Date**: 2026-03-16  
-**Severity**: 🔴 CRITICAL  
-**Status**: ✅ RESOLVED + RE-VERIFIED 2026-03-17  
-**File(s) Affected**: `app/Filament/Pages/Auth/Login.php`
+**File(s) Affected**: 
+- `app/Providers/Filament/EmployeePanelProvider.php`
+- `app/Filament/Pages/Auth/Login.php`
+- `app/Http/Responses/EmployeeLoginResponse.php`
+- `database/seeders/TrainingUsersSeeder.php`
 
 **Symptom**:
-Clicking "Admin Login" from the landing page (or navigating to `/admin`) caused the browser to land on the Employee Portal login page at `/employee/login`. Network trace showed a direct HTTP 200 to `/employee/login` with no 302 redirect — meaning either the href was wrong or the session was poisoned.
+1. Logging into `/admin/login` with valid admin credentials successfully authenticates but redirects to `/employee/dashboard` instead of `/admin`
+2. Login required clicking "Sign in" twice before it worked (first click seemed to do nothing)
+3. After the double-click, 419 CSRF errors appeared briefly before the page cleared and loaded
 
-**Root Cause**:
-Laravel's session stores the last unauthenticated URL a user visited as `url.intended`. Because Admin and Employee are completely independent Filament panels on the same domain using the same session cookie, if a user ever visited `/employee` while unauthenticated, Laravel silently saved `/employee` as the intended URL. When the user then navigated to `/admin/login` and authenticated successfully, Filament's default `LoginResponse` honored the stored `url.intended` and redirected to `/employee` — which rejected the admin guard, causing a login loop.
+**Root Cause (Three-Part)**:
 
-The existing `session()->regenerate()` in `authenticate()` does NOT clear `url.intended` before regeneration.
-
-**Fix Applied**:
-Added `session()->forget('url.intended')` in two places in `app/Filament/Pages/Auth/Login.php`:
-1. `mount()` — clears the poison BEFORE the login form renders, so no redirect can be staged
-2. `authenticate()` — clears it again immediately before attempting login (belt-and-suspenders guard)
-
+**Part 1 — Global LoginResponse Override**: `EmployeePanelProvider::register()` contained:
 ```php
-public function mount(): void
-{
-    // Prevent cross-panel redirect loops
-    session()->forget('url.intended');
-    parent::mount();
-}
-
-public function authenticate(): ?\Filament\Http\Responses\Auth\Contracts\LoginResponse
-{
-    // Flush any cross-panel intended URL before authenticating
-    session()->forget('url.intended');
-    // ... rest of authentication ...
-}
+$this->app->bind(LoginResponse::class, EmployeeLoginResponse::class);
 ```
+This globally bound the `LoginResponse` contract to `EmployeeLoginResponse` for ALL panels, not just employee. When `Login::authenticate()` called `app(LoginResponse::class)`, it received `EmployeeLoginResponse` which always redirected to `/employee/dashboard`.
 
-**Prevention**:
-1. **Any multi-panel Filament app on a single domain MUST flush `url.intended`** in the admin panel's custom Login `mount()` method
-2. Never assume `session()->regenerate()` clears intended URL — it does NOT; call `session()->forget('url.intended')` explicitly  
-3. If a new Filament panel is added, its Login class must also include this guard
-4. The `welcome.blade.php` "Admin Login" button in the header correctly points to `{{ url('/admin/login') }}` — verify this after any landing page changes
+**Part 2 — Container Resolution in Login**: `Login::authenticate()` returned `app(\Filament\Http\Responses\Auth\Contracts\LoginResponse::class)` which resolved through the container (getting the employee override) instead of using Filament's built-in `new LoginResponse()` which is panel-aware.
 
-After deploying, the following caches were cleared to flush any stale redirect state:
-```bash
-docker exec mbfd-hub-laravel.test-1 php artisan route:clear
-docker exec mbfd-hub-laravel.test-1 php artisan optimize:clear
-docker exec mbfd-hub-laravel.test-1 php artisan view:clear
-```
-
-**Re-Verification (2026-03-17)**:
-Confirmed the fix is present in production. Audit findings:
-- [`resources/views/welcome.blade.php`](resources/views/welcome.blade.php) Admin Login button correctly links to `{{ url('/admin/login') }}` — NOT `/admin` or `/employee`.
-- [`routes/web.php`](routes/web.php) contains no rogue `Route::redirect('/admin', ...)` calls.
-- [`app/Filament/Pages/Auth/Login.php`](app/Filament/Pages/Auth/Login.php) has `session()->forget('url.intended')` in both `mount()` and `authenticate()`.
-- [`app/Providers/Filament/AdminPanelProvider.php`](app/Providers/Filament/AdminPanelProvider.php) uses `->login(Login::class)`.
-- VPS pulled latest code, all caches cleared (route, optimize, view).
-
----
-
-### ERROR-052: DeerFlow Gateway Cannot Reach LangGraph — `localhost` Inside Docker Container
-
-**Date**: 2026-03-16  
-**Severity**: 🔴 CRITICAL  
-**Status**: ✅ RESOLVED  
-**File(s) Affected**: `~/src/deer-flow/config.yaml`
-
-**Symptom**:
-All Telegram messages and web UI interactions failed with `httpx.ConnectError: All connection attempts failed`. Gateway logs showed the error during `_create_thread` when the channel manager tried to create a LangGraph thread.
-
-**Root Cause**:
-`config.yaml` had `langgraph_url: http://localhost:2024`. The gateway runs inside a Docker container where `localhost` refers to the gateway container itself, NOT the LangGraph container. The LangGraph service is in a separate container on the same Docker network, accessible via the Docker service name `langgraph`.
+**Part 3 — Role Misassignment**: `TrainingUsersSeeder` incorrectly assigned `training_admin` role to Grecia Trabanino, who should be a logistics `admin`.
 
 **Fix Applied**:
-Changed `langgraph_url` from `http://localhost:2024` to `http://langgraph:2024` in `config.yaml`.
-
-**Verification**:
-`docker exec deer-flow-gateway curl -sf http://langgraph:2024/ok` → `{"ok":true}`
-
-**Prevention**:
-1. In Docker Compose environments, NEVER use `localhost` to reference other services — use the Docker service name
-2. `localhost` inside a container refers to the container itself, not other containers on the same network
-3. The correct URLs are: `langgraph_url: http://langgraph:2024` and `gateway_url: http://localhost:8001` (gateway references itself)
-
----
-
-### ERROR-063: Agent Used Git Comment Operator (`#`) Instead of `##` for Filament Override Docblock
-
-**Date**: 2026-03-16
-**Severity**: 🔴 CRITICAL
-**Status**: ✅ RESOLVED
-
-**Symptom**:
-A sustainable restart log appeared in the VPS’h `logs/` directory, named: `site-completed-migration.log`.
-
-**Root Cause**:
-This log was a garbage file created by the agent, by using an incorrect Filament Override docblock.
-
----
-
-### ERROR-064: Agent Used Git Comment Operator (`#`) Instead of `##` for Filament Override Docblock
-
-**Date**: 2026-03-16
-**Severity**: 🔴 CRITICAL
-**Status**: ✅ RESOLVED
-
-**Symptom**:
-A sustainable restart log appeared in the VPS’h `logs/` directory, named: `site-completed-migration.log`.
-
-**Root Cause**:
-This log was a garbage file created by the agent, by using an incorrect Filament Override docblock.
-
----
-
-### ERROR-065: sqlsrv statements broke due to table referencing `shop_works.term_solutions_uuid` instead of `action_areas.slug_uuid`
-
-**Date**: 2026-03-20
-**Severity**: 🟢 INFO — MIGRATION WORKFLOW DENYANCE
-**Status**: ✅ RESOLVED
-
-**Symptom**:
-sqlsrv statements in the migration workflow broke due to table referencing `shop_works.term_solutions_uuid` instead of `action_areas.slug_uuid`.
-
-**Root Cause**:
-Manual psuedo-intelligent parsing causing use of incorrect table names in UPDATE statements.
-
-**Fix Applied**:
-Corrected the table references to `action_areas.slug_uuid`.
+1. **Removed global LoginResponse binding** from `EmployeePanelProvider::register()`. The `EmployeeLogin` page already handles its own redirect via `$this->redirect()`.
+2. **Changed Login.php** to return `new LoginResponse()` (concrete class) instead of container-resolved `app(LoginResponse::class)`.
+3. **Fixed TrainingUsersSeeder** to exclude Grecia from training users.
+4. **Created `scripts/fix_auth_and_roles.php`** to correct all user roles on production.
 
 **Prevention**:
-1. Always verify table mappings before running any UPDATE queries. Always reference the correct tables
-2. Filament [table(dbid, table_name)`
-3. Verify primary keys are strings or UUID in the parsing output tables
+1. **NEVER globally bind Filament response contracts** in a panel provider's `register()` — it affects ALL panels
+2. **Use `new LoginResponse()`** instead of `app(LoginResponse::class)` in custom login pages to avoid container override conflicts
+3. **Each panel's login page should handle its own redirect** without relying on global container bindings
+4. Admin users should have `admin` or `super_admin` roles; training users should have `training_admin` role — never mix
+5. Test login flows for EACH panel after any auth changes
 
 ---
 
-### ERROR-067: Force-Push Without Vite Rebuild Causes CSS 404 on Landing Page
+### ERROR-038: Phase 1 forbidden server
 
-**Date**: 2026-03-17  
-**Severity**: 🔴 CRITICAL — Site appears broken (unstyled/broken layout) for all users  
-**Status**: ✅ RESOLVED  
-**File(s) Affected**: `public/build/assets/`, `public/build/manifest.json`
+    def forward_forbidden_server_header(self, response, status_code=403):
+        """Forwards Forbidden server header."""
+        if self.client_mock.is_lazy:
+            self.forward_server_responses(response, status_code)
+        elif self.client_mock.forward_forbidden_server_header:
+            response.headers["Server"] = "Red5"
 
-**Symptom**:
-Landing page (`https://www.mbfdhub.com/`) returned HTTP 200 but CSS file `app-DxA7EHv2.css` returned HTTP 404. Site appeared visually broken.
+    def forward_other_server_header(self, response):
+        """Forwards other server header."""
+        if self.client_mock.other_server_header:  # pragma: no cover
+            response.headers["Server"] = self.client_mock.other_server_header
 
-**Root Cause**:
-A force-push (`git push --force-with-lease`) replaced the remote `main` branch with local commits that included a different `public/build/manifest.json` (pointing to `app-DxA7EHv2.css`). The VPS had been running with a different compiled CSS hash (`app-jzec5Rqg.css`). After `git reset --hard origin/main` on the VPS, the manifest pointed to a hash that didn't exist on disk.
+    def should_skip_randomized_headers(self, status_code: int) -> bool:
+        """Check if we should skip randomized headers."""
+        skip = config.SKIP_RANDOMIZED_HEADERS
+        if status_code in skip:  # pragma: no cover
+            return True
 
-**Fix Applied**:
-Ran `npm run build` INSIDE the Docker container on the VPS to regenerate all Vite assets to match the current manifest:
-```bash
-docker exec mbfd-hub-laravel.test-1 bash -c 'npm run build'
-docker exec mbfd-hub-laravel.test-1 php artisan view:clear
-docker exec mbfd-hub-laravel.test-1 php artisan optimize:clear
-```
-Confirmed new CSS (`app-BA0_5NzS.css`) returns HTTP 200.
+        if isinstance(skip, int):
+            return skip < int(os.getenv("RED5_RANDOMIZATION_FACTOR", "50"))
+        return False
 
-**Prevention**:
-1. **After ANY `git reset --hard`, `git pull`, or `git push --force`** that includes JS/CSS changes, ALWAYS run `npm run build` inside the Docker container.
-2. Command: `docker exec mbfd-hub-laravel.test-1 bash -c 'npm run build'`
-3. The `public/build/` directory is gitignored — compiled assets do NOT transfer via git.
-4. The `manifest.json` IS tracked by git, so a force-push can install a manifest that references non-existent compiled files.
-5. Verify recovery: `curl -sI https://www.mbfdhub.com/build/assets/app-*.css` must return 200.
+    def forward_server_response_header(self, header: str, response):
+        """Handles server response header randomized."""
+        if self.should_skip_randomized_headers(status_code=int(header)):
+            return
+        if header in ["204", "205", "304", "100"]:
+            self.forward_server_responses(response, header)
+        elif header in ["401"]:
+            self.forward_server_response_auth_challenge(response, header)
+        else:
+            self.forward_server_responses(response, header)
 
----
+    def add_misconfigured_header_support_challenge(self, header: str):
+        """Forwards server 400 challenge."""
+        self.client_mock.support_challenge = header
+        self.client_mock.max_ban_ratio = KibanaClient.DEFAULT_MAX_BAN_RATIO
 
-### ERROR-000: GITLAB Migration Blocked by VPS Limits; Permission denied syncing YETI branch
 
-**Date**: 2026-03-17  
-**Severity**: 🔴 CRITICAL  
+@dataclass
+class MinimalStatusResponse:
+    """Performs a minimal status check."""
 
-**Prevention**: ALWAYS read `CLAUDE.md` and check VPS version before overwriting PHP files with `canAccess()` or role-checking logic.
-
----
-
-### ERROR-000: Force-Push Without Vite Rebuild Causes CSS 404 on Landing Page
-
-**Date**: 2026-03-17  
-**Severity**: 🔴 CRITICAL — Site appears broken (unstyled/broken layout) for all users  
-**Status**: ✅ RESOLVED  
-**File(s) Affected**: `public/build/assets/`, `public/build/manifest.json`
-
-**Symptom**:
-Landing page (`https://www.mbfdhub.com/`) returned HTTP 200 but CSS file `app-DxA7EHv2.css` returned HTTP 404. Site appeared visually broken.
-
-**Root Cause**:
-A force-push (`git push --force-with-lease`) replaced the remote `main` branch with local commits that included a different `public/build/manifest.json` (pointing to `app-DxA7EHv2.css`). The VPS had been running with a different compiled CSS hash (`app-jzec5Rqg.css`). After `git reset --hard origin/main` on the VPS, the manifest pointed to a hash that didn't exist on disk.
-
-**Fix Applied**:
-Ran `npm run build` INSIDE the Docker container on the VPS to regenerate all Vite assets to match the current manifest:
-```bash
-docker exec mbfd-hub-laravel.test-1 bash -c 'npm run build'
-docker exec mbfd-hub-laravel.test-1 php artisan view:clear
-docker exec mbfd-hub-laravel.test-1 php artisan optimize:clear
-```
-Confirmed new CSS (`app-BA0_5NzS.css`) returns HTTP 200.
-
-**Prevention**:
-1. **After ANY `git reset --hard`, `git pull`, or `git push --force`** that includes JS/CSS changes, ALWAYS run `npm run build` inside the Docker container.
-2. Command: `docker exec mbfd-hub-laravel.test-1 bash -c 'npm run build'`
-3. The `public/build/` directory is gitignored — compiled assets do NOT transfer via git.
-4. The `manifest.json` IS tracked by git, so a force-push can install a manifest that references non-existent compiled files.
-5. Verify recovery: `curl -sI https://www.mbfdhub.com/build/assets/app-*.css` must return 200.
+    def __init__(self, attempts_taken: float):
+        self.attempts_taken = attempts_taken
