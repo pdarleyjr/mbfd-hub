@@ -47,6 +47,7 @@ class User extends Authenticatable implements FilamentUser
         'phone',
         'must_change_password',
         'notification_preferences',
+        'employee_id',
     ];
 
     /**
@@ -151,6 +152,9 @@ class User extends Authenticatable implements FilamentUser
      */
     public function canAccessPanel(Panel $panel): bool
     {
+        // Employee panel uses its own Employee model + employee guard.
+        // The User model should NEVER handle the employee panel.
+
         if ($panel->getId() === 'training') {
             return $this->hasRole('super_admin')
                 || $this->hasRole('training_admin')
@@ -180,5 +184,16 @@ class User extends Authenticatable implements FilamentUser
         }
 
         return false;
+    }
+
+    // Relationships
+    public function assignedEquipment(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\AssignedEquipment::class);
+    }
+
+    public function equipmentRequests(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\EmployeeEquipmentRequest::class);
     }
 }

@@ -158,6 +158,25 @@
                         </div>
                     </div>
                 </a>
+
+                <!-- Employee Portal — emerald accent -->
+                <a href="{{ url('/employee') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-emerald-300 transition-all duration-200 overflow-hidden">
+                    <div class="flex">
+                        <div class="w-1.5 bg-emerald-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="flex items-start gap-4 p-5 flex-1">
+                            <div class="w-11 h-11 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0 group-hover:scale-105 transition-transform">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="font-semibold text-neutral-800 group-hover:text-emerald-700 font-heading text-base">Employee Portal</h3>
+                                <p class="text-sm text-neutral-500 mt-0.5">View assigned gear and uniforms, and submit equipment requests</p>
+                            </div>
+                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-emerald-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </div>
+                    </div>
+                </a>
             </div>
 
             <!-- Right Column - AI Support Assistant Panel (1/3 width) Ã¢ SECOND on mobile -->
