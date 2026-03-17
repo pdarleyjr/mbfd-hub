@@ -11,6 +11,18 @@ use App\Models\User;
 
 class Login extends BaseLogin
 {
+    /**
+     * Prevent "Intended URL" session poisoning from cross-panel navigation.
+     * If a user visited /employee while unauthenticated, Laravel stores
+     * /employee as url.intended. Without this flush, a successful admin
+     * login would redirect back to /employee, causing a guard crash.
+     */
+    public function mount(): void
+    {
+        session()->forget('url.intended');
+        parent::mount();
+    }
+
     public function form(Form $form): Form
     {
         return $form
@@ -30,6 +42,9 @@ class Login extends BaseLogin
 
     public function authenticate(): ?\Filament\Http\Responses\Auth\Contracts\LoginResponse
     {
+        // Flush any cross-panel intended URL before authenticating
+        session()->forget('url.intended');
+
         try {
             $this->rateLimit(5);
         } catch (\Illuminate\Http\Exceptions\ThrottleRequestsException $exception) {

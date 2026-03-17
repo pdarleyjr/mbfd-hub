@@ -1,0 +1,117 @@
+<?php
+
+namespace App\Providers\Filament;
+
+use App\Filament\Employee\Pages\Auth\EmployeeLogin;
+use App\Filament\Employee\Pages\ChangePasswordPage;
+use App\Filament\Employee\Pages\MyEquipmentPage;
+use App\Filament\Employee\Pages\RequestEquipmentPage;
+use App\Filament\Employee\Pages\EmployeeDashboard;
+use App\Http\Middleware\ForcePasswordChangeMiddleware;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+use Illuminate\Routing\Router;
+use Filament\Http\Middleware\Authenticate;
+use Filament\Http\Middleware\AuthenticateSession;
+use Filament\Http\Middleware\DisableBladeIconComponents;
+use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\MenuItem;
+use Filament\Panel;
+use Filament\PanelProvider;
+use Filament\Support\Colors\Color;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Session\Middleware\StartSession;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
+
+class EmployeePanelProvider extends PanelProvider
+{
+    public function register(): void
+    {
+        parent::register();
+
+        // Bind a custom LoginResponse for the employee panel
+        // so it redirects to /employee/dashboard instead of /admin
+        $this->app->bind(
+            \Filament\Http\Responses\Auth\Contracts\LoginResponse::class,
+            \App\Http\Responses\EmployeeLoginResponse::class,
+        );
+    }
+
+    /**
+     * Register any application authentication / authorization services.
+     *
+     * @return void
+     */
+    public function boot(): void
+    {
+    }
+
+    public function panel(Panel $panel): Panel
+    {
+        return $panel
+            ->id('employee')
+            ->path('employee')
+            ->login(EmployeeLogin::class)
+            ->authGuard('employee')
+            ->brandName('MBFD Employee Portal')
+            ->brandLogo(secure_asset('images/mbfd_no_bg_new.png'))
+            ->brandLogoHeight('2rem')
+            ->favicon(secure_asset('favicon.ico'))
+            ->darkMode(false)
+            ->colors([
+                'primary' => Color::Red,
+                'danger'  => Color::Rose,
+                'gray'    => Color::Slate,
+                'info'    => Color::Blue,
+                'success' => Color::Green,
+                'warning' => Color::Amber,
+            ])
+            ->font('Plus Jakarta Sans')
+            ->viteTheme('resources/css/filament/admin/theme.css')
+            ->pages([
+                EmployeeDashboard::class,
+                MyEquipmentPage::class,
+                RequestEquipmentPage::class,
+                ChangePasswordPage::class,
+            ])
+            ->widgets([])
+            ->userMenuItems([
+                MenuItem::make()
+                    ->label('My Equipment')
+                    ->url(fn (): string => MyEquipmentPage::getUrl(panel: 'employee'))
+                    ->icon('heroicon-o-shield-check'),
+                MenuItem::make()
+                    ->label('Request Equipment')
+                    ->url(fn (): string => RequestEquipmentPage::getUrl(panel: 'employee'))
+                    ->icon('heroicon-o-shopping-cart'),
+                MenuItem::make()
+                    ->label('Change Password')
+                    ->url(fn (): string => ChangePasswordPage::getUrl(panel: 'employee'))
+                    ->icon('heroicon-o-lock-closed'),
+                MenuItem::make()
+                    ->label('Return to Home')
+                    ->url('/')
+                    ->icon('heroicon-o-home'),
+            ])
+            ->middleware([
+                EncryptCookies::class,
+                AddQueuedCookiesToResponse::class,
+                StartSession::class,
+                AuthenticateSession::class,
+                ShareErrorsFromSession::class,
+                VerifyCsrfToken::class,
+                SubstituteBindings::class,
+                DisableBladeIconComponents::class,
+                DispatchServingFilamentEvent::class,
+            ])
+            ->authMiddleware([
+                Authenticate::class,
+                ForcePasswordChangeMiddleware::class,
+            ])
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('60s')
+            ->sidebarCollapsibleOnDesktop();
+    }
+}
