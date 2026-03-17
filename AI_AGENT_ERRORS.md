@@ -3,7 +3,7 @@
 
 > ⚠️ **CRITICAL MANDATE**: Every AI agent working on this codebase MUST read this entire file BEFORE making any changes. Failure to read this file WILL result in breaking existing functionality.
 
-**Last Updated**: 2026-03-15  
+**Last Updated**: 2026-03-16  
 **Project**: MBFD Hub (Laravel 11, Filament v3, VPS at 145.223.73.170)
 
 ---
@@ -703,3 +703,245 @@ DeerFlow's AIO sandbox bind-mounts `~/src/mbfd-hub` from WSL, not the Windows wo
 
 ---
 
+### ERROR-055: Employee Portal — ForcePasswordChangeMiddleware Route Check Uses `must_change_password` Not `requires_password_change`
+
+**Date**: 2026-03-16  
+**Severity**: 🟡 MEDIUM  
+**Status**: ✅ DOCUMENTED  
+**File(s) Affected**: `app/Http/Middleware/ForcePasswordChangeMiddleware.php`, `app/Models/User.php`
+
+**Context**:
+The Employee Portal feature brief used the field name `requires_password_change` but the existing User model already uses `must_change_password` (added 2026-01-23). The new Employee Portal uses the existing `must_change_password` column to avoid schema duplication.
+
+**Key Facts**:
+1. `must_change_password` is in `users` table (migration `2026_01_23_192731`)
+2. The `ForcePasswordChangeMiddleware` checks `$user->must_change_password`
+3. The `ImportPersonnel` command sets `must_change_password = true` on import
+4. The `ChangePasswordPage` clears `must_change_password = false` on success
+
+**Prevention**:
+1. Always check existing User model fields before adding new boolean flags for similar purposes
+2. `employee_id` is now stored in users table — format for email is `{employeeid}@mbfd.local`
+3. Employee panel access: `canAccessPanel('employee')` returns true when `employee_id` is not null OR user is `super_admin`
+
+---
+
+### ERROR-056: Filament Theme CSS @import Commented Out by DeerFlow Agent — All Panels Unstyled
+
+**Date**: 2026-03-16  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED
+
+**Symptom**: All Filament panels (Admin, Training, Workgroup, Employee) rendered completely unstyled — no layout, no Tailwind classes, raw HTML only.
+
+**Root Cause**: A DeerFlow agent committed `resources/css/filament/admin/theme.css` with line 1 changed from:
+```css
+@import '../../../../vendor/filament/filament/dist/theme.css';
+```
+to:
+```css
+/* @import '../../../../vendor/filament/filament/dist/theme.css'; — commented out: vendor dir not present in local build */
+```
+This stripped 106KB of Filament base Tailwind CSS from the compiled output, leaving only the 15KB of MBFD custom overrides.
+
+**Fix**: Restored the `@import` via GitHub API (commit `1b0408d5`), rebuilt on VPS.
+
+**Prevention**:
+1. **NEVER comment out the `@import` on line 1 of `theme.css`** — it imports the entire Filament base CSS
+2. The `vendor/` directory IS present in the Docker container — the comment's rationale was false
+3. Compiled theme should be ~121KB — if it's ~15KB, the `@import` is missing
+
+---
+
+### ERROR-057: Employee Portal Fake Users in users Table — Architecture Isolation Failure
+
+**Date**: 2026-03-16  
+**Severity**: 🔴 HIGH  
+**Status**: ✅ RESOLVED
+
+**Symptom**: Employee Portal was using `users` table for authentication. Import command created 229 fake `{empid}@mbfd.local` accounts in `users`, polluting it with non-admin accounts. Existing admin users showed "Employee ID: N/A" because their real accounts weren't matched.
+
+**Root Cause**: Initial architecture used a single `users` table for all panel types. The import command used `User` model, creating a duplicate account for each employee instead of updating the original admin user's `employee_id`.
+
+**Fix Applied**:
+1. Created independent `employees` table (separate from `users`) with `id, employee_id (unique), name, rank, password, must_change_password`
+2. Created `Employee` model extending `Authenticatable` with custom `getAuthIdentifierName()` returning `'employee_id'`
+3. Created `employee` auth guard + `employees` provider in `config/auth.php`
+4. `EmployeePanelProvider` now uses `->authGuard('employee')` and custom `EmployeeLogin` page
+5. Updated `ImportPersonnel` command to populate `employees` table (not `users`)
+6. Deleted all 229 `@mbfd.local` fake user accounts from `users` table
+7. `assigned_equipment` and `employee_equipment_requests` now use `employee_portal_id` FK to `employees`
+
+**Prevention**:
+1. Any new Filament panel for a different user type MUST use a separate table + guard + model
+2. Never import non-admin personnel into the `users` table
+3. Employee Portal login: Employee ID number + password (NOT email)
+4. Default password: `MBFD1!` (must change on first login)
+
+---
+
+
+
+### ERROR-058: DeerFlow Sandbox SSH Config — IdentityFile Path Mismatch
+
+**Date**: 2026-03-16  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `~/src/deer-flow/docker/sandbox-ssh/config`
+
+**Symptom**:
+DeerFlow sandbox agent SSH to VPS would fail silently because the SSH config referenced `~/.ssh/id_ed25519_hpb_docker` but the key was mounted at `/root/.ssh/id_ed25519` inside the container.
+
+**Root Cause**:
+`config.yaml` mounts the host key to `/root/.ssh/id_ed25519` in the sandbox, but the SSH config inside the sandbox still referenced the HOST path `~/.ssh/id_ed25519_hpb_docker` which does not exist inside the container.
+
+**Fix Applied**:
+Updated `~/src/deer-flow/docker/sandbox-ssh/config` to use `/root/.ssh/id_ed25519` (the container mount path) instead of `~/.ssh/id_ed25519_hpb_docker` (the host path).
+
+**Prevention**:
+1. SSH configs inside sandbox containers must reference CONTAINER paths, not host paths
+2. When bind-mounting SSH keys, ensure the SSH config `IdentityFile` matches the `container_path`, NOT the `host_path`
+
+---
+
+### ERROR-059: DeerFlow extensions_config.json — Missing MCP Servers
+
+**Date**: 2026-03-16  
+**Severity**: 🟡 MEDIUM  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `~/src/deer-flow/extensions_config.json`
+
+**Symptom**:
+Only GitHub and filesystem MCP servers were registered. The 5 authorized MCP servers (GITHUB, MEMORY, SEQUENTIAL THINKING, GIT-MCP, CONTEXT7) were not all present.
+
+**Root Cause**:
+Initial DeerFlow setup only configured GitHub and filesystem/postgres MCP servers. The remaining 3 servers were never added.
+
+**Fix Applied**:
+Updated `extensions_config.json` with all 5 authorized MCP servers: github, memory, sequential-thinking, git-mcp, context7. Removed unused postgres and filesystem entries.
+
+**Prevention**:
+1. When setting up DeerFlow MCP servers, verify all authorized servers are registered
+2. Refer to `CLAUDE.md` for the canonical list of authorized MCP servers
+
+---
+
+### ERROR-060: DeerFlow chat-box.tsx — Wrong Prop Name for ResizablePanelGroup
+
+**Date**: 2026-03-16  
+**Severity**: 🟡 MEDIUM  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `~/src/deer-flow/frontend/src/components/workspace/chats/chat-box.tsx`
+
+**Symptom**:
+React hydration mismatch warning from `ResizablePanelGroup`. The `react-resizable-panels` library's `PanelGroup` component uses `direction` prop, not `orientation`.
+
+**Root Cause**:
+`chat-box.tsx` passed `orientation="horizontal"` to `ResizablePanelGroup`, but the underlying `react-resizable-panels` library expects `direction`. The unknown `orientation` prop was passed through to the DOM, causing a hydration mismatch between SSR and client renders.
+
+**Fix Applied**:
+Changed `orientation="horizontal"` to `direction="horizontal"` in `chat-box.tsx`.
+
+**Prevention**:
+1. Always verify prop names against the actual library API docs
+2. The existing `isMounted` guard in `ChatBox` prevents the `ResizablePanelGroup` from rendering during SSR, which is the correct hydration mitigation pattern
+
+---
+
+### ERROR-061: Admin Dashboard Loads Employee Login — Filament "Intended URL" Session Poisoning
+
+**Date**: 2026-03-16  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `app/Filament/Pages/Auth/Login.php`
+
+**Symptom**:
+Clicking "Admin Login" from the landing page (or navigating to `/admin`) caused the browser to land on the Employee Portal login page at `/employee/login`. Network trace showed a direct HTTP 200 to `/employee/login` with no 302 redirect — meaning either the href was wrong or the session was poisoned.
+
+**Root Cause**:
+Laravel's session stores the last unauthenticated URL a user visited as `url.intended`. Because Admin and Employee are completely independent Filament panels on the same domain using the same session cookie, if a user ever visited `/employee` while unauthenticated, Laravel silently saved `/employee` as the intended URL. When the user then navigated to `/admin/login` and authenticated successfully, Filament's default `LoginResponse` honored the stored `url.intended` and redirected to `/employee` — which rejected the admin guard, causing a login loop.
+
+The existing `session()->regenerate()` in `authenticate()` does NOT clear `url.intended` before regeneration.
+
+**Fix Applied**:
+Added `session()->forget('url.intended')` in two places in `app/Filament/Pages/Auth/Login.php`:
+1. `mount()` — clears the poison BEFORE the login form renders, so no redirect can be staged
+2. `authenticate()` — clears it again immediately before attempting login (belt-and-suspenders guard)
+
+```php
+public function mount(): void
+{
+    // Prevent cross-panel redirect loops
+    session()->forget('url.intended');
+    parent::mount();
+}
+
+public function authenticate(): ?\Filament\Http\Responses\Auth\Contracts\LoginResponse
+{
+    // Flush any cross-panel intended URL before authenticating
+    session()->forget('url.intended');
+    // ... rest of authentication ...
+}
+```
+
+After deploying, the following caches were cleared to flush any stale redirect state:
+```bash
+docker exec mbfd-hub-laravel.test-1 php artisan route:clear
+docker exec mbfd-hub-laravel.test-1 php artisan optimize:clear
+docker exec mbfd-hub-laravel.test-1 php artisan view:clear
+```
+
+**Prevention**:
+1. **Any multi-panel Filament app on a single domain MUST flush `url.intended`** in the admin panel's custom Login `mount()` method
+2. Never assume `session()->regenerate()` clears intended URL — it does NOT; call `session()->forget('url.intended')` explicitly
+3. If a new Filament panel is added, its Login class must also include this guard
+4. The `welcome.blade.php` "Admin Login" button in the header correctly points to `{{ url('/admin/login') }}` — verify this after any landing page changes
+
+
+### ERROR-061: DeerFlow Gateway Cannot Reach LangGraph — `localhost` Inside Docker Container
+
+**Date**: 2026-03-16  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `~/src/deer-flow/config.yaml`
+
+**Symptom**:
+All Telegram messages and web UI interactions failed with `httpx.ConnectError: All connection attempts failed`. Gateway logs showed the error during `_create_thread` when the channel manager tried to create a LangGraph thread.
+
+**Root Cause**:
+`config.yaml` had `langgraph_url: http://localhost:2024`. The gateway runs inside a Docker container where `localhost` refers to the gateway container itself, NOT the LangGraph container. The LangGraph service is in a separate container on the same Docker network, accessible via the Docker service name `langgraph`.
+
+**Fix Applied**:
+Changed `langgraph_url` from `http://localhost:2024` to `http://langgraph:2024` in `config.yaml`.
+
+**Verification**:
+`docker exec deer-flow-gateway curl -sf http://langgraph:2024/ok` → `{"ok":true}`
+
+**Prevention**:
+1. In Docker Compose environments, NEVER use `localhost` to reference other services — use the Docker service name
+2. `localhost` inside a container refers to the container itself, not other containers on the same network
+3. The correct URLs are: `langgraph_url: http://langgraph:2024` and `gateway_url: http://localhost:8001` (gateway references itself)
+
+---
+
+### ERROR-062: DeerFlow Sandbox SSH Files Owned by Wrong UID — Permission Denied
+
+**Date**: 2026-03-16  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `~/src/deer-flow/docker/sandbox-ssh/*`, `~/src/deer-flow/config.yaml`
+
+**Symptom**:
+`ssh root@145.223.73.170` from inside the sandbox failed with `Bad owner or permissions on /root/.ssh/config`.
+
+**Root Cause**:
+SSH config and key files on the host were owned by `devcontainers` (UID 1000). When bind-mounted into the sandbox container (running as root, UID 0), they appeared as `gem:gem` (UID 1000 mapped to the container's `gem` user). SSH requires these files to be owned by the current user (root).
+
+**Fix Applied**:
+1. Used `docker run --rm -v .../sandbox-ssh:/fix alpine chown 0:0 /fix/*` to change host file ownership to root
+2. Changed sandbox mounts from `read_only: true` to `read_only: false` in config.yaml for SSH config, key, and gitconfig
+
+**Prevention**:
+1. SSH files bind-mounted into containers MUST be owned by the container's running user (UID 0 for root)
+2. Use Docker Alpine to `chown` files when you can't use `sudo` on the host
+3. After re-creating sandbox SSH files, always verify ownership: `docker exec sandbox ls -la /root/.ssh/`

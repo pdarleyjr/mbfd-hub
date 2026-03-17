@@ -1,0 +1,28 @@
+# MBFD Hub — Local AI-Assisting Development Sandbox
+# Usage: docker compose -f docker-compose.local-sandbox.yml up -d
+# Prerequisites: Node.js 22+, pnpm or uv for DeerFlow dependencies
+
+services:
+  browserless:
+    image: browserless/chrome:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - CONNECTION_TIMEOUT=60000
+      - MAX_CONCURRENT_SESSIONS=5
+    restart: unless-stopped
+
+  pgweb:
+    image: sosedoff/pgweb:latest
+    ports:
+      - "127.0.0.1:8081:8081"  # STRICT: localhost-only binding — PROHIBIT 0.0.0.0
+    environment:
+      - PGWEB_DATABASE_URL=${DATABASE_URL:-postgres://sail:password@host.docker.internal:5432/laravel}
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+# Note: Crawl4AI should be initialized separately using uv:
+#   uv pip install crawl4ai
+#   crawl4ai-setup
+# Configure to scrape Laravel, Filament, and Cloudflare documentation into LLM-ready Markdown.
