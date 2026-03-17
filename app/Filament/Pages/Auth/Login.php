@@ -8,6 +8,7 @@ use Filament\Pages\Auth\Login as BaseLogin;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
+use Filament\Http\Responses\Auth\LoginResponse;
 
 class Login extends BaseLogin
 {
@@ -40,7 +41,7 @@ class Login extends BaseLogin
             ->statePath('data');
     }
 
-    public function authenticate(): ?\Filament\Http\Responses\Auth\Contracts\LoginResponse
+    public function authenticate(): ?LoginResponse
     {
         // Flush any cross-panel intended URL before authenticating
         session()->forget('url.intended');
@@ -73,6 +74,6 @@ class Login extends BaseLogin
 
         session()->regenerate();
 
-        return app(\Filament\Http\Responses\Auth\Contracts\LoginResponse::class);
+        return new LoginResponse();
     }
 }
