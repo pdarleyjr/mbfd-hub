@@ -1,0 +1,164 @@
+# DeerFlow 2.0 Configuration - MBFD Hub
+# Updated: 2026-03-14 - Secured secrets + SSH/Git sandbox mounts
+
+models:
+  - name: coordinator-model
+    display_name: GLM-5 Coordinator (Planning and Orchestration)
+    use: langchain_openai:ChatOpenAI
+    model: zai-org/GLM-5
+    api_key: $DEEPINFRA_API_KEY
+    base_url: https://api.deepinfra.com/v1/openai
+    temperature: 0.2
+    max_tokens: 8192
+
+  - name: coder-model
+    display_name: MiniMax-M2.5 Coder (React/Konva/API)
+    use: langchain_openai:ChatOpenAI
+    model: MiniMaxAI/MiniMax-M2.5
+    api_key: $DEEPINFRA_API_KEY
+    base_url: https://api.deepinfra.com/v1/openai
+    temperature: 0.1
+    max_tokens: 16384
+
+  - name: vision-model
+    display_name: Qwen2.5-VL-32B Vision (Image Pipeline and OCR)
+    use: langchain_openai:ChatOpenAI
+    model: Qwen/Qwen2.5-VL-32B-Instruct
+    api_key: $DEEPINFRA_API_KEY
+    base_url: https://api.deepinfra.com/v1/openai
+    temperature: 0.0
+    max_tokens: 4096
+
+tool_groups:
+  - name: web
+  - name: file:read
+  - name: file:write
+  - name: bash
+
+tools:
+  - name: web_search
+    group: web
+    use: src.community.tavily.tools:web_search_tool
+    max_results: 5
+
+  - name: web_fetch
+    group: web
+    use: src.community.jina_ai.tools:web_fetch_tool
+    timeout: 10
+
+  - name: image_search
+    group: web
+    use: src.community.image_search.tools:image_search_tool
+    max_results: 5
+
+  - name: ls
+    group: file:read
+    use: src.sandbox.tools:ls_tool
+
+  - name: read_file
+    group: file:read
+    use: src.sandbox.tools:read_file_tool
+
+  - name: write_file
+    group: file:write
+    use: src.sandbox.tools:write_file_tool
+
+  - name: str_replace
+    group: file:write
+    use: src.sandbox.tools:str_replace_tool
+
+  - name: bash
+    group: bash
+    use: src.sandbox.tools:bash_tool
+
+sandbox:
+  use: src.community.aio_sandbox:AioSandboxProvider
+  mounts:
+    # MBFD Hub repo mount
+    - host_path: /home/devcontainers/src/mbfd-hub
+      container_path: /mnt/user-data/workspace/mbfd-hub
+      read_only: false
+    # SSH key for VPS access (read-only)
+    - host_path: /home/devcontainers/src/deer-flow/docker/sandbox-ssh/id_ed25519
+      container_path: /root/.ssh/id_ed25519
+      read_only: true
+    # SSH known_hosts (pre-baked, prevents interactive prompt)
+    - host_path: /home/devcontainers/src/deer-flow/docker/sandbox-ssh/known_hosts
+      container_path: /root/.ssh/known_hosts
+      read_only: false
+    # SSH config (VPS alias + StrictHostKeyChecking=no)
+    - host_path: /home/devcontainers/src/deer-flow/docker/sandbox-ssh/config
+      container_path: /root/.ssh/config
+      read_only: true
+    # Git config (commit identity)
+    - host_path: /home/devcontainers/src/deer-flow/docker/sandbox-ssh/.gitconfig
+      container_path: /root/.gitconfig
+      read_only: true
+  environment:
+    GITHUB_TOKEN: $GITHUB_TOKEN
+    DEEPINFRA_API_KEY: $DEEPINFRA_API_KEY
+    GIT_AUTHOR_NAME: pdarleyjr
+    GIT_AUTHOR_EMAIL: pdarleyjr@gmail.com
+    GIT_COMMITTER_NAME: pdarleyjr
+    GIT_COMMITTER_EMAIL: pdarleyjr@gmail.com
+
+skills:
+  container_path: /mnt/skills
+  custom_path: skills/custom
+
+title:
+  enabled: true
+  max_words: 6
+  max_chars: 60
+  model_name: null
+
+summarization:
+  enabled: true
+  model_name: null
+  trigger:
+    - type: tokens
+      value: 15564
+  keep:
+    type: messages
+    value: 10
+  trim_tokens_to_summarize: 15564
+  summary_prompt: null
+
+memory:
+  enabled: true
+  storage_path: memory.json
+  debounce_seconds: 30
+  model_name: null
+  max_facts: 100
+  fact_confidence_threshold: 0.7
+  injection_enabled: true
+  max_injection_tokens: 2000
+
+checkpointer:
+  type: sqlite
+  connection_string: checkpoints.db
+
+channels:
+  langgraph_url: http://localhost:2024
+  gateway_url: http://localhost:8001
+
+  session:
+    assistant_id: lead_agent
+    config:
+      recursion_limit: 150
+    context:
+      thinking_enabled: true
+      is_plan_mode: false
+      subagent_enabled: true
+
+  telegram:
+    enabled: true
+    bot_token: $TELEGRAM_BOT_TOKEN
+    allowed_users: []
+    session:
+      assistant_id: lead_agent
+      config:
+        recursion_limit: 150
+      context:
+        thinking_enabled: true
+        subagent_enabled: true
