@@ -40,12 +40,6 @@ class TrainingUsersSeeder extends Seeder
                 'password' => 'Sica1234!',
                 'roles' => ['training_admin'],
             ],
-            [
-                'name' => 'Grecia Trabanino',
-                'email' => 'greciatrabanino@miamibeachfl.gov',
-                'password' => 'MBFDSupport!',
-                'roles' => ['training_admin'],
-            ],
         ];
 
         foreach ($users as $userData) {

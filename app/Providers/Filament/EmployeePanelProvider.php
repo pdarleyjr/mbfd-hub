@@ -30,13 +30,6 @@ class EmployeePanelProvider extends PanelProvider
     public function register(): void
     {
         parent::register();
-
-        // Bind a custom LoginResponse for the employee panel
-        // so it redirects to /employee/dashboard instead of /admin
-        $this->app->bind(
-            \Filament\Http\Responses\Auth\Contracts\LoginResponse::class,
-            \App\Http\Responses\EmployeeLoginResponse::class,
-        );
     }
 
     /**
