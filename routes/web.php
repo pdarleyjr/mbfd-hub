@@ -85,6 +85,16 @@ Route::get('/workgroup/saver-report', function () {
     ]);
 })->name('workgroup.saver-report')->middleware('auth');
 
+// Workgroup Analysis Report — Gemini-generated standalone page
+Route::view('/workgroups/analysis-report', 'workgroup.analysis-report')
+    ->name('workgroup.analysis-report')
+    ->middleware('auth');
+
+// Workgroup Data Dashboard — React-based Gemini dashboard
+Route::view('/workgroups/data-dashboard', 'workgroup.data-dashboard')
+    ->name('workgroup.data-dashboard')
+    ->middleware('auth');
+
 // Workgroup Results CSV Export (authenticated)
 Route::get('/workgroup-export/{tableKey}', function (string $tableKey, \Illuminate\Http\Request $request) {
     $sessionId = $request->query('session_id') ?: null;

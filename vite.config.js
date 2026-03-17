@@ -14,6 +14,7 @@ export default defineConfig({
                 'resources/js/push-notification-widget.js',
                 'resources/css/filament/admin/theme.css',
                 'resources/js/apparatus-layout/main.tsx',
+                'resources/js/workgroup-data-dashboard.jsx',
             ],
             refresh: true,
         }),
