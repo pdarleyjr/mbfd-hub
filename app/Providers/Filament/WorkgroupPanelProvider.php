@@ -31,6 +31,7 @@ use App\Filament\Workgroup\Pages\SharedUploads;
 use App\Filament\Workgroup\Pages\Profile;
 use App\Filament\Workgroup\Pages\EvaluationFormPage;
 use App\Filament\Workgroup\Pages\SessionResultsPage;
+use App\Filament\Workgroup\Pages\Links;
 use App\Filament\Resources\Workgroup\CandidateProductResource;
 use App\Filament\Resources\Workgroup\EvaluationCategoryResource;
 
@@ -74,6 +75,7 @@ class WorkgroupPanelProvider extends PanelProvider
                 Profile::class,
                 SessionResultsPage::class,
                 NotificationSettings::class,
+                Links::class,
             ])
             ->widgets([
                 \App\Filament\Workgroup\Widgets\WorkgroupStatsWidget::class,
