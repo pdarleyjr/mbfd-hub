@@ -185,6 +185,68 @@
                 </div>
             </div>
         </a>
+
+        {{-- Workgroup Final Session Presentation Card --}}
+        <a href="{{ $this->getFinalPresentationUrl() }}"
+           target="_blank"
+           rel="noopener noreferrer"
+           style="
+               display: block;
+               background-color: #ffffff;
+               border: 1px solid rgba(229, 229, 229, 0.6);
+               border-left: 4px solid #7c3aed;
+               border-radius: 0.75rem;
+               overflow: hidden;
+               padding: 1.5rem 1.75rem;
+               text-decoration: none;
+               color: inherit;
+               transition: all 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+               box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+           "
+           onmouseenter="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)'; this.style.borderColor='rgba(212,212,212,1)';"
+           onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0,0,0,0.05)'; this.style.borderColor='rgba(229,229,229,0.6)';"
+           onfocus="this.style.outline='none'; this.style.boxShadow='0 0 0 2px #7c3aed';"
+           onblur="this.style.boxShadow='0 1px 2px 0 rgba(0,0,0,0.05)';"
+        >
+            <div style="display: flex; align-items: flex-start; gap: 1rem;">
+                <div style="
+                    flex-shrink: 0;
+                    width: 2.75rem;
+                    height: 2.75rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background-color: #f5f3ff;
+                    border-radius: 0.625rem;
+                    color: #7c3aed;
+                ">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 1.25rem; height: 1.25rem;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" />
+                    </svg>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                    <h3 style="
+                        font-size: 1.0625rem;
+                        font-weight: 600;
+                        color: #171717;
+                        margin: 0 0 0.25rem 0;
+                        line-height: 1.4;
+                        font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+                    ">Workgroup Final Session Presentation</h3>
+                    <p style="
+                        font-size: 0.875rem;
+                        color: #737373;
+                        margin: 0;
+                        line-height: 1.5;
+                    ">Reveal.js slide deck for the final review meeting — interactive charts, equipment comparisons, deliberation agenda, and consensus-building framework. Use arrow keys or click to navigate.</p>
+                </div>
+                <div style="flex-shrink: 0; color: #a3a3a3; align-self: center;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 1.25rem; height: 1.25rem;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                    </svg>
+                </div>
+            </div>
+        </a>
     </div>
 
     @push('styles')
