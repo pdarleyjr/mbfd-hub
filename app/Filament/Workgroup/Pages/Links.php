@@ -37,4 +37,9 @@ class Links extends Page
     {
         return route('workgroup.final-presentation');
     }
+
+    public function getEvaluationReportUrl(): string
+    {
+        return route('workgroup.evaluation-report');
+    }
 }

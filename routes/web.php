@@ -105,6 +105,11 @@ Route::view('/workgroups/final-presentation', 'workgroup.final-presentation')
     ->name('workgroup.final-presentation')
     ->middleware('auth');
 
+// MBFD Workgroup Evaluation Results — Professional Impeccable report with PDF export
+Route::view('/workgroups/evaluation-report', 'workgroup.evaluation-report')
+    ->name('workgroup.evaluation-report')
+    ->middleware('auth');
+
 // Workgroup Results CSV Export (authenticated)
 Route::get('/workgroup-export/{tableKey}', function (string $tableKey, \Illuminate\Http\Request $request) {
     $sessionId = $request->query('session_id') ?: null;
