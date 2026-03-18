@@ -247,6 +247,81 @@
                 </div>
             </div>
         </a>
+
+        {{-- MBFD Workgroup Evaluation Results Card --}}
+        <a href="{{ $this->getEvaluationReportUrl() }}"
+           target="_blank"
+           rel="noopener noreferrer"
+           style="
+               display: block;
+               background-color: #ffffff;
+               border: 1px solid rgba(229, 229, 229, 0.6);
+               border-left: 4px solid #0f172a;
+               border-radius: 0.75rem;
+               overflow: hidden;
+               padding: 1.5rem 1.75rem;
+               text-decoration: none;
+               color: inherit;
+               transition: all 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+               box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+           "
+           onmouseenter="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)'; this.style.borderColor='rgba(212,212,212,1)';"
+           onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0,0,0,0.05)'; this.style.borderColor='rgba(229,229,229,0.6)';"
+           onfocus="this.style.outline='none'; this.style.boxShadow='0 0 0 2px #0f172a';"
+           onblur="this.style.boxShadow='0 1px 2px 0 rgba(0,0,0,0.05)';"
+        >
+            <div style="display: flex; align-items: flex-start; gap: 1rem;">
+                <div style="
+                    flex-shrink: 0;
+                    width: 2.75rem;
+                    height: 2.75rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background-color: #f1f5f9;
+                    border-radius: 0.625rem;
+                    color: #0f172a;
+                ">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 1.25rem; height: 1.25rem;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                    </svg>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                        <h3 style="
+                            font-size: 1.0625rem;
+                            font-weight: 600;
+                            color: #171717;
+                            margin: 0;
+                            line-height: 1.4;
+                            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+                        ">MBFD Workgroup Evaluation Results</h3>
+                        <span style="
+                            display: inline-block;
+                            padding: 0.125rem 0.5rem;
+                            background: #dc2626;
+                            color: white;
+                            font-size: 0.6875rem;
+                            font-weight: 700;
+                            border-radius: 0.25rem;
+                            text-transform: uppercase;
+                            letter-spacing: 0.05em;
+                        ">PDF Ready</span>
+                    </div>
+                    <p style="
+                        font-size: 0.875rem;
+                        color: #737373;
+                        margin: 0;
+                        line-height: 1.5;
+                    ">Professional technical evaluation report — 14 products, 6 categories, Charts, data tables, product images, and one-click PDF/print export. Formatted for administrators.</p>
+                </div>
+                <div style="flex-shrink: 0; color: #a3a3a3; align-self: center;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 1.25rem; height: 1.25rem;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                    </svg>
+                </div>
+            </div>
+        </a>
     </div>
 
     @push('styles')
