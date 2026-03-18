@@ -28,6 +28,7 @@
 <body>
     <div id="root"></div>
 
+    @verbatim
     <script type="text/babel">
         // --- 1. Comprehensive Data Extraction ---
         // Every item from the PDF is strictly logged here.
@@ -398,5 +399,6 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
+    @endverbatim
 </body>
 </html>
