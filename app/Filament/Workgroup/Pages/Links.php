@@ -27,4 +27,9 @@ class Links extends Page
     {
         return route('workgroup.data-dashboard');
     }
+
+    public function getL1InventoryUrl(): string
+    {
+        return route('workgroup.l1-inventory');
+    }
 }

@@ -95,6 +95,11 @@ Route::view('/workgroups/data-dashboard', 'workgroup.data-dashboard')
     ->name('workgroup.data-dashboard')
     ->middleware('auth');
 
+// Mid-Mount L1 Proposed Inventory — Self-contained React/SheetJS dashboard
+Route::view('/workgroups/l1-inventory', 'workgroup.l1-inventory')
+    ->name('workgroup.l1-inventory')
+    ->middleware('auth');
+
 // Workgroup Results CSV Export (authenticated)
 Route::get('/workgroup-export/{tableKey}', function (string $tableKey, \Illuminate\Http\Request $request) {
     $sessionId = $request->query('session_id') ?: null;

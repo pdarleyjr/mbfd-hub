@@ -123,6 +123,68 @@
                 </div>
             </div>
         </a>
+
+        {{-- Mid-Mount L1 Proposed Inventory Card --}}
+        <a href="{{ $this->getL1InventoryUrl() }}"
+           target="_blank"
+           rel="noopener noreferrer"
+           style="
+               display: block;
+               background-color: #ffffff;
+               border: 1px solid rgba(229, 229, 229, 0.6);
+               border-left: 4px solid #059669;
+               border-radius: 0.75rem;
+               overflow: hidden;
+               padding: 1.5rem 1.75rem;
+               text-decoration: none;
+               color: inherit;
+               transition: all 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+               box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+           "
+           onmouseenter="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)'; this.style.borderColor='rgba(212,212,212,1)';"
+           onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 2px 0 rgba(0,0,0,0.05)'; this.style.borderColor='rgba(229,229,229,0.6)';"
+           onfocus="this.style.outline='none'; this.style.boxShadow='0 0 0 2px #059669';"
+           onblur="this.style.boxShadow='0 1px 2px 0 rgba(0,0,0,0.05)';"
+        >
+            <div style="display: flex; align-items: flex-start; gap: 1rem;">
+                <div style="
+                    flex-shrink: 0;
+                    width: 2.75rem;
+                    height: 2.75rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background-color: #ecfdf5;
+                    border-radius: 0.625rem;
+                    color: #059669;
+                ">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 1.25rem; height: 1.25rem;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0H21M3.375 14.25h-.375a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3h13.5a3 3 0 0 1 3 3v.75M3.375 14.25H9.75m11.25-3h.375A2.625 2.625 0 0 1 24 13.875v.375m-24-6h12" />
+                    </svg>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                    <h3 style="
+                        font-size: 1.0625rem;
+                        font-weight: 600;
+                        color: #171717;
+                        margin: 0 0 0.25rem 0;
+                        line-height: 1.4;
+                        font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+                    ">Mid-Mount L1 Proposed Inventory</h3>
+                    <p style="
+                        font-size: 0.875rem;
+                        color: #737373;
+                        margin: 0;
+                        line-height: 1.5;
+                    ">Ladder 1 apparatus modernization dashboard with full compartment inventory, KPI widgets, compliance flags, and native Excel export with embedded pricing formulas.</p>
+                </div>
+                <div style="flex-shrink: 0; color: #a3a3a3; align-self: center;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 1.25rem; height: 1.25rem;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                    </svg>
+                </div>
+            </div>
+        </a>
     </div>
 
     @push('styles')
