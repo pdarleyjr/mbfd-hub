@@ -107,6 +107,54 @@
 
         /* Prevent tailwind preflight from messing with reveal's core sizing */
         .reveal section img { margin: 0; background: none; border: none; box-shadow: none; }
+
+        /* === VIEWPORT FIT OVERRIDES === */
+        /* Scale content to fit within a single browser window */
+        .reveal h1 { font-size: 2.5rem; }
+        .reveal h2 { font-size: 1.8rem; }
+        .reveal h3 { font-size: 1.3rem; }
+
+        .reveal p, .reveal li {
+            font-size: 0.95rem;
+        }
+
+        .glass-panel {
+            padding: 1.25rem;
+        }
+
+        .chart-container {
+            height: 32vh;
+        }
+
+        .metric-score {
+            font-size: 2.5rem;
+        }
+
+        .time-badge {
+            font-size: 0.9rem;
+            padding: 0.2rem 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .reveal .slides section {
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+
+        /* Tighten the T1 specialty breaching slide */
+        .reveal .slides section .glass-panel p {
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .reveal .slides section .glass-panel h4 {
+            font-size: 0.85rem;
+        }
+
+        /* Keep grid gaps compact */
+        .reveal .slides section .grid {
+            gap: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -227,7 +275,7 @@
                 
                 <div class="glass-panel max-w-4xl mx-auto border-l-4 border-[#FF5A5F] text-left">
                     <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-3xl text-white m-0">Holmatro T1</h3>
+                        <h3 class="text-3xl text-white m-0">Holmatro T1</3>
                         <div class="text-right">
                             <div class="text-3xl font-bold font-mono text-[#00B4D8]">82.23</div>
                             <div class="text-xs text-gray-400 uppercase">Technical Score</div>
