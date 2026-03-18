@@ -42,4 +42,9 @@ class Links extends Page
     {
         return route('workgroup.evaluation-report');
     }
+
+    public function getFinalRecommendationsUrl(): string
+    {
+        return route('workgroup.final-recommendations');
+    }
 }
