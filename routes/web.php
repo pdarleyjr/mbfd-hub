@@ -100,6 +100,11 @@ Route::view('/workgroups/l1-inventory', 'workgroup.l1-inventory')
     ->name('workgroup.l1-inventory')
     ->middleware('auth');
 
+// Workgroup Final Session Presentation — Reveal.js slide deck
+Route::view('/workgroups/final-presentation', 'workgroup.final-presentation')
+    ->name('workgroup.final-presentation')
+    ->middleware('auth');
+
 // Workgroup Results CSV Export (authenticated)
 Route::get('/workgroup-export/{tableKey}', function (string $tableKey, \Illuminate\Http\Request $request) {
     $sessionId = $request->query('session_id') ?: null;

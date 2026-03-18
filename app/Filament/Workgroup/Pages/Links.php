@@ -32,4 +32,9 @@ class Links extends Page
     {
         return route('workgroup.l1-inventory');
     }
+
+    public function getFinalPresentationUrl(): string
+    {
+        return route('workgroup.final-presentation');
+    }
 }
