@@ -115,6 +115,11 @@ Route::view('/workgroups/final-recommendations', 'workgroup.final-recommendation
     ->name('workgroup.final-recommendations')
     ->middleware('auth');
 
+// MBFD Workgroup Summary — Full evaluation report with PDF export
+Route::view('/workgroups/workgroup-summary', 'workgroup.workgroup-summary')
+    ->name('workgroup.workgroup-summary')
+    ->middleware('auth');
+
 // Workgroup Results CSV Export (authenticated)
 Route::get('/workgroup-export/{tableKey}', function (string $tableKey, \Illuminate\Http\Request $request) {
     $sessionId = $request->query('session_id') ?: null;

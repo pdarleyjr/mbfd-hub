@@ -1,7 +1,7 @@
 # MBFD HUB — CURRENT STATE REPORT
 **Generated**: 2026-02-12 20:18 EST  
-**Last Updated**: 2026-03-13 13:33 EST  
-**Status**: ALL SYSTEMS OPERATIONAL ✅ (Pump Simulator V2 + Workgroup/Eval Feedback Hub + CSV/XLSX Export + Google Sheets Apparatus Sync + Workgroup AI Evaluation System + Session Results Page Rebuild + Equipment Intake + Snipe-IT SSO + UI/UX Modernization Phase 0-8 + CI/CD Fix + DeerFlow Zero Trust Exposure + Enhanced Observability Stack + Apparatus Layout Planner DeerFlow Orchestration)
+**Last Updated**: 2026-03-18 16:40 EST  
+**Status**: ALL SYSTEMS OPERATIONAL ✅ (Pump Simulator V2 + Workgroup/Eval Feedback Hub + CSV/XLSX Export + Google Sheets Apparatus Sync + Workgroup AI Evaluation System + Session Results Page Rebuild + Equipment Intake + Snipe-IT SSO + UI/UX Modernization Phase 0-8 + CI/CD Fix + DeerFlow Zero Trust Exposure + Enhanced Observability Stack + Apparatus Layout Planner DeerFlow Orchestration + DeerFlow 2.0 Integration Fix, Optimization, and Hardening)
 
 **Original Mission**: Produce READ-ONLY technical discovery for: (1) MBFD Hub dual-host migration (2) Redesign "inventory request" into "station on-hand count" system with PIN-gated stations, threshold alerts, and admin workflow.
 
@@ -149,6 +149,38 @@ DeerFlow `config.yaml` updated with three specialized DeepInfra models:
 - **Save System**: Dual-layer (Dexie local autosave + Postgres named snapshots)
 - **Image Pipeline**: Track 1 (real photo + rembg) preferred; Track 2 (FLUX.1-Kontext-dev synthetic) fallback
 - All skills at `~/src/deer-flow/skills/custom/` — NOT on production VPS
+
+---
+
+## ADDENDUM — 2026-03-18: Master Remediation & System Restoration
+
+### Supervisord Decommission
+Supervisord has been fully decommissioned from the DeerFlow WSL environment. Docker's native `restart: unless-stopped` policy now manages all container lifecycle. The `supervisord.conf` has been renamed to `.DECOMMISSIONED` and all log artifacts cleaned.
+
+### CLAUDE.md Restoration
+Previous agent corrupted `CLAUDE.md` with ~800 lines of hallucinated garbage text (ERROR-072). File has been deleted and rebuilt with structured project reference including:
+- Architecture separation (VPS for MBFD Hub, WSL for DeerFlow)
+- DeerFlow 2.0 config reference (config_version: 2, module paths, MCP servers)
+- Mandatory recovery sequence
+- Design system and Filament v3 rules
+
+### Full Verification Audit Results
+| Check | Result |
+|---|---|
+| Docker compose config | ✅ Valid |
+| LangGraph health | ✅ `{"ok":true}` |
+| Nginx reload | ✅ Stale DNS cleared |
+| `.deer-flow/` permissions | ✅ 777 |
+| `config.yaml` sections | ✅ config_version 2, tool_groups, tools, subagents |
+| `extensions_config.json` | ✅ 5 MCP servers, no `filesystem` |
+| `backend/app/` structure | ✅ DeerFlow 2.0 restructure confirmed |
+| VPS `/root/src/` | ✅ Does not exist (no DeerFlow contamination) |
+| MBFD Hub containers | ✅ Healthy (up 6 days) |
+| VPS storage permissions | ✅ 777 (www-data owned) |
+
+### New Errors Documented
+- ERROR-072: CLAUDE.md catastrophic corruption by previous agent
+- ERROR-073: Supervisord redundancy alongside Docker restart policies
 
 ---
 
