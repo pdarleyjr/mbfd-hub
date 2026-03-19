@@ -3,8 +3,8 @@
 
 > ⚠️ **CRITICAL MANDATE**: Every AI agent working on this codebase MUST read this entire file BEFORE making any changes. Failure to read this file WILL result in breaking existing functionality.
 
-**Last Updated**: 2026-03-17  
-**Project**: MBFD Hub (Laravel 11, Filament v3, VPS at 145.223.73.170)
+**Last Updated**: 2026-03-18  
+**Project**: MBFD Hub (Laravel 11, Filament v3, VPS at 145.223.73.170) + DeerFlow 2.0 (WSL local)
 
 ---
 
@@ -678,50 +678,134 @@ This globally bound the `LoginResponse` contract to `EmployeeLoginResponse` for 
 
 ---
 
-### ERROR-038: Phase 1 forbidden server
+### ERROR-038b: CORRUPTED ENTRY REMOVED (2026-03-18)
 
-    def forward_forbidden_server_header(self, response, status_code=403):
-        """Forwards Forbidden server header."""
-        if self.client_mock.is_lazy:
-            self.forward_server_responses(response, status_code)
-        elif self.client_mock.forward_forbidden_server_header:
-            response.headers["Server"] = "Red5"
+> A previous agent injected a fake "Phase 1 forbidden server" error entry containing unrelated Python code (Red5 proxy/KibanaClient). This entry has been removed as it is not a real MBFD Hub error. The real ERROR-038 (Station Inspection API Endpoint Mismatch) remains above.
 
-    def forward_other_server_header(self, response):
-        """Forwards other server header."""
-        if self.client_mock.other_server_header:  # pragma: no cover
-            response.headers["Server"] = self.client_mock.other_server_header
+---
 
-    def should_skip_randomized_headers(self, status_code: int) -> bool:
-        """Check if we should skip randomized headers."""
-        skip = config.SKIP_RANDOMIZED_HEADERS
-        if status_code in skip:  # pragma: no cover
-            return True
+### ERROR-071: Cloudflare Tunnel Docker Compose Misconfiguration
 
-        if isinstance(skip, int):
-            return skip < int(os.getenv("RED5_RANDOMIZATION_FACTOR", "50"))
-        return False
+**Date**: 2026-03-18  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `docker-compose-dev.yaml`
 
-    def forward_server_response_header(self, header: str, response):
-        """Handles server response header randomized."""
-        if self.should_skip_randomized_headers(status_code=int(header)):
-            return
-        if header in ["204", "205", "304", "100"]:
-            self.forward_server_responses(response, header)
-        elif header in ["401"]:
-            self.forward_server_response_auth_challenge(response, header)
-        else:
-            self.forward_server_responses(response, header)
+**Symptom**:
+Docker Compose fails to start with error: `networks.cloudflared Additional property image is not allowed`.
 
-    def add_misconfigured_header_support_challenge(self, header: str):
-        """Forwards server 400 challenge."""
-        self.client_mock.support_challenge = header
-        self.client_mock.max_ban_ratio = KibanaClient.DEFAULT_MAX_BAN_RATIO
+**Root Cause**:
+The `cloudflared` container block was accidentally appended to the end of the file under the `networks:` section instead of the `services:` section.
 
+**Fix Applied**:
+Moved the `cloudflared` block under `services:` in `docker-compose-dev.yaml`.
 
-@dataclass
-class MinimalStatusResponse:
-    """Performs a minimal status check."""
+**Prevention**:
+1. Always verify the indentation and section placement when appending blocks to YAML files.
+2. Run `docker compose config` to validate the YAML structure before starting services.
 
-    def __init__(self, attempts_taken: float):
-        self.attempts_taken = attempts_taken
+---
+
+### ERROR-072: CLAUDE.md Catastrophic Corruption — ~800 Lines of Hallucinated Garbage Injected
+
+**Date**: 2026-03-18  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `CLAUDE.md`
+
+**Symptom**:
+`CLAUDE.md` contained ~800 lines of incoherent mixed-language text (Japanese, Spanish, code fragments, variable names) after line 11, replacing all useful AI context documentation. New agents reading this file would receive no actionable project information.
+
+**Root Cause**:
+A previous AI agent replaced the structured "Key Files", architecture, and rules sections with hallucinated garbage text. The file was 879 lines, with only the first 8 lines containing real content.
+
+**Fix Applied**:
+Deleted the corrupted file and created a clean replacement with:
+- Architecture overview (MBFD Hub VPS vs DeerFlow WSL separation)
+- Key files table
+- DeerFlow 2.0 configuration reference (config_version: 2, module paths, MCP servers)
+- Mandatory recovery sequence
+- Design system rules
+- Filament v3 rules
+- Panel and SPA reference tables
+
+**Prevention**:
+1. Always verify file content after writes — `wc -l` and visual inspection
+2. CLAUDE.md should be version-controlled
+3. Any agent writing to CLAUDE.md should preserve existing structured sections
+
+---
+
+### ERROR-073: Supervisord Running Redundantly Alongside Docker restart: unless-stopped
+
+**Date**: 2026-03-18  
+**Severity**: 🟡 MEDIUM  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `~/src/deer-flow/supervisord.conf`
+
+**Symptom**:
+Two supervisord processes running (PID 2390888 system-level, PID 2416519 user-level in Terminal 3). Supervisord was wrapping `docker compose up` commands, adding unnecessary process management overhead when Docker already handles restart policies.
+
+**Root Cause**:
+A previous agent installed supervisord and created `supervisord.conf` to manage DeerFlow container lifecycle. This conflicts with Docker's native `restart: unless-stopped` policy and creates a confusing dual-management layer. When supervisord shuts down, it kills the compose processes it manages, potentially causing container downtime.
+
+**Fix Applied**:
+1. Shut down supervisord via `supervisorctl shutdown`
+2. Renamed `supervisord.conf` → `supervisord.conf.DECOMMISSIONED`
+3. Cleaned up log artifacts (`supervisord.log`, `supervisord.pid`, `deerflow-serves.out`, `deerflow-serves.err`)
+4. Restarted all containers via `docker compose up -d` — all 5 containers confirmed running
+5. Executed mandatory recovery sequence (permissions + nginx reload + health check)
+
+    **Prevention**:
+1. **NEVER use supervisord** to manage Docker containers that have `restart: unless-stopped`
+2. Use `docker compose up -d` directly for DeerFlow lifecycle management
+3. For persistent startup, use systemd units (see `pgweb.service` model at `/etc/systemd/system/`)
+
+---
+
+### ERROR-074: DeerFlow Nginx Missing Host Port Mapping — localhost:2026 Unreachable from Windows
+
+**Date**: 2026-03-18  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED  
+**File(s) Affected**: `~/src/deer-flow/docker/docker-compose-dev.yaml`
+
+**Symptom**:
+`http://localhost:2026` returns "Unable to connect" in Firefox. Cloudflare tunnel also returns 502 intermittently.
+
+**Root Cause**:
+The nginx service in `docker-compose-dev.yaml` had no `ports:` section. Nginx listened on port 2026 internally but never published it to the host. The cloudflared tunnel worked container-to-container, but local browser access was impossible.
+
+**Fix Applied**:
+Added `ports: - "2026:2026"` to the nginx service in `docker-compose-dev.yaml`.
+
+**Prevention**:
+1. After any compose file changes, verify port bindings: `docker inspect deer-flow-nginx --format='{{json .HostConfig.PortBindings}}'`
+2. The nginx service MUST have `ports: - "2026:2026"` for local access
+
+---
+
+### ERROR-075: WSL2 Virtual Network Broken After Power Loss — Windows Cannot Reach WSL Ports
+
+**Date**: 2026-03-18  
+**Severity**: 🔴 CRITICAL  
+**Status**: ✅ RESOLVED  
+
+**Symptom**:
+After computer power loss/restart, `localhost:2026` and the WSL IP (`172.31.98.76:2026`) are both unreachable from Windows Firefox, even though `curl http://localhost:2026` works from inside WSL.
+
+**Root Cause**:
+WSL2 uses a virtual network adapter (Hyper-V vEthernet). After an unclean shutdown (power loss), the WSL2 networking layer can become corrupted — the virtual switch stops forwarding packets between Windows and the WSL2 VM.
+
+**Fix Applied**:
+```powershell
+wsl --shutdown
+# Wait 5 seconds
+wsl bash -c "echo restarted"
+# Then restart Docker containers
+```
+
+**Prevention**:
+1. After ANY power loss or unclean shutdown, run `wsl --shutdown` then restart WSL
+2. After WSL restart, run the full DeerFlow recovery sequence (docker compose up -d, permissions, nginx reload)
+3. Verify from Windows: `powershell -Command "Invoke-WebRequest -Uri 'http://localhost:2026' -TimeoutSec 5"`
