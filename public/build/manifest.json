@@ -1,11 +1,22 @@
 {
+  "_index-Btag7GrG.js": {
+    "file": "assets/index-Btag7GrG.js",
+    "name": "index"
+  },
+  "_react-DI1TqBIi.js": {
+    "file": "assets/react-DI1TqBIi.js",
+    "name": "react",
+    "imports": [
+      "_index-Btag7GrG.js"
+    ]
+  },
   "resources/css/app.css": {
-    "file": "assets/app-DxA7EHv2.css",
+    "file": "assets/app-DMZYpgqS.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
   "resources/css/filament/admin/theme.css": {
-    "file": "assets/theme-lTMuOZ1I.css",
+    "file": "assets/theme-C3NCwCkt.css",
     "src": "resources/css/filament/admin/theme.css",
     "isEntry": true
   },
@@ -15,19 +26,48 @@
     "src": "resources/js/app.js",
     "isEntry": true
   },
+  "resources/js/apparatus-layout/main.tsx": {
+    "file": "assets/main-DQTKOtO4.js",
+    "name": "main",
+    "src": "resources/js/apparatus-layout/main.tsx",
+    "isEntry": true,
+    "imports": [
+      "_index-Btag7GrG.js",
+      "_react-DI1TqBIi.js"
+    ],
+    "css": [
+      "assets/main-DXGS_vND.css"
+    ]
+  },
   "resources/js/pump-simulator/main.tsx": {
-    "file": "assets/main-SCgh_v78.js",
+    "file": "assets/main-kYb0gZjO.js",
     "name": "main",
     "src": "resources/js/pump-simulator/main.tsx",
     "isEntry": true,
+    "imports": [
+      "_index-Btag7GrG.js",
+      "_react-DI1TqBIi.js"
+    ],
     "css": [
-      "assets/main-BRTs2ujz.css"
+      "assets/main-ljLris_k.css"
     ]
   },
   "resources/js/push-notification-widget.js": {
-    "file": "assets/push-notification-widget-CrSmpa9E.js",
+    "file": "assets/push-notification-widget-BLGKVvRm.js",
     "name": "push-notification-widget",
     "src": "resources/js/push-notification-widget.js",
     "isEntry": true
+  },
+  "resources/js/workgroup-data-dashboard.jsx": {
+    "file": "assets/workgroup-data-dashboard-DEOgUrgp.js",
+    "name": "workgroup-data-dashboard",
+    "src": "resources/js/workgroup-data-dashboard.jsx",
+    "isEntry": true,
+    "imports": [
+      "_index-Btag7GrG.js"
+    ],
+    "css": [
+      "assets/app-DMZYpgqS.css"
+    ]
   }
 }
