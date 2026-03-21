@@ -124,6 +124,8 @@ class ApparatusResource extends Resource
                                 Forms\Components\Select::make('last_service_type')
                                     ->label('Last Service Type')
                                     ->options([
+                                        'PMA' => 'PMA — Oil/Fuel Filters, Engine Oil, Grease',
+                                        'PMC' => 'PMC — Oil/Fuel/Air/Trans Filters, Air Dryer',
                                         '300-Hour PM' => '300-Hour PM',
                                         'Annual Inspection' => 'Annual Inspection',
                                         'Chassis Service' => 'Chassis Service',
@@ -489,9 +491,11 @@ class ApparatusResource extends Resource
                         Forms\Components\Select::make('service_type')
                             ->label('Service Type')
                             ->options([
-                                'PMA' => 'PMA — Oil/Fuel Filters, Engine Oil, Grease Chassis',
-                                'PMC' => 'PMC — Oil/Fuel/Air/Trans Filters, Air Dryer, Grease',
+                                'PMA' => 'PMA — Oil/Fuel Filters, Engine Oil, Grease',
+                                'PMC' => 'PMC — Oil/Fuel/Air/Trans Filters, Air Dryer',
+                                '300-Hour PM' => '300-Hour PM',
                                 'Annual Inspection' => 'Annual Inspection',
+                                'Chassis Service' => 'Chassis Service',
                             ])
                             ->required(),
                         Forms\Components\TextInput::make('service_engine_hours')
