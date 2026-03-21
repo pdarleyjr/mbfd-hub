@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Apparatus, OfficerInfo, ChecklistData, Compartment, Defect } from '../types';
+import { Apparatus, OfficerInfo, ChecklistData, Compartment, Defect, MeterData } from '../types';
 import { ApiClient } from '../utils/api';
 import { saveInspectionProgress, loadInspectionProgress, clearInspectionProgress, queueSubmission, getSubmissionQueue, removeFromQueue } from '../utils/storage';
 import { useOffline } from '../hooks/useOffline';
 import OfficerStep from './OfficerStep';
+import MeterStep from './MeterStep';
 import CompartmentStep from './CompartmentStep';
 import SubmitStep from './SubmitStep';
 
-type Step = 'officer' | 'compartments' | 'submit';
+type Step = 'officer' | 'meter' | 'compartments' | 'submit';
 
 export default function InspectionWizard() {
   const { slug } = useParams<{ slug: string }>();
@@ -23,6 +24,10 @@ export default function InspectionWizard() {
     rank: 'Firefighter',
     shift: 'A',
     unitNumber: '',
+  });
+  const [meterData, setMeterData] = useState<MeterData>({
+    engine_hours: null,
+    miles: null,
   });
   const [compartments, setCompartments] = useState<Compartment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,8 +60,14 @@ export default function InspectionWizard() {
           const saved = loadInspectionProgress(slug);
           if (saved) {
             setOfficerInfo(saved.officer);
+            if (saved.meter) {
+              setMeterData(saved.meter);
+            }
             setCompartments(saved.compartments);
-            setCurrentStep('compartments'); // Resume where they left off
+            // Resume at meter step if officer info exists
+            if (saved.officer.name) {
+              setCurrentStep(saved.compartments.some(c => c.items.some(i => i.status !== 'Present')) ? 'compartments' : 'meter');
+            }
             setHasLoadedAutosave(true);
           }
         }
@@ -99,17 +110,23 @@ export default function InspectionWizard() {
 
   // Autosave progress
   useEffect(() => {
-    if (slug && apparatus && (currentStep === 'compartments' || currentStep === 'submit')) {
+    if (slug && apparatus && (currentStep === 'meter' || currentStep === 'compartments' || currentStep === 'submit')) {
       const saveData = {
         officer: officerInfo,
+        meter: meterData,
         compartments,
       };
       saveInspectionProgress(slug, saveData);
     }
-  }, [officerInfo, compartments, currentStep, slug, apparatus]);
+  }, [officerInfo, meterData, compartments, currentStep, slug, apparatus]);
 
   const handleOfficerSubmit = (info: OfficerInfo) => {
     setOfficerInfo(info);
+    setCurrentStep('meter');
+  };
+
+  const handleMeterSubmit = (data: MeterData) => {
+    setMeterData(data);
     setCurrentStep('compartments');
   };
 
@@ -144,6 +161,8 @@ export default function InspectionWizard() {
         rank: officerInfo.rank,
         shift: officerInfo.shift,
         unit_number: officerInfo.unitNumber,
+        engine_hours: meterData.engine_hours,
+        miles: meterData.miles,
         compartments: compartments.map(c => ({
           id: c.id,
           name: c.name,
@@ -193,8 +212,10 @@ export default function InspectionWizard() {
   };
 
   const goBack = () => {
-    if (currentStep === 'compartments') {
+    if (currentStep === 'meter') {
       setCurrentStep('officer');
+    } else if (currentStep === 'compartments') {
+      setCurrentStep('meter');
     } else if (currentStep === 'submit') {
       setCurrentStep('compartments');
     }
@@ -206,7 +227,7 @@ export default function InspectionWizard() {
         <div className="skeleton h-7 w-64 mb-2"></div>
         <div className="skeleton h-4 w-40 mb-6"></div>
         <div className="flex items-center justify-center gap-4 mb-8">
-          {[1,2,3].map(i => (
+          {[1,2,3,4].map(i => (
             <div key={i} className="flex items-center gap-2">
               <div className="skeleton w-10 h-10 rounded-full"></div>
               <div className="skeleton h-4 w-20"></div>
@@ -238,6 +259,24 @@ export default function InspectionWizard() {
     );
   }
 
+  // Get step number for progress indicator
+  const getStepNumber = () => {
+    switch (currentStep) {
+      case 'officer': return 1;
+      case 'meter': return 2;
+      case 'compartments': return 3;
+      case 'submit': return 4;
+      default: return 1;
+    }
+  };
+
+  const isStepCompleted = (step: Step) => {
+    const order: Step[] = ['officer', 'meter', 'compartments', 'submit'];
+    const currentIndex = order.indexOf(currentStep);
+    const stepIndex = order.indexOf(step);
+    return stepIndex < currentIndex;
+  };
+
   return (
     <div>
       <div className="mb-8">
@@ -250,36 +289,53 @@ export default function InspectionWizard() {
         )}
       </div>
 
-      {/* Progress indicator — larger circles */}
+      {/* Progress indicator — 4 steps */}
       <div className="mb-8">
-        <div className="flex items-center justify-center space-x-4">
+        <div className="flex items-center justify-center space-x-2 md:space-x-4">
+          {/* Step 1: Officer Info */}
           <div className={`flex items-center ${currentStep === 'officer' ? 'text-red-600' : 'text-neutral-400'}`}>
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
               currentStep === 'officer' ? 'bg-red-600 text-white shadow-md' : 
-              (currentStep === 'compartments' || currentStep === 'submit') ? 'bg-teal-500 text-white' : 'bg-neutral-200'
+              isStepCompleted('officer') ? 'bg-teal-500 text-white' : 'bg-neutral-200'
             }`}>
-              {(currentStep === 'compartments' || currentStep === 'submit') ? '✓' : '1'}
+              {isStepCompleted('officer') ? '✓' : '1'}
             </div>
-            <span className="ml-2 text-sm font-medium">Officer Info</span>
+            <span className="ml-2 text-sm font-medium hidden md:inline">Officer</span>
           </div>
-          <div className={`w-10 h-0.5 ${currentStep === 'compartments' || currentStep === 'submit' ? 'bg-red-600' : 'bg-neutral-200'}`} />
+          <div className={`w-6 md:w-10 h-0.5 ${isStepCompleted('officer') || currentStep === 'meter' ? 'bg-red-600' : 'bg-neutral-200'}`} />
+          
+          {/* Step 2: Meter */}
+          <div className={`flex items-center ${currentStep === 'meter' ? 'text-red-600' : 'text-neutral-400'}`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
+              currentStep === 'meter' ? 'bg-red-600 text-white shadow-md' :
+              isStepCompleted('meter') ? 'bg-teal-500 text-white' : 'bg-neutral-200'
+            }`}>
+              {isStepCompleted('meter') ? '✓' : '2'}
+            </div>
+            <span className="ml-2 text-sm font-medium hidden md:inline">Meters</span>
+          </div>
+          <div className={`w-6 md:w-10 h-0.5 ${isStepCompleted('meter') || currentStep === 'compartments' ? 'bg-red-600' : 'bg-neutral-200'}`} />
+          
+          {/* Step 3: Compartments */}
           <div className={`flex items-center ${currentStep === 'compartments' ? 'text-red-600' : 'text-neutral-400'}`}>
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
               currentStep === 'compartments' ? 'bg-red-600 text-white shadow-md' :
-              currentStep === 'submit' ? 'bg-teal-500 text-white' : 'bg-neutral-200'
+              isStepCompleted('compartments') ? 'bg-teal-500 text-white' : 'bg-neutral-200'
             }`}>
-              {currentStep === 'submit' ? '✓' : '2'}
+              {isStepCompleted('compartments') ? '✓' : '3'}
             </div>
-            <span className="ml-2 text-sm font-medium">Compartments</span>
+            <span className="ml-2 text-sm font-medium hidden md:inline">Check</span>
           </div>
-          <div className={`w-10 h-0.5 ${currentStep === 'submit' ? 'bg-red-600' : 'bg-neutral-200'}`} />
+          <div className={`w-6 md:w-10 h-0.5 ${isStepCompleted('compartments') || currentStep === 'submit' ? 'bg-red-600' : 'bg-neutral-200'}`} />
+          
+          {/* Step 4: Submit */}
           <div className={`flex items-center ${currentStep === 'submit' ? 'text-red-600' : 'text-neutral-400'}`}>
             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
               currentStep === 'submit' ? 'bg-red-600 text-white shadow-md' : 'bg-neutral-200'
             }`}>
-              3
+              4
             </div>
-            <span className="ml-2 text-sm font-medium">Submit</span>
+            <span className="ml-2 text-sm font-medium hidden md:inline">Submit</span>
           </div>
         </div>
       </div>
@@ -288,6 +344,19 @@ export default function InspectionWizard() {
         <OfficerStep
           initialData={officerInfo}
           onSubmit={handleOfficerSubmit}
+        />
+      )}
+
+      {currentStep === 'meter' && (
+        <MeterStep
+          apparatusId={apparatus.id}
+          apparatusName={apparatus.name}
+          vehicleNumber={apparatus.vehicle_number}
+          initialData={meterData}
+          previousHours={apparatus.current_engine_hours}
+          previousMiles={apparatus.current_miles}
+          onSubmit={handleMeterSubmit}
+          onBack={goBack}
         />
       )}
 

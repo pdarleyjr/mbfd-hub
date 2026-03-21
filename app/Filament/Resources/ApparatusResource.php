@@ -10,6 +10,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -93,6 +94,59 @@ class ApparatusResource extends Resource
                             ->numeric(),
                     ])->columns(3)
                     ->collapsed(),
+                Forms\Components\Section::make('Preventative Maintenance Tracking')
+                    ->schema([
+                        Forms\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\TextInput::make('current_engine_hours')
+                                    ->label('Current Engine Hours')
+                                    ->numeric()
+                                    ->step(0.1)
+                                    ->helperText('Latest engine hour meter reading'),
+                                Forms\Components\TextInput::make('current_miles')
+                                    ->label('Current Mileage')
+                                    ->numeric()
+                                    ->helperText('Latest odometer reading'),
+                                Forms\Components\DatePicker::make('last_pm_date')
+                                    ->label('Last PM Date')
+                                    ->helperText('Date of last PM service'),
+                            ]),
+                        Forms\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\TextInput::make('last_pm_mileage')
+                                    ->label('Mileage at Last PM')
+                                    ->numeric()
+                                    ->helperText('Odometer reading at last PM'),
+                                Forms\Components\TextInput::make('last_pm_engine_hours')
+                                    ->label('Engine Hours at Last PM')
+                                    ->numeric()
+                                    ->step(0.1)
+                                    ->helperText('Engine hours at last PM'),
+                                Forms\Components\Select::make('last_service_type')
+                                    ->label('Last Service Type')
+                                    ->options([
+                                        '300-Hour PM' => '300-Hour PM',
+                                        'Annual Inspection' => 'Annual Inspection',
+                                        'Chassis Service' => 'Chassis Service',
+                                    ])
+                                    ->helperText('Type of last performed service'),
+                            ]),
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('pm_interval_miles')
+                                    ->label('PM Interval (Miles)')
+                                    ->numeric()
+                                    ->helperText('Leave empty for default'),
+                                Forms\Components\TextInput::make('pm_interval_hours')
+                                    ->label('PM Interval (Hours)')
+                                    ->numeric()
+                                    ->default(300)
+                                    ->helperText('Default: 300 hours'),
+                            ]),
+                    ])
+                    ->columns(1)
+                    ->collapsed()
+                    ->visible(fn () => auth()->user()?->can('manage_pm_settings') ?? true),
             ]);
     }
 
@@ -118,6 +172,60 @@ class ApparatusResource extends Resource
                         'Available' => 'info',
                         'Reserve' => 'gray',
                         default => 'gray',
+                    })
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('current_engine_hours')
+                    ->label('Engine Hours')
+                    ->numeric(decimalPlaces: 1)
+                    ->sortable()
+                    ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
+                    ->openUrlInNewTab()
+                    ->tooltip('Click to submit meter reading via Inspection SPA')
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('current_miles')
+                    ->label('Miles')
+                    ->numeric()
+                    ->sortable()
+                    ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
+                    ->openUrlInNewTab()
+                    ->tooltip('Click to submit meter reading via Inspection SPA')
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('pm_health_status')
+                    ->label('PM Status')
+                    ->badge()
+                    ->size('lg')
+                    ->getStateUsing(function (Apparatus $record): string {
+                        $health = $record->getPmHealthStatus();
+                        $hours = $health['hours_since_pm'];
+                        $interval = $health['interval_hours'];
+                        
+                        if ($health['status'] === 'red') {
+                            if ($health['overdue']) {
+                                return "OVERDUE: {$hours}h ({$interval}h cycle)";
+                            }
+                            return "PM DUE: {$hours}h";
+                        }
+                        if ($health['status'] === 'yellow') {
+                            return "DUE SOON: {$hours}h";
+                        }
+                        return "OK: {$hours}h / {$interval}h";
+                    })
+                    ->color(function (Apparatus $record): string {
+                        $health = $record->getPmHealthStatus();
+                        return match ($health['status']) {
+                            'red' => 'danger',
+                            'yellow' => 'warning',
+                            default => 'success',
+                        };
+                    })
+                    ->tooltip(function (Apparatus $record): ?string {
+                        $health = $record->getPmHealthStatus();
+                        if ($health['status'] === 'green') {
+                            return null;
+                        }
+                        $miles = number_format($health['miles_since_pm']);
+                        $lastPm = $health['last_pm_date'] ?? 'Never';
+                        return "Miles since PM: {$miles} | Last PM: {$lastPm}";
                     })
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('location_display')
@@ -232,6 +340,42 @@ class ApparatusResource extends Resource
             ->defaultSort('designation')
             ->striped()
             ->filters([
+                Tables\Filters\SelectFilter::make('pm_status')
+                    ->label('PM Status')
+                    ->options([
+                        'overdue' => 'PM Overdue (Critical)',
+                        'due' => 'PM Due',
+                        'due_soon' => 'PM Due Soon (Yellow)',
+                        'ok' => 'PM OK (Green)',
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (!isset($data['value']) || $data['value'] === '') {
+                            return $query;
+                        }
+                        
+                        $interval = 300; // Default PM interval
+                        $warningThreshold = $interval - 50;
+                        
+                        return match ($data['value']) {
+                            'overdue' => $query->whereRaw(
+                                '(current_engine_hours - COALESCE(last_pm_engine_hours, 0)) >= ?',
+                                [$interval + 5]
+                            ),
+                            'due' => $query->whereRaw(
+                                '(current_engine_hours - COALESCE(last_pm_engine_hours, 0)) >= ? AND (current_engine_hours - COALESCE(last_pm_engine_hours, 0)) < ?',
+                                [$interval, $interval + 5]
+                            ),
+                            'due_soon' => $query->whereRaw(
+                                '(current_engine_hours - COALESCE(last_pm_engine_hours, 0)) >= ? AND (current_engine_hours - COALESCE(last_pm_engine_hours, 0)) < ?',
+                                [$warningThreshold, $interval]
+                            ),
+                            'ok' => $query->whereRaw(
+                                '(current_engine_hours - COALESCE(last_pm_engine_hours, 0)) < ?',
+                                [$warningThreshold]
+                            ),
+                            default => $query,
+                        };
+                    }),
                 Tables\Filters\SelectFilter::make('station')
                     ->relationship('station', 'station_number')
                     ->searchable()
@@ -255,7 +399,7 @@ class ApparatusResource extends Resource
                 Tables\Filters\Filter::make('has_active_issues')
                     ->label('Has Active Issues')
                     ->query(fn (Builder $query) => $query->whereHas('defects', fn ($q) => $q->where('resolved', false))),
-            ])
+            ], layout: Tables\Enums\FiltersLayout::AboveContent)
             ->headerActions([
                 Tables\Actions\Action::make('sync_to_sheet')
                     ->label('Sync to Google Sheet')
