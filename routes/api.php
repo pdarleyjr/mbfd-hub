@@ -131,8 +131,8 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
             Route::get('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class , 'getSupplyRequests'])
                 ->name('supply-requests');
             Route::post('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class , 'createSupplyRequest']);
-        }
-        );
+        });
+});
 
 // =========================================================================
 // Workgroup AI Routes — Eval analysis & AI summaries (separate from chatbot)
