@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MBFD Workgroup Evaluation Submission",
+  "description": "Schema for individual evaluator submissions for product evaluation",
+  "type": "object",
+  "required": ["evaluator_id", "product", "scores", "recommendation"],
+  "properties": {
+    "submission_id": {
+      "type": "string",
+      "description": "Unique submission identifier (UUID)"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Evaluation session identifier"
+    },
+    "evaluator_id": {
+      "type": "string",
+      "description": "Employee ID of the evaluator"
+    },
+    "evaluator_name": {
+      "type": "string",
+      "description": "Full name of the evaluator"
+    },
+    "evaluator_rank": {
+      "type": "string",
+      "enum": ["Division Chief", "Captain", "Lieutenant", "Firefighter"],
+      "description": "Rank of the evaluator"
+    },
+    "product": {
+      "type": "object",
+      "required": ["name", "category"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Product name/model"
+        },
+        "manufacturer": {
+          "type": "string",
+          "description": "Manufacturer/brand name"
+        },
+        "model": {
+          "type": "string",
+          "description": "Specific model number"
+        },
+        "category": {
+          "type": "string",
+          "description": "Product category (e.g., 'battery_hydraulics')"
+        },
+        "subcategory": {
+          "type": "string",
+          "description": "Product subcategory (e.g., 'cutter', 'spreader')"
+        }
+      }
+    },
+    "scores": {
+      "type": "object",
+      "required": ["capability", "usability", "affordability", "maintainability", "deployability"],
+      "properties": {
+        "capability": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Capability score (1-5)"
+        },
+        "usability": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Usability score (1-5)"
+        },
+        "affordability": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Affordability score (1-5)"
+        },
+        "maintainability": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Maintainability score (1-5)"
+        },
+        "deployability": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Deployability score (1-5)"
+        }
+      }
+    },
+    "recommendation": {
+      "type": "string",
+      "enum": ["advance", "maybe", "no"],
+      "description": "Evaluator recommendation"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["Very Low", "Low", "Moderate", "High", "Very High"],
+      "description": "Evaluator confidence level"
+    },
+    "has_deal_breaker": {
+      "type": "boolean",
+      "description": "Whether this product has a deal-breaker issue"
+    },
+    "deal_breaker_note": {
+      "type": "string",
+      "description": "Description of deal-breaker issue if any"
+    },
+    "narrative": {
+      "type": "object",
+      "properties": {
+        "strongest_advantages": {
+          "type": "string",
+          "description": "What are the product's strongest advantages?"
+        },
+        "biggest_weaknesses": {
+          "type": "string",
+          "description": "What are the product's biggest weaknesses?"
+        },
+        "safety_concerns": {
+          "type": "string",
+          "description": "Any safety concerns with this product?"
+        },
+        "training_notes": {
+          "type": "string",
+          "description": "Notes about training requirements"
+        },
+        "additional_comments": {
+          "type": "string",
+          "description": "Any additional comments"
+        }
+      }
+    },
+    "specifications_reviewed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "spec_name": { "type": "string" },
+          "spec_value": { "type": "string" },
+          "notes": { "type": "string" }
+        }
+      },
+      "description": "Technical specifications reviewed during evaluation"
+    },
+    "hands_on_tested": {
+      "type": "boolean",
+      "description": "Whether evaluator performed hands-on testing"
+    },
+    "test_duration_minutes": {
+      "type": "number",
+      "description": "Duration of hands-on testing in minutes"
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Submission timestamp"
+    }
+  }
+}
