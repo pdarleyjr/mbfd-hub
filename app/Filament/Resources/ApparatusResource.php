@@ -155,16 +155,16 @@ class ApparatusResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
-                    ->grow(false)
+                    ->width('1%')
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('vehicle_number')
                     ->label('Veh #')
                     ->searchable()
-                    ->grow(false)
+                    ->width('1%')
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->grow(false)
+                    ->width('1%')
                     ->color(fn (?string $state): string => match ($state) {
                         'In Service' => 'success',
                         'Out of Service' => 'danger',
@@ -177,7 +177,7 @@ class ApparatusResource extends Resource
                 Tables\Columns\TextColumn::make('pm_health_status')
                     ->label('PM')
                     ->badge()
-                    ->grow(false)
+                    ->width('1%')
                     ->getStateUsing(function (Apparatus $record): string {
                         $health = $record->getPmHealthStatus();
                         $hours = $health['hours_since_pm'];
@@ -209,6 +209,7 @@ class ApparatusResource extends Resource
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('location_display')
                     ->label('Location')
+                    ->width('200px')
                     ->getStateUsing(function (Apparatus $record): string {
                         $stationLabel = $record->station ? 'Sta ' . $record->station->station_number : null;
                         $assignment   = trim($record->assignment ?? '');
