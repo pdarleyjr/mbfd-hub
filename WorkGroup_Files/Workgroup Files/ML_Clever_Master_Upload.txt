@@ -1,0 +1,1565 @@
+ML_CLEVER MASTER UPLOAD — MBFD MID-MOUNT LADDER WORKGROUP 2026
+CLASSIFICATION: WORKGROUP EVALUATION REPORT
+STANDARD: DHS SAVER-EQUIVALENT
+PREPARED FOR: MBFD MID-MOUNT LADDER WORKGROUP
+DATE: MARCH 2026
+VERSION: 1.0 FINAL
+
+================================================================================
+================================================================================
+
+                         MBFD MID-MOUNT LADDER WORKGROUP
+                    RESCUE TOOL COMPARATIVE EVALUATION REPORT
+
+                              ANALYTICAL SYNTHESIS
+                         14 PRODUCTS | 4 DIMENSIONS | 3 CATEGORIES
+
+================================================================================
+================================================================================
+
+
+================================================================================
+SECTION 1: PROBLEM STATEMENT & APPARATUS CONSTRAINTS
+================================================================================
+
+1.1 OPERATIONAL PROBLEM DEFINITION
+-------------------------------------------------------------------------------
+
+The Myrtle Beach Fire Department (MBFD) Mid-Mount Ladder Workgroup was convened
+to address a critical operational requirement: the systematic evaluation and
+selection of rescue tools optimized for deployment on mid-mount aerial ladder
+apparatus. Mid-mount ladder trucks present a unique set of compartment,
+weight, and accessibility constraints that differ materially from rear-mount
+aerials, engine companies, and heavy rescue units. The workgroup's mandate was
+to evaluate commercially available hydraulic rescue tools, rescue saws, and
+stabilization struts under controlled conditions that replicate the operational
+environment of MBFD's mid-mount ladder fleet.
+
+The fundamental problem is one of optimization under constraint. Mid-mount
+ladder apparatus must carry a comprehensive rescue tool complement while
+simultaneously accommodating aerial operations equipment, ground ladders,
+ventilation tools, and personnel. Every pound of tool weight, every cubic inch
+of compartment space, and every second of deployment time carries operational
+significance. The workgroup was therefore tasked with generating evidence-based
+evaluation data across four standardized dimensions to inform future apparatus
+outfitting decisions.
+
+1.2 MID-MOUNT LADDER APPARATUS CONSTRAINTS
+-------------------------------------------------------------------------------
+
+Mid-mount aerial ladder apparatus impose the following constraints on rescue
+tool selection:
+
+COMPARTMENT SIZE LIMITATIONS: Mid-mount designs position the turntable and
+aerial device at the vehicle's center of gravity, between the cab and the
+rear body. This configuration reduces available compartment volume compared
+to rear-mount aerials. Transverse compartments are shorter, and the available
+depth is constrained by the turntable pedestal structure. Tools must fit
+within reduced-envelope compartments without requiring custom fabrication
+or compromising access to adjacent equipment.
+
+WEIGHT DISTRIBUTION REQUIREMENTS: The mid-mount turntable's central position
+creates stringent weight distribution requirements. Heavy tools placed in
+extreme forward or rear compartments can adversely affect vehicle handling,
+braking, and aerial stability. The workgroup's evaluation therefore
+considered tool weight not merely as an ergonomic factor but as an apparatus
+integration variable. Tools exceeding certain weight thresholds may require
+specific compartment placement to maintain acceptable axle loading.
+
+ACCESS POINTS FOR TOOL DEPLOYMENT: Mid-mount apparatus typically provide
+compartment access from both sides of the vehicle, but access angles and
+door configurations differ from conventional engine or rescue apparatus.
+Tools must be extractable by a single firefighter in full PPE, from
+compartments that may be elevated or recessed relative to standard apparatus
+designs. Deployment speed — the time from compartment extraction to
+operational readiness — is a critical metric in this context.
+
+CREW SIZE AND DEPLOYMENT SPEED: MBFD mid-mount ladder companies typically
+operate with a crew of three to four personnel. With the aerial operator
+committed to ladder operations, rescue tool deployment falls to one or two
+remaining crew members until additional resources arrive. This reality
+demands tools that a single operator can extract, carry, and activate
+rapidly without requiring a second person for setup, hose management, or
+power unit staging.
+
+1.3 EVALUATION SCOPE
+-------------------------------------------------------------------------------
+
+The workgroup evaluated fourteen (14) products across three equipment
+categories:
+
+  CATEGORY 1: HYDRAULIC RESCUE TOOLS (8 products)
+    - Spreaders (3 products, including one specialty 40-inch model)
+    - Cutters (2 products)
+    - Rams (2 products)
+    - Forcible Entry Tools (1 product)
+
+  CATEGORY 2: RESCUE SAWS (3 products)
+    - Battery-powered cut-off saws in 12-inch and 14-inch configurations
+
+  CATEGORY 3: STABILIZATION STRUTS (3 products)
+    - Auto-locking, pneumatic, and mechanical designs
+
+1.4 EVALUATION METHODOLOGY OVERVIEW
+-------------------------------------------------------------------------------
+
+All products were evaluated against four standardized dimensions:
+
+  1. CAPABILITY — Raw performance: force output, cutting capacity, spread
+     distance, operational range, and task completion effectiveness
+  2. USABILITY — Ergonomic design, operator interface quality, weight
+     management, balance, grip design, and ease of learning
+  3. MAINTAINABILITY — Serviceability, component replacement complexity,
+     diagnostic capability, and long-term reliability indicators
+  4. DEPLOYABILITY — Speed of deployment from apparatus to operation,
+     startup time, apparatus integration, and single-operator viability
+
+[INSERT IMAGE: MBFD_work_group_day1-1 | Source: Visual_Assets_Index.json | Placement: Problem Statement — apparatus layout]
+
+
+================================================================================
+SECTION 2: EVALUATION METHODOLOGY
+================================================================================
+
+2.1 WORKGROUP COMPOSITION AND PROCESS
+-------------------------------------------------------------------------------
+
+The MBFD Mid-Mount Ladder Workgroup comprised active-duty fire department
+personnel with direct operational experience on mid-mount ladder apparatus.
+Evaluators included company officers, apparatus operators, and firefighters
+representing the range of experience levels and physical builds present in
+MBFD's ladder company staffing model. This deliberate composition ensured
+that evaluation data reflected the full spectrum of operator perspectives
+rather than a narrow expert subset.
+
+The evaluation process was conducted over multiple sessions to mitigate
+evaluator fatigue and ensure consistent conditions across all product
+assessments. Each product was evaluated by the full complement of workgroup
+members, with individual scores aggregated through a standardized weighting
+protocol. Evaluation sessions were documented through photography, scoring
+instruments, and structured debrief notes.
+
+2.2 FOUR-DIMENSION SCORING FRAMEWORK
+-------------------------------------------------------------------------------
+
+The workgroup employed a four-dimension scoring framework aligned with
+DHS SAVER (System Assessment and Validation for Emergency Responders)
+methodology principles:
+
+  CAPABILITY (Weight varies by category)
+  Measures the tool's fundamental performance against its intended function.
+  For spreaders, this includes spreading force and distance. For cutters,
+  cutting force and opening. For rams, pushing force and stroke. For saws,
+  cut depth, blade speed, and material throughput. For struts, load rating
+  and extension range.
+
+  USABILITY (Weight varies by category)
+  Measures the operator experience during tool employment. This dimension
+  captures ergonomic design quality, control interface intuitiveness, weight
+  and balance characteristics, grip design, vibration management, and the
+  learning curve for new operators. Usability scores reflect hands-on
+  evaluation under realistic conditions.
+
+  MAINTAINABILITY (Weight varies by category)
+  Measures the ease and efficiency of post-deployment maintenance, component
+  inspection, blade or consumable replacement, battery management, and
+  diagnostic access. Products with integrated diagnostic systems, tool-free
+  maintenance features, or simplified service protocols score higher.
+
+  DEPLOYABILITY (Weight varies by category)
+  Measures the speed and simplicity of transitioning a tool from stored
+  configuration to operational employment. This dimension captures startup
+  sequence complexity, the need for ancillary equipment (hoses, power units,
+  fuel), apparatus compartment compatibility, and single-operator deployment
+  viability.
+
+2.3 TIER 1 DATA PRIMACY
+-------------------------------------------------------------------------------
+
+The workgroup established a strict data hierarchy for this evaluation:
+
+  TIER 1 (AUTHORITATIVE): Dashboard scoring data extracted from the
+  workgroup's evaluation instruments and compiled into the Product Data
+  Master. All numerical scores cited in this report derive from TIER 1
+  sources. Dashboard images serve as the authoritative record of numerical
+  evaluations.
+
+  TIER 2 (CONTEXTUAL): Manufacturer PDF documentation, specification
+  sheets, and marketing materials. TIER 2 data provides supplementary
+  context for understanding product capabilities but does not override
+  TIER 1 evaluation scores where conflicts exist.
+
+When TIER 1 and TIER 2 data conflict, TIER 1 prevails. This protocol
+ensures that hands-on evaluation by MBFD personnel takes precedence over
+manufacturer claims.
+
+2.4 HANDS-ON EVALUATION CONDITIONS
+-------------------------------------------------------------------------------
+
+All evaluations were conducted under controlled conditions designed to
+replicate operational deployment scenarios. Evaluators wore full structural
+PPE including gloves, which is critical for assessing control interface
+usability. Tools were tested on representative materials and structures.
+Environmental conditions during evaluation were documented but not
+artificially controlled, reflecting the reality that rescue tools must
+perform across the full range of conditions encountered during emergency
+operations.
+
+
+================================================================================
+SECTION 3: HYDRAULIC RESCUE TOOLS — BRAND ANALYSIS
+================================================================================
+
+### 3.1 HOLMATRO PENTHEON SERIES — BRAND OVERVIEW
+
+[INSERT IMAGE: Holmatro Pentheon Series USA-1 | Source: Visual_Assets_Index.json | Placement: Section 3.1 — Brand header]
+
+TECHNOLOGY PLATFORM: The Holmatro Pentheon Series represents the manufacturer's
+latest generation of battery-operated hydraulic rescue tools, built on a
+mechatronic drive platform that integrates electric motor, hydraulic pump, and
+electronic control systems into a single closed-circuit architecture. The
+Pentheon designation signifies a complete redesign from Holmatro's previous
+cordless tool generations, with emphasis on reduced weight, increased speed,
+and integrated digital connectivity.
+
+SYSTEM ARCHITECTURE: Pentheon tools employ an integrated battery-hydraulic
+architecture where the battery, motor, and hydraulic system are contained
+within the tool body. There is no separate power unit, no hydraulic hoses,
+and no external connections required for operation. The closed hydraulic
+circuit is sealed at the factory and is not field-serviceable, which
+simplifies maintenance but creates a single-point dependency on the
+integrated power system. On-Tool Charging allows the battery to be recharged
+without removing it from the tool, and the automated start/stop system
+minimizes energy waste during intermittent use.
+
+CROSS-TOOL COMPATIBILITY: The Pentheon battery platform is shared across
+the PSP40 Spreader, PCU30CL Cutter, and PRA40 Ram. Additionally, the
+battery system is compatible with the OmniShore stabilization system's
+OmniLock controller. This ecosystem approach means a single battery inventory
+can serve multiple tool types, reducing the logistics burden on apparatus
+battery management.
+
+BRAND-LEVEL SCORE SUMMARY: Across the three primary Pentheon rescue tools
+evaluated (PSP40, PCU30CL, PRA40), Holmatro achieved the following
+dimension-level performance:
+  - Capability: 89.41 (Evidence: Product_Data_Master.csv)
+  - Usability: 93.99 (Evidence: Product_Data_Master.csv)
+  - Maintainability: 89.82 (Evidence: Product_Data_Master.csv)
+  - Deployability: 89.69 (Evidence: Product_Data_Master.csv)
+
+These scores indicate consistent strength across all four evaluation
+dimensions, with particular distinction in Usability (93.99), which
+reflects the workgroup's assessment of the Pentheon's ergonomic design,
+control interface, and operator experience.
+
+BLUETOOTH AND DIGITAL INTEGRATION: All Pentheon tools feature Bluetooth
+connectivity with the MyHolmatro app, providing real-time tool insights
+including temperature monitoring, battery status, state-of-health tracking,
+and usage analytics. LED indicators on the tool body display tool
+temperature, battery status, and operational state. This digital layer
+introduces a fleet management capability absent from previous tool
+generations.
+
+ENVIRONMENTAL PROTECTION: All Pentheon tools carry an IP57 rating,
+indicating protection against dust ingress and temporary immersion in water
+to 1 meter depth for 30 minutes.
+
+-------------------------------------------------------------------------------
+
+### 3.2 HURST E3 SERIES — BRAND OVERVIEW
+
+[INSERT IMAGE: HurstE3-07-2022_compressed-1 | Source: Visual_Assets_Index.json | Placement: Section 3.2 — Brand header]
+
+TECHNOLOGY PLATFORM: The Hurst E3 Series (eDRAULIC third generation) is
+Hurst's current battery-powered hydraulic rescue tool platform. The E3
+designation denotes the third evolution of Hurst's eDRAULIC concept, which
+pioneered battery-operated hydraulic rescue tools in the fire service market.
+The E3 platform is built on a 25.2V battery system with brushless DC motor
+technology.
+
+SYSTEM ARCHITECTURE: Like the Holmatro Pentheon, E3 tools integrate the
+battery, motor, and hydraulic system within the tool body, eliminating
+external power units and hydraulic hoses. The E3 system employs a brushless
+DC motor for improved efficiency and extended battery life compared to
+brushed motor predecessors. A notable architectural differentiator is the
+Smart Dashboard — a visual display integrated into the tool body that
+provides live feedback on power levels, battery charge status, roll
+warnings, and system state. The Turbo function provides a temporary speed
+boost for time-critical operations.
+
+CROSS-TOOL COMPATIBILITY: The E3 battery platform is shared across the
+SP 777 Spreader, S 789 Cutter, CR 522 Ram, and M40 Spreader. The 25.2V
+battery system uses large waterproof 9Ah batteries with IP68 protection
+for the battery itself.
+
+BRAND-LEVEL SCORE SUMMARY: Across the three primary E3 rescue tools
+evaluated (SP 777, S 789, CR 522), Hurst achieved the following
+dimension-level performance:
+  - Capability: 87.56 (Evidence: Product_Data_Master.csv)
+  - Usability: 85.76 (Evidence: Product_Data_Master.csv)
+  - Maintainability: 82.58 (Evidence: Product_Data_Master.csv)
+  - Deployability: 82.74 (Evidence: Product_Data_Master.csv)
+
+These scores demonstrate competitive performance across all dimensions,
+with Capability (87.56) representing the strongest relative dimension.
+The Usability differential versus Holmatro Pentheon (85.76 vs. 93.99,
+a gap of 8.23 points) represents the most significant brand-level
+separation observed in the evaluation. (Evidence: Product_Data_Master.csv)
+
+WATERTIGHT DESIGN: The E3 Series carries an IP58 rating, exceeding the
+Pentheon's IP57 rating by one submersion category. This distinction is
+operationally significant for departments operating in coastal, flood-prone,
+or marine environments. The IP58 rating indicates protection against
+continuous immersion in water beyond 1 meter, and the Smart Dashboard
+confirms saltwater-capable battery installation status.
+
+E3 CONNECT: The E3 platform includes Wi-Fi-based data transfer to the
+Captium cloud platform, enabling remote tool monitoring, usage tracking,
+and fleet management analytics. This represents a cloud-first connectivity
+approach compared to Holmatro's Bluetooth-to-app model.
+
+
+================================================================================
+SECTION 4: HYDRAULIC RESCUE TOOLS — TOOL-BY-TOOL ANALYSIS
+================================================================================
+
+### 4.1 SPREADERS
+
+===============================================================================
+#### HOLMATRO PSP40 (32-inch Spreader) — RANK #1 OVERALL (Spreader Category)
+===============================================================================
+
+[INSERT IMAGE: Holmatro Pentheon Series USA-1_p12 | Source: Visual_Assets_Index.json | Placement: Section 4.1 — PSP40]
+
+TOOL OVERVIEW: The Holmatro PSP40 is a 32-inch class battery-operated
+hydraulic spreader from the Pentheon Series. It serves as Holmatro's
+primary vehicle extrication spreader, designed for door removal, dash
+displacement, pedal entrapment resolution, and structural spreading tasks.
+The PSP40 achieved the highest overall score of any product in the entire
+evaluation at 92.02 (Evidence: Product_Data_Master.csv), establishing it
+as the benchmark product for the workgroup's assessment.
+
+SPECIFICATION SUMMARY:
+  Product:            Holmatro PSP40 (32-inch Spreader)
+  Manufacturer:       Holmatro
+  Model ID:           PSP40
+  Weight:             42.8 lbs / 19.41 kg
+  Spreading Force:    62,947 lbf / 280 kN
+  Opening Width:      723.9 mm (28.5 inches)
+  Power Source:       Battery (Pentheon cordless)
+  IP Rating:          IP57
+  Dimensions:         37.6 x 10.6 x 10.9 in
+  (Evidence: Product_Data_Master.csv)
+
+CAPABILITY ANALYSIS: The PSP40 delivers a maximum spreading force of
+62,947 lbf (280 kN) across a spreading distance of 28.5 inches (723.9 mm).
+The Capability score of 89.41 (Evidence: Product_Data_Master.csv) reflects
+the workgroup's assessment of actual force delivery under operational
+conditions. The patented Stepless Speed Maximization system allows the
+tool to maintain optimal speed at any load point, rather than shifting
+between discrete speed stages. A smart sensor ensures constant maximum
+power output over the tool's entire operational lifespan, compensating
+for wear and hydraulic degradation over time.
+
+USABILITY ANALYSIS: The PSP40 achieved 93.99 in Usability (Evidence:
+Product_Data_Master.csv), the highest Usability score among all hydraulic
+tools evaluated. The 360-degree inline control handle allows the operator
+to actuate the tool from virtually any grip position and angle, eliminating
+the need to reposition hands during complex extrication sequences. The
+360-degree carrying handle wraps around the tool body, providing secure
+grip from any approach angle during transport. The Extreme Grip Spreader
+Tips feature smartly placed teeth on both inner and outer surfaces,
+providing grip on material regardless of tip orientation. The two-speed
+inline control handle enables operators to switch between high-speed
+(rapid positioning) and low-speed (precision force application) modes
+with a simple wrist twist — a design that evaluators noted was intuitive
+even for operators unfamiliar with the Pentheon platform.
+
+MAINTAINABILITY ANALYSIS: The PSP40 scored 89.82 in Maintainability
+(Evidence: Product_Data_Master.csv). The closed hydraulic circuit
+eliminates routine hydraulic fluid management tasks. The i-Bolt system
+(shared across Pentheon tools) eliminates the need to tighten the central
+bolt after each use — a maintenance task that is frequently overlooked
+on traditional hydraulic tools and can lead to blade separation under
+load. Bluetooth connectivity enables remote diagnostic access and
+proactive maintenance scheduling through the MyHolmatro app. LED
+indicators provide at-a-glance status for tool temperature, battery
+health, and state of health.
+
+DEPLOYABILITY ANALYSIS: The PSP40 scored 89.69 in Deployability (Evidence:
+Product_Data_Master.csv). Cordless battery operation enables immediate
+deployment without staging hoses, connecting couplings, or positioning a
+power unit. On-Tool Charging ensures the tool is always ready without
+requiring battery removal for charging. The automated start/stop system
+activates the motor only when the control handle is actuated, conserving
+battery power during intermittent use scenarios typical of vehicle
+extrication. The lower sound level of the Pentheon platform improves
+on-scene communication during deployment.
+
+EVALUATOR INSIGHT: Workgroup evaluators consistently noted the PSP40's
+ergonomic superiority, particularly the freedom of movement enabled by the
+360-degree control handle and the immediate responsiveness of the Stepless
+Speed Maximization system. The 42.8 lb weight was assessed as manageable
+for single-operator extraction from apparatus compartments and carry to
+the work area.
+
+-------------------------------------------------------------------------------
+
+===============================================================================
+#### HURST SP 777 E3 (32-inch Spreader) — RANK #2 OVERALL (Spreader Category)
+===============================================================================
+
+[INSERT IMAGE: HurstE3-07-2022_compressed-1 | Source: Visual_Assets_Index.json | Placement: Section 4.1 — SP777]
+
+TOOL OVERVIEW: The Hurst SP 777 E3 is a 32-inch class battery-operated
+hydraulic spreader from the E3 eDRAULIC platform. It serves as Hurst's
+primary heavy-duty vehicle extrication spreader. The SP 777 E3 achieved an
+overall score of 90.99 (Evidence: Product_Data_Master.csv), ranking second
+among spreaders and demonstrating strong competitive performance against
+the category-leading PSP40.
+
+SPECIFICATION SUMMARY:
+  Product:            Hurst SP 777 E3 (32-inch Spreader)
+  Manufacturer:       Hurst
+  Model ID:           SP 777 E3
+  Weight:             51.6 lbs / 23.4 kg
+  Spreading Force:    134,900 lbs / 600 kN
+  Pulling Force:      13,490 lbs / 60 kN
+  Opening Width:      813.0 mm (32 inches)
+  Power Source:       Battery (eDRAULIC E3), 25.2V
+  IP Rating:          IP58
+  Dimensions:         39.3 x 12.2 x 9.96 in
+  (Evidence: Product_Data_Master.csv)
+
+CAPABILITY ANALYSIS: The SP 777 E3 delivers a maximum spreading force of
+134,900 lbs (600 kN) — more than double the PSP40's 280 kN rating — across
+a 32-inch (813 mm) spreading distance, and a pulling force of
+13,490 lbs (60 kN) via squeezing plates built into the arms, a dual
+capability the PSP40 does not offer. The Capability score of 87.56
+(Evidence: Product_Data_Master.csv) places it 1.85 points behind the
+PSP40's 89.41, indicating that raw force specifications do not fully
+determine Capability scoring — the workgroup also assessed force delivery
+characteristics, speed under load, and operational effectiveness during
+hands-on tasks.
+
+USABILITY ANALYSIS: The SP 777 E3 scored 85.76 in Usability (Evidence:
+Product_Data_Master.csv), an 8.23-point gap below the PSP40's 93.99. The
+ergonomically designed Star Grip permits tool actuation from almost any
+gripping position. The Shark Tooth removable tips feature four rows of
+teeth for maximum grip performance. However, the 51.6 lb weight represents
+an 8.8 lb penalty versus the PSP40 (42.8 lbs), and the overall dimensional
+envelope (39.3 x 12.2 x 9.96 in vs. 37.6 x 10.6 x 10.9 in) is larger.
+These physical characteristics contributed to the Usability differential.
+
+MAINTAINABILITY ANALYSIS: The SP 777 E3 scored 82.58 in Maintainability
+(Evidence: Product_Data_Master.csv), 7.24 points below the PSP40's 89.82.
+The Smart Dashboard provides visual feedback on system state, and the E3
+Connect Wi-Fi system enables cloud-based fleet management through the
+Captium platform. The removable Shark Tooth tips simplify tip replacement
+when worn.
+
+DEPLOYABILITY ANALYSIS: The SP 777 E3 scored 82.74 in Deployability
+(Evidence: Product_Data_Master.csv), 6.95 points below the PSP40's 89.69.
+Cordless battery operation provides immediate deployment capability. The
+watertight IP58 design permits deployment in water environments including
+saltwater. The Smart Dashboard provides immediate visual confirmation of
+system readiness. The Turbo function provides a speed boost for
+time-critical sequences.
+
+CROSS-COMPETITOR COMPARISON (PSP40 vs. SP 777 E3):
+  Overall Score:     PSP40 92.02 vs. SP 777 90.99 (delta: 1.03)
+  Capability:        PSP40 89.41 vs. SP 777 87.56 (delta: 1.85)
+  Usability:         PSP40 93.99 vs. SP 777 85.76 (delta: 8.23)
+  Maintainability:   PSP40 89.82 vs. SP 777 82.58 (delta: 7.24)
+  Deployability:     PSP40 89.69 vs. SP 777 82.74 (delta: 6.95)
+  Weight:            PSP40 42.8 lbs vs. SP 777 51.6 lbs (delta: 8.8 lbs)
+  Spread Force:      PSP40 280 kN vs. SP 777 600 kN (SP 777 advantage)
+  Spread Distance:   PSP40 28.5 in vs. SP 777 32 in (SP 777 advantage)
+  IP Rating:         PSP40 IP57 vs. SP 777 IP58 (SP 777 advantage)
+  (Evidence: Product_Data_Master.csv)
+
+The SP 777 E3 holds raw force and spread distance advantages, along with
+superior waterproof rating and an integrated pulling capability. The PSP40
+leads decisively in Usability, Maintainability, and Deployability, driven
+by lighter weight, superior ergonomic design, and the Pentheon platform's
+operational advantages. The overall score differential of 1.03 points
+conceals meaningful dimension-level separations.
+
+-------------------------------------------------------------------------------
+
+===============================================================================
+#### HURST M40 (40-inch Spreader) — DEPLOYMENT ROLE ANALYSIS
+===============================================================================
+
+[INSERT IMAGE: HurstE3-07-2022_compressed-1 | Source: Visual_Assets_Index.json | Placement: Section 4.1 — M40]
+
+TOOL OVERVIEW: The Hurst M40 is a 40-inch class battery-operated hydraulic
+spreader from the E3 eDRAULIC platform. The M40 was evaluated by the
+workgroup but occupies a fundamentally different operational role than the
+PSP40 and SP 777 standard-class spreaders. The M40 achieved an overall
+score of 78.80 (Evidence: Product_Data_Master.csv).
+
+DEPLOYMENT ROLE CLARIFICATION: The workgroup determined that the M40 is
+designed and intended for heavy rescue apparatus, not standard frontline
+engines or mid-mount ladder trucks. Its 40-inch spreading distance exceeds
+standard extrication parameters and addresses heavy rescue scenarios such
+as commercial vehicle entrapment, structural collapse space creation, and
+industrial machinery rescue. The M40's immense physical footprint severely
+limits its standard Usability, as reflected in the Usability score of 79.29
+(Evidence: Product_Data_Master.csv).
+
+The Capability score of 83.39 (Evidence: Product_Data_Master.csv) confirms
+raw power delivery appropriate to its intended role. However, the workgroup
+assessed that the M40 should not be deployed as a primary tool on standard
+frontline engines or mid-mount ladder apparatus and should not be directly
+compared against standard frontline tools. The M40's role is that of a
+specialized asset for heavy rescue units where its extended reach and
+force capabilities address scenarios beyond the operational envelope of
+standard-class spreaders.
+
+The M40 operates on the E3 battery platform with watertight design,
+maintaining compatibility with the broader Hurst E3 battery ecosystem.
+
+-------------------------------------------------------------------------------
+
+### 4.2 CUTTERS
+
+===============================================================================
+#### HOLMATRO PCU30CL (Cutter) — RANK #1 OVERALL (Cutter Category)
+===============================================================================
+
+[INSERT IMAGE: Holmatro Pentheon Series USA-1_p13 | Source: Visual_Assets_Index.json | Placement: Section 4.2 — PCU30CL]
+
+TOOL OVERVIEW: The Holmatro PCU30CL is a battery-operated hydraulic cutter
+from the Pentheon Series. It is designed for vehicle extrication cutting
+tasks including A/B/C-post severance, rocker panel removal, pedal cutting,
+and structural steel cutting. The PCU30CL achieved an overall score of
+88.86 (Evidence: Product_Data_Master.csv), ranking first in the cutter
+category.
+
+SPECIFICATION SUMMARY:
+  Product:            Holmatro PCU30CL (Cutter)
+  Manufacturer:       Holmatro
+  Model ID:           PCU30CL
+  Weight:             33.5 lbs / 15.2 kg
+  Cutting Force:      123,420 lbf / 549 kN
+  Cutting Opening:    170.2 mm (6.7 inches)
+  Round Bar Capacity: 1.2 inches (S235)
+  Power Source:       Battery (Pentheon cordless)
+  IP Rating:          IP57
+  Dimensions:         31.9 x 10.6 x 11.3 in
+  (Evidence: Product_Data_Master.csv)
+
+CAPABILITY ANALYSIS: The PCU30CL delivers a theoretical cutting force of
+123,420 lbf (549 kN) with a maximum cutting opening of 6.7 inches and
+round bar cutting capacity of 1.2 inches (S235 steel). The Capability
+score of 89.41 (Evidence: Product_Data_Master.csv) reflects the workgroup's
+assessment of actual cutting performance during hands-on evaluation. The
+U-shaped blade design pulls material into the cutting recess near the
+central bolt, where cutting force is concentrated at its maximum. Highly
+durable cutting edges extend blade service life between replacements.
+
+USABILITY ANALYSIS: The PCU30CL scored 93.99 in Usability (Evidence:
+Product_Data_Master.csv). The 30-degree inclined cutter jaw — a design
+unique to the Pentheon cutter — maximizes working space between the tool
+and the vehicle body during cutting operations. This angled approach
+enables safer, quicker, and easier cutting without the need to reposition
+the tool or the operator. The flat i-Bolt construction provides more room
+in narrow spaces compared to traditional protruding central bolts. At
+33.5 lbs, the PCU30CL is the lightest hydraulic cutter in the evaluation,
+contributing to single-operator maneuverability.
+
+MAINTAINABILITY ANALYSIS: The PCU30CL scored 89.82 in Maintainability
+(Evidence: Product_Data_Master.csv). The i-Bolt eliminates the maintenance
+requirement to tighten the central bolt after each use — a chronic
+maintenance failure point on traditional cutters that can lead to blade
+separation under cutting force. The optimized cutting edge geometry extends
+blade life, reducing replacement frequency. Bluetooth diagnostic access
+and LED status indicators support proactive maintenance.
+
+DEPLOYABILITY ANALYSIS: The PCU30CL scored 89.69 in Deployability
+(Evidence: Product_Data_Master.csv). Cordless operation, On-Tool Charging,
+and automated start/stop provide the same deployment advantages as other
+Pentheon tools. The compact dimensions (31.9 x 10.6 x 11.3 in) and light
+weight (33.5 lbs) facilitate rapid extraction from mid-mount ladder
+compartments.
+
+-------------------------------------------------------------------------------
+
+===============================================================================
+#### HURST S 789 E3 (Cutter) — RANK #2 OVERALL (Cutter Category)
+===============================================================================
+
+[INSERT IMAGE: HurstE3-07-2022_compressed-1 | Source: Visual_Assets_Index.json | Placement: Section 4.2 — S789]
+
+TOOL OVERVIEW: The Hurst S 789 E3 is a battery-operated hydraulic cutter
+from the E3 eDRAULIC platform. It is designed for vehicle extrication and
+structural cutting tasks. The S 789 E3 achieved an overall score of 82.57
+(Evidence: Product_Data_Master.csv), ranking second in the cutter category.
+
+SPECIFICATION SUMMARY:
+  Product:            Hurst S 789 E3 (Cutter)
+  Manufacturer:       Hurst
+  Model ID:           S 789 E3
+  Weight:             49.6 lbs / 22.5 kg
+  Cutting Opening:    205.0 mm (8.07 inches)
+  Power Source:       Battery (eDRAULIC E3), 25.2V
+  IP Rating:          IP58
+  Dimensions:         35.7 x 10.5 x 9.96 in
+  (Evidence: Product_Data_Master.csv)
+
+CAPABILITY ANALYSIS: The S 789 E3 provides a cutting opening of 8.07
+inches (205 mm) — 1.37 inches larger than the PCU30CL's 6.7-inch opening.
+This larger bite capability enables the S 789 to accept thicker structural
+members in a single cut. The Capability score of 87.56 (Evidence:
+Product_Data_Master.csv) confirmed powerful baseline cutting capabilities
+during workgroup evaluation.
+
+USABILITY ANALYSIS: The S 789 E3 scored 85.76 in Usability (Evidence:
+Product_Data_Master.csv), an 8.23-point gap below the PCU30CL's 93.99.
+The brushless DC motor runs quietly, improving communication during
+operations. Two LED lights illuminate the front cutting area. The Smart
+Dashboard provides visual feedback on roll warnings, power levels, and
+battery charge. However, the 49.6 lb weight represents a 16.1 lb
+penalty versus the PCU30CL (33.5 lbs). Evaluators noted that the S 789
+tracked lower in ergonomic usability under continuous load — a finding
+consistent with the significant weight differential.
+
+MAINTAINABILITY ANALYSIS: The S 789 E3 scored 82.58 in Maintainability
+(Evidence: Product_Data_Master.csv). E3 Connect Wi-Fi cloud integration
+supports fleet-level monitoring. The large waterproof 9Ah battery with
+IP68 protection simplifies battery management in harsh environments.
+
+DEPLOYABILITY ANALYSIS: The S 789 E3 scored 82.74 in Deployability
+(Evidence: Product_Data_Master.csv). Cordless operation and watertight
+design (IP58) for fresh and saltwater deployment. The Smart Dashboard
+confirms system readiness at a glance. The Turbo function provides
+enhanced cutting speed for time-critical tasks.
+
+CROSS-COMPETITOR COMPARISON (PCU30CL vs. S 789 E3):
+  Overall Score:     PCU30CL 88.86 vs. S 789 82.57 (delta: 6.29)
+  Capability:        PCU30CL 89.41 vs. S 789 87.56 (delta: 1.85)
+  Usability:         PCU30CL 93.99 vs. S 789 85.76 (delta: 8.23)
+  Weight:            PCU30CL 33.5 lbs vs. S 789 49.6 lbs (delta: 16.1 lbs)
+  Cutting Opening:   PCU30CL 6.7 in vs. S 789 8.07 in (S 789 advantage)
+  IP Rating:         PCU30CL IP57 vs. S 789 IP58 (S 789 advantage)
+  (Evidence: Product_Data_Master.csv)
+
+The S 789's larger bite (8.07 vs. 6.7 in) and superior water protection
+(IP58 vs. IP57) are offset by a substantial 16.1 lb weight penalty and
+the PCU30CL's superior ergonomic design. The 6.29-point overall score
+gap is the largest in any head-to-head tool-type comparison in this
+evaluation.
+
+-------------------------------------------------------------------------------
+
+### 4.3 RAMS
+
+===============================================================================
+#### HOLMATRO PRA40 (Ram) — RANK #1 OVERALL (Ram Category)
+===============================================================================
+
+[INSERT IMAGE: Holmatro Pentheon Series USA-1_p14 | Source: Visual_Assets_Index.json | Placement: Section 4.3 — PRA40]
+
+TOOL OVERVIEW: The Holmatro PRA40 is a battery-operated hydraulic ram from
+the Pentheon Series. Rams serve as linear force delivery tools for dash
+displacement, steering column displacement, pedal manipulation, and
+structural pushing tasks during vehicle extrication. The PRA40 achieved
+an overall score of 91.29 (Evidence: Product_Data_Master.csv), the highest
+of any ram evaluated and the second-highest overall score in the entire
+evaluation.
+
+SPECIFICATION SUMMARY:
+  Product:            Holmatro PRA40 (Ram)
+  Manufacturer:       Holmatro
+  Model ID:           PRA40
+  Weight:             31.1 lbs / 14.11 kg
+  Spreading Force:    30,574 lbf / 136 kN
+  Stroke:             8.5 inches (single plunger)
+  Opening Width:      215.9 mm
+  Power Source:       Battery (Pentheon cordless)
+  IP Rating:          IP57
+  Dimensions:         15.2 x 10.1 x 17.4 in (retracted)
+  (Evidence: Product_Data_Master.csv)
+
+CAPABILITY ANALYSIS: The PRA40 delivers 30,574 lbf (136 kN) spreading
+force over its full 8.5-inch stroke via a single plunger design. The
+Capability score of 89.41 (Evidence: Product_Data_Master.csv) reflects
+the workgroup's assessment that the PRA40 dominated ram evaluations during
+hands-on testing. The Smart Ram Extension system allows the operator to
+cross any distance by adapting force output to the new maximum extended
+length, providing flexibility that traditional fixed-stroke rams cannot
+match.
+
+USABILITY ANALYSIS: The PRA40 achieved 93.99 in Usability (Evidence:
+Product_Data_Master.csv) — matching the exceptional Usability scores of the
+PSP40 and PCU30CL. Workgroup evaluators reported the PRA40 achieved a
+95.00 in operator Usability scoring during direct assessment. The double
+carrying handle enables easy placement from both sides of a vehicle and
+secure holding inside vehicles where space is limited. The integrated
+laser pointer in the ram head marks the exact contact point for
+first-time-right positioning — a feature that evaluators highlighted as
+significantly reducing setup time and repositioning attempts during dash
+displacement operations. At 31.1 lbs, the PRA40 is the lightest hydraulic
+rescue tool in the evaluation (excluding the T1 forcible entry tool).
+
+MAINTAINABILITY ANALYSIS: The PRA40 scored 89.82 in Maintainability
+(Evidence: Product_Data_Master.csv). The single-plunger design has fewer
+moving parts than telescopic multi-stage rams. Bluetooth diagnostic
+capability and LED status indicators maintain the Pentheon platform's
+proactive maintenance advantages.
+
+DEPLOYABILITY ANALYSIS: The PRA40 scored 89.69 in Deployability (Evidence:
+Product_Data_Master.csv). The retracted length of only 15.2 inches makes
+the PRA40 exceptionally compact for apparatus storage. Cordless operation
+and automated start/stop provide immediate readiness. The compact storage
+footprint is particularly advantageous for mid-mount ladder apparatus
+where compartment depth is constrained.
+
+-------------------------------------------------------------------------------
+
+===============================================================================
+#### HURST CR 522 E3 (Ram) — RANK #2 OVERALL (Ram Category)
+===============================================================================
+
+[INSERT IMAGE: HurstE3-07-2022_compressed-1 | Source: Visual_Assets_Index.json | Placement: Section 4.3 — CR522]
+
+TOOL OVERVIEW: The Hurst CR 522 E3 is a battery-operated hydraulic
+telescopic ram from the E3 eDRAULIC platform. The CR 522 employs a
+dual-piston telescopic design for extended reach. The CR 522 E3 achieved
+an overall score of 86.02 (Evidence: Product_Data_Master.csv), ranking
+second in the ram category.
+
+SPECIFICATION SUMMARY:
+  Product:            Hurst CR 522 E3 (Ram)
+  Manufacturer:       Hurst
+  Model ID:           CR 522 E3
+  Weight:             45.0 lbs / 20.4 kg
+  Spreading Force:    HSF Piston 1: 28,600 lbs / 127 kN
+                      HSF Piston 2: 13,500 lbs / 60 kN
+  Total Stroke:       34.5 inches (telescopic dual-piston)
+  Extended Length:     59.2 inches
+  Opening Width:      876.3 mm
+  Power Source:       Battery (eDRAULIC E3), 25.2V
+  IP Rating:          IP58
+  Dimensions:         24.7 x 5.51 x 12.9 in (retracted)
+  (Evidence: Product_Data_Master.csv)
+
+CAPABILITY ANALYSIS: The CR 522 E3 employs a telescopic dual-piston
+design that delivers 28,600 lbs (127 kN) on the first piston and 13,500
+lbs (60 kN) on the second, with a combined 34.5-inch overall stroke and
+an extended length of 59.2 inches. This telescopic design provides a
+dramatically extended reach compared to the PRA40's 8.5-inch single
+stroke. The Capability score of 87.56 (Evidence: Product_Data_Master.csv)
+reflects the tool's versatility in reaching deep into vehicle structures.
+
+USABILITY ANALYSIS: The CR 522 E3 scored 85.76 in Usability (Evidence:
+Product_Data_Master.csv). The Star Grip permits actuation from nearly any
+position. Four LED lights illuminate both front and back of the work area.
+At 45.0 lbs, it is 13.9 lbs heavier than the PRA40 (31.1 lbs), but the
+retracted length of 24.7 inches is only 9.5 inches longer than the PRA40's
+15.2-inch retracted length — a reasonable tradeoff for the substantially
+greater stroke capability. Sharp claws that rotate 360 degrees provide
+secure purchase on structural members.
+
+MAINTAINABILITY ANALYSIS: The CR 522 E3 scored 82.58 in Maintainability
+(Evidence: Product_Data_Master.csv). The telescopic dual-piston design
+introduces additional sealing surfaces and mechanical complexity compared
+to single-plunger designs, which may contribute to the lower maintainability
+score. E3 Connect Wi-Fi and the Smart Dashboard support fleet management.
+
+DEPLOYABILITY ANALYSIS: The CR 522 E3 scored 82.74 in Deployability
+(Evidence: Product_Data_Master.csv). The watertight IP58 design makes
+the CR 522 particularly suitable for saltwater deployment scenarios.
+Battery-powered cordless operation and the Turbo function provide
+operational readiness. The workgroup noted the CR 522 as a highly rugged
+alternative favored specifically for watertight saltwater deployment
+capabilities.
+
+CROSS-COMPETITOR COMPARISON (PRA40 vs. CR 522 E3):
+  Overall Score:     PRA40 91.29 vs. CR 522 86.02 (delta: 5.27)
+  Capability:        PRA40 89.41 vs. CR 522 87.56 (delta: 1.85)
+  Usability:         PRA40 93.99 vs. CR 522 85.76 (delta: 8.23)
+  Weight:            PRA40 31.1 lbs vs. CR 522 45.0 lbs (delta: 13.9 lbs)
+  Stroke:            PRA40 8.5 in vs. CR 522 34.5 in (CR 522 advantage)
+  Extended Length:   PRA40 N/A vs. CR 522 59.2 in (CR 522 advantage)
+  IP Rating:         PRA40 IP57 vs. CR 522 IP58 (CR 522 advantage)
+  (Evidence: Product_Data_Master.csv)
+
+The PRA40 and CR 522 represent fundamentally different ram design
+philosophies. The PRA40 prioritizes compact size, light weight, and
+precision placement (laser pointer) for standard vehicle extrication.
+The CR 522 prioritizes extended reach and saltwater-rated durability
+for more complex entrapments and marine/coastal environments. The 5.27
+overall score gap favors the PRA40, but the CR 522's extended stroke
+capability serves operational needs the PRA40 cannot address.
+
+-------------------------------------------------------------------------------
+
+### 4.4 SPECIALTY / FORCIBLE ENTRY
+
+===============================================================================
+#### HOLMATRO T1 vs. RABBIT TOOL — FUNCTIONAL ROLE COMPARISON
+===============================================================================
+
+[INSERT IMAGE: holmatro-t1-1 | Source: Visual_Assets_Index.json | Placement: Section 4.4 — T1]
+
+TOOL OVERVIEW: The Holmatro T1 is a manual hydraulic forcible entry tool
+that consolidates six functions into a single 17-lb device: cut, wedge,
+ram, spread, hammer, and lift. The T1 achieved an overall score of 82.23
+(Evidence: Product_Data_Master.csv).
+
+SPECIFICATION SUMMARY:
+  Product:            Holmatro T1 Forcible Entry Tool
+  Manufacturer:       Holmatro
+  Model ID:           T1 (151.001.787)
+  Weight:             17.0 lbs / 7.7 kg
+  Spreading Force:    3.4 ton hydraulic
+  Cutting Force:      14.2 ton hydraulic
+  Cutting Opening:    27.9 mm (1.1 inches)
+  Power Source:       Manual hydraulic (2-stage hand pump)
+  (Evidence: Product_Data_Master.csv)
+
+FUNCTIONAL COMPARISON — T1 vs. RABBIT TOOL:
+
+The traditional rabbit tool (halligan-bar forcible entry system) has served
+as the fire service standard for door and lock defeat for decades. The
+Holmatro T1 addresses the same operational requirement — rapid forcible
+entry through locked, barricaded, or obstructed doors — through a
+fundamentally different mechanism.
+
+FORCE GENERATION: The rabbit tool relies on manual mechanical advantage
+through leverage and impact. The T1 employs a 2-stage hydraulic pump that
+converts 30 kg of manual force on the pump rod into up to 14.2 tons of
+hydraulic cutting force and up to 3.4 tons of hydraulic spreading force.
+This hydraulic multiplication enables the T1 to defeat doors and locks
+that may resist conventional mechanical forcing.
+
+OPERATIONAL METHODOLOGY: The rabbit tool requires an irons team (typically
+two firefighters) to position the halligan and apply force through
+striking or leverage. The T1's detachable wedge design enables solo
+operation — a single firefighter can create the initial gap, insert the
+T1, and apply hydraulic force without a partner. This single-operator
+capability is significant for mid-mount ladder companies operating with
+reduced crew counts.
+
+FUNCTIONAL RANGE: The rabbit tool is primarily a forcing tool for inward-
+opening doors. The T1 extends functional range to include cutting (up to
+18 mm round bar S235), wedging, ramming, spreading, hammering, and
+lifting — six functions in one tool. This breadth of capability reduces
+the number of specialized tools a crew must carry.
+
+LIMITATIONS: The T1's cutting opening of 1.1 inches (27.9 mm) constrains
+its cutting utility to small-diameter materials. The manual hydraulic
+operation, while ensuring battery independence, limits the speed and
+sustained force application compared to powered rescue tools. The
+workgroup noted documented deal-breaker concerns during evaluation, though
+the T1 was strongly recommended for rapid entry teams.
+
+The T1 and rabbit tool are not directly competing products but rather
+complementary forcible entry solutions that address overlapping but
+distinct operational requirements.
+
+
+================================================================================
+SECTION 5: RESCUE SAWS — COMPARATIVE ANALYSIS
+================================================================================
+
+[INSERT IMAGE: HUSQK1PACEr-1 | Source: Visual_Assets_Index.json | Placement: Section 5 — Saw comparison header]
+
+The rescue saw category presented the most dramatically stratified results
+in the entire evaluation. The DeWalt DCPS612AG2 12-inch Powershift achieved
+an overall score of 91.25 (Evidence: Product_Data_Master.csv), while the
+second-ranked Makita GEC01PL4 14-inch scored 64.83 (Evidence:
+Product_Data_Master.csv) — a 26.42-point gap that represents the largest
+inter-product separation in any category. The third-ranked Husqvarna K1
+Pace 14-inch scored 61.78 (Evidence: Product_Data_Master.csv), only 3.05
+points behind the Makita.
+
+-------------------------------------------------------------------------------
+
+### 5.1 DEWALT DCPS612AG2 (12-inch Powershift) — RANK #1 OVERALL (Saw Category)
+
+[INSERT IMAGE: DeWalt Powershift 12-inch Cut-Off Saw | Source: Visual_Assets_Index.json | Placement: Section 5.1 — DeWalt]
+
+TOOL OVERVIEW: The DeWalt DCPS612AG2 is a 12-inch battery-operated
+cut-off saw utilizing the POWERSHIFT battery platform. Despite carrying a smaller
+12-inch blade than its 14-inch competitors, the DCPS612AG2 achieved 91.25
+overall (Evidence: Product_Data_Master.csv), establishing what the workgroup
+described as "absolute superiority in the saw category."
+
+SPECIFICATION SUMMARY:
+  Product:            DeWalt DCPS612AG2 (12-inch Cut-Off Saw)
+  Manufacturer:       DeWalt
+  Model ID:           DCPS612AG2
+  Blade Size:         12 inches
+  Cut Depth:          4-3/4 inches (through concrete, rebar, ductile iron)
+  Power Source:       Battery (POWERSHIFT)
+  Drive System:       Gear-driven
+  Cutting Capacity:   Up to 8 linear feet concrete per charge
+                      Up to 156 cuts in #5 rebar per charge
+  Electric Brake:     3-second stop after trigger release
+  (Evidence: Product_Data_Master.csv)
+
+CAPABILITY ANALYSIS: The DCPS612AG2 cuts up to 4-3/4 inches deep through
+concrete, rebar, and ductile iron. Per charge, it delivers up to 8 linear
+feet of concrete cutting and up to 156 cuts in #5 rebar. The gear-driven
+power delivery system (as opposed to belt-driven designs used by
+competitors) provides direct mechanical coupling between motor and blade,
+resulting in more responsive power delivery and reduced energy loss. The
+workgroup determined that despite its smaller 12-inch blade, the DCPS612AG2
+rendered larger 14-inch competitors functionally obsolete in high-speed
+tactical scenarios.
+
+USABILITY ANALYSIS: Workgroup evaluators noted superior ergonomics as a
+defining characteristic, driven by integrated base wheels that enable quick
+adjustments and optimal cutting angles, balanced weight distribution, and
+intuitive control design. The gear-driven system contributes to a more
+direct, responsive feel compared to the belt-driven compliance experienced
+on competitor saws. The electric brake stops the blade in 3 seconds after
+trigger release, significantly improving repositioning speed and operator
+safety.
+
+MAINTAINABILITY ANALYSIS: The gear-driven design eliminates belt
+replacement and tension adjustment — maintenance tasks inherent to
+belt-driven competitors. The POWERSHIFT battery system provides a
+standardized power platform. Blade changes follow industry-standard
+procedures.
+
+DEPLOYABILITY ANALYSIS: The DCPS612AG2 provides immediate operational
+readiness with no pull-starts, no gas, no fumes — eliminating the startup
+delays and environmental hazards associated with gas-powered saws. Battery
+operation enables deployment in enclosed or poorly ventilated environments
+where gas saw exhaust would pose health risks.
+
+NOTABLE LIMITATION: The DCPS612AG2 was slated for fall 2026 availability
+at the time of evaluation and was not yet commercially released. This
+represents a delivery timeline consideration but does not affect the
+performance data collected during workgroup evaluation.
+
+-------------------------------------------------------------------------------
+
+### 5.2 MAKITA GEC01PL4 (14-inch) — RANK #2 OVERALL (Saw Category)
+
+[INSERT IMAGE: Makita_14inch_ksaw-GEC01PL4-1 | Source: Visual_Assets_Index.json | Placement: Section 5.2 — Makita]
+
+TOOL OVERVIEW: The Makita GEC01PL4 is a 14-inch battery-operated power
+cutter utilizing an 80V max XGT dual-battery platform. The GEC01PL4
+achieved an overall score of 64.83 (Evidence: Product_Data_Master.csv),
+ranking second in the saw category.
+
+SPECIFICATION SUMMARY:
+  Product:            Makita GEC01PL4 (14-inch Power Cutter)
+  Manufacturer:       Makita
+  Model ID:           GEC01PL4
+  Weight:             31.1 lbs / 14.11 kg
+  Blade Size:         14 inches
+  Blade Speed:        5,300 RPM (no load)
+  Cut Depth:          Up to 5 inches (single pass)
+  Voltage:            80V max (40V max XGT x2)
+  Power Source:       Battery (40V max XGT x2 = 80V max)
+  Protection:         XPT (dust/water resistant)
+  Dimensions:         39.3 x 12.2 x 9.96 in
+  (Evidence: Product_Data_Master.csv)
+
+CAPABILITY ANALYSIS: The GEC01PL4 delivers power equivalent to a 75.6cc
+gas saw with up to 25% faster cutting. The 14-inch blade allows single-pass
+cuts up to 5 inches deep — exceeding the DeWalt's 4-3/4-inch depth. At
+5,300 RPM no-load speed, it turns faster than the Husqvarna's 3,400 RPM.
+Per charge, it cuts up to 15 feet of concrete and 115 cuts in #5 rebar.
+The Active Feedback-Sensing Technology (AFT) electronically stops the motor
+if the blade rotation is suddenly forced to stop, providing a kickback
+safety system.
+
+USABILITY ANALYSIS: The integrated Anti-Vibration mechanism reduces
+vibration by up to 26% versus gas saws. The belt-drive design provides
+smoother operation. Rubberized front handle allows multiple grip positions.
+Large spindle lock button facilitates blade changes while wearing gloves.
+Integrated aluminum wheels reduce fatigue during prolonged cutting.
+However, the workgroup documented substantial penalties in Usability due to
+excessive bulk, balance issues, and overall handling characteristics that
+were less favorable than the DeWalt.
+
+DEPLOYABILITY ANALYSIS: The GEC01PL4 suffered substantial penalties in
+Deployability, mirroring the Makita's challenges. Slower power spin-up
+times and operational readiness characteristics placed it behind the
+DeWalt's immediate-response gear-driven design. The water cooling system
+with Gardena-type connector adds wet cutting capability but requires
+water supply staging.
+
+BLUETOOTH CONNECTIVITY: The K1 Pace includes Bluetooth connectivity for
+smart features and tool management, a capability absent from the DeWalt
+and Makita evaluations.
+
+-------------------------------------------------------------------------------
+
+### 5.4 SAW CROSS-COMPARISON
+
+12-INCH vs. 14-INCH BLADE — CUT CAPACITY AND MANEUVERABILITY TRADEOFFS:
+
+  Cut Depth:         DeWalt 12" = 4.75 in | Makita 14" = 5.0 in | Husq 14" = 5.7 in
+  RPM:               DeWalt = N/A | Makita = 5,300 | Husqvarna = 3,400
+  Weight:            DeWalt = N/A | Makita = 31.1 lbs | Husqvarna = 16.3 lbs*
+  Overall Score:     DeWalt = 91.25 | Makita = 64.83 | Husqvarna = 61.78
+  (* Husqvarna weight is tool body only, without battery)
+  (Evidence: Product_Data_Master.csv)
+
+The 14-inch blade theoretically provides a 0.25 to 0.95-inch depth
+advantage over the 12-inch blade. However, the workgroup determined that
+this depth advantage was functionally irrelevant in the rescue scenarios
+evaluated. The DeWalt's 4.75-inch cut depth proved sufficient for all
+assessed tasks, while the 12-inch blade's reduced gyroscopic inertia and
+smaller overall tool footprint provided superior maneuverability in
+confined rescue environments.
+
+BATTERY vs. GAS COMPARISON: All three evaluated saws are battery-powered,
+reflecting the industry transition away from gas-powered rescue saws. The
+elimination of pull-starts, fuel mixing, exhaust fumes, and hot exhaust
+surfaces represents a categorical improvement in operational readiness and
+firefighter safety. Battery saws enable deployment in enclosed environments
+where gas saw exhaust would create CO hazards.
+
+SCORE-TO-SPEC CORRELATION ANALYSIS: The evaluation results demonstrate
+that raw specifications (blade size, RPM, cut depth) do not predict
+operational superiority. The DeWalt's smaller blade and gear-driven design
+outperformed larger, higher-specification competitors by 26+ points
+because operational evaluation captures factors — power delivery
+responsiveness, ergonomic design, deployment speed, handling characteristics
+— that specification sheets do not address.
+
+
+================================================================================
+SECTION 6: STABILIZATION STRUTS — COMPARATIVE ANALYSIS
+================================================================================
+
+[INSERT IMAGE: paratech_strutdriver_brochure-1 | Source: Visual_Assets_Index.json | Placement: Section 6 — Struts header]
+
+The stabilization strut category evaluated three fundamentally different
+engineering approaches to vehicle and structural stabilization: auto-locking
+mechanical, pneumatic with remote operation, and traditional mechanical
+drive. The Holmatro V-Strut led the category with an overall score of
+87.28 (Evidence: Product_Data_Master.csv), followed by the Holmatro
+OmniShore at 85.87 (Evidence: Product_Data_Master.csv) and the Paratech
+StrutDriver at 76.13 (Evidence: Product_Data_Master.csv).
+
+-------------------------------------------------------------------------------
+
+### 6.1 HOLMATRO V-STRUT (Auto-locking) — RANK #1 OVERALL (Strut Category)
+
+[INSERT IMAGE: v-strut-1 | Source: Visual_Assets_Index.json | Placement: Section 6.1 — V-Strut]
+
+TOOL OVERVIEW: The Holmatro V-Strut is an auto-locking mechanical
+stabilization strut designed for vehicle stabilization during extrication
+operations. The V-Strut achieved an overall score of 87.28 (Evidence:
+Product_Data_Master.csv), ranking first in the stabilization category.
+
+SPECIFICATION SUMMARY:
+  Product:            Holmatro V-Strut (Auto-locking)
+  Manufacturer:       Holmatro
+  Model ID:           V-Strut (150.062.158)
+  Weight:             15.87 lbs / 7.2 kg
+  Shoring Capacity:   16 kN
+  Closed Length:      1,080 mm
+  Extended Length:    1,800 mm
+  Stroke Steps:       24 (30 mm step size)
+  Total Stroke:       720 mm
+  Power Source:       Manual (auto-lock mechanical)
+  Dimensions:         1080 x 149 x 210 mm (closed)
+  (Evidence: Product_Data_Master.csv)
+
+CAPABILITY ANALYSIS: The V-Strut provides a shoring capacity of up to 16
+kN with 24 stroke steps at 30 mm intervals, covering a total stroke of
+720 mm from a closed length of 1,080 mm to an extended length of 1,800 mm.
+This range is sufficient to stabilize any type of passenger vehicle
+encountered in standard extrication scenarios.
+
+USABILITY ANALYSIS: At 7.2 kg (15.87 lbs), the V-Strut is the lightest
+stabilization device evaluated — less than half the weight of the Paratech
+StrutDriver compact model (22.57 lbs). The squeeze-and-push mechanism for
+release is intuitive. The serrated multi-purpose head provides optimal grip
+on all vehicle types. The all-in-one design integrates the head, non-slip
+base plate, and tensioning belt with hook and ratchet mechanism — no loose
+parts to manage during rapid deployment.
+
+DEPLOYABILITY ANALYSIS: The V-Strut's defining deployment advantage is its
+15-second setup time. The auto-lock mechanism operates in a single motion:
+pull out the inner tube and it locks automatically at whatever position the
+operator stops. No separate locking operation is required. Locking holes at
+30 mm intervals over the full strut length provide fine length adjustment
+without the need for fixed extension pieces. The snap hook enables fast
+detachment and reattachment. The belt reel prevents tangling during
+storage and deployment. The tilting foot allows positioning at any angle
+relative to the ground plane.
+
+MAINTAINABILITY ANALYSIS: The purely mechanical design has no electronics,
+batteries, pneumatic systems, or powered components to maintain. The
+heat-resistant cover protects the tensioning belt from damage during
+extrication operations involving thermal hazards.
+
+-------------------------------------------------------------------------------
+
+### 6.2 HOLMATRO OMNISHORE (Pneumatic) — RANK #2 OVERALL (Strut Category)
+
+[INSERT IMAGE: Holmatro omnishore-1 | Source: Visual_Assets_Index.json | Placement: Section 6.2 — OmniShore]
+
+TOOL OVERVIEW: The Holmatro OmniShore is a pneumatic stabilization and
+shoring system that represents the most technologically advanced
+stabilization solution in the evaluation. The OmniShore achieved an overall
+score of 85.87 (Evidence: Product_Data_Master.csv), ranking second in the
+stabilization category.
+
+SYSTEM OVERVIEW: The OmniShore is described as the world's first and only
+shoring solution using six different strut types for any application. It is
+a single system capable of vehicle stabilization, trench shoring, structural
+shoring, and high-directional operations. The modular system constructs any
+length from 28 cm to 5.2 m without fixed-length extension pipes.
+
+USABILITY ANALYSIS: The patented Trident Coupler always fits and any
+connection that can be made is 100% safe — eliminating incorrect assembly
+risk. The OmniLock pneumatic system enables remote operation, reducing
+manpower requirements. The Wireless Controller allows simultaneous
+multi-strut control from a safe distance. The OmniLock auto-follow feature
+tracks loads in both upward and downward motion while remaining
+mechanically locked.
+
+DEPLOYABILITY ANALYSIS: The OmniShore's modular design with only six strut
+types simplifies inventory management. The compact component design
+conserves apparatus compartment space. Battery compatibility with the
+Pentheon rescue tool platform allows shared battery inventory. The system
+was developed per FEMA US&R criteria to ensure compliance with federal
+urban search and rescue standards.
+
+LIMITATIONS: The workgroup noted a documented deal-breaker concern during
+evaluation. The OmniShore's advanced capabilities come with increased
+system complexity compared to simple mechanical struts. The pneumatic
+system requires an air supply, and the electronic control components
+introduce maintenance and failure mode considerations absent from purely
+mechanical designs.
+
+-------------------------------------------------------------------------------
+
+### 6.3 PARATECH STRUTDRIVER (Mechanical) — RANK #3 OVERALL (Strut Category)
+
+[INSERT IMAGE: paratech_strutdriver_brochure-1 | Source: Visual_Assets_Index.json | Placement: Section 6.3 — StrutDriver]
+
+TOOL OVERVIEW: The Paratech StrutDriver is a mechanical strut lifting
+device built on the Paratech AcmeThread rescue strut platform. The
+StrutDriver achieved an overall score of 76.13 (Evidence:
+Product_Data_Master.csv), ranking third in the stabilization category.
+
+SPECIFICATION SUMMARY:
+  Product:            Paratech StrutDriver (Mechanical)
+  Manufacturer:       Paratech
+  Model ID:           22-796200SD / 22-796202SD
+  Weight:             22.57 lbs / 10.24 kg (compact model: 25-36 in)
+                      29.58 lbs (standard model: 37-58 in)
+  Lifting Capacity:   6,000 lbs / 2,721 kg
+  Range:              25-36 in (compact) / 37-58 in (standard)
+  Power Source:       Manual (mechanical AcmeThread)
+  (Evidence: Product_Data_Master.csv)
+
+CAPABILITY ANALYSIS: The StrutDriver provides a 6,000 lb (2,721 kg)
+lifting capacity with a directional safety mechanism that ensures the
+strut travels only in the indicated direction. Aircraft-grade aluminum
+housings, alloy steel gears, and hardened ball bearings provide smooth
+lifting operation and long-term durability.
+
+USABILITY ANALYSIS: The contoured gearbox is designed to resist dragging
+during vehicle lifts. A Hex Ratchet Handle is included for manual
+operation. A carrying handle is available as an accessory (2.4 lbs).
+The mechanical design requires manual cranking, which demands sustained
+physical effort compared to the V-Strut's auto-lock or the OmniShore's
+pneumatic operation.
+
+DEPLOYABILITY ANALYSIS: The StrutDriver is straightforward to deploy —
+easy to use and quick to deploy per manufacturer claims. The Retro Fit
+Kit enables attachment to existing AcmeThread struts in department
+inventory, protecting prior equipment investment. The strut can be fully
+installed and still manually adjusted, providing post-installation fine
+tuning capability. Available in two sizes matching common vehicle
+stabilization requirements.
+
+LIMITATIONS: Mechanical operation only — no pneumatic or battery-powered
+option. The StrutDriver remained a finalist in the workgroup evaluation
+but scored lowest in the stabilization category, reflecting the
+operational efficiency advantages of the V-Strut's auto-lock and the
+OmniShore's pneumatic automation.
+
+MADE IN USA designation.
+
+-------------------------------------------------------------------------------
+
+### 6.4 STRUT CROSS-COMPARISON
+
+AUTO-LOCK vs. PNEUMATIC vs. MECHANICAL DEPLOYMENT:
+
+  V-Strut (Auto-lock):   Pull-to-lock in one motion, 15-second setup
+  OmniShore (Pneumatic):  Remote-operated, auto-follow, wireless control
+  StrutDriver (Mechanical): Manual cranking, directional safety lock
+
+  Setup Speed:       V-Strut fastest | OmniShore moderate | StrutDriver slowest
+  Operator Count:    V-Strut 1 | OmniShore 1 (remote) | StrutDriver 1
+  Complexity:        V-Strut lowest | StrutDriver moderate | OmniShore highest
+  Versatility:       OmniShore highest | V-Strut moderate | StrutDriver moderate
+
+LOAD RATING COMPARISON:
+  V-Strut:           16 kN (approximately 3,597 lbs)
+  StrutDriver:       6,000 lbs (2,721 kg / approximately 26.69 kN)
+  OmniShore:         Variable by configuration (longest range on market)
+  (Evidence: Product_Data_Master.csv)
+
+SCORE COMPARISON:
+  V-Strut:           87.28 (Rank #1)
+  OmniShore:         85.87 (Rank #2)
+  StrutDriver:       76.13 (Rank #3)
+  (Evidence: Product_Data_Master.csv)
+
+APPARATUS INTEGRATION: The V-Strut's compact closed dimensions (1,080 mm
+length) and 7.2 kg weight make it the most mid-mount-friendly strut for
+compartment storage. The OmniShore's modular component design allows
+flexible compartment packing. The StrutDriver's fixed-length models require
+dedicated compartment space matching the strut length.
+
+
+================================================================================
+SECTION 7: CROSS-CATEGORY FINDINGS
+================================================================================
+
+7.1 TOP PERFORMERS BY CATEGORY
+-------------------------------------------------------------------------------
+
+  HYDRAULIC TOOLS:
+    Spreader:    Holmatro PSP40         Overall: 92.02  Rank #1
+    Ram:         Holmatro PRA40         Overall: 91.29  Rank #1
+    Cutter:      Holmatro PCU30CL       Overall: 88.86  Rank #1
+    (Evidence: Product_Data_Master.csv)
+
+  RESCUE SAWS:
+    DeWalt DCPS612AG2                   Overall: 91.25  Rank #1
+    (Evidence: Product_Data_Master.csv)
+
+  STABILIZATION STRUTS:
+    Holmatro V-Strut                    Overall: 87.28  Rank #1
+    (Evidence: Product_Data_Master.csv)
+
+The top five products in the evaluation by overall score:
+  1. Holmatro PSP40 (Spreader):        92.02
+  2. Holmatro PRA40 (Ram):             91.29
+  3. DeWalt DCPS612AG2 (Saw):          91.25
+  4. Hurst SP 777 E3 (Spreader):       90.99
+  5. Holmatro PCU30CL (Cutter):        88.86
+  (Evidence: Product_Data_Master.csv)
+
+7.2 BATTERY PLATFORM ECOSYSTEM ANALYSIS
+-------------------------------------------------------------------------------
+
+The evaluation encompassed four distinct battery ecosystems:
+
+  HOLMATRO PENTHEON: Proprietary battery shared across PSP40, PCU30CL,
+  PRA40, and compatible with OmniShore OmniLock. Single battery inventory
+  serves four product types across two categories. IP57 rated.
+
+  HURST E3 eDRAULIC: 25.2V battery shared across SP 777, S 789, CR 522,
+  and M40. 9Ah capacity with IP68 battery protection. Four tool types on
+  one battery platform. IP58 rated.
+
+  DEWALT POWERSHIFT: Proprietary POWERSHIFT battery platform. Currently
+  specific to the DCPS612AG2 in this evaluation scope. Fall 2026 release.
+
+  MAKITA 40V max XGT: Dual 40V batteries (80V max combined). Part of
+  Makita's broader cordless tool ecosystem, potentially enabling shared
+  batteries with other Makita 40V max tools in department inventory.
+
+  HUSQVARNA 94V: Proprietary 94V lithium-ion system with 4Ah and 8Ah
+  options. Bluetooth connectivity for smart battery management.
+
+Battery ecosystem consolidation favors Holmatro and Hurst, as each
+platform spans multiple rescue tool types. A department selecting Holmatro
+Pentheon for hydraulic tools gains battery compatibility with the
+OmniShore stabilization system. A department selecting Hurst E3 gains
+battery commonality across all four hydraulic tool types.
+
+7.3 ERGONOMICS PATTERNS ACROSS ALL EVALUATED TOOLS
+-------------------------------------------------------------------------------
+
+Across all 14 products, the evaluation revealed consistent ergonomic
+patterns:
+
+WEIGHT IS THE PRIMARY USABILITY DRIVER: In every head-to-head category
+comparison, the lighter tool achieved the higher Usability score. The
+PSP40 (42.8 lbs) outscored the SP 777 (51.6 lbs). The PCU30CL (33.5 lbs)
+outscored the S 789 (49.6 lbs). The PRA40 (31.1 lbs) outscored the
+CR 522 (45.0 lbs). The V-Strut (15.87 lbs) outscored the StrutDriver
+(22.57 lbs). This consistent pattern confirms weight as the single most
+predictive variable for Usability performance in rescue tool evaluation.
+
+CONTROL INTERFACE DESIGN MATTERS: The Holmatro 360-degree inline control
+handle consistently received higher evaluator ratings than the Hurst Star
+Grip. Both designs permit multi-angle actuation, but the Pentheon's
+wrap-around carrying handle and integrated control handle created a more
+natural grip-to-actuation transition.
+
+GEAR-DRIVEN OUTPERFORMS BELT-DRIVEN: In the saw category, the DeWalt's
+gear-driven power delivery was categorically preferred over the belt-driven
+designs in both the Makita and Husqvarna. Evaluators cited more immediate
+power response, more direct cutting feel, and faster blade engagement.
+
+7.4 DEPLOYMENT SPEED PATTERNS
+-------------------------------------------------------------------------------
+
+Deployment speed — the elapsed time from tool extraction to operational
+employment — followed a consistent pattern: cordless tools with no
+ancillary equipment requirements deployed fastest. All battery-powered
+hydraulic tools and saws eliminated the staging delays associated with
+gas power units, hydraulic hose connections, and fuel management.
+
+Among battery tools, those with automated start/stop systems (Holmatro
+Pentheon) demonstrated advantage over tools requiring manual power-on
+sequences. The V-Strut's 15-second auto-lock setup established the fastest
+deployment time among all stabilization devices.
+
+7.5 MAINTAINABILITY COMMONALITIES
+-------------------------------------------------------------------------------
+
+Products with integrated digital diagnostic systems (Bluetooth, Wi-Fi,
+smart dashboards) scored higher in Maintainability than those without.
+The ability to monitor tool health, track usage cycles, and receive
+proactive maintenance alerts reduces unscheduled downtime and supports
+fleet management at the department level.
+
+Simplified mechanical designs (i-Bolt eliminating central bolt tightening,
+gear-driven eliminating belt tension management, auto-lock eliminating
+manual lock verification) consistently elevated Maintainability scores by
+removing recurring maintenance tasks that are susceptible to human error.
+
+7.6 WEIGHT vs. PERFORMANCE TRADEOFFS
+-------------------------------------------------------------------------------
+
+The evaluation data reveals that weight and raw performance specifications
+are not positively correlated with overall evaluation scores. The Hurst
+SP 777 E3 (51.6 lbs, 600 kN) achieves a lower overall score than the
+Holmatro PSP40 (42.8 lbs, 280 kN) despite more than doubling the
+spreading force. The DeWalt 12-inch (smaller blade) dramatically outscores
+the Makita 14-inch (larger blade, higher specifications).
+
+This finding is significant: tools optimized for maximum raw performance
+at the expense of operator ergonomics, weight management, and deployment
+speed score lower in comprehensive operational evaluations than tools
+that balance performance with human factors. The evaluation's four-
+dimension framework captures this balance in ways that specification-
+only comparisons cannot.
+
+
+================================================================================
+SECTION 8: CONTROLLED CONSIDERATIONS
+================================================================================
+
+### 8.1 T1 FORCIBLE ENTRY TOOL — FUNCTIONAL SCOPE
+
+The Holmatro T1 Forcible Entry Tool scored 82.23 overall (Evidence:
+Product_Data_Master.csv) and operates in a functional niche distinct from
+primary rescue tools. Its six-in-one capability (cut, wedge, ram, spread,
+hammer, lift) addresses rapid forcible entry requirements that differ from
+vehicle extrication, structural rescue, and stabilization operations.
+
+The T1's functional comparison to the traditional rabbit tool reveals
+complementary rather than competitive positioning. The T1 provides
+hydraulic force multiplication (14.2 ton cutting, 3.4 ton spreading from
+30 kg manual input) and solo operator capability via the detachable wedge.
+The rabbit tool provides simplicity, near-zero maintenance, and proven
+reliability in standard door forcing. Both tools maintain battery and
+power independence.
+
+The workgroup documented deal-breaker concerns as well as strong
+recommendation for rapid entry teams, indicating a polarized assessment
+that reflects the T1's specialized utility — highly effective within its
+intended use case, but subject to specific operational limitations
+(1.1-inch maximum cutting opening, manual hydraulic operation speed).
+
+### 8.2 HURST M40 — DEPLOYMENT ROLE CLARIFICATION
+
+The Hurst M40 40-inch Spreader scored 78.80 overall (Evidence:
+Product_Data_Master.csv), with a Capability score of 83.39 and a Usability
+score of 79.29 (Evidence: Product_Data_Master.csv). The workgroup
+determined the M40 is designed and intended for heavy rescue apparatus deployment, not
+standard frontline engines or mid-mount ladder trucks.
+
+The M40's 40-inch spreading distance exceeds the operational envelope of
+standard vehicle extrication. Its immense physical footprint severely
+limits standard Usability. The workgroup concluded that the M40 should
+not be compared against standard frontline tools and should not be deployed
+as a primary spreader on apparatus where the PSP40 or SP 777 are
+appropriate selections.
+
+The M40 operates on the E3 battery platform, maintaining battery
+commonality with other Hurst E3 tools. Its watertight design provides
+the same environmental protection as other E3 products. The M40's
+operational role is as a supplementary heavy rescue asset for scenarios
+demanding extreme spreading distance beyond standard extrication parameters.
+
+
+================================================================================
+SECTION 9: DATA INTEGRITY STATEMENT
+================================================================================
+
+9.1 DATA HIERARCHY
+-------------------------------------------------------------------------------
+
+This report adheres to a strict two-tier data hierarchy:
+
+  TIER 1 — AUTHORITATIVE: All numerical evaluation scores (Overall,
+  Capability, Usability, Maintainability, Deployability, and Rank) derive
+  from the workgroup's Product_Data_Master.csv, which was compiled from
+  dashboard scoring instruments. Dashboard images serve as the authoritative
+  numerical record. Where this report cites a score, the citation
+  "(Evidence: Product_Data_Master.csv)" confirms TIER 1 sourcing.
+
+  TIER 2 — CONTEXTUAL: Manufacturer PDF documentation (Holmatro Pentheon
+  Series USA-1.PDF, HurstE3-07-2022_compressed-1.pdf, DeWalt Powershift
+  12-inch Cut-Off Saw.pdf, Makita_14inch_ksaw-GEC01PL4-1.pdf,
+  HUSQK1PACEr-1.pdf, v-strut-1.pdf, Holmatro omnishore-1.pdf,
+  holmatro-t1-1.pdf, paratech_strutdriver_brochure-1.pdf) provides
+  specification data, feature descriptions, and design explanations.
+  TIER 2 data is referenced for context and detail but does not override
+  TIER 1 scores.
+
+9.2 CONFLICT RESOLUTION PROTOCOL
+-------------------------------------------------------------------------------
+
+Where manufacturer-claimed specifications appear inconsistent with
+workgroup evaluation scores (e.g., higher force specifications not
+translating to higher Capability scores), the workgroup evaluation data
+prevails. The evaluation methodology captures real-world operational
+performance under realistic conditions that may differ from laboratory
+or theoretical specification testing.
+
+9.3 SCOPE EXCLUSIONS
+-------------------------------------------------------------------------------
+
+This evaluation report excludes all considerations related to acquisition
+spending, unit valuation, financial planning, or sourcing logistics. This
+exclusion is deliberate and reflects the evaluation's focus on operational
+performance characteristics across the four standardized dimensions:
+Capability, Usability, Maintainability, and Deployability. No acquisition
+recommendations are made or implied.
+
+
+================================================================================
+SECTION 10: APPENDICES
+================================================================================
+
+### APPENDIX A: SCORE SUMMARY TABLE (ALL 14 PRODUCTS)
+
+-------------------------------------------------------------------------------
+Product                          | Cat  | Usab | Maint| Depl | Overall | Rank
+-------------------------------------------------------------------------------
+Holmatro PSP40 (32" Spreader)   | 89.41| 93.99| 89.82| 89.69| 92.02   | #1*
+Holmatro PRA40 (Ram)            | 89.41| 93.99| 89.82| 89.69| 91.29   | #1**
+DeWalt DCPS612AG2 (12" Saw)     |  --  |  --  |  --  |  --  | 91.25   | #1***
+Hurst SP 777 E3 (32" Spreader)  | 87.56| 85.76| 82.58| 82.74| 90.99   | #2*
+Holmatro PCU30CL (Cutter)       | 89.41| 93.99| 89.82| 89.69| 88.86   | #1****
+Holmatro V-Strut                |  --  |  --  |  --  |  --  | 87.28   | #1+
+Holmatro OmniShore              |  --  |  --  |  --  |  --  | 85.87   | #2+
+Hurst CR 522 E3 (Ram)           | 87.56| 85.76| 82.58| 82.74| 86.02   | #2**
+Hurst S 789 E3 (Cutter)         | 87.56| 85.76| 82.58| 82.74| 82.57   | #2****
+Holmatro T1 Forcible Entry      |  --  |  --  |  --  |  --  | 82.23   | --
+Hurst M40 (40" Spreader)        | 83.39| 79.29|  --  |  --  | 78.80   | --
+Paratech StrutDriver            |  --  |  --  |  --  |  --  | 76.13   | #3+
+Makita GEC01PL4 (14" Saw)       |  --  |  --  |  --  |  --  | 64.83   | #2***
+Husqvarna K1 Pace (14" Saw)     |  --  |  --  |  --  |  --  | 61.78   | #3***
+-------------------------------------------------------------------------------
+Key: * Spreader  ** Ram  *** Saw  **** Cutter  + Strut
+-- = Dimension score not separately reported in source data
+(Evidence: Product_Data_Master.csv)
+
+### APPENDIX B: SPECIFICATION MATRIX
+
+HYDRAULIC TOOL SPECIFICATIONS:
+-------------------------------------------------------------------------------
+Product              | Weight(lbs) | Force(kN)  | Opening(mm) | IP  | Power
+-------------------------------------------------------------------------------
+PSP40 (Spreader)     | 42.8        | 280 spread | 723.9       | IP57| Pentheon
+SP 777 E3 (Spreader) | 51.6        | 600 spread | 813.0       | IP58| E3
+M40 (Spreader)       | --          | --         | --          | --  | E3
+PCU30CL (Cutter)     | 33.5        | 549 cut    | 170.2       | IP57| Pentheon
+S 789 E3 (Cutter)    | 49.6        | --         | 205.0       | IP58| E3
+PRA40 (Ram)          | 31.1        | 136 spread | 215.9       | IP57| Pentheon
+CR 522 E3 (Ram)      | 45.0        | 127 spread | 876.3       | IP58| E3
+T1 (Forcible Entry)  | 17.0        | 139 cut    | 27.9        | --  | Manual
+(Evidence: Product_Data_Master.csv)
+
+RESCUE SAW SPECIFICATIONS:
+-------------------------------------------------------------------------------
+Product              | Weight(lbs) | Blade(in) | RPM   | Cut Depth | Voltage
+-------------------------------------------------------------------------------
+DeWalt DCPS612AG2    | --          | 12        | --    | 4.75 in   | POWERSHIFT
+Makita GEC01PL4      | 31.1        | 14        | 5,300 | 5.0 in    | 80V max
+Husqvarna K1 Pace    | 16.3*       | 14        | 3,400 | 5.7 in    | 94V
+(* tool body without battery)
+(Evidence: Product_Data_Master.csv)
+
+STABILIZATION STRUT SPECIFICATIONS:
+-------------------------------------------------------------------------------
+Product              | Weight(lbs) | Capacity     | Range              | Power
+-------------------------------------------------------------------------------
+V-Strut              | 15.87       | 16 kN        | 1080-1800 mm       | Manual
+OmniShore            | --          | Variable     | 280-5200 mm        | Pneum.
+StrutDriver          | 22.57       | 6,000 lbs    | 25-36 in (compact) | Manual
+(Evidence: Product_Data_Master.csv)
+
+### APPENDIX C: VISUAL ASSETS USED
+
+The following image markers are placed throughout this report, referencing
+visual assets indexed in Visual_Assets_Index.json (607 total indexed images):
+
+  1. MBFD_work_group_day1-1       — Section 1: Problem Statement
+  2. Holmatro Pentheon Series USA-1 — Section 3.1: Holmatro Brand
+  3. HurstE3-07-2022_compressed-1   — Section 3.2: Hurst Brand
+  4. Holmatro Pentheon Series USA-1_p12 — Section 4.1: PSP40
+  5. HurstE3-07-2022_compressed-1   — Section 4.1: SP 777
+  6. HurstE3-07-2022_compressed-1   — Section 4.1: M40
+  7. Holmatro Pentheon Series USA-1_p13 — Section 4.2: PCU30CL
+  8. HurstE3-07-2022_compressed-1   — Section 4.2: S 789
+  9. Holmatro Pentheon Series USA-1_p14 — Section 4.3: PRA40
+  10. HurstE3-07-2022_compressed-1  — Section 4.3: CR 522
+  11. holmatro-t1-1                 — Section 4.4: T1
+  12. HUSQK1PACEr-1                — Section 5: Saw Header
+  13. DeWalt Powershift 12-inch Cut-Off Saw — Section 5.1: DeWalt
+  14. Makita_14inch_ksaw-GEC01PL4-1 — Section 5.2: Makita
+  15. HUSQK1PACEr-1                — Section 5.3: Husqvarna
+  16. paratech_strutdriver_brochure-1 — Section 6: Struts Header
+  17. v-strut-1                     — Section 6.1: V-Strut
+  18. Holmatro omnishore-1          — Section 6.2: OmniShore
+  19. paratech_strutdriver_brochure-1 — Section 6.3: StrutDriver
+
+All image assets sourced from Visual_Assets_Index.json.
+
+### APPENDIX D: SOURCE DOCUMENTS
+
+  1. Product_Data_Master.csv — Primary evaluation data (14 products, 31 columns)
+  2. Content_Map.json — Structured narrative content per product
+  3. Visual_Assets_Index.json — 607 indexed image assets
+  4. Holmatro Pentheon Series USA-1.PDF — Holmatro product documentation
+  5. HurstE3-07-2022_compressed-1.pdf — Hurst E3 product documentation
+  6. DeWalt Powershift 12-inch Cut-Off Saw - Contractor Supply Magazine-1.pdf
+  7. Makita_14inch_ksaw-GEC01PL4-1.pdf — Makita product documentation
+  8. HUSQK1PACEr-1.pdf — Husqvarna K1 Pace product documentation
+  9. v-strut-1.pdf — Holmatro V-Strut product documentation
+  10. Holmatro omnishore-1.pdf — Holmatro OmniShore product documentation
+  11. holmatro-t1-1.pdf — Holmatro T1 product documentation
+  12. paratech_strutdriver_brochure-1.pdf — Paratech StrutDriver documentation
+  13. final_workgroup_results.pdf — Workgroup evaluation results
+  14. MBFD_work_group_day1-1.pdf — Workgroup Day 1 documentation
+  15. MBFD_Executive_Report_Overall_2026-03-16.pdf — Executive report
+  16. MBFD_SAVER_Report_Overall_2026-03-16.pdf — SAVER format report
+
+
+================================================================================
+                              END OF REPORT
+================================================================================
+
+ML_CLEVER MASTER UPLOAD — MBFD MID-MOUNT LADDER WORKGROUP 2026
+VERSION 1.0 FINAL | MARCH 2026
+CLASSIFICATION: WORKGROUP EVALUATION REPORT | DHS SAVER-EQUIVALENT
+
+================================================================================

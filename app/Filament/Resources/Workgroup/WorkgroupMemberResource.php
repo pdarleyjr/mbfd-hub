@@ -98,12 +98,6 @@ class WorkgroupMemberResource extends Resource
                 Tables\Columns\TextColumn::make('user.email')
                     ->searchable()
                     ->label('Email'),
-                Tables\Columns\TextColumn::make('user.plain_password')
-                    ->label('Password')
-                    ->placeholder('Not set')
-                    ->toggleable()
-                    ->copyable()
-                    ->copyMessage('Password copied'),
                 Tables\Columns\TextColumn::make('workgroup.name')
                     ->searchable()
                     ->sortable()
@@ -163,7 +157,6 @@ class WorkgroupMemberResource extends Resource
                         if ($user) {
                             $user->update([
                                 'password' => Hash::make($data['new_password']),
-                                'plain_password' => $data['new_password'],
                             ]);
                             Notification::make()
                                 ->title("Password set for {$user->name}")

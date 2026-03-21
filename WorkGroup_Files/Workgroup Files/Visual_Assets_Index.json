@@ -1,0 +1,4858 @@
+[
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p0_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p0_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p0_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p1_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p2_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p2_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p2_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p3_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p3_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p3_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p3_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p3_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p4_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p4_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p4_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p4_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p4_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p5_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p6_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p6_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p7_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p7_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p7_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p7_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p7_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p7_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p7_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p7_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p7_i8.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "V-Strut",
+    "image_file": "images/cleaned/v-strut-1_p7_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "DeWalt Powershift",
+    "image_file": "images/cleaned/DeWalt Powershift 12-inch Cut-Off Saw - Contractor Supply Magazine-1_p0_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p0_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p0_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p0_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p0_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p0_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p0_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p1_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p1_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p1_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p1_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p1_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p1_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p1_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p1_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p2_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p2_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p2_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p2_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p2_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p2_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p2_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p2_i8.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p2_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p3_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p3_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p3_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p3_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p3_i8.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p3_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p3_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p3_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p4_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p4_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p4_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/final_workgroup_results_p4_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p0_i52.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p0_i54.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p1_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p1_i53.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p1_i54.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p1_i55.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p1_i57.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p2_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p3_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i23.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i34.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i45.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i67.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i78.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i82.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p4_i83.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p5_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p5_i474.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p5_i475.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p5_i476.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p5_i478.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p5_i479.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p5_i480.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p5_i481.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p5_i482.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p6_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p7_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Omnishore",
+    "image_file": "images/cleaned/Holmatro omnishore-1_p8_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p0_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p0_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p0_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p0_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p0_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p0_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p0_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p0_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p1_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p2_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p3_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p4_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p5_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p6_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p7_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p8_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p9_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p10_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i8.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i17.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p11_i20.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p12_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i8.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i17.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i18.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i19.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p13_i20.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i8.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i17.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i18.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i19.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i20.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i23.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i26.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i27.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i28.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p14_i29.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p15_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i8.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i17.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i18.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i19.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i20.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p16_i21.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p17_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i15.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p18_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i8.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i12.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i14.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i16.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i17.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i18.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i19.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p19_i20.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i67.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i90.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i119.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i121.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i124.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i127.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i128.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i133.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i138.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i144.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i155.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i177.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i188.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p20_i199.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p22_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p22_i8.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p22_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p22_i17.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p22_i28.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p22_i39.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p22_i50.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p22_i61.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p22_i72.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p22_i73.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p22_i94.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i11.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i13.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i24.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i35.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i46.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i50.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i51.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i52.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i53.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i55.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i58.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i60.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i61.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i65.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i66.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i67.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i69.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i99.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i111.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p23_i122.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p24_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p24_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p24_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p24_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p24_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p24_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p24_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro Pentheon",
+    "image_file": "images/cleaned/Holmatro Pentheon Series USA-1_p24_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro T1",
+    "image_file": "images/cleaned/holmatro-t1-1_p0_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro T1",
+    "image_file": "images/cleaned/holmatro-t1-1_p1_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro T1",
+    "image_file": "images/cleaned/holmatro-t1-1_p2_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro T1",
+    "image_file": "images/cleaned/holmatro-t1-1_p2_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro T1",
+    "image_file": "images/cleaned/holmatro-t1-1_p2_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro T1",
+    "image_file": "images/cleaned/holmatro-t1-1_p2_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro T1",
+    "image_file": "images/cleaned/holmatro-t1-1_p2_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro T1",
+    "image_file": "images/cleaned/holmatro-t1-1_p2_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro T1",
+    "image_file": "images/cleaned/holmatro-t1-1_p2_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Holmatro T1",
+    "image_file": "images/cleaned/holmatro-t1-1_p3_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p0_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p0_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p0_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p0_i23.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p0_i24.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p0_i25.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p1_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p1_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p1_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p1_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p1_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p2_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p2_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p2_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p3_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p3_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p3_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p4_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p4_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p4_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p5_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p5_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p5_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p6_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p6_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p7_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p7_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p7_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p8_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p8_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p8_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p9_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p9_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p9_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p10_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p10_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p10_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p11_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p11_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p11_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p12_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p12_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p13_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p13_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p14_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p14_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p14_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p14_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p14_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p14_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p14_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p14_i8.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p14_i9.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p14_i10.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Hurst E3",
+    "image_file": "images/cleaned/HurstE3-07-2022_compressed-1_p15_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Makita GEC01PL4",
+    "image_file": "images/cleaned/Makita_14inch_ksaw-GEC01PL4-1_p1_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p0_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p0_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p0_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p1_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p1_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p2_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p2_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p3_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p3_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p4_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p4_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p5_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p5_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p5_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p5_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p6_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p6_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p6_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p7_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p7_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p8_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p8_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p9_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p9_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p9_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p10_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p10_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p11_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p11_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p12_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p12_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p12_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p13_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p13_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p14_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-1_p14_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p0_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p0_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p0_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p1_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p1_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p2_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p2_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p3_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p3_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p4_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p4_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p5_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p5_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p5_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p5_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p6_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p6_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p6_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p7_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p7_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p8_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p8_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p9_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p9_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p9_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p10_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p10_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p11_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p11_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p12_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p12_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p12_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p13_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p13_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p14_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/cleaned/MBFD_work_group_day1-2_p14_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "Paratech StrutDriver",
+    "image_file": "images/cleaned/paratech_strutdriver_brochure-1_p0_i0.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Paratech StrutDriver",
+    "image_file": "images/cleaned/paratech_strutdriver_brochure-1_p0_i1.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Paratech StrutDriver",
+    "image_file": "images/cleaned/paratech_strutdriver_brochure-1_p0_i2.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Paratech StrutDriver",
+    "image_file": "images/cleaned/paratech_strutdriver_brochure-1_p0_i3.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Paratech StrutDriver",
+    "image_file": "images/cleaned/paratech_strutdriver_brochure-1_p0_i4.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Paratech StrutDriver",
+    "image_file": "images/cleaned/paratech_strutdriver_brochure-1_p0_i5.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Paratech StrutDriver",
+    "image_file": "images/cleaned/paratech_strutdriver_brochure-1_p0_i6.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "Paratech StrutDriver",
+    "image_file": "images/cleaned/paratech_strutdriver_brochure-1_p0_i7.png",
+    "type": "tool",
+    "placement": "",
+    "caption": "",
+    "priority": "high"
+  },
+  {
+    "product": "",
+    "image_file": "images/raw/Screenshot 2026-03-18 at 06-44-57 Workgroup Data Dashboard.png",
+    "type": "dashboard",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/raw/Screenshot 2026-03-18 at 06-45-03 Workgroup Data Dashboard.png",
+    "type": "dashboard",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/raw/Screenshot 2026-03-18 at 06-45-08 Workgroup Data Dashboard.png",
+    "type": "dashboard",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/raw/Screenshot 2026-03-18 at 06-45-13 Workgroup Data Dashboard.png",
+    "type": "dashboard",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  },
+  {
+    "product": "",
+    "image_file": "images/raw/Screenshot 2026-03-18 at 06-45-18 Workgroup Data Dashboard.png",
+    "type": "dashboard",
+    "placement": "",
+    "caption": "",
+    "priority": "medium"
+  }
+]

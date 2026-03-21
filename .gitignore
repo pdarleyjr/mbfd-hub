@@ -77,3 +77,6 @@ laravel-app/vendor/
 # Build output
 /public/build/
 laravel-app/public/build/
+
+# Security: exclude database backups
+backups/

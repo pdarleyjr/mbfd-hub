@@ -1,0 +1,151 @@
+---
+title: "MBFD Mid-Mount Ladder Workgroup — Final Equipment Selection & Implementation Report"
+subtitle: "Miami Beach Fire Department — Q1 2026"
+date: "March 18, 2026"
+author: "Mid-Mount Ladder Workgroup"
+format:
+  typst:
+    columns: 2
+    margin:
+      x: 0.75in
+      y: 0.75in
+    fontsize: 10pt
+    mainfont: "Libertinus Serif"
+    sansfont: "Libertinus Sans"
+---
+
+# Executive Summary
+
+This report documents the **final outcome** of the Miami Beach Fire Department Mid-Mount Ladder Workgroup evaluation process (Q1 2026). Following structured multi-day evaluations of hydraulic rescue tools, cut-off saws, vehicle stabilization systems, and specialty tools, the workgroup has reached consensus on final equipment selections.
+
+This report is submitted to **Fire Chief Digna Abello** and the **Health & Safety Committee**.
+
+## Final Selections Summary
+
+| Category | Selected Equipment | Platform |
+|----------|--------------------|----------|
+| Cut-Off Saw | DeWalt 12" Battery Cut-Off Saw | Frontline |
+| Chainsaw | DeWalt 18" Chainsaw | Frontline |
+| Stabilization | 4 × Holmatro V-Struts | Frontline |
+| Spreader | Hurst SP 777 E3 Connect | CAPTIUM |
+| Cutter | Hurst S 789 E3 Connect | CAPTIUM |
+| Ram | Hurst CR 522 E3 Connect | CAPTIUM |
+| Specialty (Trial) | Holmatro T1 | Trial |
+| Heavy Extrication | Hurst M40 (40" spreader) | 300 (BC) |
+| Future Addition | Lifting Struts (pending) | 300 / Capt 5 |
+
+# Evaluation Framework
+
+The workgroup employed a standardized scoring model across all 14 products from 6 manufacturers.
+
+**Scoring Dimensions:**
+
+| Dimension | Description |
+|-----------|-------------|
+| Capability | Force output, cutting capacity, spreading distance |
+| Usability | Ergonomics, control interface, operator comfort |
+| Maintainability | Service requirements, durability, field-repairability |
+| Deployability | Storage footprint, activation speed, weight |
+
+Each dimension scored 0–100. Composite **Overall Score** computed as weighted aggregate.
+
+# Brand Performance
+
+| Brand | Products | Avg. Score |
+|-------|----------|-----------|
+| DeWalt | 1 | 91.25 |
+| Holmatro | 6 | 87.93 |
+| Hurst | 4 | 84.60 |
+| Paratech | 1 | 76.13 |
+| Makita | 1 | 64.83 |
+| Husqvarna | 1 | 61.78 |
+
+## Holmatro vs. Hurst Dimension Comparison
+
+| Dimension | Holmatro | Hurst | Δ |
+|-----------|----------|-------|---|
+| Capability | 89.41 | 87.56 | +1.85 |
+| Usability | 93.99 | 85.76 | +8.23 |
+| Maintainability | 89.82 | 82.58 | +7.24 |
+| Deployability | 89.69 | 82.74 | +6.95 |
+
+Holmatro leads all four dimensions, largest gap in **Usability** (+8.23 pts).
+
+# Frontline Tools
+
+## Spreaders
+
+| Product | Score | Cap. | Usab. | Maint. | Deploy. |
+|---------|-------|------|-------|--------|---------|
+| Holmatro PSP40 | **92.02** | 89.41 | 93.99 | 89.82 | 89.69 |
+| Hurst SP 777 E3 | **90.99** | 87.56 | 85.76 | 82.58 | 82.74 |
+
+## Cutters
+
+| Product | Score | Cap. | Usab. | Maint. | Deploy. |
+|---------|-------|------|-------|--------|---------|
+| Holmatro PCU30CL | **88.86** | 89.41 | 93.99 | 89.82 | 89.69 |
+| Hurst S 789 E3 | **82.57** | 87.56 | 85.76 | 82.58 | 82.74 |
+
+## Rams
+
+| Product | Score | Cap. | Usab. | Maint. | Deploy. |
+|---------|-------|------|-------|--------|---------|
+| Holmatro PRA40 | **91.29** | 89.41 | 93.99 | 89.82 | 89.69 |
+| Hurst CR 522 E3 | **86.02** | 87.56 | 85.76 | 82.58 | 82.74 |
+
+# Cut-Off Saws
+
+| Product | Score | Blade | RPM |
+|---------|-------|-------|-----|
+| DeWalt DCPS612AG2 | **91.25** | 12" | — |
+| Makita GEC01PL4 | **64.83** | 14" | 5,300 |
+| Husqvarna K1 Pace | **61.78** | 14" | 3,400 |
+
+DeWalt outperformed 14" competitors by 26–29 points despite smaller blade.
+
+# Vehicle Stabilization
+
+| Product | Score | Mechanism | Weight |
+|---------|-------|-----------|--------|
+| Holmatro V-Strut | **87.28** | Auto-lock | 15.87 lbs |
+| Holmatro OmniShore | **85.87** | Pneumatic | — |
+| Paratech StrutDriver | **76.13** | Manual | 22.57 lbs |
+
+V-Strut auto-lock enables 15-second setup at 15.87 lbs.
+
+# Specialty Tools
+
+## Holmatro T1 — Score: 82.23
+
+Six-function tool (cut, wedge, ram, spread, hammer, lift) at 17 lbs. Trial basis as Rabbit tool replacement candidate.
+
+## Hurst M40 — Score: 78.80
+
+40" heavy spreader for 300 (Battalion Chief) vehicle. Supplemental heavy rescue capability.
+
+# Apparatus Deployment
+
+## Frontline (L1 / L3)
+
+All Hurst E3 CAPTIUM tools + 4× V-Struts + DeWalt saw/chainsaw + T1 trial.
+
+## Command Level (300 / Captain 5)
+
+Hurst M40 + batteries + charging station + future lifting struts.
+
+# Training Plan
+
+**Train-the-Trainer Model:**
+
+1. Vendor training for workgroup SMEs
+2. Shift-based department rollout (no overtime)
+3. Deep familiarization on all systems
+
+All training completed before apparatus enters service.
+
+# Data Source Verification
+
+All values sourced from `Product_Data_Master.csv` (14 products, 31 columns). No interpolation or external sources.
+
+*Report generated: March 18, 2026*

@@ -13,9 +13,10 @@ class AddBuildHeaders
     {
         $response = $next($request);
         
-        // Use headers->set() which works on all response types
+        // Read git SHA from deploy-time cached file instead of shell_exec
         try {
-            $sha = cache()->remember('build_sha', 60, fn() => trim(shell_exec('git rev-parse HEAD') ?? 'unknown'));
+            $shaFile = base_path('.git-sha');
+            $sha = file_exists($shaFile) ? trim(file_get_contents($shaFile)) : 'unknown';
             $response->headers->set('X-App-Commit', $sha);
         } catch (\Throwable $e) {
             // Silently ignore if headers can't be set

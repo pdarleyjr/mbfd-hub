@@ -6,11 +6,12 @@ $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
-echo "=== Reset ALL Employee Passwords to MBFD1! ===\n\n";
+echo "=== Reset ALL Employee Passwords ===\n\n";
 
-$password = Hash::make('MBFD1!');
+$defaultPassword = env('DEFAULT_EMPLOYEE_PASSWORD', 'changeme');
+$password = Hash::make($defaultPassword);
 echo "Generated hash: " . substr($password, 0, 30) . "...\n";
-echo "Verify check: " . (Hash::check('MBFD1!', $password) ? 'PASS' : 'FAIL') . "\n\n";
+echo "Verify check: " . (Hash::check($defaultPassword, $password) ? 'PASS' : 'FAIL') . "\n\n";
 
 // Bypass Eloquent entirely — direct DB update
 $updated = DB::table('employees')->update([
@@ -23,12 +24,12 @@ echo "Updated {$updated} employees\n";
 
 // Verify one record
 $peter = DB::table('employees')->where('employee_id', '20731')->first();
-echo "Peter Darley check: " . (Hash::check('MBFD1!', $peter->password) ? 'PASS' : 'FAIL') . "\n";
+echo "Peter Darley check: " . (Hash::check($defaultPassword, $peter->password) ? 'PASS' : 'FAIL') . "\n";
 echo "must_change_password: " . ($peter->must_change_password ? 'YES' : 'NO') . "\n";
 
 // Test auth
-$result = auth('employee')->attempt(['employee_id' => '20731', 'password' => 'MBFD1!']);
+$result = auth('employee')->attempt(['employee_id' => '20731', 'password' => $defaultPassword]);
 echo "Auth attempt: " . ($result ? 'SUCCESS' : 'FAILED') . "\n";
 auth('employee')->logout();
 
-echo "\n✅ All 229 employees reset to MBFD1!\n";
+echo "\n✅ All employees reset to default password\n";

@@ -68,7 +68,6 @@ class ProvisionWorkgroupMembers extends Command
             if ($user) {
                 $user->update([
                     'password'       => $hashedPassword,
-                    'plain_password' => $password,
                 ]);
                 $this->line("  [UPDATE] User found: {$user->email} — password reset.");
             } else {
@@ -76,7 +75,6 @@ class ProvisionWorkgroupMembers extends Command
                     'name'           => $name,
                     'email'          => $memberData['email'],
                     'password'       => $hashedPassword,
-                    'plain_password' => $password,
                     'email_verified_at' => now(),
                 ]);
                 $this->line("  [CREATE] User created: {$user->email}");
@@ -133,7 +131,6 @@ class ProvisionWorkgroupMembers extends Command
 
             $user->update([
                 'password'       => $hashedPassword,
-                'plain_password' => $password,
             ]);
             $this->line("  [RESET] {$user->email}");
             $resetCount++;

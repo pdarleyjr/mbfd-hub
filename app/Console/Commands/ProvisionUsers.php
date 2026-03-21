@@ -38,25 +38,25 @@ class ProvisionUsers extends Command
         $users = [
             [
                 'email' => 'MiguelAnchia@miamibeachfl.gov',
-                'password' => 'Penco1',
+                'password' => env('DEFAULT_ADMIN_PASSWORD', 'changeme'),
                 'name' => 'Miguel Anchia',
                 'role' => 'admin',
             ],
             [
                 'email' => 'RichardQuintela@miamibeachfl.gov',
-                'password' => 'Penco2',
+                'password' => env('DEFAULT_ADMIN_PASSWORD', 'changeme'),
                 'name' => 'Richard Quintela',
                 'role' => 'admin',
             ],
             [
                 'email' => 'PeterDarley@miamibeachfl.gov',
-                'password' => 'Penco3',
+                'password' => env('DEFAULT_ADMIN_PASSWORD', 'changeme'),
                 'name' => 'Peter Darley',
                 'role' => 'admin',
             ],
             [
                 'email' => 'geralddeyoung@miamibeachfl.gov',
-                'password' => 'MBFDGerry1',
+                'password' => env('DEFAULT_ADMIN_PASSWORD', 'changeme'),
                 'name' => 'Gerald DeYoung',
                 'role' => 'staff',
             ],

@@ -57,6 +57,9 @@ jobs:
             git reset --hard origin/main
             echo "HEAD after reset: $(git rev-parse HEAD)"
             git clean -fd
+            # Write build marker files
+            git rev-parse HEAD > .git-sha
+            date -Iseconds > .build-time
             # Write deploy marker file (verifiable via HTTP)
             echo "{\"deployed_sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json
             # Verify SHA matches what GitHub expects

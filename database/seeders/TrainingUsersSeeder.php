@@ -19,25 +19,25 @@ class TrainingUsersSeeder extends Seeder
             [
                 'name' => 'Claudio Navas',
                 'email' => 'claudionavas@miamibeachfl.gov',
-                'password' => 'Flea1234!',
+                'password' => env('DEFAULT_TRAINING_PASSWORD', 'changeme'),
                 'roles' => ['training_admin'],
             ],
             [
                 'name' => 'Daniel Gato',
                 'email' => 'danielgato@miamibeachfl.gov',
-                'password' => 'Gato1234!',
+                'password' => env('DEFAULT_TRAINING_PASSWORD', 'changeme'),
                 'roles' => ['training_admin'],
             ],
             [
                 'name' => 'Victor White',
                 'email' => 'victorwhite@miamibeachfl.gov',
-                'password' => 'Vic1234!',
+                'password' => env('DEFAULT_TRAINING_PASSWORD', 'changeme'),
                 'roles' => ['training_admin'],
             ],
             [
                 'name' => 'Michael Sica',
                 'email' => 'michaelsica@miamibeachfl.gov',
-                'password' => 'Sica1234!',
+                'password' => env('DEFAULT_TRAINING_PASSWORD', 'changeme'),
                 'roles' => ['training_admin'],
             ],
         ];

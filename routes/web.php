@@ -41,16 +41,16 @@ Route::get('/daily/{path?}', function () {
 })->where('path', '.+');
 
 Route::get('/__version', function() {
-    $sha = cache()->remember('build_sha', 60, fn() => trim(shell_exec('git rev-parse HEAD') ?? 'unknown'));
-    $branch = cache()->remember('build_branch', 60, fn() => trim(shell_exec('git rev-parse --abbrev-ref HEAD') ?? 'unknown'));
-    $buildTime = cache()->remember('build_time', 60, fn() => now()->toIso8601String());
-    
+    $shaFile = base_path('.git-sha');
+    $sha = file_exists($shaFile) ? trim(file_get_contents($shaFile)) : 'unknown';
+    $buildTimeFile = base_path('.build-time');
+    $buildTime = file_exists($buildTimeFile) ? trim(file_get_contents($buildTimeFile)) : 'unknown';
+
     return response()->json([
         'git_sha' => $sha,
-        'branch' => $branch,
         'build_time' => $buildTime,
     ]);
-});
+})->middleware('auth');
 
 // Station Inventory PDF Download
 Route::get('/inventory-pdf/{submission}', [StationInventoryController::class, 'downloadPdf'])
