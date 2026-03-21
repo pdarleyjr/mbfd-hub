@@ -1,4 +1,4 @@
-import { InspectionData, InspectionSubmission } from '../types';
+import { InspectionData, InspectionSubmission, MeterData } from '../types';
 
 const STORAGE_KEYS = {
   AUTOSAVE: 'mbfd_autosave_inspection',

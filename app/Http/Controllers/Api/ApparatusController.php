@@ -69,6 +69,8 @@ class ApparatusController extends Controller
             'rank' => 'required|string',
             'shift' => 'nullable|string',
             'unit_number' => 'nullable|string',
+            'engine_hours' => 'nullable|numeric|min:0',
+            'miles' => 'nullable|integer|min:0',
             'compartments' => 'nullable|array',
             'defects' => 'nullable|array',
             'defects.*.compartment' => 'required|string',
@@ -148,6 +150,33 @@ class ApparatusController extends Controller
         // HOLD logic: If critical defects found, set apparatus to Out of Service
         if ($hasCriticalDefects) {
             $apparatus->update(['status' => 'Out of Service']);
+        }
+
+        // Update meter readings with positive increment validation
+        if ($request->has('engine_hours') && $request->engine_hours !== null) {
+            $newHours = floatval($request->engine_hours);
+            $currentHours = floatval($apparatus->current_engine_hours ?? 0);
+            
+            // Only update if new value is greater (positive increment)
+            if ($newHours > $currentHours) {
+                $apparatus->current_engine_hours = $newHours;
+            }
+        }
+
+        if ($request->has('miles') && $request->miles !== null) {
+            $newMiles = intval($request->miles);
+            $currentMiles = intval($apparatus->current_miles ?? 0);
+            
+            // Only update if new value is greater (positive increment)
+            if ($newMiles > $currentMiles) {
+                $apparatus->current_miles = $newMiles;
+            }
+        }
+
+        // Save apparatus if meter data was updated
+        if ($apparatus->isDirty('current_engine_hours') || $apparatus->isDirty('current_miles')) {
+            $apparatus->reported_at = now();
+            $apparatus->save();
         }
 
         return response()->json($inspection->load('apparatus'), 201);
