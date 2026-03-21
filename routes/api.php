@@ -15,10 +15,23 @@ use App\Http\Controllers\Api\FireEquipmentRequestController;
 use App\Http\Controllers\Api\StationInspectionController;
 use App\Http\Controllers\Workgroup\WorkgroupAIController;
 use App\Http\Controllers\Api\Public\ApparatusLayout\ApparatusLayoutController;
+use App\Http\Controllers\Api\DatabaseAuditController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+// =========================================================================
+// Database Audit Routes (Admin only - requires authentication)
+// =========================================================================
+Route::prefix('admin/audit')->middleware(['web', 'auth'])->group(function () {
+    Route::get('/users', [DatabaseAuditController::class, 'getUsers']);
+    Route::get('/employees', [DatabaseAuditController::class, 'getEmployees']);
+    Route::get('/roles', [DatabaseAuditController::class, 'getRolesAndPermissions']);
+    Route::get('/summary', [DatabaseAuditController::class, 'getAuditSummary']);
+    Route::get('/check-email/{email}', [DatabaseAuditController::class, 'checkEmailCase'])->where('email', '.*');
+    Route::get('/check-employee-id/{employeeId}', [DatabaseAuditController::class, 'checkEmployeeIdCase']);
+});
 
 Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('apparatuses', [ApparatusController::class , 'index']);

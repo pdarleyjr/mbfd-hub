@@ -64,9 +64,9 @@ const PushNotificationManager: React.FC = () => {
     try {
       // Get VAPID public key from server
       const vapidResponse = await fetch('/api/push/vapid-public-key');
-      const { vapid_public_key } = await vapidResponse.json();
+      const { publicKey } = await vapidResponse.json();
       
-      if (!vapid_public_key) {
+      if (!publicKey) {
         throw new Error('VAPID key not configured');
       }
 
@@ -75,7 +75,7 @@ const PushNotificationManager: React.FC = () => {
       // Subscribe to push
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapid_public_key),
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
 
       // Send subscription to server
