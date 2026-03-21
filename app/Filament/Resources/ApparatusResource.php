@@ -115,33 +115,28 @@ class ApparatusResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('last_pm_mileage')
                                     ->label('Mileage at Last PM')
-                                    ->numeric()
-                                    ->helperText('Odometer reading at last PM'),
+                                    ->numeric(),
                                 Forms\Components\TextInput::make('last_pm_engine_hours')
                                     ->label('Engine Hours at Last PM')
                                     ->numeric()
-                                    ->step(0.1)
-                                    ->helperText('Engine hours at last PM'),
+                                    ->step(0.1),
                                 Forms\Components\Select::make('last_service_type')
                                     ->label('Last Service Type')
                                     ->options([
                                         '300-Hour PM' => '300-Hour PM',
                                         'Annual Inspection' => 'Annual Inspection',
                                         'Chassis Service' => 'Chassis Service',
-                                    ])
-                                    ->helperText('Type of last performed service'),
+                                    ]),
                             ]),
                         Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\TextInput::make('pm_interval_miles')
                                     ->label('PM Interval (Miles)')
-                                    ->numeric()
-                                    ->helperText('Leave empty for default'),
+                                    ->numeric(),
                                 Forms\Components\TextInput::make('pm_interval_hours')
                                     ->label('PM Interval (Hours)')
                                     ->numeric()
-                                    ->default(300)
-                                    ->helperText('Default: 300 hours'),
+                                    ->default(300),
                             ]),
                     ])
                     ->columns(1)
@@ -154,13 +149,15 @@ class ApparatusResource extends Resource
     {
         return $table
             ->columns([
+                // ── Default visible columns (5 max for alignment) ──
                 Tables\Columns\TextColumn::make('designation')
-                    ->label('Designation')
+                    ->label('Unit')
                     ->searchable()
                     ->sortable()
+                    ->weight('bold')
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('vehicle_number')
-                    ->label('Vehicle#')
+                    ->label('Veh #')
                     ->searchable()
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('status')
@@ -174,41 +171,20 @@ class ApparatusResource extends Resource
                         default => 'gray',
                     })
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('current_engine_hours')
-                    ->label('Engine Hours')
-                    ->numeric(decimalPlaces: 1)
-                    ->sortable()
-                    ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
-                    ->openUrlInNewTab()
-                    ->tooltip('Click to submit meter reading via Inspection SPA')
-                    ->placeholder('—'),
-                Tables\Columns\TextColumn::make('current_miles')
-                    ->label('Miles')
-                    ->numeric()
-                    ->sortable()
-                    ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
-                    ->openUrlInNewTab()
-                    ->tooltip('Click to submit meter reading via Inspection SPA')
-                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('pm_health_status')
-                    ->label('PM Status')
+                    ->label('PM')
                     ->badge()
-                    ->size('lg')
                     ->getStateUsing(function (Apparatus $record): string {
                         $health = $record->getPmHealthStatus();
                         $hours = $health['hours_since_pm'];
-                        $interval = $health['interval_hours'];
-                        
+
                         if ($health['status'] === 'red') {
-                            if ($health['overdue']) {
-                                return "OVERDUE: {$hours}h ({$interval}h cycle)";
-                            }
-                            return "PM DUE: {$hours}h";
+                            return $health['overdue'] ? "⚠ {$hours}h" : "DUE {$hours}h";
                         }
                         if ($health['status'] === 'yellow') {
-                            return "DUE SOON: {$hours}h";
+                            return "~{$hours}h";
                         }
-                        return "OK: {$hours}h / {$interval}h";
+                        return "{$hours}h";
                     })
                     ->color(function (Apparatus $record): string {
                         $health = $record->getPmHealthStatus();
@@ -220,27 +196,24 @@ class ApparatusResource extends Resource
                     })
                     ->tooltip(function (Apparatus $record): ?string {
                         $health = $record->getPmHealthStatus();
-                        if ($health['status'] === 'green') {
-                            return null;
-                        }
+                        $interval = $health['interval_hours'];
+                        $hours = $health['hours_since_pm'];
                         $miles = number_format($health['miles_since_pm']);
                         $lastPm = $health['last_pm_date'] ?? 'Never';
-                        return "Miles since PM: {$miles} | Last PM: {$lastPm}";
+                        return "Hours: {$hours}/{$interval} | Miles since PM: {$miles} | Last PM: {$lastPm}";
                     })
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('location_display')
                     ->label('Location')
                     ->getStateUsing(function (Apparatus $record): string {
-                        $stationLabel = $record->station ? 'Station ' . $record->station->station_number : null;
+                        $stationLabel = $record->station ? 'Sta ' . $record->station->station_number : null;
                         $assignment   = trim($record->assignment ?? '');
                         $currentLoc  = trim($record->current_location ?? '');
 
-                        // Treat identical strings as one
                         if ($currentLoc && $currentLoc === $assignment) {
                             $currentLoc = '';
                         }
 
-                        // If deployed away from assignment, show arrow notation
                         if ($currentLoc && $assignment && $currentLoc !== $stationLabel) {
                             return "{$assignment} → {$currentLoc}";
                         }
@@ -254,12 +227,32 @@ class ApparatusResource extends Resource
                         });
                     })
                     ->placeholder('—'),
+
+                // ── Toggleable columns (hidden by default) ──
+                Tables\Columns\TextColumn::make('current_engine_hours')
+                    ->label('Engine Hrs')
+                    ->numeric(decimalPlaces: 1)
+                    ->sortable()
+                    ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
+                    ->openUrlInNewTab()
+                    ->tooltip('Click to submit meter reading')
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('current_miles')
+                    ->label('Miles')
+                    ->numeric()
+                    ->sortable()
+                    ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
+                    ->openUrlInNewTab()
+                    ->tooltip('Click to submit meter reading')
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('notes')
                     ->label('Comments')
-                    ->limit(40)
+                    ->limit(30)
                     ->tooltip(fn ($record) => $record->notes)
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                // Toggleable columns (hidden by default)
                 Tables\Columns\TextColumn::make('inspections_count')
                     ->label('Inspections')
                     ->counts('inspections')
@@ -272,7 +265,6 @@ class ApparatusResource extends Resource
                     ->badge()
                     ->color(fn ($state) => $state > 0 ? 'danger' : 'success')
                     ->toggleable(isToggledHiddenByDefault: true),
-                // Hidden/toggleable columns preserved for data access
                 Tables\Columns\TextColumn::make('class_description')
                     ->label('Class')
                     ->searchable()
@@ -343,17 +335,17 @@ class ApparatusResource extends Resource
                 Tables\Filters\SelectFilter::make('pm_status')
                     ->label('PM Status')
                     ->options([
-                        'overdue' => 'PM Overdue (Critical)',
-                        'due' => 'PM Due',
-                        'due_soon' => 'PM Due Soon (Yellow)',
-                        'ok' => 'PM OK (Green)',
+                        'overdue' => '🔴 Overdue',
+                        'due' => '🔴 PM Due',
+                        'due_soon' => '🟡 Due Soon',
+                        'ok' => '🟢 OK',
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         if (!isset($data['value']) || $data['value'] === '') {
                             return $query;
                         }
                         
-                        $interval = 300; // Default PM interval
+                        $interval = 300;
                         $warningThreshold = $interval - 50;
                         
                         return match ($data['value']) {
@@ -399,7 +391,7 @@ class ApparatusResource extends Resource
                 Tables\Filters\Filter::make('has_active_issues')
                     ->label('Has Active Issues')
                     ->query(fn (Builder $query) => $query->whereHas('defects', fn ($q) => $q->where('resolved', false))),
-            ], layout: Tables\Enums\FiltersLayout::AboveContent)
+            ], layout: FiltersLayout::AboveContent)
             ->headerActions([
                 Tables\Actions\Action::make('sync_to_sheet')
                     ->label('Sync to Google Sheet')
@@ -420,13 +412,13 @@ class ApparatusResource extends Resource
             ])
             ->actions([
                 Tables\Actions\Action::make('view_inspections')
-                    ->label('View Inspections')
+                    ->label('Inspections')
                     ->icon('heroicon-o-clipboard-document-list')
                     ->color('info')
                     ->tooltip('View all inspections for this apparatus')
                     ->url(fn (Apparatus $record): string => static::getUrl('edit', ['record' => $record])),
                 Tables\Actions\Action::make('updateStatus')
-                    ->label('Update Status')
+                    ->label('Status')
                     ->icon('heroicon-m-arrow-path')
                     ->color('info')
                     ->form([

@@ -11,7 +11,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-D80aUElq.css",
+    "file": "assets/app-B6sAKQU-.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
@@ -40,7 +40,7 @@
     ]
   },
   "resources/js/pump-simulator/main.tsx": {
-    "file": "assets/main-Cd7mRf7_.js",
+    "file": "assets/main-Dpz2HsnO.js",
     "name": "main",
     "src": "resources/js/pump-simulator/main.tsx",
     "isEntry": true,
@@ -49,7 +49,7 @@
       "_react-DI1TqBIi.js"
     ],
     "css": [
-      "assets/main-dlBa5GPb.css"
+      "assets/main-Bf9SfEna.css"
     ]
   },
   "resources/js/push-notification-widget.js": {
@@ -59,7 +59,7 @@
     "isEntry": true
   },
   "resources/js/workgroup-data-dashboard.jsx": {
-    "file": "assets/workgroup-data-dashboard-exCPqFLf.js",
+    "file": "assets/workgroup-data-dashboard-DkHKOzMZ.js",
     "name": "workgroup-data-dashboard",
     "src": "resources/js/workgroup-data-dashboard.jsx",
     "isEntry": true,
@@ -67,7 +67,7 @@
       "_index-Btag7GrG.js"
     ],
     "css": [
-      "assets/app-D80aUElq.css"
+      "assets/app-B6sAKQU-.css"
     ]
   }
 }
