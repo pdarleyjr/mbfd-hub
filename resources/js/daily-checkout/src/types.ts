@@ -8,6 +8,13 @@ export interface Apparatus {
   vehicle_number: string;
   designation?: string;
   slug: string;
+  // PM Maintenance fields
+  current_engine_hours?: number | null;
+  current_miles?: number | null;
+  last_pm_engine_hours?: number | null;
+  last_pm_mileage?: number | null;
+  last_pm_date?: string | null;
+  pm_interval_hours?: number;
 }
 
 export type Rank = 'Chief' | 'Deputy Chief' | 'Captain' | 'Lieutenant' | 'Sergeant' | 'Corporal' | 'Firefighter';
@@ -54,12 +61,20 @@ export interface InspectionSubmission {
   rank: string;
   shift: string;
   unit_number: string;
+  engine_hours?: number | null;
+  miles?: number | null;
   defects: Defect[];
   officer_signature?: string | null;
 }
 
+export interface MeterData {
+  engine_hours: number | null;
+  miles: number | null;
+}
+
 export interface InspectionData {
   officer: OfficerInfo;
+  meter: MeterData;
   compartments: Compartment[];
 }
 
