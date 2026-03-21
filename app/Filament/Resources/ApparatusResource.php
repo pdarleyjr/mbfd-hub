@@ -9,7 +9,9 @@ use App\Models\Apparatus;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Support\Enums\Alignment;
 use Filament\Tables;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -93,6 +95,54 @@ class ApparatusResource extends Resource
                             ->numeric(),
                     ])->columns(3)
                     ->collapsed(),
+                Forms\Components\Section::make('Preventative Maintenance Tracking')
+                    ->schema([
+                        Forms\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\TextInput::make('current_engine_hours')
+                                    ->label('Current Engine Hours')
+                                    ->numeric()
+                                    ->step(0.1)
+                                    ->helperText('Latest engine hour meter reading'),
+                                Forms\Components\TextInput::make('current_miles')
+                                    ->label('Current Mileage')
+                                    ->numeric()
+                                    ->helperText('Latest odometer reading'),
+                                Forms\Components\DatePicker::make('last_pm_date')
+                                    ->label('Last PM Date')
+                                    ->helperText('Date of last PM service'),
+                            ]),
+                        Forms\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\TextInput::make('last_pm_mileage')
+                                    ->label('Mileage at Last PM')
+                                    ->numeric(),
+                                Forms\Components\TextInput::make('last_pm_engine_hours')
+                                    ->label('Engine Hours at Last PM')
+                                    ->numeric()
+                                    ->step(0.1),
+                                Forms\Components\Select::make('last_service_type')
+                                    ->label('Last Service Type')
+                                    ->options([
+                                        '300-Hour PM' => '300-Hour PM',
+                                        'Annual Inspection' => 'Annual Inspection',
+                                        'Chassis Service' => 'Chassis Service',
+                                    ]),
+                            ]),
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('pm_interval_miles')
+                                    ->label('PM Interval (Miles)')
+                                    ->numeric(),
+                                Forms\Components\TextInput::make('pm_interval_hours')
+                                    ->label('PM Interval (Hours)')
+                                    ->numeric()
+                                    ->default(300),
+                            ]),
+                    ])
+                    ->columns(1)
+                    ->collapsed()
+                    ->visible(fn () => auth()->user()?->can('manage_pm_settings') ?? true),
             ]);
     }
 
@@ -100,17 +150,22 @@ class ApparatusResource extends Resource
     {
         return $table
             ->columns([
+                // ── Default visible columns (5 max for alignment) ──
                 Tables\Columns\TextColumn::make('designation')
-                    ->label('Designation')
+                    ->label('Unit')
                     ->searchable()
                     ->sortable()
+                    ->weight('bold')
+                    ->alignment(Alignment::Center)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('vehicle_number')
-                    ->label('Vehicle#')
+                    ->label('Veh #')
                     ->searchable()
+                    ->alignment(Alignment::Center)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
+                    ->alignment(Alignment::Center)
                     ->color(fn (?string $state): string => match ($state) {
                         'In Service' => 'success',
                         'Out of Service' => 'danger',
@@ -120,19 +175,51 @@ class ApparatusResource extends Resource
                         default => 'gray',
                     })
                     ->placeholder('—'),
+                Tables\Columns\TextColumn::make('pm_health_status')
+                    ->label('PM')
+                    ->badge()
+                    ->alignment(Alignment::Center)
+                    ->getStateUsing(function (Apparatus $record): string {
+                        $health = $record->getPmHealthStatus();
+                        $hours = $health['hours_since_pm'];
+
+                        if ($health['status'] === 'red') {
+                            return $health['overdue'] ? "⚠ {$hours}h" : "DUE {$hours}h";
+                        }
+                        if ($health['status'] === 'yellow') {
+                            return "~{$hours}h";
+                        }
+                        return "{$hours}h";
+                    })
+                    ->color(function (Apparatus $record): string {
+                        $health = $record->getPmHealthStatus();
+                        return match ($health['status']) {
+                            'red' => 'danger',
+                            'yellow' => 'warning',
+                            default => 'success',
+                        };
+                    })
+                    ->tooltip(function (Apparatus $record): ?string {
+                        $health = $record->getPmHealthStatus();
+                        $interval = $health['interval_hours'];
+                        $hours = $health['hours_since_pm'];
+                        $miles = number_format($health['miles_since_pm']);
+                        $lastPm = $health['last_pm_date'] ?? 'Never';
+                        return "Hours: {$hours}/{$interval} | Miles since PM: {$miles} | Last PM: {$lastPm}";
+                    })
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('location_display')
                     ->label('Location')
+                    ->alignment(Alignment::Start)
                     ->getStateUsing(function (Apparatus $record): string {
-                        $stationLabel = $record->station ? 'Station ' . $record->station->station_number : null;
+                        $stationLabel = $record->station ? 'Sta ' . $record->station->station_number : null;
                         $assignment   = trim($record->assignment ?? '');
                         $currentLoc  = trim($record->current_location ?? '');
 
-                        // Treat identical strings as one
                         if ($currentLoc && $currentLoc === $assignment) {
                             $currentLoc = '';
                         }
 
-                        // If deployed away from assignment, show arrow notation
                         if ($currentLoc && $assignment && $currentLoc !== $stationLabel) {
                             return "{$assignment} → {$currentLoc}";
                         }
@@ -146,92 +233,165 @@ class ApparatusResource extends Resource
                         });
                     })
                     ->placeholder('—'),
+
+                // ── Toggleable columns (hidden by default) ──
+                Tables\Columns\TextColumn::make('current_engine_hours')
+                    ->label('Engine Hrs')
+                    ->numeric(decimalPlaces: 1)
+                    ->sortable()
+                    ->alignment(Alignment::End)
+                    ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
+                    ->openUrlInNewTab()
+                    ->tooltip('Click to submit meter reading')
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('current_miles')
+                    ->label('Miles')
+                    ->numeric()
+                    ->sortable()
+                    ->alignment(Alignment::End)
+                    ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
+                    ->openUrlInNewTab()
+                    ->tooltip('Click to submit meter reading')
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('notes')
                     ->label('Comments')
-                    ->limit(40)
+                    ->limit(30)
+                    ->alignment(Alignment::Start)
                     ->tooltip(fn ($record) => $record->notes)
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                // Toggleable columns (hidden by default)
                 Tables\Columns\TextColumn::make('inspections_count')
                     ->label('Inspections')
                     ->counts('inspections')
                     ->badge()
+                    ->alignment(Alignment::Center)
                     ->color('info')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('active_defects_count')
                     ->label('Active Issues')
                     ->getStateUsing(fn (Apparatus $record) => $record->defects()->where('resolved', false)->count())
                     ->badge()
+                    ->alignment(Alignment::Center)
                     ->color(fn ($state) => $state > 0 ? 'danger' : 'success')
                     ->toggleable(isToggledHiddenByDefault: true),
-                // Hidden/toggleable columns preserved for data access
                 Tables\Columns\TextColumn::make('class_description')
                     ->label('Class')
                     ->searchable()
+                    ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('station.station_number')
                     ->label('Station')
                     ->searchable()
+                    ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('assignment')
                     ->label('Assignment')
                     ->searchable()
+                    ->alignment(Alignment::Start)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('current_location')
                     ->label('Current Location')
                     ->searchable()
+                    ->alignment(Alignment::Start)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('unit_id')
                     ->label('Unit ID')
                     ->searchable()
+                    ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('make')
                     ->searchable()
+                    ->alignment(Alignment::Start)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('model')
                     ->searchable()
+                    ->alignment(Alignment::Start)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('year')
                     ->numeric()
                     ->sortable()
+                    ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('mileage')
                     ->numeric()
                     ->sortable()
+                    ->alignment(Alignment::End)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('last_service_date')
                     ->date()
                     ->sortable()
+                    ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('vin')
                     ->label('VIN')
                     ->searchable()
+                    ->alignment(Alignment::Start)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('reported_at')
                     ->label('Reported')
                     ->dateTime('n/j/Y')
                     ->sortable()
+                    ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
+                    ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('designation')
             ->striped()
             ->filters([
+                Tables\Filters\SelectFilter::make('pm_status')
+                    ->label('PM Status')
+                    ->options([
+                        'overdue' => '🔴 Overdue',
+                        'due' => '🔴 PM Due',
+                        'due_soon' => '🟡 Due Soon',
+                        'ok' => '🟢 OK',
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (!isset($data['value']) || $data['value'] === '') {
+                            return $query;
+                        }
+                        
+                        $interval = 300;
+                        $warningThreshold = $interval - 50;
+                        
+                        return match ($data['value']) {
+                            'overdue' => $query->whereRaw(
+                                '(current_engine_hours - COALESCE(last_pm_engine_hours, 0)) >= ?',
+                                [$interval + 5]
+                            ),
+                            'due' => $query->whereRaw(
+                                '(current_engine_hours - COALESCE(last_pm_engine_hours, 0)) >= ? AND (current_engine_hours - COALESCE(last_pm_engine_hours, 0)) < ?',
+                                [$interval, $interval + 5]
+                            ),
+                            'due_soon' => $query->whereRaw(
+                                '(current_engine_hours - COALESCE(last_pm_engine_hours, 0)) >= ? AND (current_engine_hours - COALESCE(last_pm_engine_hours, 0)) < ?',
+                                [$warningThreshold, $interval]
+                            ),
+                            'ok' => $query->whereRaw(
+                                '(current_engine_hours - COALESCE(last_pm_engine_hours, 0)) < ?',
+                                [$warningThreshold]
+                            ),
+                            default => $query,
+                        };
+                    }),
                 Tables\Filters\SelectFilter::make('station')
                     ->relationship('station', 'station_number')
                     ->searchable()
@@ -255,7 +415,7 @@ class ApparatusResource extends Resource
                 Tables\Filters\Filter::make('has_active_issues')
                     ->label('Has Active Issues')
                     ->query(fn (Builder $query) => $query->whereHas('defects', fn ($q) => $q->where('resolved', false))),
-            ])
+            ], layout: FiltersLayout::AboveContent)
             ->headerActions([
                 Tables\Actions\Action::make('sync_to_sheet')
                     ->label('Sync to Google Sheet')
@@ -276,13 +436,13 @@ class ApparatusResource extends Resource
             ])
             ->actions([
                 Tables\Actions\Action::make('view_inspections')
-                    ->label('View Inspections')
+                    ->label('Inspections')
                     ->icon('heroicon-o-clipboard-document-list')
                     ->color('info')
                     ->tooltip('View all inspections for this apparatus')
                     ->url(fn (Apparatus $record): string => static::getUrl('edit', ['record' => $record])),
                 Tables\Actions\Action::make('updateStatus')
-                    ->label('Update Status')
+                    ->label('Status')
                     ->icon('heroicon-m-arrow-path')
                     ->color('info')
                     ->form([
