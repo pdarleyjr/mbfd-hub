@@ -468,6 +468,71 @@ class ApparatusResource extends Resource
                             ->body("Status changed to: {$data['status']}")
                             ->send();
                     }),
+                Tables\Actions\Action::make('logPmService')
+                    ->label('Log PM')
+                    ->icon('heroicon-o-wrench-screwdriver')
+                    ->color(fn (Apparatus $record): string => $record->isPmDue() ? 'danger' : 'gray')
+                    ->tooltip('Log a completed PM service')
+                    ->form([
+                        Forms\Components\Placeholder::make('current_readings')
+                            ->label('Current Meter Readings')
+                            ->content(function (Apparatus $record): string {
+                                $hours = $record->current_engine_hours ?? 'N/A';
+                                $miles = number_format($record->current_miles ?? 0);
+                                $health = $record->getPmHealthStatus();
+                                return "Engine Hours: {$hours} | Miles: {$miles} | Hours since PM: {$health['hours_since_pm']}h";
+                            }),
+                        Forms\Components\DatePicker::make('service_date')
+                            ->label('Service Date')
+                            ->default(now())
+                            ->required(),
+                        Forms\Components\Select::make('service_type')
+                            ->label('Service Type')
+                            ->options([
+                                'PMA' => 'PMA — Oil/Fuel Filters, Engine Oil, Grease Chassis',
+                                'PMC' => 'PMC — Oil/Fuel/Air/Trans Filters, Air Dryer, Grease',
+                                'Annual Inspection' => 'Annual Inspection',
+                            ])
+                            ->required(),
+                        Forms\Components\TextInput::make('service_engine_hours')
+                            ->label('Engine Hours at Service')
+                            ->numeric()
+                            ->step(0.1)
+                            ->default(fn (Apparatus $record) => $record->current_engine_hours)
+                            ->helperText('Defaults to current reading. Adjust if service was at a different reading.'),
+                        Forms\Components\TextInput::make('service_mileage')
+                            ->label('Mileage at Service')
+                            ->numeric()
+                            ->default(fn (Apparatus $record) => $record->current_miles)
+                            ->helperText('Defaults to current reading.'),
+                        Forms\Components\Textarea::make('service_notes')
+                            ->label('Service Notes')
+                            ->placeholder('Additional service details...'),
+                    ])
+                    ->action(function (Apparatus $record, array $data) {
+                        $record->update([
+                            'last_pm_date' => $data['service_date'],
+                            'last_pm_engine_hours' => $data['service_engine_hours'] ?? $record->current_engine_hours,
+                            'last_pm_mileage' => $data['service_mileage'] ?? $record->current_miles,
+                            'last_service_type' => $data['service_type'],
+                            'last_service_date' => $data['service_date'],
+                        ]);
+
+                        // Also update current readings if provided values are higher
+                        if (($data['service_engine_hours'] ?? 0) > ($record->current_engine_hours ?? 0)) {
+                            $record->update(['current_engine_hours' => $data['service_engine_hours']]);
+                        }
+                        if (($data['service_mileage'] ?? 0) > ($record->current_miles ?? 0)) {
+                            $record->update(['current_miles' => $data['service_mileage']]);
+                        }
+
+                        $unit = $record->designation ?? $record->vehicle_number;
+                        \Filament\Notifications\Notification::make()
+                            ->title('PM Service Logged')
+                            ->success()
+                            ->body("{$unit}: PM cycle reset. Next service due at " . round(($data['service_engine_hours'] ?? 0) + 300, 1) . 'h')
+                            ->send();
+                    }),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([

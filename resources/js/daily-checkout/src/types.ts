@@ -1,5 +1,14 @@
 export type ApparatusType = 'engine' | 'ladder1' | 'ladder3' | 'rescue' | 'rope';
 
+export interface PmHealthStatus {
+  status: 'green' | 'yellow' | 'red';
+  hours_since_pm: number;
+  miles_since_pm: number;
+  overdue: boolean;
+  interval_hours: number;
+  last_pm_date: string | null;
+}
+
 export interface Apparatus {
   id: number;
   name: string;
@@ -15,6 +24,8 @@ export interface Apparatus {
   last_pm_mileage?: number | null;
   last_pm_date?: string | null;
   pm_interval_hours?: number;
+  // Computed PM health from API
+  pm_health?: PmHealthStatus;
 }
 
 export type Rank = 'Chief' | 'Deputy Chief' | 'Captain' | 'Lieutenant' | 'Sergeant' | 'Corporal' | 'Firefighter';
