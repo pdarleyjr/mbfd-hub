@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusDefect;
+use App\Jobs\PmAlertNotificationJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -14,7 +15,13 @@ class ApparatusController extends Controller
 {
     public function index()
     {
-        return response()->json(Apparatus::all());
+        $apparatuses = Apparatus::all()->map(function ($apparatus) {
+            $data = $apparatus->toArray();
+            $data['pm_health'] = $apparatus->getPmHealthStatus();
+            return $data;
+        });
+
+        return response()->json($apparatuses);
     }
 
     public function checklist($id)
@@ -175,8 +182,16 @@ class ApparatusController extends Controller
 
         // Save apparatus if meter data was updated
         if ($apparatus->isDirty('current_engine_hours') || $apparatus->isDirty('current_miles')) {
+            // Capture PM status BEFORE saving to detect threshold crossings
+            $previousHealth = $apparatus->getOriginal('current_engine_hours')
+                ? (new Apparatus(array_merge($apparatus->getOriginal(), ['current_engine_hours' => $apparatus->getOriginal('current_engine_hours')])))->getPmHealthStatus()['status']
+                : 'green';
+
             $apparatus->reported_at = now();
             $apparatus->save();
+
+            // Dispatch PM alert check (async) after saving new meter readings
+            PmAlertNotificationJob::dispatch($apparatus->id, $previousHealth);
         }
 
         return response()->json($inspection->load('apparatus'), 201);
