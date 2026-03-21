@@ -7,6 +7,52 @@
 
 ---
 
+## Implementation Status — 2026-03-21
+
+All four phases have been executed. Summary:
+
+### Phase 1: IMMEDIATE ✅
+- GitHub repo made private
+- `.env` permissions set to 600 on VPS
+- SSH hardened: `PermitRootLogin prohibit-password`, `PasswordAuthentication no`
+- Branch protection: requires GitHub Pro upgrade (deferred)
+
+### Phase 2: QUICK WINS ✅
+- PostgreSQL, Dozzle, Web-Check ports bound to 127.0.0.1
+- `backups/` added to .gitignore and removed from tracking
+- PHP version disclosure disabled (`expose_php = Off`)
+- TLS 1.0/1.1 disabled in nginx
+- Stale UFW rules removed (Minecraft ports, Dozzle)
+- 14 stale Docker containers pruned
+
+### Phase 3: CODE CHANGES ✅
+- `plain_password` column dropped from users table (migration ran)
+- XSS fixed in Chatify messageCard (`e()` escaping)
+- Pusher secret removed from client-side JavaScript
+- `__version` endpoint secured behind auth
+- `shell_exec` replaced with file-based `.git-sha`
+- SecurityHeaders middleware added (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
+- Rate limiting added to unauthenticated API routes
+- Signed URL validation added to station-inventory-v2
+- Hardcoded credentials replaced with `env()` calls in all scripts
+- Temp password reset scripts deleted
+- deploy.yml updated to write `.git-sha` and `.build-time`
+
+### Phase 4: DEEP CLEANUP ✅
+- All changes committed and pushed
+- Migration ran on production
+- Git history purged of all SQL backup files using `git-filter-repo`
+- Force push completed, VPS synced
+- Security headers verified on live site
+
+### Remaining Items
+- **Branch protection**: Requires GitHub Pro ($4/mo) — recommend upgrading
+- **Credential rotation**: All secrets in `.env` should be rotated since they were in a public repo
+- **Self-hosted runner**: Consider moving off production VPS
+- **Content Security Policy**: Not yet added (complex, needs testing per page)
+
+---
+
 ## Executive Summary
 
 Three independent security audits identified **49 findings** across the MBFD Hub application, infrastructure, and repository:
