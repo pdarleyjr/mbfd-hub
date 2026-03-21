@@ -281,28 +281,12 @@
 
 /* ===== TABLE ENHANCEMENTS ===== */
 .fi-ta-row {
-    position: relative;
     transition: background-color 150ms ease-out;
-}
-
-.fi-ta-row::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background-color: #B91C1C;
-    opacity: 0;
-    transition: opacity 150ms ease-out;
 }
 
 .fi-ta-row:hover {
     background-color: #F5F3F0;
-}
-
-.fi-ta-row:hover::before {
-    opacity: 1;
+    box-shadow: inset 3px 0 0 0 #B91C1C;
 }
 
 .fi-ta-header-cell {
