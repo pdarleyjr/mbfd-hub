@@ -33,15 +33,17 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class , 'apparatus']);
     Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class , 'projects']);
 
-    // Public Station Inspection submission (from React SPA)
-    Route::post('station_inspection', [StationInspectionController::class , 'storePublic']);
-
     // Apparatus Layout Planner (public read, auth write)
     Route::prefix('apparatus-layout')->group(function () {
         Route::get('tools', [ApparatusLayoutController::class, 'getTools']);
         Route::get('compartments/{apparatusId}', [ApparatusLayoutController::class, 'getCompartments']);
         Route::get('snapshots/{apparatusId}', [ApparatusLayoutController::class, 'getSnapshots']);
     });
+});
+
+// Public Station Inspection submission (stricter rate limit)
+Route::prefix('public')->middleware('throttle:10,1')->group(function () {
+    Route::post('station_inspection', [StationInspectionController::class , 'storePublic']);
 });
 
 // Push notification routes (public VAPID key, authenticated subscription management)
@@ -86,15 +88,17 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
 });
 
 // Big Ticket Requests
-Route::post('/big-ticket-requests', [BigTicketRequestController::class , 'store']);
-Route::get('/stations/{station}/big-ticket-requests', [BigTicketRequestController::class , 'index']);
-Route::delete('/big-ticket-requests/{bigTicketRequest}', [BigTicketRequestController::class , 'destroy']);
+Route::middleware('throttle:60,1')->group(function () {
+    Route::post('/big-ticket-requests', [BigTicketRequestController::class , 'store']);
+    Route::get('/stations/{station}/big-ticket-requests', [BigTicketRequestController::class , 'index']);
+    Route::delete('/big-ticket-requests/{bigTicketRequest}', [BigTicketRequestController::class , 'destroy']);
 
-// Station Inventory (v1 - legacy)
-Route::get('/station-inventory/categories', [StationInventoryController::class , 'categories']);
-Route::post('/station-inventory-submissions', [StationInventoryController::class , 'store']);
-Route::get('/stations/{station}/station-inventory-submissions', [StationInventoryController::class , 'index']);
-Route::get('/station-inventory-submissions/{submission}/pdf', [StationInventoryController::class , 'downloadPdf']);
+    // Station Inventory (v1 - legacy)
+    Route::get('/station-inventory/categories', [StationInventoryController::class , 'categories']);
+    Route::post('/station-inventory-submissions', [StationInventoryController::class , 'store']);
+    Route::get('/stations/{station}/station-inventory-submissions', [StationInventoryController::class , 'index']);
+    Route::get('/station-inventory-submissions/{submission}/pdf', [StationInventoryController::class , 'downloadPdf']);
+});
 
 // Station Inventory V2 (PIN-protected, real-time inventory management)
 Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
@@ -102,8 +106,7 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
     Route::post('/station-inventory/verify-pin', [StationInventoryV2Controller::class , 'verifyPin']);
 
     // Protected endpoints (require valid signed URL from PIN verification)
-    // Protected endpoints (require valid signed URL from PIN verification)
-    Route::name('api.v2.station-inventory.')->group(function () {
+    Route::middleware('signed')->name('api.v2.station-inventory.')->group(function () {
             // Inventory list
             Route::get('/station-inventory/{stationId}', [StationInventoryV2Controller::class , 'getInventory'])
                 ->name('access');
@@ -116,7 +119,7 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
                 ->name('supply-requests');
             Route::post('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class , 'createSupplyRequest']);
         }
-        );    });
+        );
 
 // =========================================================================
 // Workgroup AI Routes — Eval analysis & AI summaries (separate from chatbot)

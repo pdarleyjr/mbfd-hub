@@ -30,11 +30,11 @@ echo "=== Roles & permissions synced ===\n";
 
 // ----- LOGISTICS (ADMIN) DASHBOARD USERS -----
 $adminUsers = [
-    ['name' => 'Miguel Anchia',    'email' => 'miguelanchia@miamibeachfl.gov',    'password' => 'Penco1',        'roles' => ['admin']],
-    ['name' => 'Richard Quintela', 'email' => 'richardquintela@miamibeachfl.gov', 'password' => 'Penco2',        'roles' => ['admin']],
-    ['name' => 'Peter Darley',     'email' => 'peterdarley@miamibeachfl.gov',     'password' => 'Penco3',        'roles' => ['super_admin']],
-    ['name' => 'Grecia Trabanino', 'email' => 'greciatrabanino@miamibeachfl.gov', 'password' => 'MBFDSupport!',  'roles' => ['admin']],
-    ['name' => 'Gerald DeYoung',   'email' => 'geralddeyoung@miamibeachfl.gov',   'password' => 'MBFDGerry1',    'roles' => ['admin']],
+    ['name' => 'Miguel Anchia',    'email' => 'miguelanchia@miamibeachfl.gov',    'password' => env('DEFAULT_ADMIN_PASSWORD', 'changeme'),        'roles' => ['admin']],
+    ['name' => 'Richard Quintela', 'email' => 'richardquintela@miamibeachfl.gov', 'password' => env('DEFAULT_ADMIN_PASSWORD', 'changeme'),        'roles' => ['admin']],
+    ['name' => 'Peter Darley',     'email' => 'peterdarley@miamibeachfl.gov',     'password' => env('DEFAULT_ADMIN_PASSWORD', 'changeme'),        'roles' => ['super_admin']],
+    ['name' => 'Grecia Trabanino', 'email' => 'greciatrabanino@miamibeachfl.gov', 'password' => env('DEFAULT_ADMIN_PASSWORD', 'changeme'),  'roles' => ['admin']],
+    ['name' => 'Gerald DeYoung',   'email' => 'geralddeyoung@miamibeachfl.gov',   'password' => env('DEFAULT_ADMIN_PASSWORD', 'changeme'),    'roles' => ['admin']],
 ];
 
 foreach ($adminUsers as $u) {
@@ -48,10 +48,10 @@ foreach ($adminUsers as $u) {
 
 // ----- TRAINING DASHBOARD USERS -----
 $trainingUsers = [
-    ['name' => 'Daniel Gato',   'email' => 'danielgato@miamibeachfl.gov',   'password' => 'Gato1234!', 'roles' => ['training_admin']],
-    ['name' => 'Victor White',  'email' => 'victorwhite@miamibeachfl.gov',  'password' => 'Vic1234!',  'roles' => ['training_admin']],
-    ['name' => 'Claudio Navas', 'email' => 'claudionavas@miamibeachfl.gov', 'password' => 'Flea1234!', 'roles' => ['training_admin']],
-    ['name' => 'Michael Sica',  'email' => 'michaelsica@miamibeachfl.gov',  'password' => 'Sica1234!', 'roles' => ['training_admin']],
+    ['name' => 'Daniel Gato',   'email' => 'danielgato@miamibeachfl.gov',   'password' => env('DEFAULT_TRAINING_PASSWORD', 'changeme'), 'roles' => ['training_admin']],
+    ['name' => 'Victor White',  'email' => 'victorwhite@miamibeachfl.gov',  'password' => env('DEFAULT_TRAINING_PASSWORD', 'changeme'),  'roles' => ['training_admin']],
+    ['name' => 'Claudio Navas', 'email' => 'claudionavas@miamibeachfl.gov', 'password' => env('DEFAULT_TRAINING_PASSWORD', 'changeme'), 'roles' => ['training_admin']],
+    ['name' => 'Michael Sica',  'email' => 'michaelsica@miamibeachfl.gov',  'password' => env('DEFAULT_TRAINING_PASSWORD', 'changeme'), 'roles' => ['training_admin']],
 ];
 
 foreach ($trainingUsers as $u) {

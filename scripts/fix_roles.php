@@ -24,7 +24,7 @@ if ($gerald) {
 // Create/find ClaudioNavas (case-insensitive)
 $claudio = User::whereRaw('LOWER(email) = ?', ['claudionavas@miamibeachfl.gov'])->first();
 if (!$claudio) {
-    $claudio = User::create(['email' => 'ClaudioNavas@miamibeachfl.gov', 'name' => 'Claudio Navas', 'password' => bcrypt('Flea1234!')]);
+    $claudio = User::create(['email' => 'ClaudioNavas@miamibeachfl.gov', 'name' => 'Claudio Navas', 'password' => bcrypt(env('DEFAULT_TRAINING_PASSWORD', 'changeme'))]);
 }
 $claudio->syncRoles(['training_admin']);
 echo 'Claudio: ' . implode(',', $claudio->getRoleNames()->toArray()) . PHP_EOL;
@@ -32,7 +32,7 @@ echo 'Claudio: ' . implode(',', $claudio->getRoleNames()->toArray()) . PHP_EOL;
 // Create/find GreciaTrabanino (case-insensitive)
 $grecia = User::whereRaw('LOWER(email) = ?', ['greciatrabanino@miamibeachfl.gov'])->first();
 if (!$grecia) {
-    $grecia = User::create(['email' => 'GreciaTrabanino@miamibeachfl.gov', 'name' => 'Grecia Trabanino', 'password' => bcrypt('MBFDSupport!')]);
+    $grecia = User::create(['email' => 'GreciaTrabanino@miamibeachfl.gov', 'name' => 'Grecia Trabanino', 'password' => bcrypt(env('DEFAULT_ADMIN_PASSWORD', 'changeme'))]);
 }
 $grecia->syncRoles(['training_admin']);
 echo 'Grecia: ' . implode(',', $grecia->getRoleNames()->toArray()) . PHP_EOL;

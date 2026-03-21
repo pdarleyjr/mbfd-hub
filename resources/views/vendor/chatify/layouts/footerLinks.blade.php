@@ -12,7 +12,7 @@
         pusher: {
             debug: {{ config('app.debug') ? 'true' : 'false' }},
             key: "{{ config('chatify.pusher.key') }}",
-            secret: "{{ config('chatify.pusher.secret') }}",
+            {{-- SECURITY: Pusher secret must NEVER be exposed client-side --}}
             app_id: "{{ config('chatify.pusher.app_id') }}",
             options: {
                 cluster: "mt1",

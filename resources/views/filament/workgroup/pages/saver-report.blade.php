@@ -250,6 +250,7 @@
         {{-- AI-generated report content --}}
         @if(!empty($reportHtml))
         <div class="saver-report-body">
+            {{-- SECURITY: $reportHtml must be sanitized before rendering. It is AI-generated HTML controlled by admins. --}}
             {!! $reportHtml !!}
         </div>
         @else

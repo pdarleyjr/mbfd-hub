@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->trustProxies(at: '*');
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->web(append: [
             \App\Http\Middleware\AddBuildHeaders::class,
             \App\Http\Middleware\ForcePasswordChange::class,

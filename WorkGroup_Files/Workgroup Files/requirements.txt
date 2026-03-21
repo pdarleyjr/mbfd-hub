@@ -1,0 +1,4 @@
+docling>=2.80.0
+llama-index-readers-docling
+llama-index-node-parser-docling
+python-dotenv
