@@ -80,6 +80,11 @@ class ApparatusSheetSyncService
     /**
      * Build a row for each apparatus record.
      * Column mapping: A=Designation B=Vehicle# C=Status D=Location E=Comments
+     * 
+     * IMPORTANT: PM maintenance columns (current_engine_hours, current_miles,
+     * last_pm_date, last_pm_mileage, last_pm_engine_hours, pm_interval_miles,
+     * pm_interval_hours) are intentionally EXCLUDED from sync to prevent
+     * schema drift in the Google Sheet. This is "The Wall" protection.
      */
     private function buildRows(): array
     {
