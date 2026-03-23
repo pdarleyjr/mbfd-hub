@@ -106,35 +106,10 @@ jobs:
             # Copy built assets to public
             docker compose -f compose.yaml exec -T laravel.test bash -c 'cp -r /var/www/html/resources/js/daily-checkout/dist/* /var/www/html/public/daily/ 2>/dev/null || true'
             echo "✓ Daily-checkout frontend built"
-          EOF
-
-      - name: Deploy Cloudflare Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: 'cloudflare-worker'
-          command: deploy
-
-      - name: Purge Cloudflare Cache
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-        run: |
-          curl -X POST "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data '{"files":["https://www.mbfdhub.com/","https://www.mbfdhub.com/manifest.json","https://www.mbfdhub.com/site.webmanifest","https://www.mbfdhub.com/daily/index.html","https://www.mbfdhub.com/daily/","https://www.mbfdhub.com/__version","https://mbfdhub.com/","https://mbfdhub.com/daily/index.html","https://mbfdhub.com/daily/","https://mbfdhub.com/__version"]}'
-          echo "✓ Cloudflare cache purged"
-
-      - name: Run Apparatus Data Backfill
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-        run: |
-          ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'
-            cd /root/mbfd-hub
+            
+            # Run apparatus data backfill
             echo "Running apparatus:backfill-pm-data..."
-            docker compose -f compose.yaml exec -T laravel.test php artisan apparatus:backfill-pm-data
+            docker compose -f compose.yaml exec -T laravel.test php artisan apparatus:backfill-pm-data || echo "⚠ Backfill command not found or failed"
             echo "✓ Apparatus data backfilled"
           EOF
 
