@@ -126,6 +126,18 @@ jobs:
             --data '{"files":["https://www.mbfdhub.com/","https://www.mbfdhub.com/manifest.json","https://www.mbfdhub.com/site.webmanifest","https://www.mbfdhub.com/daily/index.html","https://www.mbfdhub.com/daily/","https://www.mbfdhub.com/__version","https://mbfdhub.com/","https://mbfdhub.com/daily/index.html","https://mbfdhub.com/daily/","https://mbfdhub.com/__version"]}'
           echo "✓ Cloudflare cache purged"
 
+      - name: Run Apparatus Data Backfill
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'
+            cd /root/mbfd-hub
+            echo "Running apparatus:backfill-pm-data..."
+            docker compose -f compose.yaml exec -T laravel.test php artisan apparatus:backfill-pm-data
+            echo "✓ Apparatus data backfilled"
+          EOF
+
       - name: Run Smoke Tests
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
