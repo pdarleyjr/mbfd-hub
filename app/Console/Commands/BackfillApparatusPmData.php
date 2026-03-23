@@ -203,6 +203,7 @@ class BackfillApparatusPmData extends Command
             // Update with combined data
             $apparatus->vehicle_number = $data['vehicle_number'];
             $apparatus->current_miles = $data['miles'];
+            $apparatus->mileage = $data['miles'];
             $apparatus->current_engine_hours = $data['hours'];
             $apparatus->last_service_type = $data['service_type'];
             
