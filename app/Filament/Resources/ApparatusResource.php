@@ -79,48 +79,49 @@ class ApparatusResource extends Resource
                     ->columnSpanFull(),
                 Forms\Components\Section::make('Vehicle Details')
                     ->schema([
-                        Forms\Components\TextInput::make('unit_id')
-                            ->label('Unit ID')
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('vin')
-                            ->label('VIN')
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('make')
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('model')
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('year')
-                            ->numeric(),
-                        Forms\Components\TextInput::make('mileage')
-                            ->numeric(),
-                    ])->columns(3)
+                        Forms\Components\Grid::make(4)
+                            ->schema([
+                                Forms\Components\TextInput::make('unit_id')
+                                    ->label('Unit ID')
+                                    ->maxLength(255),
+                                Forms\Components\TextInput::make('vin')
+                                    ->label('VIN')
+                                    ->maxLength(255)
+                                    ->columnSpan(2),
+                                Forms\Components\TextInput::make('year')
+                                    ->numeric()
+                                    ->placeholder('YYYY'),
+                            ]),
+                        Forms\Components\Grid::make(4)
+                            ->schema([
+                                Forms\Components\TextInput::make('make')
+                                    ->maxLength(255),
+                                Forms\Components\TextInput::make('model')
+                                    ->maxLength(255),
+                                Forms\Components\TextInput::make('mileage')
+                                    ->numeric()
+                                    ->label('Original Mileage')
+                                    ->helperText('Historical mileage record'),
+                            ]),
+                    ])->columns(1)
                     ->collapsed(),
-                Forms\Components\Section::make('Preventative Maintenance Tracking')
+                Forms\Components\Section::make('Current Meter Readings')
                     ->schema([
-                        Forms\Components\Grid::make(3)
+                        Forms\Components\Grid::make(4)
                             ->schema([
                                 Forms\Components\TextInput::make('current_engine_hours')
-                                    ->label('Current Engine Hours')
+                                    ->label('Engine Hours')
                                     ->numeric()
                                     ->step(0.1)
+                                    ->suffix(' hrs')
+                                    ->fontFamily('tabular-nums')
                                     ->helperText('Latest engine hour meter reading'),
                                 Forms\Components\TextInput::make('current_miles')
-                                    ->label('Current Mileage')
+                                    ->label('Mileage')
                                     ->numeric()
+                                    ->suffix(' mi')
+                                    ->fontFamily('tabular-nums')
                                     ->helperText('Latest odometer reading'),
-                                Forms\Components\DatePicker::make('last_pm_date')
-                                    ->label('Last PM Date')
-                                    ->helperText('Date of last PM service'),
-                            ]),
-                        Forms\Components\Grid::make(3)
-                            ->schema([
-                                Forms\Components\TextInput::make('last_pm_mileage')
-                                    ->label('Mileage at Last PM')
-                                    ->numeric(),
-                                Forms\Components\TextInput::make('last_pm_engine_hours')
-                                    ->label('Engine Hours at Last PM')
-                                    ->numeric()
-                                    ->step(0.1),
                                 Forms\Components\Select::make('last_service_type')
                                     ->label('Last Service Type')
                                     ->options([
@@ -129,13 +130,37 @@ class ApparatusResource extends Resource
                                         '300-Hour PM' => '300-Hour PM',
                                         'Annual Inspection' => 'Annual Inspection',
                                         'Chassis Service' => 'Chassis Service',
-                                    ]),
+                                    ])
+                                    ->helperText('Most recent service type'),
+                                Forms\Components\DatePicker::make('last_service_date')
+                                    ->label('Service Date')
+                                    ->helperText('Date of last service'),
+                            ]),
+                    ])->columns(1)
+                    ->visible(fn () => auth()->user()?->can('manage_pm_settings') ?? true),
+                Forms\Components\Section::make('Preventative Maintenance Tracking')
+                    ->schema([
+                        Forms\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\DatePicker::make('last_pm_date')
+                                    ->label('Last PM Date')
+                                    ->helperText('Date of last PM service'),
+                                Forms\Components\TextInput::make('last_pm_mileage')
+                                    ->label('Mileage at Last PM')
+                                    ->numeric()
+                                    ->suffix(' mi'),
+                                Forms\Components\TextInput::make('last_pm_engine_hours')
+                                    ->label('Engine Hours at Last PM')
+                                    ->numeric()
+                                    ->step(0.1)
+                                    ->suffix(' hrs'),
                             ]),
                         Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\TextInput::make('pm_interval_miles')
                                     ->label('PM Interval (Miles)')
-                                    ->numeric(),
+                                    ->numeric()
+                                    ->default(5000),
                                 Forms\Components\TextInput::make('pm_interval_hours')
                                     ->label('PM Interval (Hours)')
                                     ->numeric()
@@ -242,20 +267,20 @@ class ApparatusResource extends Resource
                     ->numeric(decimalPlaces: 1)
                     ->sortable()
                     ->alignment(Alignment::End)
+                    ->fontFamily('tabular-nums')
                     ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
                     ->openUrlInNewTab()
                     ->tooltip('Click to submit meter reading')
-                    ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('current_miles')
                     ->label('Miles')
                     ->numeric()
                     ->sortable()
                     ->alignment(Alignment::End)
+                    ->fontFamily('tabular-nums')
                     ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
                     ->openUrlInNewTab()
                     ->tooltip('Click to submit meter reading')
-                    ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('notes')
                     ->label('Comments')
