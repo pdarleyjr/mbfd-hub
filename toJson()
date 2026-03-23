@@ -1,1 +1,5 @@
-PHP Parse error:  syntax error, unexpected token "\", expecting end of file in Command line code on line 1
+In ParseErrorException.php line 44:
+                                                                      
+  PHP Parse error: Syntax error, unexpected T_NS_SEPARATOR on line 1  
+                                                                      
+

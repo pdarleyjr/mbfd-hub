@@ -16,17 +16,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('apparatuses', function (Blueprint $table) {
-            // Add last_service_type enum column
-            // Values: '300-Hour PM', 'Annual Inspection', 'Chassis Service'
-            $table->enum('last_service_type', [
-                '300-Hour PM',
-                'Annual Inspection', 
-                'Chassis Service',
-            ])->nullable()->after('last_pm_engine_hours')->comment('Type of last performed service');
+            if (!Schema::hasColumn('apparatuses', 'last_service_type')) {
+                $table->string('last_service_type')->nullable()->after('last_pm_engine_hours')->comment('Type of last performed service');
+            }
 
             // Add index on vehicle_number for high-speed API lookups
-            // This is critical for field data capture where vehicle_number is the primary identifier
-            $table->index('vehicle_number', 'apparatuses_vehicle_number_index');
+            if (!Schema::hasIndex('apparatuses', 'apparatuses_vehicle_number_index')) {
+                $table->index('vehicle_number', 'apparatuses_vehicle_number_index');
+            }
         });
     }
 
