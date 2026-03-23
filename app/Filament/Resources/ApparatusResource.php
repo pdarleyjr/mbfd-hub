@@ -114,13 +114,11 @@ class ApparatusResource extends Resource
                                     ->numeric()
                                     ->step(0.1)
                                     ->suffix(' hrs')
-                                    ->fontFamily('tabular-nums')
                                     ->helperText('Latest engine hour meter reading'),
                                 Forms\Components\TextInput::make('current_miles')
                                     ->label('Mileage')
                                     ->numeric()
                                     ->suffix(' mi')
-                                    ->fontFamily('tabular-nums')
                                     ->helperText('Latest odometer reading'),
                                 Forms\Components\Select::make('last_service_type')
                                     ->label('Last Service Type')
