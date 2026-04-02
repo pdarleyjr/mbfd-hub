@@ -94,7 +94,7 @@ jobs:
 
       - name: Build frontend assets
         run: |
-          docker exec mbfd-hub-laravel bash -c 'npm ci && npm run build'
+          docker exec mbfd-hub-laravel bash -c 'npm install && npm run build'
           docker exec mbfd-hub-laravel php artisan filament:assets
           docker exec mbfd-hub-laravel bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install && npm run build'
           echo "✓ All frontend assets built"
