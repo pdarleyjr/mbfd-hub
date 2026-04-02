@@ -1,4 +1,4 @@
-name: Deploy to VPS
+name: Deploy to Production
 
 on:
   push:
@@ -10,168 +10,129 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  # -------------------------------------------------------------------
+  # CI checks run on GitHub-hosted runner (fast, no network dependency)
+  # -------------------------------------------------------------------
+  ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress --no-scripts
+      - name: Syntax check
+        run: find app config routes -name "*.php" -exec php -l {} \; | grep -v "No syntax errors" || true
+
+  # -------------------------------------------------------------------
+  # Deploy runs on self-hosted runner on the Ubuntu production host
+  # -------------------------------------------------------------------
+  deploy:
+    needs: ci
+    runs-on: self-hosted
+    timeout-minutes: 20
     environment:
       name: production
       url: https://www.mbfdhub.com
-    
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
+      - name: Pre-deploy backup
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
+          BACKUP_DIR="/opt/mbfd/backups/daily"
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          docker exec mbfd-hub-pgsql pg_dump -U mbfd_user -Fc mbfd_hub > "${BACKUP_DIR}/pre_deploy_${TIMESTAMP}.dump"
+          echo "✓ Pre-deploy backup: pre_deploy_${TIMESTAMP}.dump"
 
-      - name: Deploy to VPS
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          GITHUB_SHA: ${{ github.sha }}
+      - name: Pull latest code
         run: |
-          ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST 'bash -s' << 'EOF'
-            set -e
-            cd /root/mbfd-hub
-            
-            # Create backup before deploy
-            BACKUP_FILE="backups/mbfd_hub_$(date +%Y%m%d_%H%M%S).sql"
-            mkdir -p backups
-            docker compose -f compose.yaml exec -T pgsql pg_dump -U mbfd_user mbfd_hub > "$BACKUP_FILE"
-            echo "✓ Backup created: $BACKUP_FILE"
-            
-            # Pull latest changes and reset to origin (deterministic deploy)
-            echo "=== Git Diagnostics ==="
-            git remote -v
-            git remote set-url origin https://${{ secrets.GH_PAT }}@github.com/pdarleyjr/mbfd-hub.git
-            echo "Remote URL updated with auth token"
-            git fetch origin --force --prune
-            echo "Fetched. origin/main is: $(git rev-parse origin/main)"
-            echo "Current HEAD before reset: $(git rev-parse HEAD)"
-            git reset --hard origin/main
-            echo "HEAD after reset: $(git rev-parse HEAD)"
-            git clean -fd
-            # Write build marker files
-            git rev-parse HEAD > .git-sha
-            date -Iseconds > .build-time
-            # Write deploy marker file (verifiable via HTTP)
-            echo "{\"deployed_sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json
-            # Verify SHA matches what GitHub expects
-            VPS_SHA=$(git rev-parse HEAD)
-            echo "VPS SHA: $VPS_SHA"
-            echo "=== End Git Diagnostics ==="
-            echo "✓ Repository reset to origin/main (pdarleyjr/mbfd-hub)"
-            
-            # Rebuild and restart containers (explicit compose file to avoid duplicate warnings)
-            docker compose -f compose.yaml up -d --build
-            echo "✓ Containers rebuilt and restarted"
-            
-            # Wait for containers to be healthy
-            sleep 15
-            
-            # Verify Reverb is running after container restart
-            docker compose -f compose.yaml exec -T laravel.test bash -c 'pgrep -f "reverb:start" || (echo "Reverb not running, starting..." && nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &)'
-            echo "✓ Reverb verified"
-            
-            # Verify queue worker
-            docker compose -f compose.yaml exec -T laravel.test bash -c 'pgrep -f "queue:work" || (echo "Queue worker not running, starting..." && nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &)'
-            echo "✓ Queue worker verified"
-            
-            # Run Laravel commands
-            docker compose -f compose.yaml exec -T laravel.test php artisan migrate --force
-            docker compose -f compose.yaml exec -T laravel.test php artisan optimize:clear
-            docker compose -f compose.yaml exec -T laravel.test php artisan config:cache
-            docker compose -f compose.yaml exec -T laravel.test php artisan route:cache
-            docker compose -f compose.yaml exec -T laravel.test php artisan view:cache || (echo "view:cache failed — clearing views instead" && docker compose -f compose.yaml exec -T laravel.test php artisan view:clear)
-            docker compose -f compose.yaml exec -T laravel.test php artisan filament:clear-cached-components
-            echo "✓ Laravel optimizations complete"
-            
-            # Build main Vite assets (CSS theme + JS)
-            docker compose -f compose.yaml exec -T laravel.test npm ci
-            docker compose -f compose.yaml exec -T laravel.test npm run build
-            echo "✓ Main Vite assets built"
-            
-            # Publish Filament assets
-            docker compose -f compose.yaml exec -T laravel.test php artisan filament:assets
-            echo "✓ Filament assets published"
-            
-            # Build daily-checkout frontend INSIDE container (not on host)
-            docker compose -f compose.yaml exec -T laravel.test bash -c 'cd /var/www/html/resources/js/daily-checkout && npm ci && npm run build'
-            # Copy built assets to public
-            docker compose -f compose.yaml exec -T laravel.test bash -c 'cp -r /var/www/html/resources/js/daily-checkout/dist/* /var/www/html/public/daily/ 2>/dev/null || true'
-            echo "✓ Daily-checkout frontend built"
-            
-            # Run apparatus data backfill
-            echo "Running apparatus:backfill-pm-data..."
-            docker compose -f compose.yaml exec -T laravel.test php artisan apparatus:backfill-pm-data || echo "⚠ Backfill command not found or failed"
-            echo "✓ Apparatus data backfilled"
-          EOF
+          cd /opt/mbfd/mbfd-hub
+          git fetch origin --force --prune
+          git reset --hard origin/main
+          git clean -fd
+          echo "{\"sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json
+          echo "✓ Code updated to $(git rev-parse --short HEAD)"
 
-      - name: Run Smoke Tests
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
+      - name: Rebuild containers
         run: |
-          echo "Running smoke tests..."
-          sleep 5
-          
-          # Test version endpoint (follow redirects with -L)
-          if curl -sfL https://www.mbfdhub.com/__version | jq .; then
-            echo "✓ Version endpoint check passed"
-          else
-            echo "⚠ Version endpoint check failed"
-          fi
-          
-          # Test daily checkout page (follow redirects with -L)
-          if curl -sfL https://www.mbfdhub.com/daily/ -o /dev/null; then
-            echo "✓ Daily checkout accessible"
-          else
-            echo "⚠ Daily checkout check failed"
-          fi
+          cd /opt/mbfd/mbfd-hub
+          docker compose -f compose.prod.yaml up -d --build
+          echo "✓ Containers rebuilt"
 
-      - name: Verify Service Workers
+      - name: Wait for health
         run: |
-          echo "Verifying /sw.js..."
-          HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" https://www.mbfdhub.com/sw.js)
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "ERROR: /sw.js returned $HTTP_CODE, expected 200"
-            exit 1
-          fi
-          echo "✓ /sw.js returned 200"
-          
-          # Verify content type is JavaScript
-          CONTENT_TYPE=$(curl -sL -I https://www.mbfdhub.com/sw.js | grep -i content-type | cut -d' ' -f2 | tr -d '\r')
-          echo "Content-Type: $CONTENT_TYPE"
-          if [[ "$CONTENT_TYPE" != *"javascript"* && "$CONTENT_TYPE" != *"text/plain"* ]]; then
-            echo "WARNING: Unexpected Content-Type for service worker"
-          fi
-
-          echo "Verifying /daily/service-worker.js..."
-          HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" https://www.mbfdhub.com/daily/service-worker.js)
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "ERROR: /daily/service-worker.js returned $HTTP_CODE, expected 200"
-            exit 1
-          fi
-          echo "✓ /daily/service-worker.js returned 200"
-
-          echo "Verifying /manifest.json..."
-          HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" https://www.mbfdhub.com/manifest.json)
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "ERROR: /manifest.json returned $HTTP_CODE, expected 200"
-            exit 1
-          fi
-          echo "✓ /manifest.json returned 200"
-          
-          echo "✓ Deployment and Verification complete!"
-
-      - name: Notify on Failure
-        if: failure()
-        run: |
-          echo "❌ Deployment failed! Check the logs above for details."
+          for i in $(seq 1 60); do
+            if docker exec mbfd-hub-laravel curl -sf http://localhost:80 > /dev/null 2>&1; then
+              echo "✓ Laravel healthy after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Laravel did not become healthy in 60s"
           exit 1
+
+      - name: Verify background services
+        run: |
+          docker exec mbfd-hub-laravel bash -c \
+            'pgrep -f "reverb:start" || nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &'
+          docker exec mbfd-hub-laravel bash -c \
+            'pgrep -f "queue:work" || nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
+          echo "✓ Reverb and queue worker running"
+
+      - name: Run migrations and optimize
+        run: |
+          docker exec mbfd-hub-laravel php artisan migrate --force
+          docker exec mbfd-hub-laravel php artisan optimize:clear
+          docker exec mbfd-hub-laravel php artisan config:cache
+          docker exec mbfd-hub-laravel php artisan route:cache
+          docker exec mbfd-hub-laravel php artisan view:cache || docker exec mbfd-hub-laravel php artisan view:clear
+          docker exec mbfd-hub-laravel php artisan filament:clear-cached-components
+          echo "✓ Laravel optimized"
+
+      - name: Build frontend assets
+        run: |
+          docker exec mbfd-hub-laravel bash -c 'npm ci && npm run build'
+          docker exec mbfd-hub-laravel php artisan filament:assets
+          docker exec mbfd-hub-laravel bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install && npm run build'
+          echo "✓ All frontend assets built"
+
+      - name: Fix permissions
+        run: docker exec mbfd-hub-laravel chmod -R 777 storage bootstrap/cache
+
+  # -------------------------------------------------------------------
+  # Smoke tests run from GitHub-hosted runner (external perspective)
+  # -------------------------------------------------------------------
+  smoke-tests:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run smoke tests
+        run: |
+          PASS=0; FAIL=0
+          test_url() {
+            local desc="$1" url="$2" expected="${3:-200}"
+            HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" "$url" --max-time 15)
+            if [ "$HTTP_CODE" = "$expected" ]; then
+              echo "✓ $desc → HTTP $HTTP_CODE"; PASS=$((PASS + 1))
+            else
+              echo "✗ $desc → HTTP $HTTP_CODE (expected $expected)"; FAIL=$((FAIL + 1))
+            fi
+          }
+          echo "=== Post-Deploy Smoke Tests ==="
+          sleep 5
+          test_url "Landing page"        "https://www.mbfdhub.com/"
+          test_url "Daily Forms"          "https://www.mbfdhub.com/daily/"
+          test_url "Admin login"          "https://www.mbfdhub.com/admin/login"
+          test_url "Service worker"       "https://www.mbfdhub.com/sw.js"
+          test_url "Daily SW"             "https://www.mbfdhub.com/daily/service-worker.js"
+          test_url "Manifest"             "https://www.mbfdhub.com/manifest.json"
+          test_url "Deploy marker"        "https://www.mbfdhub.com/deploy-marker.json"
+          test_url "Baserow"              "https://baserow.mbfdhub.com"    "200"
+          test_url "Snipe-IT"             "https://inventory.mbfdhub.com"  "200"
+          echo ""
+          echo "=== Results: $PASS passed, $FAIL failed ==="
+          [ "$FAIL" -gt 0 ] && exit 1 || true

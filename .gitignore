@@ -1,21 +1,42 @@
-/.phpunit.cache
-/node_modules
-**/node_modules
-/public/hot
-/public/storage
-/storage/*.key
-/storage/pail
-/vendor
-**/package-lock.json
+# =============================================================================
+# MBFD Hub — .gitignore
+# Government-grade exclusion policy: deny-by-default for secrets, credentials,
+# backups, build artifacts, IDE configs, and environment-specific files.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# 1. Environment & Secrets (CRITICAL — never commit)
+# ---------------------------------------------------------------------------
 .env*
 !.env.example
-.phpactor.json
+/auth.json
+*.pem
+*.key
+*.p12
+*.pfx
+**/google_service_account.json
+**/creds.json
+**/credentials.json
+
+# ---------------------------------------------------------------------------
+# 2. Dependencies & Build Artifacts
+# ---------------------------------------------------------------------------
+/vendor
+/node_modules
+**/node_modules
+**/package-lock.json
+/public/build/
+/public/hot
+/public/storage
+/.phpunit.cache
 .phpunit.result.cache
-Homestead.json
-Homestead.yaml
+.phpactor.json
 npm-debug.log
 yarn-error.log
-/auth.json
+
+# ---------------------------------------------------------------------------
+# 3. IDE & Editor
+# ---------------------------------------------------------------------------
 /.fleet
 /.idea
 /.nova
@@ -23,10 +44,22 @@ yarn-error.log
 /.zed
 *.code-workspace
 
-# Logs
+# ---------------------------------------------------------------------------
+# 4. Laravel Framework
+# ---------------------------------------------------------------------------
+/storage/*.key
+/storage/pail
+Homestead.json
+Homestead.yaml
+
+# ---------------------------------------------------------------------------
+# 5. Logs
+# ---------------------------------------------------------------------------
 *.log
 
-# Temp/debug scripts in root
+# ---------------------------------------------------------------------------
+# 6. Temporary / Debug / Scratch Files
+# ---------------------------------------------------------------------------
 /fix_*.php
 /debug_*.php
 /check_*.php
@@ -34,49 +67,78 @@ yarn-error.log
 /create_*.sh
 /test_*.php
 /sentry_test.php
+/temp_*
+/scratch_*
+*.bak
+*.backup
+*.backup2
+*.old
+*.b64
 
-# PowerShell diagnostic scripts (contain credentials/tokens)
+# ---------------------------------------------------------------------------
+# 7. Scripts with Credentials / Operations Scripts
+# ---------------------------------------------------------------------------
 *.ps1
-/check_ip_rules.ps1
-/check_vps.ps1
-/create_user_vps.ps1
-/fetch_user_ip.ps1
-/fetch_waf_logs.ps1
-/final_system_check.ps1
-/final_system_check_sql.ps1
-/fix_admin_access.ps1
-/deploy_inventory_fix.ps1
+*.sh
+!.husky/*.sh
 
-# Documentation with potentially sensitive content
+# ---------------------------------------------------------------------------
+# 8. Documentation with Sensitive Content
+# ---------------------------------------------------------------------------
 TOKEN_GENERATION_GUIDE.md
 PROJECT_SUMMARY.md
 .project_summary.md
-MBFD_HUB_DISCOVERY_REPORT_2026-02-12.md
 PERFORMANCE_FIX_REPORT_2026-02-12.md
-CLAUDE.md
 AI_AGENT_ERRORS.md
 
-# Temporary files directory
-/temp_files/
+# Numbered project docs (contain IPs, credentials, architecture details)
+[0-9].*.md
+[0-9][0-9].*.md
+MBFD_HUB_*.md
+CLAUDE.md
+VPS_*.md
 
-# Local credentials and secrets (NEVER commit)
+# ---------------------------------------------------------------------------
+# 9. Decommissioned / Legacy Directories
+# ---------------------------------------------------------------------------
+/.ai/
+/.ai_scaffold/
+/.kilocode/
+/.claude/
+/laravel-app/
+/temp_deploy/
+/temp_files/
 .local/
 pics/
 
-# MCP local artifacts
+# ---------------------------------------------------------------------------
+# 10. Infrastructure / Deployment (environment-specific)
+# ---------------------------------------------------------------------------
+cloudflared-config.yml
+compose-vps*.yaml
+compose.prod.yaml
+snipeit-compose.yaml
+observability-compose.yaml
+docker-compose.local-sandbox.yml
+
+# ---------------------------------------------------------------------------
+# 11. Database Backups & Data
+# ---------------------------------------------------------------------------
+backups/
+*.dump
+*.sql.gz
+
+# ---------------------------------------------------------------------------
+# 12. AI / MCP Local Artifacts
+# ---------------------------------------------------------------------------
 /.ai/mcp/**
 /.kilocode/mcp.local.json
-
-# Prevent accidental in-workspace local-rag storage
 /lancedb/
 /models/
 
-# Composer vendor in laravel-app (not published views)
-laravel-app/vendor/
-
-# Build output
-/public/build/
-laravel-app/public/build/
-
-# Security: exclude database backups
-backups/
+# ---------------------------------------------------------------------------
+# 13. OS Files
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
