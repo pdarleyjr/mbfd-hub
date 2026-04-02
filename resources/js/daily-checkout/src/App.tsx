@@ -13,6 +13,7 @@ import StationInventoryForm from './components/StationInventoryForm';
 import VehicleInspectionSelect from './components/VehicleInspectionSelect';
 import EquipmentRequestWizard from './components/forms/EquipmentRequestWizard';
 import StationInspectionWizard from './components/forms/StationInspectionWizard';
+import TrtInventoryWizard from './components/TrtInventoryWizard';
 
 const HomeNav = () => (
   <header className="sticky top-0 z-50 bg-neutral-900 border-b border-neutral-700/50 h-16 flex items-center justify-between px-4 lg:px-6" style={{ paddingTop: 'max(0px, env(safe-area-inset-top, 0px))' }}>
@@ -156,6 +157,7 @@ function App() {
             <Route path="/forms-hub/station-inventory" element={<StationInventoryForm />} />
             <Route path="/forms-hub/equipment-request" element={<EquipmentRequestWizard />} />
             <Route path="/forms-hub/station-inspection" element={<StationInspectionWizard />} />
+            <Route path="/forms-hub/trt-inventory" element={<TrtInventoryWizard />} />
             <Route path="/forms-hub/success" element={<SuccessPage />} />
           </Routes>
         </main>

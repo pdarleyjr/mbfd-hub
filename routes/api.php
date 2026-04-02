@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\StationInspectionController;
 use App\Http\Controllers\Workgroup\WorkgroupAIController;
 use App\Http\Controllers\Api\Public\ApparatusLayout\ApparatusLayoutController;
 use App\Http\Controllers\Api\DatabaseAuditController;
+use App\Http\Controllers\Api\TrtInventoryController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -57,6 +58,22 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
 // Public Station Inspection submission (stricter rate limit)
 Route::prefix('public')->middleware('throttle:10,1')->group(function () {
     Route::post('station_inspection', [StationInspectionController::class , 'storePublic']);
+});
+
+// TRT Trailer Inventory (public read)
+Route::prefix('public')->middleware('throttle:60,1')->group(function () {
+    Route::get('trt-inventory/catalog', [TrtInventoryController::class, 'catalogIndex']);
+});
+
+// TRT Trailer Inventory (public write - stricter rate limit)
+Route::prefix('public')->middleware('throttle:10,1')->group(function () {
+    Route::post('trt-inventory/submit', [TrtInventoryController::class, 'submit']);
+});
+
+// TRT Trailer Inventory (admin)
+Route::prefix('admin/trt-inventory')->middleware(['web', 'auth'])->group(function () {
+    Route::get('sessions', [TrtInventoryController::class, 'sessions']);
+    Route::get('sessions/{id}', [TrtInventoryController::class, 'sessionDetail']);
 });
 
 // Push notification routes (public VAPID key, authenticated subscription management)
