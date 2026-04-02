@@ -205,7 +205,7 @@ export default function TrtInventoryWizard() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-amber-600 font-bold mt-0.5">3.</span>
-                Take photos of damaged or missing equipment
+                Take photos of as much equipment as possible (especially power tools)
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-amber-600 font-bold mt-0.5">4.</span>
