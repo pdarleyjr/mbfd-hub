@@ -97,7 +97,11 @@
 
                                 {{-- Actual Qty --}}
                                 <td style="padding:0.5rem;text-align:center;font-variant-numeric:tabular-nums;color:#292524;">
-                                    {{ $item['actual_qty'] ?? '<span style="color:#a8a29e;">N/A</span>' }}
+                                    @if($item['actual_qty'] !== null)
+                                        {{ $item['actual_qty'] }}
+                                    @else
+                                        <span style="color:#a8a29e;">N/A</span>
+                                    @endif
                                 </td>
 
                                 {{-- Condition --}}
@@ -223,7 +227,7 @@
                                         <img
                                             src="{{ asset('storage/' . $entry['image_path']) }}"
                                             alt="Entry photo"
-                                            wire:click="showFullImage('{{ $entry['image_path'] }}')"
+                                            x-on:click.stop="$dispatch('show-full-image', '{{ asset('storage/' . $entry['image_path']) }}')"
                                             style="width:64px;height:64px;object-fit:cover;border-radius:0.375rem;cursor:pointer;border:1px solid #e7e5e4;"
                                             loading="lazy"
                                         />

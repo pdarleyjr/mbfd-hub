@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTrtCatalog } from '../hooks/useTrtCatalog';
 import { enqueueSubmission, processPendingSubmissions } from '../lib/sync';
@@ -26,9 +26,15 @@ export default function TrtInventoryWizard() {
   const [entries, setEntries] = useState<Map<number, TrtEntryDraft>>(new Map());
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [partialSubmitted, setPartialSubmitted] = useState(false);
   const fileInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
   const totalSteps = categories.length + 2; // welcome + N categories + review
+
+  // Scroll to top whenever step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step]);
 
   const getEntry = useCallback(
     (itemId: number): TrtEntryDraft =>
@@ -69,17 +75,20 @@ export default function TrtInventoryWizard() {
     }
   };
 
-  const handleSubmit = async () => {
+  const getFilledEntries = () =>
+    Array.from(entries.values()).filter(
+      (e) =>
+        e.present !== null ||
+        e.actual_quantity !== null ||
+        e.condition !== null ||
+        e.action !== null ||
+        e.image !== null
+    );
+
+  const submitEntries = async (andFinish: boolean) => {
     setSubmitting(true);
     try {
-      const filledEntries = Array.from(entries.values()).filter(
-        (e) =>
-          e.present !== null ||
-          e.actual_quantity !== null ||
-          e.condition !== null ||
-          e.action !== null ||
-          e.image !== null
-      );
+      const filledEntries = getFilledEntries();
 
       if (filledEntries.length === 0) {
         alert('No items have been checked. Please fill in at least one item.');
@@ -92,7 +101,13 @@ export default function TrtInventoryWizard() {
         submitted_at: new Date().toISOString(),
       });
       processPendingSubmissions('/api/public').catch(() => {});
-      setSubmitted(true);
+
+      if (andFinish) {
+        setSubmitted(true);
+      } else {
+        setPartialSubmitted(true);
+        setTimeout(() => setPartialSubmitted(false), 3000);
+      }
     } catch {
       alert('Failed to save. Your inventory will be retried automatically when online.');
     } finally {
@@ -189,7 +204,7 @@ export default function TrtInventoryWizard() {
         ))}
       </nav>
 
-      {/* Step 0: Welcome */}
+      {/* Step 0: Welcome + Section Picker */}
       {step === 0 && (
         <div className="space-y-6">
           <div className="bg-amber-50 rounded-xl p-6 ring-1 ring-amber-200/60">
@@ -216,6 +231,30 @@ export default function TrtInventoryWizard() {
               Multiple team members can submit their sections. All entries merge into today&apos;s session automatically.
             </p>
           </div>
+
+          {/* Section Picker — jump directly to an assigned area */}
+          <div>
+            <h3 className="text-sm font-semibold text-neutral-700 mb-3">Jump to a section:</h3>
+            <div className="grid grid-cols-1 gap-2">
+              {categories.map((cat, catIndex) => (
+                <button
+                  key={cat.category}
+                  type="button"
+                  onClick={() => setStep(catIndex + 1)}
+                  className="flex items-center justify-between min-h-[48px] px-4 py-3 bg-white rounded-lg ring-1 ring-neutral-200/60 text-left hover:bg-neutral-50 hover:ring-amber-300 transition-all"
+                >
+                  <div>
+                    <span className="text-sm font-medium text-neutral-800">{cat.category}</span>
+                    <span className="text-xs text-neutral-400 ml-2">{cat.items.length} items</span>
+                  </div>
+                  <svg className="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <p className="text-sm text-neutral-500">
             {categories.length} compartment sections &middot; {totalItems} items total
           </p>
@@ -485,8 +524,18 @@ export default function TrtInventoryWizard() {
         </div>
       )}
 
+      {/* Partial Submit Banner */}
+      {partialSubmitted && (
+        <div className="mt-4 bg-emerald-50 rounded-lg px-4 py-3 ring-1 ring-emerald-200/60 flex items-center gap-2">
+          <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <p className="text-sm text-emerald-700">Progress submitted! You can keep working or go back to Forms Hub.</p>
+        </div>
+      )}
+
       {/* Navigation */}
-      <div className="flex justify-between mt-8 gap-4">
+      <div className="flex flex-wrap justify-between mt-8 gap-3">
         <button
           type="button"
           onClick={() => setStep((s) => Math.max(0, s - 1))}
@@ -500,28 +549,46 @@ export default function TrtInventoryWizard() {
           Previous
         </button>
 
-        {step < totalSteps - 1 ? (
-          <button
-            type="button"
-            onClick={() => setStep((s) => Math.min(totalSteps - 1, s + 1))}
-            className="min-h-[48px] px-5 py-3 bg-amber-600 text-white rounded-lg font-medium text-sm hover:bg-amber-700 transition-colors"
-          >
-            Next
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting || filledCount === 0}
-            className={`min-h-[48px] px-6 py-3 rounded-lg font-medium text-sm transition-colors ${
-              submitting || filledCount === 0
-                ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
-                : 'bg-red-600 text-white hover:bg-red-700'
-            }`}
-          >
-            {submitting ? 'Submitting...' : 'Submit Inventory'}
-          </button>
-        )}
+        <div className="flex gap-2">
+          {/* Submit What I Have — available on any category step when there's data */}
+          {step > 0 && step < totalSteps - 1 && filledCount > 0 && (
+            <button
+              type="button"
+              onClick={() => submitEntries(false)}
+              disabled={submitting}
+              className={`min-h-[48px] px-4 py-3 rounded-lg font-medium text-sm transition-colors ${
+                submitting
+                  ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
+                  : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 ring-1 ring-emerald-300/60'
+              }`}
+            >
+              {submitting ? 'Saving...' : 'Submit Progress'}
+            </button>
+          )}
+
+          {step < totalSteps - 1 ? (
+            <button
+              type="button"
+              onClick={() => setStep((s) => Math.min(totalSteps - 1, s + 1))}
+              className="min-h-[48px] px-5 py-3 bg-amber-600 text-white rounded-lg font-medium text-sm hover:bg-amber-700 transition-colors"
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => submitEntries(true)}
+              disabled={submitting || filledCount === 0}
+              className={`min-h-[48px] px-6 py-3 rounded-lg font-medium text-sm transition-colors ${
+                submitting || filledCount === 0
+                  ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
+            >
+              {submitting ? 'Submitting...' : 'Submit & Finish'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
