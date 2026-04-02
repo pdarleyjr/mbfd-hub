@@ -1,0 +1,186 @@
+{
+  "_source": "Extracted from TRT Trailer Checkout Sheet scan (CamScanner 04-02-2026). Items marked [VERIFY] have uncertain text from scan quality.",
+  "categories": [
+    {
+      "name": "Birds Nest (Driver Side)",
+      "items": [
+        { "name": "Wrap (5), 6 Bags & Vims", "expected_quantity": 1, "sort_order": 1 },
+        { "name": "10'x10' Canopy", "expected_quantity": 1, "sort_order": 2 },
+        { "name": "Chains (1 Red, 1 Blue)", "expected_quantity": 2, "sort_order": 3 },
+        { "name": "Red Climbing Rope", "expected_quantity": 1, "sort_order": 4 },
+        { "name": "Yellow Climbing Cover", "expected_quantity": 1, "sort_order": 5 },
+        { "name": "Patio Panels", "expected_quantity": 1, "sort_order": 6 }
+      ]
+    },
+    {
+      "name": "Birds Nest (Middle)",
+      "items": [
+        { "name": "Bags w/ Line", "expected_quantity": 4, "sort_order": 1 },
+        { "name": "Bins w/ Air Hose", "expected_quantity": 2, "sort_order": 2 },
+        { "name": "Bags Small Incase", "expected_quantity": 2, "sort_order": 3 },
+        { "name": "Picker", "expected_quantity": 1, "sort_order": 4 },
+        { "name": "Base Plate (white)", "expected_quantity": 1, "sort_order": 5 },
+        { "name": "Blue Ground Pad", "expected_quantity": 1, "sort_order": 6 },
+        { "name": "Cont. Spacer Box", "expected_quantity": 1, "sort_order": 7 },
+        { "name": "Cont. Spacer Box (4 pnts)", "expected_quantity": 1, "sort_order": 8 },
+        { "name": "Yellow Stand Offs", "expected_quantity": 3, "sort_order": 9 },
+        { "name": "Lever Side Rear to Inside", "expected_quantity": 1, "sort_order": 10 },
+        { "name": "300lb Crane", "expected_quantity": 1, "sort_order": 11 },
+        { "name": "Car Batteries", "expected_quantity": 2, "sort_order": 12 },
+        { "name": "Battery Charger", "expected_quantity": 1, "sort_order": 13 },
+        { "name": "Stakes w/ Handle L-Set", "expected_quantity": 2, "sort_order": 14 },
+        { "name": "Rakers Bag", "expected_quantity": 4, "sort_order": 15 },
+        { "name": "2\"x3\"x4' Wood", "expected_quantity": 2, "sort_order": 16 },
+        { "name": "2\"x3\"x8' Wood", "expected_quantity": 6, "sort_order": 17 },
+        { "name": "2\"x6\"x4' Plywood", "expected_quantity": 2, "sort_order": 18 },
+        { "name": "2\"x6\"x8' Plywood", "expected_quantity": 2, "sort_order": 19 },
+        { "name": "10\" Crossboard SS-494", "expected_quantity": 1, "sort_order": 20 },
+        { "name": "Set Full Base Plates", "expected_quantity": 1, "sort_order": 21 },
+        { "name": "Sawzall w/ Fuel (2X)", "expected_quantity": 1, "sort_order": 22 },
+        { "name": "D Floored / 24\" Pts [VERIFY]", "expected_quantity": 2, "sort_order": 23 },
+        { "name": "U Fired 42 / I Fired 3 [VERIFY]", "expected_quantity": 1, "sort_order": 24 }
+      ]
+    },
+    {
+      "name": "Birds Nest (Off. Side)",
+      "items": [
+        { "name": "Spade Shovel", "expected_quantity": 1, "sort_order": 1 },
+        { "name": "Flat Shovel", "expected_quantity": 1, "sort_order": 2 },
+        { "name": "Pitchfork", "expected_quantity": 1, "sort_order": 3 },
+        { "name": "Flat Headed Axe", "expected_quantity": 2, "sort_order": 4 },
+        { "name": "Bat Axe", "expected_quantity": 1, "sort_order": 5 },
+        { "name": "Trashion Spike", "expected_quantity": 1, "sort_order": 6 },
+        { "name": "Wedge w/ Lite", "expected_quantity": 4, "sort_order": 7 },
+        { "name": "Small Crow Bar", "expected_quantity": 1, "sort_order": 8 },
+        { "name": "Small Crow Bar (2nd)", "expected_quantity": 1, "sort_order": 9 },
+        { "name": "Johnson Bar", "expected_quantity": 1, "sort_order": 10 },
+        { "name": "Large Crowbar", "expected_quantity": 1, "sort_order": 11 },
+        { "name": "Chain Speed Grinder", "expected_quantity": 1, "sort_order": 12 },
+        { "name": "Sea Hooks", "expected_quantity": 2, "sort_order": 13 },
+        { "name": "Halligan", "expected_quantity": 1, "sort_order": 14 },
+        { "name": "Electrical Bag", "expected_quantity": 1, "sort_order": 15 },
+        { "name": "Solar Panels [VERIFY]", "expected_quantity": 12, "sort_order": 16 },
+        { "name": "Boom Heads", "expected_quantity": 2, "sort_order": 17 }
+      ]
+    },
+    {
+      "name": "Paratech Rack",
+      "items": [
+        { "name": "Panel Frame", "expected_quantity": 1, "sort_order": 1 },
+        { "name": "33\" E46 Struts", "expected_quantity": 4, "sort_order": 2 },
+        { "name": "2\"x10\" Lumber", "expected_quantity": 1, "sort_order": 3 },
+        { "name": "4\"x4\" Posts", "expected_quantity": 4, "sort_order": 4 },
+        { "name": "3\" to 56\" Shorts", "expected_quantity": 3, "sort_order": 5 },
+        { "name": "Belt Strap [VERIFY]", "expected_quantity": 2, "sort_order": 6 },
+        { "name": "Full Plate", "expected_quantity": 2, "sort_order": 7 },
+        { "name": "Duckbill Plate", "expected_quantity": 3, "sort_order": 8 },
+        { "name": "Half Plate", "expected_quantity": 2, "sort_order": 9 }
+      ]
+    },
+    {
+      "name": "Cribbing",
+      "items": [
+        { "name": "4\"x4\" Crate", "expected_quantity": 1, "sort_order": 1 },
+        { "name": "4x4 Wedges Crate", "expected_quantity": 1, "sort_order": 2 },
+        { "name": "4\"x4\" Plywood Crate", "expected_quantity": 1, "sort_order": 3 },
+        { "name": "1' Flat Wedges Crate", "expected_quantity": 1, "sort_order": 4 },
+        { "name": "2\"x4\" Crate", "expected_quantity": 1, "sort_order": 5 },
+        { "name": "2\"x4\"x8' Wood", "expected_quantity": 1, "sort_order": 6 },
+        { "name": "Wedge Cribbing Set [VERIFY]", "expected_quantity": 1, "sort_order": 7 },
+        { "name": "Step Cribbing Set [VERIFY]", "expected_quantity": 1, "sort_order": 8 }
+      ]
+    },
+    {
+      "name": "Off Side Compartments",
+      "items": [
+        { "name": "Bonesaw Blades", "expected_quantity": 4, "sort_order": 1 },
+        { "name": "Crescent Wrench", "expected_quantity": 1, "sort_order": 2 },
+        { "name": "4\" Blades", "expected_quantity": 4, "sort_order": 3 },
+        { "name": "24\" Drill Bits S/B", "expected_quantity": 6, "sort_order": 4 },
+        { "name": "Chisel Bit", "expected_quantity": 3, "sort_order": 5 },
+        { "name": "Airbag Hose/Nozzle", "expected_quantity": 1, "sort_order": 6 },
+        { "name": "Regulator Bags", "expected_quantity": 1, "sort_order": 7 },
+        { "name": "Airbag Nozzle", "expected_quantity": 1, "sort_order": 8 },
+        { "name": "Drill Bit Set (1-13)", "expected_quantity": 1, "sort_order": 9 },
+        { "name": "Grinder Gas Mixture [VERIFY]", "expected_quantity": 1, "sort_order": 10 },
+        { "name": "Large Combo Contr [VERIFY]", "expected_quantity": 1, "sort_order": 11 },
+        { "name": "Rocker Panel Supp [VERIFY]", "expected_quantity": 1, "sort_order": 12 },
+        { "name": "Glass Master", "expected_quantity": 1, "sort_order": 13 },
+        { "name": "Framing Nails Box", "expected_quantity": 1, "sort_order": 14 },
+        { "name": "Metal Blades", "expected_quantity": 3, "sort_order": 15 },
+        { "name": "Air Chisel w/ Bits", "expected_quantity": 1, "sort_order": 16 },
+        { "name": "Bottle (Fl. Hyd.)", "expected_quantity": 1, "sort_order": 17 },
+        { "name": "Hydraulic Ram", "expected_quantity": 1, "sort_order": 18 },
+        { "name": "Small Cutter", "expected_quantity": 1, "sort_order": 19 },
+        { "name": "Circ Saw 10 1/4 w/ 3 Bl", "expected_quantity": 1, "sort_order": 20 }
+      ]
+    },
+    {
+      "name": "Penet. Room / Power Tools",
+      "items": [
+        { "name": "Orange 14\" Rope", "expected_quantity": 1, "sort_order": 1 },
+        { "name": "Red Bag w/ Orange 14\" Rope", "expected_quantity": 1, "sort_order": 2 },
+        { "name": "PVP Wood Cable / Jig", "expected_quantity": 1, "sort_order": 3 },
+        { "name": "Welding Mask/Hood [VERIFY]", "expected_quantity": 1, "sort_order": 4 },
+        { "name": "Air Hose Adaptor", "expected_quantity": 1, "sort_order": 5 },
+        { "name": "Porter Cable Jig 50 [VERIFY]", "expected_quantity": 1, "sort_order": 6 },
+        { "name": "Worm Nuts Box 2 1/8 [VERIFY]", "expected_quantity": 1, "sort_order": 7 },
+        { "name": "Ext Screw 3 2/12 [VERIFY]", "expected_quantity": 1, "sort_order": 8 },
+        { "name": "DC Amp Charger [VERIFY]", "expected_quantity": 1, "sort_order": 9 },
+        { "name": "Fire Plug/Fitting [VERIFY]", "expected_quantity": 1, "sort_order": 10 },
+        { "name": "Framing Nails 3.5\" Box [VERIFY]", "expected_quantity": 1, "sort_order": 11 }
+      ]
+    },
+    {
+      "name": "Off Side Rear to 5",
+      "items": [
+        { "name": "2\"x4\"x8' Wood", "expected_quantity": 8, "sort_order": 1 },
+        { "name": "Red Moments [VERIFY]", "expected_quantity": 4, "sort_order": 2 },
+        { "name": "Chairman Keys", "expected_quantity": 2, "sort_order": 3 },
+        { "name": "1 Box Items [VERIFY]", "expected_quantity": 1, "sort_order": 4 },
+        { "name": "Butt Cutter (On Wall)", "expected_quantity": 1, "sort_order": 5 },
+        { "name": "Box Cutter", "expected_quantity": 1, "sort_order": 6 },
+        { "name": "Bug Regulator [VERIFY]", "expected_quantity": 1, "sort_order": 7 },
+        { "name": "Road Flares (set)", "expected_quantity": 1, "sort_order": 8 },
+        { "name": "Yellow Traffic Vest", "expected_quantity": 1, "sort_order": 9 },
+        { "name": "Orange Spray Paint (2)", "expected_quantity": 2, "sort_order": 10 },
+        { "name": "Garden Hose w/ Nozzle [VERIFY]", "expected_quantity": 1, "sort_order": 11 },
+        { "name": "Small Engine Fix kit [VERIFY]", "expected_quantity": 1, "sort_order": 12 }
+      ]
+    },
+    {
+      "name": "OFC Signaling / Pre-Check",
+      "items": [
+        { "name": "Check Tire Pressure", "expected_quantity": 1, "sort_order": 1 },
+        { "name": "Check Booster PSI (140)", "expected_quantity": 1, "sort_order": 2 },
+        { "name": "Oil Front Stabilizers", "expected_quantity": 1, "sort_order": 3 },
+        { "name": "Oil Rear & Side Stabilizers", "expected_quantity": 1, "sort_order": 4 },
+        { "name": "Chain Saw Fuel/Bar Oil", "expected_quantity": 1, "sort_order": 5 },
+        { "name": "Airbags & Jets Portfolio", "expected_quantity": 1, "sort_order": 6 },
+        { "name": "Check Exit Lights w/ F-250", "expected_quantity": 1, "sort_order": 7 },
+        { "name": "Check First-Aid Batteries", "expected_quantity": 1, "sort_order": 8 }
+      ]
+    },
+    {
+      "name": "Rear Compartments (R Top / R Bottom)",
+      "items": [
+        { "name": "Crate w/ Tent Sets [VERIFY]", "expected_quantity": 1, "sort_order": 1 },
+        { "name": "Safety Glasses", "expected_quantity": 1, "sort_order": 2 },
+        { "name": "Caution Tape", "expected_quantity": 1, "sort_order": 3 },
+        { "name": "Crate 4 Fail Lights [VERIFY]", "expected_quantity": 1, "sort_order": 4 },
+        { "name": "Orange Soft Stretcher", "expected_quantity": 1, "sort_order": 5 },
+        { "name": "Cones 5 Windmills [VERIFY]", "expected_quantity": 5, "sort_order": 6 },
+        { "name": "Pad Eye/Hammers", "expected_quantity": 2, "sort_order": 7 },
+        { "name": "Builder Square", "expected_quantity": 1, "sort_order": 8 },
+        { "name": "Tape Measure", "expected_quantity": 1, "sort_order": 9 },
+        { "name": "Metric Sockets/Allen Keys", "expected_quantity": 1, "sort_order": 10 },
+        { "name": "Vinyl Repair Kit [VERIFY]", "expected_quantity": 1, "sort_order": 11 },
+        { "name": "Bin Crates w/ Gen Cord", "expected_quantity": 2, "sort_order": 12 },
+        { "name": "First Aid Panel/Kit [VERIFY]", "expected_quantity": 1, "sort_order": 13 },
+        { "name": "Bag (Short, Regular)", "expected_quantity": 1, "sort_order": 14 },
+        { "name": "Gal Bucket w/ Contents [VERIFY]", "expected_quantity": 1, "sort_order": 15 },
+        { "name": "Regular Hammers", "expected_quantity": 1, "sort_order": 16 }
+      ]
+    }
+  ]
+}

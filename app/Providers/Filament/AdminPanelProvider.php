@@ -28,6 +28,7 @@ use App\Filament\Pages\NotificationSettings;
 use App\Filament\Pages\Settings;
 use App\Http\Middleware\RedirectTrainingUsers;
 use App\Filament\Admin\Pages\EquipmentIntake;
+use App\Filament\Admin\Pages\TrtTrailerInventory;
 use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\TodoOverviewWidget;
@@ -71,6 +72,7 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Pages\Dashboard::class,
                 EquipmentIntake::class,
+                TrtTrailerInventory::class,
             ])
             ->widgets([
                 FleetStatsWidget::class,
