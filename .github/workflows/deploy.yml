@@ -100,15 +100,16 @@ jobs:
           echo "app=$APP" >> "$GITHUB_OUTPUT"
           echo "✓ Laravel container: $APP"
 
-      - name: Install PHP dependencies
+      - name: Install PHP dependencies and migrate
         run: |
           APP="${{ steps.containers.outputs.app }}"
-          # Wait for container to be running
           sleep 5
           docker exec "$APP" composer install --prefer-dist --no-interaction --no-progress --optimize-autoloader
-          docker exec "$APP" php artisan key:generate --force 2>/dev/null || true
           docker exec "$APP" php artisan package:discover --ansi 2>/dev/null || true
-          echo "✓ PHP dependencies installed"
+          docker exec "$APP" php artisan migrate --force
+          docker exec "$APP" php artisan config:cache
+          docker exec "$APP" php artisan route:cache
+          echo "✓ PHP dependencies installed and migrated"
 
       - name: Wait for health
         run: |
@@ -123,10 +124,9 @@ jobs:
           echo "::error::Laravel did not become healthy in 90s"
           exit 1
 
-      - name: Run migrations and optimize
+      - name: Optimize Laravel
         run: |
           APP="${{ steps.containers.outputs.app }}"
-          docker exec "$APP" php artisan migrate --force
           docker exec "$APP" php artisan optimize:clear
           docker exec "$APP" php artisan config:cache
           docker exec "$APP" php artisan route:cache
