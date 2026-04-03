@@ -10,9 +10,14 @@ return new class extends Migration
     public function up(): void
     {
         // Update station_inspections: add sog_mandate_acknowledged, extinguishing_system_date
+        // (These columns may already exist from the create migration)
         Schema::table('station_inspections', function (Blueprint $table) {
-            $table->boolean('sog_mandate_acknowledged')->default(false)->after('notes');
-            $table->date('extinguishing_system_date')->nullable()->after('sog_mandate_acknowledged');
+            if (! Schema::hasColumn('station_inspections', 'sog_mandate_acknowledged')) {
+                $table->boolean('sog_mandate_acknowledged')->default(false)->after('notes');
+            }
+            if (! Schema::hasColumn('station_inspections', 'extinguishing_system_date')) {
+                $table->date('extinguishing_system_date')->nullable()->after('sog_mandate_acknowledged');
+            }
         });
 
         // Update fire_equipment_requests: add officer_signature, pd_case_number, expand status enum

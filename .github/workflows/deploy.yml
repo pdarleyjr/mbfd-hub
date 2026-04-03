@@ -2,12 +2,15 @@ name: Deploy to Production
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
   group: production-deployment
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   # -------------------------------------------------------------------
@@ -16,10 +19,12 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@728c6c6b8cf02c2e48117716a91ee48313958a19 # v2
         with:
           php-version: '8.4'
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
@@ -35,6 +40,8 @@ jobs:
     needs: ci
     runs-on: self-hosted
     timeout-minutes: 20
+    permissions:
+      contents: read
     environment:
       name: production
       url: https://www.mbfdhub.com
@@ -100,7 +107,7 @@ jobs:
           echo "✓ All frontend assets built"
 
       - name: Fix permissions
-        run: docker exec mbfd-hub-laravel chmod -R 777 storage bootstrap/cache
+        run: docker exec mbfd-hub-laravel chmod -R 775 storage bootstrap/cache
 
   # -------------------------------------------------------------------
   # Smoke tests run from GitHub-hosted runner (external perspective)
@@ -109,6 +116,8 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
       - name: Run smoke tests
         run: |
