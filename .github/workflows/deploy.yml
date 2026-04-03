@@ -49,15 +49,15 @@ jobs:
     steps:
       - name: Pre-deploy backup
         run: |
-          BACKUP_DIR="/opt/mbfd/backups/daily"
-          mkdir -p "$BACKUP_DIR" 2>/dev/null || true
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          # Find PostgreSQL container (handles both compose.prod.yaml and dev naming)
           PG_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'pgsql' | head -1)
           if [ -z "$PG_CONTAINER" ]; then
             echo "::warning::No PostgreSQL container found, skipping backup"
           else
-            docker exec "$PG_CONTAINER" pg_dump -U mbfd_user -Fc mbfd_hub > "${BACKUP_DIR}/pre_deploy_${TIMESTAMP}.dump"
+            # Dump to temp then move to backup dir (avoids path permission issues)
+            TMPFILE="/tmp/pre_deploy_${TIMESTAMP}.dump"
+            docker exec "$PG_CONTAINER" pg_dump -U mbfd_user -Fc mbfd_hub > "$TMPFILE"
+            mv "$TMPFILE" /opt/mbfd/backups/daily/ 2>/dev/null || cp "$TMPFILE" /opt/mbfd/backups/daily/ 2>/dev/null || echo "::warning::Could not move backup to /opt/mbfd/backups/daily/"
             echo "✓ Pre-deploy backup: pre_deploy_${TIMESTAMP}.dump (container: $PG_CONTAINER)"
           fi
 
