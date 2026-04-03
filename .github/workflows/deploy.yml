@@ -50,7 +50,7 @@ jobs:
       - name: Pre-deploy backup
         run: |
           BACKUP_DIR="/opt/mbfd/backups/daily"
-          mkdir -p "$BACKUP_DIR"
+          mkdir -p "$BACKUP_DIR" 2>/dev/null || true
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           # Find PostgreSQL container (handles both compose.prod.yaml and dev naming)
           PG_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'pgsql' | head -1)
