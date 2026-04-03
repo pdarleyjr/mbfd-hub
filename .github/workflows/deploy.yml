@@ -62,14 +62,30 @@ jobs:
 
       - name: Prepare workspace for deploy
         run: |
-          # Copy .env from existing deploy dir if available
-          if [ -f /opt/mbfd-hub/.env ]; then
-            cp /opt/mbfd-hub/.env .env
-            echo "✓ Copied .env from /opt/mbfd-hub/"
-          elif [ -f "$GITHUB_WORKSPACE/.env" ]; then
-            echo "✓ Using existing .env in workspace"
-          else
-            echo "::error::.env file not found"
+          # Find .env from known locations on this host
+          ENV_FOUND=false
+          for ENV_PATH in /opt/mbfd-hub/.env /opt/mbfd/mbfd-hub/.env /home/*/mbfd-hub/.env /opt/mbfd-hub/app/.env; do
+            if [ -f "$ENV_PATH" ]; then
+              cp "$ENV_PATH" .env
+              echo "✓ Copied .env from $ENV_PATH"
+              ENV_FOUND=true
+              break
+            fi
+          done
+          # Also check if compose already has env_file or .env exists from prior run
+          if [ "$ENV_FOUND" = false ]; then
+            # Search more broadly
+            FOUND=$(find /opt -name ".env" -path "*mbfd*" 2>/dev/null | head -1)
+            if [ -n "$FOUND" ]; then
+              cp "$FOUND" .env
+              echo "✓ Copied .env from $FOUND"
+              ENV_FOUND=true
+            fi
+          fi
+          if [ "$ENV_FOUND" = false ]; then
+            echo "::error::.env file not found anywhere. Searched /opt/mbfd-hub, /opt/mbfd/mbfd-hub, /home/*/mbfd-hub"
+            echo "Debug: ls /opt/" && ls /opt/ 2>&1 || true
+            echo "Debug: find .env" && find /opt -name ".env" -maxdepth 4 2>/dev/null || true
             exit 1
           fi
           # Write deploy marker
