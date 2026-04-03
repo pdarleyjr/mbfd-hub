@@ -19,11 +19,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup PHP
+        uses: shivammathur/setup-php@728c6c6b8cf02c2e48117716a91ee48313958a19 # v2
+        with:
+          php-version: '8.4'
+
+      - name: Install Composer deps
+        run: composer install --prefer-dist --no-interaction --no-progress --no-scripts
+
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 22
 
       - name: Install Node deps
         run: npm install
