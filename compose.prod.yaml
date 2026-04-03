@@ -59,7 +59,7 @@ services:
       start_period: 30s
 
   baserow:
-    image: baserow/baserow:1.29
+    image: baserow/baserow:latest
     container_name: mbfd-hub-baserow
     restart: unless-stopped
     ports:
