@@ -51,8 +51,14 @@ jobs:
         run: |
           BACKUP_DIR="/opt/mbfd/backups/daily"
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          docker exec mbfd-hub-pgsql pg_dump -U mbfd_user -Fc mbfd_hub > "${BACKUP_DIR}/pre_deploy_${TIMESTAMP}.dump"
-          echo "✓ Pre-deploy backup: pre_deploy_${TIMESTAMP}.dump"
+          # Find PostgreSQL container (handles both compose.prod.yaml and dev naming)
+          PG_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'pgsql' | head -1)
+          if [ -z "$PG_CONTAINER" ]; then
+            echo "::warning::No PostgreSQL container found, skipping backup"
+          else
+            docker exec "$PG_CONTAINER" pg_dump -U mbfd_user -Fc mbfd_hub > "${BACKUP_DIR}/pre_deploy_${TIMESTAMP}.dump"
+            echo "✓ Pre-deploy backup: pre_deploy_${TIMESTAMP}.dump (container: $PG_CONTAINER)"
+          fi
 
       - name: Pull latest code
         run: |
@@ -69,10 +75,18 @@ jobs:
           docker compose -f compose.prod.yaml up -d --build
           echo "✓ Containers rebuilt"
 
+      - name: Resolve container names
+        id: containers
+        run: |
+          APP=$(docker ps --format '{{.Names}}' | grep -E 'laravel' | head -1)
+          echo "app=$APP" >> "$GITHUB_OUTPUT"
+          echo "✓ Laravel container: $APP"
+
       - name: Wait for health
         run: |
+          APP="${{ steps.containers.outputs.app }}"
           for i in $(seq 1 60); do
-            if docker exec mbfd-hub-laravel curl -sf http://localhost:80 > /dev/null 2>&1; then
+            if docker exec "$APP" curl -sf http://localhost:80 > /dev/null 2>&1; then
               echo "✓ Laravel healthy after ${i}s"
               exit 0
             fi
@@ -83,31 +97,36 @@ jobs:
 
       - name: Verify background services
         run: |
-          docker exec mbfd-hub-laravel bash -c \
+          APP="${{ steps.containers.outputs.app }}"
+          docker exec "$APP" bash -c \
             'pgrep -f "reverb:start" || nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &'
-          docker exec mbfd-hub-laravel bash -c \
+          docker exec "$APP" bash -c \
             'pgrep -f "queue:work" || nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
           echo "✓ Reverb and queue worker running"
 
       - name: Run migrations and optimize
         run: |
-          docker exec mbfd-hub-laravel php artisan migrate --force
-          docker exec mbfd-hub-laravel php artisan optimize:clear
-          docker exec mbfd-hub-laravel php artisan config:cache
-          docker exec mbfd-hub-laravel php artisan route:cache
-          docker exec mbfd-hub-laravel php artisan view:cache || docker exec mbfd-hub-laravel php artisan view:clear
-          docker exec mbfd-hub-laravel php artisan filament:clear-cached-components
+          APP="${{ steps.containers.outputs.app }}"
+          docker exec "$APP" php artisan migrate --force
+          docker exec "$APP" php artisan optimize:clear
+          docker exec "$APP" php artisan config:cache
+          docker exec "$APP" php artisan route:cache
+          docker exec "$APP" php artisan view:cache || docker exec "$APP" php artisan view:clear
+          docker exec "$APP" php artisan filament:clear-cached-components
           echo "✓ Laravel optimized"
 
       - name: Build frontend assets
         run: |
-          docker exec mbfd-hub-laravel bash -c 'npm install && npm run build'
-          docker exec mbfd-hub-laravel php artisan filament:assets
-          docker exec mbfd-hub-laravel bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install && npm run build'
+          APP="${{ steps.containers.outputs.app }}"
+          docker exec "$APP" bash -c 'npm install && npm run build'
+          docker exec "$APP" php artisan filament:assets
+          docker exec "$APP" bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install && npm run build'
           echo "✓ All frontend assets built"
 
       - name: Fix permissions
-        run: docker exec mbfd-hub-laravel chmod -R 775 storage bootstrap/cache
+        run: |
+          APP="${{ steps.containers.outputs.app }}"
+          docker exec "$APP" chmod -R 775 storage bootstrap/cache
 
   # -------------------------------------------------------------------
   # Smoke tests run from GitHub-hosted runner (external perspective)

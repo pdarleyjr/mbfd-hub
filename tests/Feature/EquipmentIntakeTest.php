@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Filament\Admin\Pages\EquipmentIntake;
 use App\Services\SnipeItService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
 use Tests\TestCase;
 use App\Models\User;
@@ -23,6 +24,11 @@ class EquipmentIntakeTest extends TestCase
         // Create required roles
         Role::findOrCreate('admin', 'web');
         Role::findOrCreate('super_admin', 'web');
+
+        // Register chatify route if not present (required by admin layout)
+        if (! Route::has('chatify')) {
+            Route::get('/chatify', fn() => '')->name('chatify');
+        }
 
         // Create admin user with required role
         $this->adminUser = User::factory()->create([
