@@ -61,6 +61,14 @@ jobs:
             echo "✓ Pre-deploy backup: pre_deploy_${TIMESTAMP}.dump (container: $PG_CONTAINER)"
           fi
 
+      - name: Debug filesystem
+        run: |
+          echo "whoami: $(whoami)"
+          echo "pwd: $(pwd)"
+          echo "ls /opt: $(ls /opt/ 2>&1)"
+          echo "ls /opt/mbfd: $(ls /opt/mbfd/ 2>&1)"
+          echo "test -d: $(test -d /opt/mbfd/mbfd-hub && echo EXISTS || echo MISSING)"
+
       - name: Pull latest code
         run: |
           cd /opt/mbfd/mbfd-hub
