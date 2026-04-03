@@ -1,8 +1,14 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTrtCatalog } from '../hooks/useTrtCatalog';
 import { enqueueSubmission, processPendingSubmissions } from '../lib/sync';
-import type { TrtEntryDraft, ItemCondition, ItemAction } from '../types/trt-inventory';
+import type { TrtEntryDraft, ItemCondition, ItemAction, TrtCatalogItem } from '../types/trt-inventory';
+
+interface SearchResult {
+  item: TrtCatalogItem;
+  category: string;
+  pageIndex: number;
+}
 
 async function compressImage(file: File): Promise<string> {
   const imageCompression = (await import('browser-image-compression')).default;
@@ -28,6 +34,9 @@ export default function TrtInventoryWizard() {
   const [submitted, setSubmitted] = useState(false);
   const [partialSubmitted, setPartialSubmitted] = useState(false);
   const fileInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const totalSteps = categories.length + 2; // welcome + N categories + review
 
@@ -35,6 +44,30 @@ export default function TrtInventoryWizard() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step]);
+
+  // Focus search input when opened
+  useEffect(() => {
+    if (searchOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [searchOpen]);
+
+  // Client-side search across all categories
+  const searchResults: SearchResult[] = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length < 2) return [];
+
+    const results: SearchResult[] = [];
+    for (let i = 0; i < categories.length; i++) {
+      const cat = categories[i];
+      for (const item of cat.items) {
+        if (item.name.toLowerCase().includes(q)) {
+          results.push({ item, category: cat.category, pageIndex: i + 1 });
+        }
+      }
+    }
+    return results;
+  }, [searchQuery, categories]);
 
   const getEntry = useCallback(
     (itemId: number): TrtEntryDraft =>
@@ -203,6 +236,90 @@ export default function TrtInventoryWizard() {
           </div>
         ))}
       </nav>
+
+      {/* Cross-Section Search */}
+      {!searchOpen && step > 0 && step < totalSteps - 1 && (
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          className="fixed bottom-24 right-4 z-30 w-12 h-12 bg-amber-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-amber-700 transition-colors"
+          aria-label="Search items across all sections"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </button>
+      )}
+
+      {searchOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex flex-col">
+          <div className="bg-white rounded-b-2xl shadow-xl max-h-[80vh] flex flex-col">
+            {/* Search header */}
+            <div className="flex items-center gap-3 p-4 border-b border-neutral-200">
+              <svg className="w-5 h-5 text-neutral-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search items across all sections..."
+                className="flex-1 text-sm outline-none placeholder-neutral-400"
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-neutral-500 hover:text-neutral-700"
+                aria-label="Close search"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Search results */}
+            <div className="overflow-y-auto flex-1 p-2">
+              {searchQuery.trim().length < 2 && (
+                <p className="text-sm text-neutral-400 text-center py-6">
+                  Type at least 2 characters to search
+                </p>
+              )}
+
+              {searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+                <p className="text-sm text-neutral-400 text-center py-6">
+                  No items found matching &ldquo;{searchQuery.trim()}&rdquo;
+                </p>
+              )}
+
+              {searchResults.map((result) => (
+                <button
+                  key={result.item.id}
+                  type="button"
+                  onClick={() => {
+                    setStep(result.pageIndex);
+                    setSearchOpen(false);
+                    setSearchQuery('');
+                  }}
+                  className="w-full text-left px-3 py-3 rounded-lg hover:bg-amber-50 transition-colors flex items-center justify-between gap-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-neutral-800 truncate">{result.item.name}</p>
+                    <p className="text-xs text-neutral-500 truncate">{result.category}</p>
+                  </div>
+                  <span className="flex-shrink-0 text-xs font-medium bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
+                    Page {result.pageIndex}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Tap backdrop to close */}
+          <div className="flex-1" onClick={() => { setSearchOpen(false); setSearchQuery(''); }} />
+        </div>
+      )}
 
       {/* Step 0: Welcome + Section Picker */}
       {step === 0 && (
