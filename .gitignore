@@ -110,6 +110,8 @@ VPS_*.md
 /temp_files/
 .local/
 pics/
+/WorkGroup_Files/
+**/.venv/
 
 # ---------------------------------------------------------------------------
 # 10. Infrastructure / Deployment (environment-specific)

@@ -6,6 +6,7 @@ use Filament\Forms\Components\Component;
 use Filament\Forms\Components\TextInput;
 use Filament\Http\Responses\Auth\Contracts\LoginResponse;
 use Filament\Pages\Auth\Login as BaseLogin;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 
 /**
  * Custom Employee Portal login page.
@@ -32,8 +33,16 @@ class EmployeeLogin extends BaseLogin
         ];
     }
 
-    public function authenticate(): LoginResponse
+    public function authenticate(): ?LoginResponse
     {
+        try {
+            $this->rateLimit(5);
+        } catch (ThrottleRequestsException $exception) {
+            $this->getRateLimitedNotification($exception)?->send();
+
+            return null;
+        }
+
         $data = $this->form->getState();
 
         $credentials = $this->getCredentialsFromFormData($data);
