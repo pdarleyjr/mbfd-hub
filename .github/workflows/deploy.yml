@@ -50,8 +50,8 @@ jobs:
       - name: Clean workspace
         run: |
           # Fix ownership of files created by Docker containers (root-owned)
-          sudo chown -R $(whoami):$(whoami) "$GITHUB_WORKSPACE" 2>/dev/null || true
-          # Remove stale git lock files
+          # Use a lightweight container to chown since runner may not have sudo
+          docker run --rm -v "$GITHUB_WORKSPACE:/workspace" alpine chown -R $(id -u):$(id -g) /workspace 2>/dev/null || true
           rm -f "$GITHUB_WORKSPACE/.git/index.lock" 2>/dev/null || true
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -155,6 +155,11 @@ jobs:
         run: |
           APP="${{ steps.containers.outputs.app }}"
           docker exec "$APP" chmod -R 775 storage bootstrap/cache
+
+      - name: Fix workspace ownership for next run
+        if: always()
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/workspace" alpine chown -R $(id -u):$(id -g) /workspace 2>/dev/null || true
 
   # -------------------------------------------------------------------
   # Smoke tests run from GitHub-hosted runner (external perspective)
