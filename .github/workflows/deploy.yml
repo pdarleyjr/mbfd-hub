@@ -121,7 +121,7 @@ jobs:
       - name: Build frontend assets
         run: |
           APP="${{ steps.containers.outputs.app }}"
-          docker exec "$APP" bash -c 'rm -rf node_modules && npm install && npm run build'
+          docker exec "$APP" bash -c 'rm -rf node_modules package-lock.json && npm install --legacy-peer-deps && npm run build'
           docker exec "$APP" php artisan filament:assets
           docker exec "$APP" bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install && npm run build'
           echo "✓ All frontend assets built"
