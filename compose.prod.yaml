@@ -1,0 +1,86 @@
+services:
+  laravel.test:
+    build:
+      context: "./vendor/laravel/sail/runtimes/8.5"
+      dockerfile: Dockerfile
+      args:
+        WWWGROUP: "${WWWGROUP}"
+    image: "sail-8.5/app"
+    container_name: mbfd-hub-laravel
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8090:8080"
+    environment:
+      WWWUSER: "${WWWUSER}"
+      LARAVEL_SAIL: 1
+      XDEBUG_MODE: "off"
+    volumes:
+      - ".:/var/www/html"
+      - "${GOOGLE_SA_PATH:-/dev/null}:/run/secrets/google_service_account.json:ro"
+    networks:
+      - mbfd-net
+    depends_on:
+      pgsql:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  pgsql:
+    image: "postgres:16-alpine"
+    container_name: mbfd-hub-pgsql
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      PGPASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_DATABASE}"
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+    volumes:
+      - "pgsql-data:/var/lib/postgresql/data"
+    networks:
+      - mbfd-net
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "${DB_DATABASE}", "-U", "${DB_USERNAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  baserow:
+    image: baserow/baserow:1.29
+    container_name: mbfd-hub-baserow
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8082:80"
+    environment:
+      BASEROW_PUBLIC_URL: "${BASEROW_PUBLIC_URL}"
+      BASEROW_CADDY_ADDRESSES: ":80"
+      BASEROW_SECRET_KEY: "${BASEROW_SECRET_KEY}"
+    volumes:
+      - baserow-data:/baserow/data
+    networks:
+      - mbfd-net
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  mbfd-net:
+    driver: bridge
+
+volumes:
+  pgsql-data:
+    driver: local
+  baserow-data:
+    driver: local
