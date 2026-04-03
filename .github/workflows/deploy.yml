@@ -88,8 +88,13 @@ jobs:
             echo '✓ Containers rebuilt'
           "
 
+      - name: Restart Laravel container
+        run: |
+          ssh deploy-target "docker restart mbfd-hub-laravel && echo '✓ Container restarted'"
+
       - name: Wait for health
         run: |
+          sleep 10
           for i in $(seq 1 90); do
             if ssh deploy-target "docker exec mbfd-hub-laravel curl -sf http://localhost:80" > /dev/null 2>&1; then
               echo "✓ Laravel healthy after ${i}s"
