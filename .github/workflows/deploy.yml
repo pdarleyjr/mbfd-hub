@@ -57,23 +57,17 @@ jobs:
             # Dump to temp then move to backup dir (avoids path permission issues)
             TMPFILE="/tmp/pre_deploy_${TIMESTAMP}.dump"
             docker exec "$PG_CONTAINER" pg_dump -U mbfd_user -Fc mbfd_hub > "$TMPFILE"
-            mv "$TMPFILE" /opt/mbfd/backups/daily/ 2>/dev/null || cp "$TMPFILE" /opt/mbfd/backups/daily/ 2>/dev/null || echo "::warning::Could not move backup to /opt/mbfd/backups/daily/"
+            BACKUP_DEST="/opt/mbfd-hub/storage/backups"
+            mkdir -p "$BACKUP_DEST" 2>/dev/null || true
+            mv "$TMPFILE" "$BACKUP_DEST/" 2>/dev/null || echo "::warning::Could not move backup to $BACKUP_DEST"
             echo "✓ Pre-deploy backup: pre_deploy_${TIMESTAMP}.dump (container: $PG_CONTAINER)"
           fi
 
-      - name: Debug filesystem
-        run: |
-          echo "whoami: $(whoami)"
-          echo "pwd: $(pwd)"
-          echo "ls /opt: $(ls /opt/ 2>&1)"
-          echo "ls /opt/mbfd: $(ls /opt/mbfd/ 2>&1)"
-          echo "test -d: $(test -d /opt/mbfd/mbfd-hub && echo EXISTS || echo MISSING)"
-
       - name: Pull latest code
         run: |
-          cd /opt/mbfd/mbfd-hub
+          cd /opt/mbfd-hub
           # Fix ownership of container-generated files before git operations
-          sudo chown -R peter:peter /opt/mbfd/mbfd-hub/
+          sudo chown -R $(whoami):$(whoami) /opt/mbfd-hub/ 2>/dev/null || true
           git fetch origin --force --prune
           git reset --hard origin/main
           git clean -fd
@@ -82,7 +76,7 @@ jobs:
 
       - name: Rebuild containers
         run: |
-          cd /opt/mbfd/mbfd-hub
+          cd /opt/mbfd-hub
           docker compose -f compose.prod.yaml up -d --build
           echo "✓ Containers rebuilt"
 
