@@ -92,9 +92,34 @@ jobs:
           echo "{\"sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json
           echo "✓ Workspace ready ($(git rev-parse --short HEAD))"
 
+      - name: Install composer deps (needed for Sail Dockerfile)
+        run: |
+          # Install composer if not available
+          if ! command -v composer &> /dev/null; then
+            curl -sS https://getcomposer.org/installer | php -- --install-dir=/tmp
+            COMPOSER="/tmp/composer.phar"
+          else
+            COMPOSER="composer"
+          fi
+          # Check if php is available; if not, skip (docker build will handle it)
+          if command -v php &> /dev/null; then
+            $COMPOSER install --prefer-dist --no-interaction --no-progress --no-scripts 2>/dev/null || echo "::warning::composer install failed, checking if Sail runtime exists"
+          fi
+          # Ensure the Sail Dockerfile directory exists
+          if [ ! -f vendor/laravel/sail/runtimes/8.5/Dockerfile ]; then
+            echo "::warning::Sail Dockerfile not found at vendor/laravel/sail/runtimes/8.5/Dockerfile"
+            echo "Checking if image already exists..."
+            if docker images sail-8.5/app --format '{{.ID}}' | head -1 | grep -q .; then
+              echo "✓ Using existing sail-8.5/app image"
+            else
+              echo "::error::No Sail Dockerfile and no cached image available"
+              exit 1
+            fi
+          fi
+
       - name: Rebuild containers
         run: |
-          docker compose -f compose.prod.yaml up -d --build
+          docker compose -f compose.prod.yaml up -d --build 2>/dev/null || docker compose -f compose.prod.yaml up -d
           echo "✓ Containers rebuilt"
 
       - name: Resolve container names

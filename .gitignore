@@ -118,7 +118,6 @@ pics/
 # ---------------------------------------------------------------------------
 cloudflared-config.yml
 compose-vps*.yaml
-compose.prod.yaml
 snipeit-compose.yaml
 observability-compose.yaml
 docker-compose.local-sandbox.yml
