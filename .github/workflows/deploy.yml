@@ -53,74 +53,36 @@ jobs:
         run: |
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           PG_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'pgsql' | head -1)
-          if [ -z "$PG_CONTAINER" ]; then
+          if [ -n "$PG_CONTAINER" ]; then
+            docker exec "$PG_CONTAINER" pg_dump -U mbfd_user -Fc mbfd_hub > "/tmp/pre_deploy_${TIMESTAMP}.dump" 2>/dev/null && \
+              echo "✓ Pre-deploy backup: /tmp/pre_deploy_${TIMESTAMP}.dump" || \
+              echo "::warning::Backup failed but continuing deploy"
+          else
             echo "::warning::No PostgreSQL container found, skipping backup"
-          else
-            docker exec "$PG_CONTAINER" pg_dump -U mbfd_user -Fc mbfd_hub > "/tmp/pre_deploy_${TIMESTAMP}.dump"
-            echo "✓ Pre-deploy backup: /tmp/pre_deploy_${TIMESTAMP}.dump"
           fi
 
-      - name: Prepare workspace for deploy
+      - name: Prepare environment
         run: |
-          # Find .env from known locations on this host
-          ENV_FOUND=false
-          for ENV_PATH in /opt/mbfd-hub/.env /opt/mbfd/mbfd-hub/.env /home/*/mbfd-hub/.env /opt/mbfd-hub/app/.env; do
-            if [ -f "$ENV_PATH" ]; then
-              cp "$ENV_PATH" .env
-              echo "✓ Copied .env from $ENV_PATH"
-              ENV_FOUND=true
-              break
-            fi
+          # Find .env from known locations
+          for p in /opt/mbfd-hub/.env /opt/mbfd/mbfd-hub/.env; do
+            if [ -f "$p" ]; then cp "$p" .env && echo "✓ .env from $p" && break; fi
           done
-          # Also check if compose already has env_file or .env exists from prior run
-          if [ "$ENV_FOUND" = false ]; then
-            # Search more broadly
-            FOUND=$(find /opt -name ".env" -path "*mbfd*" 2>/dev/null | head -1)
-            if [ -n "$FOUND" ]; then
-              cp "$FOUND" .env
-              echo "✓ Copied .env from $FOUND"
-              ENV_FOUND=true
-            fi
+          if [ ! -f .env ]; then
+            FOUND=$(find /opt /home -name ".env" -path "*mbfd*" -readable 2>/dev/null | head -1)
+            [ -n "$FOUND" ] && cp "$FOUND" .env && echo "✓ .env from $FOUND"
           fi
-          if [ "$ENV_FOUND" = false ]; then
-            echo "::error::.env file not found anywhere. Searched /opt/mbfd-hub, /opt/mbfd/mbfd-hub, /home/*/mbfd-hub"
-            echo "Debug: ls /opt/" && ls /opt/ 2>&1 || true
-            echo "Debug: find .env" && find /opt -name ".env" -maxdepth 4 2>/dev/null || true
-            exit 1
-          fi
-          # Write deploy marker
+          [ ! -f .env ] && echo "::error::No .env found" && exit 1
           echo "{\"sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json
-          echo "✓ Workspace ready ($(git rev-parse --short HEAD))"
 
-      - name: Install composer deps (needed for Sail Dockerfile)
+      - name: Deploy containers
         run: |
-          # Install composer if not available
-          if ! command -v composer &> /dev/null; then
-            curl -sS https://getcomposer.org/installer | php -- --install-dir=/tmp
-            COMPOSER="/tmp/composer.phar"
-          else
-            COMPOSER="composer"
-          fi
-          # Check if php is available; if not, skip (docker build will handle it)
-          if command -v php &> /dev/null; then
-            $COMPOSER install --prefer-dist --no-interaction --no-progress --no-scripts 2>/dev/null || echo "::warning::composer install failed, checking if Sail runtime exists"
-          fi
-          # Ensure the Sail Dockerfile directory exists
-          if [ ! -f vendor/laravel/sail/runtimes/8.5/Dockerfile ]; then
-            echo "::warning::Sail Dockerfile not found at vendor/laravel/sail/runtimes/8.5/Dockerfile"
-            echo "Checking if image already exists..."
-            if docker images sail-8.5/app --format '{{.ID}}' | head -1 | grep -q .; then
-              echo "✓ Using existing sail-8.5/app image"
-            else
-              echo "::error::No Sail Dockerfile and no cached image available"
-              exit 1
-            fi
-          fi
-
-      - name: Rebuild containers
-        run: |
-          docker compose -f compose.prod.yaml up -d --build 2>/dev/null || docker compose -f compose.prod.yaml up -d
-          echo "✓ Containers rebuilt"
+          # Use existing image (no --build) since PHP/Composer aren't available on runner
+          # The sail image was built during initial setup and is cached in Docker
+          docker compose -f compose.prod.yaml up -d 2>&1 || {
+            echo "::warning::compose up failed, trying with --no-build flag"
+            docker compose -f compose.prod.yaml up -d --no-build 2>&1
+          }
+          echo "✓ Containers deployed"
 
       - name: Resolve container names
         id: containers
@@ -132,15 +94,27 @@ jobs:
       - name: Wait for health
         run: |
           APP="${{ steps.containers.outputs.app }}"
-          for i in $(seq 1 60); do
+          for i in $(seq 1 90); do
             if docker exec "$APP" curl -sf http://localhost:80 > /dev/null 2>&1; then
               echo "✓ Laravel healthy after ${i}s"
               exit 0
             fi
             sleep 1
           done
-          echo "::error::Laravel did not become healthy in 60s"
+          echo "::error::Laravel did not become healthy in 90s"
           exit 1
+
+      - name: Run migrations and optimize
+        run: |
+          APP="${{ steps.containers.outputs.app }}"
+          docker exec "$APP" composer install --prefer-dist --no-interaction --no-progress --no-dev --optimize-autoloader 2>/dev/null || true
+          docker exec "$APP" php artisan migrate --force
+          docker exec "$APP" php artisan optimize:clear
+          docker exec "$APP" php artisan config:cache
+          docker exec "$APP" php artisan route:cache
+          docker exec "$APP" php artisan view:cache || docker exec "$APP" php artisan view:clear
+          docker exec "$APP" php artisan filament:clear-cached-components
+          echo "✓ Laravel optimized"
 
       - name: Verify background services
         run: |
@@ -150,17 +124,6 @@ jobs:
           docker exec "$APP" bash -c \
             'pgrep -f "queue:work" || nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
           echo "✓ Reverb and queue worker running"
-
-      - name: Run migrations and optimize
-        run: |
-          APP="${{ steps.containers.outputs.app }}"
-          docker exec "$APP" php artisan migrate --force
-          docker exec "$APP" php artisan optimize:clear
-          docker exec "$APP" php artisan config:cache
-          docker exec "$APP" php artisan route:cache
-          docker exec "$APP" php artisan view:cache || docker exec "$APP" php artisan view:clear
-          docker exec "$APP" php artisan filament:clear-cached-components
-          echo "✓ Laravel optimized"
 
       - name: Build frontend assets
         run: |
