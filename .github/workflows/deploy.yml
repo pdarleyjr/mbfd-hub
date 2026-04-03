@@ -63,6 +63,8 @@ jobs:
       - name: Pull latest code
         run: |
           cd /opt/mbfd/mbfd-hub
+          # Fix ownership of container-generated files before git operations
+          sudo chown -R $(whoami):$(whoami) public/build/ storage/ bootstrap/cache/ 2>/dev/null || true
           git fetch origin --force --prune
           git reset --hard origin/main
           git clean -fd
