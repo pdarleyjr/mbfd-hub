@@ -116,6 +116,7 @@ jobs:
       - name: Run migrations and optimize
         run: |
           ssh deploy-target "
+            docker exec mbfd-hub-laravel php artisan storage:link --force 2>/dev/null || true
             docker exec mbfd-hub-laravel php artisan migrate --force
             docker exec mbfd-hub-laravel php artisan optimize:clear
             docker exec mbfd-hub-laravel php artisan config:cache
