@@ -47,7 +47,16 @@ jobs:
       url: https://www.mbfdhub.com
 
     steps:
+      - name: Clean workspace
+        run: |
+          # Fix ownership of files created by Docker containers (root-owned)
+          sudo chown -R $(whoami):$(whoami) "$GITHUB_WORKSPACE" 2>/dev/null || true
+          # Remove stale git lock files
+          rm -f "$GITHUB_WORKSPACE/.git/index.lock" 2>/dev/null || true
+
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          clean: true
 
       - name: Pre-deploy backup
         run: |
