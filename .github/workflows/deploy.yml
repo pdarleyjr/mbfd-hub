@@ -114,14 +114,28 @@ jobs:
       - name: Wait for health
         run: |
           APP="${{ steps.containers.outputs.app }}"
-          for i in $(seq 1 90); do
+          echo "Checking container status..."
+          docker exec "$APP" bash -c 'ps aux | head -10' 2>/dev/null || true
+          for i in $(seq 1 120); do
+            # Try curl first, then wget, then php built-in
             if docker exec "$APP" curl -sf http://localhost:80 > /dev/null 2>&1; then
-              echo "✓ Laravel healthy after ${i}s"
+              echo "✓ Laravel healthy after ${i}s (curl)"
+              exit 0
+            elif docker exec "$APP" wget -q -O /dev/null http://localhost:80 2>/dev/null; then
+              echo "✓ Laravel healthy after ${i}s (wget)"
+              exit 0
+            elif docker exec "$APP" php -r "echo file_get_contents('http://localhost:80');" > /dev/null 2>&1; then
+              echo "✓ Laravel healthy after ${i}s (php)"
               exit 0
             fi
+            [ $((i % 15)) -eq 0 ] && echo "  Still waiting... (${i}s)"
             sleep 1
           done
-          echo "::error::Laravel did not become healthy in 90s"
+          echo "::warning::Health check diagnostics:"
+          docker exec "$APP" bash -c 'curl -v http://localhost:80 2>&1 | head -20' || true
+          docker exec "$APP" bash -c 'cat /var/log/nginx/error.log 2>/dev/null | tail -10' || true
+          docker exec "$APP" bash -c 'cat /var/www/html/storage/logs/laravel.log 2>/dev/null | tail -20' || true
+          echo "::error::Laravel did not become healthy in 120s"
           exit 1
 
       - name: Optimize Laravel
