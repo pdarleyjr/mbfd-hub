@@ -56,23 +56,28 @@ jobs:
           if [ -z "$PG_CONTAINER" ]; then
             echo "::warning::No PostgreSQL container found, skipping backup"
           else
-            TMPFILE="/tmp/pre_deploy_${TIMESTAMP}.dump"
-            docker exec "$PG_CONTAINER" pg_dump -U mbfd_user -Fc mbfd_hub > "$TMPFILE"
-            echo "✓ Pre-deploy backup: $TMPFILE (container: $PG_CONTAINER)"
+            docker exec "$PG_CONTAINER" pg_dump -U mbfd_user -Fc mbfd_hub > "/tmp/pre_deploy_${TIMESTAMP}.dump"
+            echo "✓ Pre-deploy backup: /tmp/pre_deploy_${TIMESTAMP}.dump"
           fi
 
-      - name: Sync code to deploy directory
+      - name: Prepare workspace for deploy
         run: |
-          DEPLOY_DIR="/opt/mbfd-hub"
-          sudo mkdir -p "$DEPLOY_DIR" 2>/dev/null || mkdir -p "$DEPLOY_DIR" 2>/dev/null || true
-          sudo chown -R $(whoami):$(whoami) "$DEPLOY_DIR" 2>/dev/null || true
-          rsync -a --delete --exclude='.env' --exclude='storage/app' --exclude='storage/logs' --exclude='node_modules' --exclude='vendor' "$GITHUB_WORKSPACE/" "$DEPLOY_DIR/"
-          echo "{\"sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$DEPLOY_DIR/public/deploy-marker.json"
-          echo "✓ Code synced to $DEPLOY_DIR ($(git rev-parse --short HEAD))"
+          # Copy .env from existing deploy dir if available
+          if [ -f /opt/mbfd-hub/.env ]; then
+            cp /opt/mbfd-hub/.env .env
+            echo "✓ Copied .env from /opt/mbfd-hub/"
+          elif [ -f "$GITHUB_WORKSPACE/.env" ]; then
+            echo "✓ Using existing .env in workspace"
+          else
+            echo "::error::.env file not found"
+            exit 1
+          fi
+          # Write deploy marker
+          echo "{\"sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json
+          echo "✓ Workspace ready ($(git rev-parse --short HEAD))"
 
       - name: Rebuild containers
         run: |
-          cd /opt/mbfd-hub
           docker compose -f compose.prod.yaml up -d --build
           echo "✓ Containers rebuilt"
 
