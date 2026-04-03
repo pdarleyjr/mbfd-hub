@@ -34,7 +34,7 @@ jobs:
         run: find app config routes -name "*.php" -exec php -l {} \; | grep -v "No syntax errors" || true
 
   # -------------------------------------------------------------------
-  # Deploy runs on self-hosted runner on the Ubuntu production host
+  # Deploy runs on self-hosted runner on the production host
   # -------------------------------------------------------------------
   deploy:
     needs: ci
@@ -47,6 +47,8 @@ jobs:
       url: https://www.mbfdhub.com
 
     steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
       - name: Pre-deploy backup
         run: |
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -54,25 +56,19 @@ jobs:
           if [ -z "$PG_CONTAINER" ]; then
             echo "::warning::No PostgreSQL container found, skipping backup"
           else
-            # Dump to temp then move to backup dir (avoids path permission issues)
             TMPFILE="/tmp/pre_deploy_${TIMESTAMP}.dump"
             docker exec "$PG_CONTAINER" pg_dump -U mbfd_user -Fc mbfd_hub > "$TMPFILE"
-            BACKUP_DEST="/opt/mbfd-hub/storage/backups"
-            mkdir -p "$BACKUP_DEST" 2>/dev/null || true
-            mv "$TMPFILE" "$BACKUP_DEST/" 2>/dev/null || echo "::warning::Could not move backup to $BACKUP_DEST"
-            echo "✓ Pre-deploy backup: pre_deploy_${TIMESTAMP}.dump (container: $PG_CONTAINER)"
+            echo "✓ Pre-deploy backup: $TMPFILE (container: $PG_CONTAINER)"
           fi
 
-      - name: Pull latest code
+      - name: Sync code to deploy directory
         run: |
-          cd /opt/mbfd-hub
-          # Fix ownership of container-generated files before git operations
-          sudo chown -R $(whoami):$(whoami) /opt/mbfd-hub/ 2>/dev/null || true
-          git fetch origin --force --prune
-          git reset --hard origin/main
-          git clean -fd
-          echo "{\"sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json
-          echo "✓ Code updated to $(git rev-parse --short HEAD)"
+          DEPLOY_DIR="/opt/mbfd-hub"
+          sudo mkdir -p "$DEPLOY_DIR" 2>/dev/null || mkdir -p "$DEPLOY_DIR" 2>/dev/null || true
+          sudo chown -R $(whoami):$(whoami) "$DEPLOY_DIR" 2>/dev/null || true
+          rsync -a --delete --exclude='.env' --exclude='storage/app' --exclude='storage/logs' --exclude='node_modules' --exclude='vendor' "$GITHUB_WORKSPACE/" "$DEPLOY_DIR/"
+          echo "{\"sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$DEPLOY_DIR/public/deploy-marker.json"
+          echo "✓ Code synced to $DEPLOY_DIR ($(git rev-parse --short HEAD))"
 
       - name: Rebuild containers
         run: |
@@ -123,7 +119,7 @@ jobs:
       - name: Build frontend assets
         run: |
           APP="${{ steps.containers.outputs.app }}"
-          docker exec "$APP" bash -c 'rm -rf node_modules package-lock.json && npm install --legacy-peer-deps && npm run build'
+          docker exec "$APP" bash -c 'npm install --legacy-peer-deps && npm run build'
           docker exec "$APP" php artisan filament:assets
           docker exec "$APP" bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install --legacy-peer-deps && npm run build'
           echo "✓ All frontend assets built"
