@@ -13,9 +13,6 @@ permissions:
   contents: read
 
 jobs:
-  # -------------------------------------------------------------------
-  # CI checks run on GitHub-hosted runner (fast, no network dependency)
-  # -------------------------------------------------------------------
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -33,12 +30,9 @@ jobs:
       - name: Syntax check
         run: find app config routes -name "*.php" -exec php -l {} \; | grep -v "No syntax errors" || true
 
-  # -------------------------------------------------------------------
-  # Deploy runs on self-hosted runner on the production host
-  # -------------------------------------------------------------------
   deploy:
     needs: ci
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
@@ -47,137 +41,98 @@ jobs:
       url: https://www.mbfdhub.com
 
     steps:
-      - name: Clean workspace
+      - name: Setup SSH
         run: |
-          # Fix ownership of files created by Docker containers (root-owned)
-          # Use a lightweight container to chown since runner may not have sudo
-          docker run --rm -v "$GITHUB_WORKSPACE:/workspace" alpine chown -R $(id -u):$(id -g) /workspace 2>/dev/null || true
-          rm -f "$GITHUB_WORKSPACE/.git/index.lock" 2>/dev/null || true
-
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          clean: true
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          # Configure SSH
+          cat >> ~/.ssh/config << EOF
+          Host deploy-target
+            HostName ${{ secrets.DEPLOY_HOST }}
+            User ${{ secrets.DEPLOY_USER }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+          EOF
 
       - name: Pre-deploy backup
         run: |
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          PG_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'pgsql' | head -1)
-          if [ -n "$PG_CONTAINER" ]; then
-            docker exec "$PG_CONTAINER" pg_dump -U mbfd_user -Fc mbfd_hub > "/tmp/pre_deploy_${TIMESTAMP}.dump" 2>/dev/null && \
-              echo "✓ Pre-deploy backup: /tmp/pre_deploy_${TIMESTAMP}.dump" || \
-              echo "::warning::Backup failed but continuing deploy"
-          else
-            echo "::warning::No PostgreSQL container found, skipping backup"
-          fi
+          ssh deploy-target "
+            PG=\$(docker ps --format '{{.Names}}' | grep pgsql | head -1)
+            if [ -n \"\$PG\" ]; then
+              docker exec \"\$PG\" pg_dump -U mbfd_user -Fc mbfd_hub > /tmp/pre_deploy_${TIMESTAMP}.dump
+              echo '✓ Pre-deploy backup: /tmp/pre_deploy_${TIMESTAMP}.dump'
+            else
+              echo '::warning::No PostgreSQL container found'
+            fi
+          "
 
-      - name: Prepare environment
+      - name: Pull latest code
         run: |
-          # Find .env from known locations
-          for p in /opt/mbfd-hub/.env /opt/mbfd/mbfd-hub/.env; do
-            if [ -f "$p" ]; then cp "$p" .env && echo "✓ .env from $p" && break; fi
-          done
-          if [ ! -f .env ]; then
-            FOUND=$(find /opt /home -name ".env" -path "*mbfd*" -readable 2>/dev/null | head -1)
-            [ -n "$FOUND" ] && cp "$FOUND" .env && echo "✓ .env from $FOUND"
-          fi
-          [ ! -f .env ] && echo "::error::No .env found" && exit 1
-          echo "{\"sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json
+          ssh deploy-target "
+            cd /opt/mbfd/mbfd-hub
+            git fetch origin --force --prune
+            git reset --hard origin/main
+            git clean -fd
+            echo '{\"sha\":\"'\$(git rev-parse HEAD)'\",\"deployed_at\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' > public/deploy-marker.json
+            echo '✓ Code updated to '\$(git rev-parse --short HEAD)
+          "
 
-      - name: Deploy containers
+      - name: Rebuild containers
         run: |
-          # Use existing image (no --build) since PHP/Composer aren't available on runner
-          # The sail image was built during initial setup and is cached in Docker
-          docker compose -f compose.prod.yaml up -d 2>&1 || {
-            echo "::warning::compose up failed, trying with --no-build flag"
-            docker compose -f compose.prod.yaml up -d --no-build 2>&1
-          }
-          echo "✓ Containers deployed"
-
-      - name: Resolve container names
-        id: containers
-        run: |
-          APP=$(docker ps --format '{{.Names}}' | grep -E 'laravel' | head -1)
-          echo "app=$APP" >> "$GITHUB_OUTPUT"
-          echo "✓ Laravel container: $APP"
-
-      - name: Install PHP dependencies and migrate
-        run: |
-          APP="${{ steps.containers.outputs.app }}"
-          sleep 5
-          docker exec "$APP" composer install --prefer-dist --no-interaction --no-progress --optimize-autoloader
-          docker exec "$APP" php artisan package:discover --ansi 2>/dev/null || true
-          docker exec "$APP" php artisan migrate --force
-          docker exec "$APP" php artisan config:cache
-          docker exec "$APP" php artisan route:cache
-          echo "✓ PHP dependencies installed and migrated"
+          ssh deploy-target "
+            cd /opt/mbfd/mbfd-hub
+            docker compose -f compose.prod.yaml up -d --build
+            echo '✓ Containers rebuilt'
+          "
 
       - name: Wait for health
         run: |
-          APP="${{ steps.containers.outputs.app }}"
-          echo "Checking container status..."
-          docker exec "$APP" bash -c 'ps aux | head -10' 2>/dev/null || true
-          for i in $(seq 1 120); do
-            # Try curl first, then wget, then php built-in
-            if docker exec "$APP" curl -sf http://localhost:80 > /dev/null 2>&1; then
-              echo "✓ Laravel healthy after ${i}s (curl)"
-              exit 0
-            elif docker exec "$APP" wget -q -O /dev/null http://localhost:80 2>/dev/null; then
-              echo "✓ Laravel healthy after ${i}s (wget)"
-              exit 0
-            elif docker exec "$APP" php -r "echo file_get_contents('http://localhost:80');" > /dev/null 2>&1; then
-              echo "✓ Laravel healthy after ${i}s (php)"
+          for i in $(seq 1 90); do
+            if ssh deploy-target "docker exec mbfd-hub-laravel curl -sf http://localhost:80" > /dev/null 2>&1; then
+              echo "✓ Laravel healthy after ${i}s"
               exit 0
             fi
-            [ $((i % 15)) -eq 0 ] && echo "  Still waiting... (${i}s)"
             sleep 1
           done
-          echo "::warning::Health check diagnostics:"
-          docker exec "$APP" bash -c 'curl -v http://localhost:80 2>&1 | head -20' || true
-          docker exec "$APP" bash -c 'cat /var/log/nginx/error.log 2>/dev/null | tail -10' || true
-          docker exec "$APP" bash -c 'cat /var/www/html/storage/logs/laravel.log 2>/dev/null | tail -20' || true
-          echo "::error::Laravel did not become healthy in 120s"
+          echo "::error::Laravel did not become healthy in 90s"
           exit 1
-
-      - name: Optimize Laravel
-        run: |
-          APP="${{ steps.containers.outputs.app }}"
-          docker exec "$APP" php artisan optimize:clear
-          docker exec "$APP" php artisan config:cache
-          docker exec "$APP" php artisan route:cache
-          docker exec "$APP" php artisan view:cache || docker exec "$APP" php artisan view:clear
-          docker exec "$APP" php artisan filament:clear-cached-components
-          echo "✓ Laravel optimized"
 
       - name: Verify background services
         run: |
-          APP="${{ steps.containers.outputs.app }}"
-          docker exec "$APP" bash -c \
-            'pgrep -f "reverb:start" || nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &'
-          docker exec "$APP" bash -c \
-            'pgrep -f "queue:work" || nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
-          echo "✓ Reverb and queue worker running"
+          ssh deploy-target "
+            docker exec mbfd-hub-laravel bash -c 'pgrep -f \"reverb:start\" || nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &'
+            docker exec mbfd-hub-laravel bash -c 'pgrep -f \"queue:work\" || nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
+            echo '✓ Reverb and queue worker running'
+          "
+
+      - name: Run migrations and optimize
+        run: |
+          ssh deploy-target "
+            docker exec mbfd-hub-laravel php artisan migrate --force
+            docker exec mbfd-hub-laravel php artisan optimize:clear
+            docker exec mbfd-hub-laravel php artisan config:cache
+            docker exec mbfd-hub-laravel php artisan route:cache
+            docker exec mbfd-hub-laravel php artisan view:cache || docker exec mbfd-hub-laravel php artisan view:clear
+            docker exec mbfd-hub-laravel php artisan filament:clear-cached-components
+            echo '✓ Laravel optimized'
+          "
 
       - name: Build frontend assets
         run: |
-          APP="${{ steps.containers.outputs.app }}"
-          docker exec "$APP" bash -c 'npm install --legacy-peer-deps && npm run build'
-          docker exec "$APP" php artisan filament:assets
-          docker exec "$APP" bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install --legacy-peer-deps && npm run build'
-          echo "✓ All frontend assets built"
+          ssh deploy-target "
+            docker exec mbfd-hub-laravel bash -c 'npm install --legacy-peer-deps && npm run build'
+            docker exec mbfd-hub-laravel php artisan filament:assets
+            docker exec mbfd-hub-laravel bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install --legacy-peer-deps && npm run build'
+            echo '✓ All frontend assets built'
+          "
 
       - name: Fix permissions
         run: |
-          APP="${{ steps.containers.outputs.app }}"
-          docker exec "$APP" chmod -R 775 storage bootstrap/cache
+          ssh deploy-target "docker exec mbfd-hub-laravel chmod -R 775 storage bootstrap/cache"
 
-      - name: Fix workspace ownership for next run
-        if: always()
-        run: |
-          docker run --rm -v "$GITHUB_WORKSPACE:/workspace" alpine chown -R $(id -u):$(id -g) /workspace 2>/dev/null || true
-
-  # -------------------------------------------------------------------
-  # Smoke tests run from GitHub-hosted runner (external perspective)
-  # -------------------------------------------------------------------
   smoke-tests:
     needs: deploy
     runs-on: ubuntu-latest
