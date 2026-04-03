@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
 use App\Models\User;
+use Spatie\Permission\Models\Role;
 
 class EquipmentIntakeTest extends TestCase
 {
@@ -18,6 +19,10 @@ class EquipmentIntakeTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Create required roles
+        Role::findOrCreate('admin', 'web');
+        Role::findOrCreate('super_admin', 'web');
 
         // Create admin user with required role
         $this->adminUser = User::factory()->create([
