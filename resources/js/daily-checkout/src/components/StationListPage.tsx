@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { Station } from '../types';
 import { ApiClient } from '../utils/api';
 import StationCard from './StationCard';
@@ -149,28 +148,6 @@ export default function StationListPage() {
           Select your station below to access forms, inspections, apparatus information, and more.
           Each station page contains everything you need for daily operations.
         </p>
-      </div>
-
-      {/* Quick Links Bar */}
-      <div className="flex flex-wrap justify-center gap-3 mb-8">
-        <Link
-          to="/vehicle-inspections"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white rounded-xl ring-1 ring-neutral-200/80 text-sm font-medium text-neutral-700 hover:bg-red-50 hover:text-red-700 hover:ring-red-200 transition-all"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Vehicle Inspections
-        </Link>
-        <Link
-          to="/forms-hub"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white rounded-xl ring-1 ring-neutral-200/80 text-sm font-medium text-neutral-700 hover:bg-sky-50 hover:text-sky-700 hover:ring-sky-200 transition-all"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-          Forms Hub
-        </Link>
       </div>
 
       {/* Stations Grid */}
