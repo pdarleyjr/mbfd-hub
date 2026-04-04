@@ -8,9 +8,11 @@ use App\Models\Room;
 use App\Models\RoomAsset;
 use App\Models\RoomAudit;
 use App\Models\RoomAuditItem;
+use App\Models\ApparatusInspection;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Schema;
+use Carbon\Carbon;
 
 class StationController extends Controller
 {
@@ -544,6 +546,130 @@ class StationController extends Controller
             'station_id' => $id,
             'capital_projects' => $capitalProjects,
             'under_25k_projects' => $under25kProjects,
+        ]);
+    }
+
+    /**
+     * Get station inspections for a station
+     */
+    public function stationInspections(int $id): JsonResponse
+    {
+        $station = Station::findOrFail($id);
+
+        $inspections = $station->stationInspections()
+            ->with(['inspector'])
+            ->orderBy('inspection_date', 'desc')
+            ->limit(50)
+            ->get()
+            ->map(fn ($inspection) => [
+                'id' => $inspection->id,
+                'inspection_date' => $inspection->inspection_date,
+                'inspection_type' => $inspection->inspection_type,
+                'overall_status' => $inspection->overall_status,
+                'inspector_name' => $inspection->inspector?->name ?? 'Unknown',
+                'notes' => $inspection->notes,
+                'created_at' => $inspection->created_at,
+            ]);
+
+        return response()->json([
+            'station_id' => $id,
+            'inspections' => $inspections,
+            'total' => $inspections->count(),
+        ]);
+    }
+
+    /**
+     * Get today's apparatus inspections for apparatus assigned to this station
+     */
+    public function apparatusInspections(int $id): JsonResponse
+    {
+        $station = Station::findOrFail($id);
+
+        $apparatusIds = $station->apparatuses()->pluck('id');
+
+        $inspections = ApparatusInspection::whereIn('apparatus_id', $apparatusIds)
+            ->whereDate('created_at', Carbon::today())
+            ->with('apparatus')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(fn ($inspection) => [
+                'id' => $inspection->id,
+                'apparatus_name' => $inspection->apparatus?->designation
+                    ?: $inspection->apparatus?->name
+                    ?: $inspection->apparatus?->unit_id
+                    ?: 'Unknown',
+                'operator_name' => $inspection->operator_name,
+                'rank' => $inspection->rank,
+                'shift' => $inspection->shift,
+                'completed_at' => $inspection->completed_at ?? $inspection->created_at,
+                'defect_count' => $inspection->defects()->count(),
+            ]);
+
+        return response()->json([
+            'station_id' => $id,
+            'inspections' => $inspections,
+            'total' => $inspections->count(),
+        ]);
+    }
+
+    /**
+     * Get fire equipment requests for a station
+     */
+    public function equipmentRequests(int $id): JsonResponse
+    {
+        $station = Station::findOrFail($id);
+
+        $requests = $station->fireEquipmentRequests()
+            ->with(['requestedBy'])
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get()
+            ->map(fn ($request) => [
+                'id' => $request->id,
+                'equipment_type' => $request->equipment_type,
+                'description' => $request->description,
+                'priority' => $request->priority,
+                'status' => $request->status,
+                'requested_by_name' => $request->requested_by_name
+                    ?: $request->requestedBy?->name
+                    ?: 'Unknown',
+                'created_at' => $request->created_at,
+            ]);
+
+        return response()->json([
+            'station_id' => $id,
+            'equipment_requests' => $requests,
+            'total' => $requests->count(),
+        ]);
+    }
+
+    /**
+     * Get single gas meters assigned to apparatus at this station
+     */
+    public function gasMeters(int $id): JsonResponse
+    {
+        $station = Station::findOrFail($id);
+
+        $meters = $station->singleGasMeters()
+            ->with('apparatus')
+            ->get()
+            ->map(fn ($meter) => [
+                'id' => $meter->id,
+                'serial_number' => $meter->serial_number,
+                'activation_date' => $meter->activation_date,
+                'expiration_date' => $meter->expiration_date,
+                'status' => $meter->status,
+                'days_until_expiration' => $meter->daysUntilExpiration(),
+                'apparatus_name' => $meter->apparatus?->designation
+                    ?: $meter->apparatus?->name
+                    ?: $meter->apparatus?->unit_id
+                    ?: 'Unassigned',
+            ]);
+
+        return response()->json([
+            'station_id' => $id,
+            'gas_meters' => $meters,
+            'total' => $meters->count(),
         ]);
     }
 }
