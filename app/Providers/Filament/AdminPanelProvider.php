@@ -124,9 +124,10 @@ class AdminPanelProvider extends PanelProvider
                     ->visible(fn (): bool => auth()->user()?->hasRole('super_admin') ?? false),
                 MenuItem::make()
                     ->label('Replacement Recommendations')
-                    ->url(fn (): string => url('/admin/recommendations'))
+                    ->url(fn (): string => \App\Filament\Resources\RecommendationResource::getUrl('index'))
                     ->icon('heroicon-o-light-bulb')
-                    ->sort(12),
+                    ->sort(12)
+                    ->visible(fn (): bool => auth()->user()?->hasAnyRole(['super_admin', 'admin']) ?? false),
                 MenuItem::make()
                     ->label('Application Health')
                     ->url(fn (): string => url('/admin/health'))

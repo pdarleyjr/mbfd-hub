@@ -222,8 +222,7 @@
 .fi-dropdown-panel .fi-dropdown-list-item,
 .fi-dropdown-panel .fi-dropdown-list-item-label,
 .fi-dropdown-panel [class*="text-gray"],
-.fi-dropdown-panel a,
-.fi-dropdown-panel span {
+.fi-dropdown-panel a {
     color: #292524 !important;
 }
 
