@@ -46,6 +46,10 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class , 'roomAssets']);
     Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class , 'apparatus']);
     Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class , 'projects']);
+    Route::get('stations/{station}/inspections', [\App\Http\Controllers\Api\StationController::class , 'stationInspections']);
+    Route::get('stations/{station}/apparatus-inspections', [\App\Http\Controllers\Api\StationController::class , 'apparatusInspections']);
+    Route::get('stations/{station}/equipment-requests', [\App\Http\Controllers\Api\StationController::class , 'equipmentRequests']);
+    Route::get('stations/{station}/gas-meters', [\App\Http\Controllers\Api\StationController::class , 'gasMeters']);
 
     // Apparatus Layout Planner (public read, auth write)
     Route::prefix('apparatus-layout')->group(function () {

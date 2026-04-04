@@ -1,4 +1,4 @@
-import { Apparatus, ChecklistData, InspectionSubmission, Station, StationDetail, Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData, StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse, InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest } from '../types';
+import { Apparatus, ChecklistData, InspectionSubmission, Station, StationDetail, Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData, StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse, InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest, StationInspectionSummary, ApparatusInspectionSummary, FireEquipmentRequestSummary, SingleGasMeterSummary } from '../types';
 
 const API_BASE = '/api';
 
@@ -346,6 +346,54 @@ export class ApiClient {
       throw new Error('Failed to fetch supply requests');
     }
     return response.json();
+  }
+
+  // ============================================
+  // Station Detail Sub-Resource API
+  // ============================================
+
+  static async getStationInspections(stationId: number): Promise<StationInspectionSummary[]> {
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/inspections`, {
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch station inspections');
+    }
+    const data = await response.json();
+    return data.inspections || [];
+  }
+
+  static async getTodayApparatusInspections(stationId: number): Promise<ApparatusInspectionSummary[]> {
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/apparatus-inspections`, {
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch apparatus inspections');
+    }
+    const data = await response.json();
+    return data.inspections || [];
+  }
+
+  static async getEquipmentRequests(stationId: number): Promise<FireEquipmentRequestSummary[]> {
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/equipment-requests`, {
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch equipment requests');
+    }
+    const data = await response.json();
+    return data.equipment_requests || [];
+  }
+
+  static async getGasMeters(stationId: number): Promise<SingleGasMeterSummary[]> {
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/gas-meters`, {
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch gas meters');
+    }
+    const data = await response.json();
+    return data.gas_meters || [];
   }
 
   static async createSupplyRequest(

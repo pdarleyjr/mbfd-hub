@@ -127,6 +127,55 @@ export interface Station {
   dorm_beds_count?: number;
 }
 
+// Station image mapping (station_number → image path)
+export const STATION_IMAGES: Record<number, string> = {
+  1: '/images/stations/station-1.png',
+  2: '/images/stations/station-2.png',
+  3: '/images/stations/station-3.png',
+  4: '/images/stations/station-4.png',
+  6: '/images/stations/station-6.png',
+};
+
+export interface StationInspectionSummary {
+  id: number;
+  inspection_date: string;
+  inspection_type: string;
+  overall_status: string;
+  inspector_name: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface ApparatusInspectionSummary {
+  id: number;
+  apparatus_name: string;
+  operator_name: string;
+  rank: string;
+  shift: string;
+  completed_at: string;
+  defect_count: number;
+}
+
+export interface FireEquipmentRequestSummary {
+  id: number;
+  equipment_type: string;
+  description: string;
+  priority: string;
+  status: string;
+  requested_by_name: string;
+  created_at: string;
+}
+
+export interface SingleGasMeterSummary {
+  id: number;
+  serial_number: string;
+  activation_date: string;
+  expiration_date: string;
+  status: string;
+  days_until_expiration: number;
+  apparatus_name: string;
+}
+
 export interface StationDetail extends Station {
   apparatuses?: Apparatus[];
   active_apparatuses?: Apparatus[];

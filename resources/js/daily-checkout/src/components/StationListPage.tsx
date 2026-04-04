@@ -40,7 +40,6 @@ export default function StationListPage() {
     if (containerRef.current && containerRef.current.scrollTop === 0) {
       const touchY = e.touches[0].clientY;
       const distance = touchY - touchStartY.current;
-      
       if (distance > 0 && distance < 150) {
         setPullDistance(distance);
       }
@@ -61,21 +60,21 @@ export default function StationListPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="text-center mb-8">
-          <div className="skeleton h-8 w-48 mx-auto mb-2"></div>
-          <div className="skeleton h-4 w-64 mx-auto"></div>
+      <div className="space-y-8">
+        {/* Skeleton header */}
+        <div className="text-center">
+          <div className="skeleton h-8 w-56 mx-auto mb-2"></div>
+          <div className="skeleton h-4 w-80 mx-auto"></div>
         </div>
+        {/* Skeleton cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1,2,3,4,5,6].map(i => (
-            <div key={i} className="p-5 rounded-xl ring-1 ring-neutral-200/60 bg-neutral-100">
-              <div className="skeleton h-6 w-32 mb-2"></div>
-              <div className="skeleton h-4 w-48 mb-4"></div>
-              <div className="skeleton h-4 w-full mb-2"></div>
-              <div className="flex gap-3 mt-4">
-                <div className="skeleton h-4 w-24"></div>
-                <div className="skeleton h-4 w-20"></div>
-                <div className="skeleton h-4 w-20"></div>
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="bg-white rounded-2xl ring-1 ring-neutral-200/80 overflow-hidden">
+              <div className="skeleton h-48 w-full rounded-none"></div>
+              <div className="p-5">
+                <div className="skeleton h-6 w-36 mb-3"></div>
+                <div className="skeleton h-4 w-full mb-2"></div>
+                <div className="skeleton h-4 w-40"></div>
               </div>
             </div>
           ))}
@@ -117,11 +116,11 @@ export default function StationListPage() {
     >
       {/* Pull to refresh indicator */}
       {pullDistance > 0 && (
-        <div 
+        <div
           className="flex justify-center items-center py-4 transition-opacity"
           style={{
             transform: `translateY(${Math.min(pullDistance, 80)}px)`,
-            opacity: pullDistance / 80
+            opacity: pullDistance / 80,
           }}
         >
           <svg className={`w-5 h-5 text-red-600 ${pullDistance > 80 ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,9 +142,35 @@ export default function StationListPage() {
         </div>
       )}
 
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-neutral-800 mb-2 font-heading">MBFD Stations</h1>
-        <p className="text-neutral-500">Manage and monitor all fire stations</p>
+      {/* Welcome Header */}
+      <div className="text-center mb-10">
+        <h1 className="text-3xl font-bold text-neutral-800 mb-3 font-heading">MBFD Stations</h1>
+        <p className="text-neutral-500 max-w-xl mx-auto leading-relaxed">
+          Select your station below to access forms, inspections, apparatus information, and more.
+          Each station page contains everything you need for daily operations.
+        </p>
+      </div>
+
+      {/* Quick Links Bar */}
+      <div className="flex flex-wrap justify-center gap-3 mb-8">
+        <Link
+          to="/vehicle-inspections"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white rounded-xl ring-1 ring-neutral-200/80 text-sm font-medium text-neutral-700 hover:bg-red-50 hover:text-red-700 hover:ring-red-200 transition-all"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Vehicle Inspections
+        </Link>
+        <Link
+          to="/forms-hub"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white rounded-xl ring-1 ring-neutral-200/80 text-sm font-medium text-neutral-700 hover:bg-sky-50 hover:text-sky-700 hover:ring-sky-200 transition-all"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          Forms Hub
+        </Link>
       </div>
 
       {/* Stations Grid */}
@@ -160,19 +185,6 @@ export default function StationListPage() {
           No stations available.
         </div>
       )}
-
-      {/* Back to Home */}
-      <div className="mt-8 text-center">
-        <Link
-          to="/"
-          className="inline-flex items-center px-4 py-2 text-neutral-500 hover:text-neutral-800"
-        >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to Daily Checkout
-        </Link>
-      </div>
     </div>
   );
 }
