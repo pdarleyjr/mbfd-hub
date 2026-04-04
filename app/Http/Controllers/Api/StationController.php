@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\ShopWork;
 use App\Models\Station;
 use App\Models\Room;
 use App\Models\RoomAsset;
@@ -95,25 +94,10 @@ class StationController extends Controller
             ],
         ];
 
-        $shopWorks = collect();
-
-        if (Schema::hasColumn('shop_works', 'station_id')) {
-            $shopWorks = ShopWork::query()
-                ->where('station_id', $station->id)
-                ->orderBy('created_at', 'desc')
-                ->limit(10)
-                ->get();
-        } elseif (Schema::hasColumn('shop_works', 'apparatus_id')) {
-            $apparatusIds = $station->apparatuses->pluck('id')->filter();
-
-            if ($apparatusIds->isNotEmpty()) {
-                $shopWorks = ShopWork::query()
-                    ->whereIn('apparatus_id', $apparatusIds)
-                    ->orderBy('created_at', 'desc')
-                    ->limit(10)
-                    ->get();
-            }
-        }
+        $shopWorks = $station->shopWorks()
+            ->orderBy('shop_works.created_at', 'desc')
+            ->limit(10)
+            ->get();
 
         $normalizeEnumValue = function ($value): string {
             if ($value instanceof \BackedEnum) {

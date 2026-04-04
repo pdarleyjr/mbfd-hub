@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use App\Models\Todo;
-use App\Models\ChMessage;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\EvaluationSubmission;
@@ -14,7 +13,6 @@ use App\Models\WorkgroupSharedUpload;
 use App\Models\User;
 use App\Notifications\NewSubmissionNotification;
 use App\Observers\TodoObserver;
-use App\Observers\ChMessageObserver;
 use App\Observers\ApparatusObserver;
 use App\Observers\WorkgroupSharedUploadObserver;
 use Filament\Support\Assets\Js;
@@ -36,11 +34,6 @@ class AppServiceProvider extends ServiceProvider
             \App\Http\Responses\LoginResponse::class,
         );
 
-        // Override Chatify's Pusher PHP SDK to use internal Reverb endpoint (127.0.0.1:8080)
-        // while config('chatify.pusher') stays frontend-facing (www.mbfdhub.com:443) for the browser.
-        $this->app->bind('ChatifyMessenger', function () {
-            return new \App\Services\ChatifyMessengerOverride;
-        });
     }
 
     /**
@@ -58,7 +51,6 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Todo::observe(TodoObserver::class);
-        ChMessage::observe(ChMessageObserver::class);
         Apparatus::observe(ApparatusObserver::class);
         
         // Auto-vectorize uploaded workgroup files (PDFs, DOCX, etc.) into workgroup-specs index

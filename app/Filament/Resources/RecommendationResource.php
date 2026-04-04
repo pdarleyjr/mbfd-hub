@@ -29,6 +29,11 @@ class RecommendationResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -44,7 +49,8 @@ class RecommendationResource extends Resource
                     ->content(fn ($record) => $record?->defect?->item ?? 'N/A'),
                 Forms\Components\Select::make('equipment_item_id')
                     ->label('Recommended Equipment Item')
-                    ->relationship('equipmentItem', 'name')
+                    ->relationship('equipmentItem', 'name', fn (Builder $query) => $query->whereNotNull('name'))
+                    ->getOptionLabelFromRecordUsing(fn ($record) => $record->name ?? "(ID: {$record->id})")
                     ->searchable()
                     ->preload()
                     ->required(),
@@ -136,7 +142,7 @@ class RecommendationResource extends Resource
                     ->default('pending'),
                 Tables\Filters\SelectFilter::make('apparatus_id')
                     ->label('Apparatus')
-                    ->relationship('defect.apparatus', 'unit_id')
+                    ->options(fn () => \App\Models\Apparatus::whereNotNull('unit_id')->pluck('unit_id', 'id'))
                     ->searchable()
                     ->preload(),
                 Tables\Filters\SelectFilter::make('match_method')
@@ -161,7 +167,8 @@ class RecommendationResource extends Resource
                             ->content(fn ($record) => "Recommended: {$record->equipmentItem->name} (Stock: {$record->equipmentItem->stock})"),
                         Forms\Components\Select::make('equipment_item_id')
                             ->label('Item to Allocate')
-                            ->relationship('equipmentItem', 'name')
+                            ->relationship('equipmentItem', 'name', fn (Builder $query) => $query->whereNotNull('name'))
+                            ->getOptionLabelFromRecordUsing(fn ($record) => $record->name ?? "(ID: {$record->id})")
                             ->searchable()
                             ->preload()
                             ->default(fn ($record) => $record->equipment_item_id)

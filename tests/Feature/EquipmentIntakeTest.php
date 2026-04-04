@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Filament\Admin\Pages\EquipmentIntake;
 use App\Services\SnipeItService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
 use Tests\TestCase;
 use App\Models\User;
@@ -24,11 +23,6 @@ class EquipmentIntakeTest extends TestCase
         // Create required roles
         Role::findOrCreate('admin', 'web');
         Role::findOrCreate('super_admin', 'web');
-
-        // Register chatify route if not present (required by admin layout)
-        if (! Route::has('chatify')) {
-            Route::get('/chatify', fn() => '')->name('chatify');
-        }
 
         // Create admin user with required role
         $this->adminUser = User::factory()->create([
@@ -49,7 +43,7 @@ class EquipmentIntakeTest extends TestCase
         $response = $this->get(route('filament.admin.pages.equipment-intake'));
 
         // Page requires full Filament panel setup; in CI the layout may reference
-        // vendor assets (chatify routes, Filament CSS) that aren't available.
+        // vendor assets (Filament CSS) that aren't available.
         // We verify the route exists and auth doesn't block access (not 403/401).
         $this->assertNotEquals(403, $response->getStatusCode());
         $this->assertNotEquals(401, $response->getStatusCode());

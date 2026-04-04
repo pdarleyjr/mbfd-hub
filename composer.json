@@ -18,7 +18,6 @@
         "laravel/reverb": "^1.0",
         "laravel/sanctum": "*",
         "laravel/tinker": "^2.9",
-        "monzer/filament-chatify-integration": "^1.0",
         "sentry/sentry-laravel": "*",
         "shuvroroy/filament-spatie-laravel-health": "^2.0",
         "spatie/laravel-health": "^1.29",
