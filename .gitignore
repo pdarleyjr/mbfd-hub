@@ -98,6 +98,10 @@ MBFD_HUB_*.md
 CLAUDE.md
 VPS_*.md
 
+# Plans directory (may contain credentials in prompt files)
+plans/*PROMPT*.md
+plans/*_FIXES_*.md
+
 # ---------------------------------------------------------------------------
 # 9. Decommissioned / Legacy Directories
 # ---------------------------------------------------------------------------
