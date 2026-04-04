@@ -140,6 +140,8 @@
                     </div>
                 </a>
 
+                {{-- Hidden per admin request 2026-04-04 — re-enable when ready --}}
+                @if(false)
                 <!-- Apparatus Equipment Planner — teal accent -->
                 <a href="{{ url('/apparatus-layout') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-teal-300 transition-all duration-200 overflow-hidden">
                     <div class="flex">
@@ -158,6 +160,7 @@
                         </div>
                     </div>
                 </a>
+                @endif
 
                 <!-- Employee Portal — emerald accent -->
                 <a href="{{ url('/employee') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-emerald-300 transition-all duration-200 overflow-hidden">

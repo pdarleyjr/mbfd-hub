@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Facades\Hash;
 
 class Station extends Model
@@ -142,19 +143,21 @@ class Station extends Model
     }
 
     /**
-     * Get all shop works for this station
+     * Get all shop works for this station (through apparatuses).
+     * shop_works has apparatus_id, not station_id.
      */
-    public function shopWorks(): HasMany
+    public function shopWorks(): HasManyThrough
     {
-        return $this->hasMany(ShopWork::class);
+        return $this->hasManyThrough(ShopWork::class, Apparatus::class);
     }
 
     /**
-     * Get active shop works for this station
+     * Get active shop works for this station (through apparatuses).
      */
-    public function activeShopWorks(): HasMany
+    public function activeShopWorks(): HasManyThrough
     {
-        return $this->hasMany(ShopWork::class)->whereIn('status', ['Pending', 'In Progress']);
+        return $this->hasManyThrough(ShopWork::class, Apparatus::class)
+            ->whereIn('shop_works.status', ['Pending', 'In Progress']);
     }
 
     /**

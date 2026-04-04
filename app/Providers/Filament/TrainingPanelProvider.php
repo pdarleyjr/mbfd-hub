@@ -25,7 +25,6 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Http\Middleware\EnsureTrainingPanelAccess;
 use App\Filament\Training\Support\DynamicNavigation;
 use App\Filament\Training\Pages\Settings as TrainingSettings;
-use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
 use App\Filament\Pages\Auth\Login;
 
 class TrainingPanelProvider extends PanelProvider
@@ -53,7 +52,6 @@ class TrainingPanelProvider extends PanelProvider
             ])
             ->font('Plus Jakarta Sans')
             ->viteTheme('resources/css/filament/admin/theme.css')
-            ->plugin(ChatifyPlugin::make())
             ->discoverResources(in: app_path('Filament/Training/Resources'), for: 'App\\Filament\\Training\\Resources')
             ->discoverPages(in: app_path('Filament/Training/Pages'), for: 'App\\Filament\\Training\\Pages')
             ->discoverWidgets(in: app_path('Filament/Training/Widgets'), for: 'App\\Filament\\Training\\Widgets')
@@ -77,10 +75,6 @@ class TrainingPanelProvider extends PanelProvider
                 NavigationGroup::make()
                     ->label('External Tools')
                     ->icon('heroicon-o-globe-alt')
-                    ->collapsible(false),
-                NavigationGroup::make()
-                    ->label('Communication')
-                    ->icon('heroicon-o-chat-bubble-left-right')
                     ->collapsible(false),
             ])
             ->userMenuItems([

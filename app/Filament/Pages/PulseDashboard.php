@@ -16,6 +16,8 @@ class PulseDashboard extends Page
 
     protected static ?int $navigationSort = 1;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string $view = 'filament.pages.pulse-dashboard';
 
     public static function canAccess(): bool

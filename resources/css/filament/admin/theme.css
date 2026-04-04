@@ -209,12 +209,26 @@
     color: #a3a3a3 !important;
 }
 
-/* Topbar user menu / avatar text */
-.fi-topbar .fi-dropdown-trigger,
+/* Topbar user menu / avatar text — scoped to exclude dropdown panels */
+.fi-topbar > .fi-dropdown > .fi-dropdown-trigger,
 .fi-topbar .fi-user-name,
-.fi-topbar [class*="text-gray"],
-.fi-topbar .text-sm {
+.fi-topbar > nav [class*="text-gray"],
+.fi-topbar > .fi-global-search-field .text-sm {
     color: #d4d4d4 !important;
+}
+
+/* FIX: Ensure dropdown panel menu items have readable dark text */
+.fi-dropdown-panel,
+.fi-dropdown-panel .fi-dropdown-list-item,
+.fi-dropdown-panel .fi-dropdown-list-item-label,
+.fi-dropdown-panel [class*="text-gray"],
+.fi-dropdown-panel a,
+.fi-dropdown-panel span {
+    color: #292524 !important;
+}
+
+.fi-dropdown-panel .fi-dropdown-list-item:hover {
+    background-color: #F5F3F0;
 }
 
 /* Topbar sidebar toggle (open button when sidebar collapsed) */

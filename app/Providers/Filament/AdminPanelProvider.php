@@ -13,8 +13,6 @@ use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\Support\Enums\MaxWidth;
-use Filament\Widgets;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -22,7 +20,6 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use Illuminate\Support\Facades\Blade;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\NotificationSettings;
 use App\Filament\Pages\Settings;
@@ -34,7 +31,6 @@ use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\TodoOverviewWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
-use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
 use ShuvroRoy\FilamentSpatieLaravelHealth\FilamentSpatieLaravelHealthPlugin;
 
 class AdminPanelProvider extends PanelProvider
@@ -62,7 +58,6 @@ class AdminPanelProvider extends PanelProvider
             ->font('Plus Jakarta Sans')
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->plugin(FilamentShieldPlugin::make())
-            ->plugin(ChatifyPlugin::make())
             ->plugin(
                 FilamentSpatieLaravelHealthPlugin::make()
                     ->usingPage(\App\Filament\Pages\HealthCheckResults::class)
@@ -99,14 +94,8 @@ class AdminPanelProvider extends PanelProvider
                     ->label('Workgroup Management')
                     ->icon('heroicon-o-user-group'),
                 NavigationGroup::make()
-                    ->label('Administration')
-                    ->icon('heroicon-o-cog-6-tooth'),
-                NavigationGroup::make()
-                    ->label('Communication / AI')
-                    ->icon('heroicon-o-chat-bubble-left-right'),
-                NavigationGroup::make()
-                    ->label('Monitoring')
-                    ->icon('heroicon-o-chart-bar'),
+                    ->label('Station Management')
+                    ->icon('heroicon-o-building-office-2'),
                 NavigationGroup::make()
                     ->label('External Tools')
                     ->icon('heroicon-o-arrow-top-right-on-square'),
@@ -122,9 +111,39 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-bell')
                     ->visible(fn (): bool => auth()->user()?->canManageNotificationSettings() ?? false),
                 MenuItem::make()
+                    ->label('Users')
+                    ->url(fn (): string => url('/admin/users'))
+                    ->icon('heroicon-o-users')
+                    ->sort(10)
+                    ->visible(fn (): bool => auth()->user()?->hasAnyRole(['super_admin', 'admin']) ?? false),
+                MenuItem::make()
+                    ->label('Roles')
+                    ->url(fn (): string => url('/admin/shield/roles'))
+                    ->icon('heroicon-o-shield-check')
+                    ->sort(11)
+                    ->visible(fn (): bool => auth()->user()?->hasRole('super_admin') ?? false),
+                MenuItem::make()
+                    ->label('Replacement Recommendations')
+                    ->url(fn (): string => url('/admin/recommendations'))
+                    ->icon('heroicon-o-light-bulb')
+                    ->sort(12),
+                MenuItem::make()
+                    ->label('Application Health')
+                    ->url(fn (): string => url('/admin/health'))
+                    ->icon('heroicon-o-heart')
+                    ->sort(20)
+                    ->visible(fn (): bool => auth()->user()?->hasRole('super_admin') ?? false),
+                MenuItem::make()
+                    ->label('Laravel Pulse')
+                    ->url(fn (): string => url('/admin/pulse'))
+                    ->icon('heroicon-o-bolt')
+                    ->sort(21)
+                    ->visible(fn (): bool => auth()->user()?->hasRole('super_admin') ?? false),
+                MenuItem::make()
                     ->label('Return to Home')
                     ->url('/')
-                    ->icon('heroicon-o-home'),
+                    ->icon('heroicon-o-home')
+                    ->sort(99),
             ])
             ->middleware([
                 EncryptCookies::class,

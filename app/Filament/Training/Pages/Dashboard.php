@@ -35,13 +35,7 @@ class Dashboard extends BaseDashboard
                 ->icon('heroicon-o-plus-circle')
                 ->color('primary')
                 ->url(fn () => route('filament.training.resources.training-todos.create')),
-            Action::make('openChatify')
-                ->label('Open Chatify')
-                ->icon('heroicon-o-chat-bubble-left-right')
-                ->color('gray')
-                ->url('/chatify')
-                ->openUrlInNewTab(),
-            Action::make('externalSources')
+Action::make('externalSources')
                 ->label('External Sources')
                 ->icon('heroicon-o-globe-alt')
                 ->color('gray')

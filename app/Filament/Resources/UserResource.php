@@ -23,7 +23,7 @@ class UserResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->user()?->hasAnyRole(['super_admin', 'admin']) ?? false;
+        return false;
     }
 
     public static function form(Form $form): Form
