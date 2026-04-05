@@ -75,11 +75,45 @@
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
-        <!-- Hero Section: Artwork + Quick Launch -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+        <!-- ============================================================ -->
+        <!-- HERO BANNER: Artwork (left) + Branding Text (right)          -->
+        <!-- Discord-style side-by-side hero with image and tagline       -->
+        <!-- ============================================================ -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-10">
+            <!-- Left: Hero Artwork -->
+            <div class="flex items-center justify-center">
+                <picture>
+                    <source srcset="/images/homepage-hero.webp" type="image/webp">
+                    <img
+                        src="/images/homepage-hero.png"
+                        alt="MBFD Support Hub — fire apparatus, mobile devices, and cloud infrastructure"
+                        loading="eager"
+                        width="800"
+                        height="600"
+                        class="w-full max-w-lg h-auto object-contain drop-shadow-2xl stagger-item"
+                    >
+                </picture>
+            </div>
 
-            <!-- Quick Launch + AI Chat (first in DOM for mobile, right on desktop) -->
-            <div class="lg:order-2 space-y-4">
+            <!-- Right: Branding Text Block -->
+            <div class="stagger-item text-center lg:text-left">
+                <h2 class="font-heading font-extrabold tracking-tight leading-none">
+                    <span class="block text-5xl sm:text-6xl lg:text-7xl text-red-700">MBFD Hub</span>
+                    <span class="block text-3xl sm:text-4xl lg:text-5xl text-neutral-700 font-light mt-1" style="font-family: 'Source Sans 3', Georgia, serif;">logistics platform</span>
+                </h2>
+                <p class="mt-5 text-lg sm:text-xl text-neutral-500 max-w-md mx-auto lg:mx-0 leading-relaxed">
+                    Digital operations command center for Miami Beach Fire Department — inspections, equipment tracking, and training tools in one secure hub.
+                </p>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- CONTENT GRID: Quick Launch (left) + AI Chat (right)          -->
+        <!-- ============================================================ -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Left Column: Quick Launch Navigation Cards (2/3 width) -->
+            <div class="lg:col-span-2 space-y-4">
                 <h2 class="text-lg font-semibold text-neutral-800 font-heading flex items-center gap-2 mb-2">
                     <svg class="w-5 h-5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                     Quick Launch
@@ -144,9 +178,10 @@
                     </div>
                 </a>
                 @endif
+            </div>
 
-                <!-- AI Support Assistant Panel -->
-                <div class="mt-2">
+            <!-- Right Column: AI Support Assistant Panel (1/3 width) -->
+            <div class="lg:col-span-1">
                 @if(env('FEATURE_AI_CHAT', true))
                 <section x-data="aiChat()">
                     <div class="bg-white rounded-xl shadow-card border border-neutral-200 overflow-hidden">
@@ -420,23 +455,6 @@
                 }
                 </script>
                 @endif
-                </div>
-            </div>
-
-            <!-- Hero Artwork (second in DOM for mobile, left on desktop) -->
-            <div class="lg:order-1 flex items-center justify-center lg:sticky lg:top-24">
-                <picture>
-                    <source srcset="/images/homepage-hero.webp" type="image/webp">
-                    <img
-                        src="/images/homepage-hero.png"
-                        alt="MBFD Support Hub — fire apparatus, mobile devices, and cloud infrastructure"
-                        loading="lazy"
-                        width="800"
-                        height="600"
-                        class="w-full max-w-xl h-auto object-contain drop-shadow-2xl stagger-item"
-                        fetchpriority="low"
-                    >
-                </picture>
             </div>
         </div>
 
