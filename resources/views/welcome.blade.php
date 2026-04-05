@@ -95,15 +95,19 @@
                 </picture>
             </div>
 
-            <!-- Right: Branding Text Block -->
-            <div class="stagger-item text-center lg:text-left">
-                <h2 class="font-heading font-extrabold tracking-tight leading-none">
-                    <span class="block text-5xl sm:text-6xl lg:text-7xl text-red-700">MBFD Hub</span>
-                    <span class="block text-3xl sm:text-4xl lg:text-5xl text-neutral-700 font-light mt-1" style="font-family: 'Source Sans 3', Georgia, serif;">logistics platform</span>
-                </h2>
-                <p class="mt-5 text-lg sm:text-xl text-neutral-500 max-w-md mx-auto lg:mx-0 leading-relaxed">
-                    Digital operations command center for Miami Beach Fire Department — inspections, equipment tracking, and training tools in one secure hub.
-                </p>
+            <!-- Right: Branding Image -->
+            <div class="stagger-item flex items-center justify-center lg:justify-start">
+                <picture>
+                    <source srcset="/images/homepage-branding.webp" type="image/webp">
+                    <img
+                        src="/images/homepage-branding.png"
+                        alt="MBFD Hub — logistics platform"
+                        loading="eager"
+                        width="480"
+                        height="160"
+                        class="w-full max-w-sm sm:max-w-md h-auto object-contain"
+                    >
+                </picture>
             </div>
         </div>
 
