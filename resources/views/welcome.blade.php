@@ -74,16 +74,18 @@
 
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            <!-- Left Column - Navigation Cards (Primary Actions) Ã¢ now 2/3 width on desktop, FIRST on mobile -->
-            <div class="lg:col-span-2 space-y-4 order-1">
+
+        <!-- Hero Section: Artwork + Quick Launch -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+
+            <!-- Quick Launch + AI Chat (first in DOM for mobile, right on desktop) -->
+            <div class="lg:order-2 space-y-4">
                 <h2 class="text-lg font-semibold text-neutral-800 font-heading flex items-center gap-2 mb-2">
                     <svg class="w-5 h-5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                     Quick Launch
                 </h2>
 
-                <!-- MBFD Forms Ã¢ purple accent -->
+                <!-- MBFD Forms — purple accent -->
                 <a href="{{ url('/daily') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-purple-300 transition-all duration-200 overflow-hidden">
                     <div class="flex">
                         <div class="w-1.5 bg-purple-500 flex-shrink-0 rounded-l-xl"></div>
@@ -102,40 +104,21 @@
                     </div>
                 </a>
 
-                <!-- Eval Feedback Hub Ã¢ indigo accent -->
-                <a href="{{ url('/workgroups/login') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-indigo-300 transition-all duration-200 overflow-hidden">
+                <!-- Employee Portal — emerald accent -->
+                <a href="{{ url('/employee') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-emerald-300 transition-all duration-200 overflow-hidden">
                     <div class="flex">
-                        <div class="w-1.5 bg-indigo-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="w-1.5 bg-emerald-500 flex-shrink-0 rounded-l-xl"></div>
                         <div class="flex items-start gap-4 p-5 flex-1">
-                            <div class="w-11 h-11 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 group-hover:scale-105 transition-transform">
+                            <div class="w-11 h-11 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0 group-hover:scale-105 transition-transform">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                 </svg>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <h3 class="font-semibold text-neutral-800 group-hover:text-indigo-700 font-heading text-base">Workgroup Dashboard</h3>
-                                <p class="text-sm text-neutral-500 mt-0.5">Committee evaluations, product reviews, and workgroup sessions</p>
+                                <h3 class="font-semibold text-neutral-800 group-hover:text-emerald-700 font-heading text-base">Employee Portal</h3>
+                                <p class="text-sm text-neutral-500 mt-0.5">View assigned gear and uniforms, and submit equipment requests</p>
                             </div>
-                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-indigo-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                        </div>
-                    </div>
-                </a>
-
-                <!-- Pump Simulator — amber accent -->
-                <a href="https://pdarleyjr.github.io/puc-sim-manual-ui/" target="_blank" rel="noopener noreferrer" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-amber-300 transition-all duration-200 overflow-hidden">
-                    <div class="flex">
-                        <div class="w-1.5 bg-amber-500 flex-shrink-0 rounded-l-xl"></div>
-                        <div class="flex items-start gap-4 p-5 flex-1">
-                            <div class="w-11 h-11 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0 group-hover:scale-105 transition-transform">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                                </svg>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <h3 class="font-semibold text-neutral-800 group-hover:text-amber-700 font-heading text-base">Pump Panel</h3>
-                                <p class="text-sm text-neutral-500 mt-0.5">PUC pump panel operations training simulator</p>
-                            </div>
-                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-amber-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-emerald-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                         </div>
                     </div>
                 </a>
@@ -162,28 +145,8 @@
                 </a>
                 @endif
 
-                <!-- Employee Portal — emerald accent -->
-                <a href="{{ url('/employee') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-emerald-300 transition-all duration-200 overflow-hidden">
-                    <div class="flex">
-                        <div class="w-1.5 bg-emerald-500 flex-shrink-0 rounded-l-xl"></div>
-                        <div class="flex items-start gap-4 p-5 flex-1">
-                            <div class="w-11 h-11 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0 group-hover:scale-105 transition-transform">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <h3 class="font-semibold text-neutral-800 group-hover:text-emerald-700 font-heading text-base">Employee Portal</h3>
-                                <p class="text-sm text-neutral-500 mt-0.5">View assigned gear and uniforms, and submit equipment requests</p>
-                            </div>
-                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-emerald-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                        </div>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Right Column - AI Support Assistant Panel (1/3 width) Ã¢ SECOND on mobile -->
-            <div class="lg:col-span-1 order-2">
+                <!-- AI Support Assistant Panel -->
+                <div class="mt-2">
                 @if(env('FEATURE_AI_CHAT', true))
                 <section x-data="aiChat()">
                     <div class="bg-white rounded-xl shadow-card border border-neutral-200 overflow-hidden">
@@ -457,6 +420,60 @@
                 }
                 </script>
                 @endif
+                </div>
+            </div>
+
+            <!-- Hero Artwork (second in DOM for mobile, left on desktop) -->
+            <div class="lg:order-1 flex items-center justify-center lg:sticky lg:top-24">
+                <picture>
+                    <source srcset="/images/homepage-hero.webp" type="image/webp">
+                    <img
+                        src="/images/homepage-hero.png"
+                        alt="MBFD Support Hub — fire apparatus, mobile devices, and cloud infrastructure"
+                        loading="lazy"
+                        width="800"
+                        height="600"
+                        class="w-full max-w-xl h-auto object-contain drop-shadow-2xl stagger-item"
+                        fetchpriority="low"
+                    >
+                </picture>
+            </div>
+        </div>
+
+        <!-- Additional Links — secondary navigation, scalable for future links -->
+        <div class="mt-8">
+            <h3 class="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                More Tools
+            </h3>
+            <div class="flex flex-wrap gap-3">
+                <!-- Workgroup Dashboard -->
+                <a href="{{ url('/workgroups/login') }}" class="group inline-flex items-center gap-2.5 bg-white rounded-lg border border-neutral-200 px-4 py-3 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200">
+                    <div class="w-8 h-8 rounded-md bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="text-sm font-medium text-neutral-700 group-hover:text-indigo-700 transition-colors">Workgroup Dashboard</span>
+                        <p class="text-xs text-neutral-400">Evaluations &amp; reviews</p>
+                    </div>
+                    <svg class="w-4 h-4 text-neutral-300 group-hover:text-indigo-400 transition-colors ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </a>
+
+                <!-- Pump Panel Simulator -->
+                <a href="https://pdarleyjr.github.io/puc-sim-manual-ui/" target="_blank" rel="noopener noreferrer" aria-label="Pump Panel training simulator (opens in new tab)" class="group inline-flex items-center gap-2.5 bg-white rounded-lg border border-neutral-200 px-4 py-3 shadow-sm hover:shadow-md hover:border-amber-300 transition-all duration-200">
+                    <div class="w-8 h-8 rounded-md bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="text-sm font-medium text-neutral-700 group-hover:text-amber-700 transition-colors">Pump Panel</span>
+                        <p class="text-xs text-neutral-400">Training simulator</p>
+                    </div>
+                    <svg class="w-4 h-4 text-neutral-300 group-hover:text-amber-400 transition-colors ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                </a>
             </div>
         </div>
     </main>
