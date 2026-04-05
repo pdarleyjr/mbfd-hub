@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Apparatus, OfficerInfo, ChecklistData, Compartment, Defect, MeterData } from '../types';
+import { Apparatus, OfficerInfo, ChecklistData, Compartment, Defect, MeterData, InspectionSubmission } from '../types';
 import { ApiClient } from '../utils/api';
 import { saveInspectionProgress, loadInspectionProgress, clearInspectionProgress, queueSubmission, getSubmissionQueue, removeFromQueue } from '../utils/storage';
 import { useOffline } from '../hooks/useOffline';
@@ -156,11 +156,12 @@ export default function InspectionWizard() {
         });
       });
 
-      const submission = {
+      const submission: InspectionSubmission = {
         operator_name: officerInfo.name,
         rank: officerInfo.rank,
         shift: officerInfo.shift,
         unit_number: officerInfo.unitNumber,
+        employee_id: officerInfo.employeeId,
         engine_hours: meterData.engine_hours,
         miles: meterData.miles,
         compartments: compartments.map(c => ({

@@ -38,6 +38,7 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('apparatuses', [ApparatusController::class , 'index']);
     Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class , 'checklist']);
     Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class , 'storeInspection']);
+    Route::get('employees/list', [ApparatusController::class , 'employees']);
 
     // Public Station Routes for Daily Checkout SPA
     Route::get('stations', [\App\Http\Controllers\Api\StationController::class , 'index']);

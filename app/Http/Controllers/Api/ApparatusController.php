@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusDefect;
+use App\Models\Employee;
+use App\Jobs\AuditEquipmentAfterInspection;
 use App\Jobs\PmAlertNotificationJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -33,7 +35,14 @@ class ApparatusController extends Controller
         if ($apparatus->type) {
             $type = strtolower($apparatus->type);
             if (str_contains($type, 'engine')) {
-                $checklistType = 'engine';
+                // E2 has specialized equipment (Paratech, TNT tools, etc.)
+                $designation = strtolower($apparatus->designation ?? '');
+                $name = strtolower($apparatus->name ?? '');
+                if (preg_match('/e\s*2\b/', $designation) || preg_match('/e\s*2\b/', $name)) {
+                    $checklistType = 'engine2';
+                } else {
+                    $checklistType = 'engine';
+                }
             } elseif (str_contains($type, 'ladder')) {
                 // Use designation to differentiate ladder types
                 // L 3 -> ladder3, all others (L 1, L 11) -> ladder1
@@ -86,6 +95,7 @@ class ApparatusController extends Controller
             'defects.*.notes' => 'nullable|string',
             'defects.*.photo' => 'nullable|string',
             'officer_signature' => 'nullable|string',
+            'employee_id' => 'nullable|integer|exists:employees,id',
         ]);
 
         $apparatus = Apparatus::findOrFail($id);
@@ -106,6 +116,18 @@ class ApparatusController extends Controller
             $signaturePath = $filename;
         }
 
+        // Resolve employee_id if provided
+        $employeeId = $request->employee_id;
+
+        // Generate unique inspection reference
+        $today = now()->format('Y-m-d');
+        $designation = $apparatus->designation ?? $apparatus->name ?? 'UNK';
+        $designationTag = preg_replace('/[^A-Z0-9]/i', '', $designation);
+        $todayCount = ApparatusInspection::where('apparatus_id', $apparatus->id)
+            ->whereDate('created_at', $today)
+            ->count() + 1;
+        $inspectionRef = "INS-{$designationTag}-{$today}-" . str_pad((string) $todayCount, 4, '0', STR_PAD_LEFT);
+
         $inspection = ApparatusInspection::create([
             'apparatus_id' => $apparatus->id,
             'operator_name' => $request->operator_name,
@@ -116,6 +138,8 @@ class ApparatusController extends Controller
             'designation_at_time' => $apparatus->designation,
             'results' => $request->compartments,
             'officer_signature' => $signaturePath,
+            'employee_id' => $employeeId,
+            'inspection_reference' => $inspectionRef,
             'completed_at' => now(),
         ]);
 
@@ -194,6 +218,24 @@ class ApparatusController extends Controller
             PmAlertNotificationJob::dispatch($apparatus->id, $previousHealth);
         }
 
+        // Dispatch Snipe-IT equipment audit job (async — does not slow the form)
+        if ($apparatus->snipeit_asset_id) {
+            AuditEquipmentAfterInspection::dispatch($inspection->id, $apparatus->id)
+                ->delay(now()->addSeconds(5));
+        }
+
         return response()->json($inspection->load('apparatus'), 201);
+    }
+
+    /**
+     * Return employee list for the operator name dropdown.
+     */
+    public function employees()
+    {
+        $employees = Employee::select('id', 'employee_id', 'name', 'rank')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json($employees);
     }
 }
