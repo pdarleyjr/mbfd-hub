@@ -424,16 +424,20 @@ class SnipeItService
     public function getAssetsCheckedOutTo(int $assetId): array
     {
         try {
+            // Build URL manually to ensure proper encoding of backslash in assigned_type
+            $query = http_build_query([
+                'assigned_to' => $assetId,
+                'assigned_type' => 'App\Models\Asset',
+                'limit' => 500,
+                'sort' => 'asset_tag',
+                'order' => 'asc',
+            ]);
+            $url = "{$this->baseUrl}/hardware?{$query}";
+
             $response = Http::withToken($this->token)
                 ->timeout($this->timeout)
                 ->accept('application/json')
-                ->get("{$this->baseUrl}/hardware", [
-                    'assigned_to' => $assetId,
-                    'assigned_type' => 'App\\Models\\Asset',
-                    'limit' => 500,
-                    'sort' => 'asset_tag',
-                    'order' => 'asc',
-                ]);
+                ->get($url);
 
             if ($response->successful()) {
                 return $response->json('rows', []);
@@ -442,6 +446,7 @@ class SnipeItService
             Log::warning('[SnipeIt] getAssetsCheckedOutTo failed', [
                 'asset_id' => $assetId,
                 'status' => $response->status(),
+                'body' => substr($response->body(), 0, 200),
             ]);
         } catch (\Exception $e) {
             Log::error('[SnipeIt] getAssetsCheckedOutTo error', ['message' => $e->getMessage()]);
