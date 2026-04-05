@@ -20,6 +20,8 @@ class ApparatusInspection extends Model
         'designation_at_time',
         'results',
         'officer_signature',
+        'employee_id',
+        'inspection_reference',
         'completed_at',
     ];
 

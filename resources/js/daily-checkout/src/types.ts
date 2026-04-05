@@ -32,11 +32,19 @@ export type Rank = 'Chief' | 'Deputy Chief' | 'Captain' | 'Lieutenant' | 'Sergea
 
 export type Shift = 'A' | 'B' | 'C';
 
+export interface EmployeeOption {
+  id: number;
+  employee_id: string;
+  name: string;
+  rank: string | null;
+}
+
 export interface OfficerInfo {
   name: string;
   rank: Rank;
   shift: Shift;
   unitNumber: string;
+  employeeId?: number;
 }
 
 export type ItemStatus = 'Present' | 'Missing' | 'Damaged';
@@ -72,9 +80,11 @@ export interface InspectionSubmission {
   rank: string;
   shift: string;
   unit_number: string;
+  employee_id?: number;
   engine_hours?: number | null;
   miles?: number | null;
   defects: Defect[];
+  compartments?: unknown[];
   officer_signature?: string | null;
 }
 

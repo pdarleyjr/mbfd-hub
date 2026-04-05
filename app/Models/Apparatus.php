@@ -40,6 +40,9 @@ class Apparatus extends Model
         'last_service_type',
         'pm_interval_miles',
         'pm_interval_hours',
+        // Snipe-IT integration
+        'snipeit_asset_id',
+        'snipeit_asset_tag',
     ];
 
     protected $casts = [

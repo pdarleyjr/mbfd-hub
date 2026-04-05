@@ -1,4 +1,4 @@
-import { Apparatus, ChecklistData, InspectionSubmission, Station, StationDetail, Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData, StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse, InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest, StationInspectionSummary, ApparatusInspectionSummary, FireEquipmentRequestSummary, SingleGasMeterSummary } from '../types';
+import { Apparatus, ChecklistData, InspectionSubmission, EmployeeOption, Station, StationDetail, Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData, StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse, InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest, StationInspectionSummary, ApparatusInspectionSummary, FireEquipmentRequestSummary, SingleGasMeterSummary } from '../types';
 
 const API_BASE = '/api';
 
@@ -23,6 +23,16 @@ export class ApiClient {
     });
     if (!response.ok) {
       throw new Error('Failed to fetch apparatuses');
+    }
+    return response.json();
+  }
+
+  static async getEmployees(): Promise<EmployeeOption[]> {
+    const response = await fetch(`${API_BASE}/public/employees/list`, {
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      return [];
     }
     return response.json();
   }

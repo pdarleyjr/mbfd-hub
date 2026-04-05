@@ -394,6 +394,144 @@ class SnipeItService
         return [];
     }
 
+    // -------------------------------------------------------------------------
+    // Audit & Maintenance (Equipment Inspection Integration)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Audit an asset by tag — logs a formal audit event in Snipe-IT.
+     */
+    public function auditAsset(string $assetTag, string $note, ?string $nextAuditDate = null, ?int $locationId = null): array
+    {
+        $payload = [
+            'asset_tag' => $assetTag,
+            'note' => $note,
+        ];
+
+        if ($nextAuditDate) {
+            $payload['next_audit_date'] = $nextAuditDate;
+        }
+        if ($locationId) {
+            $payload['location_id'] = $locationId;
+        }
+
+        return $this->post('/hardware/audit', $payload);
+    }
+
+    /**
+     * Get all hardware assets checked out to a given parent asset.
+     */
+    public function getAssetsCheckedOutTo(int $assetId): array
+    {
+        try {
+            $response = Http::withToken($this->token)
+                ->timeout($this->timeout)
+                ->accept('application/json')
+                ->get("{$this->baseUrl}/hardware", [
+                    'assigned_to' => $assetId,
+                    'assigned_type' => 'App\\Models\\Asset',
+                    'limit' => 500,
+                    'sort' => 'asset_tag',
+                    'order' => 'asc',
+                ]);
+
+            if ($response->successful()) {
+                return $response->json('rows', []);
+            }
+
+            Log::warning('[SnipeIt] getAssetsCheckedOutTo failed', [
+                'asset_id' => $assetId,
+                'status' => $response->status(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('[SnipeIt] getAssetsCheckedOutTo error', ['message' => $e->getMessage()]);
+        }
+
+        return [];
+    }
+
+    /**
+     * Update an asset's status label.
+     */
+    public function updateAssetStatus(int $assetId, int $statusId): array
+    {
+        return $this->put("/hardware/{$assetId}", ['status_id' => $statusId]);
+    }
+
+    /**
+     * Create a maintenance/repair record for an asset.
+     */
+    public function createMaintenanceRecord(
+        int $assetId,
+        string $name,
+        string $type,
+        string $notes,
+        string $startDate,
+    ): array {
+        return $this->post('/maintenances', [
+            'asset_id' => $assetId,
+            'name' => $name,
+            'asset_maintenance_type' => $type,
+            'notes' => $notes,
+            'start_date' => $startDate,
+        ]);
+    }
+
+    /**
+     * Get a single asset by ID.
+     */
+    public function getAsset(int $assetId): ?array
+    {
+        try {
+            $response = Http::withToken($this->token)
+                ->timeout($this->timeout)
+                ->accept('application/json')
+                ->get("{$this->baseUrl}/hardware/{$assetId}");
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+        } catch (\Exception $e) {
+            Log::error('[SnipeIt] getAsset error', ['message' => $e->getMessage()]);
+        }
+
+        return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Generic HTTP helpers
+    // -------------------------------------------------------------------------
+
+    protected function put(string $endpoint, array $payload): array
+    {
+        $payload = array_filter($payload, fn($v) => $v !== null && $v !== '');
+
+        try {
+            $response = Http::withToken($this->token)
+                ->timeout($this->timeout)
+                ->accept('application/json')
+                ->put("{$this->baseUrl}{$endpoint}", $payload);
+
+            if ($response->successful()) {
+                return ['success' => true, 'data' => $response->json()];
+            }
+
+            Log::warning("Snipe-IT PUT {$endpoint} failed", [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $response->json('messages') ?? $response->body(),
+                'status' => $response->status(),
+            ];
+        } catch (\Exception $e) {
+            Log::error("Snipe-IT API error on PUT {$endpoint}", ['message' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
     /**
      * Generate a unique asset tag.
      */
