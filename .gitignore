@@ -132,12 +132,18 @@ docker-compose.local-sandbox.yml
 backups/
 *.dump
 *.sql.gz
+/*.csv
+/import_*.sql
+/snipeit_import.sql
+/generate_*.py
+/inventory_extractor.py
 
 # ---------------------------------------------------------------------------
 # 12. AI / MCP Local Artifacts
 # ---------------------------------------------------------------------------
 /.ai/mcp/**
 /.kilocode/mcp.local.json
+/.kilocode/worktrees/
 /lancedb/
 /models/
 
