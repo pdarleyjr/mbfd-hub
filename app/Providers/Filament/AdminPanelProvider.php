@@ -28,7 +28,7 @@ use App\Filament\Admin\Pages\EquipmentIntake;
 use App\Filament\Admin\Pages\TrtTrailerInventory;
 use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
-use App\Filament\Widgets\TodoOverviewWidget;
+use App\Filament\Widgets\StationOperationsHubWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use ShuvroRoy\FilamentSpatieLaravelHealth\FilamentSpatieLaravelHealthPlugin;
@@ -72,7 +72,7 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 FleetStatsWidget::class,
                 InventoryOverviewWidget::class,
-                TodoOverviewWidget::class,
+                StationOperationsHubWidget::class,
                 SmartUpdatesWidget::class,
             ])
             ->navigationGroups([
