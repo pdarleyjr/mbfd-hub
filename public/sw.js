@@ -30,11 +30,6 @@ self.addEventListener('notificationclick', function(event) {
     const data = event.notification.data || {};
     let urlToOpen = data.url || '/admin';
 
-    // Handle chat notification clicks
-    if (event.action === 'open-chat' || urlToOpen.includes('/chat')) {
-        urlToOpen = data.url || '/admin/chat';
-    }
-
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
             // Check if there's already a window open
