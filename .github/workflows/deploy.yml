@@ -92,26 +92,22 @@ jobs:
         run: |
           ssh deploy-target "docker restart mbfd-hub-laravel && echo '✓ Container restarted'"
 
-      - name: Wait for health
+      - name: Wait for container ready
         run: |
           sleep 10
-          for i in $(seq 1 90); do
-            if ssh deploy-target "docker exec mbfd-hub-laravel curl -sf http://localhost:80" > /dev/null 2>&1; then
-              echo "✓ Laravel healthy after ${i}s"
+          for i in $(seq 1 30); do
+            if ssh deploy-target "docker exec mbfd-hub-laravel php -r 'echo 1;'" 2>/dev/null; then
+              echo "✓ Container accepting commands after ${i}s"
               exit 0
             fi
             sleep 1
           done
-          echo "::error::Laravel did not become healthy in 90s"
+          echo "::error::Container not ready after 30s"
           exit 1
 
-      - name: Verify background services
+      - name: Fix permissions
         run: |
-          ssh deploy-target "
-            docker exec mbfd-hub-laravel bash -c 'pgrep -f \"reverb:start\" || nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &'
-            docker exec mbfd-hub-laravel bash -c 'pgrep -f \"queue:work\" || nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
-            echo '✓ Reverb and queue worker running'
-          "
+          ssh deploy-target "docker exec mbfd-hub-laravel chmod -R 775 storage bootstrap/cache"
 
       - name: Run migrations and optimize
         run: |
@@ -135,9 +131,25 @@ jobs:
             echo '✓ All frontend assets built'
           "
 
-      - name: Fix permissions
+      - name: Verify background services
         run: |
-          ssh deploy-target "docker exec mbfd-hub-laravel chmod -R 775 storage bootstrap/cache"
+          ssh deploy-target "
+            docker exec mbfd-hub-laravel bash -c 'pgrep -f \"reverb:start\" || nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &'
+            docker exec mbfd-hub-laravel bash -c 'pgrep -f \"queue:work\" || nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
+            echo '✓ Reverb and queue worker running'
+          "
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 60); do
+            if ssh deploy-target "docker exec mbfd-hub-laravel curl -sf http://localhost:80" > /dev/null 2>&1; then
+              echo "✓ Laravel healthy after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Laravel did not become healthy in 60s"
+          exit 1
 
   smoke-tests:
     needs: deploy
