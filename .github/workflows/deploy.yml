@@ -42,6 +42,8 @@ jobs:
 
     steps:
       - name: Pre-deploy backup
+        env:
+          DEPLOY_DIR: /opt/mbfd/mbfd-hub
         run: |
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           PG=$(docker ps --format '{{.Names}}' | grep pgsql | head -1)
@@ -53,9 +55,12 @@ jobs:
           fi
 
       - name: Pull latest code
+        env:
+          DEPLOY_DIR: /opt/mbfd/mbfd-hub
         run: |
-          cd /opt/mbfd/mbfd-hub
-          sudo chown -R $(whoami):$(whoami) . 2>/dev/null || true
+          test -d "$DEPLOY_DIR" || { echo "::error::Deploy dir $DEPLOY_DIR not found"; exit 1; }
+          sudo chown -R $(whoami):$(whoami) "$DEPLOY_DIR" 2>/dev/null || true
+          cd "$DEPLOY_DIR"
           git fetch origin --force --prune
           git reset --hard origin/main
           git clean -fd
@@ -63,8 +68,10 @@ jobs:
           echo "✓ Code updated to $(git rev-parse --short HEAD)"
 
       - name: Rebuild containers
+        env:
+          DEPLOY_DIR: /opt/mbfd/mbfd-hub
         run: |
-          cd /opt/mbfd/mbfd-hub
+          cd "$DEPLOY_DIR"
           docker compose -f compose.prod.yaml up -d --build
           echo '✓ Containers rebuilt'
 
