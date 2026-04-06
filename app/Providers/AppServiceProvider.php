@@ -107,13 +107,16 @@ class AppServiceProvider extends ServiceProvider
         });
 
         ApparatusInspection::created(function (ApparatusInspection $inspection) {
-            $unitNumber = $inspection->apparatus?->unit_number ?? 'Unknown';
+            $unitName = $inspection->designation_at_time
+                ?? $inspection->unit_number
+                ?? $inspection->apparatus?->designation
+                ?? 'Unknown';
             $this->notifySubmissionRoles(
                 ['super_admin', 'logistics_admin'],
                 'apparatus_inspection',
                 'New Vehicle Inspection',
-                "A vehicle inspection for unit {$unitNumber} has been submitted.",
-                '/admin/apparatus-inspections/' . $inspection->id,
+                "A vehicle inspection for {$unitName} has been submitted.",
+                '/admin/inspections/' . $inspection->id,
             );
         });
 
