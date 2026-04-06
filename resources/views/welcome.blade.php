@@ -79,7 +79,7 @@
         <!-- HERO BANNER: Artwork (left) + Branding Text (right)          -->
         <!-- Discord-style side-by-side hero with image and tagline       -->
         <!-- ============================================================ -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-10">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start mb-10">
             <!-- Left: Hero Artwork -->
             <div class="flex items-center justify-center">
                 <picture>
@@ -95,97 +95,8 @@
                 </picture>
             </div>
 
-            <!-- Right: Branding Image -->
-            <div class="stagger-item flex items-center justify-center lg:justify-start">
-                <picture>
-                    <source srcset="/images/homepage-branding.webp" type="image/webp">
-                    <img
-                        src="/images/homepage-branding.png"
-                        alt="MBFD Hub — logistics platform"
-                        loading="eager"
-                        width="480"
-                        height="160"
-                        class="w-full max-w-sm sm:max-w-md h-auto object-contain"
-                    >
-                </picture>
-            </div>
-        </div>
-
-        <!-- ============================================================ -->
-        <!-- CONTENT GRID: Quick Launch (left) + AI Chat (right)          -->
-        <!-- ============================================================ -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            <!-- Left Column: Quick Launch Navigation Cards (2/3 width) -->
-            <div class="lg:col-span-2 space-y-4">
-                <h2 class="text-lg font-semibold text-neutral-800 font-heading flex items-center gap-2 mb-2">
-                    <svg class="w-5 h-5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    Quick Launch
-                </h2>
-
-                <!-- MBFD Forms — purple accent -->
-                <a href="{{ url('/daily') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-purple-300 transition-all duration-200 overflow-hidden">
-                    <div class="flex">
-                        <div class="w-1.5 bg-purple-500 flex-shrink-0 rounded-l-xl"></div>
-                        <div class="flex items-start gap-4 p-5 flex-1">
-                            <div class="w-11 h-11 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0 group-hover:scale-105 transition-transform">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-6 9l2 2 4-4"></path>
-                                </svg>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <h3 class="font-semibold text-neutral-800 group-hover:text-purple-700 font-heading text-base">MBFD Forms</h3>
-                                <p class="text-sm text-neutral-500 mt-0.5">Apparatus checkout, vehicle inspections, inventory forms, and station requests</p>
-                            </div>
-                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-purple-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                        </div>
-                    </div>
-                </a>
-
-                <!-- Employee Portal — emerald accent -->
-                <a href="{{ url('/employee') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-emerald-300 transition-all duration-200 overflow-hidden">
-                    <div class="flex">
-                        <div class="w-1.5 bg-emerald-500 flex-shrink-0 rounded-l-xl"></div>
-                        <div class="flex items-start gap-4 p-5 flex-1">
-                            <div class="w-11 h-11 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0 group-hover:scale-105 transition-transform">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <h3 class="font-semibold text-neutral-800 group-hover:text-emerald-700 font-heading text-base">Employee Portal</h3>
-                                <p class="text-sm text-neutral-500 mt-0.5">View assigned gear and uniforms, and submit equipment requests</p>
-                            </div>
-                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-emerald-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                        </div>
-                    </div>
-                </a>
-
-                {{-- Hidden per admin request 2026-04-04 — re-enable when ready --}}
-                @if(false)
-                <!-- Apparatus Equipment Planner — teal accent -->
-                <a href="{{ url('/apparatus-layout') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-teal-300 transition-all duration-200 overflow-hidden">
-                    <div class="flex">
-                        <div class="w-1.5 bg-teal-500 flex-shrink-0 rounded-l-xl"></div>
-                        <div class="flex items-start gap-4 p-5 flex-1">
-                            <div class="w-11 h-11 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600 flex-shrink-0 group-hover:scale-105 transition-transform">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path>
-                                </svg>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <h3 class="font-semibold text-neutral-800 group-hover:text-teal-700 font-heading text-base">Apparatus Equipment Planner</h3>
-                                <p class="text-sm text-neutral-500 mt-0.5">Visual compartment layout tool with drag-and-drop equipment placement</p>
-                            </div>
-                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-teal-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                        </div>
-                    </div>
-                </a>
-                @endif
-            </div>
-
-            <!-- Right Column: AI Support Assistant Panel (1/3 width) -->
-            <div class="lg:col-span-1">
+            <!-- Right: AI Support Assistant Panel -->
+            <div>
                 @if(env('FEATURE_AI_CHAT', true))
                 <section x-data="aiChat()">
                     <div class="bg-white rounded-xl shadow-card border border-neutral-200 overflow-hidden">
@@ -213,8 +124,8 @@
                         <div class="chat-messages h-72 lg:h-80 overflow-y-auto p-4 space-y-3 bg-neutral-50/50" x-ref="chatMessages">
                             <template x-for="(msg, idx) in messages" :key="idx">
                                 <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
-                                    <div :class="msg.role === 'user' 
-                                        ? 'bg-red-600 text-white rounded-2xl rounded-br-md px-4 py-2.5 max-w-xs text-sm shadow-sm' 
+                                    <div :class="msg.role === 'user'
+                                        ? 'bg-red-600 text-white rounded-2xl rounded-br-md px-4 py-2.5 max-w-xs text-sm shadow-sm'
                                         : 'msg-ai bg-white border border-neutral-200 text-neutral-800 rounded-2xl rounded-bl-md px-4 py-2.5 max-w-xs text-sm shadow-sm'">
                                         <span x-html="msg.role === 'user' ? msg.content : renderMarkdown(msg.content)"></span>
                                         <span x-show="msg.streaming" class="inline-block w-1.5 h-4 bg-red-500 ml-0.5 animate-pulse rounded-sm align-text-bottom"></span>
@@ -257,17 +168,17 @@
                         <!-- Input Area -->
                         <div class="p-4 border-t border-neutral-200 bg-white">
                             <form @submit.prevent="sendMessage()" class="flex gap-2">
-                                <input 
-                                    x-model="userInput" 
-                                    type="text" 
-                                    placeholder="Ask about SOGs, manuals, procedures..." 
+                                <input
+                                    x-model="userInput"
+                                    type="text"
+                                    placeholder="Ask about SOGs, manuals, procedures..."
                                     aria-label="Type your message to the AI assistant"
                                     class="flex-1 min-h-[44px] bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all"
                                     :disabled="loading"
                                     x-ref="chatInput"
                                 >
-                                <button 
-                                    type="submit" 
+                                <button
+                                    type="submit"
                                     :disabled="loading || !userInput.trim()"
                                     class="min-h-[44px] px-4 bg-red-600 text-white rounded-xl font-medium text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 shadow-sm"
                                 >
@@ -461,6 +372,76 @@
                 @endif
             </div>
         </div>
+
+        <!-- ============================================================ -->
+        <!-- Quick Launch Cards                                           -->
+        <!-- ============================================================ -->
+        <div class="space-y-4">
+                <h2 class="text-lg font-semibold text-neutral-800 font-heading flex items-center gap-2 mb-2">
+                    <svg class="w-5 h-5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    Quick Launch
+                </h2>
+
+                <!-- MBFD Forms — purple accent -->
+                <a href="{{ url('/daily') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-purple-300 transition-all duration-200 overflow-hidden">
+                    <div class="flex">
+                        <div class="w-1.5 bg-purple-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="flex items-start gap-4 p-5 flex-1">
+                            <div class="w-11 h-11 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0 group-hover:scale-105 transition-transform">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-6 9l2 2 4-4"></path>
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="font-semibold text-neutral-800 group-hover:text-purple-700 font-heading text-base">MBFD Forms</h3>
+                                <p class="text-sm text-neutral-500 mt-0.5">Apparatus checkout, vehicle inspections, inventory forms, and station requests</p>
+                            </div>
+                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-purple-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- Employee Portal — emerald accent -->
+                <a href="{{ url('/employee') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-emerald-300 transition-all duration-200 overflow-hidden">
+                    <div class="flex">
+                        <div class="w-1.5 bg-emerald-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="flex items-start gap-4 p-5 flex-1">
+                            <div class="w-11 h-11 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0 group-hover:scale-105 transition-transform">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="font-semibold text-neutral-800 group-hover:text-emerald-700 font-heading text-base">Employee Portal</h3>
+                                <p class="text-sm text-neutral-500 mt-0.5">View assigned gear and uniforms, and submit equipment requests</p>
+                            </div>
+                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-emerald-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </div>
+                    </div>
+                </a>
+
+                {{-- Hidden per admin request 2026-04-04 — re-enable when ready --}}
+                @if(false)
+                <!-- Apparatus Equipment Planner — teal accent -->
+                <a href="{{ url('/apparatus-layout') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-teal-300 transition-all duration-200 overflow-hidden">
+                    <div class="flex">
+                        <div class="w-1.5 bg-teal-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="flex items-start gap-4 p-5 flex-1">
+                            <div class="w-11 h-11 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600 flex-shrink-0 group-hover:scale-105 transition-transform">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path>
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="font-semibold text-neutral-800 group-hover:text-teal-700 font-heading text-base">Apparatus Equipment Planner</h3>
+                                <p class="text-sm text-neutral-500 mt-0.5">Visual compartment layout tool with drag-and-drop equipment placement</p>
+                            </div>
+                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-teal-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </div>
+                    </div>
+                </a>
+                @endif
+            </div>
 
         <!-- Additional Links — secondary navigation, scalable for future links -->
         <div class="mt-8">
