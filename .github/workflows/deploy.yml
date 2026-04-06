@@ -41,62 +41,41 @@ jobs:
       url: https://www.mbfdhub.com
 
     steps:
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          # Configure SSH
-          cat >> ~/.ssh/config << EOF
-          Host deploy-target
-            HostName ${{ secrets.DEPLOY_HOST }}
-            User ${{ secrets.DEPLOY_USER }}
-            IdentityFile ~/.ssh/deploy_key
-            StrictHostKeyChecking no
-          EOF
-
       - name: Pre-deploy backup
         run: |
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          ssh deploy-target "
-            PG=\$(docker ps --format '{{.Names}}' | grep pgsql | head -1)
-            if [ -n \"\$PG\" ]; then
-              docker exec \"\$PG\" pg_dump -U mbfd_user -Fc mbfd_hub > /tmp/pre_deploy_${TIMESTAMP}.dump
-              echo '✓ Pre-deploy backup: /tmp/pre_deploy_${TIMESTAMP}.dump'
-            else
-              echo '::warning::No PostgreSQL container found'
-            fi
-          "
+          PG=$(docker ps --format '{{.Names}}' | grep pgsql | head -1)
+          if [ -n "$PG" ]; then
+            docker exec "$PG" pg_dump -U mbfd_user -Fc mbfd_hub > /tmp/pre_deploy_${TIMESTAMP}.dump
+            echo "✓ Pre-deploy backup: /tmp/pre_deploy_${TIMESTAMP}.dump"
+          else
+            echo "::warning::No PostgreSQL container found"
+          fi
 
       - name: Pull latest code
         run: |
-          ssh deploy-target "
-            cd /opt/mbfd/mbfd-hub
-            git fetch origin --force --prune
-            git reset --hard origin/main
-            git clean -fd
-            echo '{\"sha\":\"'\$(git rev-parse HEAD)'\",\"deployed_at\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' > public/deploy-marker.json
-            echo '✓ Code updated to '\$(git rev-parse --short HEAD)
-          "
+          cd /opt/mbfd/mbfd-hub
+          sudo chown -R $(whoami):$(whoami) . 2>/dev/null || true
+          git fetch origin --force --prune
+          git reset --hard origin/main
+          git clean -fd
+          echo "{\"sha\":\"$(git rev-parse HEAD)\",\"deployed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/deploy-marker.json
+          echo "✓ Code updated to $(git rev-parse --short HEAD)"
 
       - name: Rebuild containers
         run: |
-          ssh deploy-target "
-            cd /opt/mbfd/mbfd-hub
-            docker compose -f compose.prod.yaml up -d --build
-            echo '✓ Containers rebuilt'
-          "
+          cd /opt/mbfd/mbfd-hub
+          docker compose -f compose.prod.yaml up -d --build
+          echo '✓ Containers rebuilt'
 
       - name: Restart Laravel container
-        run: |
-          ssh deploy-target "docker restart mbfd-hub-laravel && echo '✓ Container restarted'"
+        run: docker restart mbfd-hub-laravel && echo '✓ Container restarted'
 
       - name: Wait for container ready
         run: |
           sleep 10
           for i in $(seq 1 30); do
-            if ssh deploy-target "docker exec mbfd-hub-laravel php -r 'echo 1;'" 2>/dev/null; then
+            if docker exec mbfd-hub-laravel php -r 'echo 1;' 2>/dev/null; then
               echo "✓ Container accepting commands after ${i}s"
               exit 0
             fi
@@ -106,43 +85,36 @@ jobs:
           exit 1
 
       - name: Fix permissions
-        run: |
-          ssh deploy-target "docker exec mbfd-hub-laravel chmod -R 775 storage bootstrap/cache"
+        run: docker exec mbfd-hub-laravel chmod -R 775 storage bootstrap/cache
 
       - name: Run migrations and optimize
         run: |
-          ssh deploy-target "
-            docker exec mbfd-hub-laravel php artisan storage:link --force 2>/dev/null || true
-            docker exec mbfd-hub-laravel php artisan migrate --force
-            docker exec mbfd-hub-laravel php artisan optimize:clear
-            docker exec mbfd-hub-laravel php artisan config:cache
-            docker exec mbfd-hub-laravel php artisan route:cache
-            docker exec mbfd-hub-laravel php artisan view:cache || docker exec mbfd-hub-laravel php artisan view:clear
-            docker exec mbfd-hub-laravel php artisan filament:clear-cached-components
-            echo '✓ Laravel optimized'
-          "
+          docker exec mbfd-hub-laravel php artisan storage:link --force 2>/dev/null || true
+          docker exec mbfd-hub-laravel php artisan migrate --force
+          docker exec mbfd-hub-laravel php artisan optimize:clear
+          docker exec mbfd-hub-laravel php artisan config:cache
+          docker exec mbfd-hub-laravel php artisan route:cache
+          docker exec mbfd-hub-laravel php artisan view:cache || docker exec mbfd-hub-laravel php artisan view:clear
+          docker exec mbfd-hub-laravel php artisan filament:clear-cached-components
+          echo '✓ Laravel optimized'
 
       - name: Build frontend assets
         run: |
-          ssh deploy-target "
-            docker exec mbfd-hub-laravel bash -c 'npm install --legacy-peer-deps && npm run build'
-            docker exec mbfd-hub-laravel php artisan filament:assets
-            docker exec mbfd-hub-laravel bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install --legacy-peer-deps && npm run build'
-            echo '✓ All frontend assets built'
-          "
+          docker exec mbfd-hub-laravel bash -c 'npm install --legacy-peer-deps && npm run build'
+          docker exec mbfd-hub-laravel php artisan filament:assets
+          docker exec mbfd-hub-laravel bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install --legacy-peer-deps && npm run build'
+          echo '✓ All frontend assets built'
 
       - name: Verify background services
         run: |
-          ssh deploy-target "
-            docker exec mbfd-hub-laravel bash -c 'pgrep -f \"reverb:start\" || nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &'
-            docker exec mbfd-hub-laravel bash -c 'pgrep -f \"queue:work\" || nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
-            echo '✓ Reverb and queue worker running'
-          "
+          docker exec mbfd-hub-laravel bash -c 'pgrep -f "reverb:start" || nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &'
+          docker exec mbfd-hub-laravel bash -c 'pgrep -f "queue:work" || nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
+          echo '✓ Reverb and queue worker running'
 
       - name: Wait for health
         run: |
           for i in $(seq 1 60); do
-            if ssh deploy-target "docker exec mbfd-hub-laravel curl -sf http://localhost:80" > /dev/null 2>&1; then
+            if docker exec mbfd-hub-laravel curl -sf http://localhost:80 > /dev/null 2>&1; then
               echo "✓ Laravel healthy after ${i}s"
               exit 0
             fi
