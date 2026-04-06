@@ -165,11 +165,28 @@
 }
 
 /* ===== TOPBAR ===== */
-.fi-topbar {
+/* The visible topbar bar is the <nav> INSIDE .fi-topbar, which has Tailwind's
+   bg-white baked into its class list. Targeting only .fi-topbar sets the
+   background on the outer wrapper div, but the child <nav> paints over it
+   with bg-white. We must target BOTH the wrapper and the inner <nav>. */
+.fi-topbar,
+.fi-topbar > nav {
     background-color: #171717 !important; /* Impeccable dark neutral — matches React SPA header */
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+    border-bottom: none !important;
+    box-shadow: none !important;
+}
+
+.fi-topbar {
     border-bottom: 2px solid rgba(239, 68, 68, 0.3) !important; /* MBFD Red accent */
+}
+
+/* Override the ring/shadow that Filament puts on the <nav> */
+.fi-topbar > nav {
+    --tw-ring-opacity: 0 !important;
+    --tw-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
 }
 
 /* Topbar icon buttons (hamburger, notifications, etc.) */
