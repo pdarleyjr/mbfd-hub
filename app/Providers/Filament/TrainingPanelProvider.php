@@ -26,6 +26,7 @@ use App\Http\Middleware\EnsureTrainingPanelAccess;
 use App\Filament\Training\Support\DynamicNavigation;
 use App\Filament\Training\Pages\Settings as TrainingSettings;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\NotificationSettings;
 
 class TrainingPanelProvider extends PanelProvider
 {
@@ -62,6 +63,7 @@ class TrainingPanelProvider extends PanelProvider
             ->pages([
                 \App\Filament\Training\Pages\Dashboard::class,
                 \App\Filament\Training\Pages\ExternalNavItemViewer::class,
+                NotificationSettings::class,
             ])
             ->navigationGroups([
                 NavigationGroup::make()
@@ -86,6 +88,11 @@ class TrainingPanelProvider extends PanelProvider
                     ->label('Settings')
                     ->url(fn (): string => TrainingSettings::getUrl())
                     ->icon('heroicon-o-cog-6-tooth'),
+                MenuItem::make()
+                    ->label('Notification Settings')
+                    ->url(fn (): string => NotificationSettings::getUrl(panel: 'training'))
+                    ->icon('heroicon-o-bell')
+                    ->visible(fn (): bool => auth()->user()?->canManageNotificationSettings() ?? false),
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')

@@ -141,6 +141,7 @@ class User extends Authenticatable implements FilamentUser
             'super_admin',
             'admin',
             'logistics_admin',
+            'training_admin',
             'workgroup_admin',
             'workgroup_facilitator',
         ]);

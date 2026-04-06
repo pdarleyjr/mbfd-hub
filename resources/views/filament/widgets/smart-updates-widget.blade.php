@@ -45,7 +45,7 @@
                                         </span>
                                     </div>
                                     @if(in_array($key, ['defects', 'shop_work']))
-                                        <a href="{{ $key === 'defects' ? '/admin/apparatus-defects' : '/admin/shop-works' }}"
+                                        <a href="{{ $key === 'defects' ? '/admin/defects' : '/admin/shop-works' }}"
                                            class="text-xs font-medium" style="color: #B91C1C;">
                                             View All →
                                         </a>
