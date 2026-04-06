@@ -46,9 +46,9 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          # Use localhost since the self-hosted runner IS the deploy target
           ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts 2>/dev/null || true
-          cat >> ~/.ssh/config << EOF
+          # Overwrite (not append) SSH config to avoid stale deploy-target entries
+          cat > ~/.ssh/config << EOF
           Host deploy-target
             HostName 127.0.0.1
             User ${{ secrets.DEPLOY_USER }}
@@ -58,6 +58,7 @@ jobs:
             ServerAliveInterval 10
             ServerAliveCountMax 3
           EOF
+          chmod 600 ~/.ssh/config
 
       - name: Pre-deploy backup
         run: |
