@@ -2,12 +2,16 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\StationInventoryController;
+use App\Http\Controllers\IncidentsController;
 use App\Http\Controllers\Workgroup\FileDownloadController;
 use App\Http\Controllers\ReportExportController;
 
 Route::get('/', function () {
     return view('welcome');
 });
+
+// Public incident feed — proxies PulsePoint Worker with 60s server-side cache
+Route::get('/api/incidents', [IncidentsController::class, 'index'])->name('incidents.index');
 
 // Fallback login route (required by Filament export download middleware)
 Route::get('/login', function () {

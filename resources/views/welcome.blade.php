@@ -32,6 +32,7 @@
         @keyframes typing { 0%, 60%, 100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-4px); } }
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes incidentIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
         .loading-bar { position: relative; overflow: hidden; }
         .loading-bar::after { content: ''; position: absolute; top: 0; left: 0; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); animation: shimmer 1.5s infinite; }
         .msg-ai p { margin-bottom: 0.5rem; }
@@ -43,9 +44,21 @@
         .stagger-item:nth-child(1) { animation-delay: 0ms; }
         .stagger-item:nth-child(2) { animation-delay: 80ms; }
         .stagger-item:nth-child(3) { animation-delay: 160ms; }
+        /* PulsePoint call feed */
+        .incident-row { animation: incidentIn 0.25s cubic-bezier(0,0,0.2,1) forwards; }
+        .incident-row:nth-child(1) { animation-delay: 0ms; }
+        .incident-row:nth-child(2) { animation-delay: 50ms; }
+        .incident-row:nth-child(3) { animation-delay: 100ms; }
+        .incident-row:nth-child(4) { animation-delay: 150ms; }
+        .incident-row:nth-child(5) { animation-delay: 200ms; }
+        .shimmer-line { position: relative; overflow: hidden; background: #e7e5e3; border-radius: 4px; }
+        .shimmer-line::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%); animation: shimmer 1.4s infinite; }
+        .feed-scroll { scrollbar-width: thin; scrollbar-color: #e7e5e3 transparent; }
+        .feed-scroll::-webkit-scrollbar { width: 4px; }
+        .feed-scroll::-webkit-scrollbar-thumb { background: #e7e5e3; border-radius: 2px; }
         @media (prefers-reduced-motion: reduce) {
-            .typing-dot, .loading-bar::after { animation: none; }
-            .stagger-item { opacity: 1; animation: none; }
+            .typing-dot, .loading-bar::after, .shimmer-line::after { animation: none; }
+            .stagger-item, .incident-row { opacity: 1; animation: none; }
             * { transition-duration: 0.01ms !important; }
         }
     </style>
@@ -76,23 +89,161 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
         <!-- ============================================================ -->
-        <!-- HERO BANNER: Artwork (left) + Branding Text (right)          -->
-        <!-- Discord-style side-by-side hero with image and tagline       -->
+        <!-- HERO BANNER: Live Call Feed (left) + AI Assistant (right)    -->
         <!-- ============================================================ -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start mb-10">
-            <!-- Left: Hero Artwork -->
-            <div class="flex items-center justify-center">
-                <picture>
-                    <source srcset="/images/homepage-hero.webp" type="image/webp">
-                    <img
-                        src="/images/homepage-hero.png"
-                        alt="MBFD Support Hub — fire apparatus, mobile devices, and cloud infrastructure"
-                        loading="eager"
-                        width="800"
-                        height="600"
-                        class="w-full max-w-lg h-auto object-contain drop-shadow-2xl stagger-item"
-                    >
-                </picture>
+            <!-- Left: PulsePoint Live Call Feed -->
+            <div
+                x-data="pulsePointFeed()"
+                x-init="init()"
+                class="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden stagger-item"
+                aria-label="MBFD Live Incident Feed"
+                aria-live="polite"
+                aria-atomic="false"
+            >
+                <!-- Card Header -->
+                <div class="bg-[#1e293b] px-5 py-3.5 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <!-- Shield icon -->
+                        <div class="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-white font-semibold text-sm leading-tight font-heading">MBFD Live Incidents</h2>
+                            <p class="text-slate-400 text-xs">Miami Beach Fire — Agency X1012</p>
+                        </div>
+                    </div>
+                    <!-- Live badge + last-updated -->
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <span x-show="!error" class="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-red-900/40 text-red-300">
+                            <span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>
+                            Live
+                        </span>
+                        <span x-show="error" class="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-900/30 text-amber-400">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                            Offline
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Active Count Bar -->
+                <div class="px-5 py-2.5 bg-neutral-50 border-b border-neutral-200 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="text-center">
+                            <div class="font-heading font-bold text-xl text-red-600 leading-none" style="font-variant-numeric: tabular-nums;" x-text="loading ? '—' : activeCount"></div>
+                            <div class="text-xs text-neutral-500 mt-0.5">Active</div>
+                        </div>
+                        <div class="w-px h-8 bg-neutral-200"></div>
+                        <div class="text-center">
+                            <div class="font-heading font-bold text-xl text-neutral-400 leading-none" style="font-variant-numeric: tabular-nums;" x-text="loading ? '—' : recentCount"></div>
+                            <div class="text-xs text-neutral-500 mt-0.5">Recent</div>
+                        </div>
+                    </div>
+                    <span class="text-xs text-neutral-400" x-text="lastUpdated" style="font-variant-numeric: tabular-nums;"></span>
+                </div>
+
+                <!-- Incident List -->
+                <div class="feed-scroll overflow-y-auto" style="max-height: 320px; min-height: 160px;">
+
+                    <!-- Shimmer loading state -->
+                    <template x-if="loading">
+                        <div class="px-5 py-3 space-y-3">
+                            <div class="flex items-start gap-3" x-for="n in [1,2,3]">
+                                <div class="shimmer-line h-3 w-10 mt-1 flex-shrink-0"></div>
+                                <div class="flex-1 space-y-1.5">
+                                    <div class="shimmer-line h-3 w-3/4"></div>
+                                    <div class="shimmer-line h-2.5 w-1/2"></div>
+                                </div>
+                                <div class="shimmer-line h-4 w-12 rounded-full flex-shrink-0"></div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Error state -->
+                    <template x-if="!loading && error">
+                        <div class="flex flex-col items-center justify-center py-10 px-5 text-center">
+                            <svg class="w-8 h-8 text-neutral-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <p class="text-sm font-medium text-neutral-500">Monitoring Unavailable</p>
+                            <p class="text-xs text-neutral-400 mt-1">Check back shortly</p>
+                        </div>
+                    </template>
+
+                    <!-- Active incidents -->
+                    <template x-if="!loading && !error && activeIncidents.length > 0">
+                        <div>
+                            <div class="px-5 pt-2.5 pb-1">
+                                <span class="text-xs font-semibold text-red-600 uppercase tracking-wider">Active Calls</span>
+                            </div>
+                            <template x-for="(inc, idx) in activeIncidents.slice(0,8)" :key="inc.id">
+                                <div class="incident-row px-5 py-2.5 border-b border-neutral-100 last:border-0 hover:bg-neutral-50 transition-colors duration-150">
+                                    <div class="flex items-start gap-3">
+                                        <!-- Time -->
+                                        <span class="text-xs text-neutral-400 w-11 flex-shrink-0 mt-0.5 leading-tight" style="font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace;" x-text="formatTime(inc.receivedAt)"></span>
+                                        <!-- Details -->
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-semibold text-neutral-800 leading-tight truncate" x-text="inc.callType"></p>
+                                            <p class="text-xs text-neutral-500 mt-0.5 leading-snug truncate" x-text="inc.address"></p>
+                                            <!-- Units -->
+                                            <div x-show="inc.units && inc.units.length > 0" class="flex flex-wrap gap-1 mt-1.5">
+                                                <template x-for="unit in inc.units.slice(0,4)" :key="unit.id">
+                                                    <span class="text-xs px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 font-medium leading-none" style="font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace;" x-text="unit.id"></span>
+                                                </template>
+                                                <span x-show="inc.units.length > 4" class="text-xs text-neutral-400" x-text="'+' + (inc.units.length - 4) + ' more'"></span>
+                                            </div>
+                                        </div>
+                                        <!-- Status badge -->
+                                        <span class="flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 leading-snug">Active</span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Recent incidents (shown when no actives, or as secondary section) -->
+                    <template x-if="!loading && !error && activeIncidents.length === 0 && recentIncidents.length > 0">
+                        <div>
+                            <div class="px-5 pt-2.5 pb-1">
+                                <span class="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Recent Calls</span>
+                            </div>
+                            <template x-for="(inc, idx) in recentIncidents.slice(0,5)" :key="inc.id">
+                                <div class="incident-row px-5 py-2.5 border-b border-neutral-100 last:border-0 hover:bg-neutral-50 transition-colors duration-150">
+                                    <div class="flex items-start gap-3">
+                                        <span class="text-xs text-neutral-400 w-11 flex-shrink-0 mt-0.5 leading-tight" style="font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace;" x-text="formatTime(inc.receivedAt)"></span>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium text-neutral-500 leading-tight truncate" x-text="inc.callType"></p>
+                                            <p class="text-xs text-neutral-400 mt-0.5 leading-snug truncate" x-text="inc.address"></p>
+                                        </div>
+                                        <span class="flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-500 leading-snug">Cleared</span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Empty state — no incidents at all -->
+                    <template x-if="!loading && !error && activeIncidents.length === 0 && recentIncidents.length === 0">
+                        <div class="flex flex-col items-center justify-center py-10 px-5 text-center">
+                            <svg class="w-8 h-8 text-neutral-200 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p class="text-sm font-medium text-neutral-400">No Active Incidents</p>
+                            <p class="text-xs text-neutral-300 mt-1">All units available</p>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Footer: refresh hint -->
+                <div class="px-5 py-2 border-t border-neutral-100 bg-neutral-50 flex items-center justify-between">
+                    <span class="text-xs text-neutral-400">Auto-refreshes every 30 s</span>
+                    <a href="https://web.pulsepoint.org/?agency=X1012" target="_blank" rel="noopener noreferrer" class="text-xs text-neutral-400 hover:text-red-600 transition-colors duration-150 flex items-center gap-1">
+                        PulsePoint
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                    </a>
+                </div>
             </div>
 
             <!-- Right: AI Support Assistant Panel -->
@@ -488,5 +639,67 @@
             <p class="text-xs text-neutral-400">Secured System &bull; Support Services Division</p>
         </div>
     </footer>
+
+    <script>
+    function pulsePointFeed() {
+        return {
+            loading: true,
+            error: false,
+            activeIncidents: [],
+            recentIncidents: [],
+            lastUpdated: '',
+            _timer: null,
+
+            get activeCount() { return this.activeIncidents.length; },
+            get recentCount() { return this.recentIncidents.length; },
+
+            init() {
+                this.fetchData();
+                this._timer = setInterval(() => this.fetchData(), 30000);
+            },
+
+            destroy() {
+                if (this._timer) clearInterval(this._timer);
+            },
+
+            async fetchData() {
+                try {
+                    const resp = await fetch('/api/incidents', {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        signal: AbortSignal.timeout(12000)
+                    });
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    const data = await resp.json();
+                    if (data.error && !data.active) throw new Error(data.error);
+                    this.activeIncidents = data.active || [];
+                    this.recentIncidents = data.recent || [];
+                    this.error = false;
+                    this.lastUpdated = 'Updated ' + this.timeAgo(data.fetchedAt);
+                } catch (e) {
+                    this.error = true;
+                    this.lastUpdated = 'Update failed';
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            formatTime(isoStr) {
+                if (!isoStr) return '--:--';
+                try {
+                    const d = new Date(isoStr);
+                    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' });
+                } catch { return '--:--'; }
+            },
+
+            timeAgo(isoStr) {
+                if (!isoStr) return 'just now';
+                const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+                if (diff < 60) return 'just now';
+                if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
+                return Math.floor(diff / 3600) + 'h ago';
+            }
+        };
+    }
+    </script>
 </body>
 </html>
