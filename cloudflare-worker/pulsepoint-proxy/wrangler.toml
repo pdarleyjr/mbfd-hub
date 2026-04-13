@@ -1,0 +1,8 @@
+name = "pulsepoint-proxy"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+[vars]
+ALLOWED_ORIGIN = "https://www.mbfdhub.com"
+PULSEPOINT_AGENCY = "X1012"
+CACHE_TTL = "30"
