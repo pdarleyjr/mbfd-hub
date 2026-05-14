@@ -18,7 +18,7 @@ class ListEvaluationSubmissions extends ListRecords
                 ->exporter(EvaluationSubmissionExporter::class)
                 ->label('Export All Submissions')
                 ->icon('heroicon-o-arrow-down-tray')
-                ->visible(fn () => auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin'])),
+                ->visible(fn () => (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false)),
         ];
     }
 }
