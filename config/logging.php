@@ -54,7 +54,11 @@ return [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', env('LOG_STACK', 'single')),
+            // Default to the rotating `daily` channel instead of `single` so production
+            // log files don't grow unbounded (laravel.log + scheduler.log were each
+            // multi-MB before this change). Override with LOG_STACK=single,slack for
+            // composed channels.
+            'channels' => explode(',', env('LOG_STACK', 'daily')),
             'ignore_exceptions' => false,
         ],
 
