@@ -90,6 +90,19 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::post('push/test', [TestNotificationController::class , 'sendTestNotification']);
 });
 
+// Admin lookup endpoints — powers the desktop-PWA Dexie prefetch + future typeahead.
+// Uses the Filament admin cookie session (web + auth) so the installed PWA
+// authenticates identically to the browser admin. Role check happens inside the
+// controller (super_admin / admin). Rate limited at 60 req/min per IP to bound
+// abuse if a token leaks.
+Route::middleware(['web', 'auth', 'throttle:60,1'])
+    ->prefix('admin/lookups')
+    ->group(function () {
+        Route::get('stations', [\App\Http\Controllers\Api\Admin\LookupController::class, 'stations']);
+        Route::get('apparatus', [\App\Http\Controllers\Api\Admin\LookupController::class, 'apparatus']);
+        Route::get('personnel', [\App\Http\Controllers\Api\Admin\LookupController::class, 'personnel']);
+    });
+
 Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('metrics', [AdminMetricsController::class , 'index']);
     Route::get('smart-updates', [SmartUpdatesController::class , 'index'])->name('api.smart-updates');

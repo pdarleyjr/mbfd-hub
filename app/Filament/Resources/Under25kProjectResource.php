@@ -17,8 +17,11 @@ use Filament\Infolists\Infolist;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
+use App\Filament\Concerns\EnterpriseTable;
 class Under25kProjectResource extends Resource
 {
+    use EnterpriseTable;
+
     protected static ?string $model = Under25kProject::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';
@@ -159,7 +162,7 @@ class Under25kProjectResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('project_number')
                     ->searchable()

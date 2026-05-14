@@ -16,8 +16,11 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
+use App\Filament\Concerns\EnterpriseTable;
 class StationResource extends Resource
 {
+    use EnterpriseTable;
+
     protected static ?string $model = Station::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
@@ -156,7 +159,7 @@ class StationResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('station_number')
                     ->searchable()

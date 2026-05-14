@@ -14,8 +14,11 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Hash;
 
+use App\Filament\Concerns\EnterpriseTable;
 class EmployeeResource extends Resource
 {
+    use EnterpriseTable;
+
     protected static ?string $model = Employee::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-identification';
@@ -67,7 +70,7 @@ class EmployeeResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('employee_id')
                     ->label('Employee ID')

@@ -64,6 +64,70 @@ With the null-safety bug fixed, SpotlightPlugin would theoretically work. **Howe
 - Add a real authenticated HTTP smoke test to the Playwright `admin-pwa-desktop` project so the next time a pre-existing bug surfaces, it's caught in CI before reaching production
 - Audit other panel providers (Workgroup, Training, Employee) for the same null-safety anti-pattern in case future packages also enumerate resources eagerly
 
+## Followup status (2026-05-14, this commit)
+
+| Followup | Status | Where |
+|---|---|---|
+| Apply `EnterpriseTable` trait to top 15 resources | ✅ shipped | 15 files in `app/Filament/Resources/*.php` |
+| `/api/admin/lookups/{stations,apparatus,personnel}` endpoints | ✅ shipped | `app/Http/Controllers/Api/Admin/LookupController.php` + `routes/api.php` |
+| Authenticated Playwright smoke for `admin-pwa-desktop` project | ✅ shipped | `tests/e2e/admin-pwa.spec.ts` — 3 unauth + 5 auth + 4 lookup tests |
+| Redis production env-flip | ⏸ runbook + readiness probe shipped | `php artisan mbfd:activate-redis --dry-run` + [docs/REDIS_ACTIVATION.md](REDIS_ACTIVATION.md) — manual SSH cutover by operator |
+| CSP report-only → enforcing | ⏸ deferred | Wait for clean-week metric per `app/Http/Middleware/SecurityHeaders.php:35` |
+| R2 disk activation | ⏸ deferred | `config/filesystems.php` ready; needs R2_* env vars |
+
+### What the lookup endpoints unblock
+
+The Dexie prefetch (`resources/js/admin-pwa/prefetch.ts`) silently fails
+on production today because the endpoints don't exist — that was an
+acceptable degradation: the PWA installs fine, the admin shell works,
+the prefetch just returns nothing into IndexedDB. With this commit:
+
+- `GET /api/admin/lookups/stations` → `{ data: [{id, label, station_number, name, address, is_active}, ...], meta: {...} }`
+- `GET /api/admin/lookups/apparatus` → `{ data: [{id, label, unit_id, vehicle_number, designation, type, status, station_id}, ...], meta: {...} }`
+- `GET /api/admin/lookups/personnel` → `{ data: [{id, label, name, rank, assignment?, employee_id?}, ...], meta: {...} }`
+   (Falls back to the `personnel` table if the Snipe-IT integration has populated it; otherwise reads from `employees`.)
+
+All three endpoints:
+- Require `web` + `auth` middleware (Filament admin cookie session — same auth the browser admin uses)
+- Require the calling user to have `super_admin` or `admin` role
+- Are throttled at 60 req/min per IP
+- Support `?q=<term>` for cheap server-side filtering
+- Cap results at 500 rows to bound IndexedDB size
+- Cache the response 5 minutes via `Cache::remember()` (huge speedup once Redis is active)
+
+### EnterpriseTable trait application
+
+The trait is applied to:
+- ApparatusResource, Under25kProjectResource, EquipmentItemResource
+- CapitalProjectResource, RecommendationResource, StationInspectionResource
+- StationResource, EmployeeEquipmentRequestResource, FireEquipmentRequestResource
+- DefectResource, EmployeeResource, SingleGasMeterResource
+- UnitMasterVehicleResource, UserResource, InspectionResource
+
+Each resource now ships with: striped rows, default page size 50,
+options up to 250, extreme pagination links, persisted filters/search/sort
+across navigations, and deferred initial load. The five smaller resources
+(InventoryLocationResource, ShopWorkResource, InventoryItemResource,
+TodoResource, UniformResource) were intentionally left on Filament
+defaults — they're low-volume tables where the trait's overhead isn't
+worth it.
+
+### Redis activation — operator runbook
+
+See [docs/REDIS_ACTIVATION.md](REDIS_ACTIVATION.md) for the full procedure.
+Quick summary:
+
+```bash
+ssh deploy-target
+docker exec mbfd-hub-laravel php artisan mbfd:activate-redis --dry-run
+# If green: edit /opt/mbfd/mbfd-hub/.env per the runbook + config:cache + queue:restart
+```
+
+The `mbfd:activate-redis` command is a **read-only readiness probe** —
+it does not modify `.env` and does not require a maintenance window.
+Run it any time to verify Redis connectivity from inside the Laravel
+container.
+
 This document is the single source of truth for what has been scaffolded
 in-repo versus what still requires production access (deployment, secrets,
 or live infrastructure) to complete.

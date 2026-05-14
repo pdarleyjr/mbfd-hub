@@ -16,8 +16,11 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
+use App\Filament\Concerns\EnterpriseTable;
 class ApparatusResource extends Resource
 {
+    use EnterpriseTable;
+
     protected static ?string $model = Apparatus::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-truck';
@@ -173,7 +176,7 @@ class ApparatusResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return self::applyEnterpriseDefaults($table)
             ->columns([
                 // ── Default visible columns (5 max for alignment) ──
                 Tables\Columns\TextColumn::make('designation')

@@ -12,8 +12,11 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
+use App\Filament\Concerns\EnterpriseTable;
 class SingleGasMeterResource extends Resource
 {
+    use EnterpriseTable;
+
     protected static ?string $model = SingleGasMeter::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-beaker';
@@ -76,7 +79,7 @@ class SingleGasMeterResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('apparatus.designation')
                     ->label('Apparatus')

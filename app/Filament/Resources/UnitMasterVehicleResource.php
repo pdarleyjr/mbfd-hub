@@ -10,8 +10,11 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
+use App\Filament\Concerns\EnterpriseTable;
 class UnitMasterVehicleResource extends Resource
 {
+    use EnterpriseTable;
+
     protected static ?string $model = UnitMasterVehicle::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
@@ -81,7 +84,7 @@ class UnitMasterVehicleResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('veh_number')
                     ->label('Veh #')

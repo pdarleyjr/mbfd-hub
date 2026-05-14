@@ -17,8 +17,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Closure;
 
+use App\Filament\Concerns\EnterpriseTable;
 class RecommendationResource extends Resource
 {
+    use EnterpriseTable;
+
     protected static ?string $model = ApparatusDefectRecommendation::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-light-bulb';
@@ -87,7 +90,7 @@ class RecommendationResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('defect.apparatus.unit_id')
                     ->label('Apparatus')
