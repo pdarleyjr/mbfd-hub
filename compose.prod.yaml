@@ -26,10 +26,15 @@ services:
     depends_on:
       pgsql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      # Laravel 11 wires /up via bootstrap/app.php (health: '/up').
+      # Using /up instead of / gates rolling deploys on actual app readiness,
+      # not just nginx accepting the connection.
+      test: ["CMD", "curl", "-f", "http://localhost:80/up"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -65,6 +70,40 @@ services:
       retries: 5
       start_period: 30s
 
+  redis:
+    # Redis 7-alpine — sized for cache + queue + session + Reverb pub/sub fan-out.
+    # AOF persistence keeps queue jobs / sessions safe across container restarts.
+    # `appendfsync everysec` is the sweet spot between throughput and durability.
+    image: "redis:7.4-alpine"
+    container_name: mbfd-hub-redis
+    restart: unless-stopped
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "yes"
+      - "--appendfsync"
+      - "everysec"
+      - "--maxmemory"
+      - "512mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+      - "--requirepass"
+      - "${REDIS_PASSWORD}"
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - "redis-data:/data"
+    networks:
+      - mbfd-net
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   baserow:
     # Pin by image digest captured 2026-05-14 (running baserow ~1.36 series).
     # Update by running `docker pull baserow/baserow:1.36.X` against a known
@@ -93,4 +132,6 @@ volumes:
   pgsql-data:
     driver: local
   baserow-data:
+    driver: local
+  redis-data:
     driver: local

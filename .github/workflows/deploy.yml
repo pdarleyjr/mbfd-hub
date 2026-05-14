@@ -128,6 +128,18 @@ jobs:
         run: |
           ssh deploy-target "docker exec mbfd-hub-laravel chmod -R 775 storage bootstrap/cache"
 
+      # Composer install runs INSIDE the container as the sail user so vendor/
+      # ownership matches the host runner — same pattern as Build frontend
+      # assets step below. The --no-dev flag keeps phpunit/mockery out of
+      # production. Lockfile drift would fail the whole deploy here rather
+      # than at runtime when an autoloaded class can't be found.
+      - name: Install PHP dependencies
+        run: |
+          ssh deploy-target "set -e
+            docker exec -u sail mbfd-hub-laravel composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+            echo '✓ Composer dependencies installed'
+          "
+
       - name: Run migrations and optimize
         run: |
           ssh deploy-target "
@@ -200,6 +212,9 @@ jobs:
           test_url "Service worker"       "https://www.mbfdhub.com/sw.js"
           test_url "Daily SW"             "https://www.mbfdhub.com/daily/service-worker.js"
           test_url "Manifest"             "https://www.mbfdhub.com/manifest.json"
+          test_url "Admin PWA manifest"   "https://www.mbfdhub.com/admin-pwa/manifest.webmanifest"
+          test_url "Admin PWA SW"         "https://www.mbfdhub.com/admin-pwa/service-worker.js"
+          test_url "Admin /up health"     "https://www.mbfdhub.com/up"
           test_url "Deploy marker"        "https://www.mbfdhub.com/deploy-marker.json"
           test_url "Baserow"              "https://baserow.mbfdhub.com"    "200"
           test_url "Snipe-IT"             "https://inventory.mbfdhub.com"  "200"

@@ -1,0 +1,67 @@
+{
+  "name": "MBFD Support Hub — Admin",
+  "short_name": "MBFD Admin",
+  "id": "/admin/?source=pwa",
+  "description": "Mt. Brook Fire Department Support Hub administrative console — desktop PWA for fleet, station, inventory, and workgroup management.",
+  "start_url": "/admin?source=pwa",
+  "scope": "/admin/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "theme_color": "#1e293b",
+  "background_color": "#0f172a",
+  "categories": ["business", "productivity", "utilities"],
+  "lang": "en-US",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/admin-pwa/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/admin-pwa/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/admin-pwa/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Apparatus",
+      "short_name": "Apparatus",
+      "description": "Fleet apparatus management",
+      "url": "/admin/apparatus?source=pwa-shortcut",
+      "icons": [{ "src": "/admin-pwa/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Stations",
+      "short_name": "Stations",
+      "description": "Station operations hub",
+      "url": "/admin/stations?source=pwa-shortcut",
+      "icons": [{ "src": "/admin-pwa/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Application Health",
+      "short_name": "Health",
+      "description": "Live system health dashboard",
+      "url": "/admin/health?source=pwa-shortcut",
+      "icons": [{ "src": "/admin-pwa/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Pulse",
+      "short_name": "Pulse",
+      "description": "Performance & queues",
+      "url": "/admin/pulse?source=pwa-shortcut",
+      "icons": [{ "src": "/admin-pwa/icons/icon-96.png", "sizes": "96x96" }]
+    }
+  ]
+}

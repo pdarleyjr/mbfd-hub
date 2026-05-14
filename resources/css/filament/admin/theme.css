@@ -1109,3 +1109,123 @@
         transition: none;
     }
 }
+
+/* =========================================================================
+   ENTERPRISE DESKTOP LAYER (added 2026-05-14)
+
+   All rules below are gated by one of:
+     - @media (min-width: 1280px) and (pointer: fine)   ← wide + mouse only
+     - @media (display-mode: standalone), ... overlay   ← installed PWA only
+     - @media (min-width: 1536px)                       ← 2xl breakpoint
+
+   Mobile and tablet shells inherit ZERO new rules from this section.
+   ========================================================================= */
+
+/* --- Tabular figures: number columns line up like a spreadsheet ------- */
+@media (min-width: 1280px) and (pointer: fine) {
+    .fi-ta-text,
+    .fi-ta-text-item,
+    .fi-wi-stats-overview-stat-value,
+    .fi-in-text-item {
+        font-feature-settings: "tnum", "lnum";
+        font-variant-numeric: tabular-nums lining-nums;
+    }
+
+    /* Subtle inner shadow on cards/tables = "native app" depth signal */
+    .fi-section,
+    .fi-wi-card,
+    .fi-ta-ctn {
+        box-shadow:
+            0 1px 3px 0 rgba(15, 23, 42, 0.06),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    }
+}
+
+/* --- 4K / 27" monitor density (2xl: 1536px+) -------------------------- */
+@media (min-width: 1536px) and (pointer: fine) {
+    .fi-ta-row {
+        line-height: 1.35;
+    }
+    .fi-ta-cell {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+    .fi-sidebar {
+        width: 280px;
+    }
+    /* Reserve breathing room at the bottom for the status bar */
+    .fi-main {
+        padding-bottom: 1.75rem;
+    }
+}
+
+/* --- Standalone-mode (installed PWA) treatment ------------------------ */
+@media (display-mode: standalone), (display-mode: window-controls-overlay) {
+    body.mbfd-pwa .fi-topbar {
+        height: 44px;
+        min-height: 44px;
+    }
+    body.mbfd-pwa .fi-topbar-ctn {
+        height: 44px;
+        align-items: center;
+    }
+    body.mbfd-pwa .fi-user-avatar {
+        width: 26px;
+        height: 26px;
+    }
+    body.mbfd-pwa .fi-main {
+        padding-bottom: 1.75rem; /* room for status bar */
+    }
+    /* The OS chrome handles back/forward; hide our breadcrumb top padding */
+    body.mbfd-pwa .fi-page-header-heading {
+        padding-top: 0.25rem;
+    }
+}
+
+/* --- Window Controls Overlay (Chromium 102+) -------------------------- */
+@media (display-mode: window-controls-overlay) {
+    body.mbfd-pwa .fi-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        padding-left: env(titlebar-area-x, 0);
+        padding-right: calc(100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0));
+        -webkit-app-region: drag;
+    }
+    body.mbfd-pwa .fi-topbar a,
+    body.mbfd-pwa .fi-topbar button,
+    body.mbfd-pwa .fi-topbar input,
+    body.mbfd-pwa .fi-global-search {
+        -webkit-app-region: no-drag;
+    }
+}
+
+/* --- Active-row highlight from keyboard j/k nav ----------------------- */
+.fi-ta-row.admin-row-focused {
+    outline: 2px solid rgba(220, 38, 38, 0.5);
+    outline-offset: -2px;
+    background-color: rgba(254, 242, 242, 0.5);
+}
+
+/* --- Dark mode tokens (opt-in via body.mbfd-dark) --------------------- */
+@media (prefers-color-scheme: dark) {
+    body.mbfd-dark .fi-body {
+        background-color: #0f172a;
+        color: #e2e8f0;
+    }
+    body.mbfd-dark .fi-section,
+    body.mbfd-dark .fi-wi-card,
+    body.mbfd-dark .fi-ta-ctn {
+        background-color: #1e293b;
+        border-color: #334155;
+    }
+    body.mbfd-dark .fi-topbar {
+        background-color: #0f172a;
+        border-bottom: 1px solid #334155;
+    }
+    body.mbfd-dark .fi-sidebar {
+        background-color: #1e293b;
+        border-right: 1px solid #334155;
+    }
+}
+/* ===== END ENTERPRISE DESKTOP LAYER ===== */
