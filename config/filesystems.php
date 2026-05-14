@@ -60,6 +60,26 @@ return [
             'report' => false,
         ],
 
+        // Cloudflare R2 — S3-compatible, zero egress fees.
+        // Activate by setting R2_* env vars then `FILESYSTEM_DISK=r2`.
+        // Migrate existing Spatie Media Library files with:
+        //   php artisan media-library:regenerate --disk-from=local --disk-to=r2
+        'r2' => [
+            'driver' => 's3',
+            'key' => env('R2_ACCESS_KEY_ID'),
+            'secret' => env('R2_SECRET_ACCESS_KEY'),
+            'region' => env('R2_REGION', 'auto'),
+            'bucket' => env('R2_BUCKET'),
+            'url' => env('R2_PUBLIC_URL'),
+            'endpoint' => env('R2_ENDPOINT'),
+            // R2 requires path-style addressing
+            'use_path_style_endpoint' => true,
+            // Lock down: no public ACLs on R2 — visibility is bucket-level
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*

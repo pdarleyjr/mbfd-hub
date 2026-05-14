@@ -35,6 +35,28 @@ Route::get('/manifest.json', function () {
     return $response;
 });
 
+// --- Admin Desktop-PWA -----------------------------------------------------
+// These two routes serve the scoped admin manifest + service worker with
+// the correct Content-Type and Service-Worker-Allowed scope header. The
+// raw files live in public/admin-pwa/ so they survive `php artisan
+// optimize` and the Vite manifest is untouched.
+// Kill-switch: comment out either route to disable admin PWA installs.
+Route::get('/admin-pwa/manifest.webmanifest', function () {
+    return response()->file(public_path('admin-pwa/manifest.webmanifest'), [
+        'Content-Type' => 'application/manifest+json',
+        'Cache-Control' => 'public, max-age=300, must-revalidate',
+    ]);
+});
+
+Route::get('/admin-pwa/service-worker.js', function () {
+    return response()->file(public_path('admin-pwa/service-worker.js'), [
+        'Content-Type' => 'application/javascript; charset=utf-8',
+        'Service-Worker-Allowed' => '/admin/',
+        'Cache-Control' => 'no-cache, must-revalidate',
+    ]);
+});
+// --- End Admin Desktop-PWA -------------------------------------------------
+
 // Daily Checkout SPA - catch-all for React Router
 Route::get('/daily/{path?}', function () {
     return response()->file(public_path('daily/index.html'), [

@@ -15,6 +15,9 @@ export default defineConfig({
                 'resources/css/filament/admin/theme.css',
                 'resources/js/apparatus-layout/main.tsx',
                 'resources/js/workgroup-data-dashboard.jsx',
+                // Admin desktop-PWA bootstrap (registers /admin/ scoped SW,
+                // gates install prompt by matchMedia, prefetches lookups).
+                'resources/js/admin-pwa/main.ts',
             ],
             refresh: true,
         }),

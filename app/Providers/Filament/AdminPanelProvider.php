@@ -31,13 +31,14 @@ use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
+use pxlrbt\FilamentSpotlight\SpotlightPlugin;
 use ShuvroRoy\FilamentSpatieLaravelHealth\FilamentSpatieLaravelHealthPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        return $panel
+        $panel
             ->default()
             ->id('admin')
             ->path('admin')
@@ -62,6 +63,16 @@ class AdminPanelProvider extends PanelProvider
                 FilamentSpatieLaravelHealthPlugin::make()
                     ->usingPage(\App\Filament\Pages\HealthCheckResults::class)
             )
+            ->globalSearchKeyBindings(['command+k', 'ctrl+k']);
+
+        // Spotlight is conditional so the admin panel still boots when the
+        // package is not yet vendored (e.g. fresh checkout before
+        // `composer install`). When present, Cmd+K opens a richer palette.
+        if (class_exists(SpotlightPlugin::class)) {
+            $panel->plugin(SpotlightPlugin::make());
+        }
+
+        return $panel
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
@@ -182,10 +193,38 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => '<meta name="mobile-web-app-capable" content="yes">
-                    <meta name="apple-mobile-web-app-capable" content="yes">
-                    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-                    <meta name="apple-mobile-web-app-title" content="MBFD Hub">'
+                fn (): string => self::safeRender('filament.admin.partials.head-pwa', '<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="MBFD Hub">')
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): string => self::safeRender('filament.admin.partials.keyboard-shortcuts')
+                    . self::safeRender('filament.admin.partials.status-bar')
+                    . self::safeRender('filament.admin.partials.install-prompt')
+                    . self::safeRender('filament.admin.partials.context-menu')
             );
+    }
+
+    /**
+     * Render a Blade partial defensively.
+     *
+     * The desktop modernization partials live in resources/views/filament/admin/partials/.
+     * If any one of them fails to render — missing file, Blade error, view-cache
+     * stale — we silently fall back to the optional placeholder rather than
+     * crashing the entire admin page. Errors are reported to Sentry so we
+     * still hear about it.
+     */
+    private static function safeRender(string $view, string $fallback = ''): string
+    {
+        try {
+            if (! view()->exists($view)) {
+                return $fallback;
+            }
+            return view($view)->render();
+        } catch (\Throwable $e) {
+            if (app()->bound('sentry')) {
+                try { app('sentry')->captureException($e); } catch (\Throwable $ignored) {}
+            }
+            return $fallback;
+        }
     }
 }
