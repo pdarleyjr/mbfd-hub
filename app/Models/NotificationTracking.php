@@ -1,9 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class NotificationTracking extends Model
 {
@@ -13,6 +17,8 @@ class NotificationTracking extends Model
 
     protected $fillable = [
         'user_id',
+        'notifiable_type',
+        'notifiable_id',
         'project_id',
         'notification_type',
         'sent_at',
@@ -31,18 +37,31 @@ class NotificationTracking extends Model
         'metadata' => 'array',
     ];
 
-    // Relationships
-    public function user()
+    protected static function booted(): void
+    {
+        // sent_at is NOT NULL but callers don't pass it; default to creation time.
+        static::creating(function (NotificationTracking $tracking) {
+            if (empty($tracking->sent_at)) {
+                $tracking->sent_at = now();
+            }
+        });
+    }
+
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function project()
+    public function project(): BelongsTo
     {
         return $this->belongsTo(CapitalProject::class, 'project_id');
     }
 
-    // Scopes
+    public function notifiable(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
     public function scopeUnread($query)
     {
         return $query->whereNull('read_at');
