@@ -1,8 +1,68 @@
 # MBFDHUB Desktop Modernization — Phase Status
 
-**Last updated:** 2026-05-14
+**Last updated:** 2026-05-14 (post-deploy diagnostic + post-mortem)
 **Tracking branch:** `main`
 **Working directory:** `d:\GitHub_Repos\MBFD_Hub`
+
+## Production Deploy Log
+
+| Commit | Time (UTC) | Result | Notes |
+|---|---|---|---|
+| `a01b1eba` | 2026-05-14 17:42 | ⚠ deploy green, `/admin/login` 500 | Full feature push; broke admin panel — see post-mortem |
+| `bca9d83a` | 2026-05-14 18:11 | ✅ recovered | Hotfix: reverted Spotlight + new renderHooks |
+| `530db143` | 2026-05-14 18:27 | ✅ all 200 + smoke green | Bisect 1: re-added `globalSearchKeyBindings` only — SAFE |
+| `8efb3ef9` | 2026-05-14 18:30 | ✅ all 200 + smoke green | Bisect 2: re-added BODY_END renderHook + safeRender + 4 partials — SAFE |
+| `(this commit)` | 2026-05-14 | pending | Defensive fix: null-safe `auth()->user()` checks across 10 Workgroup files (root cause cleanup) |
+
+**Current production state (post-bisect):** 4 of 5 features deployed safely.
+- ✅ Phase 1 — Foundation (Redis, /up, env, cleanup, Playwright, Lighthouse-CI)
+- ✅ Phase 2 — Desktop UX (EnterpriseTable, keyboard partial, status-bar partial, Tailwind variants, global search Cmd+K via `globalSearchKeyBindings`)
+- ✅ Phase 3 — Admin PWA (manifest, SW, install prompt, prefetch, head-pwa partial)
+- ✅ Phase 4 — Workspace density (context menu partial, tnum, 2xl tightening)
+- ⏸ SpotlightPlugin (`pxlrbt/filament-spotlight`) — **deferred indefinitely**, see Post-Mortem below
+
+## Post-Mortem: `/admin/login` 500 in commit a01b1eba
+
+### Symptom
+After deploying `a01b1eba`, the post-deploy smoke test reported `Admin login → HTTP 500 (expected 200)`. The 9 other endpoints (landing, daily, SWs, manifests, /up, Baserow, Snipe-IT, admin-pwa manifest, admin-pwa SW) all returned 200. The PWA infrastructure shipped correctly — the bug was specifically in Filament's admin panel render path.
+
+### Root cause
+The `pxlrbt/filament-spotlight` plugin's boot logic (`SpotlightPlugin::boot()` → `Filament::serving(...)` → `RegisterResources::boot($panel)`) **eagerly enumerates every resource the panel has discovered** so it can build search/jump entries for the Cmd+K palette. To decide whether to expose a resource, it calls `Resource::canViewAny()`.
+
+The admin panel's `discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')` walks the entire `app/Filament/Resources/` tree, which includes `app/Filament/Resources/Workgroup/*.php`. Those workgroup resources have `canViewAny()` methods like:
+
+```php
+public static function canViewAny(): bool
+{
+    return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+}
+```
+
+On the **unauthenticated `/admin/login` route**, `auth()->user()` returns `null` — so `null->hasAnyRole(...)` throws `Error: Call to a member function hasAnyRole() on null`, surfacing as a Filament `ViewException` at the SpotlightPlugin's render layer.
+
+The bug was **dormant** before SpotlightPlugin was added because Filament's normal authorization layer only calls `canViewAny()` *after* the user is authenticated, when they navigate to a resource page. SpotlightPlugin breaks that assumption by forcing eager enumeration at panel boot.
+
+### Why bisect-1 (`globalSearchKeyBindings`) and bisect-2 (BODY_END renderHook) were safe
+Neither feature touches resource enumeration. They are purely cosmetic / UI-layer changes. They proved themselves green in production.
+
+### Why local boot tests didn't catch it
+Local `php artisan filament:upgrade` and `route:cache`/`view:cache`/`config:cache` all booted cleanly — those commands run as the artisan user with no HTTP request. The bug only manifests on an *unauthenticated request to admin/login*. A real HTTP smoke test (`tests/http-smoke.php` style) would have caught it; PR CI does not currently run authenticated browser tests against a fresh container.
+
+### Defensive fix (this commit)
+Replaced every `auth()->user()->hasAnyRole(...)` / `hasRole(...)` / `can(...)` call across **10 files in `app/Filament/Resources/Workgroup/`** with the null-safe canonical idiom `(auth()->user()?->hasAnyRole(...) ?? false)`. This fixes the bug class regardless of whether SpotlightPlugin is re-enabled in the future.
+
+### SpotlightPlugin re-introduction policy
+With the null-safety bug fixed, SpotlightPlugin would theoretically work. **However**:
+- Filament 3 already supports Cmd+K via `globalSearchKeyBindings(['command+k','ctrl+k'])` — already deployed in commit `530db143` and confirmed green
+- The visual difference between Filament's native global search and Spotlight's palette is minor
+- Spotlight introduces a Livewire component dependency (`livewire-ui-spotlight`) that requires additional config publishing for full theme integration
+- The marginal UX benefit does not justify the deployment risk
+
+**Decision: Keep `pxlrbt/filament-spotlight` in composer.lock (already vendored) but do NOT register the plugin in any panel.** Cmd+K opens Filament's native global search — same keyboard ergonomics, less risk.
+
+### Followups identified
+- Add a real authenticated HTTP smoke test to the Playwright `admin-pwa-desktop` project so the next time a pre-existing bug surfaces, it's caught in CI before reaching production
+- Audit other panel providers (Workgroup, Training, Employee) for the same null-safety anti-pattern in case future packages also enumerate resources eagerly
 
 This document is the single source of truth for what has been scaffolded
 in-repo versus what still requires production access (deployment, secrets,

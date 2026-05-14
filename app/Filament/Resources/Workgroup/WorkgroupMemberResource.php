@@ -184,21 +184,21 @@ class WorkgroupMemberResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
     }
 
     public static function canCreate(): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
     }
 
     public static function canEdit($record): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
     }
 
     public static function canDelete($record): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
     }
 }
