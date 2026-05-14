@@ -195,10 +195,22 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => '<meta name="mobile-web-app-capable" content="yes">
-                    <meta name="apple-mobile-web-app-capable" content="yes">
-                    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-                    <meta name="apple-mobile-web-app-title" content="MBFD Hub">'
+                fn (): string => self::safeRender(
+                    'filament.admin.partials.head-pwa',
+                    '<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="MBFD Hub">'
+                )
+            )
+            // Bisect step 2 (re-introduce): BODY_END composes 4 desktop-modernization
+            // partials via safeRender. Each partial is wrapped in try/catch/Throwable
+            // and a missing view falls back to ''. Any partial that throws is
+            // reported to Sentry and silently degrades. If /admin/login stays 200
+            // after this commit deploys, the renderHook composition is proven safe.
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): string => self::safeRender('filament.admin.partials.keyboard-shortcuts')
+                    . self::safeRender('filament.admin.partials.status-bar')
+                    . self::safeRender('filament.admin.partials.install-prompt')
+                    . self::safeRender('filament.admin.partials.context-menu')
             );
     }
 
