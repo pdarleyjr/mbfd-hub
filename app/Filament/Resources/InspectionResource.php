@@ -13,8 +13,11 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
 
+use App\Filament\Concerns\EnterpriseTable;
 class InspectionResource extends Resource
 {
+    use EnterpriseTable;
+
     protected static ?string $model = ApparatusInspection::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
@@ -63,7 +66,7 @@ class InspectionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('completed_at')
                     ->label('Date')

@@ -13,8 +13,11 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Hash;
 
+use App\Filament\Concerns\EnterpriseTable;
 class UserResource extends Resource
 {
+    use EnterpriseTable;
+
     protected static ?string $model = User::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
@@ -76,7 +79,7 @@ class UserResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()

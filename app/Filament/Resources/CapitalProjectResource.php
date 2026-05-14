@@ -17,8 +17,11 @@ use Filament\Infolists\Infolist;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
+use App\Filament\Concerns\EnterpriseTable;
 class CapitalProjectResource extends Resource
 {
+    use EnterpriseTable;
+
     protected static ?string $model = CapitalProject::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office';
@@ -134,7 +137,7 @@ class CapitalProjectResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('project_number')
                     ->searchable()

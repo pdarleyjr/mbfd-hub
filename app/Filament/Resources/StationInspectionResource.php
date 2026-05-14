@@ -11,8 +11,11 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Storage;
 
+use App\Filament\Concerns\EnterpriseTable;
 class StationInspectionResource extends Resource
 {
+    use EnterpriseTable;
+
     protected static ?string $model = StationInspection::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
@@ -22,7 +25,7 @@ class StationInspectionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('id')->label('ID')->sortable(),
                 Tables\Columns\TextColumn::make('station.station_number')

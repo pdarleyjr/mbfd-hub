@@ -17,8 +17,11 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
+use App\Filament\Concerns\EnterpriseTable;
 class EmployeeEquipmentRequestResource extends Resource
 {
+    use EnterpriseTable;
+
     protected static ?string $model = EmployeeEquipmentRequest::class;
     protected static ?string $navigationIcon = 'heroicon-o-shopping-cart';
     protected static ?string $navigationGroup = 'Inventory & Logistics';
@@ -51,7 +54,7 @@ class EmployeeEquipmentRequestResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return self::applyEnterpriseDefaults($table)
             ->columns([
                 TextColumn::make('employee.name')
                     ->label('Employee')
