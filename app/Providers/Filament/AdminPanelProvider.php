@@ -70,6 +70,11 @@ class AdminPanelProvider extends PanelProvider
                 FilamentSpatieLaravelHealthPlugin::make()
                     ->usingPage(\App\Filament\Pages\HealthCheckResults::class)
             )
+            // Bisect step 1 (re-introduce): globalSearchKeyBindings — Filament 3
+            // claims to support this with mod+k / cmd+k / ctrl+k strings. If
+            // /admin/login stays 200 after this commit deploys, this item is
+            // proven safe and we can move on to bisect step 2.
+            ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
