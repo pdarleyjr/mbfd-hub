@@ -38,7 +38,14 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        $panel
+        // HOTFIX 2026-05-14: SpotlightPlugin + globalSearchKeyBindings + new
+        // renderHook composition introduced a boot-time 500 on /admin/login
+        // in commit a01b1eba. Temporarily restored to last-known-good
+        // chained-call structure while we diagnose the failure offline.
+        // The PWA infrastructure (manifest, SW, install prompt, prefetch),
+        // theme.css additions, EnterpriseTable trait, and Tailwind variants
+        // all remain active — they proved themselves green (200) in smoke.
+        return $panel
             ->default()
             ->id('admin')
             ->path('admin')
@@ -63,16 +70,6 @@ class AdminPanelProvider extends PanelProvider
                 FilamentSpatieLaravelHealthPlugin::make()
                     ->usingPage(\App\Filament\Pages\HealthCheckResults::class)
             )
-            ->globalSearchKeyBindings(['command+k', 'ctrl+k']);
-
-        // Spotlight is conditional so the admin panel still boots when the
-        // package is not yet vendored (e.g. fresh checkout before
-        // `composer install`). When present, Cmd+K opens a richer palette.
-        if (class_exists(SpotlightPlugin::class)) {
-            $panel->plugin(SpotlightPlugin::make());
-        }
-
-        return $panel
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
@@ -193,14 +190,10 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => self::safeRender('filament.admin.partials.head-pwa', '<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="MBFD Hub">')
-            )
-            ->renderHook(
-                PanelsRenderHook::BODY_END,
-                fn (): string => self::safeRender('filament.admin.partials.keyboard-shortcuts')
-                    . self::safeRender('filament.admin.partials.status-bar')
-                    . self::safeRender('filament.admin.partials.install-prompt')
-                    . self::safeRender('filament.admin.partials.context-menu')
+                fn (): string => '<meta name="mobile-web-app-capable" content="yes">
+                    <meta name="apple-mobile-web-app-capable" content="yes">
+                    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+                    <meta name="apple-mobile-web-app-title" content="MBFD Hub">'
             );
     }
 
