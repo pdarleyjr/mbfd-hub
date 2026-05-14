@@ -75,13 +75,25 @@ jobs:
 
       - name: Pull latest code
         run: |
-          ssh deploy-target "
+          # Use set -e so failures inside the SSH heredoc bubble up — previously a silent
+          # `git reset --hard` permission error left the host on a stale commit while the
+          # workflow still reported success. Detect that case explicitly below.
+          ssh deploy-target "set -e
             cd /opt/mbfd/mbfd-hub
-            sudo chown -R \$(whoami):\$(whoami) . 2>/dev/null || true
+            # The Laravel container builds assets as root; chown them back to the runner
+            # UID so git can replace them. Runs inside the container as root (Docker
+            # group membership grants this without host sudo).
+            docker exec -u 0 mbfd-hub-laravel chown -R sail:sail /var/www/html/public/build /var/www/html/public/daily 2>/dev/null || true
             git fetch origin --force --prune
             git reset --hard origin/main
             git clean -fd
-            echo '{\"sha\":\"'\$(git rev-parse HEAD)'\",\"deployed_at\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' > public/deploy-marker.json
+            EXPECTED=\$(git rev-parse origin/main)
+            ACTUAL=\$(git rev-parse HEAD)
+            if [ \"\$EXPECTED\" != \"\$ACTUAL\" ]; then
+              echo \"::error::HEAD (\$ACTUAL) does not match origin/main (\$EXPECTED) after reset\" >&2
+              exit 1
+            fi
+            echo '{\"sha\":\"'\$ACTUAL'\",\"deployed_at\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' > public/deploy-marker.json
             echo '✓ Code updated to '\$(git rev-parse --short HEAD)
           "
 
@@ -129,10 +141,14 @@ jobs:
 
       - name: Build frontend assets
         run: |
-          ssh deploy-target "
-            docker exec mbfd-hub-laravel bash -c 'npm install --legacy-peer-deps && npm run build'
+          ssh deploy-target "set -e
+            # -u sail ensures generated assets are owned by UID 1000 (matches the runner
+            # user 'peter' on the host) so the next deploy's `git reset` can replace them.
+            # Previously this ran as root inside the container and left root-owned files
+            # that broke subsequent deploys.
+            docker exec -u sail mbfd-hub-laravel bash -c 'npm install --legacy-peer-deps && npm run build'
             docker exec mbfd-hub-laravel php artisan filament:assets
-            docker exec mbfd-hub-laravel bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install --legacy-peer-deps && npm run build'
+            docker exec -u sail mbfd-hub-laravel bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install --legacy-peer-deps && npm run build'
             echo '✓ All frontend assets built'
           "
 

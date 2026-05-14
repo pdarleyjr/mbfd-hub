@@ -96,13 +96,13 @@ class SendMilestoneReminders extends Command
                 ->actions([
                     \Filament\Notifications\Actions\Action::make('view')
                         ->label('View Project')
-                        ->url(route('filament.admin.resources.capital-projects.edit', $milestone->project_id)),
+                        ->url(route('filament.admin.resources.capital-projects.edit', ['record' => $milestone->capital_project_id])),
                     \Filament\Notifications\Actions\Action::make('complete')
                         ->label('Mark Complete')
                         ->color('success'),
                 ])
                 ->sendToDatabase($user);
-            
+
             NotificationTracking::create([
                 'user_id' => $user->id,
                 'notifiable_type' => ProjectMilestone::class,
@@ -111,7 +111,7 @@ class SendMilestoneReminders extends Command
                 'metadata' => [
                     'days_until_due' => $config['days'],
                     'due_date' => $milestone->due_date->toDateString(),
-                    'project_id' => $milestone->project_id,
+                    'project_id' => $milestone->capital_project_id,
                     'project_name' => $milestone->project->name,
                 ],
             ]);
