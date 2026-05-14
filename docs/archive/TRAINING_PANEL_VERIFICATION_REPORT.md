@@ -38,9 +38,9 @@ content-type: text/html; charset=utf-8
 ---
 
 ### Step 3: Authenticated User Access ⚠️ MANUAL VERIFICATION REQUIRED
-**Test Credentials:**
-- danielgato@miamibeachfl.gov / Gato1234!
-- victorwhite@miamibeachfl.gov / Vic1234!
+**Test Credentials:** (passwords redacted from this archived report — stored in the secret manager)
+- danielgato@miamibeachfl.gov
+- victorwhite@miamibeachfl.gov
 
 **Required Roles:** Users must have one of:
 - `super_admin`

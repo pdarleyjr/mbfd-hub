@@ -44,9 +44,9 @@ Push notifications help you stay informed about:
 
 1. **Open Safari** on your iPhone/iPad
 2. Navigate to: **https://support.darleyplex.com**
-3. **Log in** with your credentials:
-   - Username: `MiguelAnchia@miamibeachfl.gov`
-   - Password: `Penco1`
+3. **Log in** with your assigned credentials (do not share or commit these):
+   - Username: your `@miamibeachfl.gov` email
+   - Password: provided to you by an MBFD admin out-of-band
 4. Tap the **Share button** (square with arrow pointing up) at the bottom of the screen
 5. Scroll down and tap **"Add to Home Screen"**
 6. Enter a name for the app (e.g., "MBFD Hub")
@@ -120,9 +120,7 @@ Apple treats websites added to the home screen as "Progressive Web Apps" (PWAs).
 ### How to Send a Test Notification
 
 1. Navigate to: **https://support.darleyplex.com/admin**
-2. **Log in** with your admin credentials:
-   - Username: `MiguelAnchia@miamibeachfl.gov`
-   - Password: `Penco1`
+2. **Log in** with your admin credentials (out-of-band — not in this repo).
 3. Look for the **"Push Notification"** widget in the admin dashboard
 4. Click the **"Send Test Notification"** button
 5. Wait 10-30 seconds for the notification to arrive
