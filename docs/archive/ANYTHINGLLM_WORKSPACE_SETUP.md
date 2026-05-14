@@ -146,12 +146,15 @@ If you have access to DeepInfra models (API key: configured), you could route sp
 
 ## Credentials Reference
 
-| Service | Key |
-|---------|-----|
-| Firecrawl API | `fc-8f987bebb67d4e22b72d6ccaeeca21b5` |
-| GitHub Token | `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` |
-| DeepInfra API | `YNUXD5XZuplxFKiTVxND8OzjXACtGzYB` |
-| Sentry Token | `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` |
+| Service | Source |
+|---------|--------|
+| Firecrawl API | `1Password: MBFD Hub > Firecrawl API Key` (env: `FIRECRAWL_API_KEY`) |
+| GitHub Token | `1Password: MBFD Hub > GitHub PAT (mbfd-hub repo)` (env: `GITHUB_TOKEN`) |
+| DeepInfra API | `1Password: MBFD Hub > DeepInfra API Key` (env: `DEEPINFRA_API_KEY`) |
+| Sentry Token | `1Password: MBFD Hub > Sentry Auth Token` (env: `SENTRY_AUTH_TOKEN`) |
+
+> Real keys MUST NOT be committed. Pull them from the secret manager into your local
+> `.env` / `~/.config/anythingllm/.env` and into the AnythingLLM container env at boot.
 
 ---
 

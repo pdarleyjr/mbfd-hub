@@ -20,7 +20,7 @@ Two critical authentication issues were blocking admin dashboard access:
 Both issues have been **resolved** and admin login is now fully functional.
 
 ### Verification
-✅ Miguel Anchia successfully logged in with `MiguelAnchia@miamibeachfl.gov` / `Penco1`  
+✅ Miguel Anchia successfully logged in (credentials redacted from this archived report)
 ✅ Dashboard loaded with full admin functionality
 
 ---
@@ -93,14 +93,10 @@ $query->whereRaw('LOWER(' . $model->getAuthIdentifierName() . ') = ?', [strtolow
 
 ---
 
-## TEST CREDENTIALS (All Working)
+## TEST CREDENTIALS (redacted)
 
-| Email | Password | Role |
-|-------|----------|------|
-| MiguelAnchia@miamibeachfl.gov | Penco1 | Admin |
-| RichardQuintela@miamibeachfl.gov | Penco2 | Admin |
-| PeterDarley@miamibeachfl.gov | Penco3 | Admin |
-| geralddeyoung@miamibeachfl.gov | MBFDGerry1 | User |
+Real credentials removed during 2026-05-14 audit. Pull current admin/user passwords
+from the secret manager (1Password vault: MBFD Hub > admin-accounts).
 
 **Note:** Emails are case-insensitive, passwords are case-sensitive.
 
