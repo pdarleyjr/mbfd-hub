@@ -1,8 +1,12 @@
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = 'https://mbfdhub.com';
-const ADMIN_EMAIL = 'MiguelAnchia@miamibeachfl.gov';
-const ADMIN_PASSWORD = 'Penco1';
+const BASE_URL = process.env.E2E_BASE_URL ?? 'https://mbfdhub.com';
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? '';
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? '';
+
+if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  throw new Error('E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD must be set');
+}
 
 test('Debug admin page HTML', async ({ page }) => {
   await page.goto(`${BASE_URL}/admin/login`);

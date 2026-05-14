@@ -9,7 +9,11 @@
 # ---------------------------------------------------------------------------
 .env*
 !.env.example
+!.env.testing.example
 /auth.json
+
+# Playwright MCP captures (browser session dumps for debugging — local only)
+/.playwright-mcp/
 *.pem
 *.key
 *.p12
@@ -116,6 +120,18 @@ plans/*_FIXES_*.md
 pics/
 /WorkGroup_Files/
 **/.venv/
+
+# ---------------------------------------------------------------------------
+# 9a. TS Orchestrator source is tracked; runtime artifacts and secrets are not
+# ---------------------------------------------------------------------------
+/ts-orchestrator/.env
+/ts-orchestrator/.env.*
+!/ts-orchestrator/.env.example
+!/ts-orchestrator/api/package-lock.json
+!/ts-orchestrator/web/package-lock.json
+/ts-orchestrator/api/dist/
+/ts-orchestrator/web/dist/
+/ts-orchestrator/exam-investigation/
 
 # ---------------------------------------------------------------------------
 # 10. Infrastructure / Deployment (environment-specific)

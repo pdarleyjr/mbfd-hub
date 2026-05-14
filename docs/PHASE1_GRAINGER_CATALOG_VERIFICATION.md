@@ -62,7 +62,7 @@ This phase sets the foundation for Phase 2 (Replenishment Dashboard) and Phase 3
 **Test Case 1.1: View vendor information in Supply Items table**
 
 1. Navigate to: `https://support.darleyplex.com/admin/inventory-items`
-2. Login as admin: `MiguelAnchia@miamibeachfl.gov` / `Penco1`
+2. Login as admin (credentials are out-of-band, not in this repo)
 
 **Expected Results:**
 - ✅ Table displays new "Vendor" column (between "Low Threshold" and "Active")

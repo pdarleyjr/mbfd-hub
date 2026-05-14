@@ -1,8 +1,12 @@
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = 'https://support.darleyplex.com';
-const WORKGROUP_EMAIL = 'geralddeyoung@miamibeachfl.gov';
-const WORKGROUP_PASSWORD = 'MBFDGerry1';
+const BASE_URL = process.env.E2E_BASE_URL ?? 'https://support.darleyplex.com';
+const WORKGROUP_EMAIL = process.env.E2E_WORKGROUP_EMAIL ?? '';
+const WORKGROUP_PASSWORD = process.env.E2E_WORKGROUP_PASSWORD ?? '';
+
+if (!WORKGROUP_EMAIL || !WORKGROUP_PASSWORD) {
+  throw new Error('E2E_WORKGROUP_EMAIL and E2E_WORKGROUP_PASSWORD must be set');
+}
 
 /**
  * Smoke test for Workgroup Evaluation submission pipeline
