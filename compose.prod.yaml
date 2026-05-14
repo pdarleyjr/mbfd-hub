@@ -36,13 +36,17 @@ services:
       start_period: 60s
 
   pgsql:
-    image: "postgres:16-alpine"
+    # Pin to minor version. Bump deliberately after testing against a snapshot
+    # — `postgres:16-alpine` would silently absorb major-version-internal jumps.
+    image: "postgres:16.13-alpine"
     container_name: mbfd-hub-pgsql
     restart: unless-stopped
     ports:
       - "127.0.0.1:5432:5432"
     environment:
-      PGPASSWORD: "${DB_PASSWORD}"
+      # PGPASSWORD is for the psql CLIENT — setting it on the server container
+      # is redundant (POSTGRES_PASSWORD is what initdb uses) and exposes the
+      # secret via /proc/<pid>/environ to any user with docker exec access.
       POSTGRES_DB: "${DB_DATABASE}"
       POSTGRES_USER: "${DB_USERNAME}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
@@ -53,6 +57,8 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
+      # pg_isready ignores PGPASSWORD when it runs as the postgres user inside
+      # the container, so removing PGPASSWORD doesn't affect this check.
       test: ["CMD", "pg_isready", "-q", "-d", "${DB_DATABASE}", "-U", "${DB_USERNAME}"]
       interval: 10s
       timeout: 5s
@@ -60,7 +66,10 @@ services:
       start_period: 30s
 
   baserow:
-    image: baserow/baserow:latest
+    # Pin by image digest captured 2026-05-14 (running baserow ~1.36 series).
+    # Update by running `docker pull baserow/baserow:1.36.X` against a known
+    # release and replacing the digest below.
+    image: baserow/baserow@sha256:d6769e1ad959067c5306beef6fe32e3a9ca7f0ebe7c3d8db3922042696e6cb6a
     container_name: mbfd-hub-baserow
     restart: unless-stopped
     ports:
