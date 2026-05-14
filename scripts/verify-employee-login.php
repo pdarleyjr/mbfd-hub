@@ -16,10 +16,10 @@ if (!$emp) {
 
 echo "Found: {$emp->name} (ID: {$emp->employee_id}, Rank: {$emp->rank})\n";
 echo "Must change password: " . ($emp->must_change_password ? 'YES' : 'NO') . "\n";
-echo "Password check (MBFD1!): " . (Hash::check('MBFD1!', $emp->password) ? 'PASS' : 'FAIL') . "\n";
+echo "Password check (env VERIFY_EMP_PASSWORD): " . (Hash::check(getenv('VERIFY_EMP_PASSWORD') ?: '', $emp->password) ? 'PASS' : 'FAIL') . "\n";
 
 // Test auth attempt
-$credentials = ['employee_id' => '20731', 'password' => 'MBFD1!'];
+$credentials = ['employee_id' => '20731', 'password' => getenv('VERIFY_EMP_PASSWORD') ?: ''];
 $result = auth('employee')->attempt($credentials);
 echo "Auth attempt result: " . ($result ? 'SUCCESS' : 'FAILED') . "\n";
 

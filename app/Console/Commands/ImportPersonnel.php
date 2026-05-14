@@ -9,7 +9,7 @@ class ImportPersonnel extends Command
 {
     protected $signature = 'mbfd:import-personnel {file : Path to CSV file with Name,Rank,EmployeeID columns}
                             {--dry-run : Preview without creating records}
-                            {--password=MBFD1! : Default password for new employee portal accounts}';
+                            {--password= : Default password (falls back to config employee.default_temp_password / env EMPLOYEE_DEFAULT_TEMP_PASSWORD)}';
 
     protected $description = 'Import fire department personnel into the employees table for the Employee Portal';
 
@@ -17,7 +17,12 @@ class ImportPersonnel extends Command
     {
         $filePath = $this->argument('file');
         $isDryRun = $this->option('dry-run');
-        $defaultPassword = $this->option('password');
+        $defaultPassword = $this->option('password')
+            ?: config('employee.default_temp_password', env('EMPLOYEE_DEFAULT_TEMP_PASSWORD', ''));
+        if ($defaultPassword === '') {
+            $this->error('No default password specified. Pass --password=<value> or set config employee.default_temp_password / env EMPLOYEE_DEFAULT_TEMP_PASSWORD.');
+            return Command::FAILURE;
+        }
 
         if (! file_exists($filePath)) {
             $this->error("File not found: {$filePath}");

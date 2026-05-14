@@ -1,9 +1,16 @@
 import { test as setup, expect } from '@playwright/test';
 
-const BASE_URL = 'https://mbfdhub.com';
-const ADMIN_EMAIL = 'miguelanchia@miamibeachfl.gov';
-const ADMIN_PASSWORD = 'Penco1';
+const BASE_URL = process.env.E2E_BASE_URL ?? 'https://mbfdhub.com';
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? '';
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? '';
 const AUTH_FILE = 'tests/e2e/.auth/admin.json';
+
+if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  throw new Error(
+    'E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD must be set (see .env.testing.example). ' +
+      'Do NOT hardcode credentials in this file.'
+  );
+}
 
 setup('authenticate as admin', async ({ page }) => {
   // Log Livewire responses
