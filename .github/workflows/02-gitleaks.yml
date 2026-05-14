@@ -8,6 +8,9 @@ on:
 
 permissions:
   contents: read
+  # gitleaks-action needs to read PR commit list on pull_request events;
+  # without this, runs on Dependabot PRs fail with a 403 from /repos/.../pulls/N/commits.
+  pull-requests: read
 
 jobs:
   gitleaks:

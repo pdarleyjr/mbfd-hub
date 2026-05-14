@@ -1,9 +1,11 @@
 name: Observability (Sentry Release)
 
+# Only on push to main — Sentry releases reference deployed commits, not PR
+# branches. Dependabot PRs would also fail here because dependabot-scoped
+# GITHUB_TOKENs can't read the SENTRY_* repo secrets.
 on:
   push:
     branches: [main]
-  pull_request:
 
 permissions:
   contents: read
