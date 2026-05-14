@@ -69,17 +69,11 @@ jobs:
         uses: github/codeql-action/analyze@3b1a19a80ab047f35cbb237b5bd9bdc1e14f166c # v3
         continue-on-error: true
 
-  dependency-review:
-    name: Dependency Review
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Dependency Review
-        uses: actions/dependency-review-action@4901385134134e04cec5fbe5ddfe3b2c5bd5d976 # v4
-        with:
-          fail-on-severity: high
+  # NOTE: actions/dependency-review-action was removed 2026-05-14 — the action
+  # requires GitHub Advanced Security on private repos, which this account does
+  # not have. Coverage is provided by:
+  #   - Dependabot (vulnerability PRs + alerts)
+  #   - composer audit + npm audit (in `dependency-audit` job above)
+  #   - aquasecurity/trivy-action (03-trivy-repo.yml)
+  #   - github/codeql-action (codeql job above)
+  # Re-enable only after enabling GHAS or making the repo public.
