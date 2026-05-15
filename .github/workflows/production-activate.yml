@@ -24,6 +24,11 @@ on:
         required: false
         type: boolean
         default: false
+      rollback:
+        description: 'EMERGENCY: restore the most recent .env.pre-activate-* backup. Use if cutover broke prod.'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -59,6 +64,7 @@ jobs:
           chmod 600 ~/.ssh/config
 
       - name: Pre-flight .env backup
+        if: ${{ ! inputs.rollback }}
         run: |
           ssh deploy-target 'bash -s' <<'REMOTE_EOF'
           set -e
@@ -67,6 +73,36 @@ jobs:
           cp .env ".env.pre-activate-${TS}-${{ github.run_id }}"
           echo "::notice::Backed up .env to .env.pre-activate-${TS}-${{ github.run_id }}"
           ls -la .env.pre-activate-${TS}* | head -1
+          REMOTE_EOF
+
+      # =======================================================================
+      # ROLLBACK
+      # =======================================================================
+      - name: Rollback to most recent backup
+        if: ${{ inputs.rollback }}
+        run: |
+          ssh deploy-target 'bash -s' <<'REMOTE_EOF'
+          set -e
+          cd /opt/mbfd/mbfd-hub
+          # Most recent .env.pre-activate-* backup wins
+          LATEST=$(ls -t .env.pre-activate-* 2>/dev/null | head -1)
+          if [ -z "$LATEST" ]; then
+            echo "::error::No .env.pre-activate-* backups found"
+            exit 1
+          fi
+          echo "Restoring from: $LATEST"
+          # Keep a copy of the broken state in case we need forensics
+          cp .env ".env.rollback-from-${{ github.run_id }}"
+          cp "$LATEST" .env
+          docker exec mbfd-hub-laravel php artisan config:cache
+          docker exec mbfd-hub-laravel php artisan queue:restart || true
+          docker exec mbfd-hub-laravel bash -c 'pkill -f "reverb:start" || true'
+          sleep 2
+          docker exec mbfd-hub-laravel bash -c 'nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &'
+          docker exec mbfd-hub-laravel bash -c 'pkill -f "queue:work" || true'
+          sleep 2
+          docker exec mbfd-hub-laravel bash -c 'nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
+          echo "✓ Restored .env from $LATEST"
           REMOTE_EOF
 
       # =======================================================================
@@ -79,7 +115,7 @@ jobs:
       # the redis service is up + the password we have in .env is correct,
       # without depending on Laravel's current config.
       - name: Redis container ping (pre-flip)
-        if: ${{ inputs.activate_redis }}
+        if: ${{ inputs.activate_redis && ! inputs.rollback }}
         run: |
           ssh deploy-target 'bash -s' <<'REMOTE_EOF'
           set -e
@@ -97,7 +133,7 @@ jobs:
           REMOTE_EOF
 
       - name: Activate Redis
-        if: ${{ inputs.activate_redis }}
+        if: ${{ inputs.activate_redis && ! inputs.rollback }}
         run: |
           ssh deploy-target 'bash -s' <<'REMOTE_EOF'
           set -e
@@ -152,7 +188,7 @@ jobs:
           REMOTE_EOF
 
       - name: Redis post-flip verification
-        if: ${{ inputs.activate_redis }}
+        if: ${{ inputs.activate_redis && ! inputs.rollback }}
         run: |
           ssh deploy-target 'docker exec mbfd-hub-laravel php artisan mbfd:activate-redis --dry-run' | tee /tmp/redis-probe.log
           if ! grep -q '✓ All four drivers already point at redis/reverb' /tmp/redis-probe.log; then
@@ -164,7 +200,7 @@ jobs:
       # R2
       # =======================================================================
       - name: Validate R2 secrets are present
-        if: ${{ inputs.activate_r2 }}
+        if: ${{ inputs.activate_r2 && ! inputs.rollback }}
         env:
           R2_AK: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SK: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -178,7 +214,7 @@ jobs:
           fi
 
       - name: Activate R2 disk
-        if: ${{ inputs.activate_r2 }}
+        if: ${{ inputs.activate_r2 && ! inputs.rollback }}
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
