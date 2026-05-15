@@ -13,6 +13,16 @@ Route::get('/', function () {
 // Public incident feed — proxies PulsePoint Worker with 60s server-side cache
 Route::get('/api/incidents', [IncidentsController::class, 'index'])->name('incidents.index');
 
+// CSP violation report sink — receives reports from the report-only header in
+// SecurityHeaders middleware. Browsers POST application/csp-report or
+// application/reports+json. We log to the laravel channel so the 7-day clean
+// window before promoting to enforcing CSP is observable. Always 204 (no body).
+// VerifyCsrfToken exclusion is handled because Filament's web group does NOT
+// run on this route (it's outside the admin panel + has no session bootstrap).
+Route::post('/_csp-report', [\App\Http\Controllers\CspReportController::class, 'store'])
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
+    ->name('csp.report');
+
 // Fallback login route (required by Filament export download middleware)
 Route::get('/login', function () {
     return redirect('/admin/login');

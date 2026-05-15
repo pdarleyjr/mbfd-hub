@@ -34,8 +34,10 @@ class SecurityHeaders
         //
         // Promote to enforcing `Content-Security-Policy` ONLY after the
         // `Content-Security-Policy-Report-Only` header has been live for 1+ week with
-        // zero unexpected violations in the report stream. Filament Livewire payloads
-        // and PulsePoint embeds are the most likely places to need tuning.
+        // zero unexpected violations posted to /_csp-report (see CspReportController).
+        // Filament Livewire payloads and PulsePoint embeds are the most likely places
+        // to need tuning. Grep observed violations with:
+        //   docker exec mbfd-hub-laravel grep -F '[CSP]' storage/logs/laravel-$(date +%F).log
         $cspParts = [
             "default-src 'self'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://static.cloudflareinsights.com https://www.googletagmanager.com https://pulsepoint.org https://web.pulsepoint.org",
@@ -52,6 +54,11 @@ class SecurityHeaders
             "worker-src 'self' blob:",
             "manifest-src 'self'",
             "upgrade-insecure-requests",
+            // Legacy report-uri — supported by every browser. Reporting API v1
+            // (report-to + Report-To header) is more powerful but adds a second
+            // header and isn't supported by Safari yet; report-uri is enough to
+            // gate the 7-day clean window.
+            'report-uri /_csp-report',
         ];
         $response->headers->set('Content-Security-Policy-Report-Only', implode('; ', $cspParts));
 
