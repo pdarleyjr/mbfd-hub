@@ -44,6 +44,11 @@ on:
         required: false
         type: boolean
         default: false
+      verify_redis:
+        description: 'Read-only: run `php artisan mbfd:activate-redis --dry-run` to show which drivers are currently on redis/reverb.'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -86,6 +91,14 @@ jobs:
         if: ${{ inputs.diagnose }}
         run: |
           ssh deploy-target 'docker exec mbfd-hub-laravel php artisan mbfd:diagnose-redis'
+
+      # =======================================================================
+      # VERIFY_REDIS — read-only driver-status check via the activate-redis probe.
+      # =======================================================================
+      - name: Verify Redis driver status
+        if: ${{ inputs.verify_redis }}
+        run: |
+          ssh deploy-target 'docker exec mbfd-hub-laravel php artisan mbfd:activate-redis --dry-run'
 
       # =======================================================================
       # QUOTE_PASSWORD — apply quote-fix to REDIS_PASSWORD only, no driver flips.
@@ -175,7 +188,7 @@ jobs:
           REMOTE_EOF
 
       - name: Pre-flight .env backup
-        if: ${{ ! inputs.rollback && ! inputs.diagnose && ! inputs.quote_password && ! inputs.rotate_redis_password }}
+        if: ${{ ! inputs.rollback && ! inputs.diagnose && ! inputs.quote_password && ! inputs.rotate_redis_password && ! inputs.verify_redis }}
         run: |
           ssh deploy-target 'bash -s' <<'REMOTE_EOF'
           set -e
@@ -305,18 +318,32 @@ jobs:
           # route to Redis.
           docker exec mbfd-hub-laravel php artisan queue:restart
 
-          # Restart Reverb so it picks up Redis pub/sub.
-          docker exec mbfd-hub-laravel bash -c 'pkill -f "reverb:start" || true'
-          sleep 2
-          docker exec mbfd-hub-laravel bash -c 'nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &'
-
-          # Bounce the queue worker daemon so it picks up the new connection.
-          docker exec mbfd-hub-laravel bash -c 'pkill -f "queue:work" || true'
-          sleep 2
-          docker exec mbfd-hub-laravel bash -c 'nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
-
-          echo "✓ Redis cutover applied"
+          echo "✓ Redis cutover applied to .env + config cache"
           REMOTE_EOF
+
+      # Restart the whole Laravel container so supervisord respawns Reverb +
+      # queue:work using the freshly cached config. Previously we tried
+      # pkill+nohup inside docker exec, which caused the SSH session to be
+      # SIGTERM'd at exit (exit code 143) and made the step report failure even
+      # though the cutover actually applied. `docker restart` is clean,
+      # supervised, and ~5-10s of downtime.
+      - name: Restart Laravel container so supervisord picks up new env
+        if: ${{ inputs.activate_redis && ! inputs.rollback }}
+        run: |
+          ssh deploy-target 'docker restart mbfd-hub-laravel && echo "✓ Laravel container restarted"'
+
+      - name: Wait for Laravel health after restart
+        if: ${{ inputs.activate_redis && ! inputs.rollback }}
+        run: |
+          for i in $(seq 1 60); do
+            if ssh deploy-target 'docker exec mbfd-hub-laravel curl -sf http://localhost:80/up' > /dev/null 2>&1; then
+              echo "✓ Laravel /up healthy after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Laravel did not become healthy within 60s of restart"
+          exit 1
 
       - name: Redis post-flip verification
         if: ${{ inputs.activate_redis && ! inputs.rollback }}
