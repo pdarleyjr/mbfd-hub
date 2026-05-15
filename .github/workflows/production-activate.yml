@@ -250,22 +250,19 @@ jobs:
           set -e
           cd /opt/mbfd/mbfd-hub
 
-          # Sanity check: env() must read REDIS_PASSWORD as a non-empty string.
-          # Laravel's env() helper auto-types "null"/"true"/"false"/"empty" even
-          # after quote-stripping, so a literal "null" password silently becomes
-          # PHP null and Laravel sends no AUTH. The rotate_redis_password step
-          # is the supported way to fix that. Fail fast here so we don't
-          # half-apply the cutover into a broken state.
-          docker exec mbfd-hub-laravel php -r '
-            require "/var/www/html/vendor/autoload.php";
-            $app = require "/var/www/html/bootstrap/app.php";
-            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-            $pwd = env("REDIS_PASSWORD");
+          # Sanity check: config('database.redis.default.password') must be a
+          # non-empty string. Laravel's env() auto-types 'null' to PHP null,
+          # which caused the first cutover attempt to send no AUTH. With config
+          # cached, env() always returns null, so we check the cached config
+          # value (which IS resolved at config:cache time). The
+          # rotate_redis_password step is the supported way to fix the
+          # underlying issue.
+          docker exec mbfd-hub-laravel php artisan tinker --execute='
+            $pwd = config("database.redis.default.password");
             if ($pwd === null || $pwd === "") {
-              fwrite(STDERR, "REDIS_PASSWORD env() returned empty/null. Run with rotate_redis_password=true first.\n");
-              exit(1);
+              throw new \RuntimeException("config(database.redis.default.password) is empty/null. Run with rotate_redis_password=true first.");
             }
-            echo "Pre-flip env check OK (REDIS_PASSWORD length=" . strlen($pwd) . ")\n";
+            echo "Pre-flip config check OK (password length=".strlen($pwd).")\n";
           '
 
           # Strip any prior occurrences so Laravel reads the last (block we append)
