@@ -72,10 +72,29 @@ jobs:
       # =======================================================================
       # REDIS
       # =======================================================================
-      - name: Redis readiness probe (dry-run)
+      # We can't pre-flight via `php artisan mbfd:activate-redis --dry-run`
+      # because that command reads REDIS_HOST from .env, which is still the
+      # default 127.0.0.1 BEFORE the cutover (correct value `redis` only lands
+      # post-flip). Ping the Redis container directly instead — that proves
+      # the redis service is up + the password we have in .env is correct,
+      # without depending on Laravel's current config.
+      - name: Redis container ping (pre-flip)
         if: ${{ inputs.activate_redis }}
         run: |
-          ssh deploy-target 'docker exec mbfd-hub-laravel php artisan mbfd:activate-redis --dry-run'
+          ssh deploy-target 'bash -s' <<'REMOTE_EOF'
+          set -e
+          PWD=$(grep -E '^REDIS_PASSWORD=' /opt/mbfd/mbfd-hub/.env | head -1 | cut -d= -f2-)
+          if [ -z "$PWD" ]; then
+            echo "::error::REDIS_PASSWORD is not set in production .env — Redis activation cannot proceed."
+            exit 1
+          fi
+          REPLY=$(docker exec mbfd-hub-redis redis-cli -a "$PWD" --no-auth-warning ping 2>&1)
+          if [ "$REPLY" != "PONG" ]; then
+            echo "::error::Redis container did not respond PONG (got: $REPLY)"
+            exit 1
+          fi
+          echo "✓ Redis container responded PONG"
+          REMOTE_EOF
 
       - name: Activate Redis
         if: ${{ inputs.activate_redis }}
