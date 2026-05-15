@@ -39,6 +39,11 @@ on:
         required: false
         type: boolean
         default: false
+      rotate_redis_password:
+        description: 'Generate a strong random REDIS_PASSWORD, write to .env, recreate the redis container so Redis itself uses the new password. Required because the current value is literally `null` which Laravel env() always returns as PHP null.'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -85,6 +90,68 @@ jobs:
       # =======================================================================
       # QUOTE_PASSWORD — apply quote-fix to REDIS_PASSWORD only, no driver flips.
       # =======================================================================
+      # =======================================================================
+      # ROTATE_REDIS_PASSWORD — generates a strong random password and writes
+      # to .env. Recreates the redis container so Redis itself uses the new
+      # password. Required because the current value `null` is auto-typed to
+      # PHP null by Laravel env(), causing NOAUTH.
+      # =======================================================================
+      - name: Rotate REDIS_PASSWORD + recreate redis container
+        if: ${{ inputs.rotate_redis_password }}
+        run: |
+          ssh deploy-target 'bash -s' <<'REMOTE_EOF'
+          set -e
+          cd /opt/mbfd/mbfd-hub
+          TS=$(date +%Y%m%d_%H%M%S)
+          cp .env ".env.pre-activate-${TS}-${{ github.run_id }}"
+
+          # Generate strong 64-hex-char password. No special chars → no dotenv
+          # parsing ambiguity. We write it to .env, then recreate the redis
+          # container so the new password takes effect at requirepass time.
+          NEW_PWD=$(openssl rand -hex 32)
+
+          # Replace or insert the REDIS_PASSWORD line (single-quoted as belt+suspenders;
+          # not strictly needed for hex but cheap to add).
+          if grep -qE '^REDIS_PASSWORD=' .env; then
+            # Use a different delimiter than | because the value is hex (no |).
+            # Use ~ and ensure NEW_PWD has no ~ (hex doesn't).
+            sed -i -E "s~^REDIS_PASSWORD=.*~REDIS_PASSWORD='${NEW_PWD}'~" .env
+            echo "✓ Rewrote REDIS_PASSWORD line in .env"
+          else
+            echo "REDIS_PASSWORD='${NEW_PWD}'" >> .env
+            echo "✓ Appended REDIS_PASSWORD to .env"
+          fi
+          unset NEW_PWD  # don't leave it in the shell env
+
+          # Recreate the redis container so it picks up the new requirepass.
+          # AOF persistence (--appendonly yes in compose.prod.yaml) means cached
+          # data survives the restart.
+          docker compose -f compose.prod.yaml up -d --force-recreate redis
+          echo "✓ Recreated redis container"
+
+          # Wait up to 30s for redis to be healthy with the new password
+          for i in $(seq 1 30); do
+            PWD_NEW=$(grep -E "^REDIS_PASSWORD='" .env | head -1 | sed -E "s/^REDIS_PASSWORD='(.*)'$/\1/")
+            if docker exec mbfd-hub-redis redis-cli -a "$PWD_NEW" --no-auth-warning ping 2>/dev/null | grep -q PONG; then
+              echo "✓ Redis healthy with new password after ${i}s"
+              unset PWD_NEW
+              break
+            fi
+            sleep 1
+            if [ "$i" = "30" ]; then
+              echo "::error::Redis did not become healthy with new password within 30s"
+              exit 1
+            fi
+          done
+
+          # Rebuild Laravel config so it reads the new password
+          docker exec mbfd-hub-laravel php artisan config:cache
+          echo "✓ Config cached"
+
+          # Confirm via the Laravel-bootstrapped diagnostic
+          docker exec mbfd-hub-laravel php artisan mbfd:diagnose-redis
+          REMOTE_EOF
+
       - name: Quote REDIS_PASSWORD in .env
         if: ${{ inputs.quote_password }}
         run: |
@@ -108,7 +175,7 @@ jobs:
           REMOTE_EOF
 
       - name: Pre-flight .env backup
-        if: ${{ ! inputs.rollback && ! inputs.diagnose && ! inputs.quote_password }}
+        if: ${{ ! inputs.rollback && ! inputs.diagnose && ! inputs.quote_password && ! inputs.rotate_redis_password }}
         run: |
           ssh deploy-target 'bash -s' <<'REMOTE_EOF'
           set -e
@@ -183,18 +250,23 @@ jobs:
           set -e
           cd /opt/mbfd/mbfd-hub
 
-          # vlucas/phpdotenv interprets unquoted `$foo` in .env as a variable
-          # reference. The production REDIS_PASSWORD starts with `$` and was
-          # unquoted, so PHP env() returned empty while docker-compose's parser
-          # used the raw bytes. Laravel sent no AUTH → Redis returned NOAUTH.
-          # Idempotently single-quote the value so both parsers agree on the
-          # literal bytes. (Single-quoted values are NOT interpolated by
-          # phpdotenv; double-quoted ones still are.) Same fix for REDIS_USERNAME
-          # if present and unquoted.
-          if grep -qE '^REDIS_PASSWORD=' .env && ! grep -qE "^REDIS_PASSWORD='" .env && ! grep -qE '^REDIS_PASSWORD="' .env; then
-            sed -i -E "s|^REDIS_PASSWORD=(.+)|REDIS_PASSWORD='\1'|" .env
-            echo "✓ Quoted REDIS_PASSWORD in .env"
-          fi
+          # Sanity check: env() must read REDIS_PASSWORD as a non-empty string.
+          # Laravel's env() helper auto-types "null"/"true"/"false"/"empty" even
+          # after quote-stripping, so a literal "null" password silently becomes
+          # PHP null and Laravel sends no AUTH. The rotate_redis_password step
+          # is the supported way to fix that. Fail fast here so we don't
+          # half-apply the cutover into a broken state.
+          docker exec mbfd-hub-laravel php -r '
+            require "/var/www/html/vendor/autoload.php";
+            $app = require "/var/www/html/bootstrap/app.php";
+            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+            $pwd = env("REDIS_PASSWORD");
+            if ($pwd === null || $pwd === "") {
+              fwrite(STDERR, "REDIS_PASSWORD env() returned empty/null. Run with rotate_redis_password=true first.\n");
+              exit(1);
+            }
+            echo "Pre-flip env check OK (REDIS_PASSWORD length=" . strlen($pwd) . ")\n";
+          '
 
           # Strip any prior occurrences so Laravel reads the last (block we append)
           # without warning about duplicate keys.
