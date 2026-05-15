@@ -231,6 +231,11 @@ jobs:
           ssh deploy-target 'bash -s' <<'REMOTE_EOF'
           set -e
           PWD=$(grep -E '^REDIS_PASSWORD=' /opt/mbfd/mbfd-hub/.env | head -1 | cut -d= -f2-)
+          # Strip matched outer quotes (phpdotenv-style). bash parameter
+          # expansion handles this without spawning a subshell that would
+          # leak the value into ps output.
+          PWD="${PWD#\'}"; PWD="${PWD%\'}"
+          PWD="${PWD#\"}"; PWD="${PWD%\"}"
           if [ -z "$PWD" ]; then
             echo "::error::REDIS_PASSWORD is not set in production .env — Redis activation cannot proceed."
             exit 1
