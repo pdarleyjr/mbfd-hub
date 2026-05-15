@@ -202,6 +202,19 @@ jobs:
           set -e
           cd /opt/mbfd/mbfd-hub
 
+          # vlucas/phpdotenv interprets unquoted `$foo` in .env as a variable
+          # reference. The production REDIS_PASSWORD starts with `$` and was
+          # unquoted, so PHP env() returned empty while docker-compose's parser
+          # used the raw bytes. Laravel sent no AUTH → Redis returned NOAUTH.
+          # Idempotently single-quote the value so both parsers agree on the
+          # literal bytes. (Single-quoted values are NOT interpolated by
+          # phpdotenv; double-quoted ones still are.) Same fix for REDIS_USERNAME
+          # if present and unquoted.
+          if grep -qE '^REDIS_PASSWORD=' .env && ! grep -qE "^REDIS_PASSWORD='" .env && ! grep -qE '^REDIS_PASSWORD="' .env; then
+            sed -i -E "s|^REDIS_PASSWORD=(.+)|REDIS_PASSWORD='\1'|" .env
+            echo "✓ Quoted REDIS_PASSWORD in .env"
+          fi
+
           # Strip any prior occurrences so Laravel reads the last (block we append)
           # without warning about duplicate keys.
           sed -i '/^CACHE_STORE=/d' .env
