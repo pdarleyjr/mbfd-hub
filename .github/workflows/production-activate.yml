@@ -1,0 +1,229 @@
+name: Production activation
+
+# Manual cutover workflow. Triggered via `gh workflow run production-activate.yml`
+# or the GitHub Actions UI. Each toggle is independent — you can flip Redis
+# without R2 and vice versa. Both operations:
+#   - take a timestamped .env backup BEFORE writing anything
+#   - rebuild config cache so the new env values take effect
+#   - re-run a readiness probe / smoke test AFTER the flip
+#
+# Rollback procedure for either: SSH to deploy-target, restore the .env.pre-*
+# backup that this workflow created, then run `php artisan config:cache`.
+# Backups are tagged with the workflow run id for traceability.
+
+on:
+  workflow_dispatch:
+    inputs:
+      activate_redis:
+        description: 'Flip CACHE_STORE / QUEUE_CONNECTION / SESSION_DRIVER / BROADCAST_DRIVER to redis (+reverb)'
+        required: false
+        type: boolean
+        default: false
+      activate_r2:
+        description: 'Switch FILESYSTEM_DISK=r2 + write R2_* env vars. Requires R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY repo secrets.'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-activation
+  cancel-in-progress: false
+
+jobs:
+  activate:
+    runs-on: self-hosted
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://www.mbfdhub.com
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts 2>/dev/null || true
+          cat > ~/.ssh/config << EOF
+          Host deploy-target
+            HostName 127.0.0.1
+            User ${{ secrets.DEPLOY_USER }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+            ConnectTimeout 10
+            ServerAliveInterval 10
+            ServerAliveCountMax 3
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Pre-flight .env backup
+        run: |
+          ssh deploy-target 'bash -s' <<'REMOTE_EOF'
+          set -e
+          TS=$(date +%Y%m%d_%H%M%S)
+          cd /opt/mbfd/mbfd-hub
+          cp .env ".env.pre-activate-${TS}-${{ github.run_id }}"
+          echo "::notice::Backed up .env to .env.pre-activate-${TS}-${{ github.run_id }}"
+          ls -la .env.pre-activate-${TS}* | head -1
+          REMOTE_EOF
+
+      # =======================================================================
+      # REDIS
+      # =======================================================================
+      - name: Redis readiness probe (dry-run)
+        if: ${{ inputs.activate_redis }}
+        run: |
+          ssh deploy-target 'docker exec mbfd-hub-laravel php artisan mbfd:activate-redis --dry-run'
+
+      - name: Activate Redis
+        if: ${{ inputs.activate_redis }}
+        run: |
+          ssh deploy-target 'bash -s' <<'REMOTE_EOF'
+          set -e
+          cd /opt/mbfd/mbfd-hub
+
+          # Strip any prior occurrences so Laravel reads the last (block we append)
+          # without warning about duplicate keys.
+          sed -i '/^CACHE_STORE=/d' .env
+          sed -i '/^QUEUE_CONNECTION=/d' .env
+          sed -i '/^SESSION_DRIVER=/d' .env
+          sed -i '/^BROADCAST_DRIVER=/d' .env
+          sed -i '/^BROADCAST_CONNECTION=/d' .env
+
+          # REDIS_HOST: the docker-compose service name 'redis' resolves inside
+          # the network. Strip stale values that may have referenced 127.0.0.1.
+          sed -i '/^REDIS_HOST=/d' .env
+
+          # Append the activation block. REDIS_PASSWORD / REDIS_PORT are already
+          # in the production .env (Redis container is healthy with them) — we
+          # don't re-write them here, only the values that need to flip.
+          cat >> .env <<'BLOCK'
+
+          # --- Redis cutover (managed by production-activate.yml) ---------
+          CACHE_STORE=redis
+          QUEUE_CONNECTION=redis
+          SESSION_DRIVER=redis
+          BROADCAST_DRIVER=reverb
+          BROADCAST_CONNECTION=reverb
+          REDIS_HOST=redis
+          # ----------------------------------------------------------------
+          BLOCK
+
+          # Rebuild the config cache so the new env takes effect.
+          docker exec mbfd-hub-laravel php artisan config:cache
+
+          # Drain any in-flight DB-queued jobs before the worker re-reads its
+          # connection config. Already-queued DB jobs stay on DB; new dispatches
+          # route to Redis.
+          docker exec mbfd-hub-laravel php artisan queue:restart
+
+          # Restart Reverb so it picks up Redis pub/sub.
+          docker exec mbfd-hub-laravel bash -c 'pkill -f "reverb:start" || true'
+          sleep 2
+          docker exec mbfd-hub-laravel bash -c 'nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &'
+
+          # Bounce the queue worker daemon so it picks up the new connection.
+          docker exec mbfd-hub-laravel bash -c 'pkill -f "queue:work" || true'
+          sleep 2
+          docker exec mbfd-hub-laravel bash -c 'nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
+
+          echo "✓ Redis cutover applied"
+          REMOTE_EOF
+
+      - name: Redis post-flip verification
+        if: ${{ inputs.activate_redis }}
+        run: |
+          ssh deploy-target 'docker exec mbfd-hub-laravel php artisan mbfd:activate-redis --dry-run' | tee /tmp/redis-probe.log
+          if ! grep -q '✓ All four drivers already point at redis/reverb' /tmp/redis-probe.log; then
+            echo "::error::Redis activation probe did not report all-green after flip"
+            exit 1
+          fi
+
+      # =======================================================================
+      # R2
+      # =======================================================================
+      - name: Validate R2 secrets are present
+        if: ${{ inputs.activate_r2 }}
+        env:
+          R2_AK: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SK: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          if [ -z "$R2_AK" ] || [ -z "$R2_SK" ]; then
+            echo "::error::R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY repo secrets must be set before activating R2."
+            echo "::error::Generate the keys at: https://dash.cloudflare.com/265122b6d6f29457b0ca950c55f3ac6e/r2/api-tokens"
+            echo "::error::Then: gh secret set R2_ACCESS_KEY_ID -R pdarleyjr/mbfd-hub --body '...'"
+            echo "::error::       gh secret set R2_SECRET_ACCESS_KEY -R pdarleyjr/mbfd-hub --body '...'"
+            exit 1
+          fi
+
+      - name: Activate R2 disk
+        if: ${{ inputs.activate_r2 }}
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          # Stream the env block as stdin to remote `cat > /tmp/r2.env.add`.
+          # Using a single-quoted outer ssh + a double-quoted heredoc on the
+          # runner side lets shell-expand the secrets WITHOUT the values
+          # touching the remote process list.
+          ssh deploy-target 'cat > /tmp/r2.env.add' <<EOF
+          # --- R2 disk activated (managed by production-activate.yml) -----
+          FILESYSTEM_DISK=r2
+          R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+          R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+          R2_BUCKET=mbfd-hub-media
+          R2_ENDPOINT=https://265122b6d6f29457b0ca950c55f3ac6e.r2.cloudflarestorage.com
+          R2_REGION=auto
+          # ----------------------------------------------------------------
+          EOF
+
+          ssh deploy-target 'bash -s' <<'REMOTE_EOF'
+          set -e
+          cd /opt/mbfd/mbfd-hub
+          sed -i '/^FILESYSTEM_DISK=/d' .env
+          sed -i '/^R2_ACCESS_KEY_ID=/d' .env
+          sed -i '/^R2_SECRET_ACCESS_KEY=/d' .env
+          sed -i '/^R2_BUCKET=/d' .env
+          sed -i '/^R2_ENDPOINT=/d' .env
+          sed -i '/^R2_REGION=/d' .env
+          # Append block, then wipe the temp file (which contained the secrets in plaintext)
+          cat /tmp/r2.env.add >> .env
+          shred -u /tmp/r2.env.add 2>/dev/null || rm -f /tmp/r2.env.add
+          docker exec mbfd-hub-laravel php artisan config:cache
+          # Round-trip a tiny object to prove keys work. Output PUT_OK on success.
+          docker exec mbfd-hub-laravel php artisan mbfd:probe-r2 || {
+            echo "::warning::R2 probe failed — keys may be wrong or bucket policy mismatched. Rollback: restore .env.pre-activate-* backup."
+            exit 1
+          }
+          echo "✓ R2 disk activated"
+          REMOTE_EOF
+
+      # =======================================================================
+      # SMOKE
+      # =======================================================================
+      - name: Post-activation smoke tests
+        run: |
+          PASS=0; FAIL=0
+          check() {
+            local desc="$1" url="$2" expected="${3:-200}"
+            HTTP=$(curl -sL -o /dev/null -w "%{http_code}" "$url" --max-time 15)
+            if [ "$HTTP" = "$expected" ]; then
+              echo "✓ $desc → HTTP $HTTP"
+              PASS=$((PASS + 1))
+            else
+              echo "::error::$desc → HTTP $HTTP (expected $expected)"
+              FAIL=$((FAIL + 1))
+            fi
+          }
+          echo "=== Post-Activation Smoke ==="
+          sleep 3
+          check "Landing"                "https://www.mbfdhub.com/"
+          check "Admin login"            "https://www.mbfdhub.com/admin/login"
+          check "/up health"             "https://www.mbfdhub.com/up"
+          check "Admin PWA manifest"     "https://www.mbfdhub.com/admin-pwa/manifest.webmanifest"
+          check "Admin PWA SW"           "https://www.mbfdhub.com/admin-pwa/service-worker.js"
+          check "Deploy marker"          "https://www.mbfdhub.com/deploy-marker.json"
+          echo "=== $PASS passed, $FAIL failed ==="
+          [ "$FAIL" -gt 0 ] && exit 1 || true
