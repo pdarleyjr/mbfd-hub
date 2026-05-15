@@ -29,6 +29,11 @@ on:
         required: false
         type: boolean
         default: false
+      diagnose:
+        description: 'Print redacted Redis env diagnostics — comparing .env values vs what Laravel sees vs what redis-cli accepts. Read-only.'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -63,8 +68,66 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
+      # =======================================================================
+      # DIAGNOSE — read-only, prints redacted env info so we can find the
+      # root cause of the NOAUTH error without leaking the actual password.
+      # =======================================================================
+      - name: Diagnose Redis env
+        if: ${{ inputs.diagnose }}
+        run: |
+          ssh deploy-target 'bash -s' <<'REMOTE_EOF'
+          set -e
+          cd /opt/mbfd/mbfd-hub
+          echo "--- 1) Raw line from .env (REDIS_PASSWORD line) ---"
+          grep -E '^REDIS_PASSWORD=' .env | head -1 | sed -E 's/(REDIS_PASSWORD=).*/\1<REDACTED>/'
+          echo ""
+          echo "--- 2) Length of REDIS_PASSWORD as parsed by bash from .env ---"
+          PWD=$(grep -E '^REDIS_PASSWORD=' .env | head -1 | cut -d= -f2-)
+          echo "Bash sees length: ${#PWD}"
+          echo "First char ord: $(printf '%d' \"'${PWD:0:1}\")"
+          echo "Last char ord:  $(printf '%d' \"'${PWD: -1}\")"
+          echo "Contains \$ or # or quote? $(echo "$PWD" | grep -cE '[$#\"\x27]')"
+          echo ""
+          echo "--- 3) Length of REDIS_PASSWORD as PHP env() sees it ---"
+          docker exec mbfd-hub-laravel php -r '
+            $p = env("REDIS_PASSWORD");
+            echo "PHP env() length: ".strlen($p)."\n";
+            echo "First char ord: ".ord(substr($p,0,1))."\n";
+            echo "Last char ord:  ".ord(substr($p,-1))."\n";
+            echo "REDIS_HOST: ".env("REDIS_HOST")."\n";
+            echo "REDIS_PORT: ".env("REDIS_PORT")."\n";
+            echo "REDIS_USERNAME: [".env("REDIS_USERNAME")."]\n";
+            echo "REDIS_CLIENT: ".env("REDIS_CLIENT","phpredis")."\n";
+          '
+          echo ""
+          echo "--- 4) Length of REDIS_PASSWORD as cached Laravel config sees it ---"
+          docker exec mbfd-hub-laravel php artisan tinker --execute='
+            echo "config password length: ".strlen(config("database.redis.default.password"))."\n";
+            echo "config host: ".config("database.redis.default.host")."\n";
+            echo "config username: [".config("database.redis.default.username")."]\n";
+          '
+          echo ""
+          echo "--- 5) Direct phpredis AUTH probe from inside container ---"
+          docker exec mbfd-hub-laravel php -r '
+            $pwd = env("REDIS_PASSWORD");
+            $r = new Redis();
+            try {
+              if (!$r->connect("redis", 6379, 2.0)) {
+                echo "connect failed\n"; exit;
+              }
+              echo "connected\n";
+              if (!$r->auth($pwd)) {
+                echo "auth(\$pwd) returned false\n"; exit;
+              }
+              echo "auth ok, ping = ".$r->ping()."\n";
+            } catch (Throwable $e) {
+              echo "EXCEPTION: ".$e->getMessage()."\n";
+            }
+          '
+          REMOTE_EOF
+
       - name: Pre-flight .env backup
-        if: ${{ ! inputs.rollback }}
+        if: ${{ ! inputs.rollback && ! inputs.diagnose }}
         run: |
           ssh deploy-target 'bash -s' <<'REMOTE_EOF'
           set -e
