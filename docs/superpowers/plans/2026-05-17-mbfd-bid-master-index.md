@@ -31,7 +31,7 @@ Per the writing-plans skill: **"Each plan should produce working, testable softw
 | 04 | **Live bid core** — DO, WebSocket, draft UI | Build Phase 4 | 📋 high-level | Members can submit picks in a live event; UI matches spec §9 mockups |
 | 05 | **Admin console** — pause/resume/force/skip/admin-bid/day-end/day-start | Build Phase 5 | 📋 high-level | Chiefs can run the bid live; step-up auth on every write; full audit log viewer |
 | 06 | **AI integration** — advisory, forecast, dissent log | Build Phase 6 | 📋 high-level | Sonnet hot path + Opus deep dive, prompt-cached rulebook+roster, on-deck pre-fetch |
-| 07 | **A-Day Phase 2** — Group/weekday picker | Build Phase 7 | 📋 high-level | Phase 2 sequential A-Day bid with group capacity invariants |
+| 07 | **A-Day Phase 2** — Group/weekday picker | Build Phase 7 | ✅ **detailed** | Phase 2 sequential A-Day bid with group capacity invariants. NB: only `a_day_bid → complete` — no separate `a_day_complete` intermediate state (per Decision 12). |
 | 08 | **Audit, exports, portal write-back** | Build Phase 8 | 📋 high-level | R2 hash-chained JSONL audit + PDFs + Cloudflare Queue → employee portal action card |
 | 09 | **Hardening & rehearsal** — pen test, load test, drill | Build Phase 9 | 📋 high-level | All P0/P1 issues closed, staging "kill the DO" drill green |
 
