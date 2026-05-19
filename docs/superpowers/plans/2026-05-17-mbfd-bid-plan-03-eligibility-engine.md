@@ -1745,7 +1745,7 @@ const picks = bidRows.map((row) => {
     bidNumber: Number(obj['bid__']),
     employeeId: obj['emp_id'],
     positionId: obj['position__'],
-    rDayPositionId: obj['r-day_pick'],
+    aDayPositionId: obj['a-day_pick'],
     lastName: obj['last_name'],
     firstName: obj['first_name'],
     rank: RANK_MAP[obj['current_rank']?.toLowerCase() ?? ''] ?? obj['current_rank'],
@@ -1847,7 +1847,7 @@ describe('2025 bid replay — zero false negatives', () => {
     }>) {
       // Skip excluded members (Division Chiefs, Union President)
       if (pick.bidCategory === EXCLUDED_CATEGORY) continue;
-      // Skip R-Day/admin pre-fill positions
+      // Skip A-Day/admin pre-fill positions
       if (SKIP_POSITION_PREFIXES.some((p) => pick.positionId.startsWith(p))) continue;
 
       const member = memberByEmpId.get(pick.employeeId);
