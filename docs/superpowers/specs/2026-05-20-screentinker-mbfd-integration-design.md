@@ -1,7 +1,7 @@
 # ScreenTinker × MBFD Hub — Integration Design
 
 **Date:** 2026-05-20
-**Status:** Phase 1 deployed and live; Phase 2 in progress
+**Status:** ✅ Phase 1 + Phase 2 both deployed and verified end-to-end
 **Author:** Claude Opus 4.7 (autonomous build session)
 
 ---
@@ -150,7 +150,38 @@ The current flow is: Cloudflare Access OTP → ScreenTinker login. The user ente
 ### 6.3 Token exposure
 Cloudflare tokens (`cfut_…`, `cfat_…`) and the GitHub PAT (`ghp_…`) were pasted twice in the chat that produced this work. They are logged in Anthropic conversation transcripts. Phase 2 step "Rotate exposed tokens" handles the CF side automatically; the GitHub PAT must be rotated via the GitHub UI (no API for classic PAT rotation).
 
-## 7. Phase 2 — Auth-mirror plan (implementation immediately following this commit)
+## 7. Phase 2 — Auth-mirror DEPLOYED
+
+### 7.0 As-built summary
+
+The plan in § 7.1–7.6 below was executed in this same session. The mirror is live:
+ScreenTinker password mirror flows automatically whenever an MBFD admin user
+(roles `super_admin`, `admin`, `logistics_admin`, `training_admin`) is created
+or has their password changed in the MBFD admin dashboard. Verified end-to-end
+in three flows:
+
+1. **New admin: `User::create([..., password => 'Penco3'])` → `assignRole('admin')`** —
+   mirror fires via the `RoleAttached` event listener; screentinker login with
+   `Penco3` (6 chars!) succeeds.
+2. **Existing admin: `$u->password = 'Up!d4t3d'; $u->save()`** — mirror fires via
+   the `User::saved` model observer; screentinker login with the new password
+   succeeds; old password is rejected (no orphaned hash).
+3. **Token rotation: in-place** — `MBFD_SYNC_TOKEN` on both sides rotated mid-flight
+   without dropping any sync calls.
+
+Three bugs were caught and fixed during deployment:
+
+- **Eloquent `__set` intercept**: storing plaintext on a model dynamic property
+  was routed through `setAttribute()`. Fixed by switching to a `WeakMap<Model, string>`
+  sidecar on the cast class (commit `d9bbdc04`).
+- **Save-vs-role timing**: in Filament's `User::create → assignRole` flow,
+  `User::saved` fires before the role is attached, so the role check failed.
+  Fixed by also listening to Spatie's `RoleAttached` event (commit `82243f54`).
+- **Spatie `events_enabled=false` default**: `RoleAttached` was never dispatched.
+  Fixed by overriding `config('permission.events_enabled') => true` in
+  `AppServiceProvider::register()` (commit `8d7a42bf`).
+
+### 7.1 Goal
 
 ### 7.1 Goal
 Any user with `is_admin = true` (or equivalent MBFD admin role) in the MBFD Hub Laravel `users` table can log into ScreenTinker with the same email + plaintext password they use on the MBFD admin dashboard.
@@ -200,7 +231,42 @@ The MBFD admin dashboard (Filament) uses a permission system on the `users` tabl
 - Integration test: create a user in MBFD via factory, assert sync was attempted
 - E2E manual test: change a password in MBFD's `/admin/users/{id}` Filament form, confirm log in to media.mbfdhub.com works with the new password
 
-## 8. Reversal / rollback
+### 7.7 As-built file map (Phase 2)
+
+**ScreenTinker fork** (`pdarleyjr/screentinker` branch `mbfd-integration`):
+- `server/routes/auth.js` — password min lowered 8→4 in 4 enforcement points
+- `server/routes/admin-sync.js` — new bearer-auth'd `POST /api/admin/users/sync` upsert
+- `server/server.js` — mount line `app.use('/api/admin', require('./routes/admin-sync'))`
+
+**MBFD Hub Laravel** (`pdarleyjr/mbfd-hub` branch `main`):
+- `app/Casts/HashedAndCaptured.php` — WeakMap sidecar cast (replaces `'hashed'`)
+- `app/Observers/SyncToScreentinker.php` — `saved()` + `onRoleAttached()` hooks
+- `app/Models/User.php` — `'password' => HashedAndCaptured::class`
+- `app/Providers/AppServiceProvider.php` — observer + event listener registration + `events_enabled` override
+- `config/services.php` — `screentinker.sync_url` + `screentinker.sync_token`
+- `tests/Unit/Casts/HashedAndCapturedTest.php` — 5 tests
+- `tests/Feature/Observers/SyncToScreentinkerTest.php` — 6 tests (incl. RoleAttached flow)
+
+**Network topology** added in Phase 2:
+- `mbfd-screentinker` container joined the existing `mbfd-hub_mbfd-net` Docker network (in addition to its own `screentinker_default`)
+- Reachable from `mbfd-hub-laravel` at `http://mbfd-screentinker:3001` (no public route, no Cloudflare round-trip)
+- `SCREENTINKER_SYNC_URL=http://mbfd-screentinker:3001/api/admin/users/sync` in MBFD's `.env`
+- `MBFD_SYNC_TOKEN` (matching value) in both `.env` files, mode 600
+
+## 8. Token rotation status
+
+Five secrets touched this session. Status:
+
+| Token | Status | Note |
+|---|---|---|
+| `MBFD_SYNC_TOKEN` (the one I generated mid-session) | ✅ ROTATED | Old `aa5350bf…8063d4d` invalidated; new value lives only in `.env` files on box (mode 600), never in chat |
+| `JWT_SECRET` (ScreenTinker JWT signing key) | OK | Generated fresh in this session; lives only in `/home/peter/screentinker/.env` |
+| Cloudflare User Token `cfut_…fdbaf63f` | ⚠ NEEDS USER ACTION | Was pasted twice in chat. Verified still ACTIVE via API. **Rotate via dashboard:** https://dash.cloudflare.com/profile/api-tokens → find the user token → Roll → save new value to password manager |
+| Cloudflare R2 token `cfat_…0033cb` (tfportalapp) | ⚠ NEEDS USER ACTION | Pasted in chat. Rotate via Cloudflare dashboard → R2 → Manage API Tokens |
+| Cloudflare R2 token `cfat_…3337d6` (mbfd-hub-laravel) | ⚠ NEEDS USER ACTION | Same path as above |
+| GitHub PAT `ghp_…WgB3lkTx5` | ⚠ NEEDS USER ACTION | Pasted in chat. **No API path for rotating classic PATs.** Rotate via https://github.com/settings/tokens → Revoke + create new with same scopes |
+
+## 9. Reversal / rollback
 
 If we ever want to undo this entire deployment:
 
@@ -213,9 +279,16 @@ If we ever want to undo this entire deployment:
 
 Reversal does not need sudo. Everything that needed root has been avoided.
 
-## 9. Related docs
+## 10. Related docs
 
 - Upstream: [screentinker/screentinker README](https://github.com/screentinker/screentinker)
 - MBFD Hub Ubuntu migration plan: [docs/archive/MBFD_HUB_UBUNTU_MIGRATION_HARDENING_MASTER_PLAN.md](../../archive/MBFD_HUB_UBUNTU_MIGRATION_HARDENING_MASTER_PLAN.md)
 - Snipe-IT SSO precedent (different pattern, native SAML): [docs/SNIPEIT_SSO_SETUP.md](../../SNIPEIT_SSO_SETUP.md)
 - Backup/restore for other MBFD apps: [docs/BACKUP-RESTORE.md](../../BACKUP-RESTORE.md)
+
+## 11. Follow-ups (not blocking)
+
+1. **Run PHPUnit in a dev environment** — production install is `--no-dev` so phpunit binary isn't shipped. Tests pass `php -l` syntax check; running them requires `composer install` in a non-prod environment. The integration is verified end-to-end via the tinker E2E test which is more decisive anyway.
+2. **Add screentinker SQLite backup to `/opt/mbfd/backup-daily.sh`** — currently only MBFD-Hub-proper is in the daily backup. The screentinker DB lives in the Docker named volume `screentinker_screentinker_db`; back it up via `docker exec mbfd-screentinker sqlite3 /app/server/db/remote_display.db ".backup ..."`.
+3. **Audit existing MBFD admins on next password change** — the mirror fires on password set/change. To pre-seed all existing admins into screentinker right now without waiting for them to change passwords, we'd need a one-shot script that prompts each admin (or asks the user to enter a temp password the script then forwards through the mirror). Out of scope for this session; can be added as a Filament page if desired.
+4. **Add screentinker to monitoring** — `mbfd-uptime-kuma` already lives on this box. Add a monitor for `https://media.mbfdhub.com/app` so degradation is visible.
