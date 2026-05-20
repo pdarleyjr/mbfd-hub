@@ -7,6 +7,7 @@ namespace Tests\Feature\Observers;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Spatie\Permission\Events\RoleAttached;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -109,5 +110,29 @@ class SyncToScreentinkerTest extends TestCase
 
         $this->assertTrue(true);
         Http::assertSentCount(1);
+    }
+
+    public function test_new_user_created_with_password_then_role_attached_dispatches_sync(): void
+    {
+        // Reproduces the Filament flow: User::create([... password ...]),
+        // followed by assignRole() in the same request. saved() fires
+        // BEFORE the role is attached, so the RoleAttached listener is
+        // what actually catches this case.
+        Http::fake([
+            '*' => Http::response(['user_id' => 'u-new', 'action' => 'created'], 200),
+        ]);
+
+        $user = User::create([
+            'name' => 'Brand New Admin',
+            'email' => 'newadmin@miamibeachfl.gov',
+            'password' => 'Penco3',
+        ]);
+        $user->assignRole('admin');
+
+        Http::assertSentCount(1);
+        Http::assertSent(function ($req) {
+            return data_get($req->data(), 'email') === 'newadmin@miamibeachfl.gov'
+                && data_get($req->data(), 'password') === 'Penco3';
+        });
     }
 }
