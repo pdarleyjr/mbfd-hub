@@ -35,6 +35,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Http\Responses\LoginResponse::class,
         );
 
+        // Spatie Permission ships with events_enabled=false. We need it on so
+        // RoleAttached fires and the SyncToScreentinker listener can mirror
+        // new admin user creations to media.mbfdhub.com. Override here in
+        // register() so HasRoles sees the flag before it dispatches.
+        config(['permission.events_enabled' => true]);
     }
 
     /**
