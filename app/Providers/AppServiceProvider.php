@@ -55,8 +55,15 @@ class AppServiceProvider extends ServiceProvider
         Apparatus::observe(ApparatusObserver::class);
 
         // Mirror admin password changes into ScreenTinker at media.mbfdhub.com.
+        // Observer covers existing-admin password updates; the RoleAttached
+        // event listener covers the new-admin-creation flow where saved()
+        // fires before assignRole() and the role check would otherwise fail.
         // No-op if SCREENTINKER_SYNC_URL/TOKEN env vars are unset.
         User::observe(SyncToScreentinker::class);
+        \Illuminate\Support\Facades\Event::listen(
+            \Spatie\Permission\Events\RoleAttached::class,
+            [SyncToScreentinker::class, 'onRoleAttached']
+        );
 
         // Auto-vectorize uploaded workgroup files (PDFs, DOCX, etc.) into workgroup-specs index
         WorkgroupSharedUpload::observe(WorkgroupSharedUploadObserver::class);
