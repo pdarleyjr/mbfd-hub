@@ -12,6 +12,7 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use NotificationChannels\WebPush\HasPushSubscriptions;
+use App\Casts\HashedAndCaptured;
 
 class User extends Authenticatable implements FilamentUser
 {
@@ -70,7 +71,10 @@ class User extends Authenticatable implements FilamentUser
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            // HashedAndCaptured replaces Laravel's 'hashed' cast: it hashes
+            // the password identically AND stashes the plaintext on the model
+            // for the SyncToScreentinker observer to mirror to media.mbfdhub.com.
+            'password' => HashedAndCaptured::class,
             'must_change_password' => 'boolean',
             'notification_preferences' => 'array',
         ];

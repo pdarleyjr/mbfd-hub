@@ -15,6 +15,7 @@ use App\Notifications\NewSubmissionNotification;
 use App\Observers\TodoObserver;
 use App\Observers\ApparatusObserver;
 use App\Observers\WorkgroupSharedUploadObserver;
+use App\Observers\SyncToScreentinker;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Support\Facades\URL;
@@ -52,7 +53,11 @@ class AppServiceProvider extends ServiceProvider
 
         Todo::observe(TodoObserver::class);
         Apparatus::observe(ApparatusObserver::class);
-        
+
+        // Mirror admin password changes into ScreenTinker at media.mbfdhub.com.
+        // No-op if SCREENTINKER_SYNC_URL/TOKEN env vars are unset.
+        User::observe(SyncToScreentinker::class);
+
         // Auto-vectorize uploaded workgroup files (PDFs, DOCX, etc.) into workgroup-specs index
         WorkgroupSharedUpload::observe(WorkgroupSharedUploadObserver::class);
 
