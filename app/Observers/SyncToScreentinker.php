@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Casts\HashedAndCaptured;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Events\RoleAttached;
@@ -26,10 +26,10 @@ use Spatie\Permission\Events\RoleAttached;
  *     Typical case: admin creates a brand-new user via Filament with role +
  *     password in the same form submission.
  *
- * Plaintext is captured by App\Casts\HashedAndCaptured onto a transient
- * model property (`_screentinker_plaintext_password`). We only clear it
- * AFTER an actual sync attempt — leaving it set across saved/RoleAttached
- * boundaries within a single request.
+ * Plaintext is captured by App\Casts\HashedAndCaptured into a WeakMap keyed
+ * by the model object. We only release that entry AFTER an actual sync
+ * attempt — leaving it set across saved/RoleAttached boundaries within a
+ * single request.
  *
  * Failures are logged and never block the user save — sync is best-effort.
  */
@@ -61,7 +61,8 @@ final class SyncToScreentinker
 
     private function trySync(User $user): void
     {
-        $plaintext = $user->_screentinker_plaintext_password ?? null;
+        $captured = HashedAndCaptured::captured();
+        $plaintext = $captured[$user] ?? null;
         if (! is_string($plaintext) || $plaintext === '') {
             return;
         }
@@ -75,9 +76,7 @@ final class SyncToScreentinker
         $url = config('services.screentinker.sync_url');
         $token = config('services.screentinker.sync_token');
         if (! $url || ! $token) {
-            // Always clear the stash so it doesn't dangle past the sync
-            // opportunity; missing config means the mirror is disabled.
-            unset($user->_screentinker_plaintext_password);
+            unset($captured[$user]);
             Log::warning('SyncToScreentinker: SCREENTINKER_SYNC_URL/TOKEN missing; skipping', [
                 'user_email' => $user->email,
             ]);
@@ -114,9 +113,9 @@ final class SyncToScreentinker
                 'error' => $e->getMessage(),
             ]);
         } finally {
-            // Clear the stash once we've made an attempt, success or fail.
-            // Prevents double-fire on subsequent saves in the same request.
-            unset($user->_screentinker_plaintext_password);
+            // Clear after attempt to avoid double-fire on subsequent saves
+            // in the same request lifetime.
+            unset($captured[$user]);
         }
     }
 }

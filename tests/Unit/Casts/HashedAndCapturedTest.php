@@ -9,17 +9,20 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
+use WeakMap;
 
 class HashedAndCapturedTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_plaintext_password_is_captured_onto_the_model(): void
+    public function test_plaintext_password_is_captured_in_weakmap_keyed_by_model(): void
     {
         $user = User::factory()->make();
         $user->password = 'Penco3';
 
-        $this->assertSame('Penco3', $user->_screentinker_plaintext_password ?? null);
+        $captured = HashedAndCaptured::captured();
+        $this->assertTrue(isset($captured[$user]));
+        $this->assertSame('Penco3', $captured[$user]);
     }
 
     public function test_plaintext_password_is_hashed_for_persistence(): void
@@ -49,8 +52,9 @@ class HashedAndCapturedTest extends TestCase
         $user = User::factory()->make();
         $user->password = Hash::make('whatever');
 
-        $this->assertNull(
-            $user->_screentinker_plaintext_password ?? null,
+        $captured = HashedAndCaptured::captured();
+        $this->assertFalse(
+            isset($captured[$user]),
             'capture should only happen for plaintext assignments, never for incoming hashes'
         );
     }
@@ -60,7 +64,8 @@ class HashedAndCapturedTest extends TestCase
         $user = User::factory()->make();
         $user->password = '';
 
-        $this->assertNull($user->_screentinker_plaintext_password ?? null);
+        $captured = HashedAndCaptured::captured();
+        $this->assertFalse(isset($captured[$user]));
         $this->assertSame('', $user->getAttributes()['password'] ?? null);
     }
 }
