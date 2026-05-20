@@ -93,4 +93,24 @@ return [
         'token' => env('SNIPEIT_API_TOKEN'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | ScreenTinker Auth Mirror
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for the SyncToScreentinker observer that mirrors MBFD
+    | admin password changes into the ScreenTinker user table at
+    | https://media.mbfdhub.com. Leave SCREENTINKER_SYNC_URL or
+    | SCREENTINKER_SYNC_TOKEN unset to disable the mirror entirely.
+    |
+    | Use the loopback URL (http://host.docker.internal:8095/...) when both
+    | apps run on the same Linux host, to avoid going through the public
+    | Cloudflare edge for an internal call.
+    |
+    */
+    'screentinker' => [
+        'sync_url'   => env('SCREENTINKER_SYNC_URL'),
+        'sync_token' => env('SCREENTINKER_SYNC_TOKEN'),
+    ],
+
 ];
