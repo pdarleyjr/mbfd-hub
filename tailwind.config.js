@@ -7,12 +7,13 @@ export default {
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
         './storage/framework/views/*.php',
         './resources/**/*.blade.php',
-        './resources/**/*.js',
-        './resources/**/*.jsx',
-        './resources/**/*.tsx',
-        './resources/**/*.ts',
+        './resources/js/*.{js,jsx,ts,tsx}',
+        './resources/js/admin-pwa/**/*.{js,jsx,ts,tsx}',
+        './resources/js/components/**/*.{js,jsx,ts,tsx}',
+        './resources/js/daily-checkout/src/**/*.{js,jsx,ts,tsx}',
         './resources/**/*.vue',
         './vendor/pxlrbt/filament-spotlight/resources/**/*.blade.php',
+        '!**/node_modules/**',
     ],
     theme: {
         extend: {
