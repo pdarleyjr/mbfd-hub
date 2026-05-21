@@ -4,12 +4,11 @@ namespace App\Providers\Filament;
 
 use App\Filament\Employee\Pages\Auth\EmployeeLogin;
 use App\Filament\Employee\Pages\ChangePasswordPage;
+use App\Filament\Employee\Pages\EmployeeDashboard;
+use App\Filament\Employee\Pages\MyBidCertificationsPage;
 use App\Filament\Employee\Pages\MyEquipmentPage;
 use App\Filament\Employee\Pages\RequestEquipmentPage;
-use App\Filament\Employee\Pages\EmployeeDashboard;
 use App\Http\Middleware\ForcePasswordChangeMiddleware;
-use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
-use Illuminate\Routing\Router;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -34,12 +33,8 @@ class EmployeePanelProvider extends PanelProvider
 
     /**
      * Register any application authentication / authorization services.
-     *
-     * @return void
      */
-    public function boot(): void
-    {
-    }
+    public function boot(): void {}
 
     public function panel(Panel $panel): Panel
     {
@@ -55,9 +50,9 @@ class EmployeePanelProvider extends PanelProvider
             ->darkMode(false)
             ->colors([
                 'primary' => Color::Red,
-                'danger'  => Color::Rose,
-                'gray'    => Color::Slate,
-                'info'    => Color::Blue,
+                'danger' => Color::Rose,
+                'gray' => Color::Slate,
+                'info' => Color::Blue,
                 'success' => Color::Green,
                 'warning' => Color::Amber,
             ])
@@ -65,12 +60,23 @@ class EmployeePanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->pages([
                 EmployeeDashboard::class,
+                MyBidCertificationsPage::class,
                 MyEquipmentPage::class,
                 RequestEquipmentPage::class,
                 ChangePasswordPage::class,
             ])
             ->widgets([])
             ->userMenuItems([
+                MenuItem::make()
+                    ->label('Open Bid Console')
+                    ->url(fn (): ?string => config('services.bid.console_url'))
+                    ->visible(fn (): bool => filled(config('services.bid.console_url')))
+                    ->icon('heroicon-o-bolt')
+                    ->openUrlInNewTab(),
+                MenuItem::make()
+                    ->label('My Bid Certifications')
+                    ->url(fn (): string => MyBidCertificationsPage::getUrl(panel: 'employee'))
+                    ->icon('heroicon-o-check-badge'),
                 MenuItem::make()
                     ->label('My Equipment')
                     ->url(fn (): string => MyEquipmentPage::getUrl(panel: 'employee'))

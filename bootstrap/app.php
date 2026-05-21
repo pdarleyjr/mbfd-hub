@@ -27,10 +27,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\ForcePasswordChange::class,
             \App\Http\Middleware\SetCacheHeaders::class,
         ]);
-        
-        // Exclude station inventory API routes from CSRF protection
-        $middleware->validateCsrfTokens(except: [
-            'api/*',
+
+        $middleware->alias([
+            'admin.role' => \App\Http\Middleware\EnsureAdminApiRole::class,
+            'verify.bid.token' => \App\Http\Middleware\VerifyBidReaderToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

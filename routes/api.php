@@ -1,22 +1,24 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\ApparatusController;
 use App\Http\Controllers\Api\AdminMetricsController;
-use App\Http\Controllers\Api\SmartUpdatesController;
-use App\Http\Controllers\Api\InventoryChatController;
-use App\Http\Controllers\Api\PushSubscriptionController;
-use App\Http\Controllers\Api\TestNotificationController;
+use App\Http\Controllers\Api\ApparatusController;
+use App\Http\Controllers\Api\Bid\CredentialsController as BidCredentialsController;
 use App\Http\Controllers\Api\BigTicketRequestController;
+use App\Http\Controllers\Api\DatabaseAuditController;
+use App\Http\Controllers\Api\FireEquipmentRequestController;
+use App\Http\Controllers\Api\InventoryChatController;
+use App\Http\Controllers\Api\Public\ApparatusLayout\ApparatusLayoutController;
+use App\Http\Controllers\Api\PushSubscriptionController;
+use App\Http\Controllers\Api\SmartUpdatesController;
+use App\Http\Controllers\Api\StationInspectionController;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Api\StationInventoryV2Controller;
-use App\Http\Controllers\Api\FireEquipmentRequestController;
-use App\Http\Controllers\Api\StationInspectionController;
-use App\Http\Controllers\Workgroup\WorkgroupAIController;
-use App\Http\Controllers\Api\Public\ApparatusLayout\ApparatusLayoutController;
-use App\Http\Controllers\Api\DatabaseAuditController;
+use App\Http\Controllers\Api\SupportChatProxyController;
+use App\Http\Controllers\Api\TestNotificationController;
 use App\Http\Controllers\Api\TrtInventoryController;
+use App\Http\Controllers\Workgroup\WorkgroupAIController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -35,22 +37,22 @@ Route::prefix('admin/audit')->middleware(['web', 'auth'])->group(function () {
 });
 
 Route::prefix('public')->middleware('throttle:60,1')->group(function () {
-    Route::get('apparatuses', [ApparatusController::class , 'index']);
-    Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class , 'checklist']);
-    Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class , 'storeInspection']);
-    Route::get('employees/list', [ApparatusController::class , 'employees']);
+    Route::get('apparatuses', [ApparatusController::class, 'index']);
+    Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class, 'checklist']);
+    Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
+    Route::get('employees/list', [ApparatusController::class, 'employees']);
 
     // Public Station Routes for Daily Checkout SPA
-    Route::get('stations', [\App\Http\Controllers\Api\StationController::class , 'index']);
-    Route::get('stations/{station}', [\App\Http\Controllers\Api\StationController::class , 'show']);
-    Route::get('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class , 'rooms']);
-    Route::get('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class , 'roomAssets']);
-    Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class , 'apparatus']);
-    Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class , 'projects']);
-    Route::get('stations/{station}/inspections', [\App\Http\Controllers\Api\StationController::class , 'stationInspections']);
-    Route::get('stations/{station}/apparatus-inspections', [\App\Http\Controllers\Api\StationController::class , 'apparatusInspections']);
-    Route::get('stations/{station}/equipment-requests', [\App\Http\Controllers\Api\StationController::class , 'equipmentRequests']);
-    Route::get('stations/{station}/gas-meters', [\App\Http\Controllers\Api\StationController::class , 'gasMeters']);
+    Route::get('stations', [\App\Http\Controllers\Api\StationController::class, 'index']);
+    Route::get('stations/{station}', [\App\Http\Controllers\Api\StationController::class, 'show']);
+    Route::get('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class, 'rooms']);
+    Route::get('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class, 'roomAssets']);
+    Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class, 'apparatus']);
+    Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class, 'projects']);
+    Route::get('stations/{station}/inspections', [\App\Http\Controllers\Api\StationController::class, 'stationInspections']);
+    Route::get('stations/{station}/apparatus-inspections', [\App\Http\Controllers\Api\StationController::class, 'apparatusInspections']);
+    Route::get('stations/{station}/equipment-requests', [\App\Http\Controllers\Api\StationController::class, 'equipmentRequests']);
+    Route::get('stations/{station}/gas-meters', [\App\Http\Controllers\Api\StationController::class, 'gasMeters']);
 
     // Apparatus Layout Planner (public read, auth write)
     Route::prefix('apparatus-layout')->group(function () {
@@ -60,9 +62,13 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     });
 });
 
+Route::prefix('public')->middleware('throttle:10,1')->group(function () {
+    Route::post('support-chat', [SupportChatProxyController::class, 'chat']);
+});
+
 // Public Station Inspection submission (stricter rate limit)
 Route::prefix('public')->middleware('throttle:10,1')->group(function () {
-    Route::post('station_inspection', [StationInspectionController::class , 'storePublic']);
+    Route::post('station_inspection', [StationInspectionController::class, 'storePublic']);
 });
 
 // TRT Trailer Inventory (public read)
@@ -76,26 +82,26 @@ Route::prefix('public')->middleware('throttle:10,1')->group(function () {
 });
 
 // TRT Trailer Inventory (admin)
-Route::prefix('admin/trt-inventory')->middleware(['web', 'auth'])->group(function () {
+Route::prefix('admin/trt-inventory')->middleware(['web', 'auth', 'admin.role:super_admin,admin,logistics_admin'])->group(function () {
     Route::get('sessions', [TrtInventoryController::class, 'sessions']);
     Route::get('sessions/{id}', [TrtInventoryController::class, 'sessionDetail']);
 });
 
 // Push notification routes (public VAPID key, authenticated subscription management)
-Route::get('push/vapid-public-key', [PushSubscriptionController::class , 'vapidPublicKey']);
+Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey']);
 
 Route::middleware(['web', 'auth'])->group(function () {
-    Route::post('push-subscriptions', [PushSubscriptionController::class , 'store']);
-    Route::delete('push-subscriptions', [PushSubscriptionController::class , 'destroy']);
-    Route::post('push/test', [TestNotificationController::class , 'sendTestNotification']);
+    Route::post('push-subscriptions', [PushSubscriptionController::class, 'store']);
+    Route::delete('push-subscriptions', [PushSubscriptionController::class, 'destroy']);
+    Route::post('push/test', [TestNotificationController::class, 'sendTestNotification']);
 });
 
 // Admin lookup endpoints — powers the desktop-PWA Dexie prefetch + future typeahead.
 // Uses the Filament admin cookie session (web + auth) so the installed PWA
-// authenticates identically to the browser admin. Role check happens inside the
-// controller (super_admin / admin). Rate limited at 60 req/min per IP to bound
-// abuse if a token leaks.
-Route::middleware(['web', 'auth', 'throttle:60,1'])
+// authenticates identically to the browser admin. Role check via admin.role
+// middleware AND inline in LookupController (defense-in-depth). Rate limited
+// at 60 req/min per IP to bound abuse if a token leaks.
+Route::middleware(['web', 'auth', 'admin.role:super_admin,admin', 'throttle:60,1'])
     ->prefix('admin/lookups')
     ->group(function () {
         Route::get('stations', [\App\Http\Controllers\Api\Admin\LookupController::class, 'stations']);
@@ -103,25 +109,25 @@ Route::middleware(['web', 'auth', 'throttle:60,1'])
         Route::get('personnel', [\App\Http\Controllers\Api\Admin\LookupController::class, 'personnel']);
     });
 
-Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
-    Route::get('metrics', [AdminMetricsController::class , 'index']);
-    Route::get('smart-updates', [SmartUpdatesController::class , 'index'])->name('api.smart-updates');
+Route::prefix('admin')->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin'])->group(function () {
+    Route::get('metrics', [AdminMetricsController::class, 'index']);
+    Route::get('smart-updates', [SmartUpdatesController::class, 'index'])->name('api.smart-updates');
 
     // NEW: Inventory Chat Assistant
-    Route::post('ai/inventory-chat', [InventoryChatController::class , 'chat']);
-    Route::post('ai/inventory-execute', [InventoryChatController::class , 'executeAction']);
+    Route::post('ai/inventory-chat', [InventoryChatController::class, 'chat']);
+    Route::post('ai/inventory-execute', [InventoryChatController::class, 'executeAction']);
 
     // NEW: Station Management Routes
     Route::apiResource('stations', \App\Http\Controllers\Api\StationController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
-    Route::get('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class , 'rooms']);
-    Route::post('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class , 'storeRoom']);
-    Route::get('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class , 'roomAssets']);
-    Route::post('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class , 'storeRoomAsset']);
-    Route::get('stations/{station}/rooms/{room}/audits', [\App\Http\Controllers\Api\StationController::class , 'roomAudits']);
-    Route::post('stations/{station}/rooms/{room}/audits', [\App\Http\Controllers\Api\StationController::class , 'storeRoomAudit']);
-    Route::post('stations/{station}/rooms/{room}/audits/{audit}/complete', [\App\Http\Controllers\Api\StationController::class , 'completeAudit']);
-    Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class , 'apparatus']);
-    Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class , 'projects']);
+    Route::get('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class, 'rooms']);
+    Route::post('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class, 'storeRoom']);
+    Route::get('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class, 'roomAssets']);
+    Route::post('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class, 'storeRoomAsset']);
+    Route::get('stations/{station}/rooms/{room}/audits', [\App\Http\Controllers\Api\StationController::class, 'roomAudits']);
+    Route::post('stations/{station}/rooms/{room}/audits', [\App\Http\Controllers\Api\StationController::class, 'storeRoomAudit']);
+    Route::post('stations/{station}/rooms/{room}/audits/{audit}/complete', [\App\Http\Controllers\Api\StationController::class, 'completeAudit']);
+    Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class, 'apparatus']);
+    Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class, 'projects']);
 
     // Phase 5: Fire Equipment Requests & Station Inspections
     Route::apiResource('fire-equipment-requests', FireEquipmentRequestController::class);
@@ -137,36 +143,51 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
 
 // Big Ticket Requests
 Route::middleware('throttle:60,1')->group(function () {
-    Route::post('/big-ticket-requests', [BigTicketRequestController::class , 'store']);
-    Route::get('/stations/{station}/big-ticket-requests', [BigTicketRequestController::class , 'index']);
-    Route::delete('/big-ticket-requests/{bigTicketRequest}', [BigTicketRequestController::class , 'destroy']);
+    Route::post('/big-ticket-requests', [BigTicketRequestController::class, 'store']);
+    Route::get('/stations/{station}/big-ticket-requests', [BigTicketRequestController::class, 'index']);
 
     // Station Inventory (v1 - legacy)
-    Route::get('/station-inventory/categories', [StationInventoryController::class , 'categories']);
-    Route::post('/station-inventory-submissions', [StationInventoryController::class , 'store']);
-    Route::get('/stations/{station}/station-inventory-submissions', [StationInventoryController::class , 'index']);
-    Route::get('/station-inventory-submissions/{submission}/pdf', [StationInventoryController::class , 'downloadPdf']);
+    Route::get('/station-inventory/categories', [StationInventoryController::class, 'categories']);
+    Route::post('/station-inventory-submissions', [StationInventoryController::class, 'store']);
+    Route::get('/stations/{station}/station-inventory-submissions', [StationInventoryController::class, 'index']);
+    Route::get('/station-inventory-submissions/{submission}/pdf', [StationInventoryController::class, 'downloadPdf']);
 });
 
+Route::delete('/big-ticket-requests/{bigTicketRequest}', [BigTicketRequestController::class, 'destroy'])
+    ->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:30,1']);
+
 // Station Inventory V2 (PIN-protected, real-time inventory management)
+// =========================================================================
+// MBFD Bid Cloudflare Worker bridge — POST /api/v2/verify-credentials
+//
+// The bid Worker calls this endpoint to validate a member's portal
+// credentials when they log into https://bid.mbfdhub.com /
+// https://staging.bid.mbfdhub.com. Gated by a shared bearer token
+// (BID_READER_TOKEN env on this side, PORTAL_BID_READER on the Worker side).
+// =========================================================================
+Route::prefix('v2')->middleware(['throttle:30,1', 'verify.bid.token'])->group(function () {
+    Route::post('/verify-credentials', [BidCredentialsController::class, 'verifyCredentials'])
+        ->name('api.v2.bid.verify-credentials');
+});
+
 Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
     // PIN verification endpoint (public)
-    Route::post('/station-inventory/verify-pin', [StationInventoryV2Controller::class , 'verifyPin']);
+    Route::post('/station-inventory/verify-pin', [StationInventoryV2Controller::class, 'verifyPin']);
 
     // Protected endpoints (require valid signed URL from PIN verification)
     Route::middleware('signed')->name('api.v2.station-inventory.')->group(function () {
-            // Inventory list
-            Route::get('/station-inventory/{stationId}', [StationInventoryV2Controller::class , 'getInventory'])
-                ->name('access');
+        // Inventory list
+        Route::get('/station-inventory/{stationId}', [StationInventoryV2Controller::class, 'getInventory'])
+            ->name('access');
 
-            // Update item count
-            Route::put('/station-inventory/{stationId}/item/{itemId}', [StationInventoryV2Controller::class , 'updateItem']);
+        // Update item count
+        Route::put('/station-inventory/{stationId}/item/{itemId}', [StationInventoryV2Controller::class, 'updateItem']);
 
-            // Supply requests
-            Route::get('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class , 'getSupplyRequests'])
-                ->name('supply-requests');
-            Route::post('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class , 'createSupplyRequest']);
-        });
+        // Supply requests
+        Route::get('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'getSupplyRequests'])
+            ->name('supply-requests');
+        Route::post('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'createSupplyRequest']);
+    });
 });
 
 // =========================================================================
