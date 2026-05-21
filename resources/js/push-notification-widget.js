@@ -121,8 +121,13 @@ function pushNotificationWidget() {
             if ('serviceWorker' in navigator) {
                 try {
                     console.log('[PushWidget] Attempting to register service worker...');
-                    const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+                    const registration = await navigator.serviceWorker.register('/sw.js', {
+                        scope: '/',
+                        updateViaCache: 'none'
+                    });
                     console.log('[PushWidget] Service Worker registered successfully with scope:', registration.scope);
+                    // Force update check to ensure seamless background updates
+                    await registration.update().catch(() => {});
                     return registration;
                 } catch (error) {
                     console.error('[PushWidget] Service Worker registration failed:', error);

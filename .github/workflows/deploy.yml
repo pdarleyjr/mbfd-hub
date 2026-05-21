@@ -126,7 +126,7 @@ jobs:
 
       - name: Fix permissions
         run: |
-          ssh deploy-target "docker exec mbfd-hub-laravel chmod -R 775 storage bootstrap/cache"
+          ssh deploy-target "docker exec -u 0 mbfd-hub-laravel chmod -R 775 storage bootstrap/cache && docker exec -u 0 mbfd-hub-laravel chown -R sail:sail storage bootstrap/cache"
 
       # Composer install runs INSIDE the container as the sail user so vendor/
       # ownership matches the host runner — same pattern as Build frontend

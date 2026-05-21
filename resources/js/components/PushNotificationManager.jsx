@@ -58,7 +58,10 @@ const PushNotificationManager = ({ vapidPublicKey }) => {
 
         try {
             // Register service worker if not already registered
-            const registration = await navigator.serviceWorker.register('/sw.js');
+            const registration = await navigator.serviceWorker.register('/sw.js', {
+                updateViaCache: 'none'
+            });
+            await registration.update().catch(() => {});
             await navigator.serviceWorker.ready;
 
             // Request notification permission
