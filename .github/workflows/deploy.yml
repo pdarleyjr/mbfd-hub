@@ -85,7 +85,7 @@ jobs:
         run: |
           ssh deploy-target "set -e
             cd /opt/mbfd/mbfd-hub
-            docker exec -u 0 mbfd-hub-laravel chown -R sail:sail /var/www/html/public/build /var/www/html/public/daily /var/www/html/app/Filament 2>/dev/null || true
+            docker exec -u 0 mbfd-hub-laravel chown -R sail:sail /var/www/html/public /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/app/Filament 2>/dev/null || true
             git fetch origin --force --prune
             git reset --hard origin/main
             git clean -fd
@@ -143,13 +143,13 @@ jobs:
       - name: Run migrations and optimize
         run: |
           ssh deploy-target "
-            docker exec mbfd-hub-laravel php artisan storage:link --force 2>/dev/null || true
-            docker exec mbfd-hub-laravel php artisan migrate --force
-            docker exec mbfd-hub-laravel php artisan optimize:clear
-            docker exec mbfd-hub-laravel php artisan config:cache
-            docker exec mbfd-hub-laravel php artisan route:cache
-            docker exec mbfd-hub-laravel php artisan view:cache || docker exec mbfd-hub-laravel php artisan view:clear
-            docker exec mbfd-hub-laravel php artisan filament:clear-cached-components
+            docker exec -u sail mbfd-hub-laravel php artisan storage:link --force 2>/dev/null || true
+            docker exec -u sail mbfd-hub-laravel php artisan migrate --force
+            docker exec -u sail mbfd-hub-laravel php artisan optimize:clear
+            docker exec -u sail mbfd-hub-laravel php artisan config:cache
+            docker exec -u sail mbfd-hub-laravel php artisan route:cache
+            docker exec -u sail mbfd-hub-laravel php artisan view:cache || docker exec -u sail mbfd-hub-laravel php artisan view:clear
+            docker exec -u sail mbfd-hub-laravel php artisan filament:clear-cached-components
             echo '✓ Laravel optimized'
           "
 
@@ -160,7 +160,7 @@ jobs:
         run: |
           ssh deploy-target "set -e
             docker exec -u sail mbfd-hub-laravel bash -c 'npm install --legacy-peer-deps && npm run build'
-            docker exec mbfd-hub-laravel php artisan filament:assets
+            docker exec -u sail mbfd-hub-laravel php artisan filament:assets
             docker exec -u sail mbfd-hub-laravel bash -c 'cd /var/www/html/resources/js/daily-checkout && npm install --legacy-peer-deps && npm run build'
             echo '✓ All frontend assets built'
           "
