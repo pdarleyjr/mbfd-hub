@@ -2,6 +2,18 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Admin\Pages\BidAccessPin;
+use App\Filament\Admin\Pages\EquipmentIntake;
+use App\Filament\Admin\Pages\TrtTrailerInventory;
+use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\NotificationSettings;
+use App\Filament\Pages\Settings;
+use App\Filament\Widgets\FleetStatsWidget;
+use App\Filament\Widgets\InventoryOverviewWidget;
+use App\Filament\Widgets\SmartUpdatesWidget;
+use App\Filament\Widgets\StationOperationsHubWidget;
+use App\Http\Middleware\RedirectTrainingUsers;
+use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -20,17 +32,6 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use App\Filament\Pages\Auth\Login;
-use App\Filament\Pages\NotificationSettings;
-use App\Filament\Pages\Settings;
-use App\Http\Middleware\RedirectTrainingUsers;
-use App\Filament\Admin\Pages\EquipmentIntake;
-use App\Filament\Admin\Pages\TrtTrailerInventory;
-use App\Filament\Widgets\FleetStatsWidget;
-use App\Filament\Widgets\InventoryOverviewWidget;
-use App\Filament\Widgets\StationOperationsHubWidget;
-use App\Filament\Widgets\SmartUpdatesWidget;
-use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use pxlrbt\FilamentSpotlight\SpotlightPlugin;
 use ShuvroRoy\FilamentSpatieLaravelHealth\FilamentSpatieLaravelHealthPlugin;
 
@@ -81,6 +82,7 @@ class AdminPanelProvider extends PanelProvider
                 Pages\Dashboard::class,
                 EquipmentIntake::class,
                 TrtTrailerInventory::class,
+                BidAccessPin::class,
             ])
             ->widgets([
                 FleetStatsWidget::class,
@@ -112,6 +114,9 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make()
                     ->label('External Tools')
                     ->icon('heroicon-o-arrow-top-right-on-square'),
+                NavigationGroup::make()
+                    ->label('Bid Administration')
+                    ->icon('heroicon-o-key'),
             ])
             ->userMenuItems([
                 MenuItem::make()
@@ -208,9 +213,9 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): string => self::safeRender('filament.admin.partials.keyboard-shortcuts')
-                    . self::safeRender('filament.admin.partials.status-bar')
-                    . self::safeRender('filament.admin.partials.install-prompt')
-                    . self::safeRender('filament.admin.partials.context-menu')
+                    .self::safeRender('filament.admin.partials.status-bar')
+                    .self::safeRender('filament.admin.partials.install-prompt')
+                    .self::safeRender('filament.admin.partials.context-menu')
             );
     }
 
@@ -229,11 +234,16 @@ class AdminPanelProvider extends PanelProvider
             if (! view()->exists($view)) {
                 return $fallback;
             }
+
             return view($view)->render();
         } catch (\Throwable $e) {
             if (app()->bound('sentry')) {
-                try { app('sentry')->captureException($e); } catch (\Throwable $ignored) {}
+                try {
+                    app('sentry')->captureException($e);
+                } catch (\Throwable $ignored) {
+                }
             }
+
             return $fallback;
         }
     }
