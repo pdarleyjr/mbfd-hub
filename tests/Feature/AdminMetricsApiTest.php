@@ -2,13 +2,14 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
 use App\Models\Apparatus;
-use App\Models\Station;
 use App\Models\ApparatusInspection;
-use App\Models\ApparatusDefect;
+use App\Models\Station;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 class AdminMetricsApiTest extends TestCase
@@ -20,9 +21,8 @@ class AdminMetricsApiTest extends TestCase
      */
     public function test_admin_metrics_returns_proper_json_structure(): void
     {
-        // Create an authenticated user
-        $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        // Create an authenticated admin user
+        $this->actingAsAdminUser();
 
         // Create test data
         $station = Station::create([
@@ -59,7 +59,7 @@ class AdminMetricsApiTest extends TestCase
 
         // Assert successful response
         $response->assertStatus(200);
-        
+
         // The API returns a nested structure with 'apparatuses', 'defects', 'inspections' keys
         $data = $response->json();
         $this->assertIsArray($data);
@@ -85,15 +85,14 @@ class AdminMetricsApiTest extends TestCase
      */
     public function test_metrics_contain_correct_data_types(): void
     {
-        $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        $this->actingAsAdminUser();
 
         $response = $this->getJson('/api/admin/metrics');
 
         $response->assertStatus(200);
-        
+
         $data = $response->json();
-        
+
         // The API returns nested structure: apparatuses.total, defects.total, inspections.today
         if (isset($data['apparatuses'])) {
             $this->assertIsInt($data['apparatuses']['total'] ?? null);
@@ -110,8 +109,7 @@ class AdminMetricsApiTest extends TestCase
      */
     public function test_metrics_accurately_count_records(): void
     {
-        $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        $this->actingAsAdminUser();
 
         // Create multiple stations and apparatuses
         $station1 = Station::create([
@@ -159,9 +157,9 @@ class AdminMetricsApiTest extends TestCase
         $response = $this->getJson('/api/admin/metrics');
 
         $response->assertStatus(200);
-        
+
         $data = $response->json();
-        
+
         // The API returns nested structure: apparatuses.total
         if (isset($data['apparatuses']['total'])) {
             $this->assertEquals(2, $data['apparatuses']['total']);
@@ -171,5 +169,18 @@ class AdminMetricsApiTest extends TestCase
             // Just verify the response is successful
             $this->assertIsArray($data);
         }
+    }
+
+    private function actingAsAdminUser(): User
+    {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $role = Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $user = User::factory()->create();
+        $user->assignRole($role);
+
+        Sanctum::actingAs($user);
+
+        return $user;
     }
 }
