@@ -2,26 +2,28 @@
 
 namespace App\Providers;
 
-use App\Models\Todo;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\EvaluationSubmission;
 use App\Models\FireEquipmentRequest;
 use App\Models\StationInspection;
 use App\Models\StationInventorySubmission;
-use App\Models\WorkgroupSharedUpload;
+use App\Models\Todo;
+use App\Models\Training\TrainingTodo;
 use App\Models\User;
+use App\Models\WorkgroupSharedUpload;
 use App\Notifications\NewSubmissionNotification;
-use App\Observers\TodoObserver;
 use App\Observers\ApparatusObserver;
-use App\Observers\WorkgroupSharedUploadObserver;
 use App\Observers\SyncToScreentinker;
+use App\Observers\TodoObserver;
+use App\Observers\TrainingTodoObserver;
+use App\Observers\WorkgroupSharedUploadObserver;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
-use Illuminate\Support\Facades\URL;
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Vite;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -57,6 +59,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Todo::observe(TodoObserver::class);
+        TrainingTodo::observe(TrainingTodoObserver::class);
         Apparatus::observe(ApparatusObserver::class);
 
         // Mirror admin password changes into ScreenTinker at media.mbfdhub.com.
