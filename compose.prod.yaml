@@ -121,8 +121,6 @@ services:
       - baserow-data:/baserow/data
     networks:
       - mbfd-net
-    security_opt:
-      - no-new-privileges:true
 
 networks:
   mbfd-net:
