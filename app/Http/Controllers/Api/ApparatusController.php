@@ -9,9 +9,9 @@ use App\Models\ApparatusDefect;
 use App\Models\Employee;
 use App\Jobs\AuditEquipmentAfterInspection;
 use App\Jobs\PmAlertNotificationJob;
+use App\Support\Security\Base64Image;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ApparatusController extends Controller
 {
@@ -93,8 +93,8 @@ class ApparatusController extends Controller
             'defects.*.item' => 'required|string',
             'defects.*.status' => 'required|string|in:Present,Missing,Damaged',
             'defects.*.notes' => 'nullable|string',
-            'defects.*.photo' => 'nullable|string',
-            'officer_signature' => 'nullable|string',
+            'defects.*.photo' => 'nullable|string|max:7000000',
+            'officer_signature' => 'nullable|string|max:7000000',
             'employee_id' => 'nullable|integer|exists:employees,id',
         ]);
 
@@ -103,17 +103,12 @@ class ApparatusController extends Controller
         // Save officer signature if provided
         $signaturePath = null;
         if ($request->officer_signature) {
-            $sig = $request->officer_signature;
-            if (preg_match('/^data:image\/(\w+);base64,/', $sig, $matches)) {
-                $sig = substr($sig, strpos($sig, ',') + 1);
-                $ext = $matches[1];
-            } else {
-                $ext = 'png';
-            }
-            $decoded = base64_decode($sig);
-            $filename = 'signatures/' . Str::uuid() . '.' . $ext;
-            Storage::disk('public')->put($filename, $decoded);
-            $signaturePath = $filename;
+            $signaturePath = $this->storeImageOrFail(
+                $request->officer_signature,
+                'signatures',
+                'signature',
+                'officer_signature'
+            );
         }
 
         // Resolve employee_id if provided
@@ -150,17 +145,12 @@ class ApparatusController extends Controller
             $photoPath = null;
 
             if (!empty($defectData['photo'])) {
-                $photo = $defectData['photo'];
-                if (preg_match('/^data:image\/(\w+);base64,/', $photo, $matches)) {
-                    $photo = substr($photo, strpos($photo, ',') + 1);
-                    $extension = $matches[1];
-                } else {
-                    $extension = 'jpg';
-                }
-                $decodedImage = base64_decode($photo);
-                $filename = 'defects/' . Str::uuid() . '.' . $extension;
-                Storage::disk('public')->put($filename, $decodedImage);
-                $photoPath = $filename;
+                $photoPath = $this->storeImageOrFail(
+                    $defectData['photo'],
+                    'defects',
+                    'defect',
+                    'defects.photo'
+                );
             }
 
             // Check for critical defects (Missing or Damaged)
@@ -237,5 +227,18 @@ class ApparatusController extends Controller
             ->get();
 
         return response()->json($employees);
+    }
+
+    private function storeImageOrFail(string $payload, string $directory, string $prefix, string $field): string
+    {
+        $path = Base64Image::store($payload, $directory, $prefix);
+
+        if ($path === null) {
+            throw ValidationException::withMessages([
+                $field => 'The uploaded image must be a valid JPEG, PNG, WebP, or GIF image.',
+            ]);
+        }
+
+        return $path;
     }
 }

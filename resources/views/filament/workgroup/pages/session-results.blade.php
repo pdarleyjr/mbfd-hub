@@ -184,7 +184,9 @@
         @if($saverReportHtml && !$saverReportLoading)
         <div style="padding: 1.25rem; font-size: 0.875rem; line-height: 1.6; color: #292524;">
             <div class="wg-saver-content">
-                {!! $saverReportHtml !!}
+                {{-- SECURITY: render-boundary sanitization in addition to
+                     WorkgroupAIService::sanitizeReportPayload(). --}}
+                {!! \App\Support\Security\SafeHtml::report($saverReportHtml) !!}
             </div>
         </div>
         @endif

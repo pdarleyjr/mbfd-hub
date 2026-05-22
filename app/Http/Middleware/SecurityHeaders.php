@@ -25,18 +25,14 @@ class SecurityHeaders
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
         }
 
-        // Content-Security-Policy — REPORT-ONLY for now.
+        // Content-Security-Policy — ENFORCING (promoted from Report-Only 2026-05-20).
         //
         // This permissive baseline is calibrated for Filament v3 (inline Alpine.js
         // attributes, Livewire hydration scripts), Vite's HMR client in dev, Reverb
         // WebSockets, Tailwind injected styles, Cloudflare Insights, and the React
         // SPAs under /daily/* /pump-simulator/* /apparatus-layout/*.
         //
-        // Promote to enforcing `Content-Security-Policy` ONLY after the
-        // `Content-Security-Policy-Report-Only` header has been live for 1+ week with
-        // zero unexpected violations posted to /_csp-report (see CspReportController).
-        // Filament Livewire payloads and PulsePoint embeds are the most likely places
-        // to need tuning. Grep observed violations with:
+        // Post-promotion monitoring: watch Sentry for CSP violation reports.
         //   docker exec mbfd-hub-laravel grep -F '[CSP]' storage/logs/laravel-$(date +%F).log
         $cspParts = [
             "default-src 'self'",
@@ -56,13 +52,20 @@ class SecurityHeaders
             "upgrade-insecure-requests",
             // Legacy report-uri — supported by every browser. Reporting API v1
             // (report-to + Report-To header) is more powerful but adds a second
-            // header and isn't supported by Safari yet; report-uri is enough to
-            // gate the 7-day clean window.
+            // header and isn't supported by Safari yet; report-uri is enough for
+            // an enforcement CSP.
             'report-uri /_csp-report',
         ];
-        $response->headers->set('Content-Security-Policy-Report-Only', implode('; ', $cspParts));
+        $response->headers->set('Content-Security-Policy', implode('; ', $cspParts));
 
+        // Strip X-Powered-By from BOTH the Symfony response bag (covers PHP-FPM)
+        // AND PHP's SAPI-level header stack (covers the php artisan serve dev
+        // server used by Sail, which auto-adds the header from expose_php=On at
+        // a layer below the response bag).
         $response->headers->remove('X-Powered-By');
+        if (! headers_sent() && function_exists('header_remove')) {
+            header_remove('X-Powered-By');
+        }
 
         return $response;
     }

@@ -4,10 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\StationInspection;
+use App\Support\Security\Base64Image;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class StationInspectionController extends Controller
 {
@@ -39,6 +40,7 @@ class StationInspectionController extends Controller
             'reviewed_by' => 'nullable|exists:users,id',
             'reviewed_at' => 'nullable|date',
             'notes' => 'nullable|string',
+            'form_data.checklist.*.failImage' => 'nullable|string|max:7000000',
         ]);
 
         // Process fail images in checklist items
@@ -55,20 +57,9 @@ class StationInspectionController extends Controller
                 $failImage = $item['failImage'] ?? null;
 
                 if (strtolower($status ?? '') === 'fail' && !empty($failImage) && str_contains($failImage, 'base64')) {
-                    // Extract base64 data (handle "data:image/...;base64,XXXX" format)
-                    $imageData = preg_replace('/^data:image\/\w+;base64,/', '', $failImage);
-                    $decoded = base64_decode($imageData, true);
-
-                    if ($decoded !== false) {
-                        $area = Str::slug($item['category'] ?? $item['area'] ?? 'general');
-                        $itemId = Str::slug($item['id'] ?? $item['label'] ?? $index);
-                        $filename = "si_{$area}_{$itemId}_{$timestamp}.jpg";
-                        $path = "station-inspections/{$filename}";
-
-                        Storage::disk('public')->put($path, $decoded);
-
-                        $item['failImage'] = $path;
-                    }
+                    $area = Str::slug($item['category'] ?? $item['area'] ?? 'general');
+                    $itemId = Str::slug($item['id'] ?? $item['label'] ?? $index);
+                    $item['failImage'] = $this->storeFailImageOrFail($failImage, "si_{$area}_{$itemId}_{$timestamp}");
                 }
             }
             unset($item);
@@ -106,6 +97,7 @@ class StationInspectionController extends Controller
             'sog_mandate_acknowledged' => 'nullable|boolean',
             'signature' => 'nullable|string',
             'submitted_at' => 'nullable|string',
+            'checklist.*.failImage' => 'nullable|string|max:7000000',
         ]);
 
         // Resolve station name to station_id
@@ -131,16 +123,9 @@ class StationInspectionController extends Controller
         foreach ($checklist as $index => &$item) {
             $failImage = $item['failImage'] ?? null;
             if (strtolower($item['status']) === 'fail' && !empty($failImage) && str_contains($failImage, 'base64')) {
-                $imageData = preg_replace('/^data:image\/\w+;base64,/', '', $failImage);
-                $decoded = base64_decode($imageData, true);
-                if ($decoded !== false) {
-                    $area = Str::slug($item['category'] ?? 'general');
-                    $itemId = Str::slug($item['id'] ?? (string) $index);
-                    $filename = "si_{$area}_{$itemId}_{$timestamp}.jpg";
-                    $path = "station-inspections/{$filename}";
-                    Storage::disk('public')->put($path, $decoded);
-                    $item['failImage'] = $path;
-                }
+                $area = Str::slug($item['category'] ?? 'general');
+                $itemId = Str::slug($item['id'] ?? (string) $index);
+                $item['failImage'] = $this->storeFailImageOrFail($failImage, "si_{$area}_{$itemId}_{$timestamp}");
             }
         }
         unset($item);
@@ -192,5 +177,18 @@ class StationInspectionController extends Controller
         $stationInspection->delete();
 
         return response()->json(null, 204);
+    }
+
+    private function storeFailImageOrFail(string $payload, string $prefix): string
+    {
+        $path = Base64Image::store($payload, 'station-inspections', $prefix);
+
+        if ($path === null) {
+            throw ValidationException::withMessages([
+                'failImage' => 'The uploaded fail image must be a valid JPEG, PNG, WebP, or GIF image.',
+            ]);
+        }
+
+        return $path;
     }
 }

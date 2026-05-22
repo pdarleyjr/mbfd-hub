@@ -7,6 +7,7 @@ use App\Models\EvaluationSubmission;
 use App\Models\Workgroup;
 use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
+use App\Support\Security\SafeHtml;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -29,6 +30,7 @@ use Illuminate\Support\Facades\Storage;
 class WorkgroupAIService
 {
     protected string $workerUrl;
+    protected ?string $workerSecret;
     protected int $timeout;
 
     public function __construct()
@@ -37,6 +39,7 @@ class WorkgroupAIService
             config('workgroup.ai_worker_url', env('WORKGROUP_AI_WORKER_URL', 'https://mbfd-workgroup-ai.pdarleyjr.workers.dev')),
             '/'
         );
+        $this->workerSecret = config('workgroup.ai_worker_secret', env('WORKGROUP_AI_WORKER_SECRET'));
         $this->timeout = 60; // AI requests can take up to 60s
     }
 
@@ -71,7 +74,7 @@ class WorkgroupAIService
         }
 
         try {
-            $response = Http::timeout($this->timeout)->post("{$this->workerUrl}/vectorize", [
+            $response = $this->workerRequest($this->timeout)->post("{$this->workerUrl}/vectorize", [
                 'text'         => $text,
                 'filename'     => $filename,
                 'productName'  => $productName,
@@ -199,7 +202,7 @@ class WorkgroupAIService
             $submissionsFormatted = $submissions->map(fn($s) => $this->formatSubmission($s))->values()->toArray();
 
             try {
-                $response = Http::timeout($this->timeout)->post("{$this->workerUrl}/analyze", [
+                $response = $this->workerRequest($this->timeout)->post("{$this->workerUrl}/analyze", [
                     'productName'     => $product->name,
                     'manufacturer'    => $product->manufacturer,
                     'model'           => $product->model,
@@ -243,7 +246,7 @@ class WorkgroupAIService
             $rankingType = $this->detectRankingType($category);
 
             try {
-                $response = Http::timeout($this->timeout)->post("{$this->workerUrl}/summary", [
+                $response = $this->workerRequest($this->timeout)->post("{$this->workerUrl}/summary", [
                     'category'    => $category,
                     'products'    => $products,
                     'sessionName' => $sessionName,
@@ -289,7 +292,7 @@ class WorkgroupAIService
         $sessionLabel = $session ? $session->name : 'Overall Project Evaluation';
 
         try {
-            $response = Http::timeout(120)->post("{$this->workerUrl}/executive-report", [
+            $response = $this->workerRequest(120)->post("{$this->workerUrl}/executive-report", [
                 'sessionName'  => $sessionLabel,
                 'sessionDate'  => now()->format('F j, Y'),
                 'categories'   => $categories,
@@ -299,7 +302,7 @@ class WorkgroupAIService
             ]);
 
             if ($response->successful()) {
-                $result = $response->json();
+                $result = $this->sanitizeReportPayload($response->json());
                 $cacheKey = $session
                     ? "workgroup_ai_exec_report_{$session->id}"
                     : "workgroup_ai_exec_report_overall_{$workgroup->id}";
@@ -347,7 +350,7 @@ class WorkgroupAIService
         $prompt = $this->buildSaverPrompt($results, $workgroup, $session);
 
         try {
-            $response = Http::timeout(120)->post("{$this->workerUrl}/saver-report", [
+            $response = $this->workerRequest(120)->post("{$this->workerUrl}/saver-report", [
                 'prompt' => $prompt,
                 'workgroupName' => $workgroup->name,
                 'sessionName' => $session?->name ?? 'All Sessions',
@@ -356,7 +359,7 @@ class WorkgroupAIService
 
             if ($response->successful()) {
                 $data = $response->json();
-                $html = $data['report'] ?? $data['result']['response'] ?? '';
+                $html = SafeHtml::report($data['report'] ?? $data['result']['response'] ?? '');
 
                 if (!empty($html)) {
                     Cache::put("workgroup_saver_report_{$workgroup->id}_{$session?->id}", $html, 3600);
@@ -394,7 +397,7 @@ class WorkgroupAIService
     protected function generateSaverReportFallback(string $prompt, Workgroup $workgroup, ?WorkgroupSession $session): string
     {
         try {
-            $response = Http::timeout(120)->post("{$this->workerUrl}/executive-report", [
+            $response = $this->workerRequest(120)->post("{$this->workerUrl}/executive-report", [
                 'sessionName' => $session?->name ?? 'All Sessions — ' . $workgroup->name,
                 'sessionDate' => now()->format('F j, Y'),
                 'categories' => [],
@@ -404,7 +407,7 @@ class WorkgroupAIService
 
             if ($response->successful()) {
                 $data = $response->json();
-                $html = $data['report'] ?? $data['result']['response'] ?? '';
+                $html = SafeHtml::report($data['report'] ?? $data['result']['response'] ?? '');
                 if (!empty($html)) {
                     Cache::put("workgroup_saver_report_{$workgroup->id}_{$session?->id}", $html, 3600);
                     return $html;
@@ -952,6 +955,44 @@ class WorkgroupAIService
         }
 
         return $chunks;
+    }
+
+    /**
+     * Sanitize AI-generated HTML from the Cloudflare Worker response.
+     *
+     * The worker returns a JSON payload with a 'report' key containing
+     * AI-generated HTML. We pass it through SafeHtml::report() which
+     * uses Symfony's HtmlSanitizer (allowSafeElements + table elements,
+     * strip all scripts/event handlers/iframes/objects).
+     */
+    private function sanitizeReportPayload(array $data): array
+    {
+        if (isset($data['report']) && is_string($data['report'])) {
+            $data['report'] = SafeHtml::report($data['report']);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Build an authenticated HTTP client for the Workgroup AI worker.
+     *
+     * Adds the shared x-api-secret header when WORKGROUP_AI_WORKER_SECRET is
+     * set, so the worker can reject anonymous traffic at the edge. Falls back
+     * to an unauthenticated request when no secret is configured (e.g. local
+     * development against a public worker).
+     */
+    protected function workerRequest(int $timeout): \Illuminate\Http\Client\PendingRequest
+    {
+        $request = Http::timeout($timeout)->acceptJson();
+
+        if (! empty($this->workerSecret)) {
+            $request = $request->withHeaders([
+                'x-api-secret' => $this->workerSecret,
+            ]);
+        }
+
+        return $request;
     }
 
     protected function fallbackAnalysis(CandidateProduct $product): array

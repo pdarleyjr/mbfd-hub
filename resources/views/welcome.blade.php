@@ -150,14 +150,16 @@
                     <!-- Shimmer loading state -->
                     <template x-if="loading">
                         <div class="px-5 py-3 space-y-3">
-                            <div class="flex items-start gap-3" x-for="n in [1,2,3]">
-                                <div class="shimmer-line h-3 w-10 mt-1 flex-shrink-0"></div>
-                                <div class="flex-1 space-y-1.5">
-                                    <div class="shimmer-line h-3 w-3/4"></div>
-                                    <div class="shimmer-line h-2.5 w-1/2"></div>
+                            <template x-for="n in [1,2,3]" :key="n">
+                                <div class="flex items-start gap-3">
+                                    <div class="shimmer-line h-3 w-10 mt-1 flex-shrink-0"></div>
+                                    <div class="flex-1 space-y-1.5">
+                                        <div class="shimmer-line h-3 w-3/4"></div>
+                                        <div class="shimmer-line h-2.5 w-1/2"></div>
+                                    </div>
+                                    <div class="shimmer-line h-4 w-12 rounded-full flex-shrink-0"></div>
                                 </div>
-                                <div class="shimmer-line h-4 w-12 rounded-full flex-shrink-0"></div>
-                            </div>
+                            </template>
                         </div>
                     </template>
 
@@ -353,7 +355,7 @@
                         loading: false,
                         lastSources: [],
                         streamBuffer: '',
-                        workerUrl: 'https://mbfd-support-ai.pdarleyjr.workers.dev/chat',
+                        workerUrl: '/api/public/support-chat',
 
                         get conversationHistory() {
                             return this.messages.slice(-10).map(m => ({
@@ -636,7 +638,13 @@
     <footer class="border-t border-neutral-200 bg-white/60 backdrop-blur-sm mt-8" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p class="text-xs text-neutral-400 font-medium">&copy; {{ date('Y') }} Miami Beach Fire Department</p>
-            <p class="text-xs text-neutral-400">Secured System &bull; Support Services Division</p>
+            <div class="flex items-center gap-3 text-xs text-neutral-400">
+                <a href="{{ url('/security-standards') }}" class="hover:text-neutral-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 rounded-sm transition-colors">Security &amp; Standards</a>
+                <span aria-hidden="true">&bull;</span>
+                <span>Secured System</span>
+                <span aria-hidden="true">&bull;</span>
+                <span>Support Services Division</span>
+            </div>
         </div>
     </footer>
 

@@ -96,7 +96,10 @@
     </div>
 
     <div class="content">
-        {!! $reportHtml !!}
+        {{-- SECURITY: render-boundary sanitization. The PDF renderer
+             (Dompdf) executes inline <script>/<style> in some configurations,
+             so we re-sanitize defensively. --}}
+        {!! \App\Support\Security\SafeHtml::report($reportHtml) !!}
     </div>
 
     <div class="footer">

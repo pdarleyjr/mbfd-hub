@@ -250,8 +250,10 @@
         {{-- AI-generated report content --}}
         @if(!empty($reportHtml))
         <div class="saver-report-body">
-            {{-- SECURITY: $reportHtml must be sanitized before rendering. It is AI-generated HTML controlled by admins. --}}
-            {!! $reportHtml !!}
+            {{-- SECURITY: Defense-in-depth — re-sanitize at the render boundary
+                 in case a stale, pre-sanitization cache entry survives the
+                 WorkgroupAIService::sanitizeReportPayload() upgrade. --}}
+            {!! \App\Support\Security\SafeHtml::report($reportHtml) !!}
         </div>
         @else
         <div style="text-align: center; padding: 3rem 0; color: #6B7280;">
