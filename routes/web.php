@@ -10,6 +10,10 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Public Security & Standards trust page — no auth required, indexable.
+Route::view('/security-standards', 'security-standards')
+    ->name('security-standards');
+
 // Public incident feed — proxies PulsePoint Worker with 60s server-side cache
 Route::get('/api/incidents', [IncidentsController::class, 'index'])->name('incidents.index');
 

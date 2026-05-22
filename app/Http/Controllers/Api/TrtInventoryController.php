@@ -8,10 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Models\TrtInventoryCatalogItem;
 use App\Models\TrtInventoryEntry;
 use App\Models\TrtInventorySession;
+use App\Support\Security\Base64Image;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class TrtInventoryController extends Controller
 {
@@ -198,33 +197,11 @@ class TrtInventoryController extends Controller
      */
     private function processBase64Image(string $base64, int $catalogItemId): ?string
     {
-        if (! preg_match('/^data:image\/(jpeg|jpg|png|webp|gif);base64,/', $base64)) {
-            return null;
-        }
-
-        $imageData = preg_replace('/^data:image\/\w+;base64,/', '', $base64);
-        $decoded = base64_decode($imageData, true);
-
-        if ($decoded === false || strlen($decoded) < 12) {
-            return null;
-        }
-
-        // Validate magic bytes to prevent arbitrary file writes
-        $isJpeg = str_starts_with($decoded, "\xFF\xD8\xFF");
-        $isPng = str_starts_with($decoded, "\x89PNG");
-        $isWebP = substr($decoded, 0, 4) === 'RIFF' && substr($decoded, 8, 4) === 'WEBP';
-        $isGif = str_starts_with($decoded, 'GIF8');
-
-        if (! $isJpeg && ! $isPng && ! $isWebP && ! $isGif) {
-            return null;
-        }
-
-        $timestamp = now()->format('Ymd_His');
-        $filename = "trt_{$catalogItemId}_{$timestamp}_" . Str::random(4) . '.jpg';
-        $path = "trt-inventory/images/{$filename}";
-
-        Storage::disk('public')->put($path, $decoded);
-
-        return $path;
+        return Base64Image::store(
+            payload: $base64,
+            directory: 'trt-inventory/images',
+            prefix: "trt_{$catalogItemId}",
+            maxBytes: 500_000
+        );
     }
 }
