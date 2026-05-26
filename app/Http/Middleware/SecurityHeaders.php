@@ -15,7 +15,10 @@ class SecurityHeaders
         $response = $next($request);
 
         $response->headers->set('X-Content-Type-Options', 'nosniff');
-        $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
+        // X-Frame-Options is deprecated and only accepts DENY|SAMEORIGIN — it can't
+        // express "self + cloud.mbfdhub.com". The CSP `frame-ancestors` directive
+        // below covers the same use case and supersedes this header in all modern
+        // browsers, so we omit it intentionally.
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
         $response->headers->set('X-XSS-Protection', '1; mode=block');
@@ -43,7 +46,9 @@ class SecurityHeaders
             "media-src 'self' blob: https:",
             "connect-src 'self' wss: https://api.pulsepoint.org https://web.pulsepoint.org https://static.cloudflareinsights.com",
             "frame-src 'self' https://www.pulsepoint.org https://web.pulsepoint.org https://baserow.mbfdhub.com https://inventory.mbfdhub.com",
-            "frame-ancestors 'self'",
+            // Allow cloud.mbfdhub.com (Nextcloud) to embed this site as an
+            // External Sites iframe. All other origins remain blocked.
+            "frame-ancestors 'self' https://cloud.mbfdhub.com",
             "form-action 'self'",
             "base-uri 'self'",
             "object-src 'none'",
