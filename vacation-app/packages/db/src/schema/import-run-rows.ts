@@ -7,7 +7,7 @@ export const importRunRows = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     importRunId: uuid('import_run_id')
       .notNull()
-      .references(() => importRuns.id),
+      .references(() => importRuns.id, { onDelete: 'cascade' }),
     rowIndex: integer('row_index').notNull(),
     rawRowJson: jsonb('raw_row_json').notNull(),
     parsedStatus: text('parsed_status').notNull(),

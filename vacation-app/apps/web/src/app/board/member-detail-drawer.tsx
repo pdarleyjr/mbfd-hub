@@ -4,7 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ExternalLink, Loader2, ShieldAlert, ShieldCheck, X, XCircle } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, type MemberProfile } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -107,7 +107,10 @@ function MemberDetailBody({
     <div className="flex flex-col gap-4">
       <MemberHeader profile={profile} />
 
-      <MemberEditor profile={profile} rules={rules} />
+      {/* key by member id so opening the drawer for a different member
+          resets the editor's local state — `useState` initialisers only
+          run on first mount. */}
+      <MemberEditor key={profile.member.id} profile={profile} rules={rules} />
 
       <BalancesCard balances={profile.balances} />
 
@@ -395,16 +398,26 @@ function DecisionCheckCard({
 }: {
   profile: MemberProfile;
 }): React.JSX.Element {
-  const today = new Date().toISOString().slice(0, 10);
-  const [dayDate, setDayDate] = useState(today);
+  // Lazy initialisers so we don't construct a Date on every render (and
+  // so SSR / client hydrate cleanly, since the hook only runs on the
+  // client).
+  const [dayDate, setDayDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [blockIndex, setBlockIndex] = useState<0 | 1>(0);
-  const [leaveCode, setLeaveCode] = useState('V');
+  const [leaveCode, setLeaveCode] = useState<string>('');
 
   const lc = useQuery({
     queryKey: ['leaveCodes'],
     queryFn: () => api.listLeaveCodes(),
     staleTime: 60_000,
   });
+
+  // Once the list loads, default to the first available code rather than
+  // a hard-coded 'V' that may have been removed by the admin.
+  useEffect(() => {
+    if (!lc.data || leaveCode) return;
+    const first = lc.data.leaveCodes[0]?.code;
+    if (first) setLeaveCode(first);
+  }, [lc.data, leaveCode]);
 
   const decision = useMutation({
     mutationFn: () =>
@@ -459,7 +472,7 @@ function DecisionCheckCard({
         <Button
           size="sm"
           onClick={() => decision.mutate()}
-          disabled={decision.isPending}
+          disabled={decision.isPending || !leaveCode}
         >
           {decision.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
           Check
@@ -495,7 +508,7 @@ export function DecisionResultPanel({
       </div>
       <ul className="mt-2 space-y-1 text-xs">
         {result.reasons.map((r, i) => (
-          <li key={i} className="flex items-start gap-1.5">
+          <li key={`${r.rule}-${i}`} className="flex items-start gap-1.5">
             {r.ok ? (
               <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-700" aria-hidden />
             ) : (

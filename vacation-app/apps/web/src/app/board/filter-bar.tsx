@@ -5,7 +5,10 @@ import { cn } from '@/lib/utils';
 import type { BoardFilterState } from './use-board-filters';
 
 const SHIFTS = ['A', 'B', 'C', 'STAFF'] as const;
-const RANKS = ['DC', 'CAPT', 'LT', 'FF', 'PROB'] as const;
+// Combat ranks first (officers high-to-low, then FFs), then a couple of
+// common civilian buckets. Anything beyond this list can still be reached
+// via the search bar.
+const RANKS = ['CHIEF', 'DDC', 'DC', 'CAPT', 'LT', 'FF-DE', 'FF', 'PROB'] as const;
 
 export function FilterBar({
   filters,

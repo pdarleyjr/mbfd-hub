@@ -51,6 +51,23 @@ board.get('/board', async (c) => {
       sql`${members.rankId} IN (SELECT ${ranks.id} FROM ${ranks} WHERE ${ranks.code} = ANY(${f.rank}))`,
     );
   }
+  if (f.onlyWithLeave) {
+    // Apply the "members with leave in the window" filter in SQL so
+    // pagination + the total count stay consistent. Without this the
+    // total returned was the unfiltered count while the page was
+    // post-filtered, which made later pages render as empty.
+    memberFilters.push(
+      sql`EXISTS (
+        SELECT 1
+        FROM ${leaveEntries} le
+        INNER JOIN ${shiftBlocks} sb ON sb.id = le.shift_block_id
+        INNER JOIN ${calendarDays} cd ON cd.id = sb.calendar_day_id
+        WHERE le.member_id = ${members.id}
+          AND le.superseded_by_entry_id IS NULL
+          AND cd.date BETWEEN ${fromDate} AND ${toDate}
+      )`,
+    );
+  }
   const where = and(...memberFilters);
 
   // Total count with the same filters applied.
@@ -132,14 +149,10 @@ board.get('/board', async (c) => {
     sourceImportRunId: r.sourceImportRunId,
   }));
 
-  let finalMembers = memberRows;
-  if (f.onlyWithLeave) {
-    const idsWithLeave = new Set(cells.map((c) => c.memberId));
-    finalMembers = finalMembers.filter((m) => idsWithLeave.has(m.id));
-  }
-
+  // onlyWithLeave is now applied at SQL level (memberFilters above) so
+  // pagination + totalMembers stay consistent. No JS post-filter needed.
   return c.json({
-    members: finalMembers.map((m) => ({
+    members: memberRows.map((m) => ({
       id: m.id,
       employeeId: m.employeeId,
       lastName: m.lastName,

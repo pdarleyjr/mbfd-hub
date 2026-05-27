@@ -8,8 +8,16 @@ export type ParsedRow = Record<string, string | number | null>;
 
 const EXCEL_EPOCH = dayjs('1899-12-30');
 
+/**
+ * Convert an Excel date serial to an ISO datetime. The integer part is
+ * the day offset from 1899-12-30; the fractional part encodes time of
+ * day. We add the integer days then the fractional millisecond remainder
+ * so a serial like 45678.5 round-trips as midday rather than midnight.
+ */
 function excelSerialToISO(serial: number): string {
-  return EXCEL_EPOCH.add(serial, 'day').toISOString();
+  const days = Math.floor(serial);
+  const msInDay = (serial - days) * 86_400_000;
+  return EXCEL_EPOCH.add(days, 'day').add(Math.round(msInDay), 'millisecond').toISOString();
 }
 
 /**
@@ -36,7 +44,6 @@ export function parseXlsx(source: Readable): AsyncGenerator<{
 }> {
   return (async function* () {
     const reader = new XlsxStreamReader();
-    const queue: { type: 'row'; row: string[] } | { type: 'end' } | { type: 'error'; err: Error }[] = [] as never;
     const events: Array<
       | { type: 'row'; row: string[] }
       | { type: 'end' }

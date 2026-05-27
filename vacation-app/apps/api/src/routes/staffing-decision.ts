@@ -30,7 +30,7 @@ import {
   type DecisionResult,
   type StaffingRules,
 } from '@mbfd-vacation/shared';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, between, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { db } from '../db';
 import { loadStaffingRules } from './staffing-rules';
@@ -163,6 +163,10 @@ async function exchangeYtd(opts: {
   if (opts.exchangeCodes.length === 0) return { shifts: 0, hours: 0 };
   const yearStart = `${opts.year}-01-01`;
   const yearEnd = `${opts.year}-12-31`;
+  // Exchange codes are admin-editable via /admin/rules — pass them through
+  // `inArray` so Drizzle parameterises the list and Postgres sees `= ANY($1)`
+  // rather than a raw SQL fragment.
+  const upperCodes = opts.exchangeCodes.map((c) => c.toUpperCase());
   const [row] = await db
     .select({
       shifts: sql<number>`count(*)::int`,
@@ -176,8 +180,8 @@ async function exchangeYtd(opts: {
       and(
         isNull(leaveEntries.supersededByEntryId),
         eq(leaveEntries.memberId, opts.memberId),
-        sql`upper(${leaveCodes.code}) = ANY(${opts.exchangeCodes.map((c) => c.toUpperCase())})`,
-        sql`${calendarDays.date} BETWEEN ${yearStart} AND ${yearEnd}`,
+        inArray(sql`upper(${leaveCodes.code})`, upperCodes),
+        between(calendarDays.date, yearStart, yearEnd),
       ),
     );
   return { shifts: Number(row?.shifts ?? 0), hours: Number(row?.hours ?? 0) };
@@ -188,25 +192,60 @@ function blockStartLocalHour(blockIndex: number): number {
   return blockIndex === 0 ? 8 : 20;
 }
 
+/**
+ * Severity ladder for combining multiple failed reasons. Higher number =
+ * stricter outcome. Picking the max ensures the verdict doesn't depend on
+ * which order the rules pushed their reasons into the array.
+ */
+const SEVERITY: Record<DecisionResult['decision'], number> = {
+  grant: 0,
+  grant_after_2000: 1,
+  requires_chief_override: 2,
+  deny: 3,
+};
+
+const DECISION_BY_SEVERITY: DecisionResult['decision'][] = [
+  'grant',
+  'grant_after_2000',
+  'requires_chief_override',
+  'deny',
+];
+
+function reasonSeverity(rule: DecisionReason['rule']): DecisionResult['decision'] {
+  switch (rule) {
+    case 'air_tech_no_leave_until':
+      return 'grant_after_2000';
+    case 'exchange_shifts_cap':
+    case 'exchange_hours_cap':
+      // Per the doc the chief can authorize exceptions in writing.
+      return 'requires_chief_override';
+    case 'min_preschedule_staffing':
+    case 'marine_firefighter_cap':
+    case 'rank_pairing':
+    case 'a_day_pairing':
+    case 'de_pairing':
+    case 'at_pairing':
+    case 'over_chief_only':
+      return 'deny';
+    case 'data_missing':
+      // Data gaps shouldn't auto-deny — they're informational. The engine
+      // surfaces them so the admin can fill in the missing tag.
+      return 'grant';
+    default:
+      return 'deny';
+  }
+}
+
 function pickWorstDecision(
   reasons: DecisionReason[],
 ): DecisionResult['decision'] {
-  let decision: DecisionResult['decision'] = 'grant';
+  let worst = SEVERITY.grant;
   for (const r of reasons) {
     if (r.ok) continue;
-    if (r.rule === 'air_tech_no_leave_until' && decision === 'grant') {
-      decision = 'grant_after_2000';
-    } else if (r.rule === 'exchange_shifts_cap' || r.rule === 'exchange_hours_cap') {
-      // Chief can authorize exceptions per the doc; flag as overrideable
-      // unless something else hard-denies.
-      if (decision === 'grant' || decision === 'grant_after_2000') {
-        decision = 'requires_chief_override';
-      }
-    } else {
-      decision = 'deny';
-    }
+    const sev = SEVERITY[reasonSeverity(r.rule)];
+    if (sev > worst) worst = sev;
   }
-  return decision;
+  return DECISION_BY_SEVERITY[worst] ?? 'grant';
 }
 
 async function evaluate(
@@ -280,25 +319,28 @@ async function evaluate(
   }
 
   // ── 2) Marine FF cap ──────────────────────────────────────────────────
+  // Cached so the final-tally `marineFfOffOnDay` field doesn't reissue the
+  // join. -1 means "not computed yet".
+  let marineOffCount = -1;
   if (
     member.station === rules.marineStationKey &&
     member.shift &&
     COMBAT_SHIFTS.has(member.shift) &&
     (member.rankCode === 'FF' || member.rankCode === 'FF-DE')
   ) {
-    const marineOff = await countMarineFfOffOnDay({
+    marineOffCount = await countMarineFfOffOnDay({
       shift: member.shift,
       dayDate: req.dayDate,
       marineKey: rules.marineStationKey,
     });
-    const ok = marineOff < rules.marineFirefighterOffCap;
+    const ok = marineOffCount < rules.marineFirefighterOffCap;
     reasons.push({
       rule: 'marine_firefighter_cap',
       ok,
       message: ok
-        ? `Marine FFs off on ${req.dayDate}: ${marineOff} (cap ${rules.marineFirefighterOffCap}).`
-        : `Marine FF cap reached: ${marineOff}/${rules.marineFirefighterOffCap} already off on ${req.dayDate}.`,
-      detail: { off: marineOff, cap: rules.marineFirefighterOffCap },
+        ? `Marine FFs off on ${req.dayDate}: ${marineOffCount} (cap ${rules.marineFirefighterOffCap}).`
+        : `Marine FF cap reached: ${marineOffCount}/${rules.marineFirefighterOffCap} already off on ${req.dayDate}.`,
+      detail: { off: marineOffCount, cap: rules.marineFirefighterOffCap },
     });
   }
 
@@ -336,11 +378,26 @@ async function evaluate(
           ok: false,
           message: `Exchange partner ${req.exchangePartnerId} not found.`,
         });
+      } else if (!member.rankCode || !partner.rankCode) {
+        // Missing rank data — surface so the admin can fix the tag.
+        reasons.push({
+          rule: 'data_missing',
+          ok: false,
+          message:
+            !member.rankCode && !partner.rankCode
+              ? 'Both the member and the partner are missing rank data; the rank-pairing rule cannot be evaluated.'
+              : !member.rankCode
+                ? 'The member is missing rank data; the rank-pairing rule cannot be evaluated.'
+                : 'The partner is missing rank data; the rank-pairing rule cannot be evaluated.',
+          detail: {
+            member_rank: member.rankCode,
+            partner_rank: partner.rankCode,
+          },
+        });
       } else {
         // Rank pairing for regular exchanges
         const allowed =
-          (member.rankCode &&
-            rules.rankPairingRules[member.rankCode]?.includes(partner.rankCode ?? '')) ??
+          rules.rankPairingRules[member.rankCode]?.includes(partner.rankCode) ??
           false;
         reasons.push({
           rule: 'rank_pairing',
@@ -415,15 +472,20 @@ async function evaluate(
   const decision = pickWorstDecision(reasons);
 
   // Marine off count for the day (informational; only meaningful for
-  // requests on a combat shift).
-  const marineFfOffOnDay =
-    member.shift && COMBAT_SHIFTS.has(member.shift)
-      ? await countMarineFfOffOnDay({
-          shift: member.shift,
-          dayDate: req.dayDate,
-          marineKey: rules.marineStationKey,
-        })
-      : 0;
+  // requests on a combat shift). Reuses the value the Marine-cap rule
+  // already computed when it was applicable; falls back to a fresh query
+  // for non-Marine combat-shift requesters.
+  let marineFfOffOnDay = marineOffCount;
+  if (marineFfOffOnDay < 0) {
+    marineFfOffOnDay =
+      member.shift && COMBAT_SHIFTS.has(member.shift)
+        ? await countMarineFfOffOnDay({
+            shift: member.shift,
+            dayDate: req.dayDate,
+            marineKey: rules.marineStationKey,
+          })
+        : 0;
+  }
 
   return {
     decision,
