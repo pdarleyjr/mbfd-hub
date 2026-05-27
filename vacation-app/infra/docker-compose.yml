@@ -1,0 +1,97 @@
+name: mbfd-vacation
+
+services:
+  vac-postgres:
+    image: postgres:16-alpine
+    container_name: vac-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vacation}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-vacation}
+    volumes:
+      - vac-pgdata:/var/lib/postgresql/data
+      - ./postgres/extensions.sql:/docker-entrypoint-initdb.d/00-extensions.sql:ro
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vacation} -d ${POSTGRES_DB:-vacation}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [vac-net]
+    # not exposed to host in prod overlay
+
+  vac-redis:
+    image: redis:7-alpine
+    container_name: vac-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - vac-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [vac-net]
+
+  vac-api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    container_name: vac-api
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-vacation}:${POSTGRES_PASSWORD}@vac-postgres:5432/${POSTGRES_DB:-vacation}
+      REDIS_URL: redis://vac-redis:6379
+      API_PORT: 3001
+    depends_on:
+      vac-postgres:
+        condition: service_healthy
+      vac-redis:
+        condition: service_healthy
+    networks: [vac-net]
+
+  vac-worker:
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    container_name: vac-worker
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-vacation}:${POSTGRES_PASSWORD}@vac-postgres:5432/${POSTGRES_DB:-vacation}
+      REDIS_URL: redis://vac-redis:6379
+    depends_on:
+      vac-postgres:
+        condition: service_healthy
+      vac-redis:
+        condition: service_healthy
+    networks: [vac-net]
+
+  vac-web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    container_name: vac-web
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_URL: http://vac-api:3001
+      PORT: 3000
+    depends_on:
+      - vac-api
+    networks: [vac-net]
+
+volumes:
+  vac-pgdata: {}
+  vac-redisdata: {}
+
+networks:
+  vac-net:
+    driver: bridge
+    name: vac-net
