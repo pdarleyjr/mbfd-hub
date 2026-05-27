@@ -10,12 +10,13 @@ const PATTERNS: Pattern[] = [
   { target: 'badge_number',       substrings: ['badge', 'badge_num', 'badge number'] },
   { target: 'last_name',          substrings: ['last name', 'last_name', 'lastname', 'surname'] },
   { target: 'first_name',         substrings: ['first name', 'first_name', 'firstname', 'given name'] },
-  { target: 'rank',               substrings: ['rank', 'position', 'title', 'class'] },
+  { target: 'full_name',          substrings: ['name', 'full name', 'full_name', 'employee name'] },
+  { target: 'rank',               substrings: ['position rank', 'reporting rank', 'rank', 'position', 'title', 'class'] },
   { target: 'shift',              substrings: ['shift', 'platoon', 'crew'] },
   { target: 'a_day_group',        substrings: ['a-day', 'a day', 'aday', 'r-day', 'r day', 'rday', 'cycle'] },
   { target: 'hire_date',          substrings: ['hire date', 'hire_date', 'seniority date', 'start date'] },
-  { target: 'event_datetime',     substrings: ['datetime', 'date_time', 'start datetime', 'start_datetime', 'start time', 'start_time', 'from datetime', 'from_datetime', 'event start', 'date'] },
-  { target: 'event_end_datetime', substrings: ['end datetime', 'end_datetime', 'end time', 'end_time', 'thru', 'to datetime', 'event end'] },
+  { target: 'event_datetime',     substrings: ['start datetime', 'start_datetime', 'start time', 'start_time', 'event start', 'start', 'from datetime', 'from_datetime', 'datetime', 'date_time', 'date'] },
+  { target: 'event_end_datetime', substrings: ['end datetime', 'end_datetime', 'end time', 'end_time', 'event end', 'end', 'thru', 'to datetime'] },
   { target: 'event_description',  substrings: ['description', 'work code description', 'work description', 'paycode description', 'event description', 'reason'] },
   { target: 'event_work_code',    substrings: ['work code', 'work_code', 'paycode', 'pay code', 'event code', 'code'] },
 ];
@@ -27,11 +28,19 @@ function normalize(s: string): string {
 function score(header: string, pattern: Pattern): number {
   const h = normalize(header);
   let best = 0;
-  for (const needle of pattern.substrings) {
-    const n = normalize(needle);
-    if (h === n) return 100;
+  // Earlier needles within a pattern carry higher priority — this lets us
+  // disambiguate between two headers that both score equally on substring
+  // match (e.g. Telestaff exports include both "Date" and "Start"; the
+  // shift block math needs the Start column, so 'start' precedes 'date').
+  for (let i = 0; i < pattern.substrings.length; i++) {
+    const n = normalize(pattern.substrings[i]!);
+    const priorityBonus = pattern.substrings.length - i;
+    if (h === n) return 100 + priorityBonus;
     if (h.includes(n)) {
-      best = Math.max(best, 80 - Math.max(0, h.length - n.length));
+      best = Math.max(
+        best,
+        80 - Math.max(0, h.length - n.length) + priorityBonus,
+      );
     }
   }
   return best;

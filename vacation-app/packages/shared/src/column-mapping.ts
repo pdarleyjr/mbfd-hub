@@ -9,6 +9,7 @@ import { z } from 'zod';
 export const ColumnTarget = z.enum([
   'employee_id',
   'badge_number',
+  'full_name',
   'last_name',
   'first_name',
   'rank',
