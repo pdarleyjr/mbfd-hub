@@ -229,6 +229,9 @@ importers:
       tsx:
         specifier: ^4.19.2
         version: 4.22.1
+      xlsx:
+        specifier: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
+        version: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
       xlsx-stream-reader:
         specifier: ^1.1.1
         version: 1.1.1
@@ -3526,6 +3529,12 @@ packages:
     resolution: {integrity: sha512-BRW8CJ6tQ2mRPUcFwAu+XSYKnxqKlBrhPw1r/L/dl0n/XW4tpSwKSg4v2ECCyQFzv6gZDmoVQxbEIVQMPH0uSQ==}
     engines: {node: '>= 0.10.0'}
 
+  xlsx@https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz:
+    resolution: {tarball: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz}
+    version: 0.20.3
+    engines: {node: '>=0.8'}
+    hasBin: true
+
   xml-naming@0.1.0:
     resolution: {integrity: sha512-k8KO9hrMyNk6tUWqUfkTEZbezRRpONVOzUTnc97VnCvyj6Tf9lyUR9EDAIeiVLv56jsMcoXEwjW8Kv5yPY52lw==}
     engines: {node: '>=16.0.0'}
@@ -6480,6 +6489,8 @@ snapshots:
       ssf: 0.11.2
       tmp: 0.2.6
       unzipper: 0.10.14
+
+  xlsx@https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz: {}
 
   xml-naming@0.1.0: {}
 
