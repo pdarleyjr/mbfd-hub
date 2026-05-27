@@ -1,5 +1,10 @@
 # Deployment — MBFD Vacation Selection V1
 
+> **STATUS (2026-05-27):** V1 is **already deployed and serving** at
+> https://vacation.mbfdhub.com. This document is the runbook used to do
+> that — it remains the source of truth for re-deploying from scratch on
+> a new host or restoring after disaster.
+
 This is the end-to-end checklist for the GMKtec EVO-X2 first deploy.
 Everything is additive; nothing here touches MBFDHub, Nextcloud, OWUI, the
 admin dashboard, or any other existing stack on the box.
@@ -47,11 +52,14 @@ Edit `.env` and fill in:
 ## Step 3 — Build & start
 
 ```bash
-docker compose \
+docker compose --env-file .env \
   -f infra/docker-compose.yml \
   -f infra/docker-compose.prod.yml \
   up -d --build
 ```
+
+The `--env-file .env` flag is REQUIRED — compose's interpolation looks for
+`infra/.env` by default, but our `.env` lives at the project root.
 
 This builds `vac-api`, `vac-worker`, `vac-web`, and `vac-nginx`, then starts
 the full stack. Postgres + Redis come up first; the apps wait for them.
@@ -59,31 +67,37 @@ the full stack. Postgres + Redis come up first; the apps wait for them.
 ## Step 4 — Run migrations + seed
 
 ```bash
-docker compose exec vac-api node packages/db/dist/migrate.js
-docker compose exec vac-api node packages/db/dist/seed.js
+docker compose --env-file .env -f infra/docker-compose.yml exec -T vac-api \
+  node --import tsx/esm packages/db/src/migrate.ts
+docker compose --env-file .env -f infra/docker-compose.yml exec -T vac-api \
+  node --import tsx/esm packages/db/src/seed.ts
 ```
 
-(The image bundles the compiled migrate + seed scripts.)
+(The containers run TypeScript directly via tsx — no dist build step.)
 
-## Step 5 — Splice the Cloudflare Tunnel ingress
+## Step 5 — Add Cloudflare Tunnel ingress + DNS via API
 
-Open the existing tunnel config on GMKtec:
+The GMKtec `cloudflared` instance is token-based (no local YAML config),
+so ingress changes go through the Cloudflare API. We need TWO hostnames:
+
+- `vacation.mbfdhub.com` — what users hit, gated by the PIN Worker
+- `vacation-origin.mbfdhub.com` — same tunnel, NO Worker; the PIN Worker
+  proxies authenticated traffic here. Without a separate origin hostname
+  the Worker would loop.
+
+Both are added as ingress rules above the catch-all 404, then created as
+proxied CNAMEs pointing at `<tunnel-id>.cfargotunnel.com`. The tunnel id
+is `20cb894c-a5b0-4149-bc11-1499d772401e`; the zone id for `mbfdhub.com`
+is `9c7b03d154bbf6abe7b2edd4b5c33fe5`.
+
+Use a CF API token with Tunnel + DNS Edit permissions (the user's
+`cfut_` Wrangler token has both). The exact API calls performed during
+the first deploy are in `git log -p` for commit b6facae9 onward, or:
 
 ```bash
-sudo nano /etc/cloudflared/config.yml
-```
-
-Splice the contents of `infra/cloudflared/ingress-snippet.yml` into the
-`ingress:` list ABOVE the catch-all `service: http_status:404` rule. Then:
-
-```bash
-sudo systemctl restart cloudflared
-```
-
-Create the DNS record:
-
-```bash
-cloudflared tunnel route dns mbfdhub-gmktec vacation.mbfdhub.com
+# 1. Fetch tunnel config, splice in vacation.mbfdhub.com + vacation-origin
+#    above the catch-all 404 rule, PUT it back.
+# 2. POST DNS CNAME records for both hostnames.
 ```
 
 ## Step 6 — Deploy the PIN-gate Worker
@@ -92,18 +106,17 @@ On your laptop:
 
 ```bash
 cd vacation-app/apps/pin-gate
-npx wrangler kv:namespace create "PIN_AUDIT_KV"
-# → paste the returned id into wrangler.toml
-npx wrangler secret put PIN_VALUE                  # the shared department PIN
-npx wrangler secret put PIN_SIGNING_SECRET         # openssl rand -hex 32
-npx wrangler secret put PIN_AUDIT_WEBHOOK_SECRET   # MUST match step 2
+export CLOUDFLARE_API_TOKEN="<your cfut_ token>"
+npx wrangler kv namespace create PIN_AUDIT_KV
+# Paste the returned id into wrangler.toml's [[kv_namespaces]] block.
+echo "2300" | npx wrangler secret put PIN_VALUE
+openssl rand -hex 32 | npx wrangler secret put PIN_SIGNING_SECRET
+echo "<webhook secret from .env on GMKtec>" | npx wrangler secret put PIN_AUDIT_WEBHOOK_SECRET
 npx wrangler deploy
 ```
 
-Bind the Worker to the hostname in the Cloudflare dashboard:
-
-- Workers & Pages → `mbfd-vacation-pin-gate` → Triggers → Routes
-- Add route: `vacation.mbfdhub.com/*` on zone `mbfdhub.com`
+The `[[routes]]` block in `wrangler.toml` automatically binds the Worker
+to `vacation.mbfdhub.com/*` on every deploy. No dashboard step needed.
 
 ## Step 7 — Smoke test
 
