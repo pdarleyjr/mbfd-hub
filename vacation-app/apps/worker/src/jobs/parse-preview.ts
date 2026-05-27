@@ -1,12 +1,12 @@
 import { importRunRows, importRuns, workCodeMappings } from '@mbfd-vacation/db';
 import type { PreviewEvent } from '@mbfd-vacation/shared';
 import { eq, sql } from 'drizzle-orm';
-import { db } from '../db.js';
-import { logger } from '../log.js';
-import { detectKindFromName, iterRows } from '../parse/detect.js';
-import { inferColumnMapping } from '../parse/infer-mapping.js';
-import { getStream } from '../r2.js';
-import { publish } from '../publish.js';
+import { db } from '../db';
+import { logger } from '../log';
+import { detectKindFromName, iterRows } from '../parse/detect';
+import { inferColumnMapping } from '../parse/infer-mapping';
+import { getStream } from '../r2';
+import { publish } from '../publish';
 import { findTarget } from '@mbfd-vacation/shared';
 
 const SAMPLE_LIMIT = 100;

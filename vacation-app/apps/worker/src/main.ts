@@ -1,10 +1,10 @@
 import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
-import { close } from './db.js';
-import { getEnv } from './env.js';
-import { commitImportJob } from './jobs/commit-import.js';
-import { parsePreviewJob } from './jobs/parse-preview.js';
-import { logger } from './log.js';
+import { close } from './db';
+import { getEnv } from './env';
+import { commitImportJob } from './jobs/commit-import';
+import { parsePreviewJob } from './jobs/parse-preview';
+import { logger } from './log';
 
 const env = getEnv();
 const connection = new IORedis(env.REDIS_URL, { maxRetriesPerRequest: null });

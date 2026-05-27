@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { signCookie, verifyCookie, constantTimeEquals } from '../../../apps/pin-gate/src/sign.js';
+import { signCookie, verifyCookie, constantTimeEquals } from '../../../apps/pin-gate/src/sign';
 
 describe('signCookie / verifyCookie', () => {
   it('round-trips a valid cookie', async () => {

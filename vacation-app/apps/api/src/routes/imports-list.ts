@@ -1,7 +1,7 @@
 import { importRuns } from '@mbfd-vacation/db';
 import { desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { db } from '../db.js';
+import { db } from '../db';
 
 export const importsList = new Hono();
 

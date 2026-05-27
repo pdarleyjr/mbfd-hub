@@ -9,7 +9,7 @@ import {
 } from '@mbfd-vacation/db';
 import { rollbackImportRun } from '@mbfd-vacation/db/operations/rollback';
 import { eq, isNull } from 'drizzle-orm';
-import { startTestPostgres, type TestEnv } from './setup.js';
+import { startTestPostgres, type TestEnv } from './setup';
 
 let env: TestEnv;
 

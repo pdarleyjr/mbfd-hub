@@ -5,17 +5,17 @@ import {
   type WorkCodeDecision,
 } from '@mbfd-vacation/shared';
 import { and, eq, isNull } from 'drizzle-orm';
-import { db } from '../db.js';
-import { logger } from '../log.js';
-import { ensureShiftBlock } from '../commit/ensure-blocks.js';
+import { db } from '../db';
+import { logger } from '../log';
+import { ensureShiftBlock } from '../commit/ensure-blocks';
 import {
   buildLeaveCodeResolver,
   lookupByCode,
-} from '../commit/resolve-leave-code.js';
-import { upsertMember } from '../commit/upsert-members.js';
-import { detectKindFromName, iterRows } from '../parse/detect.js';
-import { getStream } from '../r2.js';
-import { publish } from '../publish.js';
+} from '../commit/resolve-leave-code';
+import { upsertMember } from '../commit/upsert-members';
+import { detectKindFromName, iterRows } from '../parse/detect';
+import { getStream } from '../r2';
+import { publish } from '../publish';
 
 /**
  * The main commit handler.

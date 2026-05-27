@@ -7,10 +7,10 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { importRuns } from './import-runs.js';
-import { leaveCodes } from './leave-codes.js';
-import { members } from './members.js';
-import { shiftBlocks } from './shift-blocks.js';
+import { importRuns } from './import-runs';
+import { leaveCodes } from './leave-codes';
+import { members } from './members';
+import { shiftBlocks } from './shift-blocks';
 
 /**
  * leave_entries is the "cell" of the vacation board.

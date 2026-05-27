@@ -1,7 +1,7 @@
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import type { Readable } from 'node:stream';
-import { getEnv } from './env.js';
+import { getEnv } from './env';
 
 const env = getEnv();
 

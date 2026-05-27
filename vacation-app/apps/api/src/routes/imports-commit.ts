@@ -7,9 +7,9 @@ import {
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { db } from '../db.js';
-import { logger } from '../log.js';
-import { enqueueCommitImport } from '../queue.js';
+import { db } from '../db';
+import { logger } from '../log';
+import { enqueueCommitImport } from '../queue';
 
 export const importsCommit = new Hono();
 

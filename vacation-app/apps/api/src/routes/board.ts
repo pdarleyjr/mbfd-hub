@@ -10,7 +10,7 @@ import {
 import { BoardFiltersSchema } from '@mbfd-vacation/shared';
 import { and, asc, between, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { db } from '../db.js';
+import { db } from '../db';
 
 export const board = new Hono();
 

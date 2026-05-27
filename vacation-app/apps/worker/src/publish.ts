@@ -1,5 +1,5 @@
 import IORedis from 'ioredis';
-import { getEnv } from './env.js';
+import { getEnv } from './env';
 
 const env = getEnv();
 const pub = new IORedis(env.REDIS_URL, { maxRetriesPerRequest: null });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Readable } from 'node:stream';
-import { parseCsv } from '../../../apps/worker/src/parse/csv.js';
+import { parseCsv } from '../../../apps/worker/src/parse/csv';
 
 function fromString(s: string): Readable {
   return Readable.from(Buffer.from(s, 'utf8'));

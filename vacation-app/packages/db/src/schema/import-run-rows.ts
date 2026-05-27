@@ -1,5 +1,5 @@
 import { index, integer, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
-import { importRuns } from './import-runs.js';
+import { importRuns } from './import-runs';
 
 export const importRunRows = pgTable(
   'import_run_rows',

@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
-import type { Database } from '../client.js';
-import { importRuns, leaveEntries } from '../schema/index.js';
+import type { Database } from '../client';
+import { importRuns, leaveEntries } from '../schema/index';
 
 export type RollbackResult = {
   rolledBack: boolean;
