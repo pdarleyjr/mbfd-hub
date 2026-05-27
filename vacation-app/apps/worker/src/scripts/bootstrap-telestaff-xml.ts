@@ -285,12 +285,19 @@ async function main(): Promise<void> {
     leaveCodeId: string;
     rawRow: Record<string, unknown>;
   };
-  let chunk: Pending[] = [];
+  /**
+   * `chunk` is keyed by `${memberId}|${precomputedBlockKey}` so two source
+   * rows pointing at the same (member, block) deduplicate within the chunk
+   * before we ever touch the DB. Later rows in file order win — they
+   * usually represent corrections to earlier ones.
+   */
+  let chunk = new Map<string, Pending>();
 
   const flush = async (): Promise<void> => {
-    if (chunk.length === 0) return;
+    if (chunk.size === 0) return;
+    const items = [...chunk.values()];
     await db.transaction(async (tx) => {
-      for (const p of chunk) {
+      for (const p of items) {
         const block = await ensureShiftBlock(tx, p.isoDt);
         const day = new Date(p.isoDt);
         const isoDate = day.toISOString().slice(0, 10);
@@ -308,6 +315,18 @@ async function main(): Promise<void> {
             ),
           )
           .limit(1);
+
+        // Mark any prior active entry as superseded BEFORE the insert so
+        // the partial unique index `(member_id, shift_block_id) WHERE
+        // superseded_by_entry_id IS NULL` doesn't bounce us. We point the
+        // prior at itself as a sentinel; step 3 fixes the pointer once we
+        // know the new id.
+        if (existing[0]) {
+          await tx
+            .update(leaveEntries)
+            .set({ supersededByEntryId: existing[0].id })
+            .where(eq(leaveEntries.id, existing[0].id));
+        }
 
         const [created] = await tx
           .insert(leaveEntries)
@@ -331,8 +350,41 @@ async function main(): Promise<void> {
       }
     });
     process.stdout.write(`  ${inserted} entries inserted (skipped=${skipped})\r`);
-    chunk = [];
+    chunk = new Map();
   };
+
+  /**
+   * Compute the (calendarDate, blockIndex) the same way ensureShiftBlock
+   * does, but locally so we can dedup before touching the DB.
+   * blockIndex 0 = AM (08:00–20:00); blockIndex 1 = PM (20:00 → 08:00 next).
+   */
+  function blockKey(isoDt: string): { isoDate: string; blockIndex: 0 | 1 } {
+    const dt = new Date(isoDt);
+    const hour = dt.getUTCHours();
+    const blockIndex: 0 | 1 = hour >= 8 && hour < 20 ? 0 : 1;
+    const ref = new Date(dt);
+    if (blockIndex === 1 && hour < 8) ref.setUTCDate(ref.getUTCDate() - 1);
+    return { isoDate: ref.toISOString().slice(0, 10), blockIndex };
+  }
+
+  /**
+   * For each Telestaff row produce one or two (memberId, isoDt) targets.
+   * A 24-hour combat shift block (08:00 → next-day 08:00) covers both AM
+   * and PM blocks on the start day, so we emit two entries.
+   */
+  function expandRow(row: Record<string, unknown>): string[] {
+    const startRaw = String(row['Start'] ?? row['Date'] ?? '');
+    if (!startRaw) return [];
+    const hoursRaw = row['Hours'];
+    const hoursNum = Number(hoursRaw);
+    const hours = Number.isFinite(hoursNum) ? hoursNum : 0;
+    if (hours < 23.5) return [startRaw];
+    const dt = new Date(startRaw);
+    if (Number.isNaN(dt.getTime())) return [startRaw];
+    const pm = new Date(dt);
+    pm.setUTCHours(20, 0, 0, 0); // PM block start at 20:00 the same calendar day
+    return [startRaw, pm.toISOString()];
+  }
 
   const stream2 = createReadStream(absPath);
   for await (const ev of parseSpreadsheetXml(stream2)) {
@@ -364,21 +416,25 @@ async function main(): Promise<void> {
         skipped++;
         continue;
       }
-      // Telestaff uses local Miami time. The Date field is midnight which
-      // would route to PM-block-of-prior-day; Start has the actual shift
-      // start (08:00 for 24-hour combat blocks).
-      const startRaw = String(row['Start'] ?? row['Date'] ?? '');
-      if (!startRaw) {
+      // One Telestaff row may cover multiple shift blocks. A 24-hour
+      // combat shift starting at 08:00 spans the AM block (08-20) and the
+      // PM block (20-08) of the same day, so the loader emits both.
+      const isoDts = expandRow(row as Record<string, unknown>);
+      if (isoDts.length === 0) {
         skipped++;
         continue;
       }
-      chunk.push({
-        memberId,
-        isoDt: startRaw,
-        leaveCodeId,
-        rawRow: row as Record<string, unknown>,
-      });
-      if (chunk.length >= CHUNK_SIZE) await flush();
+      for (const isoDt of isoDts) {
+        const { isoDate, blockIndex } = blockKey(isoDt);
+        const key = `${memberId}|${isoDate}|${blockIndex}`;
+        chunk.set(key, {
+          memberId,
+          isoDt,
+          leaveCodeId,
+          rawRow: row as Record<string, unknown>,
+        });
+        if (chunk.size >= CHUNK_SIZE) await flush();
+      }
     } catch (err) {
       errors++;
       console.error('row failed:', err);
