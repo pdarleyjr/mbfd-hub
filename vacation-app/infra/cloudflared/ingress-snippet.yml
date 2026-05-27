@@ -1,0 +1,32 @@
+# Drop-in ingress rule for the existing mbfdhub-gmktec Cloudflare Tunnel.
+#
+# 1. Open your tunnel config:
+#       /etc/cloudflared/config.yml  (on GMKtec)
+#    OR  ~/.cloudflared/<tunnel-id>.yml  (depending on layout)
+#
+# 2. Splice this block into the `ingress:` list ABOVE the catch-all
+#    `service: http_status:404` rule.
+#
+# 3. Restart cloudflared:
+#       sudo systemctl restart cloudflared
+#
+# 4. Create the DNS record (one of):
+#       cloudflared tunnel route dns mbfdhub-gmktec vacation.mbfdhub.com
+#    OR  via the Cloudflare dashboard → DNS → CNAME → vacation → <tunnel-id>.cfargotunnel.com
+#
+# 5. Deploy the PIN gate Worker and bind it to vacation.mbfdhub.com/*.
+#    See docs/DEPLOYMENT.md.
+
+# ─── splice below this line ──────────────────────────────────────────
+  - hostname: vacation.mbfdhub.com
+    service: http://127.0.0.1:7090
+    originRequest:
+      connectTimeout: 30s
+      tcpKeepAlive: 30s
+      noTLSVerify: true
+# ─── end snippet ─────────────────────────────────────────────────────
+
+# Note: The PIN-gate Worker proxies to a separate hostname so a request
+# that bypasses the Worker (e.g. directly to the cfargotunnel hostname)
+# never reaches the app. If you want defence-in-depth, also set up
+# Cloudflare Access on vacation.mbfdhub.com restricted to one identity.
