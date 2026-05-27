@@ -38,7 +38,7 @@
     <!-- Header (matches landing page) -->
     <header class="sticky top-0 z-50 bg-slate-850 border-b border-slate-700/50 backdrop-blur-md h-16 flex items-center justify-between px-4 lg:px-6" style="background-color: #0f172a; padding-top: max(0px, env(safe-area-inset-top, 0px));">
         <a href="{{ url('/') }}" class="flex items-center gap-3 group" aria-label="Return to MBFD Support Hub home">
-            <img src="/images/mbfd_logo_new.png" alt="" class="h-10 w-10 object-contain" aria-hidden="true">
+            <img src="/images/mbfd_logo.png" alt="" class="h-10 w-10 object-contain" aria-hidden="true">
             <div class="hidden sm:block">
                 <h1 class="text-white font-semibold text-base leading-tight font-heading">MBFD Support Hub</h1>
                 <p class="text-slate-400 text-xs">Enterprise Command Portal</p>

@@ -44,7 +44,7 @@ class EmployeePanelProvider extends PanelProvider
             ->login(EmployeeLogin::class)
             ->authGuard('employee')
             ->brandName('MBFD Employee Portal')
-            ->brandLogo(secure_asset('images/mbfd_no_bg_new.png'))
+            ->brandLogo(secure_asset('images/mbfd_logo.png'))
             ->brandLogoHeight('2rem')
             ->favicon(secure_asset('favicon.ico'))
             ->darkMode(false)
