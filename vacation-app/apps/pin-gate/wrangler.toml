@@ -25,5 +25,9 @@ PIN_AUDIT_WEBHOOK_URL = "https://vacation-origin.mbfdhub.com/api/__pin/audit-web
 
 [[kv_namespaces]]
 binding = "PIN_AUDIT_KV"
-# Generate with: npx wrangler kv:namespace create "PIN_AUDIT_KV"
-id = "REPLACE_WITH_REAL_KV_NAMESPACE_ID"
+id = "548ab30dd06a481abf5492b4f245110b"
+
+# Route binding (also configurable via dashboard / wrangler routes)
+[[routes]]
+pattern = "vacation.mbfdhub.com/*"
+zone_name = "mbfdhub.com"

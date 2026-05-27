@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { renderPinForm } from './pin-form.html';
+import { renderPinForm } from './pin-form';
 import { constantTimeEquals, signCookie, verifyCookie } from './sign';
 
 const COOKIE_NAME = 'vac_pin';
