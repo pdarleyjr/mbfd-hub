@@ -12,23 +12,35 @@ export type IncomingMember = {
   lastName?: string;
   firstName?: string;
   rankCode?: string;
+  /**
+   * Human-readable rank label as it appeared in the source. Used when we
+   * lazy-insert a rank we've never seen before, so the `ranks.label` is
+   * meaningful (e.g. "Firefighter DE") instead of just echoing the code.
+   */
+  rankLabel?: string;
   shift?: string;
   aDayGroupCode?: string;
   hireDate?: string;
   badgeNumber?: string;
 };
 
-async function ensureRank(db: Database, code: string): Promise<string> {
+async function ensureRank(
+  db: Database,
+  code: string,
+  label?: string,
+): Promise<string> {
   const [existing] = await db.select({ id: ranks.id }).from(ranks).where(eq(ranks.code, code)).limit(1);
   if (existing) return existing.id;
-  const sortMap: Record<string, number> = { DC: 1, CAPT: 2, LT: 3, FF: 4, PROB: 5 };
+  const sortMap: Record<string, number> = {
+    CHIEF: 0, DDC: 1, DC: 2, CAPT: 3, LT: 4, 'FF-DE': 5, FF: 6, PROB: 7,
+  };
   const [row] = await db
     .insert(ranks)
     .values({
       code,
-      label: code,
-      sortOrder: sortMap[code] ?? 99,
-      isOfficer: ['DC', 'CAPT', 'LT'].includes(code),
+      label: label && label.length > 0 ? label : code,
+      sortOrder: sortMap[code] ?? 50,
+      isOfficer: ['CHIEF', 'DDC', 'DC', 'CAPT', 'LT'].includes(code),
     })
     .returning({ id: ranks.id });
   if (!row) throw new Error('failed to insert rank');
@@ -67,7 +79,9 @@ export async function upsertMember(
     .where(eq(members.employeeId, m.employeeId))
     .limit(1);
 
-  const rankId = m.rankCode ? await ensureRank(db, m.rankCode.toUpperCase()) : null;
+  const rankId = m.rankCode
+    ? await ensureRank(db, m.rankCode.toUpperCase(), m.rankLabel)
+    : null;
   const aDayId = m.aDayGroupCode ? await ensureADayGroup(db, m.aDayGroupCode.toUpperCase()) : null;
 
   if (!existing) {

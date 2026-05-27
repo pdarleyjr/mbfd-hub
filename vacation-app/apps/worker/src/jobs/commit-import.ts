@@ -11,8 +11,14 @@ import {
   type Member,
 } from '@mbfd-vacation/db';
 import {
+  classifyDescription,
   findTarget,
+  normalizeRankCode,
+  rankLabelFor,
+  SKIP_CATEGORIES,
+  splitTelestaffName,
   type ColumnMapping,
+  type TelestaffCategory,
   type WorkCodeDecision,
 } from '@mbfd-vacation/shared';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -89,6 +95,7 @@ export async function commitImportJob(runId: string): Promise<void> {
 
   const lastCol = findTarget(mapping, 'last_name');
   const firstCol = findTarget(mapping, 'first_name');
+  const fullCol = findTarget(mapping, 'full_name');
   const rankCol = findTarget(mapping, 'rank');
   const shiftCol = findTarget(mapping, 'shift');
   const adayCol = findTarget(mapping, 'a_day_group');
@@ -96,6 +103,11 @@ export async function commitImportJob(runId: string): Promise<void> {
   const badgeCol = findTarget(mapping, 'badge_number');
   const descCol = findTarget(mapping, 'event_description');
   const codeCol = findTarget(mapping, 'event_work_code');
+  // Telestaff "All Records" exports include a Work Code Category column we
+  // use to drop OT/Incentive rows (people on-duty, not off).
+  const categoryCol =
+    mapping.columns.find((c) => /work\s*code\s*category|category/i.test(c.sourceHeader))
+      ?.sourceHeader;
 
   const skipDescriptions = new Set(
     decisions.filter((d) => d.kind === 'skip').map((d) => d.telestaffDescription),
@@ -125,16 +137,28 @@ export async function commitImportJob(runId: string): Promise<void> {
       await db.transaction(async (tx) => {
         for (const item of chunk) {
           const row = item.row;
-          // Member (cached upsert)
+          // Member (cached upsert). Telestaff exports the name combined
+          // into a single "LASTNAME, FIRSTNAME" cell — split it on demand.
+          let lastName = lastCol ? String(row[lastCol] ?? '') : '';
+          let firstName = firstCol ? String(row[firstCol] ?? '') : '';
+          if ((!lastName || !firstName) && fullCol) {
+            const parts = splitTelestaffName(String(row[fullCol] ?? ''));
+            lastName = lastName || parts.lastName;
+            firstName = firstName || parts.firstName;
+          }
+          const rankRaw = rankCol ? String(row[rankCol] ?? '') : '';
+          const rankCode = rankRaw ? normalizeRankCode(rankRaw) : undefined;
+          const rankLabel = rankCode ? rankLabelFor(rankRaw, rankCode) : undefined;
           let member = caches.members.get(item.empId);
           if (!member) {
             member = await upsertMember(
               tx,
               {
                 employeeId: item.empId,
-                lastName: lastCol ? String(row[lastCol] ?? '') : undefined,
-                firstName: firstCol ? String(row[firstCol] ?? '') : undefined,
-                rankCode: rankCol ? String(row[rankCol] ?? '') : undefined,
+                lastName,
+                firstName,
+                rankCode,
+                rankLabel,
                 shift: shiftCol ? String(row[shiftCol] ?? '') : undefined,
                 aDayGroupCode: adayCol ? String(row[adayCol] ?? '') : undefined,
                 hireDate: hireCol ? String(row[hireCol] ?? '') : undefined,
@@ -217,9 +241,21 @@ export async function commitImportJob(runId: string): Promise<void> {
           continue;
         }
 
-        // Resolve code: prefer description→mapping, else literal code
+        // Skip on-duty categories (OT, Incentive) — they aren't time off.
+        const cat = categoryCol ? String(row[categoryCol] ?? '').trim() : '';
+        if (cat && SKIP_CATEGORIES.has(cat as TelestaffCategory)) {
+          skipped++;
+          continue;
+        }
+
+        // Resolve code: prefer the central Telestaff description map,
+        // then the admin's resolver, then the literal Work Code lookup.
         let leaveCodeId: string | null = null;
-        if (desc) leaveCodeId = resolver.resolve(desc);
+        if (desc) {
+          const known = classifyDescription(desc, cat);
+          if (known) leaveCodeId = caches.leaveCodeByCode.get(known.toUpperCase()) ?? null;
+          if (!leaveCodeId) leaveCodeId = resolver.resolve(desc);
+        }
         if (!leaveCodeId && workCode) {
           leaveCodeId = caches.leaveCodeByCode.get(workCode.toUpperCase()) ?? null;
         }
