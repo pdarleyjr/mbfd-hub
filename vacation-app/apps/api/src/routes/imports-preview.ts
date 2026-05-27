@@ -29,11 +29,12 @@ importsPreview.get('/imports/:id/preview', (c) => {
     const sub = new IORedis(env.REDIS_URL, { maxRetriesPerRequest: null });
     const channel = progressChannel(id);
 
-    // Send the current snapshot first.
+    // Replay snapshot from DB so a client reconnect picks up the right state.
     const [run] = await db
       .select({
         status: importRuns.status,
         parseStats: importRuns.parseStats,
+        previewPayloadJson: importRuns.previewPayloadJson,
         errorMessage: importRuns.errorMessage,
       })
       .from(importRuns)
@@ -46,20 +47,34 @@ importsPreview.get('/imports/:id/preview', (c) => {
       return;
     }
 
-    if (run.status === 'preview_ready' || run.status === 'committed') {
-      // Worker has already finished; replay the cached preview if we have it.
-      await stream.writeSSE({
-        event: 'snapshot',
-        data: JSON.stringify({ status: run.status, parseStats: run.parseStats }),
-      });
-    }
     if (run.status === 'failed') {
       await stream.writeSSE({
         event: 'failed',
-        data: JSON.stringify({ errorMessage: run.errorMessage ?? 'unknown error' }),
+        data: JSON.stringify({
+          type: 'failed',
+          errorMessage: run.errorMessage ?? 'unknown error',
+        }),
       });
       await sub.quit();
       return;
+    }
+
+    // If preview already completed, emit the cached preview_ready event
+    // directly so the client can continue without waiting for live pub/sub.
+    if (
+      (run.status === 'preview_ready' || run.status === 'committing' ||
+        run.status === 'committed' || run.status === 'rolled_back') &&
+      run.previewPayloadJson
+    ) {
+      await stream.writeSSE({
+        event: 'preview_ready',
+        data: JSON.stringify(run.previewPayloadJson),
+      });
+      // For non-active states there's nothing more to stream.
+      if (run.status !== 'committing') {
+        await sub.quit();
+        return;
+      }
     }
 
     await sub.subscribe(channel);

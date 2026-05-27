@@ -1,15 +1,25 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import type { WorkCodeDecision } from '@mbfd-vacation/shared';
-
-const COMMON_CODES = ['V', 'VP', 'EV', 'FH', 'AH', 'EF', 'A', 'S', 'HO', 'XOFF', 'EON'];
+import { api } from '@/lib/api';
 
 type DecisionDraft =
-  | { kind: 'use_existing'; code: string }
-  | { kind: 'create_new'; code: string }
+  | { kind: 'use_existing'; leaveCodeId: string }
   | { kind: 'skip' };
 
+/**
+ * For each unrecognised Telestaff event description, the admin chooses
+ * either "map to an existing leave code" or "skip rows with this
+ * description". The chosen decision is sent to the worker on commit and
+ * a row is written to work_code_mappings so future imports auto-resolve.
+ *
+ * V1 deliberately does not expose "create new leave code" in the UI — the
+ * seeded codes (V, FH, AH, EF, A, S, etc.) cover every Telestaff export
+ * we've seen. Adding new codes is a Phase 2 admin concern that needs
+ * policy flags (counts_against_vacation_balance, etc.) and a proper form.
+ */
 export function UnknownCodesResolver({
   descriptions,
   onChange,
@@ -17,41 +27,51 @@ export function UnknownCodesResolver({
   descriptions: string[];
   onChange: (decisions: WorkCodeDecision[]) => void;
 }): React.JSX.Element {
-  // For V1 we let the admin pick from existing codes by literal code string.
-  // The API resolves the string to an id via lookupByCode. This keeps the UI
-  // simple without needing a separate /api/leave-codes endpoint in V1.
-  const [drafts, setDrafts] = React.useState<Record<string, DecisionDraft>>(
-    () =>
-      Object.fromEntries(
-        descriptions.map((d) => [d, { kind: 'use_existing', code: 'V' } as DecisionDraft]),
-      ),
-  );
+  const codesQuery = useQuery({
+    queryKey: ['leave-codes'],
+    queryFn: () => api.listLeaveCodes(),
+  });
+
+  const codes = codesQuery.data?.leaveCodes ?? [];
+  const defaultCodeId = React.useMemo(() => {
+    if (codes.length === 0) return '';
+    return codes.find((c) => c.code === 'V')?.id ?? codes[0]!.id;
+  }, [codes]);
+
+  const [drafts, setDrafts] = React.useState<Record<string, DecisionDraft>>({});
 
   React.useEffect(() => {
-    // Note: this UI emits 'create_new' for everything for simplicity; the
-    // worker normalises duplicates by code. A full implementation would call
-    // /api/leave-codes to fetch ids; for V1 the worker's lookupByCode covers it.
-    const out: WorkCodeDecision[] = descriptions.map((desc) => {
-      const d = drafts[desc] ?? { kind: 'use_existing', code: 'V' };
-      if (d.kind === 'skip') return { kind: 'skip', telestaffDescription: desc };
-      return {
-        kind: 'create_new',
-        telestaffDescription: desc,
-        newCode: {
-          code: d.code,
-          label: desc,
-          uiColor: '#78716C',
-          countsAgainstVacationBalance: false,
-          countsAgainstFloatingBalance: false,
-          countsAgainstDailyVacationCapacity: false,
-          countsAgainstMinimumStaffing: false,
-          isADayMarker: false,
-        },
-      };
+    if (descriptions.length === 0 || !defaultCodeId) return;
+    setDrafts((prev) => {
+      const next: Record<string, DecisionDraft> = { ...prev };
+      let changed = false;
+      for (const d of descriptions) {
+        if (!next[d]) {
+          next[d] = { kind: 'use_existing', leaveCodeId: defaultCodeId };
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
     });
+  }, [descriptions, defaultCodeId]);
+
+  React.useEffect(() => {
+    const out: WorkCodeDecision[] = [];
+    for (const desc of descriptions) {
+      const d = drafts[desc];
+      if (!d) continue;
+      if (d.kind === 'skip') {
+        out.push({ kind: 'skip', telestaffDescription: desc });
+      } else {
+        out.push({
+          kind: 'use_existing',
+          telestaffDescription: desc,
+          leaveCodeId: d.leaveCodeId,
+        });
+      }
+    }
     onChange(out);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drafts, descriptions]);
+  }, [drafts, descriptions, onChange]);
 
   if (descriptions.length === 0) {
     return (
@@ -61,29 +81,52 @@ export function UnknownCodesResolver({
     );
   }
 
+  if (codesQuery.isLoading) {
+    return <p className="text-sm text-stone-600">Loading available leave codes…</p>;
+  }
+
+  if (codesQuery.isError) {
+    return (
+      <p className="text-sm text-red-700">
+        Could not load leave codes: {(codesQuery.error as Error).message}
+      </p>
+    );
+  }
+
   return (
     <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-      <div className="grid grid-cols-3 border-b border-stone-200 bg-stone-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-stone-600">
+      <div className="grid grid-cols-[1fr_180px_240px] border-b border-stone-200 bg-stone-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-stone-600">
         <div>Telestaff description</div>
         <div>Decision</div>
-        <div>Code</div>
+        <div>Map to leave code</div>
       </div>
       <ul className="divide-y divide-stone-100">
         {descriptions.map((desc) => {
-          const d = drafts[desc] ?? { kind: 'use_existing', code: 'V' };
+          const d: DecisionDraft =
+            drafts[desc] ?? { kind: 'use_existing', leaveCodeId: defaultCodeId };
           return (
-            <li key={desc} className="grid grid-cols-3 items-center gap-3 px-4 py-2">
-              <span className="truncate font-mono text-sm text-stone-800">{desc}</span>
+            <li
+              key={desc}
+              className="grid grid-cols-[1fr_180px_240px] items-center gap-3 px-4 py-2"
+            >
+              <span className="truncate font-mono text-sm text-stone-800" title={desc}>
+                {desc}
+              </span>
               <select
                 value={d.kind}
                 onChange={(e) =>
-                  setDrafts((s) => ({
-                    ...s,
-                    [desc]:
-                      e.target.value === 'skip'
-                        ? { kind: 'skip' }
-                        : { kind: 'use_existing', code: (s[desc] as { code?: string })?.code ?? 'V' },
-                  }))
+                  setDrafts((s) => {
+                    const v = e.target.value;
+                    if (v === 'skip') return { ...s, [desc]: { kind: 'skip' } };
+                    const existingId =
+                      s[desc]?.kind === 'use_existing'
+                        ? (s[desc] as { leaveCodeId: string }).leaveCodeId
+                        : defaultCodeId;
+                    return {
+                      ...s,
+                      [desc]: { kind: 'use_existing', leaveCodeId: existingId },
+                    };
+                  })
                 }
                 className="rounded-md border border-stone-200 bg-white px-2 py-1 text-sm"
               >
@@ -94,15 +137,18 @@ export function UnknownCodesResolver({
                 <span className="text-sm text-stone-400">—</span>
               ) : (
                 <select
-                  value={d.code}
+                  value={d.leaveCodeId}
                   onChange={(e) =>
-                    setDrafts((s) => ({ ...s, [desc]: { kind: 'use_existing', code: e.target.value } }))
+                    setDrafts((s) => ({
+                      ...s,
+                      [desc]: { kind: 'use_existing', leaveCodeId: e.target.value },
+                    }))
                   }
                   className="rounded-md border border-stone-200 bg-white px-2 py-1 text-sm font-mono"
                 >
-                  {COMMON_CODES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                  {codes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} — {c.label}
                     </option>
                   ))}
                 </select>

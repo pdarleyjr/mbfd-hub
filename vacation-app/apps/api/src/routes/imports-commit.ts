@@ -16,7 +16,6 @@ export const importsCommit = new Hono();
 const BodySchema = z.object({
   columnMapping: ColumnMappingSchema,
   workCodeDecisions: WorkCodeDecisionsSchema.default([]),
-  saveAsTemplateName: z.string().min(1).max(64).optional(),
 });
 
 importsCommit.post('/imports/:id/commit', async (c) => {

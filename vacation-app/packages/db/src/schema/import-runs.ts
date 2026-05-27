@@ -22,6 +22,12 @@ export const importRuns = pgTable(
     // 'uploaded' | 'parsing' | 'preview_ready' | 'committing' | 'committed' | 'failed' | 'rolled_back'
     columnMappingJson: jsonb('column_mapping_json'),
     workCodeDecisionsJson: jsonb('work_code_decisions_json'),
+    /**
+     * Full preview_ready event payload (columns, sampleRows, suggestedMapping,
+     * unknownDescriptions). Persisted by the worker when preview completes so
+     * the SSE endpoint can replay it after a client reconnect.
+     */
+    previewPayloadJson: jsonb('preview_payload_json'),
     parseStats: jsonb('parse_stats'),
     errorMessage: text('error_message'),
     startedAt: timestamp('started_at', { withTimezone: true }),

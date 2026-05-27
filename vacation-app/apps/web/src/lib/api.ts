@@ -28,7 +28,8 @@ export type ImportRunSummary = {
   id: string;
   fileName: string;
   fileSize: number;
-  fileSha256: string;
+  /** Only on per-run detail responses, not the list. */
+  fileSha256?: string;
   uploadedAt: string;
   status: string;
   parseStats: unknown;
@@ -70,7 +71,6 @@ export const api = {
   commitImport: (runId: string, payload: {
     columnMapping: ColumnMapping;
     workCodeDecisions: WorkCodeDecision[];
-    saveAsTemplateName?: string;
   }) =>
     jsonFetch<{ queued: boolean }>(`/api/imports/${runId}/commit`, {
       method: 'POST',
@@ -90,4 +90,15 @@ export const api = {
     ),
 
   getRun: (id: string) => jsonFetch<ImportRunSummary>(`/api/imports/runs/${id}`),
+
+  listLeaveCodes: () =>
+    jsonFetch<{
+      leaveCodes: Array<{
+        id: string;
+        code: string;
+        label: string;
+        uiColor: string;
+        isADayMarker: boolean;
+      }>;
+    }>('/api/leave-codes'),
 };

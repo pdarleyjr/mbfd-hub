@@ -85,7 +85,11 @@ importsUpload.post('/imports', async (c) => {
       file.on('end', () => r2Source.end());
       file.on('error', (err) => r2Source.destroy(err));
       file.on('limit', () => {
-        r2Source.destroy(new Error('upload exceeded MAX_UPLOAD_BYTES'));
+        const err = new Error('upload exceeded MAX_UPLOAD_BYTES');
+        r2Source.destroy(err);
+        // Tear down the source TCP socket so the client can't keep
+        // streaming bytes after we've decided to abort.
+        try { reqStream.destroy(err); } catch { /* already destroyed */ }
       });
 
       // We don't know the SHA until the stream ends — but we already need
@@ -139,7 +143,7 @@ importsUpload.post('/imports', async (c) => {
 
     bb.on('error', (err) => {
       logger.error({ err }, 'busboy error');
-      reject(err);
+      safeResolve({ ok: false, status: 400, error: err instanceof Error ? err.message : 'bad multipart body' });
     });
 
     bb.on('finish', () => {
@@ -150,10 +154,20 @@ importsUpload.post('/imports', async (c) => {
         }
       }, 100);
     });
+
+    // If the request stream itself errors before busboy fires `finish` (e.g.
+    // client disconnect mid-multipart), we must still settle so the route
+    // handler doesn't hang.
+    reqStream.on('error', (err) => {
+      logger.warn({ err }, 'request stream error during upload');
+      safeResolve({ ok: false, status: 400, error: 'upload aborted by client' });
+    });
   });
 
   pipeline(reqStream, bb).catch((err) => {
     logger.error({ err }, 'pipeline error');
+    // Guaranteed-settle path: the inner Promise's safeResolve already
+    // dedupes if `bb.on('file')` already finished happy-path.
   });
 
   const result = await work;

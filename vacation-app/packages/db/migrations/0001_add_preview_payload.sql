@@ -1,0 +1,1 @@
+ALTER TABLE "import_runs" ADD COLUMN "preview_payload_json" jsonb;

@@ -14,6 +14,15 @@
 
 # Playwright MCP captures (browser session dumps for debugging — local only)
 /.playwright-mcp/
+
+# Scratch directory for local Cloudflare API work — tunnel configs, cookies,
+# pin-gate secrets, etc. NEVER commit.
+/.cf-work/
+cookies.txt
+*pin-gate-secrets*
+*.secrets-cheatsheet
+*secrets-cheatsheet*
+
 *.pem
 *.key
 *.p12

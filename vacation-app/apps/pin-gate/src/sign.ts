@@ -60,13 +60,20 @@ export async function verifyCookie(secret: string, cookie: string): Promise<bool
 }
 
 /**
- * Timing-safe string equality for the PIN comparison.
+ * Timing-safe string equality.
+ *
+ * Walks both strings to a fixed comparison length (>=16) so an attacker
+ * cannot infer the secret's length from response time. The XOR of the
+ * length difference also poisons `diff` so unequal-length inputs reliably
+ * return false in the same number of operations.
  */
 export function constantTimeEquals(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  const max = Math.max(a.length, b.length, 16);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < max; i++) {
+    const ac = i < a.length ? a.charCodeAt(i) : 0;
+    const bc = i < b.length ? b.charCodeAt(i) : 0;
+    diff |= ac ^ bc;
   }
   return diff === 0;
 }
