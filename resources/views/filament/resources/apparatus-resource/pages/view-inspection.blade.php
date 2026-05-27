@@ -12,7 +12,7 @@
     <div class="space-y-6">
         {{-- Logo & Header --}}
         <div class="text-center print-only" style="display: block;">
-            <img src="/images/mbfd_logo_new.png" alt="MBFD Logo" class="mx-auto h-20 w-20 object-contain mb-2">
+            <img src="/images/mbfd_logo.png" alt="MBFD Logo" class="mx-auto h-20 w-20 object-contain mb-2">
             <h1 class="text-2xl font-bold text-gray-900">Miami Beach Fire Department</h1>
             <p class="text-sm text-gray-500">Daily Vehicle Inspection Report</p>
         </div>
@@ -20,7 +20,7 @@
         {{-- Inspection Summary Card --}}
         <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6 dark:bg-gray-900 dark:ring-white/10">
             <div class="flex items-center gap-4 mb-6">
-                <img src="/images/mbfd_logo_new.png" alt="MBFD Logo" class="h-16 w-16 object-contain">
+                <img src="/images/mbfd_logo.png" alt="MBFD Logo" class="h-16 w-16 object-contain">
                 <div>
                     <h2 class="text-xl font-bold text-gray-900 dark:text-white">
                         Inspection Report — {{ $currentDesignation }}
@@ -130,7 +130,7 @@
                         <div class="rounded-lg bg-white dark:bg-gray-900 p-4 border border-red-200 dark:border-red-800">
                             <div class="flex items-start justify-between">
                                 <div>
-                                    <p class="font-medium text-gray-900 dark:text-white">{{ $defect->item_name ?? 'Unknown Item' }}</p>
+                                    <p class="font-medium text-gray-900 dark:text-white">{{ $defect->item ?? 'Unknown Item' }}</p>
                                     <p class="text-sm text-gray-500 dark:text-gray-400">{{ $defect->compartment ?? '—' }}</p>
                                 </div>
                                 <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $defect->resolved ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }}">
