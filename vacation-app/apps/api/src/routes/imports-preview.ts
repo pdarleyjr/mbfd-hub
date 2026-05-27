@@ -4,10 +4,10 @@ import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import IORedis from 'ioredis';
-import { db } from '../db.js';
-import { getEnv } from '../env.js';
-import { logger } from '../log.js';
-import { progressChannel } from '../queue.js';
+import { db } from '../db';
+import { getEnv } from '../env';
+import { logger } from '../log';
+import { progressChannel } from '../queue';
 
 export const importsPreview = new Hono();
 

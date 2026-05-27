@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ColumnMappingSchema } from './column-mapping.js';
+import { ColumnMappingSchema } from './column-mapping';
 
 export const ImportStatus = z.enum([
   'uploaded',

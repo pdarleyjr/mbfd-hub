@@ -7,8 +7,8 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { aDayGroups } from './a-day-groups.js';
-import { ranks } from './ranks.js';
+import { aDayGroups } from './a-day-groups';
+import { ranks } from './ranks';
 
 export const members = pgTable(
   'members',

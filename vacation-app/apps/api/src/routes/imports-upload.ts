@@ -5,11 +5,11 @@ import { Hono } from 'hono';
 import { createHash, randomUUID } from 'node:crypto';
 import { PassThrough, Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { db } from '../db.js';
-import { getEnv } from '../env.js';
-import { logger } from '../log.js';
-import { putStream, r2Key } from '../r2.js';
-import { enqueueParsePreview } from '../queue.js';
+import { db } from '../db';
+import { getEnv } from '../env';
+import { logger } from '../log';
+import { putStream, r2Key } from '../r2';
+import { enqueueParsePreview } from '../queue';
 
 export const importsUpload = new Hono();
 

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { sql } from 'drizzle-orm';
-import { db } from '../db.js';
-import { redis } from '../queue.js';
+import { db } from '../db';
+import { redis } from '../queue';
 
 export const health = new Hono();
 

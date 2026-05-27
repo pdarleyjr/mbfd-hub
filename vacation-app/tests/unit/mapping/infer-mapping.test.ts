@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inferColumnMapping } from '../../../apps/worker/src/parse/infer-mapping.js';
+import { inferColumnMapping } from '../../../apps/worker/src/parse/infer-mapping';
 
 describe('inferColumnMapping', () => {
   it('maps obvious Telestaff headers correctly', () => {

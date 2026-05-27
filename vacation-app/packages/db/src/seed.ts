@@ -1,5 +1,5 @@
-import { getDb } from './client.js';
-import { leaveCodes, ranks } from './schema/index.js';
+import { getDb } from './client';
+import { leaveCodes, ranks } from './schema/index';
 
 const connectionString = process.env.DATABASE_URL_HOST ?? process.env.DATABASE_URL;
 if (!connectionString) {

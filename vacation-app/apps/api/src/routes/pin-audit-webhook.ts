@@ -1,9 +1,9 @@
 import { pinAudit } from '@mbfd-vacation/db';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { db } from '../db.js';
-import { getEnv } from '../env.js';
-import { logger } from '../log.js';
+import { db } from '../db';
+import { getEnv } from '../env';
+import { logger } from '../log';
 
 export const pinAuditWebhook = new Hono();
 

@@ -6,7 +6,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { calendarDays } from './calendar-days.js';
+import { calendarDays } from './calendar-days';
 
 export const shiftBlocks = pgTable(
   'shift_blocks',

@@ -1,5 +1,5 @@
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { getDb } from './client.js';
+import { getDb } from './client';
 
 const connectionString = process.env.DATABASE_URL_HOST ?? process.env.DATABASE_URL;
 if (!connectionString) {

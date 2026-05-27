@@ -1,7 +1,7 @@
 import type { Readable } from 'node:stream';
-import { parseCsv } from './csv.js';
-import { parseXlsx } from './xlsx.js';
-import type { ParsedRow } from './csv.js';
+import { parseCsv } from './csv';
+import { parseXlsx } from './xlsx';
+import type { ParsedRow } from './csv';
 
 export type FileKind = 'csv' | 'xlsx';
 

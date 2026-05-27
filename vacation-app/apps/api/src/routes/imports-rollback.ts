@@ -1,7 +1,7 @@
 import { rollbackImportRun } from '@mbfd-vacation/db/operations/rollback';
 import { Hono } from 'hono';
-import { db } from '../db.js';
-import { logger } from '../log.js';
+import { db } from '../db';
+import { logger } from '../log';
 
 export const importsRollback = new Hono();
 

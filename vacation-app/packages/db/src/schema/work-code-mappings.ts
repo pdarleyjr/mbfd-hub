@@ -1,5 +1,5 @@
 import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { leaveCodes } from './leave-codes.js';
+import { leaveCodes } from './leave-codes';
 
 export const workCodeMappings = pgTable('work_code_mappings', {
   id: uuid('id').primaryKey().defaultRandom(),

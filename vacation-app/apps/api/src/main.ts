@@ -2,16 +2,16 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { logger as honoLogger } from 'hono/logger';
 import { secureHeaders } from 'hono/secure-headers';
-import { getEnv } from './env.js';
-import { logger } from './log.js';
-import { board } from './routes/board.js';
-import { health } from './routes/health.js';
-import { importsCommit } from './routes/imports-commit.js';
-import { importsList } from './routes/imports-list.js';
-import { importsPreview } from './routes/imports-preview.js';
-import { importsRollback } from './routes/imports-rollback.js';
-import { importsUpload } from './routes/imports-upload.js';
-import { pinAuditWebhook } from './routes/pin-audit-webhook.js';
+import { getEnv } from './env';
+import { logger } from './log';
+import { board } from './routes/board';
+import { health } from './routes/health';
+import { importsCommit } from './routes/imports-commit';
+import { importsList } from './routes/imports-list';
+import { importsPreview } from './routes/imports-preview';
+import { importsRollback } from './routes/imports-rollback';
+import { importsUpload } from './routes/imports-upload';
+import { pinAuditWebhook } from './routes/pin-audit-webhook';
 
 const env = getEnv();
 

@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { renderPinForm } from './pin-form.html.js';
-import { constantTimeEquals, signCookie, verifyCookie } from './sign.js';
+import { renderPinForm } from './pin-form.html';
+import { constantTimeEquals, signCookie, verifyCookie } from './sign';
 
 const COOKIE_NAME = 'vac_pin';
 const COOKIE_TTL_SEC = 14 * 24 * 60 * 60; // 14 days

@@ -1,6 +1,6 @@
 import { Queue, QueueEvents } from 'bullmq';
 import IORedis from 'ioredis';
-import { getEnv } from './env.js';
+import { getEnv } from './env';
 
 export const IMPORTS_QUEUE_NAME = 'imports' as const;
 
