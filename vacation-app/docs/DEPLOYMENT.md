@@ -124,9 +124,43 @@ to `vacation.mbfdhub.com/*` on every deploy. No dashboard step needed.
 1. Visit `https://vacation.mbfdhub.com` — you should see the MBFD-styled PIN form.
 2. Enter a wrong PIN — get a rate-limited error after 5 attempts.
 3. Enter the right PIN — redirected to `/board`, which shows the empty state.
-4. Click "Go to Import" — upload a small Telestaff CSV, follow the wizard,
-   commit. The board should populate.
+4. Click "Go to Import" — upload a small Telestaff CSV, XLSX, or
+   SpreadsheetML 2003 XML (Chief Abello's "(EX) Export All Records"
+   format), follow the wizard, commit. The board should populate.
 5. Click into Runs → open the import → roll it back → board returns to empty.
+
+## One-shot Telestaff XML bootstrap
+
+For the initial load (pre-populating members + scheduled leave from
+Telestaff without going through the wizard), the worker ships with a
+streaming XML loader:
+
+```bash
+# On your laptop:
+scp "TELESTAFF (EX) Export All Records.xml" gmktec:/tmp/telestaff-bootstrap.xml
+
+# On GMKtec:
+PGPASS=$(sudo grep ^POSTGRES_PASSWORD= /opt/mbfd-vacation/.env | cut -d= -f2)
+docker cp /tmp/telestaff-bootstrap.xml vac-worker:/tmp/telestaff-bootstrap.xml
+docker exec -e DATABASE_URL="postgres://vacation:${PGPASS}@vac-postgres:5432/vacation" \
+  -w /app vac-worker \
+  node --import tsx/esm apps/worker/src/scripts/bootstrap-telestaff-xml.ts \
+       /tmp/telestaff-bootstrap.xml
+```
+
+The loader:
+- Splits Telestaff's combined "LASTNAME, FIRSTNAME" Name column into
+  proper firstName / lastName fields.
+- Normalizes Position Rank labels (Firefighter → FF, Firefighter DE
+  → FF-DE, Captain → CAPT, Division Chief → DC, civilian roles to
+  their own short codes) and seeds any rank rows it hasn't seen.
+- Picks each employee's primary shift by plurality across the export
+  (handles cross-shift overtime correctly).
+- Skips Overtime + Incentive category rows (those are on-duty, not
+  leave) and writes an `import_runs` row so the bootstrap can be
+  rolled back from the Runs tab just like a wizard import.
+- Emits AM + PM block entries for 24-hour combat shifts so the board
+  shows the full day off, not just morning.
 
 ## Updates / re-deploy
 
