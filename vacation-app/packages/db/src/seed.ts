@@ -1,7 +1,7 @@
 import { getDb } from './client';
 import { leaveCodes, ranks } from './schema/index';
 
-const connectionString = process.env.DATABASE_URL_HOST ?? process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL ?? process.env.DATABASE_URL_HOST;
 if (!connectionString) {
   console.error('DATABASE_URL or DATABASE_URL_HOST must be set');
   process.exit(1);
