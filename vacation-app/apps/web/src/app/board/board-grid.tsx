@@ -10,6 +10,7 @@ type Props = {
   cells: BoardCell[];
   dateFrom: string;
   dateTo: string;
+  onMemberClick?: (memberId: string) => void;
 };
 
 function daysBetween(from: string, to: string): string[] {
@@ -31,7 +32,7 @@ function indexCells(cells: BoardCell[]): Map<string, BoardCell> {
   return m;
 }
 
-export function BoardGrid({ members, cells, dateFrom, dateTo }: Props): React.JSX.Element {
+export function BoardGrid({ members, cells, dateFrom, dateTo, onMemberClick }: Props): React.JSX.Element {
   const days = React.useMemo(() => daysBetween(dateFrom, dateTo), [dateFrom, dateTo]);
   const cellIndex = React.useMemo(() => indexCells(cells), [cells]);
 
@@ -130,16 +131,22 @@ export function BoardGrid({ members, cells, dateFrom, dateTo }: Props): React.JS
                 }}
               >
                 {/* Sticky member column */}
-                <div
-                  className="sticky left-0 z-10 flex items-center gap-2 border-r border-stone-200 bg-white px-3 text-sm"
+                <button
+                  type="button"
+                  onClick={() => onMemberClick?.(member.id)}
+                  className={cn(
+                    'sticky left-0 z-10 flex items-center gap-2 border-r border-stone-200 bg-white px-3 text-left text-sm',
+                    onMemberClick && 'hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700',
+                  )}
                   style={{ width: MEMBER_COL_WIDTH, height: vr.size }}
+                  aria-label={`Open details for ${member.lastName}, ${member.firstName}`}
                 >
                   <span className="font-semibold tabular">{member.lastName}</span>
                   <span className="text-xs text-stone-600">
                     {member.rank?.code ?? ''}
                   </span>
                   <span className="ml-auto text-xs text-stone-400">{member.shift ?? ''}</span>
-                </div>
+                </button>
 
                 {/* Day cells */}
                 {colVirtualizer.getVirtualItems().map((vc) => {

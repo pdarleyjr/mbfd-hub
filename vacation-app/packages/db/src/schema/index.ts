@@ -10,3 +10,4 @@ export * from './leave-entries';
 export * from './import-column-maps';
 export * from './import-run-rows';
 export * from './pin-audit';
+export * from './staffing-rules';
