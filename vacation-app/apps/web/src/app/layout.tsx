@@ -15,6 +15,12 @@ export const viewport: Viewport = {
   themeColor: '#1e293b',
 };
 
+// Every page is dynamic — there's no point pre-rendering an admin board
+// that depends entirely on runtime DB state. Avoids Next 15 attempting to
+// fetch /api/* during the build phase.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>): React.JSX.Element {
