@@ -104,16 +104,6 @@ export async function parsePreviewJob(runId: string): Promise<void> {
       uniqueEmployees: 0,
     };
 
-    await db
-      .update(importRuns)
-      .set({
-        status: 'preview_ready',
-        parseStats: parseStats,
-        columnMappingJson: suggested,
-        finishedAt: new Date(),
-      })
-      .where(eq(importRuns.id, runId));
-
     const event: PreviewEvent = {
       type: 'preview_ready',
       columns: headers,
@@ -122,6 +112,20 @@ export async function parsePreviewJob(runId: string): Promise<void> {
       unknownDescriptions: unknown,
       parseStats,
     };
+
+    await db
+      .update(importRuns)
+      .set({
+        status: 'preview_ready',
+        parseStats: parseStats,
+        columnMappingJson: suggested,
+        // Cache the full payload so the SSE endpoint can replay it on
+        // client reconnect (page reload, network blip).
+        previewPayloadJson: event,
+        finishedAt: new Date(),
+      })
+      .where(eq(importRuns.id, runId));
+
     await publish(runId, event);
     logger.info({ runId, rows, unknown: unknown.length }, 'preview ready');
   } catch (err) {

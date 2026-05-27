@@ -9,12 +9,14 @@ importsList.get('/imports/runs', async (c) => {
   const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 25), 1), 200);
   const offset = Math.max(Number(c.req.query('offset') ?? 0), 0);
 
+  // NB: fileSha256 intentionally omitted from the list response so the
+  // endpoint cannot be used as a "was this exact file ever uploaded?"
+  // oracle. It is still returned by the per-run detail endpoint below.
   const runs = await db
     .select({
       id: importRuns.id,
       fileName: importRuns.fileName,
       fileSize: importRuns.fileSize,
-      fileSha256: importRuns.fileSha256,
       uploadedAt: importRuns.uploadedAt,
       status: importRuns.status,
       parseStats: importRuns.parseStats,

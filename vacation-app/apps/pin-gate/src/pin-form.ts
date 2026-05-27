@@ -2,8 +2,17 @@
  * Self-contained PIN entry page. No external fonts/CSS; the worker serves
  * this byte-identical every time.
  */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function renderPinForm(opts: { error?: string } = {}): string {
-  const error = opts.error ? `<p class="err">${opts.error}</p>` : '';
+  const error = opts.error ? `<p class="err">${escapeHtml(opts.error)}</p>` : '';
   return `<!doctype html>
 <html lang="en">
 <head>

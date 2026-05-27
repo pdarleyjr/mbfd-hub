@@ -14,6 +14,8 @@ export type Env = {
   PIN_VALUE: string;
   PIN_SIGNING_SECRET: string;
   PIN_AUDIT_WEBHOOK_SECRET: string;
+  /** Shared secret with the origin API; injected as X-Origin-Token. */
+  ORIGIN_SHARED_TOKEN: string;
   PIN_AUDIT_KV: KVNamespace;
 };
 
@@ -102,6 +104,9 @@ async function proxyToOrigin(req: Request, env: Env): Promise<Response> {
   const forwarded = new Request(target.toString(), req);
   forwarded.headers.set('x-forwarded-host', url.hostname);
   forwarded.headers.set('x-forwarded-proto', 'https');
+  // Shared secret so the origin API can distinguish gated traffic from
+  // anyone who guesses the un-gated vacation-origin.mbfdhub.com hostname.
+  forwarded.headers.set('x-origin-token', env.ORIGIN_SHARED_TOKEN);
   return fetch(forwarded);
 }
 

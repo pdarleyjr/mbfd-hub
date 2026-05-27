@@ -16,6 +16,14 @@ const EnvSchema = z.object({
 
   PIN_AUDIT_WEBHOOK_SECRET: z.string().min(16),
 
+  /**
+   * Shared secret between the Cloudflare PIN-gate Worker and this API.
+   * The Worker injects this as `X-Origin-Token` on every proxied request;
+   * the originGuard middleware rejects anything missing it. Closes the
+   * vacation-origin.mbfdhub.com bypass.
+   */
+  ORIGIN_SHARED_TOKEN: z.string().min(16),
+
   MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(1_073_741_824),
   MAX_TELESTAFF_ROWS: z.coerce.number().int().positive().default(5_000_000),
 });

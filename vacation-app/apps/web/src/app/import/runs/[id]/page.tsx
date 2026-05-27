@@ -51,7 +51,7 @@ export default function RunDetailPage(): React.JSX.Element {
               <CardTitle>{r.fileName}</CardTitle>
               <CardDescription>
                 {formatBytes(r.fileSize)} · uploaded {formatRelative(r.uploadedAt)} ·{' '}
-                <code className="font-mono text-xs">{r.fileSha256.slice(0, 16)}…</code>
+                <code className="font-mono text-xs">{(r.fileSha256 ?? '').slice(0, 16)}…</code>
               </CardDescription>
             </div>
             <Badge tone={r.status === 'committed' ? 'success' : r.status === 'failed' ? 'brand' : 'admin'}>

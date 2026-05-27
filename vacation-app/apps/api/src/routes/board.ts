@@ -8,7 +8,7 @@ import {
   shiftBlocks,
 } from '@mbfd-vacation/db';
 import { BoardFiltersSchema } from '@mbfd-vacation/shared';
-import { and, asc, between, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, between, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { db } from '../db';
 
@@ -39,8 +39,28 @@ board.get('/board', async (c) => {
   const fromDate = f.from ?? defaultFrom.toISOString().slice(0, 10);
   const toDate = f.to ?? defaultTo.toISOString().slice(0, 10);
 
-  // Members.
-  const memberQuery = db
+  // ── Member filter built directly in SQL so pagination + filtering
+  //    don't drop matching rows past page 1.
+  const memberFilters: SQL[] = [eq(members.isActive, true)];
+  if (f.shift && f.shift.length > 0) {
+    memberFilters.push(inArray(members.shift, f.shift));
+  }
+  if (f.rank && f.rank.length > 0) {
+    // Filter by rank.code via subquery — admin sends codes, not uuids.
+    memberFilters.push(
+      sql`${members.rankId} IN (SELECT ${ranks.id} FROM ${ranks} WHERE ${ranks.code} = ANY(${f.rank}))`,
+    );
+  }
+  const where = and(...memberFilters);
+
+  // Total count with the same filters applied.
+  const totalMembersRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(members)
+    .where(where);
+  const totalMembers = totalMembersRows[0]?.count ?? 0;
+
+  const memberRows = await db
     .select({
       id: members.id,
       employeeId: members.employeeId,
@@ -58,28 +78,23 @@ board.get('/board', async (c) => {
     .from(members)
     .leftJoin(ranks, eq(ranks.id, members.rankId))
     .leftJoin(aDayGroups, eq(aDayGroups.id, members.aDayGroupId))
-    .where(eq(members.isActive, true))
+    .where(where)
     .orderBy(asc(members.shift), asc(members.lastName), asc(members.firstName))
     .limit(f.pageSize)
     .offset((f.page - 1) * f.pageSize);
 
-  const memberRows = await memberQuery;
+  const memberIds = memberRows.map((m) => m.id);
 
-  // Apply shift/rank filters in JS to keep the query simple.
-  const filtered = memberRows.filter((m) => {
-    if (f.shift?.length && !f.shift.includes(m.shift ?? '')) return false;
-    if (f.rank?.length && !f.rank.includes(m.rankCode ?? '')) return false;
-    return true;
-  });
-  const memberIds = filtered.map((m) => m.id);
-
-  // Cells.
+  // Cells. We include calendar_days.date so the UI keys cells off the
+  // authoritative calendar day, not a UTC slice of startAt (which would
+  // misclassify PM blocks that cross midnight UTC).
   const cellRows = memberIds.length
     ? await db
         .select({
           memberId: leaveEntries.memberId,
           shiftBlockId: leaveEntries.shiftBlockId,
           blockIndex: shiftBlocks.blockIndex,
+          dayDate: calendarDays.date,
           startAt: shiftBlocks.startAt,
           endAt: shiftBlocks.endAt,
           leaveCodeId: leaveCodes.id,
@@ -105,6 +120,7 @@ board.get('/board', async (c) => {
     memberId: r.memberId,
     shiftBlockId: r.shiftBlockId,
     blockIndex: r.blockIndex,
+    dayDate: r.dayDate,
     startAt: r.startAt.toISOString(),
     endAt: r.endAt.toISOString(),
     leaveCode: {
@@ -116,17 +132,11 @@ board.get('/board', async (c) => {
     sourceImportRunId: r.sourceImportRunId,
   }));
 
-  let finalMembers = filtered;
+  let finalMembers = memberRows;
   if (f.onlyWithLeave) {
     const idsWithLeave = new Set(cells.map((c) => c.memberId));
     finalMembers = finalMembers.filter((m) => idsWithLeave.has(m.id));
   }
-
-  const totalMembersResult = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(members)
-    .where(eq(members.isActive, true));
-  const totalMembers = totalMembersResult[0]?.count ?? 0;
 
   return c.json({
     members: finalMembers.map((m) => ({

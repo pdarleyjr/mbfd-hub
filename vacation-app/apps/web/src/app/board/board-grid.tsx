@@ -22,12 +22,11 @@ function daysBetween(from: string, to: string): string[] {
   return out;
 }
 
-/** Map (memberId, dayIso, blockIndex) → cell for O(1) lookup. */
+/** Map (memberId, dayDate, blockIndex) → cell for O(1) lookup. */
 function indexCells(cells: BoardCell[]): Map<string, BoardCell> {
   const m = new Map<string, BoardCell>();
   for (const c of cells) {
-    const day = c.startAt.slice(0, 10);
-    m.set(`${c.memberId}|${day}|${c.blockIndex}`, c);
+    m.set(`${c.memberId}|${c.dayDate}|${c.blockIndex}`, c);
   }
   return m;
 }

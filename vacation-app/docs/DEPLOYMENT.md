@@ -109,9 +109,10 @@ cd vacation-app/apps/pin-gate
 export CLOUDFLARE_API_TOKEN="<your cfut_ token>"
 npx wrangler kv namespace create PIN_AUDIT_KV
 # Paste the returned id into wrangler.toml's [[kv_namespaces]] block.
-echo "2300" | npx wrangler secret put PIN_VALUE
+read -s -p "Department PIN: " PIN && echo "$PIN" | npx wrangler secret put PIN_VALUE
 openssl rand -hex 32 | npx wrangler secret put PIN_SIGNING_SECRET
-echo "<webhook secret from .env on GMKtec>" | npx wrangler secret put PIN_AUDIT_WEBHOOK_SECRET
+echo "<PIN_AUDIT_WEBHOOK_SECRET from .env on GMKtec>" | npx wrangler secret put PIN_AUDIT_WEBHOOK_SECRET
+echo "<ORIGIN_SHARED_TOKEN from .env on GMKtec>" | npx wrangler secret put ORIGIN_SHARED_TOKEN
 npx wrangler deploy
 ```
 

@@ -50,9 +50,6 @@ export default function RunsPage(): React.JSX.Element {
                     </p>
                   </div>
                   <Badge tone={STATUS_TONE[r.status] ?? 'neutral'}>{r.status}</Badge>
-                  <span className="text-xs font-mono text-stone-400 hidden sm:inline">
-                    {r.fileSha256.slice(0, 12)}
-                  </span>
                   <span className="text-xs text-stone-400">→</span>
                 </Link>
               </li>

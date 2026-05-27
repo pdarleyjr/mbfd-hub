@@ -4,6 +4,12 @@ export const BoardCellSchema = z.object({
   memberId: z.string().uuid(),
   shiftBlockId: z.string().uuid(),
   blockIndex: z.number().int().min(0).max(1),
+  /**
+   * Authoritative calendar day `YYYY-MM-DD` for this block. Use this for
+   * grid keying — NOT a UTC slice of startAt (PM blocks cross midnight
+   * UTC and would otherwise hash to the wrong day).
+   */
+  dayDate: z.string(),
   startAt: z.string(), // ISO
   endAt: z.string(),   // ISO
   leaveCode: z.object({
