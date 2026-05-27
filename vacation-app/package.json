@@ -1,0 +1,36 @@
+{
+  "name": "mbfd-vacation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MBFD Vacation Selection Web App — V1 (import + read-only board)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "build": "pnpm -r --filter ./apps/* --filter ./packages/* run build",
+    "dev": "pnpm -r --parallel --filter ./apps/api --filter ./apps/worker --filter ./apps/web run dev",
+    "dev:api": "pnpm --filter ./apps/api dev",
+    "dev:worker": "pnpm --filter ./apps/worker dev",
+    "dev:web": "pnpm --filter ./apps/web dev",
+    "db:generate": "pnpm --filter ./packages/db drizzle-kit generate",
+    "db:migrate": "pnpm --filter ./packages/db run migrate",
+    "db:seed": "pnpm --filter ./packages/db run seed",
+    "test": "pnpm -r run test",
+    "test:unit": "vitest run --dir tests/unit",
+    "test:integration": "vitest run --dir tests/integration",
+    "test:e2e": "playwright test",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "stress-fixture": "tsx scripts/stress-fixture.ts",
+    "seed-dev": "tsx scripts/seed-dev.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
