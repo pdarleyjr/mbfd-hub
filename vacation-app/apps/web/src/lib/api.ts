@@ -1,6 +1,9 @@
 import type {
   BoardResponse,
   ColumnMapping,
+  DecisionRequest,
+  DecisionResult,
+  StaffingRules,
   WorkCodeDecision,
 } from '@mbfd-vacation/shared';
 
@@ -101,4 +104,91 @@ export const api = {
         isADayMarker: boolean;
       }>;
     }>('/api/leave-codes'),
+
+  searchMembers: (q: string, limit = 20) =>
+    jsonFetch<{
+      matches: Array<{
+        id: string;
+        employeeId: string;
+        lastName: string;
+        firstName: string;
+        shift: string | null;
+        station: string | null;
+        rank: { code: string; label: string } | null;
+      }>;
+    }>(`/api/members/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+
+  memberProfile: (id: string, year?: number) =>
+    jsonFetch<MemberProfile>(
+      `/api/members/${id}/profile${year ? `?year=${year}` : ''}`,
+    ),
+
+  updateMember: (
+    id: string,
+    patch: { station?: string | null; certifications?: string[] },
+  ) =>
+    jsonFetch<{ id: string; station: string | null; certifications: string[] }>(
+      `/api/members/${id}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(patch),
+      } as RequestInit,
+    ),
+
+  getStaffingRules: () =>
+    jsonFetch<{ rules: StaffingRules; updatedAt: string | null }>(
+      '/api/staffing-rules',
+    ),
+
+  putStaffingRules: (rules: StaffingRules) =>
+    jsonFetch<{ rules: StaffingRules; updatedAt: string }>(
+      '/api/staffing-rules',
+      {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(rules),
+      } as RequestInit,
+    ),
+
+  staffingDecision: (req: DecisionRequest) =>
+    jsonFetch<DecisionResult>('/api/staffing-decision', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(req),
+    } as RequestInit),
+};
+
+export type MemberProfile = {
+  member: {
+    id: string;
+    employeeId: string;
+    lastName: string;
+    firstName: string;
+    shift: string | null;
+    station: string | null;
+    certifications: string[];
+    isProbationary: boolean;
+    isActive: boolean;
+    rank: { id: string; code: string; label: string } | null;
+    aDayGroup: { id: string; code: string; label: string } | null;
+  };
+  year: number;
+  balances: Array<{
+    leaveCodeId: string;
+    code: string;
+    label: string;
+    uiColor: string;
+    entries: number;
+    hours: number;
+  }>;
+  entries: Array<{
+    id: string;
+    dayDate: string;
+    blockIndex: number;
+    hours: number | null;
+    assignment: string | null;
+    leaveCode: { code: string; label: string; uiColor: string };
+    sourceImportRunId: string;
+  }>;
 };

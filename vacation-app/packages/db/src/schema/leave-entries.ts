@@ -2,7 +2,9 @@ import { sql } from 'drizzle-orm';
 import {
   index,
   jsonb,
+  numeric,
   pgTable,
+  text,
   timestamp,
   uniqueIndex,
   uuid,
@@ -40,6 +42,18 @@ export const leaveEntries = pgTable(
       .references(() => importRuns.id),
     supersededByEntryId: uuid('superseded_by_entry_id'),
     rawTelestaffRow: jsonb('raw_telestaff_row').notNull(),
+    /**
+     * First-class hours value for fast YTD-balance aggregation. Backfilled
+     * from `raw_telestaff_row->>'Hours'` in migration 0002. Nullable so
+     * sources that don't supply hours (manual entries) don't have to lie.
+     */
+    hours: numeric('hours', { precision: 6, scale: 2 }),
+    /**
+     * Telestaff "Assignment" bucket ("Shift Assignment", "Days Assignment",
+     * "Details & Events"). Useful for differentiating shift members from
+     * civilians without joining members + ranks.
+     */
+    assignment: text('assignment'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -49,6 +63,7 @@ export const leaveEntries = pgTable(
     index('leave_entries_block_code_idx').on(t.shiftBlockId, t.leaveCodeId),
     index('leave_entries_member_idx').on(t.memberId),
     index('leave_entries_source_idx').on(t.sourceImportRunId),
+    index('leave_entries_member_hours_idx').on(t.memberId, t.leaveCodeId),
   ],
 );
 

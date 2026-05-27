@@ -15,6 +15,13 @@
       "when": 1779891447596,
       "tag": "0001_add_preview_payload",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779945600000,
+      "tag": "0002_staffing_engine",
+      "breakpoints": true
     }
   ]
 }

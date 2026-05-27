@@ -2,14 +2,24 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import { api } from '@/lib/api';
 import { BoardGrid } from './board-grid';
 import { EmptyState } from './empty-state';
 import { FilterBar } from './filter-bar';
+import { MemberDetailDrawer } from './member-detail-drawer';
+import { MemberSearch } from './member-search';
 import { useBoardFilters } from './use-board-filters';
 
 export default function BoardPage(): React.JSX.Element {
   const { filters, setFilters, toQuery } = useBoardFilters();
+  const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const openMember = (id: string): void => {
+    setActiveMemberId(id);
+    setDrawerOpen(true);
+  };
 
   const query = useQuery({
     queryKey: ['board', filters],
@@ -40,17 +50,28 @@ export default function BoardPage(): React.JSX.Element {
 
   return (
     <div className="flex flex-col gap-4">
-      <FilterBar filters={filters} setFilters={setFilters} />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
+        <MemberSearch onPick={openMember} />
+        <div className="flex-1">
+          <FilterBar filters={filters} setFilters={setFilters} />
+        </div>
+      </div>
       <BoardGrid
         members={data.members}
         cells={data.cells}
         dateFrom={data.dateRange.from}
         dateTo={data.dateRange.to}
+        onMemberClick={openMember}
       />
       <div className="text-xs text-stone-600">
         {data.members.length} of {data.pagination.totalMembers} members ·{' '}
         {data.cells.length} leave entries in the window
       </div>
+      <MemberDetailDrawer
+        memberId={activeMemberId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   );
 }

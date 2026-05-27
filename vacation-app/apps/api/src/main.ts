@@ -12,8 +12,11 @@ import { importsPreview } from './routes/imports-preview';
 import { importsRollback } from './routes/imports-rollback';
 import { importsUpload } from './routes/imports-upload';
 import { leaveCodesRoute } from './routes/leave-codes';
+import { membersRoute } from './routes/members';
 import { originGuard } from './middleware/origin-guard';
 import { pinAuditWebhook } from './routes/pin-audit-webhook';
+import { staffingDecision } from './routes/staffing-decision';
+import { staffingRulesRoute } from './routes/staffing-rules';
 
 const env = getEnv();
 
@@ -47,6 +50,9 @@ app.route('/api', importsRollback);
 app.route('/api', importsList);
 app.route('/api', board);
 app.route('/api', leaveCodesRoute);
+app.route('/api', membersRoute);
+app.route('/api', staffingRulesRoute);
+app.route('/api', staffingDecision);
 
 app.notFound((c) => c.json({ error: 'not_found' }, 404));
 app.onError((err, c) => {

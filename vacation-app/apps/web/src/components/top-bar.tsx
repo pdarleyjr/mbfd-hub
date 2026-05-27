@@ -6,8 +6,10 @@ import { cn } from '@/lib/utils';
 
 const nav = [
   { href: '/board', label: 'Board' },
+  { href: '/grant', label: 'Grant' },
   { href: '/import', label: 'Import' },
   { href: '/import/runs', label: 'Runs' },
+  { href: '/admin/rules', label: 'Rules' },
 ];
 
 export function TopBar(): React.JSX.Element {

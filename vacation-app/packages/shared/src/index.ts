@@ -4,3 +4,4 @@ export * from './work-code-decision';
 export * from './board-cell';
 export * from './member-normalize';
 export * from './telestaff-codes';
+export * from './staffing-rules';
