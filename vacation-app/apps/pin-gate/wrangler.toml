@@ -1,0 +1,29 @@
+name = "mbfd-vacation-pin-gate"
+main = "src/index.ts"
+compatibility_date = "2024-12-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Bind the worker to vacation.mbfdhub.com/*
+# Run: npx wrangler routes add "vacation.mbfdhub.com/*" --zone-name mbfdhub.com
+# (or via the Cloudflare dashboard → Workers → Routes)
+
+[vars]
+# Public-facing tunnel hostname for the GMKtec nginx. The PIN gate proxies
+# verified requests to this origin.
+# In production this is the Cloudflare Tunnel cfargotunnel hostname so the
+# gate cannot be bypassed by talking to the tunnel hostname directly.
+ORIGIN_URL = "https://vacation-origin.mbfdhub.com"
+
+# Comma-separated list of webhook origins we accept from when forwarding
+# pin audit events to the api. Default: same hostname.
+PIN_AUDIT_WEBHOOK_URL = "https://vacation-origin.mbfdhub.com/api/__pin/audit-webhook"
+
+# Secrets (set with `npx wrangler secret put NAME`):
+#   PIN_VALUE                      - the shared department PIN
+#   PIN_SIGNING_SECRET             - HMAC secret for the session cookie
+#   PIN_AUDIT_WEBHOOK_SECRET       - shared secret with the api
+
+[[kv_namespaces]]
+binding = "PIN_AUDIT_KV"
+# Generate with: npx wrangler kv:namespace create "PIN_AUDIT_KV"
+id = "REPLACE_WITH_REAL_KV_NAMESPACE_ID"
