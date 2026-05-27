@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { DecisionResultPanel } from '@/app/board/member-detail-drawer';
@@ -35,7 +35,7 @@ function GrantPageInner(): React.JSX.Element {
   const [memberSearch, setMemberSearch] = useState('');
   const [dayDate, setDayDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [blockIndex, setBlockIndex] = useState<0 | 1>(0);
-  const [leaveCode, setLeaveCode] = useState('V');
+  const [leaveCode, setLeaveCode] = useState<string>('');
   const [exchangePartnerId, setExchangePartnerId] = useState('');
   const [partnerSearch, setPartnerSearch] = useState('');
   const [requestedLocalStartHour, setRequestedLocalStartHour] = useState<number | undefined>(undefined);
@@ -52,6 +52,20 @@ function GrantPageInner(): React.JSX.Element {
   const lc = useQuery({
     queryKey: ['leaveCodes'],
     queryFn: () => api.listLeaveCodes(),
+    staleTime: 60_000,
+  });
+
+  // Default to the first available code once the list loads — never a
+  // hardcoded 'V' that might not exist on this DB.
+  useEffect(() => {
+    if (!lc.data || leaveCode) return;
+    const first = lc.data.leaveCodes[0]?.code;
+    if (first) setLeaveCode(first);
+  }, [lc.data, leaveCode]);
+
+  const rules = useQuery({
+    queryKey: ['staffingRules'],
+    queryFn: () => api.getStaffingRules(),
     staleTime: 60_000,
   });
 
@@ -83,7 +97,10 @@ function GrantPageInner(): React.JSX.Element {
       }),
   });
 
-  const isExchange = ['XOFF', 'EON'].includes(leaveCode.toUpperCase());
+  const exchangeCodes = (rules.data?.rules.exchangeLeaveCodes ?? ['XOFF', 'EON']).map((c) =>
+    c.toUpperCase(),
+  );
+  const isExchange = leaveCode.length > 0 && exchangeCodes.includes(leaveCode.toUpperCase());
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -184,7 +201,7 @@ function GrantPageInner(): React.JSX.Element {
       {isExchange && (
         <section className="grid gap-3 rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-600">
-            3. Exchange partner (required for XOFF / EON)
+            3. Exchange partner (required for {exchangeCodes.join(' / ')})
           </h2>
           <Typeahead
             placeholder="Search for the partner"
@@ -203,7 +220,7 @@ function GrantPageInner(): React.JSX.Element {
       <div>
         <Button
           onClick={() => decision.mutate()}
-          disabled={!memberId || decision.isPending}
+          disabled={!memberId || !leaveCode || decision.isPending}
         >
           {decision.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Check decision
@@ -243,8 +260,18 @@ function Typeahead({
   onPick: (m: { id: string; lastName: string; firstName: string }) => void;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  // Close on outside mousedown instead of onBlur — the previous setTimeout-
+  // based onBlur racing against onClick lost selections on slow renders.
+  useEffect(() => {
+    function onDocMouseDown(e: MouseEvent): void {
+      if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, []);
   return (
-    <div className="relative">
+    <div ref={wrapperRef} className="relative">
       <input
         type="search"
         placeholder={placeholder}
@@ -254,7 +281,6 @@ function Typeahead({
           setOpen(true);
         }}
         onFocus={() => value.length > 0 && setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 120)}
         className="h-9 w-full rounded-md border border-stone-200 bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
       />
       {open && value.trim().length > 0 && (

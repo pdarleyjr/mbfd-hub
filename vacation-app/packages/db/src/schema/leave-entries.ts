@@ -64,6 +64,9 @@ export const leaveEntries = pgTable(
     index('leave_entries_member_idx').on(t.memberId),
     index('leave_entries_source_idx').on(t.sourceImportRunId),
     index('leave_entries_member_hours_idx').on(t.memberId, t.leaveCodeId),
+    index('leave_entries_superseded_by_idx')
+      .on(t.supersededByEntryId)
+      .where(sql`${t.supersededByEntryId} IS NOT NULL`),
   ],
 );
 

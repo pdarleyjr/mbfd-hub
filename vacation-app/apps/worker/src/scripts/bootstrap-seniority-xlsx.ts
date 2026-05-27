@@ -16,6 +16,7 @@
  *
  * Idempotent. Safe to re-run after a new bid-master version.
  */
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -206,14 +207,15 @@ async function main(): Promise<void> {
   const rows = readSheet(buf);
   console.log(`Parsed ${rows.length} seniority rows.`);
 
+  const sha = createHash('sha256').update(buf).digest('hex');
   // Synthetic import_runs row so the loader fits the rollback model.
   const [run] = await db
     .insert(importRuns)
     .values({
       fileName: 'FY25 Vacation Selection Master V6.xlsx',
       fileSize: buf.length,
-      fileSha256: 'bootstrap-seniority',
-      r2Key: 'bootstrap/seniority/' + new Date().toISOString(),
+      fileSha256: sha,
+      r2Key: `bootstrap/seniority/${sha}/FY25.xlsx`,
       status: 'committing',
       startedAt: new Date(),
     })

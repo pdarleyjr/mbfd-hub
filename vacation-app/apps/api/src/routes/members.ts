@@ -7,10 +7,11 @@ import {
   ranks,
   shiftBlocks,
 } from '@mbfd-vacation/db';
-import { and, asc, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, between, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { db } from '../db';
 import { z } from 'zod';
+import { loadStaffingRules } from './staffing-rules';
 
 export const membersRoute = new Hono();
 
@@ -124,7 +125,7 @@ membersRoute.get('/members/:id/profile', async (c) => {
       and(
         eq(leaveEntries.memberId, id),
         isNull(leaveEntries.supersededByEntryId),
-        sql`${calendarDays.date} BETWEEN ${yearStart} AND ${yearEnd}`,
+        between(calendarDays.date, yearStart, yearEnd),
       ),
     )
     .groupBy(leaveCodes.id, leaveCodes.code, leaveCodes.label, leaveCodes.uiColor)
@@ -151,7 +152,7 @@ membersRoute.get('/members/:id/profile', async (c) => {
       and(
         eq(leaveEntries.memberId, id),
         isNull(leaveEntries.supersededByEntryId),
-        sql`${calendarDays.date} BETWEEN ${yearStart} AND ${yearEnd}`,
+        between(calendarDays.date, yearStart, yearEnd),
       ),
     )
     .orderBy(asc(calendarDays.date), asc(shiftBlocks.blockIndex));
@@ -211,13 +212,49 @@ const PatchBody = z.object({
 
 membersRoute.patch('/members/:id', async (c) => {
   const id = c.req.param('id');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: 'invalid_id' }, 400);
+  }
   const body = await c.req.json().catch(() => null);
   const parsed = PatchBody.safeParse(body);
   if (!parsed.success) {
     return c.json({ error: 'invalid_body', issues: parsed.error.flatten() }, 400);
   }
+
+  // Enforce the configured allowlists so a poisoned station/cert string
+  // cannot reach the decision engine, where it would corrupt pairing /
+  // Marine-cap logic.
+  const { rules } = await loadStaffingRules();
+  const allowedStations = new Set(rules.stationOptions);
+  const allowedCerts = new Set(rules.certificationOptions);
+
+  if (parsed.data.station != null && parsed.data.station !== '' && !allowedStations.has(parsed.data.station)) {
+    return c.json(
+      {
+        error: 'invalid_station',
+        message: `station must be one of: ${[...allowedStations].join(', ')}`,
+      },
+      400,
+    );
+  }
+  if (parsed.data.certifications) {
+    for (const c0 of parsed.data.certifications) {
+      if (!allowedCerts.has(c0)) {
+        return c.json(
+          {
+            error: 'invalid_certification',
+            message: `certification '${c0}' is not in: ${[...allowedCerts].join(', ')}`,
+          },
+          400,
+        );
+      }
+    }
+  }
+
   const patch: Record<string, unknown> = { updatedAt: new Date() };
-  if (parsed.data.station !== undefined) patch.station = parsed.data.station;
+  if (parsed.data.station !== undefined) {
+    patch.station = parsed.data.station === '' ? null : parsed.data.station;
+  }
   if (parsed.data.certifications !== undefined) patch.certifications = parsed.data.certifications;
 
   const [row] = await db

@@ -4,7 +4,7 @@ import {
   StaffingRulesSchema,
   type StaffingRules,
 } from '@mbfd-vacation/shared';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { db } from '../db';
 
@@ -97,16 +97,14 @@ staffingRulesRoute.get('/staffing-rules/audit', async (c) => {
       newRulesJson: staffingRulesAudit.newRulesJson,
     })
     .from(staffingRulesAudit)
-    .orderBy(staffingRulesAudit.changedAt)
+    .orderBy(desc(staffingRulesAudit.changedAt))
     .limit(20);
   return c.json({
-    entries: rows
-      .reverse()
-      .map((r) => ({
-        id: r.id,
-        changedAt: r.changedAt.toISOString(),
-        previousRules: r.previousRulesJson,
-        newRules: r.newRulesJson,
-      })),
+    entries: rows.map((r) => ({
+      id: r.id,
+      changedAt: r.changedAt.toISOString(),
+      previousRules: r.previousRulesJson,
+      newRules: r.newRulesJson,
+    })),
   });
 });

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Save } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import type { StaffingRules } from '@mbfd-vacation/shared';
@@ -287,9 +287,17 @@ function StringListField({
   value: string[];
   onChange: (arr: string[]) => void;
 }): React.JSX.Element {
+  // Track the joined string the parent told us about last so we don't
+  // clobber mid-typing edits. Only re-sync when the parent's value
+  // (joined) actually changes vs the last accepted external value.
+  const lastExternal = useRef(value.join(', '));
   const [text, setText] = useState(value.join(', '));
   useEffect(() => {
-    setText(value.join(', '));
+    const next = value.join(', ');
+    if (next !== lastExternal.current) {
+      lastExternal.current = next;
+      setText(next);
+    }
   }, [value]);
   return (
     <label className="grid gap-1">
