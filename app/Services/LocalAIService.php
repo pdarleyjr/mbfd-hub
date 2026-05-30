@@ -70,8 +70,12 @@ class LocalAIService extends CloudflareAIService
             'reasoning_effort' => 'none',
         ]);
 
-        $response = Http::timeout((int) config('cloudflare.ai.timeouts.request', 120))
-            ->connectTimeout((int) config('cloudflare.ai.timeouts.connect', 10))
+        // Local LLM cold-load (weights into VRAM) can take ~45s before the
+        // first token; the Cloudflare 30s request timeout is too short for
+        // that. Use the local-specific timeout (default 120s). Warm calls
+        // return in a few seconds.
+        $response = Http::timeout((int) config('cloudflare.ai.local.timeout', 120))
+            ->connectTimeout(10)
             ->post("{$this->baseUrl}/v1/chat/completions", $payload);
 
         if (! $response->successful()) {

@@ -12,6 +12,10 @@ return [
         'local' => [
             'url' => env('OLLAMA_URL', 'http://host.docker.internal:11434'),
             'model' => env('OLLAMA_MODEL', 'qwen3.6:35b'),
+            // Local model cold-load (~45s) + generation can exceed the 30s CF
+            // default; allow plenty of headroom so command-center calls don't
+            // fail on a cold model. Warm calls finish in a few seconds.
+            'timeout' => (int) env('OLLAMA_TIMEOUT', 120),
         ],
 
         'models' => [
