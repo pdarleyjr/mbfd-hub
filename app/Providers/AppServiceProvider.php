@@ -37,6 +37,16 @@ class AppServiceProvider extends ServiceProvider
             \App\Http\Responses\LoginResponse::class,
         );
 
+        // Route command-center / capital-project AI to the on-prem Ollama
+        // (qwen3.6:35b) when AI_DRIVER=local. All callers resolve
+        // CloudflareAIService via the container, so this one binding repoints
+        // SmartUpdatesWidget, CapitalProject analysis, and the summary commands.
+        $this->app->bind(\App\Services\CloudflareAIService::class, function () {
+            return config('cloudflare.ai.driver') === 'local'
+                ? new \App\Services\LocalAIService()
+                : new \App\Services\CloudflareAIService();
+        });
+
         // Spatie Permission ships with events_enabled=false. We need it on so
         // RoleAttached fires and the SyncToScreentinker listener can mirror
         // new admin user creations to media.mbfdhub.com. Override here in
