@@ -316,7 +316,10 @@ class SmartUpdatesWidget extends Widget
     public function loadAiSummary(): void
     {
         $svc = app(CommandCenterAiService::class);
-        $svc->ensureFresh($this->rawMetrics);
+        // Compute freshness from the service's OWN metrics (the same source the
+        // queued job uses) so the fingerprint always matches — never re-dispatch
+        // on every poll, even if the widget's display-metrics gathering drifts.
+        $svc->ensureFresh();
         $cached = $svc->cachedSummary();
         $this->aiSummary = $cached['summary'] ?? null;
         $this->aiSummaryAt = $cached['at'] ?? null;
