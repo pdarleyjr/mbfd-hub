@@ -77,6 +77,11 @@ class KnowledgeBase extends Page implements HasForms
         try {
             $state = $this->form->getState();
             $file = $state['document'] ?? null;
+            // Filament FileUpload can return an array of uploaded files even for
+            // a single upload — normalize to the first file.
+            if (is_array($file)) {
+                $file = reset($file) ?: null;
+            }
 
             if (! $file) {
                 Notification::make()->title('No file selected')->warning()->send();
