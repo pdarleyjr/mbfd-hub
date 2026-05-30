@@ -1,5 +1,5 @@
 <x-filament-widgets::widget>
-    <div x-data="{ expanded: $wire.entangle('isExpanded') }">
+    <div x-data="{ expanded: $wire.entangle('isExpanded') }" wire:poll.120s="refreshTick">
         <x-filament::section>
             <x-slot name="heading">
                 <div class="flex items-center gap-2 command-center-heading">
@@ -24,6 +24,33 @@
             <div>
                 {{-- Collapsed State - Bullet Summary --}}
                 <div x-show="!expanded" class="space-y-3">
+                    {{-- AI Brief — regenerated only when operational data changes --}}
+                    @if($aiSummary)
+                        <div class="command-center-section" style="background-color:#FFF7ED; border:1px solid #FED7AA; border-radius:8px; padding:10px;">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="command-center-badge-info">✨ AI Brief</span>
+                                @if($aiSummaryAt)
+                                    <span class="text-xs" style="color:#A8A29E;" title="{{ $aiSummaryAt }}">
+                                        updated {{ \Illuminate\Support\Carbon::parse($aiSummaryAt)->diffForHumans() }}
+                                    </span>
+                                @endif
+                            </div>
+                            @if(isset($aiSummary['raw_response']))
+                                <p class="command-center-item whitespace-pre-wrap">{{ $aiSummary['raw_response'] }}</p>
+                            @else
+                                <ul class="space-y-0.5 ml-1">
+                                    @foreach($aiSummary as $points)
+                                        @if(is_array($points))
+                                            @foreach($points as $point)
+                                                <li class="command-center-item">• {{ $point }}</li>
+                                            @endforeach
+                                        @endif
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    @endif
+
                     @if($bulletSummary)
                         @foreach($bulletSummary as $key => $section)
                             @php

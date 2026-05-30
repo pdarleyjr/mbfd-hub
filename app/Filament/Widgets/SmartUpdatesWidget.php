@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use Filament\Widgets\Widget;
 use App\Services\CloudflareAIService;
+use App\Services\CommandCenterAiService;
 use App\Models\CapitalProject;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
@@ -30,10 +31,16 @@ class SmartUpdatesWidget extends Widget
     public bool $chatLoading = false;
     public bool $isExpanded = false; // Start collapsed
 
+    // AI brief — regenerated asynchronously, and ONLY when the operational
+    // data fingerprint changes (see CommandCenterAiService).
+    public ?array $aiSummary = null;
+    public ?string $aiSummaryAt = null;
+
     public function mount(): void
     {
         // Instant load from database - NO AI call
         $this->loadInstantSummary();
+        $this->loadAiSummary();
     }
 
     /**
@@ -287,6 +294,32 @@ class SmartUpdatesWidget extends Widget
     public function refresh(): void
     {
         $this->loadInstantSummary();
+        $this->loadAiSummary();
+    }
+
+    /**
+     * Polled every ~2 min while an admin has the dashboard open. Refreshes the
+     * instant DB bullets (cheap) and the AI brief — which only regenerates when
+     * the underlying operational data actually changed (CommandCenterAiService),
+     * so the local model loads only when there is genuinely new info.
+     */
+    public function refreshTick(): void
+    {
+        $this->loadInstantSummary();
+        $this->loadAiSummary();
+    }
+
+    /**
+     * Read the cached AI brief and — non-blocking — request a regeneration if
+     * the operational data changed since the brief was produced.
+     */
+    public function loadAiSummary(): void
+    {
+        $svc = app(CommandCenterAiService::class);
+        $svc->ensureFresh($this->rawMetrics);
+        $cached = $svc->cachedSummary();
+        $this->aiSummary = $cached['summary'] ?? null;
+        $this->aiSummaryAt = $cached['at'] ?? null;
     }
 
     #[On('equipment-updated')]
