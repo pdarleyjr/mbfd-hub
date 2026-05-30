@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Admin\Pages\BidAccessPin;
 use App\Filament\Admin\Pages\EquipmentIntake;
+use App\Filament\Admin\Pages\KnowledgeBase;
 use App\Filament\Admin\Pages\TrtTrailerInventory;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\NotificationSettings;
@@ -83,6 +84,7 @@ class AdminPanelProvider extends PanelProvider
                 EquipmentIntake::class,
                 TrtTrailerInventory::class,
                 BidAccessPin::class,
+                KnowledgeBase::class,
             ])
             ->widgets([
                 FleetStatsWidget::class,
