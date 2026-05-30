@@ -4,6 +4,12 @@ interface Env {
   RATE_LIMIT_KV?: KVNamespace;
   ALLOWED_ORIGIN: string;
   AI_GATEWAY_URL?: string;
+  // Local-LLM bridge (Ollama OpenAI-compatible, fronted by office-ai.mbfdhub.com)
+  BRIDGE_URL?: string;     // var: e.g. https://office-ai.mbfdhub.com/v1
+  BRIDGE_TOKEN?: string;   // secret: bearer for the bridge
+  BRIDGE_MODEL?: string;   // var: e.g. qwen3.6:35b
+  // Shared secret required for write endpoints (/ingest, /delete)
+  INGEST_SECRET?: string;  // secret: matches the Hub's CLOUDFLARE_WORKER_API_SECRET
 }
 
 interface RateLimitEntry {
@@ -16,11 +22,13 @@ interface ConversationMessage {
   content: string;
 }
 
+const EMBEDDING_MODEL = '@cf/baai/bge-large-en-v1.5';
+const DEFAULT_BRIDGE_MODEL = 'qwen3.6:35b';
+
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
-  // 15 requests per minute per IP for the free tier (generous for ~1-2 chats/day)
   const limit = 15;
   const windowMs = 60000;
   const entry = rateLimitStore.get(ip);
@@ -43,7 +51,7 @@ function getCorsHeaders(env: Env, request: Request): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': isAllowed ? origin : allowed,
     'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, x-api-secret',
     'Access-Control-Max-Age': '86400',
   };
 }
@@ -84,30 +92,94 @@ RESPONSE RULES:
 6. For safety-critical information, add a note to verify with the current published document.
 7. For repair/deficiency reporting questions, ALWAYS provide the full reporting procedure including email address, subject format, and phone contact order as specified in the CRITICAL OVERRIDE above.`;
 
-/**
- * Run an AI model, routing through AI Gateway if configured for caching/analytics.
- * Falls back to direct env.AI.run binding otherwise.
- */
-async function runAI(env: Env, model: string, input: any): Promise<any> {
-  if (env.AI_GATEWAY_URL) {
-    const url = `${env.AI_GATEWAY_URL.replace(/\/$/, '')}/${model.replace(/^@cf\//, '')}`;
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    });
-    if (!resp.ok) {
-      console.error(`AI Gateway error ${resp.status}, falling back to direct binding`);
-      return env.AI.run(model, input);
+/** Chunk text into ~1500-char segments with 200-char overlap, breaking on
+ *  sentence/paragraph boundaries where possible. Mirrors ingest-manuals.mjs. */
+function chunkText(text: string, maxChars = 1500, overlap = 200): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = start + maxChars;
+    if (end < text.length) {
+      const lastPeriod = text.lastIndexOf('.', end);
+      const lastNewline = text.lastIndexOf('\n', end);
+      const breakPoint = Math.max(lastPeriod, lastNewline);
+      if (breakPoint > start + maxChars * 0.5) end = breakPoint + 1;
     }
-    return resp.json();
+    chunks.push(text.slice(start, Math.min(end, text.length)).trim());
+    start = end - overlap;
+    if (start >= text.length) break;
   }
-  return env.AI.run(model, input);
+  return chunks.filter((c) => c.length > 50);
+}
+
+function sanitizeId(source: string): string {
+  return source.replace(/[^a-zA-Z0-9]/g, '_');
+}
+
+/** Translate the bridge's OpenAI-style SSE into the CF-style SSE the landing
+ *  page expects: `data: {"response":"<token>"}`. Buffers across chunk
+ *  boundaries; emits a final `data: [DONE]`. */
+function openaiToCfStream(upstream: ReadableStream): ReadableStream {
+  const reader = upstream.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = '';
+  return new ReadableStream({
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) {
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+        return;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith('data:')) continue;
+        const payload = t.slice(5).trim();
+        if (payload === '' || payload === '[DONE]') continue;
+        try {
+          const j = JSON.parse(payload);
+          const tok = j.choices?.[0]?.delta?.content || '';
+          if (tok) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ response: tok })}\n\n`));
+        } catch {
+          /* ignore keep-alive / partial */
+        }
+      }
+    },
+    cancel() {
+      reader.cancel();
+    },
+  });
+}
+
+/** Call the local-Ollama bridge (OpenAI-compatible). */
+function callBridge(env: Env, messages: any[], stream: boolean): Promise<Response> {
+  const base = (env.BRIDGE_URL || 'https://office-ai.mbfdhub.com/v1').replace(/\/$/, '');
+  return fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${env.BRIDGE_TOKEN || ''}`,
+    },
+    body: JSON.stringify({
+      model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL,
+      messages,
+      max_tokens: 1024,
+      temperature: 0.3,
+      reasoning_effort: 'none', // qwen3.6 is a thinking model; keep answers direct
+      stream,
+    }),
+  });
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const corsHeaders = getCorsHeaders(env, request);
+    const json = (obj: any, status = 200) =>
+      new Response(JSON.stringify(obj), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders });
@@ -117,26 +189,77 @@ export default {
 
     // Health check
     if (url.pathname === '/health') {
-      return new Response(
-        JSON.stringify({
-          status: 'ok',
-          worker: 'mbfd-support-ai',
-          model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
-          embeddings: '@cf/baai/bge-large-en-v1.5',
-          timestamp: new Date().toISOString(),
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return json({
+        status: 'ok',
+        worker: 'mbfd-support-ai',
+        model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL,
+        llm_backend: 'local-ollama-bridge',
+        embeddings: EMBEDDING_MODEL,
+        timestamp: new Date().toISOString(),
+      });
     }
 
-    // RAG Chat endpoint
+    // ── Ingest: chunk + embed + upsert into Vectorize (admin Knowledge Base) ──
+    if (url.pathname === '/ingest' && request.method === 'POST') {
+      if (!env.INGEST_SECRET || request.headers.get('x-api-secret') !== env.INGEST_SECRET) {
+        return json({ error: 'Unauthorized' }, 401);
+      }
+      try {
+        const body: any = await request.json();
+        const source = (body.source || '').toString().trim();
+        const text = (body.text || '').toString();
+        if (!source || !text.trim()) return json({ error: 'source and text are required' }, 400);
+
+        const chunks = chunkText(text, 1500, 200);
+        if (chunks.length === 0) return json({ error: 'No extractable text (after chunking)' }, 422);
+
+        const sanitized = sanitizeId(source);
+        const ids: string[] = [];
+        const BATCH = 10;
+        for (let i = 0; i < chunks.length; i += BATCH) {
+          const batch = chunks.slice(i, i + BATCH);
+          const texts = batch.map((c) => c.slice(0, 2000));
+          const emb = await env.AI.run(EMBEDDING_MODEL, { text: texts });
+          const vectors = batch.map((c, j) => {
+            const id = `${sanitized}-chunk-${i + j}`;
+            ids.push(id);
+            return {
+              id,
+              values: emb.data[j],
+              metadata: { text: c.slice(0, 2000), source, chunk_index: i + j },
+            };
+          });
+          await env.VECTORIZE.upsert(vectors);
+        }
+        return json({ success: true, source, chunks: ids.length, ids });
+      } catch (e: any) {
+        console.error('Ingest error:', e);
+        return json({ error: 'Ingest failed', detail: String(e?.message || e) }, 500);
+      }
+    }
+
+    // ── Delete: remove a document's vectors from Vectorize by id ──
+    if (url.pathname === '/delete' && request.method === 'POST') {
+      if (!env.INGEST_SECRET || request.headers.get('x-api-secret') !== env.INGEST_SECRET) {
+        return json({ error: 'Unauthorized' }, 401);
+      }
+      try {
+        const body: any = await request.json();
+        const ids: string[] = Array.isArray(body.ids) ? body.ids : [];
+        if (ids.length === 0) return json({ error: 'ids[] required' }, 400);
+        await env.VECTORIZE.deleteByIds(ids);
+        return json({ success: true, deleted: ids.length });
+      } catch (e: any) {
+        console.error('Delete error:', e);
+        return json({ error: 'Delete failed', detail: String(e?.message || e) }, 500);
+      }
+    }
+
+    // ── RAG Chat (landing page) — Vectorize retrieval + LOCAL qwen3.6 answer ──
     if (url.pathname === '/chat' && request.method === 'POST') {
       const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
       if (!checkRateLimit(clientIp)) {
-        return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded. Please wait a moment before sending another message.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return json({ error: 'Rate limit exceeded. Please wait a moment before sending another message.' }, 429);
       }
 
       try {
@@ -145,40 +268,22 @@ export default {
         const conversationHistory: ConversationMessage[] = body.history || [];
         const enableStreaming = body.stream === true;
 
-        if (!userMessage) {
-          return new Response(
-            JSON.stringify({ error: 'Message is required' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+        if (!userMessage) return json({ error: 'Message is required' }, 400);
+        if (userMessage.length > 2000) return json({ error: 'Message too long. Please limit to 2000 characters.' }, 400);
 
-        if (userMessage.length > 2000) {
-          return new Response(
-            JSON.stringify({ error: 'Message too long. Please limit to 2000 characters.' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Step 1: Generate embedding for the user query using best free embedding model
-        const embeddingResponse = await runAI(env, '@cf/baai/bge-large-en-v1.5', {
-          text: [userMessage],
-        });
+        // Step 1: embed the query (Workers AI — must match the index's model)
+        const embeddingResponse = await env.AI.run(EMBEDDING_MODEL, { text: [userMessage] });
         const queryVector = embeddingResponse.data[0];
 
-        // Step 2: Query Vectorize — retrieve top 6 most relevant chunks for richer context
-        const vectorResults = await env.VECTORIZE.query(queryVector, {
-          topK: 6,
-          returnMetadata: 'all',
-        });
+        // Step 2: retrieve top-6 relevant chunks from Vectorize
+        const vectorResults = await env.VECTORIZE.query(queryVector, { topK: 6, returnMetadata: 'all' });
 
-        // Step 3: Build context from retrieved chunks
+        // Step 3: build context + sources
         let context = '';
         const sources: string[] = [];
         if (vectorResults.matches && vectorResults.matches.length > 0) {
-          const relevantMatches = vectorResults.matches.filter(
-            (m: any) => (m.score || 0) >= 0.2
-          );
-          for (const match of relevantMatches) {
+          const relevant = vectorResults.matches.filter((m: any) => (m.score || 0) >= 0.2);
+          for (const match of relevant) {
             const meta = match.metadata || {};
             const text = meta.text || '';
             const source = meta.source || 'Unknown';
@@ -188,71 +293,50 @@ export default {
             if (!sources.includes(source)) sources.push(source);
           }
         }
+        if (!context) context = '\n[No relevant documents found in the knowledge base for this query.]\n';
 
-        if (!context) {
-          context = '\n[No relevant documents found in the knowledge base for this query.]\n';
-        }
-
-        // Step 4: Build message array with conversation history (last 6 turns max for context window)
+        // Step 4: messages with recent history
         const recentHistory = conversationHistory.slice(-6);
         const messages: any[] = [
           { role: 'system', content: SYSTEM_PROMPT },
           ...recentHistory.map((m) => ({ role: m.role, content: m.content })),
-          {
-            role: 'user',
-            content: `CONTEXT DOCUMENTS:\n${context}\n\nUSER QUESTION: ${userMessage}`,
-          },
+          { role: 'user', content: `CONTEXT DOCUMENTS:\n${context}\n\nUSER QUESTION: ${userMessage}` },
         ];
 
-        // Step 5: Call LLM — best free-tier model: llama-3.3-70b-instruct-fp8-fast
-        // This is the highest quality model on Cloudflare's free tier
+        // Step 5: generate with LOCAL qwen3.6 via the bridge
         if (enableStreaming) {
-          // Streaming not supported through gateway — use direct binding
-          const stream = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
-            messages,
-            stream: true,
-            max_tokens: 1024,
-            temperature: 0.3, // Lower temp for factual/procedural answers
-          });
-
-          return new Response(stream, {
+          const bridgeResp = await callBridge(env, messages, true);
+          if (!bridgeResp.ok || !bridgeResp.body) {
+            const detail = await bridgeResp.text().catch(() => '');
+            console.error('Bridge stream error', bridgeResp.status, detail);
+            return json({ error: 'AI backend unavailable.' }, 502);
+          }
+          return new Response(openaiToCfStream(bridgeResp.body), {
             headers: {
               ...corsHeaders,
               'Content-Type': 'text/event-stream',
               'Cache-Control': 'no-cache',
-              'Connection': 'keep-alive',
+              Connection: 'keep-alive',
               'X-Sources': JSON.stringify(sources),
             },
           });
         }
 
-        // Non-streaming response
-        const aiResponse = await runAI(env, '@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
-          messages,
-          max_tokens: 1024,
-          temperature: 0.3,
-        });
-
-        return new Response(
-          JSON.stringify({
-            response: aiResponse.response || '',
-            sources,
-            model: 'llama-3.3-70b-instruct-fp8-fast',
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        const bridgeResp = await callBridge(env, messages, false);
+        if (!bridgeResp.ok) {
+          const detail = await bridgeResp.text().catch(() => '');
+          console.error('Bridge error', bridgeResp.status, detail);
+          return json({ error: 'AI backend unavailable.' }, 502);
+        }
+        const aiJson: any = await bridgeResp.json();
+        const answer = aiJson.choices?.[0]?.message?.content || '';
+        return json({ response: answer, sources, model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL });
       } catch (error: any) {
         console.error('Chat error:', error);
-        return new Response(
-          JSON.stringify({ error: 'An error occurred processing your request. Please try again.' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return json({ error: 'An error occurred processing your request. Please try again.' }, 500);
       }
     }
 
-    return new Response(
-      JSON.stringify({ error: 'Not found' }),
-      { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return json({ error: 'Not found' }, 404);
   },
 };
