@@ -31,7 +31,7 @@ jobs:
         run: composer install --no-interaction --prefer-dist
 
       - name: Composer security audit
-        run: composer audit --format=json || true
+        run: composer audit --locked --format=table
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -40,8 +40,8 @@ jobs:
 
       - name: NPM security audit
         run: |
-          npm install --no-audit
-          npm audit --audit-level=high || true
+          npm ci --ignore-scripts --legacy-peer-deps
+          npm audit --audit-level=high
 
   codeql:
     name: CodeQL Analysis
@@ -67,7 +67,6 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@3b1a19a80ab047f35cbb237b5bd9bdc1e14f166c # v3
-        continue-on-error: true
 
   # NOTE: actions/dependency-review-action was removed 2026-05-14 — the action
   # requires GitHub Advanced Security on private repos, which this account does

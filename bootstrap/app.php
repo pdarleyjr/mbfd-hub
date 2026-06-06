@@ -30,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin.role' => \App\Http\Middleware\EnsureAdminApiRole::class,
+            'workgroup.access' => \App\Http\Middleware\EnsureWorkgroupPanelAccess::class,
             'verify.bid.token' => \App\Http\Middleware\VerifyBidReaderToken::class,
         ]);
     })
