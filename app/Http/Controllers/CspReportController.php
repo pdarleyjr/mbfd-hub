@@ -31,6 +31,10 @@ class CspReportController extends Controller
 {
     public function store(Request $request): Response
     {
+        if ((int) $request->server('CONTENT_LENGTH', 0) > 16384) {
+            return response()->noContent();
+        }
+
         $payload = $request->json()->all();
 
         // Both wire formats share enough shape that one log line covers both.
@@ -40,9 +44,32 @@ class CspReportController extends Controller
         Log::info('[CSP] violation report', [
             'ua' => substr((string) $request->userAgent(), 0, 200),
             'ip' => $request->ip(),
-            'report' => $report,
+            'report' => $this->truncateReport($report),
         ]);
 
         return response()->noContent();
+    }
+
+    /**
+     * Keep public CSP telemetry useful without allowing arbitrary log growth.
+     */
+    private function truncateReport(mixed $value, int $depth = 0): mixed
+    {
+        if ($depth > 4) {
+            return '[truncated]';
+        }
+
+        if (is_string($value)) {
+            return substr($value, 0, 500);
+        }
+
+        if (is_array($value)) {
+            return collect($value)
+                ->take(40)
+                ->map(fn (mixed $item): mixed => $this->truncateReport($item, $depth + 1))
+                ->all();
+        }
+
+        return $value;
     }
 }

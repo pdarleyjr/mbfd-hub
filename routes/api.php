@@ -27,7 +27,7 @@ Route::get('/user', function (Request $request) {
 // =========================================================================
 // Database Audit Routes (Admin only - requires authentication)
 // =========================================================================
-Route::prefix('admin/audit')->middleware(['web', 'auth'])->group(function () {
+Route::prefix('admin/audit')->middleware(['web', 'auth', 'admin.role:super_admin,admin', 'throttle:30,1'])->group(function () {
     Route::get('/users', [DatabaseAuditController::class, 'getUsers']);
     Route::get('/employees', [DatabaseAuditController::class, 'getEmployees']);
     Route::get('/roles', [DatabaseAuditController::class, 'getRolesAndPermissions']);
@@ -109,7 +109,7 @@ Route::middleware(['web', 'auth', 'admin.role:super_admin,admin', 'throttle:60,1
         Route::get('personnel', [\App\Http\Controllers\Api\Admin\LookupController::class, 'personnel']);
     });
 
-Route::prefix('admin')->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin'])->group(function () {
+Route::prefix('admin')->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:60,1'])->group(function () {
     Route::get('metrics', [AdminMetricsController::class, 'index']);
     Route::get('smart-updates', [SmartUpdatesController::class, 'index'])->name('api.smart-updates');
 
@@ -194,7 +194,7 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
 // Workgroup AI Routes — Eval analysis & AI summaries (separate from chatbot)
 // Requires authentication (Filament session auth via 'web' middleware)
 // =========================================================================
-Route::prefix('workgroup/ai')->middleware(['web', 'auth'])->group(function () {
+Route::prefix('workgroup/ai')->middleware(['web', 'auth', 'workgroup.access', 'throttle:30,1'])->group(function () {
     Route::post('analyze-product/{productId}', [WorkgroupAIController::class, 'analyzeProduct']);
     Route::post('category-summary', [WorkgroupAIController::class, 'categorySummary']);
     Route::post('executive-report', [WorkgroupAIController::class, 'executiveReport']);

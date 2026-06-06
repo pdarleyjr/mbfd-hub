@@ -3,9 +3,15 @@ name: Debug Connectivity (VPS)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   debug:
     runs-on: [self-hosted, mbfd-vps]
+    timeout-minutes: 5
+    environment:
+      name: production
     steps:
       - name: Docker Status
         run: docker ps -a
@@ -23,4 +29,5 @@ jobs:
 
       - name: Server Logs (Last 50 lines)
         run: |
-          docker compose logs --tail=50 laravel.test
+          docker compose logs --tail=50 laravel.test \
+            | sed -E 's/(APP_KEY|TOKEN|SECRET|PASSWORD|KEY)=([^[:space:]]+)/\1=[REDACTED]/g; s/(Bearer )[A-Za-z0-9._~+\/=-]+/\1[REDACTED]/g'

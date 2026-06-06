@@ -4,7 +4,7 @@
  * Scope: /admin/*
  * Strategy:
  *   - Network-first for HTML navigations (always reflect latest server state)
- *   - Stale-while-revalidate for GET /admin/* JSON / Livewire payloads
+ *   - Network-only for authenticated admin HTML / JSON / Livewire payloads
  *   - Cache-first for static assets (/build/, /admin-pwa/, /images/, /fonts/)
  *   - Bypass entirely for /admin/login, /admin/logout, and any POST/PUT/PATCH/DELETE
  *
@@ -20,11 +20,13 @@
  *   Or push a one-line SW that calls self.registration.unregister().
  *
  * Cloned from the proven /daily/ checkout SW pattern, retuned for admin.
+ * Authenticated admin responses are intentionally not cached to prevent stale
+ * sensitive content from remaining visible after logout, role changes, or device
+ * reassignment.
  */
 
-const VERSION = 'mbfd-admin-v1';
+const VERSION = 'mbfd-admin-v2';
 const STATIC_CACHE = `${VERSION}-static`;
-const DATA_CACHE = `${VERSION}-data`;
 
 const PRECACHE_URLS = [
   '/admin-pwa/manifest.webmanifest',
@@ -99,15 +101,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML navigation under /admin → network-first with cached fallback
+  // HTML navigation under /admin → network-only with offline shell fallback
   if (req.mode === 'navigate' && url.pathname.startsWith('/admin')) {
-    event.respondWith(networkFirstWithFallback(req));
+    event.respondWith(networkOnlyAdminNavigation(req));
     return;
   }
 
-  // /admin/* JSON (e.g. read-only API endpoints) → stale-while-revalidate
+  // /admin/* JSON (e.g. read-only API endpoints) → network-only; never cache
   if (url.pathname.startsWith('/admin/') && req.headers.get('Accept')?.includes('application/json')) {
-    event.respondWith(staleWhileRevalidate(req));
+    event.respondWith(networkOnlyAdminJson(req));
     return;
   }
 
@@ -130,35 +132,23 @@ async function cacheFirst(request) {
   }
 }
 
-async function networkFirstWithFallback(request) {
+async function networkOnlyAdminNavigation(request) {
   try {
-    const fresh = await fetch(request);
-    if (fresh.ok) {
-      const cache = await caches.open(DATA_CACHE);
-      cache.put(request, fresh.clone());
-    }
-    return fresh;
+    return await fetch(request, { cache: 'no-store' });
   } catch (err) {
-    const cache = await caches.open(DATA_CACHE);
-    const cached = await cache.match(request);
-    if (cached) return cached;
     return offlineShell();
   }
 }
 
-async function staleWhileRevalidate(request) {
-  const cache = await caches.open(DATA_CACHE);
-  const cached = await cache.match(request);
-  const network = fetch(request)
-    .then((res) => {
-      if (res.ok) cache.put(request, res.clone());
-      return res;
-    })
-    .catch(() => null);
-  return cached || (await network) || new Response(JSON.stringify({ offline: true }), {
-    status: 503,
-    headers: { 'Content-Type': 'application/json' },
-  });
+async function networkOnlyAdminJson(request) {
+  try {
+    return await fetch(request, { cache: 'no-store' });
+  } catch (err) {
+    return new Response(JSON.stringify({ offline: true }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    });
+  }
 }
 
 function offlineShell() {
