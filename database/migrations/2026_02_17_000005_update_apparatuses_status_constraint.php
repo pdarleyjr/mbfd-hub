@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Postgres-only CHECK-constraint DDL. No-op on other drivers (e.g. SQLite tests).
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
         DB::statement('ALTER TABLE apparatuses DROP CONSTRAINT IF EXISTS apparatuses_status_check');
         DB::statement("ALTER TABLE apparatuses ADD CONSTRAINT apparatuses_status_check CHECK (status IN (
             'In Service', 'Out of Service', 'Maintenance', 'Available',

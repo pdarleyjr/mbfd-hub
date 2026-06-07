@@ -17,6 +17,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Private Filesystem Disk (sensitive files)
+    |--------------------------------------------------------------------------
+    |
+    | Disk used for sensitive, non-public files — station inventory PDFs,
+    | workgroup shared uploads, and generated reports. These must NEVER be
+    | web-reachable (no /public/storage symlink). Defaults to the "local"
+    | disk (storage/app/private). Set PRIVATE_FILESYSTEM_DISK=r2 to push
+    | them to private R2 once R2_* env vars are configured.
+    |
+    */
+
+    'private' => env('PRIVATE_FILESYSTEM_DISK', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |
