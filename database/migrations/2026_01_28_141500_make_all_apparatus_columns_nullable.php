@@ -11,6 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Postgres-specific schema tweak. On SQLite (test/local) columns are
+        // already nullable unless explicitly NOT NULL, so this is a no-op.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         $columns = [
             'unit_id',
             'vehicle_number',
@@ -39,8 +45,8 @@ return new class extends Migration
                 SELECT 1 FROM information_schema.columns 
                 WHERE table_name = 'apparatuses' AND column_name = ?
             ", [$column]);
-            
-            if (!empty($exists)) {
+
+            if (! empty($exists)) {
                 DB::statement("ALTER TABLE apparatuses ALTER COLUMN {$column} DROP NOT NULL");
             }
         }

@@ -1,20 +1,25 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use App\Models\InventoryItem;
 use App\Models\StationInventoryItem;
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration 
+return new class extends Migration
 {
     /**
      * Run the migrations.
      */
     public function up(): void
     {
-        // Correction List. 
+        // One-time Postgres production data correction using ILIKE fuzzy match.
+        // No-op on SQLite (test/local): ILIKE is unsupported and a fresh test
+        // DB has no inventory rows to correct.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
+        // Correction List.
         // We use fuzzy search terms to find the items.
         // Values are: [Search Term, New Name (Optional), Par, Unit Label]
         // We force unit_multiplier = 1 for all to simplify.
@@ -80,7 +85,7 @@ return new class extends Migration
                 $label = $row[3];
 
                 // Fuzzy Match with ILIKE
-                $item = InventoryItem::where('name', 'ILIKE', '%' . $term . '%')->first();
+                $item = InventoryItem::where('name', 'ILIKE', '%'.$term.'%')->first();
 
                 if ($item) {
                     $item->update([
@@ -103,6 +108,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-    //
+        //
     }
 };

@@ -10,7 +10,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement("ALTER TABLE apparatuses ALTER COLUMN status DROP NOT NULL");
+        // Postgres-only DROP NOT NULL. SQLite columns are nullable by default,
+        // so this is a no-op on the test/local SQLite driver.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
+        DB::statement('ALTER TABLE apparatuses ALTER COLUMN status DROP NOT NULL');
     }
 
     /**

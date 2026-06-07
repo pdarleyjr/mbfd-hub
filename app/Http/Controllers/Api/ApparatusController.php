@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Apparatus;
-use App\Models\ApparatusInspection;
-use App\Models\ApparatusDefect;
-use App\Models\Employee;
 use App\Jobs\AuditEquipmentAfterInspection;
 use App\Jobs\PmAlertNotificationJob;
+use App\Models\Apparatus;
+use App\Models\ApparatusDefect;
+use App\Models\ApparatusInspection;
+use App\Models\Employee;
 use App\Support\Security\Base64Image;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -20,6 +20,7 @@ class ApparatusController extends Controller
         $apparatuses = Apparatus::all()->map(function ($apparatus) {
             $data = $apparatus->toArray();
             $data['pm_health'] = $apparatus->getPmHealthStatus();
+
             return $data;
         });
 
@@ -62,7 +63,7 @@ class ApparatusController extends Controller
         $checklistPath = storage_path("app/checklists/{$checklistType}_checklist.json");
 
         // Fallback to default if specific checklist does not exist
-        if (!file_exists($checklistPath)) {
+        if (! file_exists($checklistPath)) {
             $checklistPath = storage_path('app/checklists/default_checklist.json');
         }
 
@@ -121,7 +122,7 @@ class ApparatusController extends Controller
         $todayCount = ApparatusInspection::where('apparatus_id', $apparatus->id)
             ->whereDate('created_at', $today)
             ->count() + 1;
-        $inspectionRef = "INS-{$designationTag}-{$today}-" . str_pad((string) $todayCount, 4, '0', STR_PAD_LEFT);
+        $inspectionRef = "INS-{$designationTag}-{$today}-".str_pad((string) $todayCount, 4, '0', STR_PAD_LEFT);
 
         $inspection = ApparatusInspection::create([
             'apparatus_id' => $apparatus->id,
@@ -135,6 +136,7 @@ class ApparatusController extends Controller
             'officer_signature' => $signaturePath,
             'employee_id' => $employeeId,
             'inspection_reference' => $inspectionRef,
+            'review_status' => 'approved',
             'completed_at' => now(),
         ]);
 
@@ -144,7 +146,7 @@ class ApparatusController extends Controller
         foreach ($request->defects ?? [] as $defectData) {
             $photoPath = null;
 
-            if (!empty($defectData['photo'])) {
+            if (! empty($defectData['photo'])) {
                 $photoPath = $this->storeImageOrFail(
                     $defectData['photo'],
                     'defects',
@@ -168,16 +170,19 @@ class ApparatusController extends Controller
             );
         }
 
-        // HOLD logic: If critical defects found, set apparatus to Out of Service
+        // SECURITY (H-01): a public, unauthenticated submission must NOT directly
+        // drive an apparatus Out of Service. When critical defects are reported,
+        // hold the inspection for review instead of mutating operational status.
+        // An authorized user applies the out-of-service hold via approve().
         if ($hasCriticalDefects) {
-            $apparatus->update(['status' => 'Out of Service']);
+            $inspection->update(['review_status' => 'pending_review']);
         }
 
         // Update meter readings with positive increment validation
         if ($request->has('engine_hours') && $request->engine_hours !== null) {
             $newHours = floatval($request->engine_hours);
             $currentHours = floatval($apparatus->current_engine_hours ?? 0);
-            
+
             // Only update if new value is greater (positive increment)
             if ($newHours > $currentHours) {
                 $apparatus->current_engine_hours = $newHours;
@@ -187,7 +192,7 @@ class ApparatusController extends Controller
         if ($request->has('miles') && $request->miles !== null) {
             $newMiles = intval($request->miles);
             $currentMiles = intval($apparatus->current_miles ?? 0);
-            
+
             // Only update if new value is greater (positive increment)
             if ($newMiles > $currentMiles) {
                 $apparatus->current_miles = $newMiles;
@@ -215,6 +220,31 @@ class ApparatusController extends Controller
         }
 
         return response()->json($inspection->load('apparatus'), 201);
+    }
+
+    /**
+     * Approve a pending-review inspection (authenticated/authorized only).
+     *
+     * SECURITY (H-01): this is the only path that may flip an apparatus to
+     * "Out of Service" as a result of a reported critical defect. The public
+     * submission endpoint records the inspection as 'pending_review'; an
+     * authorized reviewer confirms it here, which applies the operational hold.
+     */
+    public function approveInspection(Request $request, $id)
+    {
+        $inspection = ApparatusInspection::with('apparatus')->findOrFail($id);
+
+        if ($inspection->review_status === 'pending_review') {
+            $apparatus = $inspection->apparatus;
+
+            if ($apparatus !== null && $apparatus->status !== 'Out of Service') {
+                $apparatus->update(['status' => 'Out of Service']);
+            }
+        }
+
+        $inspection->update(['review_status' => 'approved']);
+
+        return response()->json($inspection->fresh()->load('apparatus'));
     }
 
     /**

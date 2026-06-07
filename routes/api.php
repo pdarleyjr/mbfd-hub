@@ -156,6 +156,11 @@ Route::middleware('throttle:60,1')->group(function () {
 Route::delete('/big-ticket-requests/{bigTicketRequest}', [BigTicketRequestController::class, 'destroy'])
     ->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:30,1']);
 
+// SECURITY (H-01): approving a pending-review apparatus inspection is the only
+// path that may flip an apparatus Out of Service. Authenticated + authorized only.
+Route::post('/apparatus-inspections/{inspection}/approve', [ApparatusController::class, 'approveInspection'])
+    ->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:30,1']);
+
 // Station Inventory V2 (PIN-protected, real-time inventory management)
 // =========================================================================
 // MBFD Bid Cloudflare Worker bridge — POST /api/v2/verify-credentials

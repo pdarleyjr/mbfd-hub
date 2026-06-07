@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -28,10 +28,14 @@ return new class extends Migration
             $table->text('explanation')->nullable()->after('description');
         });
 
-        // Expand the status enum for equipment requests to support multi-step approval
-        DB::statement("ALTER TABLE fire_equipment_requests DROP CONSTRAINT IF EXISTS fire_equipment_requests_status_check");
-        DB::statement("ALTER TABLE fire_equipment_requests ALTER COLUMN status TYPE varchar(50)");
-        DB::statement("ALTER TABLE fire_equipment_requests ALTER COLUMN status SET DEFAULT 'pending'");
+        // Expand the status enum for equipment requests to support multi-step
+        // approval. These are Postgres-only DDL statements; SQLite stores the
+        // column as plain text already, so skip on non-pgsql drivers.
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE fire_equipment_requests DROP CONSTRAINT IF EXISTS fire_equipment_requests_status_check');
+            DB::statement('ALTER TABLE fire_equipment_requests ALTER COLUMN status TYPE varchar(50)');
+            DB::statement("ALTER TABLE fire_equipment_requests ALTER COLUMN status SET DEFAULT 'pending'");
+        }
     }
 
     public function down(): void
