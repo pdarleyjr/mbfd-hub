@@ -134,11 +134,12 @@ class StationInventoryController extends Controller
         ];
 
         $pdf = Pdf::loadView('pdf.station-inventory', $pdfData);
-        
-        // Save PDF
+
+        // Save PDF to the PRIVATE disk (not web-reachable). Served only via the
+        // authenticated downloadPdf route below — never a public /storage URL.
         $filename = 'inventory-' . $station->id . '-' . time() . '.pdf';
         $pdfPath = 'inventory-submissions/' . $filename;
-        Storage::disk('public')->put($pdfPath, $pdf->output());
+        Storage::disk($this->privateDisk())->put($pdfPath, $pdf->output());
 
         // Create submission record
         $submission = StationInventorySubmission::create([
@@ -157,7 +158,8 @@ class StationInventoryController extends Controller
             'message' => 'Inventory submission saved and PDF generated.',
             'data' => [
                 'submission_id' => $submission->id,
-                'pdf_url' => Storage::url($pdfPath),
+                // Authenticated download route — NOT a public /storage URL.
+                'pdf_download_url' => route('download-inventory-pdf', $submission),
             ],
         ], 201);
     }
@@ -183,17 +185,44 @@ class StationInventoryController extends Controller
      */
     public function downloadPdf(StationInventorySubmission $submission): Response|JsonResponse
     {
-        if (!Storage::disk('public')->exists($submission->pdf_path)) {
+        // Prefer the private disk; fall back to the legacy public disk so files
+        // generated before this hardening (and not yet migrated) still download.
+        $disk = $this->resolveDiskFor($submission->pdf_path);
+
+        if ($disk === null) {
             return response()->json([
                 'success' => false,
                 'message' => 'PDF file not found.',
             ], 404);
         }
 
-        $pdfContent = Storage::disk('public')->get($submission->pdf_path);
-        
+        $pdfContent = Storage::disk($disk)->get($submission->pdf_path);
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'attachment; filename="station-inventory-' . $submission->station->slug . '.pdf"');
+            ->header('Content-Disposition', 'attachment; filename="station-inventory-' . $submission->station->station_number . '.pdf"');
+    }
+
+    /**
+     * The private disk used for sensitive inventory PDFs.
+     */
+    private function privateDisk(): string
+    {
+        return config('filesystems.private', 'local');
+    }
+
+    /**
+     * Return the disk that actually holds the given path, or null if missing.
+     * Checks the private disk first, then the legacy public disk.
+     */
+    private function resolveDiskFor(string $path): ?string
+    {
+        foreach ([$this->privateDisk(), 'public'] as $disk) {
+            if (Storage::disk($disk)->exists($path)) {
+                return $disk;
+            }
+        }
+
+        return null;
     }
 }

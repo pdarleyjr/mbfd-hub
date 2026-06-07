@@ -45,10 +45,12 @@ return new class extends Migration
                 ->update(['status' => $newValue]);
         }
 
-        // Drop and recreate the enum with correct values
-        DB::statement("ALTER TABLE capital_projects DROP CONSTRAINT IF EXISTS capital_projects_status_check");
-        DB::statement("ALTER TABLE capital_projects ALTER COLUMN status TYPE VARCHAR(50)");
-        DB::statement("ALTER TABLE capital_projects ADD CONSTRAINT capital_projects_status_check CHECK (status IN ('pending', 'in_progress', 'on_hold', 'completed'))");
+        // Drop and recreate the enum with correct values (Postgres-only raw DDL).
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement("ALTER TABLE capital_projects DROP CONSTRAINT IF EXISTS capital_projects_status_check");
+            DB::statement("ALTER TABLE capital_projects ALTER COLUMN status TYPE VARCHAR(50)");
+            DB::statement("ALTER TABLE capital_projects ADD CONSTRAINT capital_projects_status_check CHECK (status IN ('pending', 'in_progress', 'on_hold', 'completed'))");
+        }
     }
 
     public function down(): void
