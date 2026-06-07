@@ -28,10 +28,13 @@ return new class extends Migration
             $table->text('explanation')->nullable()->after('description');
         });
 
-        // Expand the status enum for equipment requests to support multi-step approval
-        DB::statement("ALTER TABLE fire_equipment_requests DROP CONSTRAINT IF EXISTS fire_equipment_requests_status_check");
-        DB::statement("ALTER TABLE fire_equipment_requests ALTER COLUMN status TYPE varchar(50)");
-        DB::statement("ALTER TABLE fire_equipment_requests ALTER COLUMN status SET DEFAULT 'pending'");
+        // Expand the status enum for equipment requests to support multi-step
+        // approval (Postgres-only raw DDL).
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement("ALTER TABLE fire_equipment_requests DROP CONSTRAINT IF EXISTS fire_equipment_requests_status_check");
+            DB::statement("ALTER TABLE fire_equipment_requests ALTER COLUMN status TYPE varchar(50)");
+            DB::statement("ALTER TABLE fire_equipment_requests ALTER COLUMN status SET DEFAULT 'pending'");
+        }
     }
 
     public function down(): void

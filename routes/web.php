@@ -24,6 +24,7 @@ Route::get('/api/incidents', [IncidentsController::class, 'index'])->name('incid
 // VerifyCsrfToken exclusion is handled because Filament's web group does NOT
 // run on this route (it's outside the admin panel + has no session bootstrap).
 Route::post('/_csp-report', [\App\Http\Controllers\CspReportController::class, 'store'])
+    ->middleware('throttle:30,1')
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
     ->name('csp.report');
 
@@ -100,15 +101,15 @@ Route::get('/inventory-pdf/{submission}', [StationInventoryController::class, 'd
 // Workgroup File Downloads & Preview
 Route::get('/workgroup/file/{file}/download', [FileDownloadController::class, 'downloadFile'])
     ->name('workgroup.file.download')
-    ->middleware('auth');
+    ->middleware(['auth', 'workgroup.access']);
 
 Route::get('/workgroup/file/{file}/preview', [FileDownloadController::class, 'previewFile'])
     ->name('workgroup.file.preview')
-    ->middleware('auth');
+    ->middleware(['auth', 'workgroup.access']);
 
 Route::get('/workgroup/shared-upload/{upload}/download', [FileDownloadController::class, 'downloadSharedUpload'])
     ->name('workgroup.shared-upload.download')
-    ->middleware('auth');
+    ->middleware(['auth', 'workgroup.access']);
 
 // SAVER Report — Print-ready view
 Route::get('/workgroup/saver-report', function () {
@@ -123,42 +124,42 @@ Route::get('/workgroup/saver-report', function () {
         'sessionName' => 'All Sessions',
         'generatedAt' => now()->format('F j, Y'),
     ]);
-})->name('workgroup.saver-report')->middleware('auth');
+})->name('workgroup.saver-report')->middleware(['auth', 'workgroup.access']);
 
 // Workgroup Analysis Report — Gemini-generated standalone page
 Route::view('/workgroups/analysis-report', 'workgroup.analysis-report')
     ->name('workgroup.analysis-report')
-    ->middleware('auth');
+    ->middleware(['auth', 'workgroup.access']);
 
 // Workgroup Data Dashboard — React-based Gemini dashboard
 Route::view('/workgroups/data-dashboard', 'workgroup.data-dashboard')
     ->name('workgroup.data-dashboard')
-    ->middleware('auth');
+    ->middleware(['auth', 'workgroup.access']);
 
 // Mid-Mount L1 Proposed Inventory — Self-contained React/SheetJS dashboard
 Route::view('/workgroups/l1-inventory', 'workgroup.l1-inventory')
     ->name('workgroup.l1-inventory')
-    ->middleware('auth');
+    ->middleware(['auth', 'workgroup.access']);
 
 // Workgroup Final Session Presentation — Reveal.js slide deck
 Route::view('/workgroups/final-presentation', 'workgroup.final-presentation')
     ->name('workgroup.final-presentation')
-    ->middleware('auth');
+    ->middleware(['auth', 'workgroup.access']);
 
 // MBFD Workgroup Evaluation Results — Professional Impeccable report with PDF export
 Route::view('/workgroups/evaluation-report', 'workgroup.evaluation-report')
     ->name('workgroup.evaluation-report')
-    ->middleware('auth');
+    ->middleware(['auth', 'workgroup.access']);
 
 // MBFD Workgroup Final Recommendations — Final Selection & Implementation Report
 Route::view('/workgroups/final-recommendations', 'workgroup.final-recommendations')
     ->name('workgroup.final-recommendations')
-    ->middleware('auth');
+    ->middleware(['auth', 'workgroup.access']);
 
 // MBFD Workgroup Summary — Full evaluation report with PDF export
 Route::view('/workgroups/workgroup-summary', 'workgroup.workgroup-summary')
     ->name('workgroup.workgroup-summary')
-    ->middleware('auth');
+    ->middleware(['auth', 'workgroup.access']);
 
 // Workgroup Results CSV Export (authenticated)
 Route::get('/workgroup-export/{tableKey}', function (string $tableKey, \Illuminate\Http\Request $request) {
@@ -229,11 +230,10 @@ Route::get('/workgroup-export/{tableKey}', function (string $tableKey, \Illumina
         foreach ($items as $i => $item) { fputcsv($h, [$i+1, $item['name']??($item['product']->name??''), $item['brand']??'', $item['avg_score']??'', $item['capability_avg']??'', $item['usability_avg']??'', $item['affordability_avg']??'', $item['maintainability_avg']??'', $item['deployability_avg']??'', $item['advance_yes']??'', $item['advance_no']??'', $item['deal_breakers']??'', $item['response_count']??'']); }
         fclose($h);
     }, $fn, ['Content-Type'=>'text/csv']);
-})->name('workgroup.export.csv')->middleware('auth');
+})->name('workgroup.export.csv')->middleware(['auth', 'workgroup.access']);
 
-// Workgroup Report PDF Exports (authenticated)
-Route::middleware(['auth'])->group(function () {
+// Workgroup Report PDF Exports (authenticated + workgroup-authorized)
+Route::middleware(['auth', 'workgroup.access'])->group(function () {
     Route::get('/reports/executive-report/pdf', [ReportExportController::class, 'exportExecutiveReport'])->name('reports.executive.pdf');
     Route::get('/reports/saver-report/pdf', [ReportExportController::class, 'exportSaverReport'])->name('reports.saver.pdf');
 });
-

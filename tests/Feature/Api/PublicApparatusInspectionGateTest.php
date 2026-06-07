@@ -1,0 +1,163 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Api;
+
+use App\Models\Apparatus;
+use App\Models\ApparatusInspection;
+use App\Models\Station;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
+use Tests\TestCase;
+
+/**
+ * H-01: an unauthenticated public inspection submission must not be able to
+ * directly drive an apparatus Out of Service. Critical defects are recorded as
+ * a pending-review submission; only an authenticated/authorized approval mutates
+ * operational status.
+ */
+class PublicApparatusInspectionGateTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function makeApparatus(string $status = 'In Service'): Apparatus
+    {
+        $station = Station::create([
+            'station_number' => 1,
+            'name' => 'Station 1',
+            'address' => '123 Main St',
+            'is_active' => true,
+        ]);
+
+        return Apparatus::create([
+            'station_id' => $station->id,
+            'unit_id' => 'E1-'.uniqid(),
+            'name' => 'Engine 1',
+            'type' => 'Engine',
+            'vehicle_number' => 'V100',
+            'designation' => 'E1',
+            'slug' => 'engine-1-'.uniqid(),
+            'make' => 'Pierce',
+            'model' => 'Enforcer',
+            'year' => 2020,
+            'status' => $status,
+        ]);
+    }
+
+    private function criticalDefectPayload(): array
+    {
+        return [
+            'operator_name' => 'John Doe',
+            'rank' => 'Lieutenant',
+            'shift' => 'A',
+            'unit_number' => 'E1',
+            'defects' => [
+                [
+                    'compartment' => 'Cab',
+                    'item' => 'SCBA',
+                    'status' => 'Missing',
+                    'notes' => 'Not on board',
+                ],
+            ],
+        ];
+    }
+
+    public function test_public_submission_with_critical_defect_does_not_set_out_of_service(): void
+    {
+        $apparatus = $this->makeApparatus('In Service');
+
+        $response = $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspections",
+            $this->criticalDefectPayload()
+        );
+
+        $response->assertStatus(201);
+
+        // Operational status must be unchanged by an anonymous submission.
+        $this->assertSame('In Service', $apparatus->fresh()->status);
+
+        // The submission is recorded but held for review.
+        $inspection = ApparatusInspection::latest('id')->first();
+        $this->assertNotNull($inspection);
+        $this->assertSame('pending_review', $inspection->review_status);
+    }
+
+    public function test_public_submission_without_critical_defect_is_approved_and_status_unchanged(): void
+    {
+        $apparatus = $this->makeApparatus('In Service');
+
+        $response = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", [
+            'operator_name' => 'Jane Roe',
+            'rank' => 'Firefighter',
+            'shift' => 'B',
+            'defects' => [
+                [
+                    'compartment' => 'Cab',
+                    'item' => 'Flashlight',
+                    'status' => 'Present',
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(201);
+
+        $this->assertSame('In Service', $apparatus->fresh()->status);
+        $inspection = ApparatusInspection::latest('id')->first();
+        $this->assertSame('approved', $inspection->review_status);
+    }
+
+    public function test_unauthenticated_user_cannot_approve_pending_inspection(): void
+    {
+        $apparatus = $this->makeApparatus('In Service');
+
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspections",
+            $this->criticalDefectPayload()
+        )->assertStatus(201);
+
+        $inspection = ApparatusInspection::latest('id')->first();
+
+        $response = $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve");
+
+        $response->assertStatus(401);
+        $this->assertSame('In Service', $apparatus->fresh()->status);
+        $this->assertSame('pending_review', $inspection->fresh()->review_status);
+    }
+
+    public function test_authorized_user_can_approve_pending_inspection_and_set_out_of_service(): void
+    {
+        $apparatus = $this->makeApparatus('In Service');
+
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspections",
+            $this->criticalDefectPayload()
+        )->assertStatus(201);
+
+        $inspection = ApparatusInspection::latest('id')->first();
+
+        $this->actingAsAdmin();
+
+        $response = $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve");
+
+        $response->assertStatus(200);
+        $this->assertSame('Out of Service', $apparatus->fresh()->status);
+        $this->assertSame('approved', $inspection->fresh()->review_status);
+    }
+
+    private function actingAsAdmin(): User
+    {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $role = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        $user = User::factory()->create();
+        $user->assignRole($role);
+
+        Sanctum::actingAs($user);
+
+        return $user;
+    }
+}

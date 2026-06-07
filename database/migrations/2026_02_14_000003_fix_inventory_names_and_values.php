@@ -14,7 +14,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Correction List. 
+        // Uses Postgres ILIKE for fuzzy matching. No-op on other drivers (e.g. SQLite tests).
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+        // Correction List.
         // We use fuzzy search terms to find the items.
         // Values are: [Search Term, New Name (Optional), Par, Unit Label]
         // We force unit_multiplier = 1 for all to simplify.

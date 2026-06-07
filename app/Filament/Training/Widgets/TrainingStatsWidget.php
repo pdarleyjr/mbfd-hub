@@ -3,7 +3,6 @@
 namespace App\Filament\Training\Widgets;
 
 use App\Models\Training\TrainingTodo;
-use App\Models\ExternalSource;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -21,13 +20,6 @@ class TrainingStatsWidget extends BaseWidget
             ->count();
         $recentlyUpdated = TrainingTodo::where('updated_at', '>=', now()->subDays(7))->count();
 
-        $externalSourceCount = 0;
-        try {
-            $externalSourceCount = ExternalSource::count();
-        } catch (\Exception $e) {
-            // Table may not exist
-        }
-
         return [
             Stat::make('Open Training Todos', $openTodos)
                 ->description($openTodos > 0 ? "{$openTodos} tasks pending" : 'All clear')
@@ -43,11 +35,6 @@ class TrainingStatsWidget extends BaseWidget
                 ->description('Last 7 days')
                 ->descriptionIcon('heroicon-m-arrow-path')
                 ->color('info'),
-
-            Stat::make('External Sources', $externalSourceCount)
-                ->description('Linked tools & views')
-                ->descriptionIcon('heroicon-m-globe-alt')
-                ->color('gray'),
         ];
     }
 }
