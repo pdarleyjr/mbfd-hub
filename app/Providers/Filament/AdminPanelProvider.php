@@ -114,9 +114,6 @@ class AdminPanelProvider extends PanelProvider
                     ->label('Station Management')
                     ->icon('heroicon-o-building-office-2'),
                 NavigationGroup::make()
-                    ->label('External Tools')
-                    ->icon('heroicon-o-arrow-top-right-on-square'),
-                NavigationGroup::make()
                     ->label('Bid Administration')
                     ->icon('heroicon-o-key'),
             ])
@@ -185,11 +182,6 @@ class AdminPanelProvider extends PanelProvider
             ->databaseNotificationsPolling('30s')
             ->sidebarCollapsibleOnDesktop()
             ->navigationItems([
-                NavigationItem::make('Baserow')
-                    ->url('https://baserow.mbfdhub.com', shouldOpenInNewTab: true)
-                    ->icon('heroicon-o-arrow-top-right-on-square')
-                    ->group('External Tools')
-                    ->sort(99),
                 NavigationItem::make('Snipe-IT Inventory')
                     ->url('https://inventory.mbfdhub.com/', shouldOpenInNewTab: true)
                     ->icon('heroicon-o-cube')

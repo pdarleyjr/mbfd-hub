@@ -45,7 +45,7 @@ class SecurityHeaders
             "img-src 'self' data: blob: https:",
             "media-src 'self' blob: https:",
             "connect-src 'self' wss: https://api.pulsepoint.org https://web.pulsepoint.org https://static.cloudflareinsights.com",
-            "frame-src 'self' https://www.pulsepoint.org https://web.pulsepoint.org https://baserow.mbfdhub.com https://inventory.mbfdhub.com",
+            "frame-src 'self' https://www.pulsepoint.org https://web.pulsepoint.org https://inventory.mbfdhub.com",
             // Allow cloud.mbfdhub.com (Nextcloud) to embed this site as an
             // External Sites iframe. All other origins remain blocked.
             "frame-ancestors 'self' https://cloud.mbfdhub.com",

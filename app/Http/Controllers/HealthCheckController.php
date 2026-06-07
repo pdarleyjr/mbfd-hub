@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 
 class HealthCheckController extends Controller
 {
@@ -14,7 +13,6 @@ class HealthCheckController extends Controller
         $checks = [
             'database' => $this->checkDatabase(),
             'cache' => $this->checkCache(),
-            'baserow' => $this->checkBaserow(),
         ];
 
         $healthy = collect($checks)->every(fn ($c) => $c['status'] === 'ok');
@@ -46,16 +44,6 @@ class HealthCheckController extends Controller
             return ['status' => $result ? 'ok' : 'fail'];
         } catch (\Throwable $e) {
             return ['status' => 'fail', 'error' => 'Cache unavailable'];
-        }
-    }
-
-    private function checkBaserow(): array
-    {
-        try {
-            $response = Http::timeout(3)->get('http://127.0.0.1:8082/api/_health/');
-            return ['status' => $response->successful() ? 'ok' : 'fail'];
-        } catch (\Throwable $e) {
-            return ['status' => 'unreachable'];
         }
     }
 

@@ -27,7 +27,7 @@ Route::get('/user', function (Request $request) {
 // =========================================================================
 // Database Audit Routes (Admin only - requires authentication)
 // =========================================================================
-Route::prefix('admin/audit')->middleware(['web', 'auth'])->group(function () {
+Route::prefix('admin/audit')->middleware(['web', 'auth', 'admin.role:super_admin,admin', 'throttle:30,1'])->group(function () {
     Route::get('/users', [DatabaseAuditController::class, 'getUsers']);
     Route::get('/employees', [DatabaseAuditController::class, 'getEmployees']);
     Route::get('/roles', [DatabaseAuditController::class, 'getRolesAndPermissions']);
@@ -109,7 +109,7 @@ Route::middleware(['web', 'auth', 'admin.role:super_admin,admin', 'throttle:60,1
         Route::get('personnel', [\App\Http\Controllers\Api\Admin\LookupController::class, 'personnel']);
     });
 
-Route::prefix('admin')->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin'])->group(function () {
+Route::prefix('admin')->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:60,1'])->group(function () {
     Route::get('metrics', [AdminMetricsController::class, 'index']);
     Route::get('smart-updates', [SmartUpdatesController::class, 'index'])->name('api.smart-updates');
 
@@ -156,6 +156,11 @@ Route::middleware('throttle:60,1')->group(function () {
 Route::delete('/big-ticket-requests/{bigTicketRequest}', [BigTicketRequestController::class, 'destroy'])
     ->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:30,1']);
 
+// SECURITY (H-01): approving a pending-review apparatus inspection is the only
+// path that may flip an apparatus Out of Service. Authenticated + authorized only.
+Route::post('/apparatus-inspections/{inspection}/approve', [ApparatusController::class, 'approveInspection'])
+    ->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:30,1']);
+
 // Station Inventory V2 (PIN-protected, real-time inventory management)
 // =========================================================================
 // MBFD Bid Cloudflare Worker bridge — POST /api/v2/verify-credentials
@@ -194,7 +199,7 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
 // Workgroup AI Routes — Eval analysis & AI summaries (separate from chatbot)
 // Requires authentication (Filament session auth via 'web' middleware)
 // =========================================================================
-Route::prefix('workgroup/ai')->middleware(['web', 'auth'])->group(function () {
+Route::prefix('workgroup/ai')->middleware(['web', 'auth', 'workgroup.access', 'throttle:30,1'])->group(function () {
     Route::post('analyze-product/{productId}', [WorkgroupAIController::class, 'analyzeProduct']);
     Route::post('category-summary', [WorkgroupAIController::class, 'categorySummary']);
     Route::post('executive-report', [WorkgroupAIController::class, 'executiveReport']);

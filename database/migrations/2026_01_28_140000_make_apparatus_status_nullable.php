@@ -10,6 +10,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Postgres-specific raw ALTER. No-op on other drivers (e.g. SQLite tests).
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
         DB::statement("ALTER TABLE apparatuses ALTER COLUMN status DROP NOT NULL");
     }
 

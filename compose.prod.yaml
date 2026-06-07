@@ -104,32 +104,12 @@ services:
       retries: 5
       start_period: 15s
 
-  baserow:
-    # Pin by image digest captured 2026-05-14 (running baserow ~1.36 series).
-    # Update by running `docker pull baserow/baserow:1.36.X` against a known
-    # release and replacing the digest below.
-    image: baserow/baserow@sha256:d6769e1ad959067c5306beef6fe32e3a9ca7f0ebe7c3d8db3922042696e6cb6a
-    container_name: mbfd-hub-baserow
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8082:80"
-    environment:
-      BASEROW_PUBLIC_URL: "${BASEROW_PUBLIC_URL}"
-      BASEROW_CADDY_ADDRESSES: ":80"
-      BASEROW_SECRET_KEY: "${BASEROW_SECRET_KEY}"
-    volumes:
-      - baserow-data:/baserow/data
-    networks:
-      - mbfd-net
-
 networks:
   mbfd-net:
     driver: bridge
 
 volumes:
   pgsql-data:
-    driver: local
-  baserow-data:
     driver: local
   redis-data:
     driver: local

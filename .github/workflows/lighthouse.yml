@@ -21,4 +21,4 @@ jobs:
             https://www.mbfdhub.com/
           budgetPath: ./budget.json
           uploadArtifacts: true
-          temporaryPublicStorage: true
+          temporaryPublicStorage: false

@@ -54,15 +54,17 @@ class FileDownloadController extends Controller
             abort(403, 'You do not have access to this file.');
         }
 
-        // Check if file exists
-        if (!Storage::disk('public')->exists($upload->filepath)) {
-            abort(404, 'File not found.');
+        // Stream from the private disk; fall back to the legacy public disk for
+        // uploads created before this hardening (and not yet migrated).
+        $privateDisk = config('filesystems.private', 'local');
+
+        foreach ([$privateDisk, 'public'] as $disk) {
+            if (Storage::disk($disk)->exists($upload->filepath)) {
+                return Storage::disk($disk)->download($upload->filepath, $upload->filename);
+            }
         }
 
-        return Storage::disk('public')->download(
-            $upload->filepath,
-            $upload->filename
-        );
+        abort(404, 'File not found.');
     }
 
     /**
