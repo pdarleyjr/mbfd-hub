@@ -8,6 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // jsonb + information_schema are Postgres-only. SQLite (test/local)
+        // stores JSON as text, so this conversion is a no-op there.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         if (Schema::hasTable('notifications')) {
             $type = DB::selectOne("SELECT data_type FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'data'");
             if ($type && $type->data_type !== 'jsonb') {
@@ -19,6 +25,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         if (Schema::hasTable('notifications')) {
             DB::statement('ALTER TABLE notifications ALTER COLUMN data TYPE text');
         }

@@ -11,6 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Named CHECK-constraint DDL is Postgres-only. SQLite (test/local) has
+        // no such constraint to alter, so skip on non-pgsql drivers.
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE apparatuses DROP CONSTRAINT IF EXISTS apparatuses_status_check');
         DB::statement("ALTER TABLE apparatuses ADD CONSTRAINT apparatuses_status_check CHECK (status IN (
             'In Service', 'Out of Service', 'Maintenance', 'Available',
@@ -23,6 +29,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement('ALTER TABLE apparatuses DROP CONSTRAINT IF EXISTS apparatuses_status_check');
         DB::statement("ALTER TABLE apparatuses ADD CONSTRAINT apparatuses_status_check CHECK (status IN ('In Service', 'Out of Service', 'Maintenance'))");
     }

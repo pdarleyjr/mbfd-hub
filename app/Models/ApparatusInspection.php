@@ -22,6 +22,7 @@ class ApparatusInspection extends Model
         'officer_signature',
         'employee_id',
         'inspection_reference',
+        'review_status',
         'completed_at',
     ];
 
