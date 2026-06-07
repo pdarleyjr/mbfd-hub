@@ -17,9 +17,19 @@ class ApparatusController extends Controller
 {
     public function index()
     {
-        $apparatuses = Apparatus::all()->map(function ($apparatus) {
+        // Internal/identifying fields are redacted from this public (unauthenticated)
+        // endpoint. The daily-checkout SPA only needs operational/status fields; VIN,
+        // Snipe-IT asset identifiers, internal notes, and physical location are not
+        // exposed to anonymous callers.
+        $hidden = ['vin', 'snipeit_asset_id', 'snipeit_asset_tag', 'notes', 'current_location'];
+
+        $apparatuses = Apparatus::all()->map(function ($apparatus) use ($hidden) {
             $data = $apparatus->toArray();
             $data['pm_health'] = $apparatus->getPmHealthStatus();
+
+            foreach ($hidden as $key) {
+                unset($data[$key]);
+            }
 
             return $data;
         });
@@ -72,8 +82,14 @@ class ApparatusController extends Controller
             $checklist = json_decode(file_get_contents($checklistPath), true);
         }
 
+        // Redact internal/identifying apparatus fields from this public endpoint.
+        $apparatusData = $apparatus->toArray();
+        foreach (['vin', 'snipeit_asset_id', 'snipeit_asset_tag', 'notes', 'current_location'] as $key) {
+            unset($apparatusData[$key]);
+        }
+
         return response()->json([
-            'apparatus' => $apparatus,
+            'apparatus' => $apparatusData,
             'checklist' => $checklist,
             'open_defects' => $apparatus->openDefects,
         ]);
