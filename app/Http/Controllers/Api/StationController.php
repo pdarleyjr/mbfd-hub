@@ -3,27 +3,53 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Station;
+use App\Http\Resources\Public\PublicApparatusInspectionResource;
+use App\Http\Resources\Public\PublicApparatusResource;
+use App\Http\Resources\Public\PublicEquipmentRequestResource;
+use App\Http\Resources\Public\PublicGasMeterResource;
+use App\Http\Resources\Public\PublicProjectResource;
+use App\Http\Resources\Public\PublicRoomAssetResource;
+use App\Http\Resources\Public\PublicRoomResource;
+use App\Http\Resources\Public\PublicStationInspectionResource;
+use App\Http\Resources\Public\PublicStationResource;
+use App\Models\ApparatusInspection;
 use App\Models\Room;
 use App\Models\RoomAsset;
 use App\Models\RoomAudit;
 use App\Models\RoomAuditItem;
-use App\Models\ApparatusInspection;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Schema;
+use App\Models\Station;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class StationController extends Controller
 {
     /**
+     * Whether the current request is served via the unauthenticated public API
+     * (routes under the /api/public/* prefix). Used to apply field-redacting
+     * public resources without altering the authenticated/admin responses.
+     */
+    private function isPublicRequest(Request $request): bool
+    {
+        return $request->is('api/public/*');
+    }
+
+    /**
      * List all stations
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $stations = Station::with(['apparatuses', 'rooms'])
             ->withCount('apparatuses', 'rooms', 'capitalProjects', 'shopWorks')
             ->get();
+
+        if ($this->isPublicRequest($request)) {
+            return response()->json([
+                'stations' => PublicStationResource::collection($stations)->resolve($request),
+                'total' => $stations->count(),
+            ]);
+        }
 
         return response()->json([
             'stations' => $stations,
@@ -34,7 +60,7 @@ class StationController extends Controller
     /**
      * Get a single station with all related data
      */
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
         $roomTypeColumn = Schema::hasColumn('rooms', 'room_type') ? 'room_type' : 'type';
         $roomsHaveIsActive = Schema::hasColumn('rooms', 'is_active');
@@ -60,8 +86,8 @@ class StationController extends Controller
                     ->orderBy('name');
             },
         ])
-        ->withCount(['apparatuses', 'rooms', 'capitalProjects', 'under25kProjects'])
-        ->findOrFail($id);
+            ->withCount(['apparatuses', 'rooms', 'capitalProjects', 'under25kProjects'])
+            ->findOrFail($id);
 
         $dormBedsCount = $personnelTableExists
             ? $station->personnel()->where('assignment', 'Dorm')->where('status', 'Active')->count()
@@ -136,7 +162,7 @@ class StationController extends Controller
             };
         };
 
-        return response()->json([
+        $payload = [
             'id' => $station->id,
             'name' => $station->getRawOriginal('name') ?: $station->name,
             'address' => $station->address ?? '',
@@ -193,7 +219,7 @@ class StationController extends Controller
                 return [
                     'id' => $project->id,
                     'project_number' => $project->project_number,
-                    'title' => $project->name ?? $project->project_name ?? ('Project ' . $project->id),
+                    'title' => $project->name ?? $project->project_name ?? ('Project '.$project->id),
                     'description' => $project->description,
                     'station_id' => $project->station_id,
                     'budget' => (float) ($project->budget_amount ?? 0),
@@ -211,7 +237,7 @@ class StationController extends Controller
                 return [
                     'id' => $project->id,
                     'project_number' => $project->project_number,
-                    'title' => $project->name ?? ('Project ' . $project->id),
+                    'title' => $project->name ?? ('Project '.$project->id),
                     'description' => $project->description,
                     'station_id' => $project->station_id,
                     'budget' => (float) ($project->budget_amount ?? 0),
@@ -228,8 +254,8 @@ class StationController extends Controller
             'shop_works' => $shopWorks->map(function ($work) use ($normalizeProjectStatus) {
                 return [
                     'id' => $work->id,
-                    'work_order_number' => 'SW-' . $work->id,
-                    'title' => $work->project_name ?? ('Shop Work ' . $work->id),
+                    'work_order_number' => 'SW-'.$work->id,
+                    'title' => $work->project_name ?? ('Shop Work '.$work->id),
                     'description' => $work->description,
                     'apparatus_id' => $work->apparatus_id,
                     'priority' => 'medium',
@@ -249,7 +275,46 @@ class StationController extends Controller
                 'apparatus_by_type' => $apparatusByType,
                 'project_totals' => $projectTotals,
             ],
-        ]);
+        ];
+
+        if ($this->isPublicRequest($request)) {
+            return response()->json($this->redactStationShow($request, $station, $payload));
+        }
+
+        return response()->json($payload);
+    }
+
+    /**
+     * SECURITY (H-02): build the redacted public payload for show(). Drops
+     * internal-only fields (notes) and replaces nested apparatuses / projects
+     * with field-allowlisted public resources so financials, VIN, and internal
+     * metadata are never exposed to the unauthenticated daily-checkout SPA.
+     */
+    private function redactStationShow(Request $request, Station $station, array $payload): array
+    {
+        unset(
+            $payload['notes'],
+            $payload['latitude'],
+            $payload['longitude'],
+            $payload['shop_works'],
+        );
+
+        $payload['apparatuses'] = PublicApparatusResource::collection($station->apparatuses)
+            ->resolve($request);
+        $payload['rooms'] = PublicRoomResource::collection($station->rooms)
+            ->resolve($request);
+        $payload['capital_projects'] = PublicProjectResource::collection($station->capitalProjects)
+            ->resolve($request);
+        $payload['under_25k_projects'] = PublicProjectResource::collection($station->under25kProjects)
+            ->resolve($request);
+
+        // Project budget/spend financials are summarized in 'summary.project_totals';
+        // redact that from the public response too.
+        if (isset($payload['summary']['project_totals'])) {
+            unset($payload['summary']['project_totals']);
+        }
+
+        return $payload;
     }
 
     /**
@@ -324,7 +389,7 @@ class StationController extends Controller
     /**
      * Get rooms for a station
      */
-    public function rooms(int $id): JsonResponse
+    public function rooms(Request $request, int $id): JsonResponse
     {
         $station = Station::findOrFail($id);
 
@@ -333,6 +398,14 @@ class StationController extends Controller
             ->orderBy('floor')
             ->orderBy('name')
             ->get();
+
+        if ($this->isPublicRequest($request)) {
+            return response()->json([
+                'station_id' => $id,
+                'rooms' => PublicRoomResource::collection($rooms)->resolve($request),
+                'total' => $rooms->count(),
+            ]);
+        }
 
         return response()->json([
             'station_id' => $id,
@@ -368,15 +441,30 @@ class StationController extends Controller
     /**
      * Get assets for a room
      */
-    public function roomAssets(int $stationId, int $roomId): JsonResponse
+    public function roomAssets(Request $request, int $stationId, int $roomId): JsonResponse
     {
         $room = Room::where('station_id', $stationId)->findOrFail($roomId);
 
-        $assets = $room->assets()
-            ->active()
+        $assetsQuery = $room->assets();
+
+        // The active() scope filters on an is_active column that only exists on
+        // some deployments; guard it so the query is portable.
+        if (Schema::hasColumn('room_assets', 'is_active')) {
+            $assetsQuery->active();
+        }
+
+        $assets = $assetsQuery
             ->orderBy('category')
             ->orderBy('name')
             ->get();
+
+        if ($this->isPublicRequest($request)) {
+            return response()->json([
+                'room_id' => $roomId,
+                'assets' => PublicRoomAssetResource::collection($assets)->resolve($request),
+                'total' => $assets->count(),
+            ]);
+        }
 
         return response()->json([
             'room_id' => $roomId,
@@ -509,7 +597,7 @@ class StationController extends Controller
     /**
      * Get station apparatus
      */
-    public function apparatus(int $id): JsonResponse
+    public function apparatus(Request $request, int $id): JsonResponse
     {
         $station = Station::findOrFail($id);
 
@@ -517,6 +605,14 @@ class StationController extends Controller
             ->with('currentDefects')
             ->orderBy('unit_number')
             ->get();
+
+        if ($this->isPublicRequest($request)) {
+            return response()->json([
+                'station_id' => $id,
+                'apparatuses' => PublicApparatusResource::collection($apparatuses)->resolve($request),
+                'total' => $apparatuses->count(),
+            ]);
+        }
 
         return response()->json([
             'station_id' => $id,
@@ -528,7 +624,7 @@ class StationController extends Controller
     /**
      * Get station projects
      */
-    public function projects(int $id): JsonResponse
+    public function projects(Request $request, int $id): JsonResponse
     {
         $station = Station::findOrFail($id);
 
@@ -541,6 +637,14 @@ class StationController extends Controller
             ->with('updates')
             ->orderBy('target_completion_date')
             ->get();
+
+        if ($this->isPublicRequest($request)) {
+            return response()->json([
+                'station_id' => $id,
+                'capital_projects' => PublicProjectResource::collection($capitalProjects)->resolve($request),
+                'under_25k_projects' => PublicProjectResource::collection($under25kProjects)->resolve($request),
+            ]);
+        }
 
         return response()->json([
             'station_id' => $id,
@@ -557,23 +661,14 @@ class StationController extends Controller
         $station = Station::findOrFail($id);
 
         $inspections = $station->stationInspections()
-            ->with(['inspector'])
             ->orderBy('inspection_date', 'desc')
             ->limit(50)
-            ->get()
-            ->map(fn ($inspection) => [
-                'id' => $inspection->id,
-                'inspection_date' => $inspection->inspection_date,
-                'inspection_type' => $inspection->inspection_type,
-                'overall_status' => $inspection->overall_status,
-                'inspector_name' => $inspection->inspector?->name ?? 'Unknown',
-                'notes' => $inspection->notes,
-                'created_at' => $inspection->created_at,
-            ]);
+            ->get();
 
+        // SECURITY (H-02): public endpoint — redact inspector identity and notes.
         return response()->json([
             'station_id' => $id,
-            'inspections' => $inspections,
+            'inspections' => PublicStationInspectionResource::collection($inspections)->resolve(request()),
             'total' => $inspections->count(),
         ]);
     }
@@ -591,23 +686,12 @@ class StationController extends Controller
             ->whereDate('created_at', Carbon::today())
             ->with('apparatus')
             ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(fn ($inspection) => [
-                'id' => $inspection->id,
-                'apparatus_name' => $inspection->apparatus?->designation
-                    ?: $inspection->apparatus?->name
-                    ?: $inspection->apparatus?->unit_id
-                    ?: 'Unknown',
-                'operator_name' => $inspection->operator_name,
-                'rank' => $inspection->rank,
-                'shift' => $inspection->shift,
-                'completed_at' => $inspection->completed_at ?? $inspection->created_at,
-                'defect_count' => $inspection->defects()->count(),
-            ]);
+            ->get();
 
+        // SECURITY (H-02): public endpoint — redact operator name and rank.
         return response()->json([
             'station_id' => $id,
-            'inspections' => $inspections,
+            'inspections' => PublicApparatusInspectionResource::collection($inspections)->resolve(request()),
             'total' => $inspections->count(),
         ]);
     }
@@ -620,25 +704,14 @@ class StationController extends Controller
         $station = Station::findOrFail($id);
 
         $requests = $station->fireEquipmentRequests()
-            ->with(['requestedBy'])
             ->orderBy('created_at', 'desc')
             ->limit(50)
-            ->get()
-            ->map(fn ($request) => [
-                'id' => $request->id,
-                'equipment_type' => $request->equipment_type,
-                'description' => $request->description,
-                'priority' => $request->priority,
-                'status' => $request->status,
-                'requested_by_name' => $request->requested_by_name
-                    ?: $request->requestedBy?->name
-                    ?: 'Unknown',
-                'created_at' => $request->created_at,
-            ]);
+            ->get();
 
+        // SECURITY (H-02): public endpoint — redact requester identity & internals.
         return response()->json([
             'station_id' => $id,
-            'equipment_requests' => $requests,
+            'equipment_requests' => PublicEquipmentRequestResource::collection($requests)->resolve(request()),
             'total' => $requests->count(),
         ]);
     }
@@ -652,23 +725,13 @@ class StationController extends Controller
 
         $meters = $station->singleGasMeters()
             ->with('apparatus')
-            ->get()
-            ->map(fn ($meter) => [
-                'id' => $meter->id,
-                'serial_number' => $meter->serial_number,
-                'activation_date' => $meter->activation_date,
-                'expiration_date' => $meter->expiration_date,
-                'status' => $meter->status,
-                'days_until_expiration' => $meter->daysUntilExpiration(),
-                'apparatus_name' => $meter->apparatus?->designation
-                    ?: $meter->apparatus?->name
-                    ?: $meter->apparatus?->unit_id
-                    ?: 'Unassigned',
-            ]);
+            ->get();
 
+        // SECURITY (H-02): public endpoint — full serial numbers are redacted
+        // (masked to last 4 chars) by PublicGasMeterResource.
         return response()->json([
             'station_id' => $id,
-            'gas_meters' => $meters,
+            'gas_meters' => PublicGasMeterResource::collection($meters)->resolve(request()),
             'total' => $meters->count(),
         ]);
     }
