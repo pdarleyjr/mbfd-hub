@@ -10,6 +10,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Postgres-only extension/index. No-op on other drivers (e.g. SQLite tests).
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
         // Enable PostgreSQL trigram extension for fuzzy text matching
         DB::statement('CREATE EXTENSION IF NOT EXISTS pg_trgm');
         

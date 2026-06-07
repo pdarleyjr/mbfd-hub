@@ -116,8 +116,12 @@ class WorkgroupAIService
         $filename = $upload->filename;
 
         try {
-            // Get file content from storage
-            $content = Storage::disk('public')->get($filepath);
+            // Read from the private disk; fall back to the legacy public disk
+            // for uploads created before storage hardening.
+            $privateDisk = config('filesystems.private', 'local');
+            $content = Storage::disk($privateDisk)->exists($filepath)
+                ? Storage::disk($privateDisk)->get($filepath)
+                : Storage::disk('public')->get($filepath);
             if (!$content) {
                 return ['success' => false, 'error' => 'File not found in storage'];
             }

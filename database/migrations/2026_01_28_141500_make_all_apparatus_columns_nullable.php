@@ -11,6 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Postgres-specific (information_schema + raw ALTER). No-op on other
+        // drivers (e.g. SQLite tests), where columns are already nullable.
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
         $columns = [
             'unit_id',
             'vehicle_number',
