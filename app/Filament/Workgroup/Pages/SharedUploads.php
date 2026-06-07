@@ -157,20 +157,23 @@ class SharedUploads extends Page implements HasTable
             $file = reset($file); // Get first element
         }
 
+        // Sensitive: shared uploads must NOT be web-reachable.
+        $privateDisk = config('filesystems.private', 'local');
+
         if (is_string($file)) {
             // Filament already stored the file in the default Livewire temp directory.
-            // Move it to the permanent location on the public disk.
+            // Move it to the permanent location on the private disk.
             $tempPath = $file; // e.g. "livewire-tmp/abc123.pdf"
             $filename = pathinfo($tempPath, PATHINFO_BASENAME);
             $extension = pathinfo($tempPath, PATHINFO_EXTENSION);
             $permanentDir = 'workgroup-shared-uploads/' . $member->workgroup->id;
             $permanentPath = $permanentDir . '/' . $filename;
 
-            // Move from default disk (local) to public disk
+            // Move from the Livewire temp (local) disk to the private disk
             $contents = Storage::disk('local')->get($tempPath);
-            Storage::disk('public')->put($permanentPath, $contents);
-            $fileSize = Storage::disk('public')->size($permanentPath);
-            $mimeType = Storage::disk('public')->mimeType($permanentPath);
+            Storage::disk($privateDisk)->put($permanentPath, $contents);
+            $fileSize = Storage::disk($privateDisk)->size($permanentPath);
+            $mimeType = Storage::disk($privateDisk)->mimeType($permanentPath);
 
             // Clean up temp file
             Storage::disk('local')->delete($tempPath);
@@ -187,7 +190,7 @@ class SharedUploads extends Page implements HasTable
             ]);
         } else {
             // UploadedFile object (fallback for direct uploads)
-            $path = $file->store('workgroup-shared-uploads/' . $member->workgroup->id, 'public');
+            $path = $file->store('workgroup-shared-uploads/' . $member->workgroup->id, $privateDisk);
 
             WorkgroupSharedUpload::create([
                 'workgroup_id' => $member->workgroup->id,
