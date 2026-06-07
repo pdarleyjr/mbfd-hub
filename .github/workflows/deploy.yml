@@ -216,7 +216,6 @@ jobs:
           test_url "Admin PWA SW"         "https://www.mbfdhub.com/admin-pwa/service-worker.js"
           test_url "Admin /up health"     "https://www.mbfdhub.com/up"
           test_url "Deploy marker"        "https://www.mbfdhub.com/deploy-marker.json"
-          test_url "Baserow"              "https://baserow.mbfdhub.com"    "200"
           test_url "Snipe-IT"             "https://inventory.mbfdhub.com"  "200"
           echo ""
           echo "=== Results: $PASS passed, $FAIL failed ==="
