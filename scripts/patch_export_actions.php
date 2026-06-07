@@ -42,8 +42,6 @@ $files = [
     'Resources/Under25kProjectResource/RelationManagers/UpdatesRelationManager.php'   => 'mbfd_under25k_updates',
 
     // === TRAINING RESOURCES ===
-    'Training/Resources/ExternalNavItemResource.php'                                   => 'mbfd_training_nav_items',
-    'Training/Resources/ExternalSourceResource.php'                                    => 'mbfd_training_sources',
     'Training/Resources/TrainingTodoResource.php'                                      => 'mbfd_training_todos',
 
     // === WORKGROUP RESOURCES ===
