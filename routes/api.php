@@ -86,16 +86,11 @@ Route::prefix('display')->middleware(['display.token', 'display.readonly', 'thro
     Route::get('incidents', [DisplayController::class, 'incidents']);
     Route::get('health', [DisplayController::class, 'health']);
 
-    // Catch-all for any mutating verb on a display path. Registered AFTER the
-    // GET routes so reads are unaffected; the display.readonly group middleware
-    // intercepts and returns the uniform read-only 405 before this closure runs
-    // (the closure is a never-reached belt-and-suspenders guarantee).
-    Route::addRoute(['POST', 'PUT', 'PATCH', 'DELETE'], '{any}', function () {
-        return response()->json(
-            ['message' => 'Method Not Allowed. Display API is read-only.'],
-            405
-        );
-    })->where('any', '.*');
+    // Catch-all for any mutating verb on a display path. Registered AFTER the GET
+    // routes so reads are unaffected. Routed to a controller method (not a closure)
+    // so the route table remains cacheable via `php artisan route:cache`.
+    Route::addRoute(['POST', 'PUT', 'PATCH', 'DELETE'], '{any}', [DisplayController::class, 'methodNotAllowed'])
+        ->where('any', '.*');
 });
 
 Route::prefix('public')->middleware('throttle:10,1')->group(function () {
