@@ -224,6 +224,18 @@ final class DisplayController extends Controller
             ->header('Cache-Control', 'no-store');
     }
 
+    /**
+     * Uniform read-only 405 for any mutating verb on a display path. Routed to a
+     * controller method (not a closure) so the route table stays cacheable via
+     * `php artisan route:cache`.
+     */
+    public function methodNotAllowed(): JsonResponse
+    {
+        return response()
+            ->json(['message' => 'Method Not Allowed. Display API is read-only.'], 405)
+            ->header('Allow', 'GET, HEAD, OPTIONS');
+    }
+
     private function notFound(string $message): JsonResponse
     {
         return response()
