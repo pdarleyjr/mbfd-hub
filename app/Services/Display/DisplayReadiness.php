@@ -1,0 +1,201 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Display;
+
+/**
+ * Weighted station-readiness model for the command display.
+ *
+ * Pure, side-effect-free calculator. Produces a 0-100 score, a status band,
+ * and human-readable reasons — never a bare number. Inputs are simple scalars
+ * so the caller (DisplaySnapshotService) keeps all data access in one place
+ * and this class stays trivially testable.
+ *
+ * Weighting (sums to 100):
+ *   - 40  apparatus checkout completeness (today's inspections / apparatus)
+ *   - 25  station inspection currency (passed within 30d)
+ *   - 15  inverse of unresolved equipment-request load
+ *   - 10  apparatus status / open-defect health (in-service ratio + penalty)
+ *   - 10  source freshness (snapshot age)
+ */
+final class DisplayReadiness
+{
+    public const STATUS_READY = 'READY';
+
+    public const STATUS_ATTENTION = 'ATTENTION';
+
+    public const STATUS_INCOMPLETE = 'INCOMPLETE';
+
+    public const STATUS_CRITICAL = 'CRITICAL';
+
+    public const STATUS_UNKNOWN = 'UNKNOWN';
+
+    private const W_CHECKOUT = 40.0;
+
+    private const W_STATION_INSPECTION = 25.0;
+
+    private const W_REQUEST_LOAD = 15.0;
+
+    private const W_STATUS_DEFECTS = 10.0;
+
+    private const W_FRESHNESS = 10.0;
+
+    /**
+     * @return array{percent: int, status: string, reasons: list<string>}
+     */
+    public static function compute(
+        int $apparatusCount,
+        int $inspectionsToday,
+        int $inServiceCount,
+        int $outOfServiceCount,
+        int $maintenanceCount,
+        int $openDefects,
+        int $criticalDefects,
+        ?string $lastStationInspectionStatus,
+        ?int $stationInspectionAgeDays,
+        int $pendingEquipmentRequests,
+        int $criticalPendingEquipmentRequests,
+        int $snapshotAgeSeconds
+    ): array {
+        $reasons = [];
+
+        // No apparatus and no station inspection signal => nothing to grade on.
+        if ($apparatusCount === 0 && $lastStationInspectionStatus === null) {
+            return [
+                'percent' => 0,
+                'status' => self::STATUS_UNKNOWN,
+                'reasons' => ['No apparatus or recent station inspection data available'],
+            ];
+        }
+
+        // 1. Apparatus checkout completeness (40).
+        if ($apparatusCount > 0) {
+            $ratio = min(1.0, $inspectionsToday / $apparatusCount);
+            $checkoutScore = self::W_CHECKOUT * $ratio;
+            $reasons[] = sprintf(
+                '%d of %d apparatus checked out today',
+                min($inspectionsToday, $apparatusCount),
+                $apparatusCount
+            );
+        } else {
+            // No apparatus at this station: this dimension does not apply, award
+            // it fully so the station is not penalised for having no rigs.
+            $checkoutScore = self::W_CHECKOUT;
+            $reasons[] = 'No apparatus assigned to this station';
+        }
+
+        // 2. Station inspection currency (25).
+        if ($lastStationInspectionStatus === null) {
+            $inspectionScore = 0.0;
+            $reasons[] = 'No station inspection in the last 30 days';
+        } elseif (strtolower($lastStationInspectionStatus) === 'pass') {
+            $inspectionScore = self::W_STATION_INSPECTION;
+            $reasons[] = $stationInspectionAgeDays !== null
+                ? sprintf('Station inspection passed %dd ago', $stationInspectionAgeDays)
+                : 'Station inspection passed';
+        } elseif (strtolower($lastStationInspectionStatus) === 'needs_attention') {
+            $inspectionScore = self::W_STATION_INSPECTION * 0.5;
+            $reasons[] = 'Station inspection flagged needs attention';
+        } else {
+            $inspectionScore = 0.0;
+            $reasons[] = 'Station inspection failed';
+        }
+
+        // 3. Inverse of unresolved equipment-request load (15).
+        // 0 pending => full; load tapers the score, critical pending hits harder.
+        $loadPenalty = min(1.0, ($pendingEquipmentRequests * 0.15) + ($criticalPendingEquipmentRequests * 0.35));
+        $requestScore = self::W_REQUEST_LOAD * (1.0 - $loadPenalty);
+        if ($pendingEquipmentRequests > 0) {
+            $reasons[] = $criticalPendingEquipmentRequests > 0
+                ? sprintf(
+                    '%d equipment request%s pending (%d critical)',
+                    $pendingEquipmentRequests,
+                    $pendingEquipmentRequests === 1 ? '' : 's',
+                    $criticalPendingEquipmentRequests
+                )
+                : sprintf(
+                    '%d equipment request%s pending',
+                    $pendingEquipmentRequests,
+                    $pendingEquipmentRequests === 1 ? '' : 's'
+                );
+        } else {
+            $reasons[] = 'No pending equipment requests';
+        }
+
+        // 4. Apparatus status / open-defect health (10).
+        if ($apparatusCount > 0) {
+            $inServiceRatio = min(1.0, $inServiceCount / $apparatusCount);
+            $defectPenalty = min(0.5, ($openDefects * 0.05) + ($criticalDefects * 0.15));
+            $statusScore = max(0.0, self::W_STATUS_DEFECTS * ($inServiceRatio - $defectPenalty));
+        } else {
+            $statusScore = self::W_STATUS_DEFECTS;
+        }
+        if ($outOfServiceCount > 0) {
+            $reasons[] = sprintf(
+                '%d apparatus out of service',
+                $outOfServiceCount
+            );
+        }
+        if ($maintenanceCount > 0) {
+            $reasons[] = sprintf(
+                '%d apparatus in maintenance',
+                $maintenanceCount
+            );
+        }
+        if ($criticalDefects > 0) {
+            $reasons[] = sprintf(
+                '%d critical defect%s open',
+                $criticalDefects,
+                $criticalDefects === 1 ? '' : 's'
+            );
+        } elseif ($openDefects > 0) {
+            $reasons[] = sprintf(
+                '%d open defect%s',
+                $openDefects,
+                $openDefects === 1 ? '' : 's'
+            );
+        }
+
+        // 5. Source freshness (10). Full credit under 5 min, decays to zero by 1h.
+        $freshnessRatio = self::freshnessRatio($snapshotAgeSeconds);
+        $freshnessScore = self::W_FRESHNESS * $freshnessRatio;
+        if ($freshnessRatio < 1.0) {
+            $reasons[] = sprintf('Data is %ds old', $snapshotAgeSeconds);
+        }
+
+        $percent = (int) round(
+            $checkoutScore + $inspectionScore + $requestScore + $statusScore + $freshnessScore
+        );
+        $percent = max(0, min(100, $percent));
+
+        return [
+            'percent' => $percent,
+            'status' => self::statusForPercent($percent),
+            'reasons' => array_values($reasons),
+        ];
+    }
+
+    private static function freshnessRatio(int $ageSeconds): float
+    {
+        if ($ageSeconds <= 300) {
+            return 1.0;
+        }
+        if ($ageSeconds >= 3600) {
+            return 0.0;
+        }
+
+        // Linear decay between 5 minutes and 60 minutes.
+        return max(0.0, 1.0 - (($ageSeconds - 300) / (3600 - 300)));
+    }
+
+    private static function statusForPercent(int $percent): string
+    {
+        return match (true) {
+            $percent >= 85 => self::STATUS_READY,
+            $percent >= 70 => self::STATUS_ATTENTION,
+            $percent >= 50 => self::STATUS_INCOMPLETE,
+            default => self::STATUS_CRITICAL,
+        };
+    }
+}

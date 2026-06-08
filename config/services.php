@@ -28,6 +28,13 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    // Shared secret guarding the read-only /api/display/* surface. When set, the
+    // command-display Cloudflare Functions gateway must present it as X-Display-Token.
+    // Empty/unset = open (no-op) for local/dev and staged rollout.
+    'display_api' => [
+        'token' => env('DISPLAY_API_TOKEN'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
