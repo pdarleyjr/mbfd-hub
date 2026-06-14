@@ -45,6 +45,10 @@ jobs:
 
   codeql:
     name: CodeQL Analysis
+    # CodeQL upload requires GitHub Advanced Security for private repos. Keep
+    # dependency/trivy/gitleaks coverage on private runs and enable this job
+    # automatically if the repository is ever made public or GHAS is enabled.
+    if: ${{ github.event.repository.private == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

@@ -10,7 +10,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const swPath = path.join(__dirname, '..', '..', '..', 'public', 'daily', 'sw.js');
+const defaultOutDir = path.join(__dirname, '..', '..', '..', 'public', 'daily');
+const outDir = process.env.DAILY_CHECKOUT_OUT_DIR
+  ? path.resolve(__dirname, process.env.DAILY_CHECKOUT_OUT_DIR)
+  : defaultOutDir;
+const swPath = path.join(outDir, 'sw.js');
 
 const pushListeners = `
 // \u2500\u2500\u2500 Injected Push Notification Handlers (ERROR-036 fix) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
