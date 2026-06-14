@@ -8,6 +8,10 @@ import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const defaultOutDir = path.join(__dirname, '..', '..', '..', 'public', 'daily')
+const dailyOutDir = process.env.DAILY_CHECKOUT_OUT_DIR
+  ? path.resolve(__dirname, process.env.DAILY_CHECKOUT_OUT_DIR)
+  : defaultOutDir
 
 const manifestCopyPlugin = {
   name: 'manifest-copy',
@@ -61,7 +65,7 @@ const serviceWorkerPushInjectPlugin = {
   apply: 'build',
   closeBundle() {
     const customSwPath = path.join(__dirname, 'public', 'service-worker.js')
-    const outputSwPath = path.join(__dirname, '..', '..', '..', 'public', 'daily', 'sw.js')
+    const outputSwPath = path.join(dailyOutDir, 'sw.js')
     
     console.log(`[sw-push-inject] Injecting push listeners from: ${customSwPath}`)
     console.log(`[sw-push-inject] Into generated SW at: ${outputSwPath}`)
@@ -189,7 +193,7 @@ export default defineConfig({
     // }),
   ],
   build: {
-    outDir: '../../../public/daily',
+    outDir: dailyOutDir,
     emptyOutDir: true,
     sourcemap: true,
   },

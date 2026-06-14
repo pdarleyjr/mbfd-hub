@@ -175,12 +175,32 @@ jobs:
       # docker exec runs as 'sail' (UID 1000) so build output is owned by the
       # same user as the host runner — without this, files end up root-owned
       # and the next deploy's git reset fails to replace them.
+      # Build into temporary directories first, then atomically swap public
+      # assets only after manifests exist. A failed Vite build must never remove
+      # the currently-live public/build/manifest.json again.
       - name: Build frontend assets
         run: |
           ssh deploy-target "set -e
-            docker exec -u sail mbfd-hub-laravel bash -c 'npm ci --legacy-peer-deps && npm run build'
+            cd /opt/mbfd/mbfd-hub
+            docker exec -u sail mbfd-hub-laravel bash -lc 'set -e
+              rm -rf /var/www/html/public/build-next
+              npm ci --legacy-peer-deps
+              npx vite build --outDir public/build-next --emptyOutDir
+              test -s /var/www/html/public/build-next/manifest.json
+            '
             docker exec -u sail mbfd-hub-laravel php artisan filament:assets
-            docker exec -u sail mbfd-hub-laravel bash -c 'cd /var/www/html/resources/js/daily-checkout && npm ci --legacy-peer-deps && npm run build'
+            docker exec -u sail mbfd-hub-laravel bash -lc 'set -e
+              rm -rf /var/www/html/public/daily-next
+              cd /var/www/html/resources/js/daily-checkout
+              npm ci --legacy-peer-deps
+              DAILY_CHECKOUT_OUT_DIR=../../../public/daily-next npm run build
+              test -f /var/www/html/public/daily-next/index.html
+            '
+            rm -rf public/build-previous public/daily-previous
+            if [ -d public/build ]; then mv public/build public/build-previous; fi
+            mv public/build-next public/build
+            if [ -d public/daily ]; then mv public/daily public/daily-previous; fi
+            mv public/daily-next public/daily
             echo '✓ All frontend assets built'
           "
 
