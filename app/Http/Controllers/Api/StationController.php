@@ -603,7 +603,9 @@ class StationController extends Controller
 
         $apparatuses = $station->apparatuses()
             ->with('currentDefects')
-            ->orderBy('unit_number')
+            ->orderBy('designation')
+            ->orderBy('name')
+            ->orderBy('unit_id')
             ->get();
 
         if ($this->isPublicRequest($request)) {

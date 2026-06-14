@@ -140,7 +140,7 @@ class PublicStationRedactionTest extends TestCase
     {
         SingleGasMeter::create([
             'apparatus_id' => $this->apparatus->id,
-            'serial_number' => 'SN-SECRET-99887766',
+            'serial_number' => '98765',
             'activation_date' => now()->subMonths(6)->toDateString(),
         ]);
 
@@ -149,10 +149,11 @@ class PublicStationRedactionTest extends TestCase
 
         $body = $response->getContent();
         // Full serial number must never appear in the public response.
-        $this->assertStringNotContainsString('SN-SECRET-99887766', $body);
+        $this->assertStringNotContainsString('98765', $body);
 
         $meter = $response->json('gas_meters.0');
         $this->assertNotNull($meter);
+        $this->assertSame("\u{2022}\u{2022}\u{2022}\u{2022}8765", $meter['serial_number']);
         // Safe fields the gas-meter tab renders.
         $this->assertArrayHasKey('id', $meter);
         $this->assertArrayHasKey('status', $meter);

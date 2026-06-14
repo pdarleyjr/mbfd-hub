@@ -71,7 +71,27 @@ jobs:
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts 2>/dev/null || true
-          cat > ~/.ssh/config << EOF
+          touch ~/.ssh/config
+          cp ~/.ssh/config ~/.ssh/config.before-production-activate-${{ github.run_id }}
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path.home() / '.ssh' / 'config'
+          lines = path.read_text().splitlines()
+          kept = []
+          skip = False
+
+          for line in lines:
+              stripped = line.strip()
+              lower = stripped.lower()
+              if lower.startswith('host ') or lower.startswith('match '):
+                  skip = lower.startswith('host ') and 'deploy-target' in stripped.split()[1:]
+              if not skip:
+                  kept.append(line)
+
+          path.write_text('\n'.join(kept).rstrip() + '\n')
+          PY
+          cat >> ~/.ssh/config << EOF
           Host deploy-target
             HostName 127.0.0.1
             User ${{ secrets.DEPLOY_USER }}
