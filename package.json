@@ -34,5 +34,9 @@
         "react-konva": "^19.2.3",
         "typescript": "^5.9.3",
         "zustand": "^5.0.11"
+    },
+    "overrides": {
+        "esbuild": "0.28.1",
+        "shell-quote": "1.8.4"
     }
 }
