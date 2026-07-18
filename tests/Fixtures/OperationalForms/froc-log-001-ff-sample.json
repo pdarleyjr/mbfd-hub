@@ -1,0 +1,77 @@
+{
+  "data": {
+    "general_information": {
+      "event_id": "EXERCISE-2026-001",
+      "applicant_name": "City of Miami Beach",
+      "department": "Miami Beach Fire Department",
+      "date": "2026-07-18"
+    },
+    "team_members": [
+      { "employee_id": "21401", "employee_name": "Alex Sample" },
+      { "employee_id": "21402", "employee_name": "Jordan Sample" }
+    ],
+    "labor": [
+      {
+        "category": "B",
+        "work_performed": "Established the exercise work area and completed assigned field activities.",
+        "location_gps": "25.7907, -80.1300",
+        "start": "08:00",
+        "end": "16:00",
+        "event_related": true
+      },
+      {
+        "category": "B",
+        "work_performed": "Routine apparatus readiness check.",
+        "location_gps": "Station 1",
+        "start": "16:00",
+        "end": "17:00",
+        "event_related": false
+      }
+    ],
+    "equipment_hours": [
+      {
+        "category": "B",
+        "equipment_id": "TRK-01",
+        "operator": "Alex Sample",
+        "description": "Utility response vehicle",
+        "location": "Exercise work area",
+        "hours": "4.25",
+        "event_related": true
+      }
+    ],
+    "vehicle_mileage": [
+      {
+        "category": "B",
+        "equipment_id": "TRK-01",
+        "operator": "Alex Sample",
+        "destination": "Exercise work area",
+        "start_odometer": "12000.00",
+        "end_odometer": "12012.50",
+        "event_related": true
+      }
+    ],
+    "materials": [
+      {
+        "category": "B",
+        "item": "Marking paint",
+        "quantity": "2",
+        "cost": "16.50",
+        "justification": "Exercise work-area markings",
+        "receipt_reference": "SAMPLE-INV-1",
+        "from_stock": true
+      }
+    ],
+    "certification": {
+      "page2_employee_signature_text": "Alex Sample",
+      "page2_reviewer_signature_text": "Review Sample",
+      "final_employee_signature_text": "Alex Sample",
+      "final_employee_signature_date": "2026-07-18",
+      "final_reviewer_signature_text": "Review Sample",
+      "final_reviewer_signature_date": "2026-07-18",
+      "confirmed": true
+    },
+    "additional_notes": [
+      "Non-sensitive demonstration data generated for implementation acceptance."
+    ]
+  }
+}
