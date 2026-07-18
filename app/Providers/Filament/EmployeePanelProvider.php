@@ -5,7 +5,6 @@ namespace App\Providers\Filament;
 use App\Filament\Employee\Pages\Auth\EmployeeLogin;
 use App\Filament\Employee\Pages\ChangePasswordPage;
 use App\Filament\Employee\Pages\EmployeeDashboard;
-use App\Filament\Employee\Pages\MyBidCertificationsPage;
 use App\Filament\Employee\Pages\MyEquipmentPage;
 use App\Filament\Employee\Pages\OperationalForms;
 use App\Filament\Employee\Pages\RequestEquipmentPage;
@@ -63,23 +62,12 @@ class EmployeePanelProvider extends PanelProvider
             ->pages([
                 EmployeeDashboard::class,
                 OperationalForms::class,
-                MyBidCertificationsPage::class,
                 MyEquipmentPage::class,
                 RequestEquipmentPage::class,
                 ChangePasswordPage::class,
             ])
             ->widgets([])
             ->userMenuItems([
-                MenuItem::make()
-                    ->label('Open Bid Console')
-                    ->url(fn (): ?string => config('services.bid.console_url'))
-                    ->visible(fn (): bool => filled(config('services.bid.console_url')))
-                    ->icon('heroicon-o-bolt')
-                    ->openUrlInNewTab(),
-                MenuItem::make()
-                    ->label('My Bid Certifications')
-                    ->url(fn (): string => MyBidCertificationsPage::getUrl(panel: 'employee'))
-                    ->icon('heroicon-o-check-badge'),
                 MenuItem::make()
                     ->label('My Equipment')
                     ->url(fn (): string => MyEquipmentPage::getUrl(panel: 'employee'))
