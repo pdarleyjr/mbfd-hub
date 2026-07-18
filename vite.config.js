@@ -18,6 +18,7 @@ export default defineConfig({
                 // Admin desktop-PWA bootstrap (registers /admin/ scoped SW,
                 // gates install prompt by matchMedia, prefetches lookups).
                 'resources/js/admin-pwa/main.ts',
+                'resources/js/operational-forms/main.tsx',
             ],
             refresh: true,
         }),

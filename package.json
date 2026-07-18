@@ -3,7 +3,8 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "test:operational-forms-e2e": "playwright test --config=playwright.operational-forms.config.ts"
     },
     "devDependencies": {
         "@playwright/test": "^1.59.1",
@@ -20,6 +21,7 @@
         "vite": "8.0.16"
     },
     "dependencies": {
+        "@fluentui/react-components": "9.74.4",
         "@tanstack/react-query": "^5.90.21",
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
@@ -28,6 +30,7 @@
         "konva": "^10.2.1",
         "lucide-react": "^0.500.0",
         "pdf-lib": "^1.17.1",
+        "pdfjs-dist": "5.1.91",
         "puppeteer": "^24.39.1",
         "react": "^19.2.4",
         "react-dom": "^19.2.4",

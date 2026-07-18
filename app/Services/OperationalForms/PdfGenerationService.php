@@ -1,0 +1,233 @@
+<?php
+
+namespace App\Services\OperationalForms;
+
+use App\Models\Employee;
+use App\Models\OperationalFormDocument;
+use App\Models\OperationalFormEvent;
+use App\Models\OperationalFormRecord;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use RuntimeException;
+use Throwable;
+
+final class PdfGenerationService
+{
+    public function __construct(
+        private readonly FormRegistry $registry,
+        private readonly FormDataValidator $validator,
+    ) {}
+
+    public function generate(OperationalFormRecord $record, Employee $employee, ?string $requestIp = null): array
+    {
+        if ($record->employee_id !== $employee->getKey()) {
+            abort(404);
+        }
+
+        $snapshot = $this->validator->validate($record->form_type, $record->data, true);
+        $existing = $record->documents()->where('source_revision', $record->revision)->latest('version_number')->first();
+        if ($existing) {
+            return ['document' => $existing, 'metadata' => $this->metadataFromDocument($existing, $snapshot)];
+        }
+
+        $definition = $this->registry->get($record->form_type);
+        $manifest = $definition->manifest();
+        $temporaryDirectory = storage_path('app/private/operational-forms-tmp');
+        File::ensureDirectoryExists($temporaryDirectory, 0700);
+        $nonce = Str::uuid()->toString();
+        $inputPath = $temporaryDirectory.'/'.$nonce.'.json';
+        $outputPath = $temporaryDirectory.'/'.$nonce.'.pdf';
+
+        try {
+            file_put_contents($inputPath, $this->canonicalJson(['data' => $snapshot]), LOCK_EX);
+            $result = Process::timeout(config('operational-forms.generator_timeout_seconds', 30))->run([
+                config('operational-forms.node_binary', 'node'),
+                base_path('scripts/operational-forms/generate.mjs'),
+                '--form', $record->form_type,
+                '--version', $record->form_version,
+                '--input', $inputPath,
+                '--output', $outputPath,
+            ]);
+
+            if ($result->failed()) {
+                throw new RuntimeException('The controlled PDF generator failed.');
+            }
+
+            $metadata = json_decode(trim($result->output()), true, flags: JSON_THROW_ON_ERROR);
+            $bytes = file_get_contents($outputPath);
+            if ($bytes === false || ! str_starts_with($bytes, '%PDF-')) {
+                throw new RuntimeException('The controlled PDF generator returned an invalid file.');
+            }
+            if (strlen($bytes) > config('operational-forms.maximum_pdf_bytes')) {
+                throw new RuntimeException('The generated PDF exceeds the configured safe size.');
+            }
+            if (! hash_equals($metadata['pdf_sha256'], hash('sha256', $bytes))) {
+                throw new RuntimeException('The generated PDF checksum did not validate.');
+            }
+
+            $this->externalValidation($outputPath);
+
+            return $this->storeImmutable(
+                $record,
+                $employee,
+                $snapshot,
+                $bytes,
+                $metadata,
+                $manifest,
+                $requestIp,
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+            throw $exception;
+        } finally {
+            File::delete([$inputPath, $outputPath]);
+        }
+    }
+
+    private function storeImmutable(
+        OperationalFormRecord $record,
+        Employee $employee,
+        array $snapshot,
+        string $bytes,
+        array $metadata,
+        array $manifest,
+        ?string $requestIp,
+    ): array {
+        $disk = config('filesystems.private', 'local');
+        $storedPath = null;
+
+        try {
+            return DB::transaction(function () use (
+                $record, $employee, $snapshot, $bytes, $metadata, $manifest, $requestIp, $disk, &$storedPath,
+            ): array {
+                $locked = OperationalFormRecord::query()->lockForUpdate()->findOrFail($record->getKey());
+                $existing = $locked->documents()->where('source_revision', $record->revision)->first();
+                if ($existing) {
+                    return ['document' => $existing, 'metadata' => $this->metadataFromDocument($existing, $snapshot)];
+                }
+                if ($locked->revision !== $record->revision) {
+                    throw new RuntimeException('The form changed while its PDF was being generated. Save and generate again.');
+                }
+
+                $version = ((int) $locked->documents()->max('version_number')) + 1;
+                $documentId = (string) Str::ulid();
+                $storedPath = sprintf(
+                    'operational-forms/%s/%s/%s/v%d/%s.pdf',
+                    $record->form_type,
+                    now()->format('Y/m'),
+                    $record->id,
+                    $version,
+                    $documentId,
+                );
+
+                if (! Storage::disk($disk)->put($storedPath, $bytes, ['visibility' => 'private'])) {
+                    throw new RuntimeException('Unable to store the generated PDF on the private filesystem.');
+                }
+
+                $document = OperationalFormDocument::query()->create([
+                    'id' => $documentId,
+                    'form_record_id' => $record->id,
+                    'version_number' => $version,
+                    'source_revision' => $record->revision,
+                    'storage_disk' => $disk,
+                    'storage_path' => $storedPath,
+                    'display_name' => $this->displayName($record, $version),
+                    'mime_type' => 'application/pdf',
+                    'file_size' => strlen($bytes),
+                    'page_count' => $metadata['page_count'],
+                    'pdf_sha256' => $metadata['pdf_sha256'],
+                    'source_snapshot' => $snapshot,
+                    'template_version' => $record->form_version,
+                    'template_sha256' => $manifest['template_sha256'],
+                    'mapping_sha256' => $manifest['mapping_sha256'],
+                    'generator_version' => config('operational-forms.generator_version'),
+                    'created_by_employee_id' => $employee->getKey(),
+                ]);
+
+                $locked->update([
+                    'data' => $snapshot,
+                    'latest_pdf_version' => $version,
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                ]);
+
+                OperationalFormEvent::query()->create([
+                    'form_record_id' => $record->id,
+                    'document_id' => $document->id,
+                    'employee_id' => $employee->getKey(),
+                    'event_type' => 'pdf_generated',
+                    'request_ip_hash' => $requestIp ? hash('sha256', $requestIp) : null,
+                    'created_at' => now(),
+                ]);
+
+                return ['document' => $document, 'metadata' => $metadata];
+            });
+        } catch (Throwable $exception) {
+            if ($storedPath !== null) {
+                Storage::disk($disk)->delete($storedPath);
+            }
+            throw $exception;
+        }
+    }
+
+    private function externalValidation(string $path): void
+    {
+        $validators = [
+            ['name' => 'qpdf', 'probe' => ['qpdf', '--version'], 'validate' => ['qpdf', '--check', $path]],
+            ['name' => 'pdfinfo', 'probe' => ['pdfinfo', '-v'], 'validate' => ['pdfinfo', $path]],
+        ];
+        foreach ($validators as $validator) {
+            $probe = Process::timeout(5)->run($validator['probe']);
+            if ($probe->failed()) {
+                if (config('operational-forms.require_external_validation')) {
+                    throw new RuntimeException("Required PDF validator {$validator['name']} is unavailable.");
+                }
+
+                continue;
+            }
+            if (Process::timeout(15)->run($validator['validate'])->failed()) {
+                throw new RuntimeException('External PDF structural validation failed.');
+            }
+        }
+    }
+
+    private function displayName(OperationalFormRecord $record, int $version): string
+    {
+        $prefix = $record->form_type === 'ics_214' ? 'ICS214' : 'FROC_LOG_001_FF';
+        $title = Str::of($record->title)->ascii()->replaceMatches('/[^A-Za-z0-9]+/', '_')->trim('_')->limit(80, '');
+
+        return sprintf('%s_%s_%s_v%d.pdf', $prefix, now()->format('Ymd'), $title ?: 'Record', $version);
+    }
+
+    private function canonicalJson(array $value): string
+    {
+        $sort = function (&$item) use (&$sort): void {
+            if (! is_array($item)) {
+                return;
+            }
+            foreach ($item as &$child) {
+                $sort($child);
+            }
+            unset($child);
+            if (! array_is_list($item)) {
+                ksort($item);
+            }
+        };
+        $sort($value);
+
+        return json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    private function metadataFromDocument(OperationalFormDocument $document, array $snapshot): array
+    {
+        return [
+            'page_count' => $document->page_count,
+            'remaining_form_fields' => 0,
+            'remaining_annotations' => 0,
+            'calculated_totals' => $snapshot['calculated_totals'] ?? null,
+        ];
+    }
+}

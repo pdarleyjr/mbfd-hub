@@ -11,6 +11,7 @@ export default {
         './resources/js/admin-pwa/**/*.{js,jsx,ts,tsx}',
         './resources/js/components/**/*.{js,jsx,ts,tsx}',
         './resources/js/daily-checkout/src/**/*.{js,jsx,ts,tsx}',
+        './resources/js/operational-forms/**/*.{js,jsx,ts,tsx}',
         './resources/**/*.vue',
         './vendor/pxlrbt/filament-spotlight/resources/**/*.blade.php',
         '!**/node_modules/**',
