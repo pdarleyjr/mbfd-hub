@@ -143,7 +143,7 @@
                         e: '/admin/users',
                         d: '/admin',
                         w: '/workgroups',
-                        t: '/training',
+                        t: '/admin/training-todos',
                         p: '/admin/pulse',
                         h: '/admin/health',
                     };

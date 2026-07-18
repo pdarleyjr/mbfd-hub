@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Filament\Training\Resources\TrainingTodoResource;
 use App\Models\Training\TrainingTodo;
 use App\Models\User;
 use App\Notifications\TrainingTodoAssignedNotification;
@@ -77,7 +78,7 @@ class TrainingTodoObserver
             todoId: $todo->id,
             title: $todo->title,
             priority: $todo->priority ?? 'medium',
-            actionUrl: route('filament.training.resources.training-todos.view', ['record' => $todo]),
+            actionUrl: TrainingTodoResource::getUrl('view', ['record' => $todo], panel: 'admin'),
         ));
     }
 

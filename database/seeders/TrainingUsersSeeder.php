@@ -4,8 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
 
 class TrainingUsersSeeder extends Seeder
 {
@@ -20,25 +18,25 @@ class TrainingUsersSeeder extends Seeder
                 'name' => 'Claudio Navas',
                 'email' => 'claudionavas@miamibeachfl.gov',
                 'password' => env('DEFAULT_TRAINING_PASSWORD', 'changeme'),
-                'roles' => ['training_admin'],
+                'roles' => ['training_admin', 'admin'],
             ],
             [
                 'name' => 'Daniel Gato',
                 'email' => 'danielgato@miamibeachfl.gov',
                 'password' => env('DEFAULT_TRAINING_PASSWORD', 'changeme'),
-                'roles' => ['training_admin'],
+                'roles' => ['training_admin', 'admin'],
             ],
             [
                 'name' => 'Victor White',
                 'email' => 'victorwhite@miamibeachfl.gov',
                 'password' => env('DEFAULT_TRAINING_PASSWORD', 'changeme'),
-                'roles' => ['training_admin'],
+                'roles' => ['training_admin', 'admin'],
             ],
             [
                 'name' => 'Michael Sica',
                 'email' => 'michaelsica@miamibeachfl.gov',
                 'password' => env('DEFAULT_TRAINING_PASSWORD', 'changeme'),
-                'roles' => ['training_admin'],
+                'roles' => ['training_admin', 'admin'],
             ],
         ];
 

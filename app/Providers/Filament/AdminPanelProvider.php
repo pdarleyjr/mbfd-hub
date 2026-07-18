@@ -13,7 +13,6 @@ use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
-use App\Http\Middleware\RedirectTrainingUsers;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -78,6 +77,7 @@ class AdminPanelProvider extends PanelProvider
             // proven safe and we can move on to bisect step 2.
             ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
+            ->discoverResources(in: app_path('Filament/Training/Resources'), for: 'App\\Filament\\Training\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 Pages\Dashboard::class,
@@ -91,6 +91,8 @@ class AdminPanelProvider extends PanelProvider
                 InventoryOverviewWidget::class,
                 StationOperationsHubWidget::class,
                 SmartUpdatesWidget::class,
+                \App\Filament\Training\Widgets\TrainingStatsWidget::class,
+                \App\Filament\Training\Widgets\TrainingTodoWidget::class,
             ])
             ->navigationGroups([
                 NavigationGroup::make()
@@ -101,6 +103,9 @@ class AdminPanelProvider extends PanelProvider
                     ->label('Active Operations')
                     ->icon('heroicon-o-clipboard-document-list')
                     ->collapsed(false),
+                NavigationGroup::make()
+                    ->label('Training Tasks')
+                    ->icon('heroicon-o-academic-cap'),
                 NavigationGroup::make()
                     ->label('Fleet Management')
                     ->icon('heroicon-o-truck'),
@@ -176,7 +181,6 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-                RedirectTrainingUsers::class,
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')

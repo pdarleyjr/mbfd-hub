@@ -9,11 +9,19 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use NotificationChannels\WebPush\WebPushChannel;
 use Spatie\Permission\Models\Role;
+use Tests\Concerns\EnsuresPermissionTables;
 use Tests\TestCase;
 
 class TrainingTodoNotificationTest extends TestCase
 {
+    use EnsuresPermissionTables;
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->ensurePermissionTables();
+    }
 
     public function test_training_todo_creation_notifies_assignees(): void
     {
@@ -36,7 +44,8 @@ class TrainingTodoNotificationTest extends TestCase
         Notification::assertSentTo(
             $assignee,
             TrainingTodoAssignedNotification::class,
-            fn (TrainingTodoAssignedNotification $notification, array $channels): bool => $channels === ['database'],
+            fn (TrainingTodoAssignedNotification $notification, array $channels): bool => $channels === ['database']
+                && str_contains($notification->toDatabase($assignee)['actions'][0]['url'], '/admin/training-todos/'),
         );
 
         Notification::assertNotSentTo($creator, TrainingTodoAssignedNotification::class);
@@ -117,7 +126,7 @@ class TrainingTodoNotificationTest extends TestCase
             todoId: 123,
             title: 'Review training roster',
             priority: 'urgent',
-            actionUrl: '/training/training-todos/123',
+            actionUrl: '/admin/training-todos/123',
         );
 
         $this->assertContains(WebPushChannel::class, $notification->via($user));

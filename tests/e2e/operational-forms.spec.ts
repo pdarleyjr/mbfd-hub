@@ -26,6 +26,7 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
   await expect(page.locator('.fi-sidebar')).toBeHidden();
   await expect(page.locator('.fi-topbar')).toBeHidden();
   await expect(page.locator('.fi-sidebar-close-overlay')).toBeHidden();
+  await expect(page.getByRole('link', { name: 'MBFD Hub home' })).toHaveAttribute('href', '/');
   await expect(page.getByText('ICS 214 — Activity Log')).toBeVisible();
   await expect(page.getByText(/FROC-LOG-001-FF/)).toBeVisible();
   await page.screenshot({ path: `tests/e2e/screenshots/operational-forms-library-${testInfo.project.name}.png`, fullPage: true });
@@ -54,6 +55,30 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
   }
   await expect(page.getByRole('button', { name: 'Generate PDF' })).toBeVisible();
   await page.screenshot({ path: `tests/e2e/screenshots/operational-forms-ics-editor-${testInfo.project.name}.png`, fullPage: true });
+});
+
+test('employee dashboard header returns members to the main MBFD Hub', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'One touch-device header acceptance is sufficient.');
+
+  await page.goto('/employee/login');
+  await page.getByLabel('Employee ID').fill(employeeId);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page).toHaveURL(/\/employee\/dashboard$/, { timeout: 30_000 });
+
+  const sidebarOverlay = page.locator('.fi-sidebar-close-overlay');
+  if (await sidebarOverlay.isVisible()) {
+    await page.evaluate(() => (window as any).Alpine?.store('sidebar')?.close());
+    await expect(sidebarOverlay).toBeHidden();
+  }
+
+  const home = page.getByRole('link', { name: 'Return to MBFD Hub home' });
+  await expect(home).toBeVisible();
+  await expect(home).toHaveAttribute('href', '/');
+  const target = await home.boundingBox();
+  expect(target?.width).toBeGreaterThanOrEqual(44);
+  expect(target?.height).toBeGreaterThanOrEqual(44);
+  await page.screenshot({ path: 'tests/e2e/screenshots/employee-dashboard-home-phone.png', fullPage: true });
 });
 
 test('phone F-ROC repeating rows become touch-friendly field cards', async ({ page }, testInfo) => {

@@ -39,4 +39,22 @@ class EmployeeWorkspaceTest extends TestCase
             ->assertDontSee('OperationalForms!1')
             ->assertDontSee('storage_path');
     }
+
+    public function test_employee_dashboard_header_has_a_main_hub_home_action(): void
+    {
+        $this->withoutVite();
+        $employee = Employee::query()->create([
+            'employee_id' => 'F043',
+            'name' => 'Jordan Lee',
+            'password' => 'OperationalForms!1',
+            'must_change_password' => false,
+        ]);
+
+        $this->actingAs($employee, 'employee')
+            ->get('/employee/dashboard')
+            ->assertOk()
+            ->assertSee('employee-header-home', false)
+            ->assertSee('href="/"', false)
+            ->assertSee('Return to MBFD Hub home');
+    }
 }

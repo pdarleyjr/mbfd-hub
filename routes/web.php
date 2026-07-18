@@ -38,6 +38,12 @@ Route::get('/login', function () {
     return redirect('/admin/login');
 })->name('login');
 
+// The former Training panel is consolidated into the regular Admin panel.
+// Preserve bookmarks and notification deep links while using one login flow.
+Route::get('/training/{path?}', function (?string $path = null) {
+    return redirect('/admin'.($path ? '/'.ltrim($path, '/') : ''));
+})->where('path', '.*')->name('legacy-training.redirect');
+
 Route::prefix('employee/forms/api')
     ->middleware(['auth:employee', ForcePasswordChangeMiddleware::class, 'throttle:120,1'])
     ->name('employee.forms.api.')

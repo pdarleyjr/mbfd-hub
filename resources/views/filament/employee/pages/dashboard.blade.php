@@ -18,12 +18,6 @@
                 </span>
             </div>
         </div>
-        <a href="/" class="ep-home-btn" title="Return to MBFD Hub">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/>
-            </svg>
-            <span>Hub Home</span>
-        </a>
     </div>
 
     {{-- Stats Bar --}}
@@ -188,25 +182,6 @@
             font-size: 0.8125rem;
             color: #a8a29e;
             font-variant-numeric: tabular-nums;
-        }
-        .ep-home-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.375rem;
-            padding: 0.5rem 0.875rem;
-            border-radius: 0.5rem;
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.15);
-            color: #d4d4d4;
-            font-size: 0.75rem;
-            font-weight: 500;
-            text-decoration: none;
-            transition: background 150ms, color 150ms;
-            flex-shrink: 0;
-        }
-        .ep-home-btn:hover {
-            background: rgba(255,255,255,0.15);
-            color: #ffffff;
         }
         /* Stats bar */
         .ep-stats-bar {

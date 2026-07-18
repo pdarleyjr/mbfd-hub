@@ -1,34 +1,36 @@
-# Training Panel Documentation
+# Training Administration
 
 ## Overview
-The Training Division panel is a separate Filament v3 panel accessible at `/training`. It provides training-specific resources and functionality.
+Training administration is part of the regular Filament Admin panel. Training accounts use the same email/password login and navigation as every other administrator.
 
 ## Access
-- **URL:** https://support.darleyplex.com/training
-- **Login:** https://support.darleyplex.com/training/login
+- **Admin:** https://www.mbfdhub.com/admin
+- **Login:** https://www.mbfdhub.com/admin/login
+- **Training Todos:** https://www.mbfdhub.com/admin/training-todos
+
+Legacy `/training` bookmarks redirect to the equivalent `/admin` path.
 
 ## User Credentials
-Training users with `training_admin` role (passwords stored out-of-band in the
-secret manager — never commit credentials):
+Training users retain their `training_admin` or `training_viewer` label for notification targeting and also receive the regular `admin` role. Passwords remain unchanged and stored out-of-band.
 
 - danielgato@miamibeachfl.gov
 - victorwhite@miamibeachfl.gov
 - ClaudioNavas@miamibeachfl.gov
 - michaelsica@miamibeachfl.gov
 
-## Roles & Permissions
-- `training_admin` - Full access to Training panel
-- `training_viewer` - Read-only access
-- `training.access` - Permission required to access panel
+## Access Model
+
+- `admin` provides the canonical Admin panel access, including Operational Forms.
+- `training_admin` and `training_viewer` are retained as secondary labels for Training Todo notifications.
+- `2026_07_18_220000_consolidate_training_accounts_into_admin_panel.php` adds `admin` to every existing Training account without removing roles or changing passwords.
 
 ## Resources
-- **Training Todo** - Manage training tasks
-- **External Sources** - Configure external data sources (Baserow)
-- **External Nav Items** - Create dynamic navigation items
-
-## Baserow Integration
-See [docs/BASEROW_INTEGRATION.md](BASEROW_INTEGRATION.md)
+- **Training Todos** — available under the Admin panel's Training Tasks navigation group.
+- **Operational Forms** — available under Active Operations.
+- All regular administration, fleet, inventory, logistics, station, and workgroup information allowed to `admin` accounts.
 
 ## Troubleshooting
-- RouteNotFoundException: Clear caches with `php artisan optimize:clear`
-- Login issues: Ensure user has `training_admin` role
+
+- Clear route and panel caches with `php artisan optimize:clear` after deployment.
+- Confirm the account has `admin` plus its existing Training role.
+- Run `php artisan migrate --force` to consolidate older Training accounts.

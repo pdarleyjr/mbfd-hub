@@ -197,7 +197,7 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
             <div className="of-app">
                 <header className="of-topbar">
                     <div className="of-brand"><ShieldCheck size={22} /><span>MBFD</span><span className="of-brand-divider" />Operational Forms</div>
-                    <div className="of-employee"><span>{bootstrap.employee.name}</span><small>{bootstrap.employee.rank || 'Employee'} · ID {bootstrap.employee.employee_id}</small></div>
+                    <div className="of-topbar-actions"><a className="of-hub-home" href="/" aria-label="MBFD Hub home" title="Return to MBFD Hub home"><Home size={19} /><span>Hub home</span></a><div className="of-employee"><span>{bootstrap.employee.name}</span><small>{bootstrap.employee.rank || 'Employee'} · ID {bootstrap.employee.employee_id}</small></div></div>
                 </header>
                 <div className="of-layout">
                     <nav className="of-rail" aria-label="Forms navigation">
