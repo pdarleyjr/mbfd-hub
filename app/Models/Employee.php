@@ -13,7 +13,7 @@ use Illuminate\Notifications\Notifiable;
  * Employee model — completely separate from the users table.
  * Used exclusively for the Employee Portal (/employee) panel.
  * Authentication: employee_id (as "username") + password.
- * 
+ *
  * This model is NEVER used for Admin, Training, or Workgroup panels.
  */
 class Employee extends Authenticatable implements FilamentUser
@@ -36,7 +36,7 @@ class Employee extends Authenticatable implements FilamentUser
     ];
 
     protected $casts = [
-        'password'             => 'hashed',
+        'password' => 'hashed',
         'must_change_password' => 'boolean',
     ];
 
@@ -44,7 +44,7 @@ class Employee extends Authenticatable implements FilamentUser
      * NOTE: Do NOT override getAuthIdentifierName() here.
      * The default returns 'id' (auto-increment primary key) which is required
      * for session-based auth (retrieveById uses Model::find($id)).
-     * 
+     *
      * Employee ID-based credential matching is handled by EmployeeLogin::getCredentialsFromFormData()
      * which passes ['employee_id' => '...'] to EloquentUserProvider::retrieveByCredentials().
      */
@@ -75,5 +75,15 @@ class Employee extends Authenticatable implements FilamentUser
     public function equipmentRequests(): HasMany
     {
         return $this->hasMany(EmployeeEquipmentRequest::class, 'employee_portal_id');
+    }
+
+    public function operationalFormRecords(): HasMany
+    {
+        return $this->hasMany(OperationalFormRecord::class);
+    }
+
+    public function operationalFormDocuments(): HasMany
+    {
+        return $this->hasMany(OperationalFormDocument::class, 'created_by_employee_id');
     }
 }

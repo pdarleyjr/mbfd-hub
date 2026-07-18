@@ -5,10 +5,11 @@ namespace App\Providers\Filament;
 use App\Filament\Employee\Pages\Auth\EmployeeLogin;
 use App\Filament\Employee\Pages\ChangePasswordPage;
 use App\Filament\Employee\Pages\EmployeeDashboard;
-use App\Filament\Employee\Pages\MyBidCertificationsPage;
 use App\Filament\Employee\Pages\MyEquipmentPage;
+use App\Filament\Employee\Pages\OperationalForms;
 use App\Filament\Employee\Pages\RequestEquipmentPage;
 use App\Http\Middleware\ForcePasswordChangeMiddleware;
+use App\Http\Middleware\RememberEmployeeIntendedPath;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -60,23 +61,13 @@ class EmployeePanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->pages([
                 EmployeeDashboard::class,
-                MyBidCertificationsPage::class,
+                OperationalForms::class,
                 MyEquipmentPage::class,
                 RequestEquipmentPage::class,
                 ChangePasswordPage::class,
             ])
             ->widgets([])
             ->userMenuItems([
-                MenuItem::make()
-                    ->label('Open Bid Console')
-                    ->url(fn (): ?string => config('services.bid.console_url'))
-                    ->visible(fn (): bool => filled(config('services.bid.console_url')))
-                    ->icon('heroicon-o-bolt')
-                    ->openUrlInNewTab(),
-                MenuItem::make()
-                    ->label('My Bid Certifications')
-                    ->url(fn (): string => MyBidCertificationsPage::getUrl(panel: 'employee'))
-                    ->icon('heroicon-o-check-badge'),
                 MenuItem::make()
                     ->label('My Equipment')
                     ->url(fn (): string => MyEquipmentPage::getUrl(panel: 'employee'))
@@ -98,6 +89,7 @@ class EmployeePanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
+                RememberEmployeeIntendedPath::class,
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 VerifyCsrfToken::class,

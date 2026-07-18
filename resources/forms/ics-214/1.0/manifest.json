@@ -1,0 +1,11 @@
+{
+  "form_type": "ics_214",
+  "display_name": "ICS 214 — Activity Log",
+  "form_version": "1.0",
+  "template_sha256": "1c56a9efa115755e23c49d40a500ea47824d66170de87ce5735c51ddc5fb41e5",
+  "mapping_sha256": "9dbc7824b2ff2595e47c852b630050a0ee7efa7ecca66b316d6a0ebbf965d47c",
+  "expected_field_count": 84,
+  "expected_page_count": 1,
+  "expected_page_sizes": [[612, 792]],
+  "generator_contract_version": "1.0"
+}

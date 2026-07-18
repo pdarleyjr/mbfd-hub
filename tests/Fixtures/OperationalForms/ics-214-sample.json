@@ -1,0 +1,42 @@
+{
+  "data": {
+    "incident": {
+      "name": "Harbor Safety Exercise",
+      "date_from": "2026-07-18",
+      "time_from": "08:00",
+      "date_to": "2026-07-18",
+      "time_to": "18:00"
+    },
+    "unit": {
+      "name": "Rescue Group",
+      "ics_position": "Rescue Group Firefighter",
+      "home_agency_unit": "Miami Beach Fire Department"
+    },
+    "resources": [
+      {
+        "name": "Alex Sample",
+        "ics_position": "Firefighter",
+        "home_agency_unit": "MBFD Rescue 1"
+      }
+    ],
+    "activities": [
+      {
+        "date": "2026-07-18",
+        "time": "08:15",
+        "notable_activity": "Established the exercise work area and completed the initial safety briefing."
+      },
+      {
+        "date": "2026-07-18",
+        "time": "17:45",
+        "notable_activity": "Accounted for personnel and returned equipment to service."
+      }
+    ],
+    "prepared_by": {
+      "name": "Alex Sample",
+      "position_title": "Firefighter",
+      "signature_text": "Alex Sample",
+      "date": "2026-07-18",
+      "time": "18:05"
+    }
+  }
+}
