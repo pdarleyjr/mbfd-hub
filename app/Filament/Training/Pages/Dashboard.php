@@ -2,8 +2,9 @@
 
 namespace App\Filament\Training\Pages;
 
-use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Actions\Action;
+use Filament\Pages\Dashboard as BaseDashboard;
+use Illuminate\Support\Facades\Route;
 
 class Dashboard extends BaseDashboard
 {
@@ -29,17 +30,22 @@ class Dashboard extends BaseDashboard
 
     protected function getHeaderActions(): array
     {
-        return [
+        $actions = [
             Action::make('newTrainingTodo')
                 ->label('New Training Todo')
                 ->icon('heroicon-o-plus-circle')
                 ->color('primary')
                 ->url(fn () => route('filament.training.resources.training-todos.create')),
-            Action::make('externalSources')
+        ];
+
+        if (Route::has('filament.training.resources.external-sources.index')) {
+            $actions[] = Action::make('externalSources')
                 ->label('External Sources')
                 ->icon('heroicon-o-globe-alt')
                 ->color('gray')
-                ->url(fn () => route('filament.training.resources.external-sources.index')),
-        ];
+                ->url(fn () => route('filament.training.resources.external-sources.index'));
+        }
+
+        return $actions;
     }
 }

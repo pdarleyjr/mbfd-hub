@@ -5,7 +5,7 @@ import {
 } from '@fluentui/react-components';
 import {
     AlertTriangle, ArrowLeft, Check, ChevronRight, ClipboardList, Clock3, Cloud, Copy, Download,
-    FileCheck2, FilePenLine, FilePlus2, Home, Library, LoaderCircle, Plus, Printer, RefreshCw, Save,
+    Eye, FileCheck2, FilePenLine, FilePlus2, Home, Library, LoaderCircle, Plus, Printer, RefreshCw, Save,
     ShieldCheck, Trash2, UsersRound, WifiOff,
 } from 'lucide-react';
 import { ApiError, createApi } from './api';
@@ -31,6 +31,7 @@ const EMPTY_ROWS: Record<string, Record<string, any>> = {
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)); }
 function stamp(value?: string | null) { return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Not yet saved'; }
 function typeLabel(type: FormType) { return type === 'ics_214' ? 'ICS 214' : 'F-ROC Daily Activity Report'; }
+function latestDocument(record: FormRecord) { return [...record.documents].sort((a, b) => b.version_number - a.version_number)[0] || null; }
 
 export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData }) {
     const api = useMemo(() => createApi(bootstrap), [bootstrap]);
@@ -48,6 +49,7 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
     const [recovery, setRecovery] = useState<RecoveryDraft | null>(null);
     const [preview, setPreview] = useState<FormDocument | null>(null);
     const [activeSection, setActiveSection] = useState('overview');
+    const [isGenerating, setIsGenerating] = useState(false);
 
     useEffect(() => { currentRef.current = current; }, [current]);
 
@@ -159,16 +161,16 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
         if (!record) return;
         if (dirtyRef.current) record = await flushSaves();
         if (!record) return;
-        setBusy(true); setMessage({ intent: 'info', text: 'Generating and validating the controlled PDF…' });
+        setBusy(true); setIsGenerating(true); setMessage({ intent: 'info', text: 'Generating and validating the controlled PDF…' });
         try {
             const document = await api.generate(record.id);
             const refreshed = await api.show(record.id);
-            setCurrent(refreshed); setRecords((items) => items.map((item) => item.id === refreshed.id ? refreshed : item));
-            setMessage({ intent: 'success', text: `PDF version ${document.version_number} generated and stored privately.` }); setPreview(document);
+            currentRef.current = refreshed; dirtyRef.current = false; setCurrent(refreshed); setRecords((items) => items.map((item) => item.id === refreshed.id ? refreshed : item));
+            setActiveSection('documents'); setMessage({ intent: 'success', text: `PDF version ${document.version_number} is ready to view, print, or download.` }); setPreview(document);
         } catch (error) {
             const text = error instanceof ApiError && error.problem.errors ? Object.values(error.problem.errors).flat().join(' ') : (error instanceof Error ? error.message : 'PDF generation failed.');
             setMessage({ intent: 'error', text });
-        } finally { setBusy(false); }
+        } finally { setBusy(false); setIsGenerating(false); }
     };
 
     const removeCurrent = async () => {
@@ -206,11 +208,11 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
                     <main className="of-main">
                         {message && <MessageBar intent={message.intent}><MessageBarBody>{message.text}</MessageBarBody></MessageBar>}
                         {!current ? (
-                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} openRecord={openRecord} refresh={refreshLibrary} />
+                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} openRecord={openRecord} refresh={refreshLibrary} preview={setPreview} />
                         ) : (
                             <EditorView
                                 record={current} definition={definitions.find((item) => item.form_type === current.form_type)}
-                                saveState={saveState} activeSection={activeSection} setActiveSection={setActiveSection}
+                                saveState={saveState} activeSection={activeSection} setActiveSection={setActiveSection} isGenerating={isGenerating}
                                 update={updateCurrent} save={() => void saveNow()} generate={() => void generate()} remove={() => void removeCurrent()}
                                 back={() => { void flushSaves().then((saved) => { if (saved) setCurrent(null); }); }} preview={setPreview}
                             />
@@ -225,9 +227,9 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
     );
 }
 
-function LibraryView({ definitions, records, busy, createRecord, openRecord, refresh }: {
+function LibraryView({ definitions, records, busy, createRecord, openRecord, refresh, preview }: {
     definitions: FormDefinition[]; records: FormRecord[]; busy: boolean;
-    createRecord: (type: FormType) => void; openRecord: (record: FormRecord) => void; refresh: () => void;
+    createRecord: (type: FormType) => void; openRecord: (record: FormRecord) => void; refresh: () => void; preview: (doc: FormDocument) => void;
 }) {
     return <div className="of-library">
         <div className="of-page-heading"><div><p className="of-eyebrow">Controlled records workspace</p><h1>Operational Forms</h1><p>Start, resume, and generate official incident and reimbursement records.</p></div><Button icon={<RefreshCw size={16} />} onClick={refresh} disabled={busy}>Refresh</Button></div>
@@ -237,20 +239,22 @@ function LibraryView({ definitions, records, busy, createRecord, openRecord, ref
         <section aria-labelledby="recent-records"><div className="of-section-heading"><h2 id="recent-records">Recent records</h2><span>{records.length} record{records.length === 1 ? '' : 's'}</span></div>
             <div className="of-table-wrap"><table className="of-record-table"><thead><tr><th>Record</th><th>Status</th><th>Last saved</th><th>PDF</th><th><span className="sr-only">Open</span></th></tr></thead><tbody>
                 {records.length === 0 && <tr><td colSpan={5} className="of-empty">No records yet. Start with one of the controlled forms above.</td></tr>}
-                {records.map((record) => <tr key={record.id} onDoubleClick={() => openRecord(record)}><td data-label="Record"><strong>{record.title}</strong><small>{typeLabel(record.form_type)} · rev {record.revision}</small></td><td data-label="Status"><StatusBadge status={record.status} /></td><td data-label="Last saved">{stamp(record.last_autosaved_at)}</td><td data-label="PDF">{record.latest_pdf_version ? `Version ${record.latest_pdf_version}` : 'Not generated'}</td><td data-label="Open"><Button appearance="subtle" icon={<ChevronRight size={17} />} aria-label={`Open ${record.title}`} onClick={() => openRecord(record)} /></td></tr>)}
+                {records.map((record) => { const document = latestDocument(record); return <tr key={record.id} onDoubleClick={() => openRecord(record)}><td data-label="Record"><strong>{record.title}</strong><small>{typeLabel(record.form_type)} · rev {record.revision}</small></td><td data-label="Status"><StatusBadge status={record.status} /></td><td data-label="Last saved">{stamp(record.last_autosaved_at)}</td><td data-label="PDF">{document ? <Button appearance="subtle" icon={<Eye size={16} />} aria-label={`View PDF for ${record.title}`} onClick={() => preview(document)}>Version {document.version_number}</Button> : 'Not generated'}</td><td data-label="Open"><Button appearance="subtle" icon={<ChevronRight size={17} />} aria-label={`Open ${record.title}`} onClick={() => openRecord(record)} /></td></tr>; })}
             </tbody></table></div>
         </section>
     </div>;
 }
 
-function EditorView({ record, definition, saveState, activeSection, setActiveSection, update, save, generate, remove, back, preview }: {
-    record: FormRecord; definition?: FormDefinition; saveState: SaveState; activeSection: string; setActiveSection: (value: string) => void;
+function EditorView({ record, definition, saveState, activeSection, setActiveSection, isGenerating, update, save, generate, remove, back, preview }: {
+    record: FormRecord; definition?: FormDefinition; saveState: SaveState; activeSection: string; setActiveSection: (value: string) => void; isGenerating: boolean;
     update: (mutator: (data: Record<string, any>) => void) => void; save: () => void; generate: () => void; remove: () => void; back: () => void; preview: (doc: FormDocument) => void;
 }) {
+    const document = latestDocument(record);
     const sections = record.form_type === 'ics_214' ? [['overview', 'Operational period'], ['resources', 'Resources'], ['activities', 'Activity log'], ['prepared', 'Prepared by'], ['documents', 'PDF versions']] : [['overview', 'General information'], ['team', 'Team members'], ['labor', 'Labor'], ['equipment', 'Equipment'], ['mileage', 'Mileage'], ['materials', 'Materials'], ['certification', 'Certification'], ['documents', 'PDF versions']];
     return <div className="of-editor">
-        <div className="of-commandbar"><Button appearance="subtle" icon={<ArrowLeft size={17} />} aria-label="Forms library" onClick={back}>Forms library</Button><span className="of-command-divider" /><SaveIndicator state={saveState} savedAt={record.last_autosaved_at} /><span className="of-toolbar-spacer" /><Button icon={<Save size={17} />} aria-label="Save now" onClick={save}>Save now</Button><Button appearance="primary" icon={<FileCheck2 size={17} />} aria-label="Generate PDF" onClick={generate}>Generate PDF</Button>{!record.latest_pdf_version && <Button appearance="subtle" icon={<Trash2 size={17} />} aria-label="Delete draft" onClick={remove}>Delete draft</Button>}</div>
+        <div className="of-commandbar"><Button appearance="subtle" icon={<ArrowLeft size={17} />} aria-label="Forms library" onClick={back}>Forms library</Button><span className="of-command-divider" /><SaveIndicator state={saveState} savedAt={record.last_autosaved_at} /><span className="of-toolbar-spacer" />{document && <Button icon={<Eye size={17} />} aria-label="View latest PDF" onClick={() => preview(document)}>View PDF</Button>}<Button icon={<Save size={17} />} aria-label="Save now" onClick={save} disabled={isGenerating}>Save now</Button><Button appearance="primary" icon={isGenerating ? <LoaderCircle className="spin" size={17} /> : <FileCheck2 size={17} />} aria-label="Generate PDF" onClick={generate} disabled={isGenerating}>{isGenerating ? 'Generating…' : 'Generate PDF'}</Button>{!record.latest_pdf_version && <Button appearance="subtle" icon={<Trash2 size={17} />} aria-label="Delete draft" onClick={remove} disabled={isGenerating}>Delete draft</Button>}</div>
         <div className="of-record-spine"><div><Badge appearance="outline">{typeLabel(record.form_type)} · v{record.form_version}</Badge><h1>{record.title}</h1><p>Record {record.id.slice(-8).toUpperCase()} · revision {record.revision}</p></div><div className="of-spine-status"><StatusBadge status={record.status} />{record.latest_pdf_version && <Badge color={record.has_changes_since_latest_pdf ? 'warning' : 'success'}>{record.has_changes_since_latest_pdf ? 'Changed since PDF' : `PDF v${record.latest_pdf_version} current`}</Badge>}</div></div>
+        {document && <div className="of-document-ready" role="status"><div className="of-document-ready-icon"><FileCheck2 size={20} /></div><div><strong>Latest controlled PDF</strong><span>Version {document.version_number} · {document.display_name}</span><small>Generated {stamp(document.created_at)} from revision {document.source_revision}</small></div><div className="of-document-ready-actions"><Button appearance="primary" icon={<Eye size={16} />} aria-label="View latest PDF" onClick={() => preview(document)}>View / print</Button><Button as="a" href={document.download_url} icon={<Download size={16} />} aria-label="Download latest PDF">Download</Button></div></div>}
         <div className="of-editor-grid"><aside className="of-context-nav" aria-label="Form sections">{sections.map(([id, label]) => <button key={id} className={activeSection === id ? 'active' : ''} onClick={() => setActiveSection(id)}>{label}</button>)}</aside><div className="of-form-canvas" onBlur={save}>
             {record.form_type === 'ics_214' ? <IcsEditor record={record} definition={definition} section={activeSection} update={update} /> : <FrocEditor record={record} definition={definition} section={activeSection} update={update} />}
             {activeSection === 'documents' && <Documents record={record} preview={preview} />}
