@@ -1,7 +1,8 @@
-export type FormType = 'ics_214' | 'froc_log_001_ff';
+export type EditableFormType = 'ics_214' | 'froc_log_001_ff';
+export type FormType = EditableFormType | 'uploaded_file';
 
 export interface FormDefinition {
-    form_type: FormType;
+    form_type: EditableFormType;
     form_version: string;
     display_name: string;
     capacities: Record<string, number>;
@@ -68,6 +69,8 @@ export interface FormDocument {
     version_number: number;
     source_revision: number;
     display_name: string;
+    mime_type: string;
+    is_inline_previewable: boolean;
     page_count: number;
     pdf_sha256?: string;
     preview_url: string;
@@ -105,7 +108,7 @@ export interface FormRecord {
 
 export interface BootstrapData {
     employee: { id: number; employee_id: string; name: string; rank?: string | null };
-    endpoints: { form_types: string; records: string };
+    endpoints: { form_types: string; records: string; uploads: string; guide: string };
     csrf_token: string;
     build: string;
 }

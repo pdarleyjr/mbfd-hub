@@ -4,13 +4,13 @@ import {
     Field, FluentProvider, Input, MessageBar, MessageBarBody, Spinner, Textarea, webLightTheme,
 } from '@fluentui/react-components';
 import {
-    AlertTriangle, ArrowLeft, Check, ChevronRight, ClipboardList, Clock3, Cloud, Copy, Download,
-    Bot, Eye, FileArchive, FileCheck2, FilePenLine, FilePlus2, Home, Library, LoaderCircle, Plus, Printer, RefreshCw, Save,
+    AlertTriangle, ArrowLeft, BookOpen, Check, ChevronRight, ClipboardList, Clock3, Cloud, Copy, Download,
+    Bot, Eye, FileArchive, FileCheck2, FilePenLine, FilePlus2, FileUp, Home, Library, LoaderCircle, Plus, Printer, RefreshCw, Save,
     ShieldCheck, Sparkles, Trash2, UsersRound, WifiOff,
 } from 'lucide-react';
 import { ApiError, createApi } from './api';
 import { recoveryDrafts, type RecoveryDraft } from './draftsDb';
-import type { BootstrapData, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportSummary } from './types';
+import type { BootstrapData, EditableFormType, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportSummary } from './types';
 
 const PdfPreview = lazy(() => import('./PdfPreview').then((module) => ({ default: module.PdfPreview })));
 
@@ -30,7 +30,11 @@ const EMPTY_ROWS: Record<string, Record<string, any>> = {
 
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)); }
 function stamp(value?: string | null) { return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Not yet saved'; }
-function typeLabel(type: FormType) { return type === 'ics_214' ? 'ICS 214' : 'F-ROC Daily Activity Report'; }
+function typeLabel(type: FormType) {
+    if (type === 'ics_214') return 'ICS 214';
+    if (type === 'uploaded_file') return 'Submitted file';
+    return 'F-ROC Daily Activity Report';
+}
 function latestDocument(record: FormRecord) { return [...record.documents].sort((a, b) => b.version_number - a.version_number)[0] || null; }
 
 export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData }) {
@@ -77,7 +81,7 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
         } finally { setBusy(false); }
     }, [api]);
 
-    const createRecord = async (formType: FormType) => {
+    const createRecord = async (formType: EditableFormType) => {
         setBusy(true);
         try {
             const now = new Date();
@@ -86,6 +90,21 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
             setRecords((items) => [created, ...items.filter((item) => item.id !== created.id)]); currentRef.current = created; setCurrent(created); dirtyRef.current = false; setSaveState('saved'); setActiveSection('overview');
         } catch (error) { setMessage({ intent: 'error', text: error instanceof Error ? error.message : 'The record could not be created.' }); }
         finally { setBusy(false); }
+    };
+
+    const uploadFile = async (name: string, file: File): Promise<void> => {
+        const created = await api.upload(name, file);
+        setRecords((items) => [created, ...items.filter((item) => item.id !== created.id)]);
+        setMessage({ intent: 'success', text: `“${created.title}” was submitted as a completed form and is ready for administrators.` });
+    };
+
+    const openDocument = (document: FormDocument) => {
+        if (document.mime_type === 'application/pdf') {
+            setPreview(document);
+            return;
+        }
+
+        window.open(document.preview_url, '_blank', 'noopener,noreferrer');
     };
 
     const applyFrocImport = async (payload: FormData): Promise<FrocImportSummary> => {
@@ -239,7 +258,7 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
                     <main className="of-main">
                         {message && <MessageBar intent={message.intent}><MessageBarBody>{message.text}</MessageBarBody></MessageBar>}
                         {!current ? (
-                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} openRecord={openRecord} refresh={refreshLibrary} preview={setPreview} />
+                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} uploadFile={uploadFile} openRecord={openRecord} refresh={refreshLibrary} openDocument={openDocument} guideUrl={bootstrap.endpoints.guide} />
                         ) : (
                             <EditorView
                                 record={current} definition={definitions.find((item) => item.form_type === current.form_type)}
@@ -259,23 +278,67 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
     );
 }
 
-function LibraryView({ definitions, records, busy, createRecord, openRecord, refresh, preview }: {
+function LibraryView({ definitions, records, busy, createRecord, uploadFile, openRecord, refresh, openDocument, guideUrl }: {
     definitions: FormDefinition[]; records: FormRecord[]; busy: boolean;
-    createRecord: (type: FormType) => Promise<void>;
-    openRecord: (record: FormRecord) => void; refresh: () => void; preview: (doc: FormDocument) => void;
+    createRecord: (type: EditableFormType) => Promise<void>;
+    uploadFile: (name: string, file: File) => Promise<void>;
+    openRecord: (record: FormRecord) => void; refresh: () => void; openDocument: (doc: FormDocument) => void; guideUrl: string;
 }) {
     return <div className="of-library">
-        <div className="of-page-heading"><div><p className="of-eyebrow">Controlled records workspace</p><h1>Operational Forms</h1><p>Start, resume, and generate official incident and reimbursement records.</p></div><Button icon={<RefreshCw size={16} />} onClick={refresh} disabled={busy}>Refresh</Button></div>
+        <div className="of-page-heading"><div><p className="of-eyebrow">Controlled records workspace</p><h1>Operational Forms</h1><p>Start, resume, generate, or submit incident and reimbursement records.</p></div><div className="of-heading-actions"><Button as="a" href={guideUrl} target="_blank" icon={<BookOpen size={16} />}>User guide</Button><Button icon={<RefreshCw size={16} />} onClick={refresh} disabled={busy}>Refresh</Button></div></div>
         <section aria-labelledby="start-form"><h2 id="start-form">Start a form</h2><div className="of-form-cards">
             {definitions.map((definition) => <article className="of-form-card" key={definition.form_type}><div className="of-form-card-icon">{definition.form_type === 'ics_214' ? <ClipboardList /> : <FileCheck2 />}</div><div><Badge appearance="outline">Version {definition.form_version}</Badge><h3>{definition.display_name}</h3><p>{definition.form_type === 'ics_214' ? 'Document unit resources and chronological incident activity.' : 'Capture firefighter labor, equipment, mileage, materials, and certification—with optional AI-assisted note import.'}</p></div><Button appearance="primary" icon={<FilePlus2 size={17} />} onClick={() => void createRecord(definition.form_type)}>Create form</Button></article>)}
         </div></section>
+        <FileSubmissionCard upload={uploadFile} />
         <section aria-labelledby="recent-records"><div className="of-section-heading"><h2 id="recent-records">Recent records</h2><span>{records.length} record{records.length === 1 ? '' : 's'}</span></div>
-            <div className="of-table-wrap"><table className="of-record-table"><thead><tr><th>Record</th><th>Status</th><th>Last saved</th><th>PDF</th><th><span className="sr-only">Open</span></th></tr></thead><tbody>
+            <div className="of-table-wrap"><table className="of-record-table"><thead><tr><th>Record</th><th>Status</th><th>Last saved</th><th>Document</th><th><span className="sr-only">Open</span></th></tr></thead><tbody>
                 {records.length === 0 && <tr><td colSpan={5} className="of-empty">No records yet. Start with one of the controlled forms above.</td></tr>}
-                {records.map((record) => { const document = latestDocument(record); return <tr key={record.id} onDoubleClick={() => openRecord(record)}><td data-label="Record"><strong>{record.title}</strong><small>{typeLabel(record.form_type)} · rev {record.revision}</small></td><td data-label="Status"><StatusBadge status={record.status} /></td><td data-label="Last saved">{stamp(record.last_autosaved_at)}</td><td data-label="PDF">{document ? <Button appearance="subtle" icon={<Eye size={16} />} aria-label={`View PDF for ${record.title}`} onClick={() => preview(document)}>Version {document.version_number}</Button> : 'Not generated'}</td><td data-label="Open"><Button appearance="subtle" icon={<ChevronRight size={17} />} aria-label={`Open ${record.title}`} onClick={() => openRecord(record)} /></td></tr>; })}
+                {records.map((record) => {
+                    const document = latestDocument(record);
+                    const open = () => record.form_type === 'uploaded_file' && document ? openDocument(document) : openRecord(record);
+                    return <tr key={record.id} onDoubleClick={open}><td data-label="Record"><strong>{record.title}</strong><small>{typeLabel(record.form_type)} · rev {record.revision}</small></td><td data-label="Status"><StatusBadge status={record.status} /></td><td data-label="Last saved">{stamp(record.last_autosaved_at)}</td><td data-label="Document">{document ? <Button appearance="subtle" icon={<Eye size={16} />} aria-label={`Open document for ${record.title}`} onClick={() => openDocument(document)}>{record.form_type === 'uploaded_file' ? 'Open file' : `PDF v${document.version_number}`}</Button> : 'Not generated'}</td><td data-label="Open"><Button appearance="subtle" icon={<ChevronRight size={17} />} aria-label={`Open ${record.title}`} onClick={open} /></td></tr>;
+                })}
             </tbody></table></div>
         </section>
     </div>;
+}
+
+function FileSubmissionCard({ upload }: { upload: (name: string, file: File) => Promise<void> }) {
+    const [name, setName] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+    const [working, setWorking] = useState(false);
+    const [error, setError] = useState('');
+    const input = useRef<HTMLInputElement | null>(null);
+
+    const submit = async () => {
+        if (!file || !name.trim()) return;
+        setWorking(true); setError('');
+        try {
+            await upload(name.trim(), file);
+            setName(''); setFile(null);
+            if (input.current) input.current.value = '';
+        } catch (caught) {
+            setError(caught instanceof ApiError && caught.problem.errors
+                ? Object.values(caught.problem.errors).flat().join(' ')
+                : (caught instanceof Error ? caught.message : 'The file could not be submitted.'));
+        } finally {
+            setWorking(false);
+        }
+    };
+
+    return <section aria-labelledby="submit-file">
+        <h2 id="submit-file">Submit an existing file</h2>
+        <article className="of-upload-card">
+            <div className="of-upload-icon"><FileUp size={22} /></div>
+            <div className="of-upload-copy"><h3>Send a completed file to Forms administration</h3><p>Name and upload any file type. It is stored privately and appears in Recent records and the Admin Forms page as completed.</p></div>
+            <div className="of-upload-controls">
+                <Field label="File name"><Input value={name} maxLength={200} placeholder="Example: CMD1 event notes" onChange={(_, data) => setName(data.value)} /></Field>
+                <Field label="File" hint="Any file type, up to 50 MB."><label className="of-file-picker of-upload-picker"><FileArchive size={18} /><span>{file ? file.name : 'Choose file'}</span><input ref={input} type="file" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label></Field>
+                <Button appearance="primary" icon={working ? <LoaderCircle className="spin" size={17} /> : <FileUp size={17} />} disabled={working || !file || !name.trim()} onClick={() => void submit()}>{working ? 'Submitting…' : 'Submit completed file'}</Button>
+            </div>
+            {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
+        </article>
+    </section>;
 }
 
 function FrocImportPanel({ apply, undo, review }: {
@@ -368,7 +431,7 @@ function FrocEditor({ record, definition, section, update, searchEmployees, appl
     if (section === 'equipment') return <RepeatingTable title="Equipment hours" rows={data.equipment_hours || []} fields={[['category', 'Cat.'], ['equipment_id', 'Equipment ID'], ['operator', 'Operator'], ['description', 'Description'], ['location', 'Location'], ['hours', 'Hours'], ['event_related', 'Event?', 'checkbox']]} capacity={cap.equipment_hours || 6} onChange={(rows) => update((d) => { d.equipment_hours = rows; })} rowType="equipment_hours" categories={options?.categories} />;
     if (section === 'mileage') return <RepeatingTable title="Vehicle mileage" rows={data.vehicle_mileage || []} fields={[['category', 'Cat.'], ['equipment_id', 'Vehicle ID'], ['operator', 'Operator'], ['destination', 'Destination'], ['start_odometer', 'Start odo.'], ['end_odometer', 'End odo.'], ['manual_miles', 'Corrected miles'], ['correction_reason', 'Correction reason'], ['event_related', 'Event?', 'checkbox']]} capacity={cap.vehicle_mileage || 2} onChange={(rows) => update((d) => { d.vehicle_mileage = rows; })} rowType="vehicle_mileage" categories={options?.categories} />;
     if (section === 'materials') return <RepeatingTable title="Materials and supplies" rows={data.materials || []} fields={[['category', 'Cat.'], ['item', 'Item'], ['quantity', 'Quantity'], ['cost', 'Cost'], ['justification', 'Justification'], ['receipt_reference', 'Receipt ref.'], ['from_stock', 'Stock?', 'checkbox']]} capacity={cap.materials || 7} onChange={(rows) => update((d) => { d.materials = rows; })} rowType="materials" categories={options?.categories} />;
-    if (section === 'certification') return <><FormSection number="Certification" title="Employee and reviewer certification" help="The final employee signature, date, and confirmation are required. Page 2 and reviewer lines may remain blank when they do not apply."><FieldGrid><TextField label="Page 2 employee signature (optional)" value={data.certification?.page2_employee_signature_text} set={(v) => update((d) => setPath(d, ['certification', 'page2_employee_signature_text'], v))} /><TextField label="Page 2 reviewer signature (optional)" value={data.certification?.page2_reviewer_signature_text} set={(v) => update((d) => setPath(d, ['certification', 'page2_reviewer_signature_text'], v))} /><TextField label="Final employee signature" value={data.certification?.final_employee_signature_text} set={(v) => update((d) => setPath(d, ['certification', 'final_employee_signature_text'], v))} /><TextField type="date" label="Employee signature date" value={data.certification?.final_employee_signature_date} set={(v) => update((d) => setPath(d, ['certification', 'final_employee_signature_date'], v))} /><TextField label="Final reviewer signature (optional)" value={data.certification?.final_reviewer_signature_text} set={(v) => update((d) => setPath(d, ['certification', 'final_reviewer_signature_text'], v))} /><TextField type="date" label="Reviewer signature date (optional)" value={data.certification?.final_reviewer_signature_date} set={(v) => update((d) => setPath(d, ['certification', 'final_reviewer_signature_date'], v))} /></FieldGrid><label className="of-confirm"><input type="checkbox" checked={Boolean(data.certification?.confirmed)} onChange={(e) => update((d) => setPath(d, ['certification', 'confirmed'], e.target.checked))} /><span>I certify that this report is complete and accurate.</span></label></FormSection><NotesEditor values={data.additional_notes || []} capacity={cap.additional_notes || 28} onChange={(values) => update((d) => { d.additional_notes = values; })} /></>;
+    if (section === 'certification') return <><FormSection number="Certification" title="Employee and reviewer certification" help="The final employee signature, date, and confirmation are required. Page 2 and reviewer lines may remain blank when they do not apply."><FieldGrid><TextField label="Page 2 employee signature (optional)" value={data.certification?.page2_employee_signature_text} set={(v) => update((d) => setPath(d, ['certification', 'page2_employee_signature_text'], v))} /><TextField label="Page 2 reviewer signature (optional)" value={data.certification?.page2_reviewer_signature_text} set={(v) => update((d) => setPath(d, ['certification', 'page2_reviewer_signature_text'], v))} /><TextField label="Final employee signature" value={data.certification?.final_employee_signature_text} set={(v) => update((d) => setPath(d, ['certification', 'final_employee_signature_text'], v))} /><TextField type="date" label="Employee signature date" value={data.certification?.final_employee_signature_date} set={(v) => update((d) => setPath(d, ['certification', 'final_employee_signature_date'], v))} /><TextField type="time" label="Employee signature time (optional)" value={data.certification?.final_employee_signature_time} set={(v) => update((d) => setPath(d, ['certification', 'final_employee_signature_time'], v))} /><TextField label="Final reviewer signature (optional)" value={data.certification?.final_reviewer_signature_text} set={(v) => update((d) => setPath(d, ['certification', 'final_reviewer_signature_text'], v))} /><TextField type="date" label="Reviewer signature date (optional)" value={data.certification?.final_reviewer_signature_date} set={(v) => update((d) => setPath(d, ['certification', 'final_reviewer_signature_date'], v))} /><TextField type="time" label="Reviewer signature time (optional)" value={data.certification?.final_reviewer_signature_time} set={(v) => update((d) => setPath(d, ['certification', 'final_reviewer_signature_time'], v))} /></FieldGrid><label className="of-confirm"><input type="checkbox" checked={Boolean(data.certification?.confirmed)} onChange={(e) => update((d) => setPath(d, ['certification', 'confirmed'], e.target.checked))} /><span>I certify that this report is complete and accurate.</span></label></FormSection><NotesEditor values={data.additional_notes || []} capacity={cap.additional_notes || 28} onChange={(values) => update((d) => { d.additional_notes = values; })} /></>;
     return null;
 }
 

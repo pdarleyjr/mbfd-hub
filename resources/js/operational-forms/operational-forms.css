@@ -43,6 +43,7 @@
 .of-page-heading { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 28px; }
 .of-page-heading h1, .of-record-spine h1 { font-size: 25px; line-height: 1.2; font-weight: 650; color: var(--of-navy); margin: 2px 0 5px; letter-spacing: -.02em; }
 .of-page-heading p, .of-record-spine p { color: var(--of-slate); margin: 0; font-size: 14px; }
+.of-heading-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .of-eyebrow { color: var(--of-blue) !important; font-size: 11px !important; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; }
 .of-library { max-width: 1320px; margin: 0 auto; }
 .of-library section + section { margin-top: 28px; }
@@ -53,6 +54,14 @@
 .of-form-card-icon { width: 42px; height: 42px; display: grid; place-items: center; background: var(--of-blue-soft); color: var(--of-blue); border-radius: 4px; }
 .of-form-card h3 { font-size: 16px; margin: 6px 0 3px; color: var(--of-navy); }
 .of-form-card p { margin: 0; color: var(--of-slate); font-size: 13px; line-height: 1.45; }
+.of-upload-card { background: var(--of-paper); border: 1px solid var(--of-border); border-left: 4px solid var(--of-navy); padding: 18px; display: grid; grid-template-columns: 44px minmax(210px, .75fr) minmax(440px, 1.4fr); gap: 15px; align-items: center; border-radius: 5px; }
+.of-upload-icon { width: 42px; height: 42px; display: grid; place-items: center; background: #eef2f6; color: var(--of-navy); border-radius: 4px; }
+.of-upload-copy h3 { color: var(--of-navy); font-size: 15px; margin: 0 0 4px; }
+.of-upload-copy p { color: var(--of-slate); font-size: 12px; line-height: 1.45; margin: 0; }
+.of-upload-controls { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(180px, 1fr) auto; gap: 12px; align-items: end; }
+.of-upload-controls > button { min-height: 32px; white-space: nowrap; }
+.of-upload-picker { width: 100%; min-height: 32px; }
+.of-upload-card > [role="alert"] { grid-column: 2 / -1; }
 .of-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 10px; }
 .of-section-heading h2 { margin: 0; }
 .of-section-heading p, .of-section-heading span { margin: 2px 0 0; color: var(--of-slate); font-size: 12px; }
@@ -198,6 +207,8 @@
     .of-totals div:nth-child(-n+3) { border-bottom: 1px solid var(--of-border); }
     .of-labor-fields { grid-template-columns: 100px minmax(260px, 2fr) minmax(160px, 1fr); }
     .of-labor-fields > *:nth-last-child(-n+2) { grid-column: auto; }
+    .of-upload-card { grid-template-columns: 44px minmax(0, 1fr); }
+    .of-upload-controls { grid-column: 1 / -1; }
 }
 @media (max-width: 960px) {
     .of-save-state { min-width: 0; }
@@ -253,6 +264,8 @@
     .of-correction > div { grid-template-columns: 1fr; }
     .of-select { min-height: 44px; font-size: 16px; }
     .of-page-heading, .of-record-spine { flex-direction: column; }
+    .of-heading-actions { width: 100%; justify-content: flex-start; }
+    .of-heading-actions > * { min-height: 44px; }
     .of-document-ready { grid-template-columns: 34px minmax(0, 1fr); padding: 12px; }
     .of-document-ready-actions { grid-column: 1 / -1; }
     .of-document-ready-actions > * { flex: 1; min-height: 44px; }
@@ -307,12 +320,17 @@
     .of-record-table td::before { content: attr(data-label); color: #52606d; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
     .of-record-table td[data-label="Record"] { grid-column: 1 / -1; display: block; padding-bottom: 9px; }
     .of-record-table td[data-label="Record"]::before { display: none; }
-    .of-record-table td[data-label="Status"], .of-record-table td[data-label="Last saved"], .of-record-table td[data-label="PDF"] { grid-column: 1; }
+    .of-record-table td[data-label="Status"], .of-record-table td[data-label="Last saved"], .of-record-table td[data-label="Document"] { grid-column: 1; }
     .of-record-table td[data-label="Open"] { grid-column: 2; grid-row: 2 / 5; display: grid; grid-template-columns: 1fr; align-self: stretch; padding-left: 8px; }
     .of-record-table td[data-label="Open"]::before { display: none; }
     .of-record-table td[data-label="Open"] button { min-width: 48px; min-height: 48px; align-self: center; }
     .of-record-table .of-empty { display: block; }
     .of-record-table .of-empty::before { display: none; }
+    .of-upload-card { grid-template-columns: 38px minmax(0, 1fr); padding: 14px 12px; gap: 10px; }
+    .of-upload-icon { width: 38px; height: 38px; }
+    .of-upload-controls { grid-template-columns: 1fr; }
+    .of-upload-controls > button, .of-upload-picker { min-height: 44px; }
+    .of-upload-card > [role="alert"] { grid-column: 1 / -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

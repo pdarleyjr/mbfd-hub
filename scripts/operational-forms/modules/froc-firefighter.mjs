@@ -6,6 +6,12 @@ function date(value) {
   return year && month && day ? `${month}/${day}/${year}` : String(value);
 }
 
+function dateTime(dateValue, timeValue) {
+  const formattedDate = date(dateValue);
+  const formattedTime = String(timeValue ?? '').replace(':', '');
+  return formattedTime ? `${formattedDate} ${formattedTime}`.trim() : formattedDate;
+}
+
 function getPath(value, path) {
   const normalized = path.replace(/\[(\d+)\]/g, '.$1');
   return normalized.split('.').reduce((current, key) => current?.[key], value);
@@ -77,9 +83,15 @@ export function frocValues(data, mapping) {
       },
       final: {
         employee_signature_text: data.certification?.final_employee_signature_text,
-        employee_signature_date: date(data.certification?.final_employee_signature_date),
+        employee_signature_date: dateTime(
+          data.certification?.final_employee_signature_date,
+          data.certification?.final_employee_signature_time,
+        ),
         reviewer_signature_text: data.certification?.final_reviewer_signature_text,
-        reviewer_signature_date: date(data.certification?.final_reviewer_signature_date),
+        reviewer_signature_date: dateTime(
+          data.certification?.final_reviewer_signature_date,
+          data.certification?.final_reviewer_signature_time,
+        ),
       },
     },
     additional_notes: data.additional_notes ?? [],

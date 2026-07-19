@@ -1,7 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
+import { closeSync, openSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const e2eDatabase = process.env.OPERATIONAL_FORMS_E2E_DATABASE ?? resolve(process.cwd(), 'database/operational_forms_e2e.sqlite');
+const e2eAppKey = process.env.APP_KEY ?? 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+closeSync(openSync(e2eDatabase, 'a'));
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -25,6 +28,7 @@ export default defineConfig({
     env: {
       ...process.env,
       APP_ENV: 'testing',
+      APP_KEY: e2eAppKey,
       DB_CONNECTION: 'sqlite',
       DB_DATABASE: e2eDatabase,
       QUEUE_CONNECTION: 'sync',

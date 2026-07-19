@@ -56,6 +56,8 @@ final class OperationalFormRecordPresenter
             'version_number' => $document->version_number,
             'source_revision' => $document->source_revision,
             'display_name' => $document->display_name,
+            'mime_type' => $document->mime_type,
+            'is_inline_previewable' => $document->isInlinePreviewable(),
             'page_count' => $document->page_count,
             'pdf_sha256' => $document->pdf_sha256,
             'preview_url' => route('employee.forms.api.documents.preview', $document),
