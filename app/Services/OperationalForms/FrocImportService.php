@@ -9,6 +9,7 @@ use App\Services\LocalAIService;
 use DateInterval;
 use DateTimeImmutable;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 use ZipArchive;
@@ -35,12 +36,17 @@ final class FrocImportService
 
         try {
             $labor = $this->aiLabor($messages);
-            if ($labor !== []) {
-                $fallback['labor'] = $labor;
-                $fallback['engine'] = $this->ai instanceof LocalAIService ? 'qwen3.6:35b (GMKtec Ollama)' : 'Cloudflare Workers AI';
-                $fallback['warning'] = 'AI suggestions must be reviewed. Estimated end times are marked and every field remains editable.';
+            if ($labor === []) {
+                throw new RuntimeException('The AI response contained no valid source-linked labor rows.');
             }
-        } catch (Throwable) {
+            $fallback['labor'] = $labor;
+            $fallback['engine'] = $this->ai instanceof LocalAIService ? 'qwen3.6:35b (GMKtec Ollama)' : 'Cloudflare Workers AI';
+            $fallback['warning'] = 'AI suggestions must be reviewed. Estimated end times are marked and every field remains editable.';
+        } catch (Throwable $exception) {
+            Log::warning('F-ROC import used deterministic fallback.', [
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
             $fallback['engine'] = 'deterministic-fallback';
             $fallback['warning'] = 'The AI service was unavailable, so a rules-based preview was created. Review every suggested activity and estimated end time.';
         }
