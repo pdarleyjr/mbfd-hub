@@ -82,6 +82,11 @@
 .of-import-summary small { color: var(--of-slate); text-transform: uppercase; font-size: 10px; }
 .of-import-summary strong { color: var(--of-navy); margin-top: 2px; overflow-wrap: anywhere; }
 .of-suggestion-list { display: grid; gap: 8px; margin-top: 12px; }
+.of-mileage-preview { margin-top: 12px; border: 1px solid var(--of-border); background: white; }
+.of-mileage-preview h3 { margin: 0; padding: 8px 10px; color: white; background: var(--of-navy); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.of-mileage-preview > div { display: grid; grid-template-columns: minmax(90px, .7fr) repeat(2, minmax(150px, 1fr)); gap: 10px; padding: 10px; border-top: 1px solid var(--of-border); font-size: 12px; }
+.of-mileage-preview > div:first-of-type { border-top: 0; }
+.of-mileage-preview span { color: #334255; font-variant-numeric: tabular-nums; }
 .of-suggestion-list article { padding: 12px; border: 1px solid var(--of-border); border-left: 3px solid var(--of-amber); background: white; }
 .of-suggestion-list article > div { display: flex; gap: 6px; margin-bottom: 5px; }
 .of-suggestion-list article > strong, .of-suggestion-list article > span, .of-suggestion-list article > small { display: block; }
@@ -217,6 +222,7 @@
     .of-import-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .of-import-summary div { border-bottom: 1px solid #e4d9bd; }
     .of-import-summary div:nth-child(2n) { border-right: 0; }
+    .of-mileage-preview > div { grid-template-columns: 1fr; gap: 4px; }
     .of-member-row { grid-template-columns: 32px minmax(0, 1fr) 44px; }
     .of-member-row > *:nth-child(2), .of-member-row > *:nth-child(3) { grid-column: 2 / -1; }
     .of-member-row > button { grid-column: 3; grid-row: 1; min-width: 44px; min-height: 44px; }
