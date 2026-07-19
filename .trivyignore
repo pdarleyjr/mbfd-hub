@@ -1,0 +1,3 @@
+# Laravel 11 has no patched release for this advisory. Keep the Composer audit
+# entry and remove this exception when a fixed Laravel 11 release is available.
+GHSA-5vg9-5847-vvmq
