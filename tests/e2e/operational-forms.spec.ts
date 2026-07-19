@@ -23,6 +23,8 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
 
   await expect(page).toHaveURL(/\/employee\/forms$/, { timeout: 30_000 });
   await expect(page.getByRole('heading', { name: 'Operational Forms' })).toBeVisible();
+  await expect(page.locator('.fi-sidebar')).toBeHidden();
+  await expect(page.locator('.fi-topbar')).toBeHidden();
   await expect(page.locator('.fi-sidebar-close-overlay')).toBeHidden();
   await expect(page.getByText('ICS 214 — Activity Log')).toBeVisible();
   await expect(page.getByText(/FROC-LOG-001-FF/)).toBeVisible();
@@ -85,8 +87,9 @@ test('desktop employee previews a generated flattened ICS PDF', async ({ page },
   await expect(page).toHaveURL(/\/employee\/forms$/, { timeout: 30_000 });
   const seededRecord = page.locator('.of-record-table tbody tr').filter({ hasText: 'E2E Controlled ICS 214' });
   await seededRecord.getByRole('button', { name: /Open E2E Controlled ICS 214/ }).click();
-  await page.getByRole('button', { name: 'PDF versions', exact: true }).click();
-  await page.getByRole('button', { name: 'Preview / print' }).click();
+  await expect(page.getByText('Latest controlled PDF')).toBeVisible();
+  await page.screenshot({ path: 'tests/e2e/screenshots/operational-forms-pdf-ready-desktop.png', fullPage: true });
+  await page.locator('.of-document-ready').getByRole('button', { name: 'View latest PDF', exact: true }).click();
   await expect(page.getByText('Page 1 of 1')).toBeVisible({ timeout: 15_000 });
   await expect.poll(() => page.locator('.of-preview-content canvas').evaluate((canvas: HTMLCanvasElement) => canvas.width)).toBeGreaterThan(500);
   await page.screenshot({ path: 'tests/e2e/screenshots/operational-forms-pdf-preview-desktop.png', fullPage: true });
