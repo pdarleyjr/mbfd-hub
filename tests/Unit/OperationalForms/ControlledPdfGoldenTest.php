@@ -55,7 +55,7 @@ class ControlledPdfGoldenTest extends TestCase
                 '1.0',
                 'tests/Fixtures/OperationalForms/ics-214-sample.json',
                 'docs/operational-forms/samples/ICS-214-sample.pdf',
-                '2dae797b4258fbe3adb7cfca9c129f4cbfbf8db3b052d8bcb661b117045c6dfd',
+                '6c832bd5c2def1938fde79fb42bc062c18191b05f1975aada3f8753849d7e69f',
                 1,
             ],
             'FROC v11' => [
@@ -63,7 +63,7 @@ class ControlledPdfGoldenTest extends TestCase
                 '11',
                 'tests/Fixtures/OperationalForms/froc-log-001-ff-sample.json',
                 'docs/operational-forms/samples/FROC-LOG-001-FF-v11-sample.pdf',
-                'c1730a20a248fe28d81258182aa11dac75290bcdefec08042a14c5d6e6cd779d',
+                '9826099d7b1efaffa8820339e7712b6c65050f95e2e4918e4cc4a796f88a5991',
                 4,
             ],
         ];
