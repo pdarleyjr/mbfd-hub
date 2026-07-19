@@ -38,14 +38,62 @@ class FrocTotalsCalculatorTest extends TestCase
 
     public function test_rejects_negative_mileage_without_a_correction_reason(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-
-        FrocTotalsCalculator::calculate([
+        $result = FrocTotalsCalculator::calculate([
             'vehicle_mileage' => [[
                 'start_odometer' => '120',
                 'end_odometer' => '100',
                 'event_related' => true,
             ]],
+        ]);
+
+        $this->assertSame('0.00', $result['p3_mileage_total_event']);
+        $this->assertNull(FrocTotalsCalculator::mileage([
+            'start_odometer' => '120',
+            'end_odometer' => '100',
+        ]));
+    }
+
+    public function test_incomplete_mileage_is_excluded_instead_of_becoming_negative(): void
+    {
+        foreach ([
+            ['start_odometer' => '113969', 'end_odometer' => ''],
+            ['start_odometer' => '', 'end_odometer' => '113999'],
+            ['start_odometer' => '', 'end_odometer' => ''],
+        ] as $row) {
+            $result = FrocTotalsCalculator::calculate([
+                'vehicle_mileage' => [$row + ['event_related' => true]],
+            ]);
+
+            $this->assertSame('0.00', $result['p3_mileage_total_event']);
+            $this->assertNull(FrocTotalsCalculator::mileage($row));
+        }
+    }
+
+    public function test_incomplete_labor_time_is_excluded_from_totals(): void
+    {
+        foreach ([
+            ['start' => '15:06', 'end' => ''],
+            ['start' => '', 'end' => '15:36'],
+            ['start' => '', 'end' => ''],
+        ] as $row) {
+            $result = FrocTotalsCalculator::calculate([
+                'labor' => [$row + ['event_related' => true]],
+            ]);
+
+            $this->assertSame('0.00', $result['p2_total_event_hours']);
+            $this->assertNull(FrocTotalsCalculator::effectiveLaborHours($row));
+        }
+    }
+
+    public function test_manual_mileage_requires_a_non_negative_value_and_reason(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('manual mileage correction requires a reason');
+
+        FrocTotalsCalculator::mileage([
+            'start_odometer' => '120',
+            'end_odometer' => '100',
+            'manual_miles' => '20',
         ]);
     }
 }

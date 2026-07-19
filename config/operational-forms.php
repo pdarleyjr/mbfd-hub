@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'import_force_fallback' => (bool) env('FROC_IMPORT_FORCE_FALLBACK', false),
     'node_binary' => env('OPERATIONAL_FORMS_NODE_BINARY', 'node'),
     'generator_timeout_seconds' => (int) env('OPERATIONAL_FORMS_GENERATOR_TIMEOUT', 30),
     'maximum_pdf_bytes' => (int) env('OPERATIONAL_FORMS_MAXIMUM_PDF_BYTES', 20 * 1024 * 1024),

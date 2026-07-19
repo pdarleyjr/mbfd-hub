@@ -11,17 +11,19 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OperationalFormDocumentController extends Controller
 {
-    public function preview(Request $request, OperationalFormDocument $document, DocumentStreamService $streamer): StreamedResponse
+    public function preview(Request $request, string $document, DocumentStreamService $streamer): StreamedResponse
     {
         $this->authorizeAdmin($request);
+        $document = OperationalFormDocument::query()->findOrFail($document);
         $this->audit($request, $document, 'pdf_previewed');
 
         return $streamer->response($document, false);
     }
 
-    public function download(Request $request, OperationalFormDocument $document, DocumentStreamService $streamer): StreamedResponse
+    public function download(Request $request, string $document, DocumentStreamService $streamer): StreamedResponse
     {
         $this->authorizeAdmin($request);
+        $document = OperationalFormDocument::query()->findOrFail($document);
         $this->audit($request, $document, 'pdf_downloaded');
 
         return $streamer->response($document, true);

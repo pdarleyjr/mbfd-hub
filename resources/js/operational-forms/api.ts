@@ -1,4 +1,4 @@
-import type { ApiProblem, BootstrapData, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportPreview, GenerationJob } from './types';
+import type { ApiProblem, BootstrapData, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportPreview, FrocImportSummary, GenerationJob } from './types';
 
 export class ApiError extends Error {
     constructor(public status: number, public problem: ApiProblem) {
@@ -59,5 +59,15 @@ export function createApi(bootstrap: BootstrapData) {
         importFroc: async (payload: FormData) => (await request<{ preview: FrocImportPreview }>(`${bootstrap.endpoints.records.replace(/\/records$/, '')}/froc/import-preview`, {
             method: 'POST', body: payload,
         })).preview,
+        applyFrocImport: async (record: FormRecord, payload: FormData) => {
+            payload.set('revision', String(record.revision));
+            payload.set('merge_mode', 'fill_empty_and_append');
+            return request<{ record: FormRecord; import: FrocImportSummary }>(`${bootstrap.endpoints.records}/${record.id}/froc/import`, {
+                method: 'POST', body: payload,
+            });
+        },
+        undoFrocImport: async (record: FormRecord, importId: string) => (await request<{ record: FormRecord }>(`${bootstrap.endpoints.records}/${record.id}/froc/import/${importId}/undo`, {
+            method: 'POST', body: JSON.stringify({ revision: record.revision }),
+        })).record,
     };
 }

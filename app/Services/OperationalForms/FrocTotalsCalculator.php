@@ -10,17 +10,19 @@ final class FrocTotalsCalculator
     {
         $labor = [false => 0, true => 0];
         foreach ($data['labor'] ?? [] as $row) {
-            $labor[(bool) ($row['event_related'] ?? false)] += self::effectiveLaborHundredths($row);
+            $labor[(bool) ($row['event_related'] ?? false)] += self::effectiveLaborHundredths($row) ?? 0;
         }
 
         $equipment = [false => 0, true => 0];
         foreach ($data['equipment_hours'] ?? [] as $row) {
-            $equipment[(bool) ($row['event_related'] ?? false)] += self::decimalToHundredths((string) ($row['hours'] ?? '0'));
+            if (filled($row['hours'] ?? null)) {
+                $equipment[(bool) ($row['event_related'] ?? false)] += self::decimalToHundredths((string) $row['hours']);
+            }
         }
 
         $mileage = [false => 0, true => 0];
         foreach (($data['vehicle_mileage'] ?? $data['equipment_mileage'] ?? []) as $row) {
-            $mileage[(bool) ($row['event_related'] ?? false)] += self::mileageHundredths($row);
+            $mileage[(bool) ($row['event_related'] ?? false)] += self::mileageHundredths($row) ?? 0;
         }
 
         return [
@@ -33,17 +35,21 @@ final class FrocTotalsCalculator
         ];
     }
 
-    public static function effectiveLaborHours(array $row): string
+    public static function effectiveLaborHours(array $row): ?string
     {
-        return self::formatHundredths(self::effectiveLaborHundredths($row));
+        $hundredths = self::effectiveLaborHundredths($row);
+
+        return $hundredths === null ? null : self::formatHundredths($hundredths);
     }
 
-    public static function mileage(array $row): string
+    public static function mileage(array $row): ?string
     {
-        return self::formatHundredths(self::mileageHundredths($row));
+        $hundredths = self::mileageHundredths($row);
+
+        return $hundredths === null ? null : self::formatHundredths($hundredths);
     }
 
-    private static function effectiveLaborHundredths(array $row): int
+    private static function effectiveLaborHundredths(array $row): ?int
     {
         if (filled($row['manual_override_hours'] ?? null)) {
             if (blank($row['override_reason'] ?? null)) {
@@ -53,8 +59,12 @@ final class FrocTotalsCalculator
             return self::decimalToHundredths((string) $row['manual_override_hours']);
         }
 
-        $start = self::timeToMinutes((string) ($row['start'] ?? '00:00'));
-        $end = self::timeToMinutes((string) ($row['end'] ?? '00:00'));
+        if (blank($row['start'] ?? null) || blank($row['end'] ?? null)) {
+            return null;
+        }
+
+        $start = self::timeToMinutes((string) $row['start']);
+        $end = self::timeToMinutes((string) $row['end']);
         if ($end < $start) {
             $end += 24 * 60;
         }
@@ -62,19 +72,30 @@ final class FrocTotalsCalculator
         return intdiv((($end - $start) * 100) + 30, 60);
     }
 
-    private static function mileageHundredths(array $row): int
+    private static function mileageHundredths(array $row): ?int
     {
-        $start = self::decimalToHundredths((string) ($row['start_odometer'] ?? '0'));
-        $end = self::decimalToHundredths((string) ($row['end_odometer'] ?? '0'));
-        $difference = $end - $start;
+        if (filled($row['manual_miles'] ?? null)) {
+            if (blank($row['correction_reason'] ?? null)) {
+                throw new InvalidArgumentException('A manual mileage correction requires a reason.');
+            }
 
-        if ($difference < 0 && blank($row['correction_reason'] ?? null)) {
-            throw new InvalidArgumentException('Negative mileage requires a correction reason.');
+            $manual = self::decimalToHundredths((string) $row['manual_miles']);
+            if ($manual < 0) {
+                throw new InvalidArgumentException('Manual mileage must not be negative.');
+            }
+
+            return $manual;
         }
 
-        return filled($row['manual_miles'] ?? null)
-            ? self::decimalToHundredths((string) $row['manual_miles'])
-            : $difference;
+        if (blank($row['start_odometer'] ?? null) || blank($row['end_odometer'] ?? null)) {
+            return null;
+        }
+
+        $start = self::decimalToHundredths((string) $row['start_odometer']);
+        $end = self::decimalToHundredths((string) $row['end_odometer']);
+        $difference = $end - $start;
+
+        return $difference < 0 ? null : $difference;
     }
 
     private static function timeToMinutes(string $time): int

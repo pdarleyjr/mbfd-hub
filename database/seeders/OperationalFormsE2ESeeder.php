@@ -30,16 +30,6 @@ class OperationalFormsE2ESeeder extends Seeder
                 'must_change_password' => false,
             ],
         );
-        Employee::query()->updateOrCreate(
-            ['employee_id' => '19545'],
-            [
-                'name' => 'Victor White',
-                'rank' => 'Firefighter',
-                'password' => Hash::make('OperationalForms!1'),
-                'must_change_password' => false,
-            ],
-        );
-
         $this->ensurePermissionTables();
         $adminId = DB::table('users')->insertGetId([
             'name' => 'Operational Forms Test Admin',
