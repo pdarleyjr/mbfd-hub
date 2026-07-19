@@ -63,7 +63,7 @@ class ControlledPdfGoldenTest extends TestCase
                 '11',
                 'tests/Fixtures/OperationalForms/froc-log-001-ff-sample.json',
                 'docs/operational-forms/samples/FROC-LOG-001-FF-v11-sample.pdf',
-                '91a0ef2c90bb1fe3196a442b8eaa6133cacbfd40f58c43f1bca1008217685a3c',
+                'c1730a20a248fe28d81258182aa11dac75290bcdefec08042a14c5d6e6cd779d',
                 4,
             ],
         ];
