@@ -50,6 +50,19 @@ for (const specification of mapping.fields) {
   const value = specification.input_type === 'boolean_mark' ? (raw ? 'X' : '') : raw;
   const field = fillTextField(form, font, specification, value);
 
+  const insetLeft = Number(specification.appearance_inset_left ?? 0);
+  if (insetLeft > 0 && String(value ?? '') !== '') {
+    for (const widget of field.acroField.getWidgets()) {
+      const rectangle = widget.getRectangle();
+      widget.setRectangle({
+        x: rectangle.x + insetLeft,
+        y: rectangle.y,
+        width: Math.max(1, rectangle.width - insetLeft),
+        height: rectangle.height,
+      });
+    }
+  }
+
   if (specification.rendering?.requires_background_knockout_when_value_changes && String(value ?? '') !== '') {
     const rectangle = specification.rect_pdf;
     pdfDocument.getPage(specification.page - 1).drawRectangle({
