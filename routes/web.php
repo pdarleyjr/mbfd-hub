@@ -1,17 +1,19 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\OperationalFormDeletionController;
+use App\Http\Controllers\Admin\OperationalFormDocumentController;
 use App\Http\Controllers\Api\StationInventoryController;
-use App\Http\Controllers\IncidentsController;
-use App\Http\Controllers\Workgroup\FileDownloadController;
-use App\Http\Controllers\ReportExportController;
+use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
+use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
 use App\Http\Controllers\Employee\OperationalForms\FormGenerationController;
 use App\Http\Controllers\Employee\OperationalForms\FormRecordController;
-use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
-use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
+use App\Http\Controllers\Employee\OperationalForms\FormUploadController;
 use App\Http\Controllers\Employee\OperationalForms\FrocImportController;
-use App\Http\Controllers\Admin\OperationalFormDocumentController;
+use App\Http\Controllers\IncidentsController;
+use App\Http\Controllers\ReportExportController;
+use App\Http\Controllers\Workgroup\FileDownloadController;
 use App\Http\Middleware\ForcePasswordChangeMiddleware;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
@@ -46,15 +48,18 @@ Route::prefix('employee/forms/api')
     ->group(function (): void {
         Route::get('/form-types', [FormRecordController::class, 'formTypes'])->name('form-types');
         Route::get('/employees/search', EmployeeLookupController::class)
-            ->middleware('throttle:60,1')
+            ->middleware('throttle:60,1,operational-forms-employee-search')
             ->name('employees.search');
         Route::post('/froc/import-preview', FrocImportController::class)
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,operational-forms-froc-import')
             ->name('froc.import-preview');
         Route::get('/records', [FormRecordController::class, 'index'])->name('records.index');
         Route::post('/records', [FormRecordController::class, 'store'])->name('records.store');
+        Route::post('/uploads', FormUploadController::class)
+            ->middleware('throttle:10,1,operational-forms-upload')
+            ->name('uploads.store');
         Route::post('/records/{record}/froc/import', [FrocImportController::class, 'apply'])
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,operational-forms-froc-import')
             ->name('records.froc.import');
         Route::post('/records/{record}/froc/import/{import}/undo', [FrocImportController::class, 'undo'])
             ->name('records.froc.import.undo');
@@ -63,10 +68,10 @@ Route::prefix('employee/forms/api')
         Route::patch('/records/{record}', [FormRecordController::class, 'update'])->name('records.update');
         Route::delete('/records/{record}', [FormRecordController::class, 'destroy'])->name('records.destroy');
         Route::post('/records/{record}/generate', FormGenerationController::class)
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,operational-forms-generate')
             ->name('records.generate');
         Route::post('/records/{record}/complete', FormGenerationController::class)
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,operational-forms-complete')
             ->name('records.complete');
         Route::get('/records/{record}/generation/{job}', [FormGenerationController::class, 'status'])
             ->name('records.generation.status');
@@ -82,7 +87,12 @@ Route::prefix('admin/operational-forms/documents')
     ->group(function (): void {
         Route::get('/{document}/preview', [OperationalFormDocumentController::class, 'preview'])->name('preview');
         Route::get('/{document}/download', [OperationalFormDocumentController::class, 'download'])->name('download');
+        Route::delete('/{document}', [OperationalFormDeletionController::class, 'document'])->name('destroy');
     });
+
+Route::delete('/admin/operational-forms/records/{record}', [OperationalFormDeletionController::class, 'record'])
+    ->middleware('auth:web')
+    ->name('admin.operational-forms.records.destroy');
 
 // Pump Simulator - Public route for training
 Route::view('/pump-simulator', 'pump-simulator')->name('pump-simulator');

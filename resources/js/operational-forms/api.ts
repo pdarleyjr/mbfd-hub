@@ -1,4 +1,4 @@
-import type { ApiProblem, BootstrapData, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportPreview, FrocImportSummary, GenerationJob } from './types';
+import type { ApiProblem, BootstrapData, EditableFormType, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FrocImportPreview, FrocImportSummary, GenerationJob } from './types';
 
 export class ApiError extends Error {
     constructor(public status: number, public problem: ApiProblem) {
@@ -46,9 +46,19 @@ export function createApi(bootstrap: BootstrapData) {
     return {
         definitions: async () => (await request<{ form_types: FormDefinition[] }>(bootstrap.endpoints.form_types)).form_types,
         records: async () => (await request<{ records: FormRecord[] }>(bootstrap.endpoints.records)).records,
-        create: async (formType: FormType, title: string) => (await request<{ record: FormRecord }>(bootstrap.endpoints.records, {
+        create: async (formType: EditableFormType, title: string) => (await request<{ record: FormRecord }>(bootstrap.endpoints.records, {
             method: 'POST', body: JSON.stringify({ form_type: formType, title }),
         })).record,
+        upload: async (name: string, file: File) => {
+            const payload = new FormData();
+            payload.append('name', name);
+            payload.append('file', file);
+
+            return (await request<{ record: FormRecord }>(bootstrap.endpoints.uploads, {
+                method: 'POST',
+                body: payload,
+            })).record;
+        },
         show: async (id: string) => (await request<{ record: FormRecord }>(`${bootstrap.endpoints.records}/${id}`)).record,
         save: async (record: FormRecord) => (await request<{ record: FormRecord }>(`${bootstrap.endpoints.records}/${record.id}`, {
             method: 'PATCH', body: JSON.stringify({ revision: record.revision, data: record.data }),

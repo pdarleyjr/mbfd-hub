@@ -37,4 +37,13 @@ class OperationalFormDocument extends Model
     {
         return $this->belongsTo(Employee::class, 'created_by_employee_id');
     }
+
+    public function isInlinePreviewable(): bool
+    {
+        return $this->mime_type === 'application/pdf'
+            || $this->mime_type === 'text/plain'
+            || (str_starts_with($this->mime_type, 'image/') && $this->mime_type !== 'image/svg+xml')
+            || str_starts_with($this->mime_type, 'audio/')
+            || str_starts_with($this->mime_type, 'video/');
+    }
 }

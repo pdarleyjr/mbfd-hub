@@ -16,6 +16,7 @@ class ListOperationalFormRecords extends ListRecords
             'all' => Tab::make('All Forms'),
             'ics_214' => Tab::make('ICS 214')->modifyQueryUsing(fn ($query) => $query->where('form_type', 'ics_214')),
             'froc' => Tab::make('F-ROC Daily Activity Reports')->modifyQueryUsing(fn ($query) => $query->where('form_type', 'froc_log_001_ff')),
+            'uploads' => Tab::make('Submitted files')->modifyQueryUsing(fn ($query) => $query->where('form_type', 'uploaded_file')),
         ];
     }
 
