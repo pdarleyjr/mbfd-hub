@@ -36,7 +36,10 @@ export function mileage(row) {
   if (difference < 0 && !String(row.correction_reason ?? '').trim()) {
     throw new Error('Negative FROC mileage is missing its correction reason.');
   }
-  return formatted(row.manual_miles !== undefined && String(row.manual_miles).trim() !== '' ? hundredths(row.manual_miles) : difference);
+  const hasManualMileage = row.manual_miles !== undefined
+    && row.manual_miles !== null
+    && String(row.manual_miles).trim() !== '';
+  return formatted(hasManualMileage ? hundredths(row.manual_miles) : difference);
 }
 
 export function frocTotals(data) {
