@@ -57,6 +57,11 @@ class OperationalFormRecord extends Model
         return $this->hasMany(OperationalFormGeneration::class, 'form_record_id');
     }
 
+    public function imports(): HasMany
+    {
+        return $this->hasMany(OperationalFormImport::class, 'form_record_id');
+    }
+
     public function latestDocument(): HasOne
     {
         return $this->hasOne(OperationalFormDocument::class, 'form_record_id')->latestOfMany('version_number');

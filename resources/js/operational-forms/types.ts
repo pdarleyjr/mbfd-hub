@@ -27,10 +27,27 @@ export interface FrocImportLaborRow {
     manual_override_hours: string;
     override_reason: string;
     event_related: boolean;
-    source_excerpt: string;
+    source_index: number;
     source_timestamp: string;
     confidence: 'high' | 'review';
     end_estimated: boolean;
+}
+
+export interface FrocImportSummary {
+    id: string;
+    engine: string;
+    fallback_used: boolean;
+    matched_message_count: number;
+    source_sha256: string;
+    source_type: string;
+    applied_fields: string[];
+    appended_labor_rows: number[];
+    appended_mileage_rows: number[];
+    updated_mileage_rows: number[];
+    estimated_fields: string[];
+    skipped_conflicts: string[];
+    capacity_warnings: string[];
+    idempotent_replay: boolean;
 }
 
 export interface FrocImportPreview {
@@ -80,6 +97,10 @@ export interface FormRecord {
     updated_at: string;
     has_changes_since_latest_pdf: boolean;
     documents: FormDocument[];
+    import_metadata?: {
+        estimated_fields: string[];
+        imported_fields: string[];
+    };
 }
 
 export interface BootstrapData {

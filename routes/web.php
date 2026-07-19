@@ -53,6 +53,11 @@ Route::prefix('employee/forms/api')
             ->name('froc.import-preview');
         Route::get('/records', [FormRecordController::class, 'index'])->name('records.index');
         Route::post('/records', [FormRecordController::class, 'store'])->name('records.store');
+        Route::post('/records/{record}/froc/import', [FrocImportController::class, 'apply'])
+            ->middleware('throttle:10,1')
+            ->name('records.froc.import');
+        Route::post('/records/{record}/froc/import/{import}/undo', [FrocImportController::class, 'undo'])
+            ->name('records.froc.import.undo');
         Route::get('/records/{record}', [FormRecordController::class, 'show'])->name('records.show');
         Route::get('/records/{record}/documents', [FormRecordController::class, 'documents'])->name('records.documents');
         Route::patch('/records/{record}', [FormRecordController::class, 'update'])->name('records.update');

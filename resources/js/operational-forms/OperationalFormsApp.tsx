@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { ApiError, createApi } from './api';
 import { recoveryDrafts, type RecoveryDraft } from './draftsDb';
-import type { BootstrapData, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportPreview } from './types';
+import type { BootstrapData, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportSummary } from './types';
 
 const PdfPreview = lazy(() => import('./PdfPreview').then((module) => ({ default: module.PdfPreview })));
 
@@ -77,25 +77,35 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
         } finally { setBusy(false); }
     }, [api]);
 
-    const createRecord = async (formType: FormType, imported?: FrocImportPreview) => {
+    const createRecord = async (formType: FormType) => {
         setBusy(true);
         try {
             const now = new Date();
-            const title = imported ? `${imported.event_name} — ${imported.unit_designation}` : `${typeLabel(formType)} — ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(now)}`;
+            const title = `${typeLabel(formType)} — ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(now)}`;
             const created = await api.create(formType, title);
-            let ready = created;
-            if (imported && formType === 'froc_log_001_ff') {
-                const data = clone(created.data);
-                setPath(data, ['general_information', 'event_id'], imported.event_name);
-                if (imported.report_date) setPath(data, ['general_information', 'date'], imported.report_date);
-                data.labor = imported.labor.map(({ source_excerpt: _source, source_timestamp: _stamp, confidence: _confidence, end_estimated: _estimated, ...row }) => row);
-                data.vehicle_mileage = imported.vehicle_mileage;
-                ready = await api.save({ ...created, data });
-            }
-            setRecords((items) => [ready, ...items.filter((item) => item.id !== ready.id)]); currentRef.current = ready; setCurrent(ready); dirtyRef.current = false; setSaveState('saved'); setActiveSection('overview');
-            if (imported) setMessage({ intent: 'info', text: 'Import suggestions were placed into an editable draft. Review the event, mileage, labor descriptions, and every estimated end time before generating the PDF.' });
+            setRecords((items) => [created, ...items.filter((item) => item.id !== created.id)]); currentRef.current = created; setCurrent(created); dirtyRef.current = false; setSaveState('saved'); setActiveSection('overview');
         } catch (error) { setMessage({ intent: 'error', text: error instanceof Error ? error.message : 'The record could not be created.' }); }
         finally { setBusy(false); }
+    };
+
+    const applyFrocImport = async (payload: FormData): Promise<FrocImportSummary> => {
+        let record = currentRef.current;
+        if (!record || record.form_type !== 'froc_log_001_ff') throw new Error('Open a F-ROC draft before importing activity notes.');
+        if (dirtyRef.current) record = await flushSaves();
+        if (!record) throw new Error('Save the current draft before importing activity notes.');
+        const result = await api.applyFrocImport(record, payload);
+        currentRef.current = result.record; setCurrent(result.record); dirtyRef.current = false; setSaveState('saved');
+        setRecords((items) => items.map((item) => item.id === result.record.id ? result.record : item));
+        await recoveryDrafts.remove(result.record.id);
+        return result.import;
+    };
+
+    const undoFrocImport = async (importId: string): Promise<void> => {
+        const record = currentRef.current;
+        if (!record) return;
+        const restored = await api.undoFrocImport(record, importId);
+        currentRef.current = restored; setCurrent(restored); dirtyRef.current = false; setSaveState('saved');
+        setRecords((items) => items.map((item) => item.id === restored.id ? restored : item));
     };
 
     const updateCurrent = useCallback((mutator: (data: Record<string, any>) => void) => {
@@ -179,6 +189,16 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
             currentRef.current = refreshed; dirtyRef.current = false; setCurrent(refreshed); setRecords((items) => items.map((item) => item.id === refreshed.id ? refreshed : item));
             setActiveSection('documents'); setMessage({ intent: 'success', text: `PDF version ${document.version_number} is ready to view, print, or download.` }); setPreview(document);
         } catch (error) {
+            if (error instanceof ApiError && error.problem.errors) {
+                const firstField = Object.keys(error.problem.errors)[0] || '';
+                if (firstField.startsWith('vehicle_mileage')) setActiveSection('mileage');
+                else if (firstField.startsWith('labor')) setActiveSection('labor');
+                else if (firstField.startsWith('certification')) setActiveSection('certification');
+                else if (firstField.startsWith('equipment')) setActiveSection('equipment');
+                else if (firstField.startsWith('materials')) setActiveSection('materials');
+                else if (firstField.startsWith('team_members')) setActiveSection('team');
+                else setActiveSection('overview');
+            }
             const text = error instanceof ApiError && error.problem.errors ? Object.values(error.problem.errors).flat().join(' ') : (error instanceof Error ? error.message : 'PDF generation failed.');
             setMessage({ intent: 'error', text });
         } finally { setBusy(false); setIsGenerating(false); }
@@ -219,13 +239,14 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
                     <main className="of-main">
                         {message && <MessageBar intent={message.intent}><MessageBarBody>{message.text}</MessageBarBody></MessageBar>}
                         {!current ? (
-                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} analyzeFroc={api.importFroc} openRecord={openRecord} refresh={refreshLibrary} preview={setPreview} />
+                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} openRecord={openRecord} refresh={refreshLibrary} preview={setPreview} />
                         ) : (
                             <EditorView
                                 record={current} definition={definitions.find((item) => item.form_type === current.form_type)}
-                                saveState={saveState} activeSection={activeSection} setActiveSection={setActiveSection} isGenerating={isGenerating}
-                                update={updateCurrent} save={() => void saveNow()} generate={() => void generate()} remove={() => void removeCurrent()}
-                                back={() => { void flushSaves().then((saved) => { if (saved) setCurrent(null); }); }} preview={setPreview} searchEmployees={api.searchEmployees}
+                                 saveState={saveState} activeSection={activeSection} setActiveSection={setActiveSection} isGenerating={isGenerating}
+                                 update={updateCurrent} save={() => void saveNow()} generate={() => void generate()} remove={() => void removeCurrent()}
+                                 back={() => { void flushSaves().then((saved) => { if (saved) setCurrent(null); }); }} preview={setPreview} searchEmployees={api.searchEmployees}
+                                 applyFrocImport={applyFrocImport} undoFrocImport={undoFrocImport}
                             />
                         )}
                     </main>
@@ -238,18 +259,16 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
     );
 }
 
-function LibraryView({ definitions, records, busy, createRecord, analyzeFroc, openRecord, refresh, preview }: {
+function LibraryView({ definitions, records, busy, createRecord, openRecord, refresh, preview }: {
     definitions: FormDefinition[]; records: FormRecord[]; busy: boolean;
-    createRecord: (type: FormType, imported?: FrocImportPreview) => Promise<void>; analyzeFroc: (payload: FormData) => Promise<FrocImportPreview>;
+    createRecord: (type: FormType) => Promise<void>;
     openRecord: (record: FormRecord) => void; refresh: () => void; preview: (doc: FormDocument) => void;
 }) {
-    const [showImport, setShowImport] = useState(false);
     return <div className="of-library">
         <div className="of-page-heading"><div><p className="of-eyebrow">Controlled records workspace</p><h1>Operational Forms</h1><p>Start, resume, and generate official incident and reimbursement records.</p></div><Button icon={<RefreshCw size={16} />} onClick={refresh} disabled={busy}>Refresh</Button></div>
         <section aria-labelledby="start-form"><h2 id="start-form">Start a form</h2><div className="of-form-cards">
-            {definitions.map((definition) => <article className="of-form-card" key={definition.form_type}><div className="of-form-card-icon">{definition.form_type === 'ics_214' ? <ClipboardList /> : <FileCheck2 />}</div><div><Badge appearance="outline">Version {definition.form_version}</Badge><h3>{definition.display_name}</h3><p>{definition.form_type === 'ics_214' ? 'Document unit resources and chronological incident activity.' : 'Capture firefighter labor, equipment, mileage, materials, and certification—with optional AI-assisted note import.'}</p></div><Button appearance="primary" icon={definition.form_type === 'froc_log_001_ff' ? <Sparkles size={17} /> : <FilePlus2 size={17} />} onClick={() => definition.form_type === 'froc_log_001_ff' ? setShowImport(true) : void createRecord(definition.form_type)}>{definition.form_type === 'froc_log_001_ff' ? 'Start / import' : 'Create form'}</Button></article>)}
+            {definitions.map((definition) => <article className="of-form-card" key={definition.form_type}><div className="of-form-card-icon">{definition.form_type === 'ics_214' ? <ClipboardList /> : <FileCheck2 />}</div><div><Badge appearance="outline">Version {definition.form_version}</Badge><h3>{definition.display_name}</h3><p>{definition.form_type === 'ics_214' ? 'Document unit resources and chronological incident activity.' : 'Capture firefighter labor, equipment, mileage, materials, and certification—with optional AI-assisted note import.'}</p></div><Button appearance="primary" icon={<FilePlus2 size={17} />} onClick={() => void createRecord(definition.form_type)}>Create form</Button></article>)}
         </div></section>
-        {showImport && <FrocImportPanel analyze={analyzeFroc} create={createRecord} close={() => setShowImport(false)} />}
         <section aria-labelledby="recent-records"><div className="of-section-heading"><h2 id="recent-records">Recent records</h2><span>{records.length} record{records.length === 1 ? '' : 's'}</span></div>
             <div className="of-table-wrap"><table className="of-record-table"><thead><tr><th>Record</th><th>Status</th><th>Last saved</th><th>PDF</th><th><span className="sr-only">Open</span></th></tr></thead><tbody>
                 {records.length === 0 && <tr><td colSpan={5} className="of-empty">No records yet. Start with one of the controlled forms above.</td></tr>}
@@ -259,49 +278,59 @@ function LibraryView({ definitions, records, busy, createRecord, analyzeFroc, op
     </div>;
 }
 
-function FrocImportPanel({ analyze, create, close }: { analyze: (payload: FormData) => Promise<FrocImportPreview>; create: (type: FormType, imported?: FrocImportPreview) => Promise<void>; close: () => void }) {
+function FrocImportPanel({ apply, undo, review }: {
+    apply: (payload: FormData) => Promise<FrocImportSummary>;
+    undo: (importId: string) => Promise<void>;
+    review: (summary: FrocImportSummary) => void;
+}) {
     const [unitId, setUnitId] = useState('');
     const [notes, setNotes] = useState('');
     const [file, setFile] = useState<File | null>(null);
-    const [preview, setPreview] = useState<FrocImportPreview | null>(null);
+    const [summary, setSummary] = useState<FrocImportSummary | null>(null);
     const [working, setWorking] = useState(false);
     const [error, setError] = useState('');
+    const idempotencyKey = useRef(crypto.randomUUID());
 
     const run = async () => {
-        setWorking(true); setError(''); setPreview(null);
+        setWorking(true); setError('');
         try {
             const payload = new FormData(); payload.append('unit_id', unitId.trim());
             if (notes.trim()) payload.append('notes', notes);
             if (file) payload.append('notes_file', file);
-            setPreview(await analyze(payload));
+            payload.append('idempotency_key', idempotencyKey.current);
+            setSummary(await apply(payload));
         } catch (caught) {
             setError(caught instanceof ApiError && caught.problem.errors ? Object.values(caught.problem.errors).flat().join(' ') : (caught instanceof Error ? caught.message : 'The notes could not be analyzed.'));
         } finally { setWorking(false); }
     };
 
-    return <section className="of-import" aria-labelledby="froc-import-title">
-        <div className="of-import-head"><div className="of-import-icon"><Bot size={22} /></div><div><p className="of-eyebrow">Optional pre-entry assistant</p><h2 id="froc-import-title">Turn activity notes into a reviewable F-ROC draft</h2><p>Paste notes or upload a WhatsApp <strong>.zip without media</strong> or a <strong>.txt</strong> export. Only messages matching your unit are sent to the configured MBFD AI service.</p></div></div>
-        <div className="of-import-fields">
-            <Field label="Unit designation" hint="Required—for example R6, JHAT, Gator 1, or Detail Medic 2."><Input value={unitId} onChange={(_, data) => setUnitId(data.value)} /></Field>
-            <Field label="WhatsApp export or text file" hint="Maximum 2 MB upload; extracted text is limited to 512 KB."><label className="of-file-picker"><FileArchive size={18} /><span>{file ? file.name : 'Choose .zip or .txt file'}</span><input type="file" accept=".zip,.txt,text/plain,application/zip" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label></Field>
-            <Field className="of-import-notes" label="Paste activity notes" hint="Large review area—paste copied chat messages, field notes, or unit logs."><Textarea value={notes} onChange={(_, data) => setNotes(data.value)} resize="vertical" /></Field>
+    const reset = () => {
+        setUnitId(''); setNotes(''); setFile(null); setError(''); setSummary(null);
+        idempotencyKey.current = crypto.randomUUID();
+    };
+
+    return <details className="of-import">
+        <summary><Bot size={19} /><span><strong>Optional: Import activity notes with AI</strong><small>Upload a WhatsApp text export or paste unit notes. The assistant will add supported details to this draft. All fields remain editable.</small></span></summary>
+        <div className="of-import-body">
+            <div className="of-import-fields">
+                <Field label="Unit designation" hint="Required—for example R6, JHAT, Gator 1, or Detail Medic 2."><Input value={unitId} onChange={(_, data) => setUnitId(data.value)} /></Field>
+                <Field label="WhatsApp export or text file" hint="Maximum 2 MB upload; extracted text is limited to 512 KB and is not stored."><div className="of-file-row"><label className="of-file-picker"><FileArchive size={18} /><span>{file ? file.name : 'Choose .zip or .txt file'}</span><input type="file" accept=".zip,.txt,text/plain,application/zip" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>{file && <Button appearance="subtle" onClick={() => setFile(null)}>Remove file</Button>}</div>{file && <small className="of-source-size">{(file.size / 1024).toFixed(1)} KB selected</small>}</Field>
+                <Field className="of-import-notes" label="Paste activity notes" hint="Paste copied chat messages, field notes, or unit logs. Source content is processed transiently and never saved with the form."><Textarea value={notes} onChange={(_, data) => setNotes(data.value)} resize="vertical" /></Field>
+            </div>
+            {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
+            <div className="of-import-actions"><Button onClick={reset} disabled={working}>Cancel / reset</Button><Button appearance="primary" icon={working ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} disabled={working || !unitId.trim() || (!notes.trim() && !file)} onClick={() => void run()}>{working ? 'Analyzing and adding…' : 'Analyze and add to form'}</Button></div>
+            {summary && <div className="of-import-success" role="status">
+                <Check size={20} /><div><strong>Activity notes added</strong><p>Added {summary.applied_fields.length} field{summary.applied_fields.length === 1 ? '' : 's'}, {summary.updated_mileage_rows.length} mileage row{summary.updated_mileage_rows.length === 1 ? '' : 's'}, and {summary.appended_labor_rows.length} labor activit{summary.appended_labor_rows.length === 1 ? 'y' : 'ies'}.{summary.estimated_fields.length > 0 ? ` ${summary.estimated_fields.length} end time${summary.estimated_fields.length === 1 ? ' was' : 's were'} estimated.` : ''}</p>{summary.fallback_used && <small>Rules-based extraction was used because the configured AI service was unavailable.</small>}{summary.skipped_conflicts.length > 0 && <small>{summary.skipped_conflicts.length} existing value{summary.skipped_conflicts.length === 1 ? ' was' : 's were'} preserved.</small>}</div>
+                <div className="of-import-success-actions"><Button onClick={() => review(summary)}>Review imported fields</Button><Button onClick={() => void undo(summary.id).then(() => setSummary(null))}>Undo this import</Button><Button appearance="subtle" onClick={() => setSummary(null)}>Dismiss</Button></div>
+            </div>}
         </div>
-        {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
-        <div className="of-import-actions"><Button onClick={close}>Cancel</Button><Button onClick={() => void create('froc_log_001_ff')}>Create blank draft</Button><Button appearance="primary" icon={working ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} disabled={working || !unitId.trim() || (!notes.trim() && !file)} onClick={() => void run()}>{working ? 'Analyzing secure source…' : 'Analyze notes'}</Button></div>
-        {preview && <div className="of-import-preview">
-            <div className="of-evidence-spine"><span>Source filtered</span><ChevronRight size={15} /><span>{preview.engine}</span><ChevronRight size={15} /><strong>Member review required</strong></div>
-            <div className="of-import-summary"><div><small>Event</small><strong>{preview.event_name}</strong></div><div><small>Unit</small><strong>{preview.unit_designation}</strong></div><div><small>Matched messages</small><strong>{preview.matched_message_count}</strong></div><div><small>Suggested labor rows</small><strong>{preview.labor.length}</strong></div></div>
-            <MessageBar intent="warning"><MessageBarBody>{preview.warning}</MessageBarBody></MessageBar>
-            {preview.vehicle_mileage.length > 0 && <div className="of-mileage-preview"><h3>Extracted mileage</h3>{preview.vehicle_mileage.map((row, index) => <div key={index}><strong>{row.equipment_id || preview.unit_designation}</strong><span>Starting: {row.start_odometer || 'Review required'}</span><span>Ending / arrival: {row.end_odometer || 'Not found'}</span></div>)}</div>}
-            <div className="of-suggestion-list">{preview.labor.map((row, index) => <article key={`${row.source_timestamp}-${index}`}><div><Badge color={row.confidence === 'high' ? 'success' : 'warning'}>{row.confidence === 'high' ? 'High confidence' : 'Review'}</Badge>{row.end_estimated && <Badge color="warning">End estimated</Badge>}</div><strong>{row.work_performed}</strong><span>{row.start}–{row.end} · Category {row.category}{row.location_gps ? ` · ${row.location_gps}` : ''}</span><small>Source: “{row.source_excerpt}”</small></article>)}</div>
-            <div className="of-import-actions"><Button appearance="primary" icon={<FilePlus2 size={17} />} onClick={() => void create('froc_log_001_ff', preview)}>Create editable draft with these suggestions</Button></div>
-        </div>}
-    </section>;
+    </details>;
 }
 
-function EditorView({ record, definition, saveState, activeSection, setActiveSection, isGenerating, update, save, generate, remove, back, preview, searchEmployees }: {
+function EditorView({ record, definition, saveState, activeSection, setActiveSection, isGenerating, update, save, generate, remove, back, preview, searchEmployees, applyFrocImport, undoFrocImport }: {
     record: FormRecord; definition?: FormDefinition; saveState: SaveState; activeSection: string; setActiveSection: (value: string) => void; isGenerating: boolean;
     update: (mutator: (data: Record<string, any>) => void) => void; save: () => void; generate: () => void; remove: () => void; back: () => void; preview: (doc: FormDocument) => void; searchEmployees: (query: string) => Promise<EmployeeSuggestion[]>;
+    applyFrocImport: (payload: FormData) => Promise<FrocImportSummary>; undoFrocImport: (importId: string) => Promise<void>;
 }) {
     const document = latestDocument(record);
     const sections = record.form_type === 'ics_214' ? [['overview', 'Operational period'], ['resources', 'Resources'], ['activities', 'Activity log'], ['prepared', 'Prepared by'], ['documents', 'PDF versions']] : [['overview', 'General information'], ['team', 'Team members'], ['labor', 'Labor'], ['equipment', 'Equipment'], ['mileage', 'Mileage'], ['materials', 'Materials'], ['certification', 'Certification'], ['documents', 'PDF versions']];
@@ -310,7 +339,7 @@ function EditorView({ record, definition, saveState, activeSection, setActiveSec
         <div className="of-record-spine"><div><Badge appearance="outline">{typeLabel(record.form_type)} · v{record.form_version}</Badge><h1>{record.title}</h1><p>Record {record.id.slice(-8).toUpperCase()} · revision {record.revision}</p></div><div className="of-spine-status"><StatusBadge status={record.status} />{record.latest_pdf_version && <Badge color={record.has_changes_since_latest_pdf ? 'warning' : 'success'}>{record.has_changes_since_latest_pdf ? 'Changed since PDF' : `PDF v${record.latest_pdf_version} current`}</Badge>}</div></div>
         {document && <div className="of-document-ready" role="status"><div className="of-document-ready-icon"><FileCheck2 size={20} /></div><div><strong>Latest controlled PDF</strong><span>Version {document.version_number} · {document.display_name}</span><small>Generated {stamp(document.created_at)} from revision {document.source_revision}</small></div><div className="of-document-ready-actions"><Button appearance="primary" icon={<Eye size={16} />} aria-label="View latest PDF" onClick={() => preview(document)}>View / print</Button><Button as="a" href={document.download_url} icon={<Download size={16} />} aria-label="Download latest PDF">Download</Button></div></div>}
         <div className="of-editor-grid"><aside className="of-context-nav" aria-label="Form sections">{sections.map(([id, label]) => <button key={id} className={activeSection === id ? 'active' : ''} onClick={() => setActiveSection(id)}>{label}</button>)}</aside><div className="of-form-canvas" onBlur={save}>
-            {record.form_type === 'ics_214' ? <IcsEditor record={record} definition={definition} section={activeSection} update={update} /> : <FrocEditor record={record} definition={definition} section={activeSection} update={update} searchEmployees={searchEmployees} />}
+            {record.form_type === 'ics_214' ? <IcsEditor record={record} definition={definition} section={activeSection} update={update} /> : <FrocEditor record={record} definition={definition} section={activeSection} update={update} searchEmployees={searchEmployees} applyImport={applyFrocImport} undoImport={undoFrocImport} reviewImport={(summary) => setActiveSection(summary.updated_mileage_rows.length > 0 ? 'mileage' : summary.appended_labor_rows.length > 0 ? 'labor' : 'overview')} />}
             {activeSection === 'documents' && <Documents record={record} preview={preview} />}
         </div></div>
     </div>;
@@ -325,12 +354,17 @@ function IcsEditor({ record, definition, section, update }: EditorProps) {
     return null;
 }
 
-function FrocEditor({ record, definition, section, update, searchEmployees }: EditorProps & { searchEmployees: (query: string) => Promise<EmployeeSuggestion[]> }) {
+function FrocEditor({ record, definition, section, update, searchEmployees, applyImport, undoImport, reviewImport }: EditorProps & {
+    searchEmployees: (query: string) => Promise<EmployeeSuggestion[]>;
+    applyImport: (payload: FormData) => Promise<FrocImportSummary>;
+    undoImport: (importId: string) => Promise<void>;
+    reviewImport: (summary: FrocImportSummary) => void;
+}) {
     const data = record.data; const cap = definition?.capacities || {};
     const options = definition?.field_options;
-    if (section === 'overview') return <FormSection number="1" title="General information" help="An imported event name is placed in the controlled Event ID / event name field for member confirmation."><FieldGrid><TextField label="Event ID / event name" value={data.general_information?.event_id} set={(v) => update((d) => setPath(d, ['general_information', 'event_id'], v))} /><TextField label="Applicant name" value={data.general_information?.applicant_name} set={(v) => update((d) => setPath(d, ['general_information', 'applicant_name'], v))} /><TextField label="Department" value={data.general_information?.department} set={(v) => update((d) => setPath(d, ['general_information', 'department'], v))} /><TextField type="date" label="Report date" value={data.general_information?.date} set={(v) => update((d) => setPath(d, ['general_information', 'date'], v))} /></FieldGrid><Totals data={data} /></FormSection>;
+    if (section === 'overview') return <FormSection number="1" title="General information" help="Enter the event and reporting details directly. Importing activity notes is optional."><FieldGrid><TextField label="Event ID / event name" value={data.general_information?.event_id} set={(v) => update((d) => setPath(d, ['general_information', 'event_id'], v))} /><TextField label="Applicant name" value={data.general_information?.applicant_name} set={(v) => update((d) => setPath(d, ['general_information', 'applicant_name'], v))} /><TextField label="Department" value={data.general_information?.department} set={(v) => update((d) => setPath(d, ['general_information', 'department'], v))} /><TextField type="date" label="Report date" value={data.general_information?.date} set={(v) => update((d) => setPath(d, ['general_information', 'date'], v))} /></FieldGrid><FrocImportPanel apply={applyImport} undo={undoImport} review={reviewImport} /><Totals data={data} /></FormSection>;
     if (section === 'team') return <TeamMembersEditor rows={data.team_members || []} capacity={cap.team_members || 14} onChange={(rows) => update((d) => { d.team_members = rows; })} search={searchEmployees} />;
-    if (section === 'labor') return <LaborEditor rows={data.labor || []} capacity={cap.labor || 13} onChange={(rows) => update((d) => { d.labor = rows; })} options={options} />;
+    if (section === 'labor') return <LaborEditor rows={data.labor || []} capacity={cap.labor || 13} onChange={(rows) => update((d) => { d.labor = rows; })} options={options} estimatedFields={record.import_metadata?.estimated_fields || []} />;
     if (section === 'equipment') return <RepeatingTable title="Equipment hours" rows={data.equipment_hours || []} fields={[['category', 'Cat.'], ['equipment_id', 'Equipment ID'], ['operator', 'Operator'], ['description', 'Description'], ['location', 'Location'], ['hours', 'Hours'], ['event_related', 'Event?', 'checkbox']]} capacity={cap.equipment_hours || 6} onChange={(rows) => update((d) => { d.equipment_hours = rows; })} rowType="equipment_hours" categories={options?.categories} />;
     if (section === 'mileage') return <RepeatingTable title="Vehicle mileage" rows={data.vehicle_mileage || []} fields={[['category', 'Cat.'], ['equipment_id', 'Vehicle ID'], ['operator', 'Operator'], ['destination', 'Destination'], ['start_odometer', 'Start odo.'], ['end_odometer', 'End odo.'], ['manual_miles', 'Corrected miles'], ['correction_reason', 'Correction reason'], ['event_related', 'Event?', 'checkbox']]} capacity={cap.vehicle_mileage || 2} onChange={(rows) => update((d) => { d.vehicle_mileage = rows; })} rowType="vehicle_mileage" categories={options?.categories} />;
     if (section === 'materials') return <RepeatingTable title="Materials and supplies" rows={data.materials || []} fields={[['category', 'Cat.'], ['item', 'Item'], ['quantity', 'Quantity'], ['cost', 'Cost'], ['justification', 'Justification'], ['receipt_reference', 'Receipt ref.'], ['from_stock', 'Stock?', 'checkbox']]} capacity={cap.materials || 7} onChange={(rows) => update((d) => { d.materials = rows; })} rowType="materials" categories={options?.categories} />;
@@ -376,27 +410,45 @@ function EmployeeLookup({ value, set, choose, search }: { value: string; set: (v
     return <Field label="Employee ID or name" hint="Choose a match to auto-fill; free text remains allowed."><div className="of-lookup"><Input value={value} autoComplete="off" onFocus={() => setOpen(matches.length > 0)} onChange={(_, data) => set(data.value)} onBlur={() => window.setTimeout(() => setOpen(false), 120)} />{open && matches.length > 0 && <div className="of-lookup-menu" role="listbox">{matches.map((employee) => <button type="button" role="option" key={employee.employee_id} onMouseDown={(event) => event.preventDefault()} onClick={() => { choose(employee); setOpen(false); }}><strong>{employee.employee_id}</strong><span>{employee.name}</span><small>{employee.rank || 'Member'}</small></button>)}</div>}</div></Field>;
 }
 
-function LaborEditor({ rows, capacity, onChange, options }: { rows: Record<string, any>[]; capacity: number; onChange: (rows: Record<string, any>[]) => void; options?: FormDefinition['field_options'] }) {
+function LaborEditor({ rows, capacity, onChange, options, estimatedFields }: { rows: Record<string, any>[]; capacity: number; onChange: (rows: Record<string, any>[]) => void; options?: FormDefinition['field_options']; estimatedFields: string[] }) {
     const edit = (index: number, key: string, value: any) => { const next = clone(rows); next[index][key] = value; if (key === 'category') next[index].work_performed = ''; onChange(next); };
     const descriptions = (category: string) => options?.descriptions_by_category?.[category] || [];
     return <section className="of-form-section"><div className="of-section-heading"><div><h2>Labor activity</h2><p>{rows.length} of {capacity} controlled rows used · descriptions remain editable</p></div><Button icon={<Plus size={16} />} onClick={() => rows.length < capacity && onChange([...rows, clone(EMPTY_ROWS.labor)])} disabled={rows.length >= capacity}>Add activity</Button></div>
-        <div className="of-labor-list">{rows.length === 0 && <div className="of-empty-panel"><Clock3 /><p>No labor activity entered. Add a row when activity begins.</p></div>}{rows.map((row, index) => { const listId = `froc-description-${index}`; return <article className="of-labor-row" key={index}><div className="of-labor-row-head"><span>Activity {index + 1}</span><label className="of-event-check"><input type="checkbox" checked={Boolean(row.event_related)} onChange={(event) => edit(index, 'event_related', event.target.checked)} /> Event related</label><Button appearance="subtle" icon={<Trash2 size={15} />} aria-label={`Remove labor activity ${index + 1}`} onClick={() => onChange(rows.filter((_, i) => i !== index))} /></div><div className="of-labor-fields"><Field label="Category"><CategorySelect value={row.category} set={(value) => edit(index, 'category', value)} label={`Category activity ${index + 1}`} options={options?.categories} /></Field><Field className="of-labor-description" label="Description of work performed" hint={row.category ? 'Choose a controlled option or enter a more specific professional description.' : 'Select a category first.'}><Input list={listId} disabled={!row.category} value={row.work_performed || ''} onChange={(_, data) => edit(index, 'work_performed', data.value)} /><datalist id={listId}>{descriptions(row.category).map((description) => <option value={description} key={description} />)}</datalist></Field><Field label="Work location / GPS"><Input value={row.location_gps || ''} onChange={(_, data) => edit(index, 'location_gps', data.value)} /></Field><Field label="Start"><Input type="time" value={row.start || ''} onChange={(_, data) => edit(index, 'start', data.value)} /></Field><Field label="End"><Input type="time" value={row.end || ''} onChange={(_, data) => edit(index, 'end', data.value)} /></Field></div><details className="of-correction"><summary>Calculated-hours correction (only if needed)</summary><div><Field label="Override hours"><Input inputMode="decimal" value={row.manual_override_hours || ''} onChange={(_, data) => edit(index, 'manual_override_hours', data.value)} /></Field><Field label="Required correction reason"><Textarea value={row.override_reason || ''} onChange={(_, data) => edit(index, 'override_reason', data.value)} /></Field></div></details></article>; })}</div>
+        <div className="of-labor-list">{rows.length === 0 && <div className="of-empty-panel"><Clock3 /><p>No labor activity entered. Add a row when activity begins.</p></div>}{rows.map((row, index) => { const listId = `froc-description-${index}`; const estimated = estimatedFields.includes(`labor.${index}.end`); return <article className="of-labor-row" key={index}><div className="of-labor-row-head"><span>Activity {index + 1}</span><label className="of-event-check"><input type="checkbox" checked={Boolean(row.event_related)} onChange={(event) => edit(index, 'event_related', event.target.checked)} /> Event related</label><Button appearance="subtle" icon={<Trash2 size={15} />} aria-label={`Remove labor activity ${index + 1}`} onClick={() => onChange(rows.filter((_, i) => i !== index))} /></div><div className="of-labor-fields"><Field label="Category"><CategorySelect value={row.category} set={(value) => edit(index, 'category', value)} label={`Category activity ${index + 1}`} options={options?.categories} /></Field><Field className="of-labor-description" label="Description of work performed" hint={row.category ? 'Choose a controlled option or enter a more specific professional description.' : 'Select a category first.'}><Input list={listId} disabled={!row.category} value={row.work_performed || ''} onChange={(_, data) => edit(index, 'work_performed', data.value)} /><datalist id={listId}>{descriptions(row.category).map((description) => <option value={description} key={description} />)}</datalist></Field><Field label="Work location / GPS"><Input value={row.location_gps || ''} onChange={(_, data) => edit(index, 'location_gps', data.value)} /></Field><Field label="Start"><Input type="time" value={row.start || ''} onChange={(_, data) => edit(index, 'start', data.value)} /></Field><Field label={estimated ? 'End · AI estimate' : 'End'} hint={estimated ? 'Estimated from the source timeline. Confirm or edit this time.' : undefined}><Input type="time" value={row.end || ''} onChange={(_, data) => edit(index, 'end', data.value)} /></Field></div><details className="of-correction"><summary>Calculated-hours correction (only if needed)</summary><div><Field label="Override hours"><Input inputMode="decimal" value={row.manual_override_hours || ''} onChange={(_, data) => edit(index, 'manual_override_hours', data.value)} /></Field><Field label="Required correction reason"><Textarea value={row.override_reason || ''} onChange={(_, data) => edit(index, 'override_reason', data.value)} /></Field></div></details></article>; })}</div>
     </section>;
 }
 
 function RepeatingTable({ title, rows, fields, capacity, onChange, rowType, wide, categories }: { title: string; rows: Record<string, any>[]; fields: [string, string, (InputType | 'checkbox')?][]; capacity: number; onChange: (rows: Record<string, any>[]) => void; rowType: string; wide?: string; categories?: string[] }) {
     const add = () => rows.length < capacity && onChange([...rows, clone(EMPTY_ROWS[rowType])]);
     const edit = (index: number, key: string, value: any) => { const next = clone(rows); next[index][key] = value; onChange(next); };
-    return <section className="of-form-section"><div className="of-section-heading"><div><h2>{title}</h2><p>{rows.length} of {capacity} controlled rows used</p></div><Button icon={<Plus size={16} />} onClick={add} disabled={rows.length >= capacity}>Add row</Button></div><div className="of-table-wrap"><table className="of-edit-table"><thead><tr><th>#</th>{fields.map(([key, label]) => <th key={key} className={key === wide ? 'wide' : ''}>{label}</th>)}<th /></tr></thead><tbody>{rows.length === 0 && <tr><td colSpan={fields.length + 2} className="of-empty">No entries. Add a row when activity begins.</td></tr>}{rows.map((row, index) => <tr key={index}><td data-label="Row">{index + 1}</td>{fields.map(([key, label, type]) => <td key={key} data-label={label}>{type === 'checkbox' ? <input type="checkbox" checked={Boolean(row[key])} aria-label={`${label} row ${index + 1}`} onChange={(e) => edit(index, key, e.target.checked)} /> : key === 'category' ? <CategorySelect value={row[key]} set={(value) => edit(index, key, value)} label={`${label} row ${index + 1}`} options={categories} /> : key.includes('performed') || key.includes('reason') || key === 'justification' ? <Textarea aria-label={`${label} row ${index + 1}`} value={row[key] || ''} onChange={(_, data) => edit(index, key, data.value)} resize="vertical" /> : <Input aria-label={`${label} row ${index + 1}`} type={type || 'text'} value={row[key] ?? ''} onChange={(_, data) => edit(index, key, data.value)} />}</td>)}<td data-label="Actions"><Button appearance="subtle" icon={<Trash2 size={15} />} aria-label={`Remove row ${index + 1}`} onClick={() => onChange(rows.filter((_, i) => i !== index))} /></td></tr>)}</tbody></table></div></section>;
+    const cell = (row: Record<string, any>, index: number, key: string, label: string, type?: InputType | 'checkbox') => {
+        if (type === 'checkbox') return <input type="checkbox" checked={Boolean(row[key])} aria-label={`${label} row ${index + 1}`} onChange={(e) => edit(index, key, e.target.checked)} />;
+        if (key === 'category') return <CategorySelect value={row[key]} set={(value) => edit(index, key, value)} label={`${label} row ${index + 1}`} options={categories} />;
+        if (key.includes('performed') || key.includes('reason') || key === 'justification') return <Textarea aria-label={`${label} row ${index + 1}`} value={row[key] || ''} onChange={(_, data) => edit(index, key, data.value)} resize="vertical" />;
+        const incompleteMileage = rowType === 'vehicle_mileage'
+            && ((key === 'end_odometer' && row.start_odometer && !row.end_odometer) || (key === 'start_odometer' && row.end_odometer && !row.start_odometer));
+        return <><Input aria-label={`${label} row ${index + 1}`} type={type || 'text'} value={row[key] ?? ''} onChange={(_, data) => edit(index, key, data.value)} />{incompleteMileage && <small className="of-field-note">Pending — complete the odometer pair before PDF generation.</small>}</>;
+    };
+    return <section className="of-form-section"><div className="of-section-heading"><div><h2>{title}</h2><p>{rows.length} of {capacity} controlled rows used</p></div><Button icon={<Plus size={16} />} onClick={add} disabled={rows.length >= capacity}>Add row</Button></div><div className="of-table-wrap"><table className="of-edit-table"><thead><tr><th>#</th>{fields.map(([key, label]) => <th key={key} className={key === wide ? 'wide' : ''}>{label}</th>)}<th /></tr></thead><tbody>{rows.length === 0 && <tr><td colSpan={fields.length + 2} className="of-empty">No entries. Add a row when activity begins.</td></tr>}{rows.map((row, index) => <tr key={index}><td data-label="Row">{index + 1}</td>{fields.map(([key, label, type]) => <td key={key} data-label={label}>{cell(row, index, key, label, type)}</td>)}<td data-label="Actions"><Button appearance="subtle" icon={<Trash2 size={15} />} aria-label={`Remove row ${index + 1}`} onClick={() => onChange(rows.filter((_, i) => i !== index))} /></td></tr>)}</tbody></table></div></section>;
 }
 
 function NotesEditor({ values, capacity, onChange }: { values: string[]; capacity: number; onChange: (values: string[]) => void }) { return <section className="of-form-section"><div className="of-section-heading"><div><h2>Additional notes</h2><p>{values.length} of {capacity} lines used</p></div><Button icon={<Plus size={16} />} disabled={values.length >= capacity} onClick={() => onChange([...values, ''])}>Add note</Button></div>{values.map((value, index) => <div className="of-note" key={index}><span>{index + 1}</span><Textarea value={value} onChange={(_, d) => { const next = [...values]; next[index] = d.value; onChange(next); }} /><Button appearance="subtle" icon={<Trash2 size={15} />} onClick={() => onChange(values.filter((_, i) => i !== index))} /></div>)}</section>; }
 
 function Totals({ data }: { data: Record<string, any> }) {
     const sum = (rows: any[], key: string, event: boolean) => rows.filter((r) => Boolean(r.event_related) === event).reduce((total, row) => total + Number(row[key] || 0), 0);
-    const miles = (event: boolean) => (data.vehicle_mileage || []).filter((r: any) => Boolean(r.event_related) === event).reduce((total: number, row: any) => total + Number(row.manual_miles || (Number(row.end_odometer || 0) - Number(row.start_odometer || 0))), 0);
+    const mileage = (event: boolean) => {
+        const rows = (data.vehicle_mileage || []).filter((row: any) => Boolean(row.event_related) === event);
+        let total = 0; let pending = false;
+        rows.forEach((row: any) => {
+            if (row.manual_miles !== '' && row.manual_miles != null) { total += Math.max(0, Number(row.manual_miles)); return; }
+            if (row.start_odometer === '' || row.start_odometer == null || row.end_odometer === '' || row.end_odometer == null) { if (row.start_odometer || row.end_odometer) pending = true; return; }
+            const difference = Number(row.end_odometer) - Number(row.start_odometer);
+            if (difference >= 0) total += difference; else pending = true;
+        });
+        return pending ? (total > 0 ? `${total.toFixed(2)} mi + pending` : 'Pending') : `${total.toFixed(2)} mi`;
+    };
     const values = data.calculated_totals || {};
-    return <div className="of-totals" aria-label="Authoritative calculated totals"><div><small>Event labor</small><strong>{values.p2_total_event_hours ?? '0.00'} h</strong></div><div><small>Non-event labor</small><strong>{values.p2_total_non_event_hours ?? '0.00'} h</strong></div><div><small>Event equipment</small><strong>{values.p3_equipment_hours_total_event ?? sum(data.equipment_hours || [], 'hours', true).toFixed(2)} h</strong></div><div><small>Non-event equipment</small><strong>{values.p3_equipment_hours_total_non_event ?? sum(data.equipment_hours || [], 'hours', false).toFixed(2)} h</strong></div><div><small>Event mileage</small><strong>{values.p3_mileage_total_event ?? miles(true).toFixed(2)} mi</strong></div><div><small>Non-event mileage</small><strong>{values.p3_mileage_total_non_event ?? miles(false).toFixed(2)} mi</strong></div></div>;
+    return <div className="of-totals" aria-label="Authoritative calculated totals"><div><small>Event labor</small><strong>{values.p2_total_event_hours ?? '0.00'} h</strong></div><div><small>Non-event labor</small><strong>{values.p2_total_non_event_hours ?? '0.00'} h</strong></div><div><small>Event equipment</small><strong>{values.p3_equipment_hours_total_event ?? sum(data.equipment_hours || [], 'hours', true).toFixed(2)} h</strong></div><div><small>Non-event equipment</small><strong>{values.p3_equipment_hours_total_non_event ?? sum(data.equipment_hours || [], 'hours', false).toFixed(2)} h</strong></div><div><small>Event mileage</small><strong>{mileage(true)}</strong></div><div><small>Non-event mileage</small><strong>{mileage(false)}</strong></div></div>;
 }
 
 function Documents({ record, preview }: { record: FormRecord; preview: (doc: FormDocument) => void }) { return <section className="of-form-section"><div className="of-section-title"><span><FileCheck2 size={18} /></span><div><h2>Generated PDF versions</h2><p>Immutable private files created from frozen source revisions.</p></div></div><div className="of-document-list">{record.documents.length === 0 && <div className="of-empty-panel"><FilePlus2 /><p>No PDF has been generated from this record.</p></div>}{[...record.documents].sort((a, b) => b.version_number - a.version_number).map((doc) => <article key={doc.id}><div><strong>Version {doc.version_number}</strong><span>{doc.display_name}</span><small>Source revision {doc.source_revision} · {stamp(doc.created_at)}</small></div><Button icon={<Printer size={16} />} onClick={() => preview(doc)}>Preview / print</Button><Button as="a" href={doc.download_url} icon={<Download size={16} />}>Download</Button></article>)}</div></section>; }

@@ -119,9 +119,9 @@ final class FormDataValidator
             'vehicle_mileage.*.equipment_id' => ['nullable', 'string', 'max:60'],
             'vehicle_mileage.*.operator' => ['nullable', 'string', 'max:100'],
             'vehicle_mileage.*.destination' => ['nullable', 'string', 'max:180'],
-            'vehicle_mileage.*.start_odometer' => ['nullable', 'regex:/^-?\d+(?:\.\d{1,2})?$/'],
-            'vehicle_mileage.*.end_odometer' => ['nullable', 'regex:/^-?\d+(?:\.\d{1,2})?$/'],
-            'vehicle_mileage.*.manual_miles' => ['nullable', 'regex:/^-?\d+(?:\.\d{1,2})?$/'],
+            'vehicle_mileage.*.start_odometer' => ['nullable', 'regex:/^\d+(?:\.\d{1,2})?$/'],
+            'vehicle_mileage.*.end_odometer' => ['nullable', 'regex:/^\d+(?:\.\d{1,2})?$/'],
+            'vehicle_mileage.*.manual_miles' => ['nullable', 'regex:/^\d+(?:\.\d{1,2})?$/'],
             'vehicle_mileage.*.correction_reason' => ['nullable', 'string', 'max:250'],
             'vehicle_mileage.*.event_related' => ['nullable', 'boolean'],
             'materials' => ['nullable', 'array', 'max:7'],
@@ -149,10 +149,52 @@ final class FormDataValidator
         ];
 
         $validator = Validator::make($data, $rules);
-        $validator->after(function ($validator) use (&$data): void {
+        $validator->after(function ($validator) use (&$data, $forCompletion): void {
             foreach ($data['labor'] ?? [] as $index => $row) {
                 if (filled($row['manual_override_hours'] ?? null) && blank($row['override_reason'] ?? null)) {
                     $validator->errors()->add("labor.$index.override_reason", 'An override reason is required.');
+                }
+
+                if (! $forCompletion || $this->rowIsBlank($row)) {
+                    continue;
+                }
+
+                $hasOverride = filled($row['manual_override_hours'] ?? null) && filled($row['override_reason'] ?? null);
+                $hasTimes = filled($row['start'] ?? null) && filled($row['end'] ?? null);
+                if (! $hasOverride && ! $hasTimes) {
+                    $validator->errors()->add(
+                        "labor.$index.end",
+                        'Enter both start and end times, or corrected hours with a reason.',
+                    );
+                }
+            }
+
+            foreach ($data['vehicle_mileage'] ?? [] as $index => $row) {
+                $hasManual = filled($row['manual_miles'] ?? null);
+                if ($hasManual && blank($row['correction_reason'] ?? null)) {
+                    $validator->errors()->add(
+                        "vehicle_mileage.$index.correction_reason",
+                        'A correction reason is required when corrected mileage is entered.',
+                    );
+                }
+
+                if (! $forCompletion || $this->rowIsBlank($row)) {
+                    continue;
+                }
+
+                $hasStart = filled($row['start_odometer'] ?? null);
+                $hasEnd = filled($row['end_odometer'] ?? null);
+                $validPair = $hasStart
+                    && $hasEnd
+                    && (float) $row['end_odometer'] >= (float) $row['start_odometer'];
+                $validManual = $hasManual && filled($row['correction_reason'] ?? null);
+
+                if (! $validPair && ! $validManual) {
+                    $field = $hasStart && $hasEnd ? 'manual_miles' : ($hasStart ? 'end_odometer' : 'start_odometer');
+                    $message = $hasStart && $hasEnd
+                        ? 'Ending mileage is below starting mileage. Enter corrected mileage and a correction reason.'
+                        : 'Enter both starting and ending odometers, or corrected mileage with a reason.';
+                    $validator->errors()->add("vehicle_mileage.$index.$field", $message);
                 }
             }
 
@@ -167,6 +209,17 @@ final class FormDataValidator
         $validated['calculated_totals'] = FrocTotalsCalculator::calculate($validated);
 
         return $validated;
+    }
+
+    private function rowIsBlank(array $row): bool
+    {
+        foreach ($row as $key => $value) {
+            if ($key !== 'event_related' && filled($value)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function normalize(array $data): array

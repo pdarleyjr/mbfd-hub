@@ -30,7 +30,10 @@ class FormRecordController extends Controller
     public function index(Request $request): JsonResponse
     {
         $records = $this->ownedQuery($request->user('employee'))
-            ->with(['documents' => fn ($query) => $query->latest('version_number')])
+            ->with([
+                'documents' => fn ($query) => $query->latest('version_number'),
+                'imports' => fn ($query) => $query->where('status', 'applied')->latest(),
+            ])
             ->latest('updated_at')
             ->get()
             ->map(fn (OperationalFormRecord $record) => $this->serialize($record));
@@ -65,7 +68,10 @@ class FormRecordController extends Controller
     public function show(Request $request, string $record): JsonResponse
     {
         return response()->json([
-            'record' => $this->serialize($this->owned($request->user('employee'), $record)->load('documents')),
+            'record' => $this->serialize($this->owned($request->user('employee'), $record)->load([
+                'documents',
+                'imports' => fn ($query) => $query->where('status', 'applied')->latest(),
+            ])),
         ]);
     }
 
@@ -112,7 +118,10 @@ class FormRecordController extends Controller
             ], 409);
         }
 
-        $saved = $this->owned($employee, $record)->load('documents');
+        $saved = $this->owned($employee, $record)->load([
+            'documents',
+            'imports' => fn ($query) => $query->where('status', 'applied')->latest(),
+        ]);
         $this->audit($saved, 'autosaved', $request);
 
         return response()->json(['record' => $this->serialize($saved)]);
@@ -160,6 +169,27 @@ class FormRecordController extends Controller
             'documents' => $record->relationLoaded('documents')
                 ? $record->documents->map(fn ($document) => $this->serializeDocument($document))->values()
                 : [],
+            'import_metadata' => $this->importMetadata($record),
+        ];
+    }
+
+    private function importMetadata(OperationalFormRecord $record): array
+    {
+        if (! $record->relationLoaded('imports')) {
+            return ['estimated_fields' => [], 'imported_fields' => []];
+        }
+
+        return [
+            'estimated_fields' => $record->imports->flatMap(
+                fn ($import) => data_get($import->result, 'summary.estimated_fields', []),
+            )->unique()->values(),
+            'imported_fields' => $record->imports->flatMap(function ($import) {
+                return array_merge(
+                    data_get($import->result, 'summary.applied_fields', []),
+                    array_map(fn ($index) => "labor.$index", data_get($import->result, 'summary.appended_labor_rows', [])),
+                    array_map(fn ($index) => "vehicle_mileage.$index", data_get($import->result, 'summary.updated_mileage_rows', [])),
+                );
+            })->unique()->values(),
         ];
     }
 

@@ -4,6 +4,7 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
+        "typecheck": "tsc --noEmit",
         "test:operational-forms-e2e": "playwright test --config=playwright.operational-forms.config.ts"
     },
     "devDependencies": {
