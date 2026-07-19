@@ -39,6 +39,7 @@ final class FormRegistry
                 'form_version' => $manifest['form_version'],
                 'display_name' => $manifest['display_name'],
                 'capacities' => $definition->capacities(),
+                'field_options' => $type === 'froc_log_001_ff' ? FrocDropdownOptions::toArray() : null,
             ];
         }, ['ics_214', 'froc_log_001_ff']);
     }

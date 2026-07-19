@@ -5,6 +5,45 @@ export interface FormDefinition {
     form_version: string;
     display_name: string;
     capacities: Record<string, number>;
+    field_options?: {
+        categories: string[];
+        descriptions_by_category: Record<string, string[]>;
+        description_allows_custom: boolean;
+    } | null;
+}
+
+export interface EmployeeSuggestion {
+    employee_id: string;
+    name: string;
+    rank?: string | null;
+}
+
+export interface FrocImportLaborRow {
+    category: string;
+    work_performed: string;
+    location_gps: string;
+    start: string;
+    end: string;
+    manual_override_hours: string;
+    override_reason: string;
+    event_related: boolean;
+    source_excerpt: string;
+    source_timestamp: string;
+    confidence: 'high' | 'review';
+    end_estimated: boolean;
+}
+
+export interface FrocImportPreview {
+    event_name: string;
+    unit_designation: string;
+    report_date: string;
+    vehicle_mileage: Record<string, any>[];
+    labor: FrocImportLaborRow[];
+    engine: string;
+    warning: string;
+    source_type: string;
+    source_sha256: string;
+    matched_message_count: number;
 }
 
 export interface FormDocument {

@@ -37,4 +37,20 @@ class FormRegistryTest extends TestCase
             'additional_notes' => 28,
         ], $registry->get('froc_log_001_ff')->capacities());
     }
+
+    public function test_registry_exposes_exact_v11_dropdown_options(): void
+    {
+        $froc = collect(app(FormRegistry::class)->formTypes())->firstWhere('form_type', 'froc_log_001_ff');
+        $options = $froc['field_options'];
+
+        $this->assertSame(['A', 'B', 'N/A'], $options['categories']);
+        $this->assertCount(27, $options['descriptions_by_category']['A']);
+        $this->assertCount(32, $options['descriptions_by_category']['B']);
+        $this->assertCount(59, $options['descriptions_by_category']['N/A']);
+        $this->assertSame(
+            [...$options['descriptions_by_category']['A'], ...$options['descriptions_by_category']['B']],
+            $options['descriptions_by_category']['N/A'],
+        );
+        $this->assertTrue($options['description_allows_custom']);
+    }
 }
