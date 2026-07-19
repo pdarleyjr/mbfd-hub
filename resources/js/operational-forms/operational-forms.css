@@ -25,6 +25,10 @@
 .of-topbar { min-height: 52px; background: var(--of-navy); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
 .of-brand { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 600; letter-spacing: .01em; }
 .of-brand-divider { height: 20px; width: 1px; background: #66758a; margin: 0 3px; }
+.of-topbar-actions { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.of-hub-home { min-width: 44px; min-height: 44px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: #e8eef6; border: 1px solid #52647c; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: 600; }
+.of-hub-home:hover, .of-hub-home:focus-visible { color: white; background: #243b59; border-color: #8ea1b8; }
+.of-hub-home:focus-visible { outline: 2px solid #8fc5ff; outline-offset: 2px; }
 .of-employee { display: flex; align-items: flex-end; flex-direction: column; line-height: 1.25; min-width: 0; max-width: min(52vw, 420px); }
 .of-employee span, .of-employee small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .of-employee span { font-size: 13px; font-weight: 600; }
@@ -292,6 +296,8 @@
 }
 
 @media (max-width: 520px) {
+    .of-hub-home { padding-inline: 0; }
+    .of-hub-home span { display: none; }
     .of-employee { display: none; }
     .of-record-table thead { display: none; }
     .of-record-table, .of-record-table tbody { display: block; }
