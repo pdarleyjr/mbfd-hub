@@ -105,4 +105,24 @@ class FormDataValidatorTest extends TestCase
         $validated = app(FormDataValidator::class)->validate('froc_log_001_ff', $base, true);
         $this->assertSame('20.00', data_get($validated, 'calculated_totals.p3_mileage_total_event'));
     }
+
+    public function test_froc_accepts_optional_signature_times_for_exact_certification_records(): void
+    {
+        $validated = app(FormDataValidator::class)->validate('froc_log_001_ff', [
+            'general_information' => [
+                'event_id' => 'Gold Game',
+                'applicant_name' => 'City of Miami Beach',
+                'department' => 'Miami Beach Fire Department',
+                'date' => '2026-07-19',
+            ],
+            'certification' => [
+                'final_employee_signature_text' => 'Victor White',
+                'final_employee_signature_date' => '2026-07-19',
+                'final_employee_signature_time' => '23:00',
+                'confirmed' => true,
+            ],
+        ], true);
+
+        $this->assertSame('23:00', $validated['certification']['final_employee_signature_time']);
+    }
 }

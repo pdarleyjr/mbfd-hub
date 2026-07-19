@@ -35,6 +35,8 @@ class OperationalForms extends Page
                 'endpoints' => [
                     'form_types' => route('employee.forms.api.form-types'),
                     'records' => route('employee.forms.api.records.index'),
+                    'uploads' => route('employee.forms.api.uploads.store'),
+                    'guide' => url('/documents/MBFD_Operational_Forms_User_Guide.pdf'),
                 ],
                 'csrf_token' => csrf_token(),
                 'build' => config('app.version', 'development'),

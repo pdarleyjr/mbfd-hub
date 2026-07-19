@@ -81,6 +81,32 @@ test('employee dashboard header returns members to the main MBFD Hub', async ({ 
   await page.screenshot({ path: 'tests/e2e/screenshots/employee-dashboard-home-phone.png', fullPage: true });
 });
 
+test('employee can submit an arbitrary completed file from the Forms library', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One desktop upload acceptance is sufficient.');
+
+  await page.goto('/employee/forms');
+  await page.getByLabel('Employee ID').fill(employeeId);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page).toHaveURL(/\/employee\/forms$/, { timeout: 30_000 });
+
+  const upload = page.locator('.of-upload-card');
+  await expect(upload.getByRole('heading', { name: 'Send a completed file to Forms administration' })).toBeVisible();
+  await upload.getByLabel('File name').fill('E2E command notes');
+  await upload.locator('input[type=file]').setInputFiles({
+    name: 'command-notes.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Operational Forms E2E file submission'),
+  });
+  await upload.getByRole('button', { name: 'Submit completed file' }).click();
+  await expect(page.getByText(/was submitted as a completed form/)).toBeVisible();
+
+  const row = page.locator('.of-record-table tbody tr').filter({ hasText: 'E2E command notes' });
+  await expect(row).toContainText('Submitted file');
+  await expect(row).toContainText('Completed');
+  await expect(row.getByRole('button', { name: 'Open document for E2E command notes' })).toBeVisible();
+});
+
 test('employee creates a F-ROC and imports R6 activity notes into the real editor', async ({ page }, testInfo) => {
   await page.goto('/employee/login');
   await page.getByLabel('Employee ID').fill(employeeId);
@@ -187,6 +213,8 @@ test('admin Forms resource exposes separate controlled-form tabs', async ({ page
   await page.goto('/admin/operational-forms');
   await expect(page.getByText('ICS 214', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('F-ROC Daily Activity Reports', { exact: true })).toBeVisible();
+  await expect(page.getByText('Submitted files', { exact: true })).toBeVisible();
   await expect(page.getByText('E2E Controlled ICS 214')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: 'Delete' }).first()).toBeVisible();
   await page.screenshot({ path: 'tests/e2e/screenshots/operational-forms-admin-tabs-desktop.png', fullPage: true });
 });

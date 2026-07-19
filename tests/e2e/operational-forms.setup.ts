@@ -9,7 +9,14 @@ export default function globalSetup() {
   const options = {
     cwd: process.cwd(),
     stdio: 'inherit' as const,
-    env: { ...process.env, APP_ENV: 'testing', DB_CONNECTION: 'sqlite', DB_DATABASE: database, QUEUE_CONNECTION: 'sync' },
+    env: {
+      ...process.env,
+      APP_ENV: 'testing',
+      APP_KEY: process.env.APP_KEY ?? 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      DB_CONNECTION: 'sqlite',
+      DB_DATABASE: database,
+      QUEUE_CONNECTION: 'sync',
+    },
   };
 
   execFileSync(php, ['artisan', 'migrate:fresh', '--force'], options);

@@ -29,7 +29,7 @@ class OperationalFormRecordPolicy
 
     public function delete(User $user, OperationalFormRecord $record): bool
     {
-        return false;
+        return $this->viewAny($user);
     }
 
     public function restore(User $user, OperationalFormRecord $record): bool
@@ -39,6 +39,6 @@ class OperationalFormRecordPolicy
 
     public function forceDelete(User $user, OperationalFormRecord $record): bool
     {
-        return false;
+        return $this->viewAny($user);
     }
 }
