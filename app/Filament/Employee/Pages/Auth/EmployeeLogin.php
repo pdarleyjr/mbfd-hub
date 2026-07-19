@@ -14,6 +14,55 @@ use Illuminate\Http\Exceptions\ThrottleRequestsException;
  */
 class EmployeeLogin extends BaseLogin
 {
+    public static function safeIntendedPath(mixed $candidate): ?string
+    {
+        if (! is_string($candidate) || $candidate === '' || str_contains($candidate, '\\') || str_starts_with($candidate, '//')) {
+            return null;
+        }
+
+        $decoded = $candidate;
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            $next = rawurldecode($decoded);
+            if ($next === $decoded) {
+                break;
+            }
+            $decoded = $next;
+        }
+
+        if (preg_match('/[\x00-\x1F\x7F]/', $decoded)) {
+            return null;
+        }
+
+        $parts = parse_url($decoded);
+        if ($parts === false) {
+            return null;
+        }
+
+        if (isset($parts['host'])) {
+            $application = parse_url(config('app.url'));
+            $sameHost = strcasecmp($parts['host'], $application['host'] ?? '') === 0;
+            $samePort = ($parts['port'] ?? null) === ($application['port'] ?? null);
+            if (! $sameHost || ! $samePort || ! in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true)) {
+                return null;
+            }
+            $decoded = ($parts['path'] ?? '/').(isset($parts['query']) ? '?'.$parts['query'] : '');
+            $parts = parse_url($decoded);
+        } elseif (isset($parts['scheme'])) {
+            return null;
+        }
+
+        if (! str_starts_with($decoded, '/employee/')) {
+            return null;
+        }
+
+        $segments = explode('/', $parts['path'] ?? '');
+        if (array_intersect($segments, ['.', '..']) !== []) {
+            return null;
+        }
+
+        return $decoded;
+    }
+
     protected function getEmailFormComponent(): Component
     {
         return TextInput::make('email')
@@ -29,7 +78,7 @@ class EmployeeLogin extends BaseLogin
     {
         return [
             'employee_id' => $data['email'],
-            'password'    => $data['password'],
+            'password' => $data['password'],
         ];
     }
 
@@ -54,8 +103,9 @@ class EmployeeLogin extends BaseLogin
 
         session()->regenerate();
 
-        // Redirect to the employee dashboard
-        $this->redirect(route('filament.employee.pages.dashboard'), navigate: false);
+        $intended = session()->pull('employee.intended_path') ?? session()->pull('url.intended');
+        $target = self::safeIntendedPath($intended) ?? route('filament.employee.pages.dashboard');
+        $this->redirect($target, navigate: false);
 
         return app(LoginResponse::class);
     }

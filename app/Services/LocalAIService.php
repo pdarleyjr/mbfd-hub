@@ -58,6 +58,10 @@ class LocalAIService extends CloudflareAIService
      */
     public function runModel(string $model, array $messages, array $options = []): array
     {
+        // Interactive browser requests may use a shorter ceiling than the
+        // global cold-load timeout. Never forward this transport option.
+        $requestTimeout = (int) ($options['request_timeout'] ?? config('cloudflare.ai.local.timeout', 120));
+        unset($options['request_timeout']);
         $payload = array_merge([
             'temperature' => 0.3,
             'max_tokens' => 2048,
@@ -74,7 +78,7 @@ class LocalAIService extends CloudflareAIService
         // first token; the Cloudflare 30s request timeout is too short for
         // that. Use the local-specific timeout (default 120s). Warm calls
         // return in a few seconds.
-        $response = Http::timeout((int) config('cloudflare.ai.local.timeout', 120))
+        $response = Http::timeout($requestTimeout)
             ->connectTimeout(10)
             ->post("{$this->baseUrl}/v1/chat/completions", $payload);
 

@@ -5,6 +5,13 @@ use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\IncidentsController;
 use App\Http\Controllers\Workgroup\FileDownloadController;
 use App\Http\Controllers\ReportExportController;
+use App\Http\Controllers\Employee\OperationalForms\FormGenerationController;
+use App\Http\Controllers\Employee\OperationalForms\FormRecordController;
+use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
+use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
+use App\Http\Controllers\Employee\OperationalForms\FrocImportController;
+use App\Http\Controllers\Admin\OperationalFormDocumentController;
+use App\Http\Middleware\ForcePasswordChangeMiddleware;
 
 Route::get('/', function () {
     return view('welcome');
@@ -32,6 +39,50 @@ Route::post('/_csp-report', [\App\Http\Controllers\CspReportController::class, '
 Route::get('/login', function () {
     return redirect('/admin/login');
 })->name('login');
+
+Route::prefix('employee/forms/api')
+    ->middleware(['auth:employee', ForcePasswordChangeMiddleware::class, 'throttle:120,1'])
+    ->name('employee.forms.api.')
+    ->group(function (): void {
+        Route::get('/form-types', [FormRecordController::class, 'formTypes'])->name('form-types');
+        Route::get('/employees/search', EmployeeLookupController::class)
+            ->middleware('throttle:60,1')
+            ->name('employees.search');
+        Route::post('/froc/import-preview', FrocImportController::class)
+            ->middleware('throttle:10,1')
+            ->name('froc.import-preview');
+        Route::get('/records', [FormRecordController::class, 'index'])->name('records.index');
+        Route::post('/records', [FormRecordController::class, 'store'])->name('records.store');
+        Route::post('/records/{record}/froc/import', [FrocImportController::class, 'apply'])
+            ->middleware('throttle:10,1')
+            ->name('records.froc.import');
+        Route::post('/records/{record}/froc/import/{import}/undo', [FrocImportController::class, 'undo'])
+            ->name('records.froc.import.undo');
+        Route::get('/records/{record}', [FormRecordController::class, 'show'])->name('records.show');
+        Route::get('/records/{record}/documents', [FormRecordController::class, 'documents'])->name('records.documents');
+        Route::patch('/records/{record}', [FormRecordController::class, 'update'])->name('records.update');
+        Route::delete('/records/{record}', [FormRecordController::class, 'destroy'])->name('records.destroy');
+        Route::post('/records/{record}/generate', FormGenerationController::class)
+            ->middleware('throttle:10,1')
+            ->name('records.generate');
+        Route::post('/records/{record}/complete', FormGenerationController::class)
+            ->middleware('throttle:10,1')
+            ->name('records.complete');
+        Route::get('/records/{record}/generation/{job}', [FormGenerationController::class, 'status'])
+            ->name('records.generation.status');
+        Route::get('/documents/{document}/preview', [FormDocumentController::class, 'preview'])
+            ->name('documents.preview');
+        Route::get('/documents/{document}/download', [FormDocumentController::class, 'download'])
+            ->name('documents.download');
+    });
+
+Route::prefix('admin/operational-forms/documents')
+    ->middleware('auth:web')
+    ->name('admin.operational-forms.documents.')
+    ->group(function (): void {
+        Route::get('/{document}/preview', [OperationalFormDocumentController::class, 'preview'])->name('preview');
+        Route::get('/{document}/download', [OperationalFormDocumentController::class, 'download'])->name('download');
+    });
 
 // Pump Simulator - Public route for training
 Route::view('/pump-simulator', 'pump-simulator')->name('pump-simulator');
