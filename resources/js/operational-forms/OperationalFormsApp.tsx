@@ -5,12 +5,12 @@ import {
 } from '@fluentui/react-components';
 import {
     AlertTriangle, ArrowLeft, Check, ChevronRight, ClipboardList, Clock3, Cloud, Copy, Download,
-    Eye, FileCheck2, FilePenLine, FilePlus2, Home, Library, LoaderCircle, Plus, Printer, RefreshCw, Save,
-    ShieldCheck, Trash2, UsersRound, WifiOff,
+    Bot, Eye, FileArchive, FileCheck2, FilePenLine, FilePlus2, Home, Library, LoaderCircle, Plus, Printer, RefreshCw, Save,
+    ShieldCheck, Sparkles, Trash2, UsersRound, WifiOff,
 } from 'lucide-react';
 import { ApiError, createApi } from './api';
 import { recoveryDrafts, type RecoveryDraft } from './draftsDb';
-import type { BootstrapData, FormDefinition, FormDocument, FormRecord, FormType } from './types';
+import type { BootstrapData, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportPreview } from './types';
 
 const PdfPreview = lazy(() => import('./PdfPreview').then((module) => ({ default: module.PdfPreview })));
 
@@ -77,12 +77,23 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
         } finally { setBusy(false); }
     }, [api]);
 
-    const createRecord = async (formType: FormType) => {
+    const createRecord = async (formType: FormType, imported?: FrocImportPreview) => {
         setBusy(true);
         try {
             const now = new Date();
-            const created = await api.create(formType, `${typeLabel(formType)} — ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(now)}`);
-            setRecords((items) => [created, ...items]); currentRef.current = created; setCurrent(created); dirtyRef.current = false; setSaveState('saved');
+            const title = imported ? `${imported.event_name} — ${imported.unit_designation}` : `${typeLabel(formType)} — ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(now)}`;
+            const created = await api.create(formType, title);
+            let ready = created;
+            if (imported && formType === 'froc_log_001_ff') {
+                const data = clone(created.data);
+                setPath(data, ['general_information', 'event_id'], imported.event_name);
+                if (imported.report_date) setPath(data, ['general_information', 'date'], imported.report_date);
+                data.labor = imported.labor.map(({ source_excerpt: _source, source_timestamp: _stamp, confidence: _confidence, end_estimated: _estimated, ...row }) => row);
+                data.vehicle_mileage = imported.vehicle_mileage;
+                ready = await api.save({ ...created, data });
+            }
+            setRecords((items) => [ready, ...items.filter((item) => item.id !== ready.id)]); currentRef.current = ready; setCurrent(ready); dirtyRef.current = false; setSaveState('saved'); setActiveSection('overview');
+            if (imported) setMessage({ intent: 'info', text: 'Import suggestions were placed into an editable draft. Review the event, mileage, labor descriptions, and every estimated end time before generating the PDF.' });
         } catch (error) { setMessage({ intent: 'error', text: error instanceof Error ? error.message : 'The record could not be created.' }); }
         finally { setBusy(false); }
     };
@@ -208,13 +219,13 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
                     <main className="of-main">
                         {message && <MessageBar intent={message.intent}><MessageBarBody>{message.text}</MessageBarBody></MessageBar>}
                         {!current ? (
-                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} openRecord={openRecord} refresh={refreshLibrary} preview={setPreview} />
+                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} analyzeFroc={api.importFroc} openRecord={openRecord} refresh={refreshLibrary} preview={setPreview} />
                         ) : (
                             <EditorView
                                 record={current} definition={definitions.find((item) => item.form_type === current.form_type)}
                                 saveState={saveState} activeSection={activeSection} setActiveSection={setActiveSection} isGenerating={isGenerating}
                                 update={updateCurrent} save={() => void saveNow()} generate={() => void generate()} remove={() => void removeCurrent()}
-                                back={() => { void flushSaves().then((saved) => { if (saved) setCurrent(null); }); }} preview={setPreview}
+                                back={() => { void flushSaves().then((saved) => { if (saved) setCurrent(null); }); }} preview={setPreview} searchEmployees={api.searchEmployees}
                             />
                         )}
                     </main>
@@ -227,15 +238,18 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
     );
 }
 
-function LibraryView({ definitions, records, busy, createRecord, openRecord, refresh, preview }: {
+function LibraryView({ definitions, records, busy, createRecord, analyzeFroc, openRecord, refresh, preview }: {
     definitions: FormDefinition[]; records: FormRecord[]; busy: boolean;
-    createRecord: (type: FormType) => void; openRecord: (record: FormRecord) => void; refresh: () => void; preview: (doc: FormDocument) => void;
+    createRecord: (type: FormType, imported?: FrocImportPreview) => Promise<void>; analyzeFroc: (payload: FormData) => Promise<FrocImportPreview>;
+    openRecord: (record: FormRecord) => void; refresh: () => void; preview: (doc: FormDocument) => void;
 }) {
+    const [showImport, setShowImport] = useState(false);
     return <div className="of-library">
         <div className="of-page-heading"><div><p className="of-eyebrow">Controlled records workspace</p><h1>Operational Forms</h1><p>Start, resume, and generate official incident and reimbursement records.</p></div><Button icon={<RefreshCw size={16} />} onClick={refresh} disabled={busy}>Refresh</Button></div>
         <section aria-labelledby="start-form"><h2 id="start-form">Start a form</h2><div className="of-form-cards">
-            {definitions.map((definition) => <article className="of-form-card" key={definition.form_type}><div className="of-form-card-icon">{definition.form_type === 'ics_214' ? <ClipboardList /> : <FileCheck2 />}</div><div><Badge appearance="outline">Version {definition.form_version}</Badge><h3>{definition.display_name}</h3><p>{definition.form_type === 'ics_214' ? 'Document unit resources and chronological incident activity.' : 'Capture firefighter labor, equipment, mileage, materials, and certification.'}</p></div><Button appearance="primary" icon={<FilePlus2 size={17} />} onClick={() => createRecord(definition.form_type)}>Create form</Button></article>)}
+            {definitions.map((definition) => <article className="of-form-card" key={definition.form_type}><div className="of-form-card-icon">{definition.form_type === 'ics_214' ? <ClipboardList /> : <FileCheck2 />}</div><div><Badge appearance="outline">Version {definition.form_version}</Badge><h3>{definition.display_name}</h3><p>{definition.form_type === 'ics_214' ? 'Document unit resources and chronological incident activity.' : 'Capture firefighter labor, equipment, mileage, materials, and certification—with optional AI-assisted note import.'}</p></div><Button appearance="primary" icon={definition.form_type === 'froc_log_001_ff' ? <Sparkles size={17} /> : <FilePlus2 size={17} />} onClick={() => definition.form_type === 'froc_log_001_ff' ? setShowImport(true) : void createRecord(definition.form_type)}>{definition.form_type === 'froc_log_001_ff' ? 'Start / import' : 'Create form'}</Button></article>)}
         </div></section>
+        {showImport && <FrocImportPanel analyze={analyzeFroc} create={createRecord} close={() => setShowImport(false)} />}
         <section aria-labelledby="recent-records"><div className="of-section-heading"><h2 id="recent-records">Recent records</h2><span>{records.length} record{records.length === 1 ? '' : 's'}</span></div>
             <div className="of-table-wrap"><table className="of-record-table"><thead><tr><th>Record</th><th>Status</th><th>Last saved</th><th>PDF</th><th><span className="sr-only">Open</span></th></tr></thead><tbody>
                 {records.length === 0 && <tr><td colSpan={5} className="of-empty">No records yet. Start with one of the controlled forms above.</td></tr>}
@@ -245,9 +259,48 @@ function LibraryView({ definitions, records, busy, createRecord, openRecord, ref
     </div>;
 }
 
-function EditorView({ record, definition, saveState, activeSection, setActiveSection, isGenerating, update, save, generate, remove, back, preview }: {
+function FrocImportPanel({ analyze, create, close }: { analyze: (payload: FormData) => Promise<FrocImportPreview>; create: (type: FormType, imported?: FrocImportPreview) => Promise<void>; close: () => void }) {
+    const [unitId, setUnitId] = useState('');
+    const [notes, setNotes] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+    const [preview, setPreview] = useState<FrocImportPreview | null>(null);
+    const [working, setWorking] = useState(false);
+    const [error, setError] = useState('');
+
+    const run = async () => {
+        setWorking(true); setError(''); setPreview(null);
+        try {
+            const payload = new FormData(); payload.append('unit_id', unitId.trim());
+            if (notes.trim()) payload.append('notes', notes);
+            if (file) payload.append('notes_file', file);
+            setPreview(await analyze(payload));
+        } catch (caught) {
+            setError(caught instanceof ApiError && caught.problem.errors ? Object.values(caught.problem.errors).flat().join(' ') : (caught instanceof Error ? caught.message : 'The notes could not be analyzed.'));
+        } finally { setWorking(false); }
+    };
+
+    return <section className="of-import" aria-labelledby="froc-import-title">
+        <div className="of-import-head"><div className="of-import-icon"><Bot size={22} /></div><div><p className="of-eyebrow">Optional pre-entry assistant</p><h2 id="froc-import-title">Turn activity notes into a reviewable F-ROC draft</h2><p>Paste notes or upload a WhatsApp <strong>.zip without media</strong> or a <strong>.txt</strong> export. Only messages matching your unit are sent to the configured MBFD AI service.</p></div></div>
+        <div className="of-import-fields">
+            <Field label="Unit designation" hint="Required—for example R6, JHAT, Gator 1, or Detail Medic 2."><Input value={unitId} onChange={(_, data) => setUnitId(data.value)} /></Field>
+            <Field label="WhatsApp export or text file" hint="Maximum 2 MB upload; extracted text is limited to 512 KB."><label className="of-file-picker"><FileArchive size={18} /><span>{file ? file.name : 'Choose .zip or .txt file'}</span><input type="file" accept=".zip,.txt,text/plain,application/zip" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label></Field>
+            <Field className="of-import-notes" label="Paste activity notes" hint="Large review area—paste copied chat messages, field notes, or unit logs."><Textarea value={notes} onChange={(_, data) => setNotes(data.value)} resize="vertical" /></Field>
+        </div>
+        {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
+        <div className="of-import-actions"><Button onClick={close}>Cancel</Button><Button onClick={() => void create('froc_log_001_ff')}>Create blank draft</Button><Button appearance="primary" icon={working ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} disabled={working || !unitId.trim() || (!notes.trim() && !file)} onClick={() => void run()}>{working ? 'Analyzing secure source…' : 'Analyze notes'}</Button></div>
+        {preview && <div className="of-import-preview">
+            <div className="of-evidence-spine"><span>Source filtered</span><ChevronRight size={15} /><span>{preview.engine}</span><ChevronRight size={15} /><strong>Member review required</strong></div>
+            <div className="of-import-summary"><div><small>Event</small><strong>{preview.event_name}</strong></div><div><small>Unit</small><strong>{preview.unit_designation}</strong></div><div><small>Matched messages</small><strong>{preview.matched_message_count}</strong></div><div><small>Suggested labor rows</small><strong>{preview.labor.length}</strong></div></div>
+            <MessageBar intent="warning"><MessageBarBody>{preview.warning}</MessageBarBody></MessageBar>
+            <div className="of-suggestion-list">{preview.labor.map((row, index) => <article key={`${row.source_timestamp}-${index}`}><div><Badge color={row.confidence === 'high' ? 'success' : 'warning'}>{row.confidence === 'high' ? 'High confidence' : 'Review'}</Badge>{row.end_estimated && <Badge color="warning">End estimated</Badge>}</div><strong>{row.work_performed}</strong><span>{row.start}–{row.end} · Category {row.category}{row.location_gps ? ` · ${row.location_gps}` : ''}</span><small>Source: “{row.source_excerpt}”</small></article>)}</div>
+            <div className="of-import-actions"><Button appearance="primary" icon={<FilePlus2 size={17} />} onClick={() => void create('froc_log_001_ff', preview)}>Create editable draft with these suggestions</Button></div>
+        </div>}
+    </section>;
+}
+
+function EditorView({ record, definition, saveState, activeSection, setActiveSection, isGenerating, update, save, generate, remove, back, preview, searchEmployees }: {
     record: FormRecord; definition?: FormDefinition; saveState: SaveState; activeSection: string; setActiveSection: (value: string) => void; isGenerating: boolean;
-    update: (mutator: (data: Record<string, any>) => void) => void; save: () => void; generate: () => void; remove: () => void; back: () => void; preview: (doc: FormDocument) => void;
+    update: (mutator: (data: Record<string, any>) => void) => void; save: () => void; generate: () => void; remove: () => void; back: () => void; preview: (doc: FormDocument) => void; searchEmployees: (query: string) => Promise<EmployeeSuggestion[]>;
 }) {
     const document = latestDocument(record);
     const sections = record.form_type === 'ics_214' ? [['overview', 'Operational period'], ['resources', 'Resources'], ['activities', 'Activity log'], ['prepared', 'Prepared by'], ['documents', 'PDF versions']] : [['overview', 'General information'], ['team', 'Team members'], ['labor', 'Labor'], ['equipment', 'Equipment'], ['mileage', 'Mileage'], ['materials', 'Materials'], ['certification', 'Certification'], ['documents', 'PDF versions']];
@@ -256,7 +309,7 @@ function EditorView({ record, definition, saveState, activeSection, setActiveSec
         <div className="of-record-spine"><div><Badge appearance="outline">{typeLabel(record.form_type)} · v{record.form_version}</Badge><h1>{record.title}</h1><p>Record {record.id.slice(-8).toUpperCase()} · revision {record.revision}</p></div><div className="of-spine-status"><StatusBadge status={record.status} />{record.latest_pdf_version && <Badge color={record.has_changes_since_latest_pdf ? 'warning' : 'success'}>{record.has_changes_since_latest_pdf ? 'Changed since PDF' : `PDF v${record.latest_pdf_version} current`}</Badge>}</div></div>
         {document && <div className="of-document-ready" role="status"><div className="of-document-ready-icon"><FileCheck2 size={20} /></div><div><strong>Latest controlled PDF</strong><span>Version {document.version_number} · {document.display_name}</span><small>Generated {stamp(document.created_at)} from revision {document.source_revision}</small></div><div className="of-document-ready-actions"><Button appearance="primary" icon={<Eye size={16} />} aria-label="View latest PDF" onClick={() => preview(document)}>View / print</Button><Button as="a" href={document.download_url} icon={<Download size={16} />} aria-label="Download latest PDF">Download</Button></div></div>}
         <div className="of-editor-grid"><aside className="of-context-nav" aria-label="Form sections">{sections.map(([id, label]) => <button key={id} className={activeSection === id ? 'active' : ''} onClick={() => setActiveSection(id)}>{label}</button>)}</aside><div className="of-form-canvas" onBlur={save}>
-            {record.form_type === 'ics_214' ? <IcsEditor record={record} definition={definition} section={activeSection} update={update} /> : <FrocEditor record={record} definition={definition} section={activeSection} update={update} />}
+            {record.form_type === 'ics_214' ? <IcsEditor record={record} definition={definition} section={activeSection} update={update} /> : <FrocEditor record={record} definition={definition} section={activeSection} update={update} searchEmployees={searchEmployees} />}
             {activeSection === 'documents' && <Documents record={record} preview={preview} />}
         </div></div>
     </div>;
@@ -271,14 +324,15 @@ function IcsEditor({ record, definition, section, update }: EditorProps) {
     return null;
 }
 
-function FrocEditor({ record, definition, section, update }: EditorProps) {
+function FrocEditor({ record, definition, section, update, searchEmployees }: EditorProps & { searchEmployees: (query: string) => Promise<EmployeeSuggestion[]> }) {
     const data = record.data; const cap = definition?.capacities || {};
-    if (section === 'overview') return <FormSection number="1" title="General information"><FieldGrid><TextField label="Event ID" value={data.general_information?.event_id} set={(v) => update((d) => setPath(d, ['general_information', 'event_id'], v))} /><TextField label="Applicant name" value={data.general_information?.applicant_name} set={(v) => update((d) => setPath(d, ['general_information', 'applicant_name'], v))} /><TextField label="Department" value={data.general_information?.department} set={(v) => update((d) => setPath(d, ['general_information', 'department'], v))} /><TextField type="date" label="Report date" value={data.general_information?.date} set={(v) => update((d) => setPath(d, ['general_information', 'date'], v))} /></FieldGrid><Totals data={data} /></FormSection>;
-    if (section === 'team') return <RepeatingTable title="Team members" rows={data.team_members || []} fields={[['employee_id', 'Employee ID'], ['employee_name', 'Employee name']]} capacity={cap.team_members || 14} onChange={(rows) => update((d) => { d.team_members = rows; })} rowType="team_members" />;
-    if (section === 'labor') return <RepeatingTable title="Labor activity" rows={data.labor || []} fields={[['category', 'Cat.'], ['work_performed', 'Work performed'], ['location_gps', 'Location / GPS'], ['start', 'Start', 'time'], ['end', 'End', 'time'], ['manual_override_hours', 'Override hours'], ['override_reason', 'Override reason'], ['event_related', 'Event?', 'checkbox']]} capacity={cap.labor || 13} onChange={(rows) => update((d) => { d.labor = rows; })} rowType="labor" wide="work_performed" />;
-    if (section === 'equipment') return <RepeatingTable title="Equipment hours" rows={data.equipment_hours || []} fields={[['category', 'Cat.'], ['equipment_id', 'Equipment ID'], ['operator', 'Operator'], ['description', 'Description'], ['location', 'Location'], ['hours', 'Hours'], ['event_related', 'Event?', 'checkbox']]} capacity={cap.equipment_hours || 6} onChange={(rows) => update((d) => { d.equipment_hours = rows; })} rowType="equipment_hours" />;
-    if (section === 'mileage') return <RepeatingTable title="Vehicle mileage" rows={data.vehicle_mileage || []} fields={[['category', 'Cat.'], ['equipment_id', 'Vehicle ID'], ['operator', 'Operator'], ['destination', 'Destination'], ['start_odometer', 'Start odo.'], ['end_odometer', 'End odo.'], ['manual_miles', 'Corrected miles'], ['correction_reason', 'Correction reason'], ['event_related', 'Event?', 'checkbox']]} capacity={cap.vehicle_mileage || 2} onChange={(rows) => update((d) => { d.vehicle_mileage = rows; })} rowType="vehicle_mileage" />;
-    if (section === 'materials') return <RepeatingTable title="Materials and supplies" rows={data.materials || []} fields={[['category', 'Cat.'], ['item', 'Item'], ['quantity', 'Quantity'], ['cost', 'Cost'], ['justification', 'Justification'], ['receipt_reference', 'Receipt ref.'], ['from_stock', 'Stock?', 'checkbox']]} capacity={cap.materials || 7} onChange={(rows) => update((d) => { d.materials = rows; })} rowType="materials" />;
+    const options = definition?.field_options;
+    if (section === 'overview') return <FormSection number="1" title="General information" help="An imported event name is placed in the controlled Event ID / event name field for member confirmation."><FieldGrid><TextField label="Event ID / event name" value={data.general_information?.event_id} set={(v) => update((d) => setPath(d, ['general_information', 'event_id'], v))} /><TextField label="Applicant name" value={data.general_information?.applicant_name} set={(v) => update((d) => setPath(d, ['general_information', 'applicant_name'], v))} /><TextField label="Department" value={data.general_information?.department} set={(v) => update((d) => setPath(d, ['general_information', 'department'], v))} /><TextField type="date" label="Report date" value={data.general_information?.date} set={(v) => update((d) => setPath(d, ['general_information', 'date'], v))} /></FieldGrid><Totals data={data} /></FormSection>;
+    if (section === 'team') return <TeamMembersEditor rows={data.team_members || []} capacity={cap.team_members || 14} onChange={(rows) => update((d) => { d.team_members = rows; })} search={searchEmployees} />;
+    if (section === 'labor') return <LaborEditor rows={data.labor || []} capacity={cap.labor || 13} onChange={(rows) => update((d) => { d.labor = rows; })} options={options} />;
+    if (section === 'equipment') return <RepeatingTable title="Equipment hours" rows={data.equipment_hours || []} fields={[['category', 'Cat.'], ['equipment_id', 'Equipment ID'], ['operator', 'Operator'], ['description', 'Description'], ['location', 'Location'], ['hours', 'Hours'], ['event_related', 'Event?', 'checkbox']]} capacity={cap.equipment_hours || 6} onChange={(rows) => update((d) => { d.equipment_hours = rows; })} rowType="equipment_hours" categories={options?.categories} />;
+    if (section === 'mileage') return <RepeatingTable title="Vehicle mileage" rows={data.vehicle_mileage || []} fields={[['category', 'Cat.'], ['equipment_id', 'Vehicle ID'], ['operator', 'Operator'], ['destination', 'Destination'], ['start_odometer', 'Start odo.'], ['end_odometer', 'End odo.'], ['manual_miles', 'Corrected miles'], ['correction_reason', 'Correction reason'], ['event_related', 'Event?', 'checkbox']]} capacity={cap.vehicle_mileage || 2} onChange={(rows) => update((d) => { d.vehicle_mileage = rows; })} rowType="vehicle_mileage" categories={options?.categories} />;
+    if (section === 'materials') return <RepeatingTable title="Materials and supplies" rows={data.materials || []} fields={[['category', 'Cat.'], ['item', 'Item'], ['quantity', 'Quantity'], ['cost', 'Cost'], ['justification', 'Justification'], ['receipt_reference', 'Receipt ref.'], ['from_stock', 'Stock?', 'checkbox']]} capacity={cap.materials || 7} onChange={(rows) => update((d) => { d.materials = rows; })} rowType="materials" categories={options?.categories} />;
     if (section === 'certification') return <><FormSection number="Certification" title="Employee and reviewer certification" help="All six signature/date fields and confirmation are required before PDF generation."><FieldGrid><TextField label="Page 2 employee signature" value={data.certification?.page2_employee_signature_text} set={(v) => update((d) => setPath(d, ['certification', 'page2_employee_signature_text'], v))} /><TextField label="Page 2 reviewer signature" value={data.certification?.page2_reviewer_signature_text} set={(v) => update((d) => setPath(d, ['certification', 'page2_reviewer_signature_text'], v))} /><TextField label="Final employee signature" value={data.certification?.final_employee_signature_text} set={(v) => update((d) => setPath(d, ['certification', 'final_employee_signature_text'], v))} /><TextField type="date" label="Employee signature date" value={data.certification?.final_employee_signature_date} set={(v) => update((d) => setPath(d, ['certification', 'final_employee_signature_date'], v))} /><TextField label="Final reviewer signature" value={data.certification?.final_reviewer_signature_text} set={(v) => update((d) => setPath(d, ['certification', 'final_reviewer_signature_text'], v))} /><TextField type="date" label="Reviewer signature date" value={data.certification?.final_reviewer_signature_date} set={(v) => update((d) => setPath(d, ['certification', 'final_reviewer_signature_date'], v))} /></FieldGrid><label className="of-confirm"><input type="checkbox" checked={Boolean(data.certification?.confirmed)} onChange={(e) => update((d) => setPath(d, ['certification', 'confirmed'], e.target.checked))} /><span>I certify that this report is complete and accurate.</span></label></FormSection><NotesEditor values={data.additional_notes || []} capacity={cap.additional_notes || 28} onChange={(values) => update((d) => { d.additional_notes = values; })} /></>;
     return null;
 }
@@ -297,10 +351,42 @@ function TextField({ label, value, set, type = 'text' }: { label: string; value?
 function FieldGrid({ children }: { children: React.ReactNode }) { return <div className="of-field-grid">{children}</div>; }
 function FormSection({ number, title, help, children }: { number: string; title: string; help?: string; children: React.ReactNode }) { return <section className="of-form-section"><div className="of-section-title"><span>{number}</span><div><h2>{title}</h2>{help && <p>{help}</p>}</div></div>{children}</section>; }
 
-function RepeatingTable({ title, rows, fields, capacity, onChange, rowType, wide }: { title: string; rows: Record<string, any>[]; fields: [string, string, (InputType | 'checkbox')?][]; capacity: number; onChange: (rows: Record<string, any>[]) => void; rowType: string; wide?: string }) {
+function CategorySelect({ value, set, label, options = ['A', 'B', 'N/A'] }: { value?: string; set: (value: string) => void; label: string; options?: string[] }) {
+    return <select className="of-select" aria-label={label} value={value || ''} onChange={(event) => set(event.target.value)}><option value="">Select</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select>;
+}
+
+function TeamMembersEditor({ rows, capacity, onChange, search }: { rows: Record<string, any>[]; capacity: number; onChange: (rows: Record<string, any>[]) => void; search: (query: string) => Promise<EmployeeSuggestion[]> }) {
+    const edit = (index: number, key: string, value: string) => { const next = clone(rows); next[index][key] = value; onChange(next); };
+    const select = (index: number, employee: EmployeeSuggestion) => { const next = clone(rows); next[index] = { ...next[index], employee_id: employee.employee_id, employee_name: employee.name }; onChange(next); };
+    return <section className="of-form-section"><div className="of-section-heading"><div><h2>Team members</h2><p>Search the MBFD employee directory or type an outside member manually.</p></div><Button icon={<Plus size={16} />} onClick={() => rows.length < capacity && onChange([...rows, clone(EMPTY_ROWS.team_members)])} disabled={rows.length >= capacity}>Add member</Button></div>
+        <div className="of-member-list">{rows.length === 0 && <div className="of-empty-panel"><UsersRound /><p>No team members entered.</p></div>}{rows.map((row, index) => <article className="of-member-row" key={index}><span className="of-row-number">{index + 1}</span><EmployeeLookup value={row.employee_id || ''} search={search} set={(value) => edit(index, 'employee_id', value)} choose={(employee) => select(index, employee)} /><Field label="Employee name" hint="Editable for manual or outside members."><Input value={row.employee_name || ''} onChange={(_, data) => edit(index, 'employee_name', data.value)} /></Field><Button appearance="subtle" icon={<Trash2 size={15} />} aria-label={`Remove team member ${index + 1}`} onClick={() => onChange(rows.filter((_, i) => i !== index))} /></article>)}</div>
+    </section>;
+}
+
+function EmployeeLookup({ value, set, choose, search }: { value: string; set: (value: string) => void; choose: (employee: EmployeeSuggestion) => void; search: (query: string) => Promise<EmployeeSuggestion[]> }) {
+    const [matches, setMatches] = useState<EmployeeSuggestion[]>([]);
+    const [open, setOpen] = useState(false);
+    useEffect(() => {
+        if (value.trim().length < 2) { setMatches([]); return; }
+        let active = true;
+        const timer = window.setTimeout(() => { void search(value.trim()).then((results) => { if (active) { setMatches(results); setOpen(true); } }).catch(() => { if (active) setMatches([]); }); }, 220);
+        return () => { active = false; window.clearTimeout(timer); };
+    }, [value, search]);
+    return <Field label="Employee ID or name" hint="Choose a match to auto-fill; free text remains allowed."><div className="of-lookup"><Input value={value} autoComplete="off" onFocus={() => setOpen(matches.length > 0)} onChange={(_, data) => set(data.value)} onBlur={() => window.setTimeout(() => setOpen(false), 120)} />{open && matches.length > 0 && <div className="of-lookup-menu" role="listbox">{matches.map((employee) => <button type="button" role="option" key={employee.employee_id} onMouseDown={(event) => event.preventDefault()} onClick={() => { choose(employee); setOpen(false); }}><strong>{employee.employee_id}</strong><span>{employee.name}</span><small>{employee.rank || 'Member'}</small></button>)}</div>}</div></Field>;
+}
+
+function LaborEditor({ rows, capacity, onChange, options }: { rows: Record<string, any>[]; capacity: number; onChange: (rows: Record<string, any>[]) => void; options?: FormDefinition['field_options'] }) {
+    const edit = (index: number, key: string, value: any) => { const next = clone(rows); next[index][key] = value; if (key === 'category') next[index].work_performed = ''; onChange(next); };
+    const descriptions = (category: string) => options?.descriptions_by_category?.[category] || [];
+    return <section className="of-form-section"><div className="of-section-heading"><div><h2>Labor activity</h2><p>{rows.length} of {capacity} controlled rows used · descriptions remain editable</p></div><Button icon={<Plus size={16} />} onClick={() => rows.length < capacity && onChange([...rows, clone(EMPTY_ROWS.labor)])} disabled={rows.length >= capacity}>Add activity</Button></div>
+        <div className="of-labor-list">{rows.length === 0 && <div className="of-empty-panel"><Clock3 /><p>No labor activity entered. Add a row when activity begins.</p></div>}{rows.map((row, index) => { const listId = `froc-description-${index}`; return <article className="of-labor-row" key={index}><div className="of-labor-row-head"><span>Activity {index + 1}</span><label className="of-event-check"><input type="checkbox" checked={Boolean(row.event_related)} onChange={(event) => edit(index, 'event_related', event.target.checked)} /> Event related</label><Button appearance="subtle" icon={<Trash2 size={15} />} aria-label={`Remove labor activity ${index + 1}`} onClick={() => onChange(rows.filter((_, i) => i !== index))} /></div><div className="of-labor-fields"><Field label="Category"><CategorySelect value={row.category} set={(value) => edit(index, 'category', value)} label={`Category activity ${index + 1}`} options={options?.categories} /></Field><Field className="of-labor-description" label="Description of work performed" hint={row.category ? 'Choose a controlled option or enter a more specific professional description.' : 'Select a category first.'}><Input list={listId} disabled={!row.category} value={row.work_performed || ''} onChange={(_, data) => edit(index, 'work_performed', data.value)} /><datalist id={listId}>{descriptions(row.category).map((description) => <option value={description} key={description} />)}</datalist></Field><Field label="Work location / GPS"><Input value={row.location_gps || ''} onChange={(_, data) => edit(index, 'location_gps', data.value)} /></Field><Field label="Start"><Input type="time" value={row.start || ''} onChange={(_, data) => edit(index, 'start', data.value)} /></Field><Field label="End"><Input type="time" value={row.end || ''} onChange={(_, data) => edit(index, 'end', data.value)} /></Field></div><details className="of-correction"><summary>Calculated-hours correction (only if needed)</summary><div><Field label="Override hours"><Input inputMode="decimal" value={row.manual_override_hours || ''} onChange={(_, data) => edit(index, 'manual_override_hours', data.value)} /></Field><Field label="Required correction reason"><Textarea value={row.override_reason || ''} onChange={(_, data) => edit(index, 'override_reason', data.value)} /></Field></div></details></article>; })}</div>
+    </section>;
+}
+
+function RepeatingTable({ title, rows, fields, capacity, onChange, rowType, wide, categories }: { title: string; rows: Record<string, any>[]; fields: [string, string, (InputType | 'checkbox')?][]; capacity: number; onChange: (rows: Record<string, any>[]) => void; rowType: string; wide?: string; categories?: string[] }) {
     const add = () => rows.length < capacity && onChange([...rows, clone(EMPTY_ROWS[rowType])]);
     const edit = (index: number, key: string, value: any) => { const next = clone(rows); next[index][key] = value; onChange(next); };
-    return <section className="of-form-section"><div className="of-section-heading"><div><h2>{title}</h2><p>{rows.length} of {capacity} controlled rows used</p></div><Button icon={<Plus size={16} />} onClick={add} disabled={rows.length >= capacity}>Add row</Button></div><div className="of-table-wrap"><table className="of-edit-table"><thead><tr><th>#</th>{fields.map(([key, label]) => <th key={key} className={key === wide ? 'wide' : ''}>{label}</th>)}<th /></tr></thead><tbody>{rows.length === 0 && <tr><td colSpan={fields.length + 2} className="of-empty">No entries. Add a row when activity begins.</td></tr>}{rows.map((row, index) => <tr key={index}><td data-label="Row">{index + 1}</td>{fields.map(([key, label, type]) => <td key={key} data-label={label}>{type === 'checkbox' ? <input type="checkbox" checked={Boolean(row[key])} aria-label={`${label} row ${index + 1}`} onChange={(e) => edit(index, key, e.target.checked)} /> : key.includes('performed') || key.includes('reason') || key === 'justification' ? <Textarea aria-label={`${label} row ${index + 1}`} value={row[key] || ''} onChange={(_, data) => edit(index, key, data.value)} resize="vertical" /> : <Input aria-label={`${label} row ${index + 1}`} type={type || 'text'} value={row[key] ?? ''} onChange={(_, data) => edit(index, key, data.value)} />}</td>)}<td data-label="Actions"><Button appearance="subtle" icon={<Trash2 size={15} />} aria-label={`Remove row ${index + 1}`} onClick={() => onChange(rows.filter((_, i) => i !== index))} /></td></tr>)}</tbody></table></div></section>;
+    return <section className="of-form-section"><div className="of-section-heading"><div><h2>{title}</h2><p>{rows.length} of {capacity} controlled rows used</p></div><Button icon={<Plus size={16} />} onClick={add} disabled={rows.length >= capacity}>Add row</Button></div><div className="of-table-wrap"><table className="of-edit-table"><thead><tr><th>#</th>{fields.map(([key, label]) => <th key={key} className={key === wide ? 'wide' : ''}>{label}</th>)}<th /></tr></thead><tbody>{rows.length === 0 && <tr><td colSpan={fields.length + 2} className="of-empty">No entries. Add a row when activity begins.</td></tr>}{rows.map((row, index) => <tr key={index}><td data-label="Row">{index + 1}</td>{fields.map(([key, label, type]) => <td key={key} data-label={label}>{type === 'checkbox' ? <input type="checkbox" checked={Boolean(row[key])} aria-label={`${label} row ${index + 1}`} onChange={(e) => edit(index, key, e.target.checked)} /> : key === 'category' ? <CategorySelect value={row[key]} set={(value) => edit(index, key, value)} label={`${label} row ${index + 1}`} options={categories} /> : key.includes('performed') || key.includes('reason') || key === 'justification' ? <Textarea aria-label={`${label} row ${index + 1}`} value={row[key] || ''} onChange={(_, data) => edit(index, key, data.value)} resize="vertical" /> : <Input aria-label={`${label} row ${index + 1}`} type={type || 'text'} value={row[key] ?? ''} onChange={(_, data) => edit(index, key, data.value)} />}</td>)}<td data-label="Actions"><Button appearance="subtle" icon={<Trash2 size={15} />} aria-label={`Remove row ${index + 1}`} onClick={() => onChange(rows.filter((_, i) => i !== index))} /></td></tr>)}</tbody></table></div></section>;
 }
 
 function NotesEditor({ values, capacity, onChange }: { values: string[]; capacity: number; onChange: (values: string[]) => void }) { return <section className="of-form-section"><div className="of-section-heading"><div><h2>Additional notes</h2><p>{values.length} of {capacity} lines used</p></div><Button icon={<Plus size={16} />} disabled={values.length >= capacity} onClick={() => onChange([...values, ''])}>Add note</Button></div>{values.map((value, index) => <div className="of-note" key={index}><span>{index + 1}</span><Textarea value={value} onChange={(_, d) => { const next = [...values]; next[index] = d.value; onChange(next); }} /><Button appearance="subtle" icon={<Trash2 size={15} />} onClick={() => onChange(values.filter((_, i) => i !== index))} /></div>)}</section>; }

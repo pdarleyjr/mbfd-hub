@@ -26,6 +26,7 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
   await expect(page.locator('.fi-sidebar')).toBeHidden();
   await expect(page.locator('.fi-topbar')).toBeHidden();
   await expect(page.locator('.fi-sidebar-close-overlay')).toBeHidden();
+  await expect(page.getByRole('link', { name: 'MBFD Hub home' })).toHaveAttribute('href', '/');
   await expect(page.getByText('ICS 214 — Activity Log')).toBeVisible();
   await expect(page.getByText(/FROC-LOG-001-FF/)).toBeVisible();
   await page.screenshot({ path: `tests/e2e/screenshots/operational-forms-library-${testInfo.project.name}.png`, fullPage: true });
@@ -56,7 +57,31 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
   await page.screenshot({ path: `tests/e2e/screenshots/operational-forms-ics-editor-${testInfo.project.name}.png`, fullPage: true });
 });
 
-test('phone F-ROC repeating rows become touch-friendly field cards', async ({ page }, testInfo) => {
+test('employee dashboard header returns members to the main MBFD Hub', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'One touch-device header acceptance is sufficient.');
+
+  await page.goto('/employee/login');
+  await page.getByLabel('Employee ID').fill(employeeId);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page).toHaveURL(/\/employee\/dashboard$/, { timeout: 30_000 });
+
+  const sidebarOverlay = page.locator('.fi-sidebar-close-overlay');
+  if (await sidebarOverlay.isVisible()) {
+    await page.evaluate(() => (window as any).Alpine?.store('sidebar')?.close());
+    await expect(sidebarOverlay).toBeHidden();
+  }
+
+  const home = page.getByRole('link', { name: 'Return to MBFD Hub home' });
+  await expect(home).toBeVisible();
+  await expect(home).toHaveAttribute('href', '/');
+  const target = await home.boundingBox();
+  expect(target?.width).toBeGreaterThanOrEqual(44);
+  expect(target?.height).toBeGreaterThanOrEqual(44);
+  await page.screenshot({ path: 'tests/e2e/screenshots/employee-dashboard-home-phone.png', fullPage: true });
+});
+
+test('phone F-ROC labor rows and controlled dropdowns are touch-friendly', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone-small', 'Focused phone-only repeating-row acceptance.');
 
   await page.goto('/employee/login');
@@ -67,14 +92,48 @@ test('phone F-ROC repeating rows become touch-friendly field cards', async ({ pa
   await page.goto('/employee/forms');
   await expect(page.locator('.fi-sidebar-close-overlay')).toBeHidden();
 
-  await page.locator('.of-form-card').filter({ hasText: 'FROC-LOG-001-FF' }).getByRole('button', { name: 'Create form' }).click();
+  await page.locator('.of-form-card').filter({ hasText: 'FROC-LOG-001-FF' }).getByRole('button', { name: 'Start / import' }).click();
+  await expect(page.getByLabel('Paste activity notes')).toBeVisible();
+  const notesBox = await page.getByLabel('Paste activity notes').boundingBox();
+  expect(notesBox?.height).toBeGreaterThanOrEqual(180);
+  await page.screenshot({ path: 'tests/e2e/screenshots/operational-forms-froc-import-phone-small.png', fullPage: true });
+  await page.getByRole('button', { name: 'Create blank draft' }).click();
   await page.getByRole('button', { name: 'Labor', exact: true }).click();
-  await page.getByRole('button', { name: 'Add row' }).click();
-  await page.getByLabel('Work performed row 1').fill('Phone field-card acceptance entry');
-  await expect(page.getByLabel('Work performed row 1')).toHaveValue('Phone field-card acceptance entry');
-  await expect(page.locator('.of-edit-table td[data-label="Work performed"]')).toHaveCSS('display', 'grid');
+  await page.getByRole('button', { name: 'Add activity' }).click();
+  await page.getByLabel('Category activity 1').selectOption('B');
+  await page.getByLabel('Description of work performed').fill('Phone field-card acceptance entry');
+  await expect(page.getByLabel('Description of work performed')).toHaveValue('Phone field-card acceptance entry');
+  const categoryTarget = await page.getByLabel('Category activity 1').boundingBox();
+  expect(categoryTarget?.height).toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   await page.screenshot({ path: 'tests/e2e/screenshots/operational-forms-froc-labor-phone-small.png', fullPage: true });
+});
+
+test('desktop F-ROC start flow exposes import review and employee auto-fill', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Focused desktop F-ROC interaction acceptance.');
+
+  await page.goto('/employee/login');
+  await page.getByLabel('Employee ID').fill(employeeId);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page).toHaveURL(/\/employee\/dashboard/, { timeout: 30_000 });
+  await page.goto('/employee/forms');
+
+  await page.locator('.of-form-card').filter({ hasText: 'FROC-LOG-001-FF' }).getByRole('button', { name: 'Start / import' }).click();
+  await expect(page.getByRole('heading', { name: /Turn activity notes into a reviewable F-ROC draft/ })).toBeVisible();
+  await expect(page.getByLabel('Unit designation')).toBeVisible();
+  const notesBox = await page.getByLabel('Paste activity notes').boundingBox();
+  expect(notesBox?.height).toBeGreaterThanOrEqual(180);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  await page.screenshot({ path: 'tests/e2e/screenshots/operational-forms-froc-import-desktop.png', fullPage: true });
+
+  await page.getByRole('button', { name: 'Create blank draft' }).click();
+  await page.getByRole('button', { name: 'Team members', exact: true }).click();
+  const lookup = page.getByLabel('Employee ID or name').first();
+  await lookup.fill('19545');
+  await page.locator('.of-lookup-menu').getByRole('option', { name: /19545.*Victor White/i }).click();
+  await expect(lookup).toHaveValue('19545');
+  await expect(page.getByLabel('Employee name').first()).toHaveValue('Victor White');
 });
 
 test('desktop employee previews a generated flattened ICS PDF', async ({ page }, testInfo) => {
