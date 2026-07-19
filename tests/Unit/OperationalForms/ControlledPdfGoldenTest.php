@@ -10,6 +10,48 @@ use Tests\TestCase;
 
 class ControlledPdfGoldenTest extends TestCase
 {
+    public function test_froc_generator_accepts_normalized_null_optional_numeric_fields(): void
+    {
+        $fixture = json_decode(
+            file_get_contents(base_path('tests/Fixtures/OperationalForms/froc-log-001-ff-sample.json')),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        $fixture['data']['labor'][0]['manual_override_hours'] = null;
+        $fixture['data']['labor'][0]['override_reason'] = null;
+        $fixture['data']['vehicle_mileage'][0]['manual_miles'] = null;
+        $fixture['data']['vehicle_mileage'][0]['correction_reason'] = null;
+        $input = tempnam(sys_get_temp_dir(), 'mbfd-form-null-input-');
+        $output = tempnam(sys_get_temp_dir(), 'mbfd-form-null-output-');
+        $this->assertNotFalse($input);
+        $this->assertNotFalse($output);
+
+        try {
+            file_put_contents($input, json_encode($fixture, JSON_THROW_ON_ERROR));
+            $process = new Process([
+                config('operational-forms.node_binary', 'node'),
+                base_path('scripts/operational-forms/generate.mjs'),
+                '--form', 'froc_log_001_ff',
+                '--version', '11',
+                '--input', $input,
+                '--output', $output,
+            ], base_path(), timeout: 60);
+            $process->mustRun();
+
+            $metadata = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+            $this->assertSame(4, $metadata['page_count']);
+            $this->assertSame('12.50', $metadata['calculated_totals']['p3_mileage_total_event']);
+            $this->assertSame(0, $metadata['remaining_form_fields']);
+            $this->assertSame(0, $metadata['remaining_annotations']);
+        } finally {
+            foreach ([$input, $output] as $path) {
+                if (is_string($path) && file_exists($path)) {
+                    unlink($path);
+                }
+            }
+        }
+    }
+
     #[DataProvider('goldenCases')]
     public function test_controlled_generator_matches_pinned_golden_output(
         string $form,
