@@ -1,4 +1,4 @@
-import type { ApiProblem, BootstrapData, FormDefinition, FormDocument, FormRecord, FormType, GenerationJob } from './types';
+import type { ApiProblem, BootstrapData, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportPreview, GenerationJob } from './types';
 
 export class ApiError extends Error {
     constructor(public status: number, public problem: ApiProblem) {
@@ -8,12 +8,13 @@ export class ApiError extends Error {
 
 export function createApi(bootstrap: BootstrapData) {
     async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
+        const isFormData = init.body instanceof FormData;
         const response = await fetch(url, {
             credentials: 'same-origin',
             ...init,
             headers: {
                 Accept: 'application/json',
-                'Content-Type': 'application/json',
+                ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
                 'X-CSRF-TOKEN': bootstrap.csrf_token,
                 ...init.headers,
             },
@@ -54,5 +55,9 @@ export function createApi(bootstrap: BootstrapData) {
         })).record,
         generate,
         remove: async (id: string) => request<void>(`${bootstrap.endpoints.records}/${id}`, { method: 'DELETE' }),
+        searchEmployees: async (query: string) => (await request<{ employees: EmployeeSuggestion[] }>(`${bootstrap.endpoints.records.replace(/\/records$/, '')}/employees/search?q=${encodeURIComponent(query)}`)).employees,
+        importFroc: async (payload: FormData) => (await request<{ preview: FrocImportPreview }>(`${bootstrap.endpoints.records.replace(/\/records$/, '')}/froc/import-preview`, {
+            method: 'POST', body: payload,
+        })).preview,
     };
 }

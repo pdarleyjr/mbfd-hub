@@ -8,6 +8,8 @@ use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\Employee\OperationalForms\FormGenerationController;
 use App\Http\Controllers\Employee\OperationalForms\FormRecordController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
+use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
+use App\Http\Controllers\Employee\OperationalForms\FrocImportController;
 use App\Http\Controllers\Admin\OperationalFormDocumentController;
 use App\Http\Middleware\ForcePasswordChangeMiddleware;
 
@@ -49,6 +51,12 @@ Route::prefix('employee/forms/api')
     ->name('employee.forms.api.')
     ->group(function (): void {
         Route::get('/form-types', [FormRecordController::class, 'formTypes'])->name('form-types');
+        Route::get('/employees/search', EmployeeLookupController::class)
+            ->middleware('throttle:60,1')
+            ->name('employees.search');
+        Route::post('/froc/import-preview', FrocImportController::class)
+            ->middleware('throttle:10,1')
+            ->name('froc.import-preview');
         Route::get('/records', [FormRecordController::class, 'index'])->name('records.index');
         Route::post('/records', [FormRecordController::class, 'store'])->name('records.store');
         Route::get('/records/{record}', [FormRecordController::class, 'show'])->name('records.show');
