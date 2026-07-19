@@ -15,8 +15,9 @@ export async function validateOutput(bytes, manifest) {
     return [width, height];
   });
 
-  const remainingFormFields = document.getForm().getFields().length;
-  if (remainingFormFields !== 0) throw new Error('Generated PDF still contains AcroForm fields.');
+  const hasAcroForm = document.catalog.has(PDFName.of('AcroForm'));
+  const remainingFormFields = hasAcroForm ? document.getForm().getFields().length : 0;
+  if (hasAcroForm) throw new Error('Generated PDF still contains an AcroForm dictionary.');
 
   const remainingAnnotations = pages.reduce((count, page) => {
     const annotations = page.node.lookupMaybe(PDFName.of('Annots'), PDFArray);
