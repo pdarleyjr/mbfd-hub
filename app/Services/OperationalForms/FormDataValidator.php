@@ -133,12 +133,16 @@ final class FormDataValidator
             'materials.*.receipt_reference' => ['nullable', 'string', 'max:80'],
             'materials.*.from_stock' => ['nullable', 'boolean'],
             'certification' => ['nullable', 'array'],
-            'certification.page2_employee_signature_text' => [$required, 'string', 'max:150'],
-            'certification.page2_reviewer_signature_text' => [$required, 'string', 'max:150'],
+            // The official form instructs employees to leave the page-two
+            // signature lines blank when they also complete later pages.
+            // Reviewer signatures are likewise allowed to remain open for the
+            // agency's downstream review workflow.
+            'certification.page2_employee_signature_text' => ['nullable', 'string', 'max:150'],
+            'certification.page2_reviewer_signature_text' => ['nullable', 'string', 'max:150'],
             'certification.final_employee_signature_text' => [$required, 'string', 'max:150'],
             'certification.final_employee_signature_date' => [$required, 'date_format:Y-m-d'],
-            'certification.final_reviewer_signature_text' => [$required, 'string', 'max:150'],
-            'certification.final_reviewer_signature_date' => [$required, 'date_format:Y-m-d'],
+            'certification.final_reviewer_signature_text' => ['nullable', 'string', 'max:150'],
+            'certification.final_reviewer_signature_date' => ['nullable', 'date_format:Y-m-d'],
             'certification.confirmed' => [$forCompletion ? 'accepted' : 'nullable', 'boolean'],
             'additional_notes' => ['nullable', 'array', 'max:28'],
             'additional_notes.*' => ['nullable', 'string', 'max:500'],
