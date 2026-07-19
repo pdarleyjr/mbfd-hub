@@ -84,6 +84,7 @@ for (const page of pdfDocument.getPages()) {
   const annotations = page.node.lookupMaybe(PDFName.of('Annots'), PDFArray);
   if (annotations?.size() === 0) page.node.delete(PDFName.of('Annots'));
 }
+pdfDocument.catalog.delete(PDFName.of('AcroForm'));
 
 pdfDocument.setTitle(manifest.display_name);
 pdfDocument.setSubject('Controlled operational form generated from validated structured data');
