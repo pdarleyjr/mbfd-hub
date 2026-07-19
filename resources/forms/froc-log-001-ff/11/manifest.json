@@ -1,0 +1,11 @@
+{
+  "form_type": "froc_log_001_ff",
+  "display_name": "Daily Activity Report — Firefighter (FROC-LOG-001-FF), Version 11",
+  "form_version": "11",
+  "template_sha256": "eff55cb3746aad797bb9eb3ffa62b77b855a9279302f7fad7da7f7f7f8e844e0",
+  "mapping_sha256": "dbf6348c5fde80f55c493e209f7a505468de6d098566c8f81d679cedad76c056",
+  "expected_field_count": 270,
+  "expected_page_count": 4,
+  "expected_page_sizes": [[792, 612], [792, 612], [792, 612], [792, 612]],
+  "generator_contract_version": "1.0"
+}

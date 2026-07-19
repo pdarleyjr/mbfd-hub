@@ -535,8 +535,8 @@
                     Quick Launch
                 </h2>
 
-                <!-- MBFD Forms — purple accent -->
-                <a href="{{ url('/daily') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-purple-300 transition-all duration-200 overflow-hidden">
+                <!-- Stations / Vehicles — purple accent -->
+                <a href="{{ url('/daily/stations') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-purple-300 transition-all duration-200 overflow-hidden">
                     <div class="flex">
                         <div class="w-1.5 bg-purple-500 flex-shrink-0 rounded-l-xl"></div>
                         <div class="flex items-start gap-4 p-5 flex-1">
@@ -546,8 +546,8 @@
                                 </svg>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <h3 class="font-semibold text-neutral-800 group-hover:text-purple-700 font-heading text-base">MBFD Forms</h3>
-                                <p class="text-sm text-neutral-500 mt-0.5">Apparatus checkout, vehicle inspections, inventory forms, and station requests</p>
+                                <h3 class="font-semibold text-neutral-800 group-hover:text-purple-700 font-heading text-base">Stations / Vehicles</h3>
+                                <p class="text-sm text-neutral-500 mt-0.5">Apparatus checkout, vehicle inspections, station inventory, and station requests</p>
                             </div>
                             <svg class="w-5 h-5 text-neutral-300 group-hover:text-purple-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                         </div>
@@ -603,6 +603,20 @@
                 More Tools
             </h3>
             <div class="flex flex-wrap gap-3">
+                <!-- Operational Forms -->
+                <a href="{{ url('/employee/forms') }}" aria-label="Open operational forms" class="group inline-flex items-center gap-2.5 bg-white rounded-lg border border-neutral-200 px-4 py-3 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200">
+                    <div class="w-8 h-8 rounded-md bg-blue-50 flex items-center justify-center text-blue-700 flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-6 0a3 3 0 016 0m-6 0a3 3 0 006 0M9 12h6m-6 4h4"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="text-sm font-medium text-neutral-700 group-hover:text-blue-700 transition-colors">Forms</span>
+                        <p class="text-xs text-neutral-400">ICS 214 &amp; F-ROC reports</p>
+                    </div>
+                    <svg class="w-4 h-4 text-neutral-300 group-hover:text-blue-500 transition-colors ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </a>
+
                 <!-- Workgroup Dashboard -->
                 <a href="{{ url('/workgroups/login') }}" class="group inline-flex items-center gap-2.5 bg-white rounded-lg border border-neutral-200 px-4 py-3 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200">
                     <div class="w-8 h-8 rounded-md bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 group-hover:scale-105 transition-transform">

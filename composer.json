@@ -80,7 +80,9 @@
         "sort-packages": true,
         "audit": {
             "ignore": {
-                "PKSA-mdq4-51ck-6kdq": "No patched Laravel 11 release is available yet; remove this ignore once Laravel publishes a fixed 11.x release."
+                "PKSA-3r5d-mb8f-1qw9": "No patched Laravel 11 release is available; remove this ignore when Laravel publishes a fixed 11.x release.",
+                "PKSA-m5cs-t1y6-qpcs": "No patched Laravel 11 release is available; remove this ignore when Laravel publishes a fixed 11.x release.",
+                "PKSA-mdq4-51ck-6kdq": "No patched Laravel 11 release is available; remove this ignore when Laravel publishes a fixed 11.x release."
             }
         },
         "allow-plugins": {

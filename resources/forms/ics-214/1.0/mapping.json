@@ -1,0 +1,4022 @@
+{
+  "schema": "controlled-pdf-template-mapping",
+  "schema_version": "1.0.0",
+  "template": {
+    "document_name": "Activity Log (ICS 214)",
+    "source_filename": "ICS_Form_214.pdf",
+    "source_sha256": "e1f2070c5a0ad154dc9268da21333d6d3a45843e27d2d76f334f933ec7da3307",
+    "controlled_template_filename": "ICS_214_Controlled_AcroForm_Template_v1.0.pdf",
+    "controlled_template_sha256": "1c56a9efa115755e23c49d40a500ea47824d66170de87ce5735c51ddc5fb41e5",
+    "template_version": "ICS-214-Controlled-v1.0",
+    "source_page_count": 1,
+    "page_size_points": {
+      "width": 612.0,
+      "height": 792.0
+    },
+    "page_size_inches": {
+      "width": 8.5,
+      "height": 11.0
+    },
+    "orientation": "portrait",
+    "visual_strategy": "Original visible page artwork retained without redrawing; invisible, borderless AcroForm widgets added above blank entry regions. The PDF file bytes necessarily differ because form objects are added."
+  },
+  "coordinate_systems": {
+    "acroform_rectangles": {
+      "units": "PDF points",
+      "origin": "bottom-left",
+      "rect_order": [
+        "x0",
+        "y0",
+        "x1",
+        "y1"
+      ]
+    },
+    "pymupdf_rectangles": {
+      "units": "PDF points",
+      "origin": "top-left",
+      "rect_order": [
+        "x0",
+        "y0",
+        "x1",
+        "y1"
+      ]
+    },
+    "reference_render": {
+      "dpi": 200,
+      "pixel_dimensions": {
+        "width": 1700,
+        "height": 2200
+      },
+      "origin": "top-left"
+    }
+  },
+  "generation_contract": {
+    "verify_template_sha256_before_generation": true,
+    "populate_by_exact_acroform_field_name": true,
+    "regenerate_appearance_streams": true,
+    "embed_or_use_one_pinned_approved_font": true,
+    "flatten_final_pdf": true,
+    "reject_unmapped_input_keys": true,
+    "reject_missing_required_fields": true,
+    "never_silently_clip_text": true,
+    "store_source_data_snapshot_with_generated_version": true,
+    "continuation_page_policy": "When resources or activity content exceeds available capacity, use a separately approved continuation-page template. Never add rows by scaling or changing the original page."
+  },
+  "fixed_coordinate_fallback": {
+    "purpose": "Use only when a PDF library cannot reliably populate AcroForm fields.",
+    "rect_source": "rect_pdf_points_bottom_left on each field",
+    "placement_rule": "Draw text within the mapped rectangle, clip disabled, with the mapped alignment and pinned font metrics. Then flatten and visual-regression test.",
+    "signature_image_field": "prepared_by_signature",
+    "signature_image_rule": "Preserve aspect ratio and fit entirely inside the mapped rectangle; do not cover the printed Signature label."
+  },
+  "fields": [
+    {
+      "name": "incident_name",
+      "semantic_path": "report.incident_name",
+      "label": "1. Incident Name",
+      "group": "header",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        40.0,
+        706.0,
+        234.0,
+        721.0
+      ],
+      "rect_pdf_points_top_left": [
+        40.0,
+        71.0,
+        234.0,
+        86.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        111,
+        197,
+        650,
+        239
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 8.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": true,
+        "max_length": 160,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_6pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "operational_period_date_from",
+      "semantic_path": "report.operational_period.date_from",
+      "label": "2. Operational Period - Date From",
+      "group": "header",
+      "field_type": "text",
+      "data_type": "date",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        405.0,
+        721.0,
+        462.0,
+        735.2
+      ],
+      "rect_pdf_points_top_left": [
+        405.0,
+        56.8,
+        462.0,
+        71.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1125,
+        158,
+        1283,
+        197
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": true,
+        "max_length": 10,
+        "format_hint": "MM/DD/YYYY"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_min_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "operational_period_date_to",
+      "semantic_path": "report.operational_period.date_to",
+      "label": "2. Operational Period - Date To",
+      "group": "header",
+      "field_type": "text",
+      "data_type": "date",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        508.0,
+        721.0,
+        571.5,
+        735.2
+      ],
+      "rect_pdf_points_top_left": [
+        508.0,
+        56.8,
+        571.5,
+        71.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1411,
+        158,
+        1588,
+        197
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": true,
+        "max_length": 10,
+        "format_hint": "MM/DD/YYYY"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_min_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "operational_period_time_from",
+      "semantic_path": "report.operational_period.time_from",
+      "label": "2. Operational Period - Time From",
+      "group": "header",
+      "field_type": "text",
+      "data_type": "time",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        405.0,
+        705.5,
+        462.0,
+        720.0
+      ],
+      "rect_pdf_points_top_left": [
+        405.0,
+        72.0,
+        462.0,
+        86.5
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1125,
+        200,
+        1283,
+        240
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": true,
+        "max_length": 5,
+        "format_hint": "HHMM or HH:MM"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_min_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "operational_period_time_to",
+      "semantic_path": "report.operational_period.time_to",
+      "label": "2. Operational Period - Time To",
+      "group": "header",
+      "field_type": "text",
+      "data_type": "time",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        508.0,
+        705.5,
+        571.5,
+        720.0
+      ],
+      "rect_pdf_points_top_left": [
+        508.0,
+        72.0,
+        571.5,
+        86.5
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1411,
+        200,
+        1588,
+        240
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": true,
+        "max_length": 5,
+        "format_hint": "HHMM or HH:MM"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_min_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "unit_name",
+      "semantic_path": "report.unit.name",
+      "label": "3. Name",
+      "group": "unit",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        40.0,
+        673.5,
+        211.5,
+        689.0
+      ],
+      "rect_pdf_points_top_left": [
+        40.0,
+        103.0,
+        211.5,
+        118.5
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        111,
+        286,
+        588,
+        329
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 8.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": true,
+        "max_length": 140,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_min_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "unit_ics_position",
+      "semantic_path": "report.unit.ics_position",
+      "label": "4. ICS Position",
+      "group": "unit",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        220.0,
+        673.5,
+        391.5,
+        689.0
+      ],
+      "rect_pdf_points_top_left": [
+        220.0,
+        103.0,
+        391.5,
+        118.5
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        611,
+        286,
+        1088,
+        329
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 8.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": true,
+        "max_length": 120,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_min_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "unit_home_agency_unit",
+      "semantic_path": "report.unit.home_agency_unit",
+      "label": "5. Home Agency (and Unit)",
+      "group": "unit",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        400.0,
+        673.5,
+        572.0,
+        689.0
+      ],
+      "rect_pdf_points_top_left": [
+        400.0,
+        103.0,
+        572.0,
+        118.5
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1111,
+        286,
+        1589,
+        329
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 8.0,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": true,
+        "max_length": 160,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_min_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_01_name",
+      "semantic_path": "report.resources[0].name",
+      "label": "6. Resources Assigned row 1 - Name",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        624.12,
+        215.0,
+        637.68
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        154.32,
+        215.0,
+        167.88
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        429,
+        597,
+        466
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 120,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_01_ics_position",
+      "semantic_path": "report.resources[0].ics_position",
+      "label": "6. Resources Assigned row 1 - ICS Position",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        216.8,
+        624.12,
+        395.0,
+        637.68
+      ],
+      "rect_pdf_points_top_left": [
+        216.8,
+        154.32,
+        395.0,
+        167.88
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        602,
+        429,
+        1097,
+        466
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 100,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_01_home_agency_unit",
+      "semantic_path": "report.resources[0].home_agency_unit",
+      "label": "6. Resources Assigned row 1 - Home Agency (and Unit)",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        396.8,
+        624.12,
+        575.0,
+        637.68
+      ],
+      "rect_pdf_points_top_left": [
+        396.8,
+        154.32,
+        575.0,
+        167.88
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1102,
+        429,
+        1597,
+        466
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.2,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 140,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_02_name",
+      "semantic_path": "report.resources[1].name",
+      "label": "6. Resources Assigned row 2 - Name",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        608.16,
+        215.0,
+        621.72
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        170.28,
+        215.0,
+        183.84
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        473,
+        597,
+        511
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 120,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_02_ics_position",
+      "semantic_path": "report.resources[1].ics_position",
+      "label": "6. Resources Assigned row 2 - ICS Position",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        216.8,
+        608.16,
+        395.0,
+        621.72
+      ],
+      "rect_pdf_points_top_left": [
+        216.8,
+        170.28,
+        395.0,
+        183.84
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        602,
+        473,
+        1097,
+        511
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 100,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_02_home_agency_unit",
+      "semantic_path": "report.resources[1].home_agency_unit",
+      "label": "6. Resources Assigned row 2 - Home Agency (and Unit)",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        396.8,
+        608.16,
+        575.0,
+        621.72
+      ],
+      "rect_pdf_points_top_left": [
+        396.8,
+        170.28,
+        575.0,
+        183.84
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1102,
+        473,
+        1597,
+        511
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.2,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 140,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_03_name",
+      "semantic_path": "report.resources[2].name",
+      "label": "6. Resources Assigned row 3 - Name",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        592.08,
+        215.0,
+        605.76
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        186.24,
+        215.0,
+        199.92
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        517,
+        597,
+        555
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 120,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_03_ics_position",
+      "semantic_path": "report.resources[2].ics_position",
+      "label": "6. Resources Assigned row 3 - ICS Position",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        216.8,
+        592.08,
+        395.0,
+        605.76
+      ],
+      "rect_pdf_points_top_left": [
+        216.8,
+        186.24,
+        395.0,
+        199.92
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        602,
+        517,
+        1097,
+        555
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 100,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_03_home_agency_unit",
+      "semantic_path": "report.resources[2].home_agency_unit",
+      "label": "6. Resources Assigned row 3 - Home Agency (and Unit)",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        396.8,
+        592.08,
+        575.0,
+        605.76
+      ],
+      "rect_pdf_points_top_left": [
+        396.8,
+        186.24,
+        575.0,
+        199.92
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1102,
+        517,
+        1597,
+        555
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.2,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 140,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_04_name",
+      "semantic_path": "report.resources[3].name",
+      "label": "6. Resources Assigned row 4 - Name",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        576.12,
+        215.0,
+        589.68
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        202.32,
+        215.0,
+        215.88
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        562,
+        597,
+        600
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 120,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_04_ics_position",
+      "semantic_path": "report.resources[3].ics_position",
+      "label": "6. Resources Assigned row 4 - ICS Position",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        216.8,
+        576.12,
+        395.0,
+        589.68
+      ],
+      "rect_pdf_points_top_left": [
+        216.8,
+        202.32,
+        395.0,
+        215.88
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        602,
+        562,
+        1097,
+        600
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 100,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_04_home_agency_unit",
+      "semantic_path": "report.resources[3].home_agency_unit",
+      "label": "6. Resources Assigned row 4 - Home Agency (and Unit)",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        396.8,
+        576.12,
+        575.0,
+        589.68
+      ],
+      "rect_pdf_points_top_left": [
+        396.8,
+        202.32,
+        575.0,
+        215.88
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1102,
+        562,
+        1597,
+        600
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.2,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 140,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_05_name",
+      "semantic_path": "report.resources[4].name",
+      "label": "6. Resources Assigned row 5 - Name",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        560.16,
+        215.0,
+        573.72
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        218.28,
+        215.0,
+        231.84
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        606,
+        597,
+        644
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 120,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_05_ics_position",
+      "semantic_path": "report.resources[4].ics_position",
+      "label": "6. Resources Assigned row 5 - ICS Position",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        216.8,
+        560.16,
+        395.0,
+        573.72
+      ],
+      "rect_pdf_points_top_left": [
+        216.8,
+        218.28,
+        395.0,
+        231.84
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        602,
+        606,
+        1097,
+        644
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 100,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_05_home_agency_unit",
+      "semantic_path": "report.resources[4].home_agency_unit",
+      "label": "6. Resources Assigned row 5 - Home Agency (and Unit)",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        396.8,
+        560.16,
+        575.0,
+        573.72
+      ],
+      "rect_pdf_points_top_left": [
+        396.8,
+        218.28,
+        575.0,
+        231.84
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1102,
+        606,
+        1597,
+        644
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.2,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 140,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_06_name",
+      "semantic_path": "report.resources[5].name",
+      "label": "6. Resources Assigned row 6 - Name",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        544.08,
+        215.0,
+        557.76
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        234.24,
+        215.0,
+        247.92
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        651,
+        597,
+        689
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 120,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_06_ics_position",
+      "semantic_path": "report.resources[5].ics_position",
+      "label": "6. Resources Assigned row 6 - ICS Position",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        216.8,
+        544.08,
+        395.0,
+        557.76
+      ],
+      "rect_pdf_points_top_left": [
+        216.8,
+        234.24,
+        395.0,
+        247.92
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        602,
+        651,
+        1097,
+        689
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 100,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_06_home_agency_unit",
+      "semantic_path": "report.resources[5].home_agency_unit",
+      "label": "6. Resources Assigned row 6 - Home Agency (and Unit)",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        396.8,
+        544.08,
+        575.0,
+        557.76
+      ],
+      "rect_pdf_points_top_left": [
+        396.8,
+        234.24,
+        575.0,
+        247.92
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1102,
+        651,
+        1597,
+        689
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.2,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 140,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_07_name",
+      "semantic_path": "report.resources[6].name",
+      "label": "6. Resources Assigned row 7 - Name",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        528.12,
+        215.0,
+        541.68
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        250.32,
+        215.0,
+        263.88
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        695,
+        597,
+        733
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 120,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_07_ics_position",
+      "semantic_path": "report.resources[6].ics_position",
+      "label": "6. Resources Assigned row 7 - ICS Position",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        216.8,
+        528.12,
+        395.0,
+        541.68
+      ],
+      "rect_pdf_points_top_left": [
+        216.8,
+        250.32,
+        395.0,
+        263.88
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        602,
+        695,
+        1097,
+        733
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 100,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_07_home_agency_unit",
+      "semantic_path": "report.resources[6].home_agency_unit",
+      "label": "6. Resources Assigned row 7 - Home Agency (and Unit)",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        396.8,
+        528.12,
+        575.0,
+        541.68
+      ],
+      "rect_pdf_points_top_left": [
+        396.8,
+        250.32,
+        575.0,
+        263.88
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1102,
+        695,
+        1597,
+        733
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.2,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 140,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_08_name",
+      "semantic_path": "report.resources[7].name",
+      "label": "6. Resources Assigned row 8 - Name",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        511.68,
+        215.0,
+        525.72
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        266.28,
+        215.0,
+        280.32
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        740,
+        597,
+        779
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 120,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_08_ics_position",
+      "semantic_path": "report.resources[7].ics_position",
+      "label": "6. Resources Assigned row 8 - ICS Position",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        216.8,
+        511.68,
+        395.0,
+        525.72
+      ],
+      "rect_pdf_points_top_left": [
+        216.8,
+        266.28,
+        395.0,
+        280.32
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        602,
+        740,
+        1097,
+        779
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.5,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 100,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "resource_08_home_agency_unit",
+      "semantic_path": "report.resources[7].home_agency_unit",
+      "label": "6. Resources Assigned row 8 - Home Agency (and Unit)",
+      "group": "resources_assigned",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        396.8,
+        511.68,
+        575.0,
+        525.72
+      ],
+      "rect_pdf_points_top_left": [
+        396.8,
+        266.28,
+        575.0,
+        280.32
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1102,
+        740,
+        1597,
+        779
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.2,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 140,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.5pt_then_reject_or_use_additional_page",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_01_date_time",
+      "semantic_path": "report.activities[0].date_time",
+      "label": "7. Activity Log row 1 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        462.88,
+        129.7,
+        476.96
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        315.04,
+        129.7,
+        329.12
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        875,
+        360,
+        914
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_01_notable_activities",
+      "semantic_path": "report.activities[0].notable_activities",
+      "label": "7. Activity Log row 1 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        462.88,
+        575.0,
+        476.96
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        315.04,
+        575.0,
+        329.12
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        875,
+        1597,
+        914
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_02_date_time",
+      "semantic_path": "report.activities[1].date_time",
+      "label": "7. Activity Log row 2 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        446.92,
+        129.7,
+        460.88
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        331.12,
+        129.7,
+        345.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        920,
+        360,
+        959
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_02_notable_activities",
+      "semantic_path": "report.activities[1].notable_activities",
+      "label": "7. Activity Log row 2 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        446.92,
+        575.0,
+        460.88
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        331.12,
+        575.0,
+        345.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        920,
+        1597,
+        959
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_03_date_time",
+      "semantic_path": "report.activities[2].date_time",
+      "label": "7. Activity Log row 3 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        430.96,
+        129.7,
+        444.92
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        347.08,
+        129.7,
+        361.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        964,
+        360,
+        1003
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_03_notable_activities",
+      "semantic_path": "report.activities[2].notable_activities",
+      "label": "7. Activity Log row 3 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        430.96,
+        575.0,
+        444.92
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        347.08,
+        575.0,
+        361.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        964,
+        1597,
+        1003
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_04_date_time",
+      "semantic_path": "report.activities[3].date_time",
+      "label": "7. Activity Log row 4 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        414.88,
+        129.7,
+        428.96
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        363.04,
+        129.7,
+        377.12
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1008,
+        360,
+        1048
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_04_notable_activities",
+      "semantic_path": "report.activities[3].notable_activities",
+      "label": "7. Activity Log row 4 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        414.88,
+        575.0,
+        428.96
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        363.04,
+        575.0,
+        377.12
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1008,
+        1597,
+        1048
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_05_date_time",
+      "semantic_path": "report.activities[4].date_time",
+      "label": "7. Activity Log row 5 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        398.92,
+        129.7,
+        412.88
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        379.12,
+        129.7,
+        393.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1053,
+        360,
+        1092
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_05_notable_activities",
+      "semantic_path": "report.activities[4].notable_activities",
+      "label": "7. Activity Log row 5 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        398.92,
+        575.0,
+        412.88
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        379.12,
+        575.0,
+        393.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1053,
+        1597,
+        1092
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_06_date_time",
+      "semantic_path": "report.activities[5].date_time",
+      "label": "7. Activity Log row 6 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        382.96,
+        129.7,
+        396.92
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        395.08,
+        129.7,
+        409.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1097,
+        360,
+        1136
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_06_notable_activities",
+      "semantic_path": "report.activities[5].notable_activities",
+      "label": "7. Activity Log row 6 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        382.96,
+        575.0,
+        396.92
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        395.08,
+        575.0,
+        409.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1097,
+        1597,
+        1136
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_07_date_time",
+      "semantic_path": "report.activities[6].date_time",
+      "label": "7. Activity Log row 7 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        366.88,
+        129.7,
+        380.96
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        411.04,
+        129.7,
+        425.12
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1142,
+        360,
+        1181
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_07_notable_activities",
+      "semantic_path": "report.activities[6].notable_activities",
+      "label": "7. Activity Log row 7 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        366.88,
+        575.0,
+        380.96
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        411.04,
+        575.0,
+        425.12
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1142,
+        1597,
+        1181
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_08_date_time",
+      "semantic_path": "report.activities[7].date_time",
+      "label": "7. Activity Log row 8 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        350.92,
+        129.7,
+        364.88
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        427.12,
+        129.7,
+        441.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1186,
+        360,
+        1225
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_08_notable_activities",
+      "semantic_path": "report.activities[7].notable_activities",
+      "label": "7. Activity Log row 8 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        350.92,
+        575.0,
+        364.88
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        427.12,
+        575.0,
+        441.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1186,
+        1597,
+        1225
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_09_date_time",
+      "semantic_path": "report.activities[8].date_time",
+      "label": "7. Activity Log row 9 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        334.96,
+        129.7,
+        348.92
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        443.08,
+        129.7,
+        457.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1231,
+        360,
+        1270
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_09_notable_activities",
+      "semantic_path": "report.activities[8].notable_activities",
+      "label": "7. Activity Log row 9 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        334.96,
+        575.0,
+        348.92
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        443.08,
+        575.0,
+        457.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1231,
+        1597,
+        1270
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_10_date_time",
+      "semantic_path": "report.activities[9].date_time",
+      "label": "7. Activity Log row 10 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        318.88,
+        129.7,
+        332.96
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        459.04,
+        129.7,
+        473.12
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1275,
+        360,
+        1314
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_10_notable_activities",
+      "semantic_path": "report.activities[9].notable_activities",
+      "label": "7. Activity Log row 10 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        318.88,
+        575.0,
+        332.96
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        459.04,
+        575.0,
+        473.12
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1275,
+        1597,
+        1314
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_11_date_time",
+      "semantic_path": "report.activities[10].date_time",
+      "label": "7. Activity Log row 11 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        302.92,
+        129.7,
+        316.88
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        475.12,
+        129.7,
+        489.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1320,
+        360,
+        1359
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_11_notable_activities",
+      "semantic_path": "report.activities[10].notable_activities",
+      "label": "7. Activity Log row 11 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        302.92,
+        575.0,
+        316.88
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        475.12,
+        575.0,
+        489.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1320,
+        1597,
+        1359
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_12_date_time",
+      "semantic_path": "report.activities[11].date_time",
+      "label": "7. Activity Log row 12 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        286.96,
+        129.7,
+        300.92
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        491.08,
+        129.7,
+        505.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1364,
+        360,
+        1403
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_12_notable_activities",
+      "semantic_path": "report.activities[11].notable_activities",
+      "label": "7. Activity Log row 12 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        286.96,
+        575.0,
+        300.92
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        491.08,
+        575.0,
+        505.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1364,
+        1597,
+        1403
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_13_date_time",
+      "semantic_path": "report.activities[12].date_time",
+      "label": "7. Activity Log row 13 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        270.88,
+        129.7,
+        284.96
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        507.04,
+        129.7,
+        521.12
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1408,
+        360,
+        1448
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_13_notable_activities",
+      "semantic_path": "report.activities[12].notable_activities",
+      "label": "7. Activity Log row 13 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        270.88,
+        575.0,
+        284.96
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        507.04,
+        575.0,
+        521.12
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1408,
+        1597,
+        1448
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_14_date_time",
+      "semantic_path": "report.activities[13].date_time",
+      "label": "7. Activity Log row 14 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        254.92,
+        129.7,
+        268.88
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        523.12,
+        129.7,
+        537.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1453,
+        360,
+        1492
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_14_notable_activities",
+      "semantic_path": "report.activities[13].notable_activities",
+      "label": "7. Activity Log row 14 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        254.92,
+        575.0,
+        268.88
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        523.12,
+        575.0,
+        537.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1453,
+        1597,
+        1492
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_15_date_time",
+      "semantic_path": "report.activities[14].date_time",
+      "label": "7. Activity Log row 15 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        238.96,
+        129.7,
+        252.92
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        539.08,
+        129.7,
+        553.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1497,
+        360,
+        1536
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_15_notable_activities",
+      "semantic_path": "report.activities[14].notable_activities",
+      "label": "7. Activity Log row 15 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        238.96,
+        575.0,
+        252.92
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        539.08,
+        575.0,
+        553.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1497,
+        1597,
+        1536
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_16_date_time",
+      "semantic_path": "report.activities[15].date_time",
+      "label": "7. Activity Log row 16 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        223.0,
+        129.7,
+        236.96
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        555.04,
+        129.7,
+        569.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1542,
+        360,
+        1581
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_16_notable_activities",
+      "semantic_path": "report.activities[15].notable_activities",
+      "label": "7. Activity Log row 16 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        223.0,
+        575.0,
+        236.96
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        555.04,
+        575.0,
+        569.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1542,
+        1597,
+        1581
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_17_date_time",
+      "semantic_path": "report.activities[16].date_time",
+      "label": "7. Activity Log row 17 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        206.92,
+        129.7,
+        221.0
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        571.0,
+        129.7,
+        585.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1586,
+        360,
+        1625
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_17_notable_activities",
+      "semantic_path": "report.activities[16].notable_activities",
+      "label": "7. Activity Log row 17 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        206.92,
+        575.0,
+        221.0
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        571.0,
+        575.0,
+        585.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1586,
+        1597,
+        1625
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_18_date_time",
+      "semantic_path": "report.activities[17].date_time",
+      "label": "7. Activity Log row 18 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        190.96,
+        129.7,
+        204.92
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        587.08,
+        129.7,
+        601.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1631,
+        360,
+        1670
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_18_notable_activities",
+      "semantic_path": "report.activities[17].notable_activities",
+      "label": "7. Activity Log row 18 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        190.96,
+        575.0,
+        204.92
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        587.08,
+        575.0,
+        601.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1631,
+        1597,
+        1670
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_19_date_time",
+      "semantic_path": "report.activities[18].date_time",
+      "label": "7. Activity Log row 19 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        175.0,
+        129.7,
+        188.96
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        603.04,
+        129.7,
+        617.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1675,
+        360,
+        1714
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_19_notable_activities",
+      "semantic_path": "report.activities[18].notable_activities",
+      "label": "7. Activity Log row 19 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        175.0,
+        575.0,
+        188.96
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        603.04,
+        575.0,
+        617.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1675,
+        1597,
+        1714
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_20_date_time",
+      "semantic_path": "report.activities[19].date_time",
+      "label": "7. Activity Log row 20 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        158.92,
+        129.7,
+        173.0
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        619.0,
+        129.7,
+        633.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1719,
+        360,
+        1759
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_20_notable_activities",
+      "semantic_path": "report.activities[19].notable_activities",
+      "label": "7. Activity Log row 20 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        158.92,
+        575.0,
+        173.0
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        619.0,
+        575.0,
+        633.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1719,
+        1597,
+        1759
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_21_date_time",
+      "semantic_path": "report.activities[20].date_time",
+      "label": "7. Activity Log row 21 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        142.96,
+        129.7,
+        156.92
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        635.08,
+        129.7,
+        649.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1764,
+        360,
+        1803
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_21_notable_activities",
+      "semantic_path": "report.activities[20].notable_activities",
+      "label": "7. Activity Log row 21 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        142.96,
+        575.0,
+        156.92
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        635.08,
+        575.0,
+        649.04
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1764,
+        1597,
+        1803
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_22_date_time",
+      "semantic_path": "report.activities[21].date_time",
+      "label": "7. Activity Log row 22 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        127.0,
+        129.7,
+        140.96
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        651.04,
+        129.7,
+        665.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1808,
+        360,
+        1847
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_22_notable_activities",
+      "semantic_path": "report.activities[21].notable_activities",
+      "label": "7. Activity Log row 22 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        127.0,
+        575.0,
+        140.96
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        651.04,
+        575.0,
+        665.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1808,
+        1597,
+        1847
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_23_date_time",
+      "semantic_path": "report.activities[22].date_time",
+      "label": "7. Activity Log row 23 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        110.92,
+        129.7,
+        125.0
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        667.0,
+        129.7,
+        681.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1853,
+        360,
+        1892
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_23_notable_activities",
+      "semantic_path": "report.activities[22].notable_activities",
+      "label": "7. Activity Log row 23 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        110.92,
+        575.0,
+        125.0
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        667.0,
+        575.0,
+        681.08
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1853,
+        1597,
+        1892
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "activity_24_date_time",
+      "semantic_path": "report.activities[23].date_time",
+      "label": "7. Activity Log row 24 - Date/Time",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        36.8,
+        94.48,
+        129.7,
+        108.92
+      ],
+      "rect_pdf_points_top_left": [
+        36.8,
+        683.08,
+        129.7,
+        697.52
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        102,
+        1897,
+        360,
+        1938
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.2,
+        "alignment": "center",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 24,
+        "format_hint": "MM/DD/YYYY HHMM, or approved agency format"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_5.2pt_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "activity_24_notable_activities",
+      "semantic_path": "report.activities[23].notable_activities",
+      "label": "7. Activity Log row 24 - Notable Activities",
+      "group": "activity_log",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        131.4,
+        94.48,
+        575.0,
+        108.92
+      ],
+      "rect_pdf_points_top_left": [
+        131.4,
+        683.08,
+        575.0,
+        697.52
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        365,
+        1897,
+        1597,
+        1938
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 6.6,
+        "minimum_font_size_pt": 5.0,
+        "alignment": "left",
+        "multiline": true
+      },
+      "validation": {
+        "required": false,
+        "max_length": 420,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "fit_within_row_or_move_full_entry_to_continuation_page",
+        "flatten_final_output": true
+      },
+      "notes": "Do not silently clip. For long narratives, generate an approved ICS 214 continuation page rather than over-shrinking."
+    },
+    {
+      "name": "prepared_by_name",
+      "semantic_path": "report.prepared_by.name",
+      "label": "8. Prepared by - Name",
+      "group": "prepared_by",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        154.3,
+        79.0,
+        252.0,
+        92.5
+      ],
+      "rect_pdf_points_top_left": [
+        154.3,
+        699.5,
+        252.0,
+        713.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        429,
+        1943,
+        700,
+        1981
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.4,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": true,
+        "max_length": 100,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_min_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "prepared_by_position_title",
+      "semantic_path": "report.prepared_by.position_title",
+      "label": "8. Prepared by - Position/Title",
+      "group": "prepared_by",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        322.1,
+        79.0,
+        410.0,
+        92.5
+      ],
+      "rect_pdf_points_top_left": [
+        322.1,
+        699.5,
+        410.0,
+        713.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        895,
+        1943,
+        1139,
+        1981
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.2,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": true,
+        "max_length": 100,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_min_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    },
+    {
+      "name": "prepared_by_signature",
+      "semantic_path": "report.prepared_by.signature_text",
+      "label": "8. Prepared by - Signature",
+      "group": "prepared_by",
+      "field_type": "text",
+      "data_type": "string",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        469.6,
+        79.0,
+        570.4,
+        92.5
+      ],
+      "rect_pdf_points_top_left": [
+        469.6,
+        699.5,
+        570.4,
+        713.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        1304,
+        1943,
+        1584,
+        1981
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.2,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": false,
+        "max_length": 120,
+        "format_hint": null
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_min_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": "Text-signature field. For image signatures, use this exact rectangle as the fixed-coordinate image placement region before flattening."
+    },
+    {
+      "name": "prepared_by_date_time",
+      "semantic_path": "report.prepared_by.date_time",
+      "label": "8. Prepared by - Date/Time",
+      "group": "prepared_by",
+      "field_type": "text",
+      "data_type": "datetime_text",
+      "page": 1,
+      "rect_pdf_points_bottom_left": [
+        312.3,
+        61.0,
+        570.4,
+        72.9
+      ],
+      "rect_pdf_points_top_left": [
+        312.3,
+        719.1,
+        570.4,
+        731.0
+      ],
+      "rect_reference_pixels_200dpi_top_left": [
+        868,
+        1998,
+        1584,
+        2031
+      ],
+      "font": {
+        "default_acroform_font": "Helvetica",
+        "recommended_production_font": "Arial or an approved metrically compatible embedded font",
+        "font_size_pt": 7.2,
+        "minimum_font_size_pt": 5.5,
+        "alignment": "left",
+        "multiline": false
+      },
+      "validation": {
+        "required": true,
+        "max_length": 32,
+        "format_hint": "MM/DD/YYYY HHMM"
+      },
+      "rendering": {
+        "transparent_fill": true,
+        "borderless": true,
+        "overflow_strategy": "shrink_to_min_then_reject",
+        "flatten_final_output": true
+      },
+      "notes": null
+    }
+  ]
+}
