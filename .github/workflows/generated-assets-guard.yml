@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Verify generated assets are not tracked
-        run: bash scripts/ci/guard-generated-assets.sh
+        run: node scripts/ci/guard-generated-assets.mjs
 
   build-guard:
     name: Build produces valid manifest
@@ -34,4 +34,4 @@ jobs:
       - name: Build frontend assets
         run: npm run build
       - name: Verify manifest after build
-        run: bash scripts/ci/guard-generated-assets.sh
+        run: node scripts/ci/guard-generated-assets.mjs
