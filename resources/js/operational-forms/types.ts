@@ -106,11 +106,21 @@ export interface FormRecord {
     };
 }
 
+export interface FrocImportConfig {
+    accepted_extensions: string[];
+    upload_max_bytes: number;
+    upload_max_megabytes: number;
+    max_extracted_bytes: number;
+    max_extracted_megabytes: number;
+    max_zip_entries: number;
+}
+
 export interface BootstrapData {
     employee: { id: number; employee_id: string; name: string; rank?: string | null };
     endpoints: { form_types: string; records: string; uploads: string; guide: string };
     csrf_token: string;
     build: string;
+    froc_import: FrocImportConfig;
 }
 
 export interface ApiProblem {

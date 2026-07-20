@@ -9,8 +9,9 @@ import {
     ShieldCheck, Sparkles, Trash2, UsersRound, WifiOff,
 } from 'lucide-react';
 import { ApiError, createApi } from './api';
+import { validateImportFile } from './importLimits.js';
 import { recoveryDrafts, type RecoveryDraft } from './draftsDb';
-import type { BootstrapData, EditableFormType, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportSummary } from './types';
+import type { BootstrapData, EditableFormType, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportConfig, FrocImportSummary } from './types';
 
 const PdfPreview = lazy(() => import('./PdfPreview').then((module) => ({ default: module.PdfPreview })));
 
@@ -266,6 +267,7 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
                                  update={updateCurrent} save={() => void saveNow()} generate={() => void generate()} remove={() => void removeCurrent()}
                                  back={() => { void flushSaves().then((saved) => { if (saved) setCurrent(null); }); }} preview={setPreview} searchEmployees={api.searchEmployees}
                                  applyFrocImport={applyFrocImport} undoFrocImport={undoFrocImport}
+                                 frocImport={bootstrap.froc_import}
                             />
                         )}
                     </main>
@@ -341,47 +343,79 @@ function FileSubmissionCard({ upload }: { upload: (name: string, file: File) => 
     </section>;
 }
 
-function FrocImportPanel({ apply, undo, review }: {
+function FrocImportPanel({ apply, undo, review, frocImport }: {
     apply: (payload: FormData) => Promise<FrocImportSummary>;
     undo: (importId: string) => Promise<void>;
     review: (summary: FrocImportSummary) => void;
+    frocImport: FrocImportConfig;
 }) {
     const [unitId, setUnitId] = useState('');
     const [notes, setNotes] = useState('');
     const [file, setFile] = useState<File | null>(null);
+    const [clientError, setClientError] = useState('');
+    const [fileNote, setFileNote] = useState('');
+    const [phase, setPhase] = useState<'idle' | 'uploading' | 'applying' | 'done' | 'error'>('idle');
     const [summary, setSummary] = useState<FrocImportSummary | null>(null);
     const [working, setWorking] = useState(false);
     const [error, setError] = useState('');
     const idempotencyKey = useRef(crypto.randomUUID());
 
+    const handleFile = (selected: File | null) => {
+        setFile(selected);
+        setFileNote('');
+        setClientError('');
+        setError('');
+        if (!selected) return;
+        const result = validateImportFile(selected, frocImport);
+        if (result.status === 'accepted') {
+            setFileNote(result.media_note || result.message);
+        } else {
+            setClientError(result.message);
+        }
+    };
+
     const run = async () => {
-        setWorking(true); setError('');
+        if (clientError) return;
+        setWorking(true); setError(''); setPhase('uploading');
         try {
             const payload = new FormData(); payload.append('unit_id', unitId.trim());
             if (notes.trim()) payload.append('notes', notes);
             if (file) payload.append('notes_file', file);
             payload.append('idempotency_key', idempotencyKey.current);
+            setPhase('applying');
             setSummary(await apply(payload));
+            setPhase('done');
         } catch (caught) {
-            setError(caught instanceof ApiError && caught.problem.errors ? Object.values(caught.problem.errors).flat().join(' ') : (caught instanceof Error ? caught.message : 'The notes could not be analyzed.'));
+            setPhase('error');
+            if (caught instanceof ApiError && caught.status === 413) {
+                setError(caught.message || 'The upload exceeded the server request limit. The F-ROC importer accepts ZIP or TXT files up to 50 MB.');
+            } else {
+                setError(caught instanceof ApiError && caught.problem.errors ? Object.values(caught.problem.errors).flat().join(' ') : (caught instanceof Error ? caught.message : 'The notes could not be analyzed.'));
+            }
         } finally { setWorking(false); }
     };
 
     const reset = () => {
-        setUnitId(''); setNotes(''); setFile(null); setError(''); setSummary(null);
+        setUnitId(''); setNotes(''); setFile(null); setClientError(''); setFileNote(''); setError(''); setSummary(null); setPhase('idle');
         idempotencyKey.current = crypto.randomUUID();
     };
 
+    const hasSource = Boolean(notes.trim() || file);
+    const submitDisabled = working || !unitId.trim() || !hasSource || Boolean(clientError);
+
     return <details className="of-import">
-        <summary><Bot size={19} /><span><strong>Optional: Import activity notes with AI</strong><small>Upload a WhatsApp text export or paste unit notes. The assistant will add supported details to this draft. All fields remain editable.</small></span></summary>
+        <summary><Bot size={19} /><span><strong>Optional: Import activity notes with AI</strong><small>Upload a WhatsApp .zip or .txt export, or paste unit notes. The assistant adds supported details to this open F-ROC draft. This does not store a completed file—use “Submit an existing file” below the library to archive a finished document.</small></span></summary>
         <div className="of-import-body">
             <div className="of-import-fields">
                 <Field label="Unit designation" hint="Required—for example R6, JHAT, Gator 1, or Detail Medic 2."><Input value={unitId} onChange={(_, data) => setUnitId(data.value)} /></Field>
-                <Field label="WhatsApp export or text file" hint="Maximum 2 MB upload; extracted text is limited to 512 KB and is not stored."><div className="of-file-row"><label className="of-file-picker"><FileArchive size={18} /><span>{file ? file.name : 'Choose .zip or .txt file'}</span><input type="file" accept=".zip,.txt,text/plain,application/zip" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>{file && <Button appearance="subtle" onClick={() => setFile(null)}>Remove file</Button>}</div>{file && <small className="of-source-size">{(file.size / 1024).toFixed(1)} KB selected</small>}</Field>
+                <Field label="WhatsApp export or text file" hint={`Up to ${frocImport.upload_max_megabytes} MB. ZIP exports containing media are accepted; only the chat text is analyzed. PDF, Word, image, and video files are not analyzed.`}><div className="of-file-row"><label className="of-file-picker"><FileArchive size={18} /><span>{file ? file.name : 'Choose .zip or .txt file'}</span><input type="file" accept=".zip,.txt,text/plain,application/zip" onChange={(event) => handleFile(event.target.files?.[0] || null)} /></label>{file && <Button appearance="subtle" onClick={() => handleFile(null)}>Remove file</Button>}</div>{file && <small className="of-source-size">{fileNote || `${(file.size / 1024).toFixed(1)} KB selected`}</small>}</Field>
                 <Field className="of-import-notes" label="Paste activity notes" hint="Paste copied chat messages, field notes, or unit logs. Source content is processed transiently and never saved with the form."><Textarea value={notes} onChange={(_, data) => setNotes(data.value)} resize="vertical" /></Field>
             </div>
+            {clientError && <MessageBar intent="error"><MessageBarBody>{clientError}</MessageBarBody></MessageBar>}
             {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
-            <div className="of-import-actions"><Button onClick={reset} disabled={working}>Cancel / reset</Button><Button appearance="primary" icon={working ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} disabled={working || !unitId.trim() || (!notes.trim() && !file)} onClick={() => void run()}>{working ? 'Analyzing and adding…' : 'Analyze and add to form'}</Button></div>
+            {phase === 'uploading' && <MessageBar intent="info"><MessageBarBody>Uploading and analyzing…</MessageBarBody></MessageBar>}
+            {phase === 'applying' && <MessageBar intent="info"><MessageBarBody>Applying imported fields…</MessageBarBody></MessageBar>}
+            <div className="of-import-actions"><Button onClick={reset} disabled={working}>Cancel / reset</Button><Button appearance="primary" icon={working ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} disabled={submitDisabled} onClick={() => void run()}>{working ? (phase === 'applying' ? 'Applying fields…' : 'Analyzing…') : 'Analyze and add to form'}</Button></div>
             {summary && <div className="of-import-success" role="status">
                 <Check size={20} /><div><strong>Activity notes added</strong><p>Added {summary.applied_fields.length} field{summary.applied_fields.length === 1 ? '' : 's'}, {summary.updated_mileage_rows.length} mileage row{summary.updated_mileage_rows.length === 1 ? '' : 's'}, and {summary.appended_labor_rows.length} labor activit{summary.appended_labor_rows.length === 1 ? 'y' : 'ies'}.{summary.estimated_fields.length > 0 ? ` ${summary.estimated_fields.length} end time${summary.estimated_fields.length === 1 ? ' was' : 's were'} estimated.` : ''}</p>{summary.fallback_used && <small>Rules-based extraction was used because the configured AI service was unavailable.</small>}{summary.skipped_conflicts.length > 0 && <small>{summary.skipped_conflicts.length} existing value{summary.skipped_conflicts.length === 1 ? ' was' : 's were'} preserved.</small>}</div>
                 <div className="of-import-success-actions"><Button onClick={() => review(summary)}>Review imported fields</Button><Button onClick={() => void undo(summary.id).then(() => setSummary(null))}>Undo this import</Button><Button appearance="subtle" onClick={() => setSummary(null)}>Dismiss</Button></div>
@@ -390,10 +424,10 @@ function FrocImportPanel({ apply, undo, review }: {
     </details>;
 }
 
-function EditorView({ record, definition, saveState, activeSection, setActiveSection, isGenerating, update, save, generate, remove, back, preview, searchEmployees, applyFrocImport, undoFrocImport }: {
+function EditorView({ record, definition, saveState, activeSection, setActiveSection, isGenerating, update, save, generate, remove, back, preview, searchEmployees, applyFrocImport, undoFrocImport, frocImport }: {
     record: FormRecord; definition?: FormDefinition; saveState: SaveState; activeSection: string; setActiveSection: (value: string) => void; isGenerating: boolean;
     update: (mutator: (data: Record<string, any>) => void) => void; save: () => void; generate: () => void; remove: () => void; back: () => void; preview: (doc: FormDocument) => void; searchEmployees: (query: string) => Promise<EmployeeSuggestion[]>;
-    applyFrocImport: (payload: FormData) => Promise<FrocImportSummary>; undoFrocImport: (importId: string) => Promise<void>;
+    applyFrocImport: (payload: FormData) => Promise<FrocImportSummary>; undoFrocImport: (importId: string) => Promise<void>; frocImport: FrocImportConfig;
 }) {
     const document = latestDocument(record);
     const sections = record.form_type === 'ics_214' ? [['overview', 'Operational period'], ['resources', 'Resources'], ['activities', 'Activity log'], ['prepared', 'Prepared by'], ['documents', 'PDF versions']] : [['overview', 'General information'], ['team', 'Team members'], ['labor', 'Labor'], ['equipment', 'Equipment'], ['mileage', 'Mileage'], ['materials', 'Materials'], ['certification', 'Certification'], ['documents', 'PDF versions']];
@@ -402,7 +436,7 @@ function EditorView({ record, definition, saveState, activeSection, setActiveSec
         <div className="of-record-spine"><div><Badge appearance="outline">{typeLabel(record.form_type)} · v{record.form_version}</Badge><h1>{record.title}</h1><p>Record {record.id.slice(-8).toUpperCase()} · revision {record.revision}</p></div><div className="of-spine-status"><StatusBadge status={record.status} />{record.latest_pdf_version && <Badge color={record.has_changes_since_latest_pdf ? 'warning' : 'success'}>{record.has_changes_since_latest_pdf ? 'Changed since PDF' : `PDF v${record.latest_pdf_version} current`}</Badge>}</div></div>
         {document && <div className="of-document-ready" role="status"><div className="of-document-ready-icon"><FileCheck2 size={20} /></div><div><strong>Latest controlled PDF</strong><span>Version {document.version_number} · {document.display_name}</span><small>Generated {stamp(document.created_at)} from revision {document.source_revision}</small></div><div className="of-document-ready-actions"><Button appearance="primary" icon={<Eye size={16} />} aria-label="View latest PDF" onClick={() => preview(document)}>View / print</Button><Button as="a" href={document.download_url} icon={<Download size={16} />} aria-label="Download latest PDF">Download</Button></div></div>}
         <div className="of-editor-grid"><aside className="of-context-nav" aria-label="Form sections">{sections.map(([id, label]) => <button key={id} className={activeSection === id ? 'active' : ''} onClick={() => setActiveSection(id)}>{label}</button>)}</aside><div className="of-form-canvas" onBlur={save}>
-            {record.form_type === 'ics_214' ? <IcsEditor record={record} definition={definition} section={activeSection} update={update} /> : <FrocEditor record={record} definition={definition} section={activeSection} update={update} searchEmployees={searchEmployees} applyImport={applyFrocImport} undoImport={undoFrocImport} reviewImport={(summary) => setActiveSection(summary.updated_mileage_rows.length > 0 ? 'mileage' : summary.appended_labor_rows.length > 0 ? 'labor' : 'overview')} />}
+            {record.form_type === 'ics_214' ? <IcsEditor record={record} definition={definition} section={activeSection} update={update} /> : <FrocEditor record={record} definition={definition} section={activeSection} update={update} searchEmployees={searchEmployees} applyImport={applyFrocImport} undoImport={undoFrocImport} reviewImport={(summary) => setActiveSection(summary.updated_mileage_rows.length > 0 ? 'mileage' : summary.appended_labor_rows.length > 0 ? 'labor' : 'overview')} frocImport={frocImport} />}
             {activeSection === 'documents' && <Documents record={record} preview={preview} />}
         </div></div>
     </div>;
@@ -417,15 +451,16 @@ function IcsEditor({ record, definition, section, update }: EditorProps) {
     return null;
 }
 
-function FrocEditor({ record, definition, section, update, searchEmployees, applyImport, undoImport, reviewImport }: EditorProps & {
+function FrocEditor({ record, definition, section, update, searchEmployees, applyImport, undoImport, reviewImport, frocImport }: EditorProps & {
     searchEmployees: (query: string) => Promise<EmployeeSuggestion[]>;
     applyImport: (payload: FormData) => Promise<FrocImportSummary>;
     undoImport: (importId: string) => Promise<void>;
     reviewImport: (summary: FrocImportSummary) => void;
+    frocImport: FrocImportConfig;
 }) {
     const data = record.data; const cap = definition?.capacities || {};
     const options = definition?.field_options;
-    if (section === 'overview') return <FormSection number="1" title="General information" help="Enter the event and reporting details directly. Importing activity notes is optional."><FieldGrid><TextField label="Event ID / event name" value={data.general_information?.event_id} set={(v) => update((d) => setPath(d, ['general_information', 'event_id'], v))} /><TextField label="Applicant name" value={data.general_information?.applicant_name} set={(v) => update((d) => setPath(d, ['general_information', 'applicant_name'], v))} /><TextField label="Department" value={data.general_information?.department} set={(v) => update((d) => setPath(d, ['general_information', 'department'], v))} /><TextField type="date" label="Report date" value={data.general_information?.date} set={(v) => update((d) => setPath(d, ['general_information', 'date'], v))} /></FieldGrid><FrocImportPanel apply={applyImport} undo={undoImport} review={reviewImport} /><Totals data={data} /></FormSection>;
+    if (section === 'overview') return <FormSection number="1" title="General information" help="Enter the event and reporting details directly. Importing activity notes is optional."><FieldGrid><TextField label="Event ID / event name" value={data.general_information?.event_id} set={(v) => update((d) => setPath(d, ['general_information', 'event_id'], v))} /><TextField label="Applicant name" value={data.general_information?.applicant_name} set={(v) => update((d) => setPath(d, ['general_information', 'applicant_name'], v))} /><TextField label="Department" value={data.general_information?.department} set={(v) => update((d) => setPath(d, ['general_information', 'department'], v))} /><TextField type="date" label="Report date" value={data.general_information?.date} set={(v) => update((d) => setPath(d, ['general_information', 'date'], v))} /></FieldGrid><FrocImportPanel apply={applyImport} undo={undoImport} review={reviewImport} frocImport={frocImport} /><Totals data={data} /></FormSection>;
     if (section === 'team') return <TeamMembersEditor rows={data.team_members || []} capacity={cap.team_members || 14} onChange={(rows) => update((d) => { d.team_members = rows; })} search={searchEmployees} />;
     if (section === 'labor') return <LaborEditor rows={data.labor || []} capacity={cap.labor || 13} onChange={(rows) => update((d) => { d.labor = rows; })} options={options} estimatedFields={record.import_metadata?.estimated_fields || []} />;
     if (section === 'equipment') return <RepeatingTable title="Equipment hours" rows={data.equipment_hours || []} fields={[['category', 'Cat.'], ['equipment_id', 'Equipment ID'], ['operator', 'Operator'], ['description', 'Description'], ['location', 'Location'], ['hours', 'Hours'], ['event_related', 'Event?', 'checkbox']]} capacity={cap.equipment_hours || 6} onChange={(rows) => update((d) => { d.equipment_hours = rows; })} rowType="equipment_hours" categories={options?.categories} />;

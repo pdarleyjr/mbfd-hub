@@ -3,6 +3,7 @@
 namespace App\Filament\Employee\Pages;
 
 use App\Models\Employee;
+use App\Services\OperationalForms\FrocImportLimits;
 use Filament\Pages\Page;
 
 class OperationalForms extends Page
@@ -40,6 +41,7 @@ class OperationalForms extends Page
                 ],
                 'csrf_token' => csrf_token(),
                 'build' => config('app.version', 'development'),
+                ...FrocImportLimits::bootstrap(),
             ],
         ];
     }

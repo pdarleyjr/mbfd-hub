@@ -6,19 +6,20 @@ namespace App\Services\OperationalForms;
 
 use App\Services\CloudflareAIService;
 use App\Services\LocalAIService;
+use App\Services\OperationalForms\FrocImportException;
+use App\Services\OperationalForms\FrocImportLimits;
+use App\Services\OperationalForms\FrocZipReader;
 use DateInterval;
 use DateTimeImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
-use ZipArchive;
 
 final class FrocImportService
 {
-    private const MAX_SOURCE_BYTES = 524_288;
-
-    private const MAX_ZIP_ENTRIES = 10;
+    /** @var array<string, int>|null Safe, non-source accounting from the last ZIP read. */
+    private ?array $lastZipStats = null;
 
     public function __construct(private readonly CloudflareAIService $ai) {}
 
@@ -70,6 +71,10 @@ final class FrocImportService
                 : 'The AI service was unavailable, so a rules-based preview was created. Review every suggested activity and estimated end time.';
         }
 
+        if ($sourceType === 'whatsapp-zip' && $this->lastZipStats !== null) {
+            $fallback['zip_stats'] = $this->lastZipStats;
+        }
+
         $fallback['source_type'] = $sourceType;
         $fallback['source_sha256'] = $sourceSha256;
         $fallback['matched_message_count'] = count($messages);
@@ -117,11 +122,14 @@ final class FrocImportService
         if ($source === '') {
             throw new RuntimeException('Paste activity notes or upload a .txt or .zip file.');
         }
-        if (strlen($source) > self::MAX_SOURCE_BYTES) {
-            throw new RuntimeException('The extracted text is larger than 512 KB. Remove unrelated chat history and try again.');
+        if (strlen($source) > FrocImportLimits::maxExtractedBytes()) {
+            throw new FrocImportException(
+                'text_too_large',
+                'The extracted text is larger than the '.round(FrocImportLimits::maxExtractedBytes() / 1024 / 1024, 2).' MB import limit. Remove unrelated chat history and try again.',
+            );
         }
         if (! mb_check_encoding($source, 'UTF-8')) {
-            throw new RuntimeException('The activity notes are not valid UTF-8 text.');
+            throw new FrocImportException('text_invalid_utf8', 'The activity notes are not valid UTF-8 text.');
         }
 
         return [$this->cleanText($source), $eventName, $sourceType];
@@ -129,57 +137,16 @@ final class FrocImportService
 
     private function readZip(string $path): string
     {
-        if (! class_exists(ZipArchive::class)) {
-            throw new RuntimeException('ZIP import is not available on this server. Extract the chat and upload its .txt file.');
-        }
+        $result = FrocZipReader::fromConfig()->read($path);
 
-        $zip = new ZipArchive;
-        if ($zip->open($path) !== true) {
-            throw new RuntimeException('The WhatsApp ZIP could not be opened.');
-        }
+        $this->lastZipStats = [
+            'total_entries' => $result->totalEntries,
+            'text_entries' => $result->textEntries,
+            'extracted_bytes' => $result->extractedBytes,
+            'media_entries_ignored' => $result->mediaEntriesIgnored,
+        ];
 
-        try {
-            if ($zip->numFiles > self::MAX_ZIP_ENTRIES) {
-                throw new RuntimeException('The ZIP contains too many files. Export the WhatsApp chat without media.');
-            }
-
-            $texts = [];
-            $total = 0;
-            for ($index = 0; $index < $zip->numFiles; $index++) {
-                $stat = $zip->statIndex($index);
-                if (! is_array($stat)) {
-                    continue;
-                }
-                $name = str_replace('\\', '/', (string) ($stat['name'] ?? ''));
-                if ($name === '' || str_contains($name, '../') || str_starts_with($name, '/')) {
-                    throw new RuntimeException('The ZIP contains an unsafe file path.');
-                }
-                if (! str_ends_with(strtolower($name), '.txt')) {
-                    continue;
-                }
-                $size = (int) ($stat['size'] ?? 0);
-                $compressed = max(1, (int) ($stat['comp_size'] ?? 1));
-                if ($size > self::MAX_SOURCE_BYTES || $size / $compressed > 100) {
-                    throw new RuntimeException('The ZIP has an unsafe compression ratio or an oversized text entry.');
-                }
-                $total += $size;
-                if ($total > self::MAX_SOURCE_BYTES) {
-                    throw new RuntimeException('The ZIP contains more than 512 KB of text.');
-                }
-                $contents = $zip->getFromIndex($index, self::MAX_SOURCE_BYTES);
-                if (is_string($contents)) {
-                    $texts[] = $contents;
-                }
-            }
-
-            if ($texts === []) {
-                throw new RuntimeException('No .txt chat export was found inside the ZIP.');
-            }
-
-            return implode("\n", $texts);
-        } finally {
-            $zip->close();
-        }
+        return $result->text;
     }
 
     private function eventNameFromFilename(string $filename): string
@@ -353,11 +320,52 @@ final class FrocImportService
         return '';
     }
 
+    /**
+     * Limit the messages sent to the configured AI service to a safe byte
+     * budget, selecting complete messages in chronological order. The extracted
+     * text ceiling (1 MiB) already bounds most imports; this is an independent
+     * guard for the prompt size actually handed to the model.
+     *
+     * @param  array<int, array{timestamp: DateTimeImmutable|null, date_known: bool, sender: string, text: string}>  $messages
+     * @return array<int, array{timestamp: DateTimeImmutable|null, date_known: bool, sender: string, text: string}>
+     */
+    private function boundMessagesForModel(array $messages): array
+    {
+        $budget = FrocImportLimits::maxModelInputBytes();
+        if ($budget <= 0) {
+            return $messages;
+        }
+
+        $selected = [];
+        $used = 0;
+        foreach ($messages as $message) {
+            $size = strlen((string) ($message['text'] ?? '')) + strlen((string) ($message['sender'] ?? '')) + 64;
+            if ($selected !== [] && $used + $size > $budget) {
+                break;
+            }
+            if ($selected === [] && $size > $budget) {
+                throw new FrocImportException(
+                    'model_input_too_large',
+                    'This activity export is too large to analyze. Provide a narrower WhatsApp export for the requested unit.',
+                );
+            }
+            $selected[] = $message;
+            $used += $size;
+        }
+
+        return $selected;
+    }
+
     /** @param array<int, array{timestamp: DateTimeImmutable|null, date_known: bool, sender: string, text: string}> $messages
      * @return array<int, array<string, mixed>>
      */
     private function aiLabor(array $messages): array
     {
+        // Bound the model input independently from the upload size so a 50 MB
+        // archive never produces a 50 MB prompt. Only complete messages in
+        // chronological order are sent.
+        $messages = $this->boundMessagesForModel($messages);
+
         $sources = array_map(fn (array $message, int $index): array => [
             'source_index' => $index,
             'timestamp' => $message['date_known'] ? ($message['timestamp']?->format(DATE_ATOM)) : ($message['timestamp']?->format('H:i')),

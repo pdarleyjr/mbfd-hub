@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Employee\OperationalForms;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Employee\OperationalForms\ApplyFrocImportRequest;
+use App\Http\Requests\Employee\OperationalForms\FrocImportPreviewRequest;
 use App\Models\Employee;
 use App\Services\OperationalForms\FrocImportService;
 use App\Services\OperationalForms\FrocRecordImportService;
@@ -17,13 +19,9 @@ use RuntimeException;
 
 final class FrocImportController extends Controller
 {
-    public function __invoke(Request $request, FrocImportService $service): JsonResponse
+    public function __invoke(FrocImportPreviewRequest $request, FrocImportService $service): JsonResponse
     {
-        $validated = $request->validate([
-            'unit_id' => ['required', 'string', 'max:30', 'regex:/^[\pL\pN][\pL\pN .\/_-]*$/u'],
-            'notes' => ['nullable', 'string', 'max:524288', 'required_without:notes_file'],
-            'notes_file' => ['nullable', 'file', 'max:2048', 'required_without:notes'],
-        ]);
+        $validated = $request->validated();
 
         try {
             $preview = $service->preview(
@@ -39,19 +37,12 @@ final class FrocImportController extends Controller
     }
 
     public function apply(
-        Request $request,
+        ApplyFrocImportRequest $request,
         string $record,
         FrocRecordImportService $service,
         OperationalFormRecordPresenter $presenter,
     ): JsonResponse {
-        $validated = $request->validate([
-            'revision' => ['required', 'integer', 'min:1'],
-            'unit_id' => ['required', 'string', 'max:30', 'regex:/^[\pL\pN][\pL\pN .\/_-]*$/u'],
-            'notes' => ['nullable', 'string', 'max:524288', 'required_without:notes_file'],
-            'notes_file' => ['nullable', 'file', 'max:2048', 'required_without:notes'],
-            'merge_mode' => ['required', 'in:fill_empty_and_append'],
-            'idempotency_key' => ['required', 'string', 'max:100'],
-        ]);
+        $validated = $request->validated();
         /** @var Employee $employee */
         $employee = $request->user('employee');
 

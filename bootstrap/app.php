@@ -37,5 +37,20 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        // Render a stable, user-readable JSON contract for requests that exceed
+        // the server's request-size limit (HTTP 413). This is thrown by the
+        // ValidatePostSize middleware before Laravel validation runs, so the
+        // React API client must not receive an HTML error page.
+        $exceptions->render(function (\Illuminate\Http\Exceptions\PostTooLargeException $exception, \Illuminate\Http\Request $request) {
+            if (! $request->expectsJson()) {
+                return null;
+            }
+
+            return response()->json([
+                'message' => 'The upload was rejected before analysis because it exceeded the server’s request limit. The F-ROC importer accepts ZIP or TXT files up to 50 MB. Contact Forms administration if this file is below that size.',
+                'code' => 'request_too_large',
+            ], 413);
+        });
+
         Integration::handles($exceptions);
     })->create();
