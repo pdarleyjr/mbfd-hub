@@ -8,55 +8,15 @@ use App\Enums\ProjectPriority;
 use App\Enums\ProjectStatus;
 use App\Models\CapitalProject;
 use App\Services\CloudflareAIService;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Tests\TestCase;
 
 class ScheduledAICommandsTest extends TestCase
 {
     use RefreshDatabase;
-
-    /** @var array<string, string|false> */
-    private array $originalDatabaseEnvironment = [];
-
-    protected function setUp(): void
-    {
-        foreach (['DB_CONNECTION', 'DB_DATABASE'] as $name) {
-            $this->originalDatabaseEnvironment[$name] = getenv($name);
-        }
-        putenv('DB_CONNECTION=sqlite');
-        putenv('DB_DATABASE=:memory:');
-        $_ENV['DB_CONNECTION'] = 'sqlite';
-        $_ENV['DB_DATABASE'] = ':memory:';
-        $_SERVER['DB_CONNECTION'] = 'sqlite';
-        $_SERVER['DB_DATABASE'] = ':memory:';
-
-        parent::setUp();
-
-        config()->set('database.default', 'sqlite');
-        config()->set('database.connections.sqlite.database', ':memory:');
-        $this->ensureRoleTablesExist();
-    }
-
-    protected function tearDown(): void
-    {
-        parent::tearDown();
-
-        foreach ($this->originalDatabaseEnvironment as $name => $value) {
-            if ($value === false) {
-                putenv($name);
-                unset($_ENV[$name], $_SERVER[$name]);
-            } else {
-                putenv("{$name}={$value}");
-                $_ENV[$name] = $value;
-                $_SERVER[$name] = $value;
-            }
-        }
-    }
 
     public function test_analyze_project_priorities_passes_collection_and_handles_priorities_shape(): void
     {
@@ -131,25 +91,5 @@ class ScheduledAICommandsTest extends TestCase
         ]);
 
         return CapitalProject::query()->findOrFail($id);
-    }
-
-    private function ensureRoleTablesExist(): void
-    {
-        if (! Schema::hasTable('roles')) {
-            Schema::create('roles', function (Blueprint $table): void {
-                $table->id();
-                $table->string('name');
-                $table->string('guard_name')->default('web');
-                $table->timestamps();
-            });
-        }
-
-        if (! Schema::hasTable('model_has_roles')) {
-            Schema::create('model_has_roles', function (Blueprint $table): void {
-                $table->unsignedBigInteger('role_id');
-                $table->string('model_type');
-                $table->unsignedBigInteger('model_id');
-            });
-        }
     }
 }
