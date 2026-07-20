@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   test: {
@@ -20,9 +21,23 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: {
-      '@mbfd-vacation/db': new URL('./packages/db/src/index.ts', import.meta.url).pathname,
-      '@mbfd-vacation/shared': new URL('./packages/shared/src/index.ts', import.meta.url).pathname,
-    },
+    alias: [
+      {
+        find: /^@mbfd-vacation\/db\/(.+)$/,
+        replacement: `${fileURLToPath(new URL('./packages/db/src/', import.meta.url))}$1`,
+      },
+      {
+        find: '@mbfd-vacation/db',
+        replacement: fileURLToPath(new URL('./packages/db/src/index.ts', import.meta.url)),
+      },
+      {
+        find: /^@mbfd-vacation\/shared\/(.+)$/,
+        replacement: `${fileURLToPath(new URL('./packages/shared/src/', import.meta.url))}$1`,
+      },
+      {
+        find: '@mbfd-vacation/shared',
+        replacement: fileURLToPath(new URL('./packages/shared/src/index.ts', import.meta.url)),
+      },
+    ],
   },
 });

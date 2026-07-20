@@ -78,10 +78,6 @@ jobs:
     - name: Discover packages
       run: php artisan package:discover --ansi
 
-    - name: Publish vendor migrations
-      run: |
-        php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider" --tag="permission-migrations" --force
-
     - name: Directory Permissions
       run: chmod -R 775 storage bootstrap/cache
 

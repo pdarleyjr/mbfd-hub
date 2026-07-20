@@ -1,11 +1,12 @@
+import { fileURLToPath } from 'node:url';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: 'standalone',
-  experimental: {
-    typedRoutes: false,
-  },
+  outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
+  typedRoutes: false,
   async rewrites() {
     return [
       {

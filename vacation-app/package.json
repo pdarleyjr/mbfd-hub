@@ -18,8 +18,8 @@
     "db:migrate": "pnpm --filter ./packages/db run migrate",
     "db:seed": "pnpm --filter ./packages/db run seed",
     "test": "pnpm -r run test",
-    "test:unit": "vitest run --dir tests/unit",
-    "test:integration": "vitest run --dir tests/integration",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
@@ -28,7 +28,9 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
+    "@testcontainers/postgresql": "12.0.4",
     "@types/node": "^22.10.0",
+    "drizzle-orm": "^0.45.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^3.2.6"
