@@ -11,32 +11,36 @@ namespace App\Services\OperationalForms;
  * frontend bootstrap read through this class so the MB/KB/entry values can
  * never drift. Untrusted or misconfigured configuration is clamped to safe
  * operational ranges here, in one place.
+ *
+ * The documented maximums below are the hard ceilings the product guarantees.
+ * Configuration may only make a limit *smaller* than these ceilings, never
+ * larger, so a malformed configuration can never raise the effective limit.
  */
 final class FrocImportLimits
 {
     public const MIN_UPLOAD_KILOBYTES = 1024; // 1 MB
 
-    public const MAX_UPLOAD_KILOBYTES = 100 * 1024; // 100 MB
+    public const MAX_UPLOAD_KILOBYTES = 50 * 1024; // 50 MiB / 51,200 KiB
 
     public const MIN_EXTRACTED_BYTES = 64 * 1024; // 64 KB
 
-    public const MAX_EXTRACTED_BYTES = 4 * 1024 * 1024; // 4 MB
+    public const MAX_EXTRACTED_BYTES = 1 * 1024 * 1024; // 1 MiB
 
     public const MIN_ZIP_ENTRIES = 1;
 
-    public const MAX_ZIP_ENTRIES = 1000;
+    public const MAX_ZIP_ENTRIES = 500;
 
     public const MIN_TEXT_ENTRIES = 1;
 
-    public const MAX_TEXT_ENTRIES = 25;
+    public const MAX_TEXT_ENTRIES = 10;
 
     public const MIN_COMPRESSION_RATIO = 10.0;
 
-    public const MAX_COMPRESSION_RATIO = 200.0;
+    public const MAX_COMPRESSION_RATIO = 100.0;
 
     public const MIN_MODEL_INPUT_BYTES = 16 * 1024; // 16 KB
 
-    public const MAX_MODEL_INPUT_BYTES = 1 * 1024 * 1024; // 1 MB
+    public const MAX_MODEL_INPUT_BYTES = 1 * 1024 * 1024; // 1 MiB
 
     public static function uploadMaxKilobytes(): int
     {
@@ -50,6 +54,11 @@ final class FrocImportLimits
     public static function uploadMaxBytes(): int
     {
         return self::uploadMaxKilobytes() * 1024;
+    }
+
+    public static function uploadMaxMegabytes(): int
+    {
+        return (int) round(self::uploadMaxBytes() / (1024 * 1024));
     }
 
     public static function maxExtractedBytes(): int
@@ -116,6 +125,8 @@ final class FrocImportLimits
                 'max_extracted_bytes' => $extractedBytes,
                 'max_extracted_megabytes' => (int) round($extractedBytes / (1024 * 1024)),
                 'max_zip_entries' => self::maxZipEntries(),
+                'max_text_entries' => self::maxTextEntries(),
+                'max_compression_ratio' => self::maxCompressionRatio(),
             ],
         ];
     }
