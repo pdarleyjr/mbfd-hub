@@ -5,6 +5,7 @@
         "build": "vite build",
         "dev": "vite",
         "typecheck": "tsc --noEmit",
+        "typecheck:operational-forms": "tsc -p tsconfig.operational-forms.json",
         "test:operational-forms-node": "node --test tests/Node/operational-forms/*.test.mjs",
         "test:operational-forms-e2e": "playwright test --config=playwright.operational-forms.config.ts"
     },

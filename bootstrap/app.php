@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\OperationalForms\FrocImportLimits;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -37,5 +38,33 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        // Render a stable, user-readable JSON contract for Operational Forms API
+        // requests (or any JSON request) that exceed the server's request-size
+        // limit (HTTP 413). This is thrown by the ValidatePostSize middleware
+        // before Laravel validation runs, so the React API client must not
+        // receive an HTML error page.
+        //
+        // Scoped to the Operational Forms API (and any JSON request) so unrelated
+        // web error handling and unrelated exceptions are left untouched. For a
+        // normal, non-API, non-JSON web request we fall through to a standard
+        // HTML 413 page and never convert it to the F-ROC JSON schema.
+        $exceptions->render(function (\Illuminate\Http\Exceptions\PostTooLargeException $exception, \Illuminate\Http\Request $request) {
+            if (! $request->is('employee/forms/api/*') && ! $request->expectsJson()) {
+                return response()->make(
+                    '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>413 Payload Too Large</title></head>'
+                        .'<body><h1>413</h1><p>The uploaded file is too large for this request.</p></body></html>',
+                    413,
+                    ['Content-Type' => 'text/html; charset=utf-8'],
+                );
+            }
+
+            $megabytes = FrocImportLimits::uploadMaxMegabytes();
+
+            return response()->json([
+                'message' => "The upload was rejected before analysis because it exceeded the server’s request limit. The F-ROC importer accepts ZIP or TXT files up to {$megabytes} MB. Contact Forms administration if this file is below that size.",
+                'code' => 'request_too_large',
+            ], 413);
+        });
+
         Integration::handles($exceptions);
     })->create();
