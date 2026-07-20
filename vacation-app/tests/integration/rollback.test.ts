@@ -8,7 +8,7 @@ import {
   shiftBlocks,
 } from '@mbfd-vacation/db';
 import { rollbackImportRun } from '@mbfd-vacation/db/operations/rollback';
-import { eq, isNull } from 'drizzle-orm';
+import { eq, isNull, sql } from 'drizzle-orm';
 import { startTestPostgres, type TestEnv } from './setup';
 
 let env: TestEnv;
@@ -95,6 +95,14 @@ describe('rollbackImportRun', () => {
       })
       .returning();
     if (!run2) throw new Error('no run2');
+
+    // Match the production supersession transaction: retire the current
+    // active row before inserting the replacement, then connect the audit
+    // pointer once the replacement id exists.
+    await db
+      .update(leaveEntries)
+      .set({ supersededByEntryId: sql`${leaveEntries.id}` })
+      .where(eq(leaveEntries.id, original.id));
 
     const [replacement] = await db
       .insert(leaveEntries)

@@ -21,7 +21,7 @@ import {
   type TelestaffCategory,
   type WorkCodeDecision,
 } from '@mbfd-vacation/shared';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { logger } from '../log';
 import { ensureShiftBlock } from '../commit/ensure-blocks';
@@ -188,6 +188,18 @@ export async function commitImportJob(runId: string): Promise<void> {
               ),
             )
             .limit(1);
+
+          // Retire the prior active row before inserting its replacement.
+          // The self-reference is a transaction-local sentinel: it removes
+          // the row from the partial active-row unique index until the new
+          // id exists. If any later statement fails, the transaction restores
+          // the original row automatically.
+          if (existing[0]) {
+            await tx
+              .update(leaveEntries)
+              .set({ supersededByEntryId: sql`${leaveEntries.id}` })
+              .where(eq(leaveEntries.id, existing[0].id));
+          }
 
           const [created] = await tx
             .insert(leaveEntries)

@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, not, sql } from 'drizzle-orm';
 import type { Database } from '../client';
 import { importRuns, leaveEntries } from '../schema/index';
 
@@ -38,7 +38,10 @@ export async function rollbackImportRun(
 
     // 1. Find every entry from this run.
     const ours = await tx
-      .select({ id: leaveEntries.id })
+      .select({
+        id: leaveEntries.id,
+        supersededByEntryId: leaveEntries.supersededByEntryId,
+      })
       .from(leaveEntries)
       .where(eq(leaveEntries.sourceImportRunId, importRunId));
 
@@ -51,26 +54,41 @@ export async function rollbackImportRun(
       return { rolledBack: true, restoredCount: 0, removedCount: 0 };
     }
 
-    // 2. Restore the prior entries that were superseded by our entries.
+    const ourIdSet = new Set(ourIds);
+    const replacedByLaterRun = ours.some(
+      (entry) =>
+        entry.supersededByEntryId !== null &&
+        !ourIdSet.has(entry.supersededByEntryId) &&
+        entry.supersededByEntryId !== entry.id,
+    );
+    if (replacedByLaterRun) {
+      throw new Error(
+        `Import run ${importRunId} is not the latest committed run for every affected slot`,
+      );
+    }
+
+    // 2. Retire our active entries before restoring their predecessors. The
+    //    ordering is required by leave_entries_active_uk. A self-reference is
+    //    the durable audit sentinel for rows removed by rollback.
+    await tx
+      .update(leaveEntries)
+      .set({ supersededByEntryId: sql`${leaveEntries.id}` })
+      .where(inArray(leaveEntries.id, ourIds));
+
+    // 3. Restore only predecessors from earlier runs. Entries within this
+    //    run can point at one another when an import repeats a slot; none of
+    //    those rows should become active when the whole run is rolled back.
     const restored = await tx
       .update(leaveEntries)
       .set({ supersededByEntryId: null })
       .where(
         and(
+          not(inArray(leaveEntries.id, ourIds)),
           isNotNull(leaveEntries.supersededByEntryId),
           inArray(leaveEntries.supersededByEntryId, ourIds),
         ),
       )
       .returning({ id: leaveEntries.id });
-
-    // 3. Mark our entries as superseded by a synthetic null pointer that
-    //    still keeps them out of the active unique index (we use a sentinel
-    //    self-reference: superseded_by_entry_id = id). This keeps the
-    //    history without violating the partial unique index.
-    await tx
-      .update(leaveEntries)
-      .set({ supersededByEntryId: sql`${leaveEntries.id}` })
-      .where(inArray(leaveEntries.id, ourIds));
 
     // 4. Mark the run.
     await tx
