@@ -68,6 +68,7 @@ final class FrocImportService
                 'failure_code' => $failureCode,
                 'exception' => $exception::class,
                 'fallback_used' => true,
+                'zip_stats' => $zipStats,
             ]);
             $fallback['engine'] = 'deterministic-fallback';
             $fallback['fallback_reason'] = $failureCode;
@@ -76,10 +77,11 @@ final class FrocImportService
                 : 'The AI service was unavailable, so a rules-based preview was created. Review every suggested activity and estimated end time.').$truncationNote;
         }
 
-        if ($sourceType === 'whatsapp-zip' && $zipStats !== null) {
-            $fallback['zip_stats'] = $zipStats;
-        }
-
+        // `zip_stats` is retained for structured audit logging only (see the
+        // deterministic-fallback log context above). It is intentionally not
+        // placed in the public preview/import response: the frontend derives
+        // its media-handling explanation client-side, so exposing archive entry
+        // accounting here would leak internal metadata with no consumer need.
         $fallback['source_type'] = $sourceType;
         $fallback['source_sha256'] = $sourceSha256;
         $fallback['matched_message_count'] = count($messages);
