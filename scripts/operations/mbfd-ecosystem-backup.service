@@ -1,0 +1,26 @@
+[Unit]
+Description=Encrypted MBFD ecosystem backup
+RequiresMountsFor=/mnt/mbfd-backup-local
+Wants=docker.service
+After=docker.service mnt-mbfd\x2dstorage.mount
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/mbfd-ecosystem-backup
+UMask=0077
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX
+ReadWritePaths=/var/backups /var/cache/restic-mbfd /var/lock /mnt/mbfd-backup-local
+TimeoutStartSec=24h
+
+[Install]
+WantedBy=multi-user.target

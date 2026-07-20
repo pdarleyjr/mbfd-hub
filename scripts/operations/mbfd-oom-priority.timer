@@ -1,0 +1,12 @@
+[Unit]
+Description=Reapply conservative MBFD OOM priorities periodically
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+RandomizedDelaySec=60s
+Persistent=true
+Unit=mbfd-oom-priority.service
+
+[Install]
+WantedBy=timers.target

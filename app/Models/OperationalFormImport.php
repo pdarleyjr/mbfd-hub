@@ -21,6 +21,7 @@ class OperationalFormImport extends Model
         'source_type',
         'engine',
         'fallback_used',
+        'fallback_reason',
         'matched_message_count',
         'status',
         'result',

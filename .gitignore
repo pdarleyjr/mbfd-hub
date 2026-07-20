@@ -11,6 +11,7 @@
 !.env.example
 !.env.testing.example
 /auth.json
+*.extras.env
 
 # Playwright MCP captures (browser session dumps for debugging — local only)
 /.playwright-mcp/
@@ -37,7 +38,7 @@ cookies.txt
 /vendor
 /node_modules
 **/node_modules
-**/package-lock.json
+# Lock files are source-controlled supply-chain inputs. Do not ignore them.
 /public/build/
 /public/hot
 /public/storage
@@ -56,6 +57,12 @@ yarn-error.log
 /.vscode
 /.zed
 *.code-workspace
+
+# Local agent state and linked worktrees are never part of the application.
+/.agent/
+/.kilo/
+/.claude-flow/
+/.worktrees/
 
 # ---------------------------------------------------------------------------
 # 4. Laravel Framework
@@ -94,6 +101,7 @@ Homestead.yaml
 *.ps1
 *.sh
 !.husky/*.sh
+!/scripts/operations/*.sh
 
 # ---------------------------------------------------------------------------
 # 8. Documentation with Sensitive Content
@@ -129,6 +137,16 @@ plans/*_FIXES_*.md
 pics/
 /WorkGroup_Files/
 **/.venv/
+**/__pycache__/
+**/.pytest_cache/
+*.py[cod]
+
+# External clones and one-off remediation evidence have their own lifecycle.
+/analysis/
+/gmktec_prep*/
+/mbfd-tactical-scene-simulator/
+/owui-*/
+/memory/
 
 # ---------------------------------------------------------------------------
 # 9a. TS Orchestrator source is tracked; runtime artifacts and secrets are not

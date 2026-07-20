@@ -1,0 +1,25 @@
+[Unit]
+Description=MBFD OBS Studio live director runtime
+Wants=mbfd-obs-x.service mbfd-mediamtx.service
+After=mbfd-obs-x.service mbfd-mediamtx.service network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=mbfd
+Group=mbfd
+Environment=DISPLAY=:20
+Environment=QT_QPA_PLATFORM=xcb
+EnvironmentFile=-/etc/mbfd/ai-live-director/config.env
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 80); do xdpyinfo -display :20 >/dev/null 2>&1 && exit 0; sleep .25; done; exit 1'
+ExecStartPre=/usr/bin/find /home/mbfd/.config/obs-studio/.sentinel -maxdepth 1 -type f -name run_* -delete
+ExecStart=/bin/bash -lc 'exec /usr/bin/obs --profile "$OBS_PROFILE" --collection "$OBS_COLLECTION" --scene "$OBS_START_SCENE" --disable-missing-files-check --disable-shutdown-check --websocket_port "$OBS_WEBSOCKET_PORT"'
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

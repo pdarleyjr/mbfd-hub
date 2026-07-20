@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -22,6 +24,7 @@ use Illuminate\Support\Facades\Log;
 class LocalAIService extends CloudflareAIService
 {
     protected string $baseUrl;
+
     protected string $localModel;
 
     public function __construct()
@@ -51,7 +54,7 @@ class LocalAIService extends CloudflareAIService
     /**
      * Run the local model and return a Cloudflare-shaped response array.
      *
-     * @param  string  $model    Ignored (callers pass @cf/... ids); always uses the local model.
+     * @param  string  $model  Ignored (callers pass @cf/... ids); always uses the local model.
      * @param  array<int, array{role: string, content: string}>  $messages
      * @param  array<string, mixed>  $options
      * @return array{result: array{response: string}}
@@ -61,7 +64,30 @@ class LocalAIService extends CloudflareAIService
         // Interactive browser requests may use a shorter ceiling than the
         // global cold-load timeout. Never forward this transport option.
         $requestTimeout = (int) ($options['request_timeout'] ?? config('cloudflare.ai.local.timeout', 120));
+        $responseSchema = $options['response_schema'] ?? null;
         unset($options['request_timeout']);
+        unset($options['response_schema']);
+
+        if (is_array($responseSchema)) {
+            $temperature = (float) ($options['temperature'] ?? 0.1);
+            $maxTokens = (int) ($options['max_tokens'] ?? 2048);
+            $response = $this->postWithBoundedRetry("{$this->baseUrl}/api/chat", [
+                'model' => $this->localModel,
+                'messages' => $messages,
+                'stream' => false,
+                'think' => false,
+                'format' => $responseSchema,
+                'options' => [
+                    'temperature' => $temperature,
+                    'num_predict' => $maxTokens,
+                ],
+            ], $requestTimeout);
+
+            $content = (string) data_get($response->json(), 'message.content', '');
+
+            return ['result' => ['response' => $content]];
+        }
+
         $payload = array_merge([
             'temperature' => 0.3,
             'max_tokens' => 2048,
@@ -78,21 +104,59 @@ class LocalAIService extends CloudflareAIService
         // first token; the Cloudflare 30s request timeout is too short for
         // that. Use the local-specific timeout (default 120s). Warm calls
         // return in a few seconds.
-        $response = Http::timeout($requestTimeout)
-            ->connectTimeout(10)
-            ->post("{$this->baseUrl}/v1/chat/completions", $payload);
-
-        if (! $response->successful()) {
-            Log::error('Local AI request failed', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-            throw new \Exception("Local AI request failed: {$response->status()}");
-        }
+        $response = $this->postWithBoundedRetry("{$this->baseUrl}/v1/chat/completions", $payload, $requestTimeout);
 
         $content = (string) data_get($response->json(), 'choices.0.message.content', '');
 
         return ['result' => ['response' => $content]];
+    }
+
+    /**
+     * Retry one time only for connection failures, rate limiting, and server
+     * errors. Successful-but-invalid model output is validated by the caller
+     * and is never retried here.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function postWithBoundedRetry(string $url, array $payload, int $timeout): Response
+    {
+        $attempt = 0;
+
+        while (true) {
+            $attempt++;
+
+            try {
+                $response = Http::timeout($timeout)
+                    ->connectTimeout(10)
+                    ->post($url, $payload);
+            } catch (ConnectionException $exception) {
+                if ($attempt >= 2) {
+                    throw $exception;
+                }
+
+                usleep(250_000);
+
+                continue;
+            }
+
+            $retryable = $response->status() === 429 || $response->serverError();
+            if ($retryable && $attempt < 2) {
+                usleep(250_000);
+
+                continue;
+            }
+
+            if (! $response->successful()) {
+                Log::error('Local AI request failed', [
+                    'status' => $response->status(),
+                    'response_bytes' => strlen($response->body()),
+                    'attempts' => $attempt,
+                ]);
+                throw new \RuntimeException("Local AI request failed: {$response->status()}");
+            }
+
+            return $response;
+        }
     }
 
     /**
@@ -111,7 +175,7 @@ class LocalAIService extends CloudflareAIService
             ],
             [
                 'role' => 'user',
-                'content' => $message . (empty($metrics) ? '' : "\n\nINVENTORY CONTEXT:\n" . json_encode($metrics)),
+                'content' => $message.(empty($metrics) ? '' : "\n\nINVENTORY CONTEXT:\n".json_encode($metrics)),
             ],
         ];
 

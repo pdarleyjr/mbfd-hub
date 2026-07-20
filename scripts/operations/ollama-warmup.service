@@ -1,0 +1,18 @@
+[Unit]
+Description=Preload and keep the default Ollama model resident
+Requires=ollama.service
+After=ollama.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/mbfd-ollama-warmup.sh
+RemainAfterExit=yes
+TimeoutStartSec=15min
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

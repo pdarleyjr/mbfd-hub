@@ -34,6 +34,7 @@ class AdminMetricsApiTest extends TestCase
 
         $apparatus = Apparatus::create([
             'station_id' => $station->id,
+            'unit_id' => 'E1',
             'type' => 'Engine',
             'identifier' => 'E1',
             'name' => 'Engine 1',
@@ -128,6 +129,7 @@ class AdminMetricsApiTest extends TestCase
 
         $apparatus1 = Apparatus::create([
             'station_id' => $station1->id,
+            'unit_id' => 'E1',
             'type' => 'Engine',
             'identifier' => 'E1',
             'name' => 'Engine 1',
@@ -142,6 +144,7 @@ class AdminMetricsApiTest extends TestCase
 
         $apparatus2 = Apparatus::create([
             'station_id' => $station2->id,
+            'unit_id' => 'L1',
             'type' => 'Ladder',
             'identifier' => 'L1',
             'name' => 'Ladder 1',

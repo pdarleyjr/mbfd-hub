@@ -46,8 +46,12 @@ final class FrocImportService
             }
             $fallback['labor'] = $labor;
             $fallback['engine'] = $this->ai instanceof LocalAIService ? 'qwen3.6:35b (GMKtec Ollama)' : 'Cloudflare Workers AI';
+            $fallback['fallback_reason'] = null;
             $fallback['warning'] = 'AI suggestions must be reviewed. Estimated end times are marked and every field remains editable.';
         } catch (Throwable $exception) {
+            $failureCode = $exception instanceof FrocAiOutputException
+                ? 'output_'.$exception->reason
+                : 'provider_unavailable';
             Log::warning('F-ROC import used deterministic fallback.', [
                 ...$auditContext,
                 'source_sha256' => $sourceSha256,
@@ -55,12 +59,15 @@ final class FrocImportService
                 'matched_message_count' => count($messages),
                 'engine' => $this->ai instanceof LocalAIService ? 'qwen3.6:35b' : 'cloudflare-workers-ai',
                 'duration_ms' => (int) ((hrtime(true) - $startedAt) / 1_000_000),
-                'failure_code' => 'provider_or_output_invalid',
+                'failure_code' => $failureCode,
                 'exception' => $exception::class,
                 'fallback_used' => true,
             ]);
             $fallback['engine'] = 'deterministic-fallback';
-            $fallback['warning'] = 'The AI service was unavailable, so a rules-based preview was created. Review every suggested activity and estimated end time.';
+            $fallback['fallback_reason'] = $failureCode;
+            $fallback['warning'] = $exception instanceof FrocAiOutputException
+                ? 'The AI response did not pass validation, so a rules-based preview was created. Review every suggested activity and estimated end time.'
+                : 'The AI service was unavailable, so a rules-based preview was created. Review every suggested activity and estimated end time.';
         }
 
         $fallback['source_type'] = $sourceType;
@@ -86,7 +93,7 @@ final class FrocImportService
             $eventName = $this->eventNameFromFilename($file->getClientOriginalName());
             $magic = (string) file_get_contents($file->getRealPath(), false, null, 0, 4);
             if ($extension === 'txt') {
-                if (str_starts_with($magic, "PK") || str_contains($magic, "\0")) {
+                if (str_starts_with($magic, 'PK') || str_contains($magic, "\0")) {
                     throw new RuntimeException('The uploaded file is not valid plain text.');
                 }
                 $contents = file_get_contents($file->getRealPath());
@@ -96,7 +103,7 @@ final class FrocImportService
                 $parts[] = $contents;
                 $sourceType = 'txt';
             } elseif ($extension === 'zip') {
-                if (! str_starts_with($magic, "PK")) {
+                if (! str_starts_with($magic, 'PK')) {
                     throw new RuntimeException('The uploaded file is not a valid ZIP archive.');
                 }
                 $parts[] = $this->readZip($file->getRealPath());
@@ -365,24 +372,22 @@ final class FrocImportService
             'source_messages' => $sources,
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
+        $responseSchema = $this->aiResponseSchema();
         $response = $this->ai->runModel('froc-import', [
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $user],
         ], array_merge([
             'temperature' => 0.1,
             'max_tokens' => 4096,
-            // Supported by both Ollama's OpenAI-compatible endpoint and
-            // Cloudflare Workers AI. Application validation still treats the
-            // response as untrusted input.
             'response_format' => ['type' => 'json_object'],
-        ], $this->ai instanceof LocalAIService ? ['request_timeout' => 75] : []));
+        ], $this->ai instanceof LocalAIService ? [
+            'request_timeout' => 75,
+            'response_schema' => $responseSchema,
+        ] : []));
         $text = (string) data_get($response, 'result.response', '');
-        if (! preg_match('/\{[\s\S]*\}/', $text, $match)) {
-            throw new RuntimeException('The AI response did not contain JSON.');
-        }
-        $decoded = json_decode($match[0], true, flags: JSON_THROW_ON_ERROR);
+        $decoded = $this->decodeAiResponse($text);
         if (! is_array($decoded['labor'] ?? null)) {
-            throw new RuntimeException('The AI response did not contain labor rows.');
+            throw new FrocAiOutputException('labor_missing');
         }
 
         $labor = [];
@@ -416,5 +421,65 @@ final class FrocImportService
         }
 
         return $labor;
+    }
+
+    /** @return array<string, mixed> */
+    private function decodeAiResponse(string $text): array
+    {
+        $text = trim($text);
+        $candidates = [$text];
+
+        if (preg_match('/^```(?:json)?\s*(\{[\s\S]*\})\s*```$/i', $text, $fence)) {
+            $candidates[] = $fence[1];
+        }
+
+        if (preg_match('/\{[\s\S]*\}/', $text, $object)) {
+            $candidates[] = $object[0];
+        }
+
+        foreach (array_unique($candidates) as $candidate) {
+            try {
+                $decoded = json_decode($candidate, true, flags: JSON_THROW_ON_ERROR);
+                if (is_array($decoded)) {
+                    return $decoded;
+                }
+            } catch (\JsonException) {
+                // Try the next tightly bounded candidate; never log raw output.
+            }
+        }
+
+        throw new FrocAiOutputException('json_invalid');
+    }
+
+    /** @return array<string, mixed> */
+    private function aiResponseSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => [
+                'labor' => [
+                    'type' => 'array',
+                    'minItems' => 1,
+                    'maxItems' => 13,
+                    'items' => [
+                        'type' => 'object',
+                        'additionalProperties' => false,
+                        'properties' => [
+                            'source_index' => ['type' => 'integer', 'minimum' => 0],
+                            'category' => ['type' => 'string', 'enum' => FrocDropdownOptions::CATEGORIES],
+                            'work_performed' => ['type' => 'string', 'maxLength' => 500],
+                            'location_gps' => ['type' => 'string', 'maxLength' => 180],
+                            'start' => ['type' => 'string', 'pattern' => '^(?:$|(?:[01]\\d|2[0-3]):[0-5]\\d)$'],
+                            'end' => ['type' => 'string', 'pattern' => '^(?:$|(?:[01]\\d|2[0-3]):[0-5]\\d)$'],
+                            'end_estimated' => ['type' => 'boolean'],
+                            'confidence' => ['type' => 'string', 'enum' => ['high', 'review']],
+                        ],
+                        'required' => ['source_index', 'category', 'work_performed', 'location_gps', 'start', 'end', 'end_estimated', 'confidence'],
+                    ],
+                ],
+            ],
+            'required' => ['labor'],
+        ];
     }
 }

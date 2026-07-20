@@ -1,0 +1,21 @@
+[Unit]
+Description=Validate latest MBFD ecosystem backup can be restored
+RequiresMountsFor=/mnt/mbfd-backup-local
+Wants=docker.service
+After=docker.service mbfd-ecosystem-backup.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/mbfd-ecosystem-restore-smoke
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX
+ReadWritePaths=/var/backups /var/cache/restic-mbfd /var/lock /mnt/mbfd-backup-local
+TimeoutStartSec=2h

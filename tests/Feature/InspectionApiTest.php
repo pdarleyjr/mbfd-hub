@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Apparatus;
-use App\Models\Station;
 use App\Models\ApparatusInspection;
+use App\Models\Station;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -27,6 +27,7 @@ class InspectionApiTest extends TestCase
 
         $apparatus = Apparatus::create([
             'station_id' => $station->id,
+            'unit_id' => 'E1',
             'type' => 'Engine',
             'identifier' => 'E1',
             'name' => 'Engine 1',
@@ -108,6 +109,7 @@ class InspectionApiTest extends TestCase
 
         $apparatus = Apparatus::create([
             'station_id' => $station->id,
+            'unit_id' => 'E1',
             'type' => 'Engine',
             'identifier' => 'E1',
             'name' => 'Engine 1',

@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+scanner="$(git config --get mbfd.gitleaksPath || true)"
+if [ -z "$scanner" ]; then
+    scanner="$(command -v gitleaks 2>/dev/null || command -v gitleaks.exe 2>/dev/null || true)"
+fi
+
+if [ -z "$scanner" ] || [ ! -x "$scanner" ]; then
+    echo "MBFD security hook: gitleaks is required. Configure its executable with:" >&2
+    echo "  git config mbfd.gitleaksPath /absolute/path/to/gitleaks" >&2
+    exit 1
+fi
+
+exec "$scanner" git --pre-commit --staged --redact --no-banner .

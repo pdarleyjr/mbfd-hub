@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily encrypted MBFD ecosystem backup
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+Persistent=true
+RandomizedDelaySec=10min
+Unit=mbfd-ecosystem-backup.service
+
+[Install]
+WantedBy=timers.target

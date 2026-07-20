@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly MBFD backup restore smoke test
+
+[Timer]
+OnCalendar=Sun *-*-* 06:15:00
+Persistent=true
+RandomizedDelaySec=15min
+Unit=mbfd-ecosystem-restore-smoke.service
+
+[Install]
+WantedBy=timers.target

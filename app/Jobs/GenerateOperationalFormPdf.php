@@ -18,7 +18,10 @@ class GenerateOperationalFormPdf implements ShouldBeUnique, ShouldQueue
 
     public int $timeout = 45;
 
-    public int $tries = 1;
+    public int $tries = 2;
+
+    /** @var array<int, int> */
+    public array $backoff = [10];
 
     public bool $failOnTimeout = true;
 

@@ -9,8 +9,8 @@ use App\Models\OperationalFormRecord;
 use App\Services\CloudflareAIService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class OperationalFormsApiTest extends TestCase
@@ -372,6 +372,7 @@ CHAT;
         Log::shouldHaveReceived('warning')->once()->withArgs(
             fn (string $message, array $context): bool => $message === 'F-ROC import used deterministic fallback.'
                 && ! array_key_exists('message', $context)
+                && $context['failure_code'] === 'provider_unavailable'
                 && ! str_contains(json_encode($context, JSON_THROW_ON_ERROR), 'provider output'),
         );
     }

@@ -1,0 +1,14 @@
+[Unit]
+Description=Apply conservative MBFD OOM priorities
+After=docker.service ollama.service cloudflared.service tailscaled.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/mbfd/runbooks/mbfd-oom-priority.sh apply
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/proc

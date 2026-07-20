@@ -1,7 +1,0 @@
-
-In ParseErrorException.php line 44:
-                                                                               
-  PHP Parse error: Syntax error, unexpected T_NAME_FULLY_QUALIFIED, expecting  
-   '{' on line 1                                                               
-                                                                               
-

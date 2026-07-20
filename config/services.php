@@ -28,6 +28,10 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    'pulsepoint' => [
+        'worker_url' => env('PULSEPOINT_WORKER_URL', 'https://pulsepoint-proxy.pdarleyjr.workers.dev/incidents'),
+    ],
+
     // Shared secret guarding the read-only /api/display/* surface. When set, the
     // command-display Cloudflare Functions gateway must present it as X-Display-Token.
     // Empty/unset = open (no-op) for local/dev and staged rollout.

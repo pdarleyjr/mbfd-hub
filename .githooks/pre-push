@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+scanner="$(git config --get mbfd.gitleaksPath || true)"
+if [ -z "$scanner" ]; then
+    scanner="$(command -v gitleaks 2>/dev/null || command -v gitleaks.exe 2>/dev/null || true)"
+fi
+
+if [ -z "$scanner" ] || [ ! -x "$scanner" ]; then
+    echo "MBFD security hook: gitleaks is required. Configure its executable with:" >&2
+    echo "  git config mbfd.gitleaksPath /absolute/path/to/gitleaks" >&2
+    exit 1
+fi
+
+zero=0000000000000000000000000000000000000000
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ "$local_sha" = "$zero" ] && continue
+
+    if [ "$remote_sha" = "$zero" ]; then
+        log_opts="$local_sha --not --remotes"
+    else
+        log_opts="$remote_sha..$local_sha"
+    fi
+
+    "$scanner" git --log-opts="$log_opts" --redact --no-banner .
+done

@@ -8,6 +8,7 @@ use App\Models\OperationalFormEvent;
 use App\Models\OperationalFormRecord;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -46,6 +47,7 @@ final class PdfGenerationService
 
         try {
             file_put_contents($inputPath, $this->canonicalJson(['data' => $snapshot]), LOCK_EX);
+            $generatorStartedAt = hrtime(true);
             $result = Process::timeout(config('operational-forms.generator_timeout_seconds', 30))->run([
                 config('operational-forms.node_binary', 'node'),
                 base_path('scripts/operational-forms/generate.mjs'),
@@ -56,7 +58,17 @@ final class PdfGenerationService
             ]);
 
             if ($result->failed()) {
-                throw new RuntimeException('The controlled PDF generator failed.');
+                $errorOutput = $result->errorOutput();
+                Log::warning('Controlled PDF generator subprocess failed.', [
+                    'failure_code' => 'generator_exit_nonzero',
+                    'exit_code' => $result->exitCode(),
+                    'stderr_bytes' => strlen($errorOutput),
+                    'stderr_sha256' => hash('sha256', $errorOutput),
+                    'duration_ms' => (int) ((hrtime(true) - $generatorStartedAt) / 1_000_000),
+                    'form_type' => $record->form_type,
+                    'form_version' => $record->form_version,
+                ]);
+                throw new RuntimeException('The controlled PDF generator failed with a non-zero exit code.');
             }
 
             $metadata = json_decode(trim($result->output()), true, flags: JSON_THROW_ON_ERROR);
