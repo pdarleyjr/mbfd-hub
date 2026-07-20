@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\OperationalForms\FrocImportLimits;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -41,13 +42,22 @@ return Application::configure(basePath: dirname(__DIR__))
         // the server's request-size limit (HTTP 413). This is thrown by the
         // ValidatePostSize middleware before Laravel validation runs, so the
         // React API client must not receive an HTML error page.
+        // Render a stable, user-readable JSON contract for requests that exceed
+        // the server's request-size limit (HTTP 413). This is thrown by the
+        // ValidatePostSize middleware before Laravel validation runs, so the
+        // React API client must not receive an HTML error page.
+        //
+        // Scoped to the Operational Forms API (and any JSON request) so unrelated
+        // web error handling and unrelated exceptions are left untouched.
         $exceptions->render(function (\Illuminate\Http\Exceptions\PostTooLargeException $exception, \Illuminate\Http\Request $request) {
-            if (! $request->expectsJson()) {
+            if (! $request->is('employee/forms/api/*') && ! $request->expectsJson()) {
                 return null;
             }
 
+            $megabytes = FrocImportLimits::uploadMaxMegabytes();
+
             return response()->json([
-                'message' => 'The upload was rejected before analysis because it exceeded the server’s request limit. The F-ROC importer accepts ZIP or TXT files up to 50 MB. Contact Forms administration if this file is below that size.',
+                'message' => "The upload was rejected before analysis because it exceeded the server’s request limit. The F-ROC importer accepts ZIP or TXT files up to {$megabytes} MB. Contact Forms administration if this file is below that size.",
                 'code' => 'request_too_large',
             ], 413);
         });

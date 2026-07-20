@@ -18,22 +18,27 @@ use Throwable;
 
 final class FrocImportService
 {
-    /** @var array<string, int>|null Safe, non-source accounting from the last ZIP read. */
-    private ?array $lastZipStats = null;
-
     public function __construct(private readonly CloudflareAIService $ai) {}
 
     /** @return array<string, mixed> */
     public function preview(string $unitId, ?string $pastedText, ?UploadedFile $file, array $auditContext = []): array
     {
         $startedAt = hrtime(true);
-        [$source, $eventName, $sourceType] = $this->readSource($pastedText, $file);
+        [$source, $eventName, $sourceType, $zipStats] = $this->readSource($pastedText, $file);
         $messages = $this->messagesForUnit($source, $unitId);
         $sourceSha256 = hash('sha256', $source);
 
         if ($messages === []) {
             throw new RuntimeException("No activity messages matching unit {$unitId} were found. Check the unit designation or paste the relevant notes manually.");
         }
+
+        // Bound the model input independently and remember whether anything was
+        // dropped so the user gets a clear, non-silent warning.
+        $bounded = $this->boundMessagesForModel($messages);
+        $truncatedForModel = count($bounded) < count($messages);
+        $truncationNote = $truncatedForModel
+            ? ' Some activity messages were omitted from AI analysis because they exceeded the model input budget; review the imported fields carefully.'
+            : '';
 
         $fallback = $this->deterministicPreview($messages, $unitId, $eventName);
 
@@ -48,7 +53,7 @@ final class FrocImportService
             $fallback['labor'] = $labor;
             $fallback['engine'] = $this->ai instanceof LocalAIService ? 'qwen3.6:35b (GMKtec Ollama)' : 'Cloudflare Workers AI';
             $fallback['fallback_reason'] = null;
-            $fallback['warning'] = 'AI suggestions must be reviewed. Estimated end times are marked and every field remains editable.';
+            $fallback['warning'] = 'AI suggestions must be reviewed. Estimated end times are marked and every field remains editable.'.$truncationNote;
         } catch (Throwable $exception) {
             $failureCode = $exception instanceof FrocAiOutputException
                 ? 'output_'.$exception->reason
@@ -66,13 +71,13 @@ final class FrocImportService
             ]);
             $fallback['engine'] = 'deterministic-fallback';
             $fallback['fallback_reason'] = $failureCode;
-            $fallback['warning'] = $exception instanceof FrocAiOutputException
+            $fallback['warning'] = ($exception instanceof FrocAiOutputException
                 ? 'The AI response did not pass validation, so a rules-based preview was created. Review every suggested activity and estimated end time.'
-                : 'The AI service was unavailable, so a rules-based preview was created. Review every suggested activity and estimated end time.';
+                : 'The AI service was unavailable, so a rules-based preview was created. Review every suggested activity and estimated end time.').$truncationNote;
         }
 
-        if ($sourceType === 'whatsapp-zip' && $this->lastZipStats !== null) {
-            $fallback['zip_stats'] = $this->lastZipStats;
+        if ($sourceType === 'whatsapp-zip' && $zipStats !== null) {
+            $fallback['zip_stats'] = $zipStats;
         }
 
         $fallback['source_type'] = $sourceType;
@@ -82,12 +87,13 @@ final class FrocImportService
         return $fallback;
     }
 
-    /** @return array{string, string, string} */
+    /** @return array{string, string, string, array<string, int>|null} */
     private function readSource(?string $pastedText, ?UploadedFile $file): array
     {
         $parts = [];
         $eventName = 'Imported activity notes';
         $sourceType = 'pasted-text';
+        $zipStats = null;
 
         if (filled($pastedText)) {
             $parts[] = (string) $pastedText;
@@ -101,17 +107,20 @@ final class FrocImportService
                 if (str_starts_with($magic, 'PK') || str_contains($magic, "\0")) {
                     throw new RuntimeException('The uploaded file is not valid plain text.');
                 }
-                $contents = file_get_contents($file->getRealPath());
-                if ($contents === false) {
-                    throw new RuntimeException('The uploaded text file could not be read.');
-                }
-                $parts[] = $contents;
+                $parts[] = $this->streamTextFile($file->getRealPath());
                 $sourceType = 'txt';
             } elseif ($extension === 'zip') {
                 if (! str_starts_with($magic, 'PK')) {
                     throw new RuntimeException('The uploaded file is not a valid ZIP archive.');
                 }
-                $parts[] = $this->readZip($file->getRealPath());
+                $result = $this->readZip($file->getRealPath());
+                $parts[] = $result->text;
+                $zipStats = [
+                    'total_entries' => $result->totalEntries,
+                    'text_entries' => $result->textEntries,
+                    'extracted_bytes' => $result->extractedBytes,
+                    'media_entries_ignored' => $result->mediaEntriesIgnored,
+                ];
                 $sourceType = 'whatsapp-zip';
             } else {
                 throw new RuntimeException('Upload a plain-text (.txt) file or a WhatsApp export (.zip).');
@@ -132,21 +141,55 @@ final class FrocImportService
             throw new FrocImportException('text_invalid_utf8', 'The activity notes are not valid UTF-8 text.');
         }
 
-        return [$this->cleanText($source), $eventName, $sourceType];
+        return [$this->cleanText($source), $eventName, $sourceType, $zipStats];
     }
 
-    private function readZip(string $path): string
+    /**
+     * Stream a plain-text upload in bounded chunks so a file that may now be as
+     * large as the 50 MB upload ceiling is never loaded entirely into memory.
+     * Stops as soon as the extracted-text ceiling would be exceeded, rejects
+     * NUL bytes and invalid UTF-8, and closes the handle in all cases.
+     */
+    private function streamTextFile(string $path): string
     {
-        $result = FrocZipReader::fromConfig()->read($path);
+        $max = FrocImportLimits::maxExtractedBytes();
+        $handle = fopen($path, 'rb');
+        if ($handle === false) {
+            throw new RuntimeException('The uploaded text file could not be read.');
+        }
 
-        $this->lastZipStats = [
-            'total_entries' => $result->totalEntries,
-            'text_entries' => $result->textEntries,
-            'extracted_bytes' => $result->extractedBytes,
-            'media_entries_ignored' => $result->mediaEntriesIgnored,
-        ];
+        try {
+            $buffer = '';
+            while (! feof($handle)) {
+                $chunk = fread($handle, 8192);
+                if ($chunk === false || $chunk === '') {
+                    break;
+                }
+                if (str_contains($chunk, "\0")) {
+                    throw new FrocImportException('text_invalid_utf8', 'The uploaded text file is not valid plain text.');
+                }
+                $buffer .= $chunk;
+                if (strlen($buffer) > $max) {
+                    throw new FrocImportException(
+                        'text_too_large',
+                        'The extracted text is larger than the '.round($max / 1024 / 1024, 2).' MB import limit. Remove unrelated chat history and try again.',
+                    );
+                }
+            }
 
-        return $result->text;
+            if (! mb_check_encoding($buffer, 'UTF-8')) {
+                throw new FrocImportException('text_invalid_utf8', 'The uploaded text file is not valid UTF-8 text.');
+            }
+
+            return $buffer;
+        } finally {
+            fclose($handle);
+        }
+    }
+
+    private function readZip(string $path): FrocZipReadResult
+    {
+        return FrocZipReader::fromConfig()->read($path);
     }
 
     private function eventNameFromFilename(string $filename): string
