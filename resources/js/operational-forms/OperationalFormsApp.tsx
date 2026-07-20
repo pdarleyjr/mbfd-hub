@@ -388,7 +388,7 @@ function FrocImportPanel({ apply, undo, review, frocImport }: {
         } catch (caught) {
             setPhase('error');
             if (caught instanceof ApiError && caught.status === 413) {
-                setError(caught.message || 'The upload exceeded the server request limit. The F-ROC importer accepts ZIP or TXT files up to 50 MB.');
+                setError(caught.message || `The upload exceeded the server request limit. The F-ROC importer accepts ZIP or TXT files up to ${frocImport.upload_max_megabytes} MB.`);
             } else {
                 setError(caught instanceof ApiError && caught.problem.errors ? Object.values(caught.problem.errors).flat().join(' ') : (caught instanceof Error ? caught.message : 'The notes could not be analyzed.'));
             }
