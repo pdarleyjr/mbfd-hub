@@ -10,6 +10,12 @@
 .env*
 !.env.example
 !.env.testing.example
+# Env files whose basename does NOT start with ".env" slip past the .env* glob
+# above (e.g. openwebui-extras.env, which holds a live WEBUI_SECRET_KEY +
+# NEXTCLOUD_FS_TOKEN). Catch them explicitly; *.env.example stays tracked since
+# it ends in .example, which *.env / *extras.env do not match.
+*extras.env
+gmktec_prep_*/**/*.env
 /auth.json
 
 # Playwright MCP captures (browser session dumps for debugging — local only)
@@ -103,6 +109,7 @@ PROJECT_SUMMARY.md
 .project_summary.md
 PERFORMANCE_FIX_REPORT_2026-02-12.md
 AI_AGENT_ERRORS.md
+/analysis/MBFD_MEDIA_CONTROL_TECHNICAL_FINDINGS.md
 
 # Numbered project docs (contain IPs, credentials, architecture details)
 [0-9].*.md
@@ -122,6 +129,7 @@ plans/*_FIXES_*.md
 /.ai_scaffold/
 /.kilocode/
 /.claude/
+/.claude-flow/
 /laravel-app/
 /temp_deploy/
 /temp_files/
@@ -178,3 +186,31 @@ backups/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# ---------------------------------------------------------------------------
+# 14. Local AI-stack audit + change deliverables (infra/config metadata).
+# Kept local, not committed per request (2026-05-30/31).
+# ---------------------------------------------------------------------------
+/docs/audits/
+
+# ---------------------------------------------------------------------------
+# Local scratch / agent / runtime artifacts (not project source)
+# ---------------------------------------------------------------------------
+/.agent/
+/.kilo/
+/__pycache__/
+/ollama
+/ts-orchestrator/
+/memory/
+/analysis/
+/30min
+/item.slug
+/.worktrees/
+/mbfd-tactical-scene-simulator/
+/owui-095/
+/gmktec_prep_2026-05-21/
+/*.png
+/*.jpg
+HANDOFF_2026-05-18.md
+install-mbfd-workspace-desktop-2026-05-26.md
+welcome-emails-2026-05-26.md

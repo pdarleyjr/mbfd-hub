@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\ApparatusController;
 use App\Http\Controllers\Api\Bid\CredentialsController as BidCredentialsController;
 use App\Http\Controllers\Api\BigTicketRequestController;
 use App\Http\Controllers\Api\DatabaseAuditController;
+use App\Http\Controllers\Api\Display\DisplayController;
 use App\Http\Controllers\Api\FireEquipmentRequestController;
 use App\Http\Controllers\Api\InventoryChatController;
 use App\Http\Controllers\Api\Public\ApparatusLayout\ApparatusLayoutController;
@@ -60,6 +61,36 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
         Route::get('compartments/{apparatusId}', [ApparatusLayoutController::class, 'getCompartments']);
         Route::get('snapshots/{apparatusId}', [ApparatusLayoutController::class, 'getSnapshots']);
     });
+});
+
+// =========================================================================
+// Command Display API (NEW, ADDITIVE, READ-ONLY) — feeds the separate
+// staff-only command-display dashboard. GET-only: the display.readonly
+// middleware rejects any non-GET verb with 405. No app login here; the
+// display origin is gated by Cloudflare Access at the edge plus a shared
+// secret from the CF Functions gateway. All payloads are redacted of
+// sensitive/personnel data EXCEPT the dedicated personnel endpoint (allowed
+// because the surface is staff-only behind Access).
+// =========================================================================
+Route::prefix('display')->middleware(['display.token', 'display.readonly', 'throttle:120,1'])->group(function () {
+    Route::get('snapshot', [DisplayController::class, 'overview']);
+    Route::get('stations', [DisplayController::class, 'stations']);
+    Route::get('stations/{station}', [DisplayController::class, 'stationDetail']);
+    Route::get('stations/{station}/apparatus', [DisplayController::class, 'stationApparatus']);
+    Route::get('stations/{station}/personnel', [DisplayController::class, 'stationPersonnel']);
+    Route::get('stations/{station}/submissions', [DisplayController::class, 'stationSubmissions']);
+    Route::get('stations/{station}/camera-feeds', [DisplayController::class, 'stationCameraFeeds']);
+    Route::get('critical-items', [DisplayController::class, 'criticalItems']);
+    Route::get('ai-snapshot', [DisplayController::class, 'aiSnapshot']);
+    Route::get('cameras', [DisplayController::class, 'cameras']);
+    Route::get('incidents', [DisplayController::class, 'incidents']);
+    Route::get('health', [DisplayController::class, 'health']);
+
+    // Catch-all for any mutating verb on a display path. Registered AFTER the GET
+    // routes so reads are unaffected. Routed to a controller method (not a closure)
+    // so the route table remains cacheable via `php artisan route:cache`.
+    Route::addRoute(['POST', 'PUT', 'PATCH', 'DELETE'], '{any}', [DisplayController::class, 'methodNotAllowed'])
+        ->where('any', '.*');
 });
 
 Route::prefix('public')->middleware('throttle:10,1')->group(function () {

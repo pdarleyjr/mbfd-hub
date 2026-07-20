@@ -57,16 +57,27 @@ class AnalyzeProjectPriorities extends Command
             $bar = $this->output->createProgressBar($activeProjects->count());
             $bar->start();
             
-            $result = $aiService->prioritizeProjects($activeProjects->toArray());
-            
-            if (!$result['success']) {
-                $this->error('AI analysis failed: ' . $result['error']);
-                Log::error('Project priority analysis failed', ['error' => $result['error']]);
+            $result = $aiService->prioritizeProjects($activeProjects);
+            $prioritizedProjects = collect($result['projects'] ?? $result['priorities'] ?? [])
+                ->map(function (array $projectData) {
+                    return [
+                        'id' => $projectData['id'] ?? null,
+                        'priority_rank' => $projectData['priority_rank'] ?? $projectData['rank'] ?? null,
+                        'priority_score' => $projectData['priority_score'] ?? $projectData['score'] ?? null,
+                        'reasoning' => $projectData['reasoning'] ?? $projectData['risk_level'] ?? null,
+                    ];
+                })
+                ->filter(fn (array $projectData) => ! empty($projectData['id']))
+                ->values();
+
+            if ($prioritizedProjects->isEmpty()) {
+                $error = $result['error'] ?? $result['raw_response'] ?? 'AI response did not include project priorities';
+                $this->error('AI analysis failed: ' . $error);
+                Log::error('Project priority analysis failed', ['error' => $error]);
                 return Command::FAILURE;
             }
             
             // Update projects with AI analysis results
-            $prioritizedProjects = $result['data']['projects'] ?? [];
             $updatedCount = 0;
             $notificationsSent = 0;
             
@@ -98,16 +109,17 @@ class AnalyzeProjectPriorities extends Command
             
             // Log results to ai_analysis_logs table
             AIAnalysisLog::create([
-                'analysis_type' => 'priority_ranking',
+                'type' => 'priority_ranking',
                 'projects_analyzed' => $activeProjects->count(),
-                'model_used' => $result['data']['model'] ?? 'unknown',
-                'tokens_used' => $result['data']['tokens_used'] ?? 0,
-                'analysis_summary' => json_encode([
+                'result' => [
                     'projects_updated' => $updatedCount,
                     'notifications_sent' => $notificationsSent,
-                    'execution_time' => $result['data']['execution_time'] ?? null,
-                ]),
-                'status' => 'completed',
+                    'model_used' => $result['model'] ?? 'unknown',
+                    'tokens_used' => $result['tokens_used'] ?? 0,
+                    'execution_time' => $result['execution_time'] ?? null,
+                    'summary' => $result['summary'] ?? null,
+                ],
+                'executed_at' => now(),
             ]);
             
             $this->info("✓ Analysis complete: {$updatedCount} projects updated");
@@ -130,12 +142,10 @@ class AnalyzeProjectPriorities extends Command
             
             // Log failed analysis
             AIAnalysisLog::create([
-                'analysis_type' => 'priority_ranking',
+                'type' => 'priority_ranking',
                 'projects_analyzed' => 0,
-                'model_used' => 'N/A',
-                'tokens_used' => 0,
-                'analysis_summary' => json_encode(['error' => $e->getMessage()]),
-                'status' => 'failed',
+                'result' => ['error' => $e->getMessage(), 'status' => 'failed'],
+                'executed_at' => now(),
             ]);
             
             return Command::FAILURE;

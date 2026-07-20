@@ -49,11 +49,7 @@ class GenerateWeeklySummary extends Command
             
             if ($aiService->canMakeRequest() && $activeProjects->isNotEmpty()) {
                 $this->info('Requesting AI-generated summary...');
-                $result = $aiService->generateWeeklySummary($activeProjects->toArray());
-                
-                if ($result['success']) {
-                    $aiSummary = $result['data']['summary'] ?? null;
-                }
+                $aiSummary = $aiService->generateWeeklySummary($activeProjects);
             }
             
             // Build summary message
