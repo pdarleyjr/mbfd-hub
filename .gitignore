@@ -198,7 +198,7 @@ Desktop.ini
 # ---------------------------------------------------------------------------
 /.agent/
 /.kilo/
-/__pycache__/
+**/__pycache__/
 /ollama
 /ts-orchestrator/
 /memory/
