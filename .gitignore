@@ -102,6 +102,8 @@ Homestead.yaml
 *.sh
 !.husky/*.sh
 !/scripts/operations/*.sh
+!/infra/backup/*.sh
+!/infra/cloudflared-watchdog/*.sh
 
 # ---------------------------------------------------------------------------
 # 8. Documentation with Sensitive Content

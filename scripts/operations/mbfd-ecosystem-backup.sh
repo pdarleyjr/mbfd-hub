@@ -18,20 +18,24 @@ fail() { log "FATAL: $*" >&2; exit 1; }
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 : "${RESTIC_REPOSITORY:?RESTIC_REPOSITORY is required}"
-: "${RESTIC_PASSWORD_FILE:?RESTIC_PASSWORD_FILE is required}"
+if [[ -z "${RESTIC_PASSWORD_FILE:-}" && -z "${RESTIC_PASSWORD:-}" ]]; then
+    fail 'RESTIC_PASSWORD or RESTIC_PASSWORD_FILE is required'
+fi
 
 exec 9>"$LOCK_FILE"
 flock -n 9 || fail 'another ecosystem backup is running'
 
 mountpoint -q "$BACKUP_MOUNT" || fail "$BACKUP_MOUNT is not mounted"
-actual_uuid="$(findmnt -nr -o UUID --target "$BACKUP_MOUNT")"
+actual_uuid="$(findmnt -nr -o UUID --target "$BACKUP_MOUNT" | grep -v '^$' | head -1)"
 [[ "$actual_uuid" == "$EXPECTED_UUID" ]] || fail "backup filesystem UUID mismatch"
 case "$RESTIC_REPOSITORY" in
     "$BACKUP_MOUNT"/*) ;;
     *) fail 'RESTIC_REPOSITORY is not on the verified backup filesystem' ;;
 esac
 
-export RESTIC_REPOSITORY RESTIC_PASSWORD_FILE
+export RESTIC_REPOSITORY
+[[ -n "${RESTIC_PASSWORD_FILE:-}" ]] && export RESTIC_PASSWORD_FILE
+[[ -n "${RESTIC_PASSWORD:-}" ]] && export RESTIC_PASSWORD
 export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-/var/cache/restic-mbfd}"
 install -d -m 0700 "$RESTIC_CACHE_DIR" "$STAGING_ROOT"
 
@@ -145,6 +149,15 @@ excludes=(
 log 'creating encrypted restic snapshot'
 restic backup --host mbfdhub --tag "$SNAPSHOT_TAG" --tag daily \
     --exclude-caches "${excludes[@]}" "${paths[@]}"
+
+log 'capturing exact snapshot id'
+CAPTURE_SCRIPT="${MBFD_BACKUP_CAPTURE_SCRIPT:-/usr/local/sbin/mbfd-backup-capture-snapshot-id.sh}"
+if [[ -x "$CAPTURE_SCRIPT" ]]; then
+    "$CAPTURE_SCRIPT"
+else
+    log "WARNING: capture script not found at $CAPTURE_SCRIPT; using restic snapshots --latest 1"
+    restic snapshots --host mbfdhub --tag "$SNAPSHOT_TAG" --latest 1
+fi
 
 log 'applying retention policy'
 restic forget --host mbfdhub --tag "$SNAPSHOT_TAG" \
