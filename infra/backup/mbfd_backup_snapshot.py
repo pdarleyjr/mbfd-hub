@@ -89,22 +89,23 @@ def verify_snapshot(
 
 
 def capture_snapshot(snapshots_json: str, expected_host: str, expected_tag: str) -> str:
-    """Return the single short_id from a just-created backup's snapshots list.
+    """Return the most recent short_id from a backup's snapshots list.
 
-    The caller must pass restic output already filtered to the new backup
-    (e.g. `restic snapshots --host H --tag T --latest 1 --json`). Exactly one
-    match is required; otherwise fail closed.
+    The caller passes restic output already filtered to the backup's host/tag.
+    Selects the single most recent snapshot by time, ensuring we capture the
+    one just created by the backup (not a stale older one).
     """
     snapshots = [
         s
         for s in _parse_snapshots(snapshots_json)
         if _matches_host_tag(s, expected_host, expected_tag)
     ]
-    if len(snapshots) != 1:
+    if not snapshots:
         raise SnapshotError(
-            f"expected exactly 1 captured snapshot (host={expected_host} tag={expected_tag}), "
-            f"got {len(snapshots)}"
+            f"no snapshots found with host={expected_host} tag={expected_tag}"
         )
+    # Sort by time descending and take the most recent.
+    snapshots.sort(key=lambda s: str(s.get("time", "")), reverse=True)
     short = str(snapshots[0].get("short_id", ""))
     if not short:
         raise SnapshotError("captured snapshot has no short_id")

@@ -11,7 +11,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HELPER="$HERE/mbfd_backup_snapshot.py"
 
 mkdir -p "$STAGING"
-snapshot="$(restic snapshots --host "$EXPECTED_HOST" --tag "$EXPECTED_TAG" --latest 1 --json \
+snapshot="$(restic snapshots --host "$EXPECTED_HOST" --tag "$EXPECTED_TAG" --json \
     | python3 "$HELPER" capture --host "$EXPECTED_HOST" --tag "$EXPECTED_TAG")" \
     || { echo "FATAL: could not capture snapshot id" >&2; exit 1; }
 printf '%s\n' "$snapshot" > "$STAGING/latest-snapshot-id"
