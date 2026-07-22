@@ -54,6 +54,9 @@ DEFAULT_STATE_DIR = os.getenv(
     "MBFD_WATCH_STATE_DIR", "/var/lib/mbfd-cloudflared-watchdog"
 )
 CLOUDFLARED_UNIT = os.getenv("MBFD_WATCH_CLOUDFLARED_UNIT", "cloudflared.service")
+DEFAULT_LOCAL_URL = os.getenv("MBFD_WATCH_LOCAL_URL", "http://localhost:8096")
+# systemctl is-active states that mean cloudflared is mid-transition; never stack a restart on top.
+_RESTARTING_STATES = frozenset({"activating", "deactivating", "reloading", "maintenance"})
 
 
 @dataclass
@@ -67,6 +70,7 @@ class WatchdogConfig:
     request_timeout: float
     state_dir: Path
     dry_run: bool
+    local_url: str = DEFAULT_LOCAL_URL
 
 
 @dataclass
@@ -102,6 +106,39 @@ def check_public_path(cfg: WatchdogConfig) -> CheckResult:
             False, f"socket.io {socketio_url} -> {sio_code} {sio_detail}".strip()
         )
     return CheckResult(True, f"health=200 socket.io={sio_code}")
+
+
+def check_local_media_control(cfg: WatchdogConfig) -> CheckResult:
+    """Local Media Control origin health (http://localhost:8096/api/status).
+
+    Lets the watchdog distinguish a *tunnel* failure (public unhealthy but local
+    healthy -> restart cloudflared) from a *Media Control* failure (local also
+    unhealthy -> restarting the connector will not help; alert only, never touch
+    Media Control).
+    """
+    local_url = cfg.local_url.rstrip("/") + cfg.health_path
+    code, detail = _http_get(local_url, cfg.request_timeout)
+    if code != 200:
+        return CheckResult(False, f"local {local_url} -> {code} {detail}".strip())
+    return CheckResult(True, "local=200")
+
+
+def is_cloudflared_restarting() -> bool:
+    """True if cloudflared is mid-transition (activating/deactivating/reloading/...).
+
+    Never stack a restart on top of one already in progress.
+    """
+    try:
+        out = subprocess.run(
+            ["systemctl", "is-active", CLOUDFLARED_UNIT],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+    return out.stdout.strip() in _RESTARTING_STATES
 
 
 def registered_tunnel_connections(minutes: int = 5) -> int:
@@ -234,6 +271,28 @@ def evaluate(cfg: WatchdogConfig) -> int:
         save_state(state_file, state)
         return 1
 
+    # Local Media Control health: if the origin itself is down, this is NOT a
+    # tunnel problem. Restarting cloudflared cannot help and must not be done.
+    local = check_local_media_control(cfg)
+    if not local.healthy:
+        LOGGER.error(
+            "public path unhealthy AND local Media Control unhealthy (%s); "
+            "this is not a tunnel problem. NOT restarting %s. ALERT REQUIRED.",
+            local.detail,
+            CLOUDFLARED_UNIT,
+        )
+        save_state(state_file, state)
+        return 2  # alert-only; never restart the connector for a service-side outage
+
+    # Never stack a restart on top of one already in progress.
+    if is_cloudflared_restarting():
+        LOGGER.warning(
+            "%s is already mid-transition; skipping restart this cycle.",
+            CLOUDFLARED_UNIT,
+        )
+        save_state(state_file, state)
+        return 1
+
     restarted = restart_cloudflared(cfg)
     if restarted:
         state["consecutive_failures"] = 0
@@ -258,6 +317,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--timeout", type=float, default=DEFAULT_REQUEST_TIMEOUT)
     p.add_argument("--state-dir", default=DEFAULT_STATE_DIR)
     p.add_argument(
+        "--local-url",
+        default=DEFAULT_LOCAL_URL,
+        help="local Media Control origin to health-check before restarting",
+    )
+    p.add_argument(
         "--dry-run", action="store_true", help="log actions without restarting"
     )
     p.add_argument(
@@ -279,6 +343,7 @@ def main(argv: list[str] | None = None) -> int:
         request_timeout=args.timeout,
         state_dir=Path(args.state_dir),
         dry_run=args.dry_run,
+        local_url=args.local_url,
     )
 
     if args.once_check_only:

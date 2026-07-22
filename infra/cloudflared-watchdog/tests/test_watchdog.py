@@ -27,13 +27,17 @@ def _cfg(module, state_dir: Path, **overrides):
         request_timeout=8.0,
         state_dir=state_dir,
         dry_run=False,
+        local_url="http://localhost:8096",
     )
     base.update(overrides)
     return module.WatchdogConfig(**base)
 
 
-def _install_mocks(module, *, healthy: bool, restart_succeeds: bool = True):
+def _install_mocks(module, *, healthy: bool, restart_succeeds: bool = True,
+                   local_healthy: bool = True, already_restarting: bool = False):
     module.check_public_path = lambda cfg: module.CheckResult(healthy, "stub")
+    module.check_local_media_control = lambda cfg: module.CheckResult(local_healthy, "local-stub")
+    module.is_cloudflared_restarting = lambda: already_restarting
     module.registered_tunnel_connections = lambda minutes=5: 4
     restarted = {"count": 0}
 
@@ -135,4 +139,51 @@ def test_check_public_path_failure_for_network_error(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "_http_get", fake_get)
     cfg = _cfg(mod, tmp_path)
     result = mod.check_public_path(cfg)
+    assert result.healthy is False
+
+
+def test_local_media_control_down_does_not_restart_cloudflared(tmp_path):
+    """Public unhealthy + local Media Control unhealthy -> NOT a tunnel problem;
+    never restart cloudflared; alert-only (exit 2)."""
+    mod = _load_watchdog(tmp_path)
+    restarted = _install_mocks(mod, healthy=False, local_healthy=False)
+    cfg = _cfg(mod, tmp_path, failure_threshold=1, cooldown_seconds=0)
+    rc = mod.evaluate(cfg)
+    assert rc == 2
+    assert restarted["count"] == 0
+
+
+def test_sustained_external_failure_with_local_healthy_restarts(tmp_path):
+    """Public unhealthy + local Media Control healthy -> tunnel problem; restart cloudflared."""
+    mod = _load_watchdog(tmp_path)
+    restarted = _install_mocks(mod, healthy=False, local_healthy=True, restart_succeeds=True)
+    cfg = _cfg(mod, tmp_path, failure_threshold=1, cooldown_seconds=0)
+    rc = mod.evaluate(cfg)
+    assert rc == 0
+    assert restarted["count"] == 1
+
+
+def test_cloudflared_already_restarting_skips_restart(tmp_path):
+    """cloudflared mid-transition -> skip restart this cycle (exit 1)."""
+    mod = _load_watchdog(tmp_path)
+    restarted = _install_mocks(mod, healthy=False, local_healthy=True, already_restarting=True)
+    cfg = _cfg(mod, tmp_path, failure_threshold=1, cooldown_seconds=0)
+    rc = mod.evaluate(cfg)
+    assert rc == 1
+    assert restarted["count"] == 0
+
+
+def test_check_local_media_control_healthy(tmp_path, monkeypatch):
+    mod = _load_watchdog(tmp_path)
+    monkeypatch.setattr(mod, "_http_get", lambda url, timeout: (200, ""))
+    cfg = _cfg(mod, tmp_path)
+    result = mod.check_local_media_control(cfg)
+    assert result.healthy is True
+
+
+def test_check_local_media_control_unhealthy(tmp_path, monkeypatch):
+    mod = _load_watchdog(tmp_path)
+    monkeypatch.setattr(mod, "_http_get", lambda url, timeout: (502, "http_error=502"))
+    cfg = _cfg(mod, tmp_path)
+    result = mod.check_local_media_control(cfg)
     assert result.healthy is False
