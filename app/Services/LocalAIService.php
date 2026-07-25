@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -33,8 +34,59 @@ class LocalAIService extends CloudflareAIService
 
     public function isEnabled(): bool
     {
-        // Local Ollama needs no account id / API token.
-        return true;
+        return $this->checkHealth()['available'] === true;
+    }
+
+    /**
+     * Bounded, cached health/capability check for the local Ollama instance.
+     *
+     * Pings /api/tags (lightweight — does not load the model into VRAM) with a
+     * short connect timeout. The result is cached for 60 seconds so it does not
+     * fire on every page request. Distinguishes:
+     *   - configured  (base URL + model name are set)
+     *   - reachable   (Ollama daemon responds)
+     *   - model_exists (the configured model is in /api/tags)
+     *   - available   (all three true) — what isEnabled() returns
+     *
+     * @return array{configured: bool, reachable: bool, model_exists: bool, available: bool, error: ?string}
+     */
+    public function checkHealth(): array
+    {
+        $cacheKey = 'local_ai_health:' . md5($this->baseUrl . ':' . $this->localModel);
+        return Cache::remember($cacheKey, now()->addSeconds(60), function () {
+            $configured = ! empty($this->baseUrl) && ! empty($this->localModel);
+            if (! $configured) {
+                return ['configured' => false, 'reachable' => false, 'model_exists' => false, 'available' => false, 'error' => 'Ollama URL or model not configured'];
+            }
+
+            try {
+                $response = Http::connectTimeout(3)->timeout(5)->get("{$this->baseUrl}/api/tags");
+                if (! $response->successful()) {
+                    Log::warning('Local AI health check: Ollama returned non-200', ['status' => $response->status()]);
+                    return ['configured' => true, 'reachable' => false, 'model_exists' => false, 'available' => false, 'error' => "Ollama returned HTTP {$response->status()}"];
+                }
+
+                $models = collect(data_get($response->json(), 'models', []))
+                    ->pluck('name')
+                    ->filter()
+                    ->map(fn ($n) => (string) $n)
+                    ->all();
+
+                $modelExists = in_array($this->localModel, $models, true);
+                if (! $modelExists) {
+                    Log::warning('Local AI health check: configured model not found', [
+                        'model' => $this->localModel,
+                        'available_models' => array_slice($models, 0, 10),
+                    ]);
+                    return ['configured' => true, 'reachable' => true, 'model_exists' => false, 'available' => false, 'error' => "Model '{$this->localModel}' not found in Ollama"];
+                }
+
+                return ['configured' => true, 'reachable' => true, 'model_exists' => true, 'available' => true, 'error' => null];
+            } catch (\Exception $e) {
+                Log::warning('Local AI health check: Ollama unreachable', ['error' => $e->getMessage()]);
+                return ['configured' => true, 'reachable' => false, 'model_exists' => false, 'available' => false, 'error' => 'Ollama unreachable: ' . $e->getMessage()];
+            }
+        });
     }
 
     public function checkRateLimit(): bool
