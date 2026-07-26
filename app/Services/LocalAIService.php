@@ -6,6 +6,7 @@ namespace App\Services;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -36,8 +37,125 @@ class LocalAIService extends CloudflareAIService
 
     public function isEnabled(): bool
     {
-        // Local Ollama needs no account id / API token.
-        return true;
+        return $this->checkHealth()['available'];
+    }
+
+    /**
+     * Perform a bounded, cached capability check without loading a model.
+     *
+     * @return array{
+     *     configured: bool,
+     *     reachable: bool,
+     *     model_exists: bool,
+     *     available: bool,
+     *     error: string|null
+     * }
+     */
+    public function checkHealth(): array
+    {
+        $cacheKey = 'local_ai_health:'.md5($this->baseUrl.':'.$this->localModel);
+
+        return Cache::remember($cacheKey, now()->addSeconds(60), function (): array {
+            if ($this->baseUrl === '' || $this->localModel === '') {
+                return [
+                    'configured' => false,
+                    'reachable' => false,
+                    'model_exists' => false,
+                    'available' => false,
+                    'error' => 'Ollama URL or model not configured',
+                ];
+            }
+
+            try {
+                $response = Http::connectTimeout(3)
+                    ->timeout(5)
+                    ->get("{$this->baseUrl}/api/tags");
+            } catch (ConnectionException $exception) {
+                Log::warning('Local AI health check: Ollama unreachable', [
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return [
+                    'configured' => true,
+                    'reachable' => false,
+                    'model_exists' => false,
+                    'available' => false,
+                    'error' => 'Ollama unreachable: '.$exception->getMessage(),
+                ];
+            }
+
+            if (! $response->successful()) {
+                Log::warning('Local AI health check: Ollama returned non-200', [
+                    'status' => $response->status(),
+                ]);
+
+                return [
+                    'configured' => true,
+                    'reachable' => false,
+                    'model_exists' => false,
+                    'available' => false,
+                    'error' => "Ollama returned HTTP {$response->status()}",
+                ];
+            }
+
+            try {
+                $inventory = json_decode($response->body(), true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                $inventory = null;
+            }
+
+            if (! is_array($inventory) || ! isset($inventory['models']) || ! is_array($inventory['models'])) {
+                Log::warning('Local AI health check: Ollama returned malformed model inventory');
+
+                return [
+                    'configured' => true,
+                    'reachable' => true,
+                    'model_exists' => false,
+                    'available' => false,
+                    'error' => 'Ollama returned malformed model inventory',
+                ];
+            }
+
+            $models = collect($inventory['models'])
+                ->pluck('name')
+                ->filter(fn (mixed $name): bool => is_string($name) && $name !== '')
+                ->map(fn (string $name): string => $this->normalizeModelName($name))
+                ->values()
+                ->all();
+            $modelExists = in_array($this->normalizeModelName($this->localModel), $models, true);
+
+            if (! $modelExists) {
+                Log::warning('Local AI health check: configured model not found', [
+                    'model' => $this->localModel,
+                    'available_models' => array_slice($models, 0, 10),
+                ]);
+
+                return [
+                    'configured' => true,
+                    'reachable' => true,
+                    'model_exists' => false,
+                    'available' => false,
+                    'error' => "Model '{$this->localModel}' not found in Ollama",
+                ];
+            }
+
+            return [
+                'configured' => true,
+                'reachable' => true,
+                'model_exists' => true,
+                'available' => true,
+                'error' => null,
+            ];
+        });
+    }
+
+    private function normalizeModelName(string $model): string
+    {
+        $model = trim($model);
+
+        return str_ends_with($model, ':latest')
+            ? substr($model, 0, -strlen(':latest'))
+            : $model;
     }
 
     public function checkRateLimit(): bool
