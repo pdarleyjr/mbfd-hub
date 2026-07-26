@@ -11,9 +11,12 @@ Sentry.init({
   release: import.meta.env.VITE_SENTRY_RELEASE,
 })
 
-// Service worker is registered by vite-plugin-pwa via registerSW.js (in index.html).
-// Do NOT register a second SW here — dual registration causes infinite reload loops.
-// See: ERROR-037 fix applied 2026-03-21
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/daily/sw.js', { scope: '/daily/' })
+      .catch((error) => console.error('Service worker registration failed:', error))
+  })
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

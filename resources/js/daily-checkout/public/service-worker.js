@@ -153,7 +153,7 @@ self.addEventListener('fetch', (event) => {
 
 // ─── Push Notification Handlers (ERROR-036 fix) ───────────────────────────────
 // These listeners MUST be present in the final sw.js to receive web push events.
-// VitePWA's Workbox build was previously stripping them. The serviceWorkerCopyPlugin
+// The build's serviceWorkerCopyPlugin
 // in vite.config.js copies this file to public/daily/sw.js at closeBundle, preserving
 // these handlers.
 

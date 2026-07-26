@@ -1,7 +1,5 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
-import { sentryVitePlugin } from '@sentry/vite-plugin'
+import react from '@vitejs/plugin-react-swc'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -55,50 +53,20 @@ const manifestCopyPlugin = {
   }
 }
 
-// This plugin MUST be placed AFTER VitePWA in the plugins array.
-// VitePWA's generateSW mode produces its own sw.js during closeBundle,
-// overwriting any previously copied custom service worker.
-// This plugin appends the push/notificationclick listeners from our
-// custom service-worker.js into VitePWA's generated sw.js.
-const serviceWorkerPushInjectPlugin = {
-  name: 'service-worker-push-inject',
+// Ship the audited, application-owned worker directly. This avoids a second
+// generated worker and keeps the runtime cache/push contract deterministic.
+const serviceWorkerCopyPlugin = {
+  name: 'service-worker-copy',
   apply: 'build',
   closeBundle() {
     const customSwPath = path.join(__dirname, 'public', 'service-worker.js')
     const outputSwPath = path.join(dailyOutDir, 'sw.js')
-    
-    console.log(`[sw-push-inject] Injecting push listeners from: ${customSwPath}`)
-    console.log(`[sw-push-inject] Into generated SW at: ${outputSwPath}`)
-    
-    if (fs.existsSync(customSwPath) && fs.existsSync(outputSwPath)) {
-      try {
-        const customSw = fs.readFileSync(customSwPath, 'utf-8')
-        
-        // Extract everything from the push handler comment to the end of notificationclick
-        const pushSection = customSw.substring(
-          customSw.indexOf('// \u2500\u2500\u2500 Push Notification Handlers')
-        )
-        // Find end of notificationclick listener block
-        const notificationClickEnd = pushSection.indexOf("// Message event")
-        const pushListeners = notificationClickEnd > 0
-          ? pushSection.substring(0, notificationClickEnd).trim()
-          : pushSection.trim()
-        
-        if (pushListeners.includes("addEventListener('push'")) {
-          const generatedSw = fs.readFileSync(outputSwPath, 'utf-8')
-          fs.writeFileSync(outputSwPath, generatedSw + '\n\n' + pushListeners + '\n')
-          console.log('[sw-push-inject] \u2713 Push + notificationclick listeners injected into generated sw.js')
-        } else {
-          // Fallback: overwrite entirely with the custom SW
-          fs.copyFileSync(customSwPath, outputSwPath)
-          console.log('[sw-push-inject] \u2713 Fallback: copied entire custom service worker as sw.js')
-        }
-      } catch (error) {
-        console.error('[sw-push-inject] Error:', error.message)
-      }
-    } else {
-      console.warn(`[sw-push-inject] Missing files: custom=${fs.existsSync(customSwPath)} output=${fs.existsSync(outputSwPath)}`)
+    if (!fs.existsSync(customSwPath)) {
+      throw new Error(`Service worker source is missing: ${customSwPath}`)
     }
+    fs.mkdirSync(dailyOutDir, { recursive: true })
+    fs.copyFileSync(customSwPath, outputSwPath)
+    console.log(`[service-worker-copy] \u2713 ${outputSwPath}`)
   }
 }
 
@@ -107,90 +75,8 @@ export default defineConfig({
   base: '/daily/',
   plugins: [
     react(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
-      manifest: {
-        name: 'MBFD Daily Checkout',
-        short_name: 'MBFD Daily',
-        description: 'Miami Beach Fire Department Daily Checkout System',
-        start_url: '/daily/',
-        scope: '/daily/',
-        display: 'standalone',
-        orientation: 'portrait',
-        theme_color: '#1e3a5f',
-        background_color: '#f8f6f2',
-        icons: [
-          {
-            src: '/daily/icons/icon-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: '/daily/icons/icon-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-          },
-          {
-            src: '/daily/icons/icon-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable',
-          },
-        ],
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\/api\//i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24, // 24 hours
-              },
-              networkTimeoutSeconds: 5,
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-          {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'image-cache',
-              expiration: {
-                maxEntries: 60,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-              },
-            },
-          },
-          {
-            urlPattern: /\.(?:woff2?|ttf|eot)$/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'font-cache',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-              },
-            },
-          },
-        ],
-      },
-    }),
     manifestCopyPlugin,
-    serviceWorkerPushInjectPlugin,
-    // Sentry plugin disabled temporarily - needs project setup in Sentry dashboard
-    // sentryVitePlugin({
-    //   org: process.env.SENTRY_ORG,
-    //   project: process.env.SENTRY_PROJECT_FRONTEND,
-    //   authToken: process.env.SENTRY_AUTH_TOKEN,
-    //   telemetry: false,
-    // }),
+    serviceWorkerCopyPlugin,
   ],
   build: {
     outDir: dailyOutDir,

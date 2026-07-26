@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Shift, PINVerifyResponse } from '../types';
 import InventoryUserInfoStep from './InventoryUserInfoStep';
 import InventoryPINStep from './InventoryPINStep';

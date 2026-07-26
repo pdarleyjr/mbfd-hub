@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { Room, RoomAsset, RoomAudit, AssetCondition } from '../types';
 import { ApiClient } from '../utils/api';
 
