@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router';
 import ApparatusList from './components/ApparatusList';
 import InspectionWizard from './components/InspectionWizard';
 import SuccessPage from './components/SuccessPage';

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router';
 import { Apparatus } from '../types';
 import { ApiClient } from '../utils/api';
 import { ApparatusListSkeleton } from './SkeletonLoader';

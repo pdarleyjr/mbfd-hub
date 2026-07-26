@@ -43,6 +43,24 @@ jobs:
           npm ci --ignore-scripts --legacy-peer-deps
           npm audit --audit-level=high
 
+      - name: Daily Checkout security audit
+        working-directory: resources/js/daily-checkout
+        run: |
+          npm ci --ignore-scripts
+          npm audit --audit-level=high
+
+      - name: Vision Agent security audit
+        working-directory: cloudflare-worker/vision-agent
+        run: |
+          npm ci --ignore-scripts
+          npm audit --audit-level=high
+
+      - name: Vacation app security audit
+        working-directory: vacation-app
+        run: |
+          corepack pnpm@9.12.0 install --frozen-lockfile --ignore-scripts
+          corepack pnpm@9.12.0 audit --audit-level=high
+
   codeql:
     name: CodeQL Analysis
     # CodeQL upload requires GitHub Advanced Security for private repos. Keep
@@ -76,7 +94,7 @@ jobs:
   # requires GitHub Advanced Security on private repos, which this account does
   # not have. Coverage is provided by:
   #   - Dependabot (vulnerability PRs + alerts)
-  #   - composer audit + npm audit (in `dependency-audit` job above)
+  #   - composer audit + per-lockfile npm/pnpm audits (in `dependency-audit` above)
   #   - aquasecurity/trivy-action (03-trivy-repo.yml)
   #   - github/codeql-action (codeql job above)
   # Re-enable only after enabling GHAS or making the repo public.

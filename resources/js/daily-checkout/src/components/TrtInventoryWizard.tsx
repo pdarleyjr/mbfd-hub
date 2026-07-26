@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useTrtCatalog } from '../hooks/useTrtCatalog';
 import { enqueueSubmission, processPendingSubmissions } from '../lib/sync';
 import type { TrtEntryDraft, ItemCondition, ItemAction, TrtCatalogItem } from '../types/trt-inventory';

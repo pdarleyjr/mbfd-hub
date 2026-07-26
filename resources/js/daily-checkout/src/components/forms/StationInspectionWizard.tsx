@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import SignatureCanvas from 'react-signature-canvas';
 import { enqueueSubmission, processPendingSubmissions } from '../../lib/sync';
 
