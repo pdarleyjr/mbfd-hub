@@ -36,6 +36,19 @@ if (tracked.length > 0) {
 }
 console.log("OK: no generated assets are tracked in git.");
 
+console.log("== CI asset-order guard ==");
+const ciWorkflowPath = resolve(root, ".github/workflows/ci.yml");
+const ciWorkflow = readFileSync(ciWorkflowPath, "utf8");
+const ciBuildIndex = ciWorkflow.indexOf("run: npm run build");
+const ciTestIndex = ciWorkflow.indexOf("run: php artisan test");
+if (ciBuildIndex === -1 || ciTestIndex === -1 || ciBuildIndex > ciTestIndex) {
+  console.error(
+    "ERROR: .github/workflows/ci.yml must run `npm run build` before `php artisan test`.",
+  );
+  process.exit(1);
+}
+console.log("OK: CI builds the untracked Vite manifest before HTTP tests.");
+
 const requireBuild = process.env.REQUIRE_GENERATED_ASSETS === "1";
 const manifest = resolve(root, "public/build/manifest.json");
 if (!existsSync(manifest) && !requireBuild) {
