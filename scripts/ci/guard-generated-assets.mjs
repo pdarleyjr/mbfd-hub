@@ -36,10 +36,15 @@ if (tracked.length > 0) {
 }
 console.log("OK: no generated assets are tracked in git.");
 
+const requireBuild = process.env.REQUIRE_GENERATED_ASSETS === "1";
 const manifest = resolve(root, "public/build/manifest.json");
-if (!existsSync(manifest)) {
+if (!existsSync(manifest) && !requireBuild) {
   console.log("SKIP: public/build/manifest.json not present (no build performed in this job).");
   process.exit(0);
+}
+if (!existsSync(manifest)) {
+  console.error("ERROR: required Vite manifest is missing after the build.");
+  process.exit(1);
 }
 
 console.log("== Vite manifest guard ==");
@@ -50,14 +55,22 @@ if (readFileSync(manifest, "utf8").trim().length === 0) {
 
 const data = JSON.parse(readFileSync(manifest, "utf8"));
 const refs = new Set();
+const referencedEntries = new Set();
 for (const entry of Object.values(data)) {
   if (entry.file) refs.add(entry.file);
   if (Array.isArray(entry.css)) entry.css.forEach((f) => refs.add(f));
-  if (Array.isArray(entry.js)) entry.js.forEach((f) => refs.add(f));
-  if (Array.isArray(entry.imports)) entry.imports.forEach((f) => refs.add(f));
+  if (Array.isArray(entry.assets)) entry.assets.forEach((f) => refs.add(f));
+  if (Array.isArray(entry.imports)) entry.imports.forEach((key) => referencedEntries.add(key));
+  if (Array.isArray(entry.dynamicImports)) entry.dynamicImports.forEach((key) => referencedEntries.add(key));
 }
 
 let missing = 0;
+for (const key of referencedEntries) {
+  if (!Object.hasOwn(data, key)) {
+    console.error("ERROR: manifest references missing entry: " + key);
+    missing += 1;
+  }
+}
 for (const f of refs) {
   const full = resolve(root, "public/build", f);
   if (!existsSync(full)) {
@@ -67,3 +80,20 @@ for (const f of refs) {
 }
 if (missing > 0) process.exit(1);
 console.log("OK: Vite manifest present and all referenced primary files exist.");
+
+if (requireBuild) {
+  const requiredOutputs = [
+    "public/css/filament/filament/app.css",
+    "public/js/filament/filament/app.js",
+    "public/daily/index.html",
+    "public/daily/manifest.webmanifest",
+    "public/daily/sw.js",
+  ];
+  const missingOutputs = requiredOutputs.filter((file) => !existsSync(resolve(root, file)));
+  if (missingOutputs.length > 0) {
+    console.error("ERROR: deployment-generated asset(s) are missing:");
+    missingOutputs.forEach((file) => console.error("  " + file));
+    process.exit(1);
+  }
+  console.log("OK: Vite, Filament, and Daily deployment assets are reproducible.");
+}

@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, fix/untrack-generated-hub-assets]
+    branches: [main, fix/generated-assets-final-20260726]
 
 permissions:
   contents: read
@@ -29,9 +29,27 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+          coverage: none
+      - name: Install PHP dependencies
+        run: composer install --no-dev --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts --optimize-autoloader
       - name: Install Node dependencies
         run: npm ci --ignore-scripts --legacy-peer-deps
-      - name: Build frontend assets
-        run: npm run build
-      - name: Verify manifest after build
+      - name: Build Vite and Filament assets
+        run: |
+          npm run build
+          php artisan filament:assets
+      - name: Build Daily PWA assets
+        working-directory: resources/js/daily-checkout
+        env:
+          DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
+        run: |
+          npm ci --ignore-scripts --legacy-peer-deps
+          npm run build
+      - name: Verify deployment assets after build
+        env:
+          REQUIRE_GENERATED_ASSETS: '1'
         run: node scripts/ci/guard-generated-assets.mjs
