@@ -95,10 +95,7 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
-        // Register push notification widget JavaScript
-        FilamentAsset::register([
-            Js::make('push-notification-widget', Vite::asset('resources/js/push-notification-widget.js')),
-        ]);
+        $this->registerPushNotificationWidgetAssets();
 
         // ─── Submission Notification Triggers ──────────────────────────────
         // Dispatch NewSubmissionNotification (database + web push) when new
@@ -163,6 +160,22 @@ class AppServiceProvider extends ServiceProvider
                 '/admin/stations/' . $submission->station_id . '?activeRelationManager=inventoryItems',
             );
         });
+    }
+
+    /**
+     * Register browser-only assets without making Artisan commands depend on a
+     * generated Vite manifest. Deployment separately proves and atomically
+     * activates that manifest before serving web traffic.
+     */
+    protected function registerPushNotificationWidgetAssets(): void
+    {
+        if ($this->app->runningInConsole()) {
+            return;
+        }
+
+        FilamentAsset::register([
+            Js::make('push-notification-widget', Vite::asset('resources/js/push-notification-widget.js')),
+        ]);
     }
 
     /**
