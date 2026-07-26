@@ -39,7 +39,15 @@ cookies.txt
 /node_modules
 **/node_modules
 # Lock files are source-controlled supply-chain inputs. Do not ignore them.
+# Generated build output (Vite / Filament / Daily PWA). Reproduced by the
+# deployment pipeline; never edited by hand and must not be Git-tracked.
 /public/build/
+/public/build-previous/
+/public/daily-previous/
+/public/deploy-marker.json
+/public/css/filament/
+/public/js/filament/
+/public/daily/
 /public/hot
 /public/storage
 /.phpunit.cache

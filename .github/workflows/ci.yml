@@ -57,6 +57,9 @@ jobs:
     - name: Install dependencies
       run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
 
+    - name: Build Vite assets for HTTP tests
+      run: npm run build
+
     - name: Copy .env
       run: cp .env.example .env || true
 
