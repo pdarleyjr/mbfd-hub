@@ -37,13 +37,15 @@ const manifestCopyPlugin = {
           console.log('[manifest-copy] Updated scope to /daily/')
         }
         
-        // Emit the manifest.json as part of the bundle
-        this.emitFile({
-          type: 'asset',
-          fileName: 'manifest.json',
-          source: JSON.stringify(manifest, null, 2)
-        })
-        console.log('[manifest-copy] \u2713 manifest.json added to bundle output')
+        const source = JSON.stringify(manifest, null, 2)
+        for (const fileName of ['manifest.json', 'manifest.webmanifest']) {
+          this.emitFile({
+            type: 'asset',
+            fileName,
+            source
+          })
+          console.log(`[manifest-copy] \u2713 ${fileName} added to bundle output`)
+        }
       } catch (error) {
         console.error('[manifest-copy] Error processing manifest:', error.message)
       }
