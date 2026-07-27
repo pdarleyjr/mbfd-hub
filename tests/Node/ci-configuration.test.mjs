@@ -38,7 +38,7 @@ test("PHPStan is a hard gate backed by a reviewed baseline", () => {
   assert.doesNotMatch(phpstanCommand, /\|\|\s*true\b/);
   assert.doesNotMatch(workflow, /continue-on-error:\s*(?:true|["']true["'])\b/);
   assert.doesNotMatch(phpstanCommand, /--generate-baseline(?:=|\s)/);
-  assert.match(config, /includes:\s*\n\s+-\s+phpstan-baseline\.neon\b/);
+  assert.match(config, /^\s+-\s+phpstan-baseline\.neon\s*$/m);
   assert.ok(existsSync(resolve(root, "phpstan-baseline.neon")));
 });
 
