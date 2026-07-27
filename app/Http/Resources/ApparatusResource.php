@@ -52,7 +52,7 @@ class ApparatusResource extends JsonResource
             'last_pm_engine_hours'   => $this->last_pm_engine_hours,
             'pm_interval_miles'      => $this->pm_interval_miles,
             'pm_interval_hours'      => $this->pm_interval_hours,
-            'pm_health'              => $this->whenAppended('pm_health', fn () => $this->resource->getPmHealthStatus()),
+            'pm_health'              => $this->whenPmHealthAppended('pm_health', fn () => $this->resource->getPmHealthStatus()),
             'station_id'             => $this->station_id,
             'station'                => $this->whenLoaded('station'),
             'notes'                  => $this->notes,
@@ -73,7 +73,7 @@ class ApparatusResource extends JsonResource
      * Conditionally include a value only when the model has the appendable
      * key set (lets callers opt into expensive method calls via append()).
      */
-    private function whenAppended(string $key, \Closure $resolver): mixed
+    private function whenPmHealthAppended(string $key, \Closure $resolver): mixed
     {
         $appended = method_exists($this->resource, 'getAppends')
             ? $this->resource->getAppends()
