@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: CI configuration contract tests
-        run: node --test tests/Node/ci-configuration.test.mjs
+        run: node --test tests/Node/*.test.mjs
 
       - name: Run actionlint
         uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2.1.2
