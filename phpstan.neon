@@ -7,4 +7,3 @@ parameters:
         - app/
     excludePaths:
         - app/Console/Kernel.php (?)
-    checkMissingIterableValueType: false
