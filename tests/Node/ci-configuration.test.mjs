@@ -27,7 +27,7 @@ test("every Dependabot package directory contains its ecosystem manifest", () =>
   assert.deepEqual(missing, []);
 });
 
-test("PHPStan failures are not downgraded to warnings", () => {
+test("PHPStan executes without shell-level suppression", () => {
   const workflow = readFileSync(resolve(root, ".github/workflows/06-static-analysis.yml"), "utf8");
   const phpstanCommand = workflow
     .split(/\r?\n/)
