@@ -30,11 +30,14 @@ jobs:
         run: composer require --dev "larastan/larastan:^3.0" --no-interaction --no-progress
 
       - name: Run PHPStan
-        # The current application baseline has unresolved findings. Keep the
-        # analysis visible without blocking unrelated changes until that
-        # baseline is remediated in a dedicated application-code change.
-        continue-on-error: true
-        run: vendor/bin/phpstan analyse --memory-limit=512M --no-progress -c phpstan.neon
+        run: vendor/bin/phpstan analyse --memory-limit=512M --no-progress -c phpstan.neon --generate-baseline=phpstan-baseline.neon
+
+      - name: Upload generated PHPStan baseline
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: phpstan-baseline-${{ github.sha }}
+          path: phpstan-baseline.neon
+          if-no-files-found: error
 
   actionlint:
     name: Action Lint
