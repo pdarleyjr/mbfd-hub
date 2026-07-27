@@ -401,6 +401,8 @@ jobs:
           # Using a single-quoted outer ssh + a double-quoted heredoc on the
           # runner side lets shell-expand the secrets WITHOUT the values
           # touching the remote process list.
+          # This local expansion is intentional and is why EOF is not quoted.
+          # shellcheck disable=SC2087
           ssh deploy-target 'cat > /tmp/r2.env.add' <<EOF
           # --- R2 disk activated (managed by production-activate.yml) -----
           FILESYSTEM_DISK=r2
@@ -459,4 +461,6 @@ jobs:
           check "Admin PWA SW"           "https://www.mbfdhub.com/admin-pwa/service-worker.js"
           check "Deploy marker"          "https://www.mbfdhub.com/deploy-marker.json"
           echo "=== $PASS passed, $FAIL failed ==="
-          [ "$FAIL" -gt 0 ] && exit 1 || true
+          if [ "$FAIL" -gt 0 ]; then
+            exit 1
+          fi

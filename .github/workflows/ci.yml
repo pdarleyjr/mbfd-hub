@@ -65,15 +65,17 @@ jobs:
 
     - name: Configure test environment
       run: |
-        echo "DB_CONNECTION=pgsql" >> .env
-        echo "DB_HOST=127.0.0.1" >> .env
-        echo "DB_PORT=5432" >> .env
-        echo "DB_DATABASE=testing" >> .env
-        echo "DB_USERNAME=testing" >> .env
-        echo "DB_PASSWORD=testing" >> .env
-        echo "CACHE_DRIVER=array" >> .env
-        echo "SESSION_DRIVER=array" >> .env
-        echo "QUEUE_CONNECTION=sync" >> .env
+        {
+          echo "DB_CONNECTION=pgsql"
+          echo "DB_HOST=127.0.0.1"
+          echo "DB_PORT=5432"
+          echo "DB_DATABASE=testing"
+          echo "DB_USERNAME=testing"
+          echo "DB_PASSWORD=testing"
+          echo "CACHE_DRIVER=array"
+          echo "SESSION_DRIVER=array"
+          echo "QUEUE_CONNECTION=sync"
+        } >> .env
 
     - name: Generate key
       run: php artisan key:generate
