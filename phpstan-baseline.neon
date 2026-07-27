@@ -1,0 +1,3451 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Call to function in_array\(\) with App\\Enums\\ProjectPriority and array\{''critical'', ''high''\} will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Console/Commands/AnalyzeProjectPriorities.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$make\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Console/Commands/BackfillApparatusPmData.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$mileage\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/BackfillApparatusPmData.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$model\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Console/Commands/BackfillApparatusPmData.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$year\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Console/Commands/BackfillApparatusPmData.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ProjectMilestone\:\:\$project\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/CheckOverdueProjects.php
+
+		-
+			message: '#^Relation ''project'' is not found in App\\Models\\ProjectMilestone model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Console/Commands/CheckOverdueProjects.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 8
+			path: app/Console/Commands/DiagnoseRedisEnv.php
+
+		-
+			message: '#^Method App\\Models\\EquipmentItem\:\:setStock\(\) invoked with 3 parameters, 1\-2 required\.$#'
+			identifier: arguments.count
+			count: 2
+			path: app/Console/Commands/ImportFireEquipment.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Console/Commands/ImportPersonnel.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: app/Console/Commands/MoveSensitiveFilesToPrivate.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Console/Commands/MoveSensitiveFilesToPrivate.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 4
+			path: app/Console/Commands/ProvisionUsers.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Console/Commands/ResetEmployeePassword.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ProjectMilestone\:\:\$project\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Console/Commands/SendMilestoneReminders.php
+
+		-
+			message: '#^Relation ''project'' is not found in App\\Models\\ProjectMilestone model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Console/Commands/SendMilestoneReminders.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>full_location" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Console/Commands/TestEquipmentMatching.php
+
+		-
+			message: '#^Method App\\Enums\\ProjectPriority\:\:getColor\(\) never returns array\{50\: string, 100\: string, 200\: string, 300\: string, 400\: string, 500\: string, 600\: string, 700\: string, \.\.\.\} so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/ProjectPriority.php
+
+		-
+			message: '#^Method App\\Enums\\ProjectPriority\:\:getColor\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/ProjectPriority.php
+
+		-
+			message: '#^Method App\\Enums\\ProjectStatus\:\:getColor\(\) never returns array\{50\: string, 100\: string, 200\: string, 300\: string, 400\: string, 500\: string, 600\: string, 700\: string, \.\.\.\} so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/ProjectStatus.php
+
+		-
+			message: '#^Method App\\Enums\\ProjectStatus\:\:getColor\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Enums/ProjectStatus.php
+
+		-
+			message: '#^Access to an undefined property App\\Filament\\Admin\\Pages\\BidAccessPin\:\:\$form\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Filament/Admin/Pages/BidAccessPin.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Admin/Pages/BidAccessPin.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>email" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Admin/Pages/BidAccessPin.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Admin/Pages/BidAccessPin.php
+
+		-
+			message: '#^Access to an undefined property App\\Filament\\Admin\\Pages\\KnowledgeBase\:\:\$form\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Filament/Admin/Pages/KnowledgeBase.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Admin/Pages/TrtTrailerInventory.php
+
+		-
+			message: '#^Trait App\\Filament\\Concerns\\HasExportActions is used zero times and is not analysed\.$#'
+			identifier: trait.unused
+			count: 1
+			path: app/Filament/Concerns/HasExportActions.php
+
+		-
+			message: '#^Parameter \#1 \$exception of method Filament\\Pages\\Auth\\Login\:\:getRateLimitedNotification\(\) expects DanHarrin\\LivewireRateLimiting\\Exceptions\\TooManyRequestsException, Illuminate\\Http\\Exceptions\\ThrottleRequestsException given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Employee/Pages/Auth/EmployeeLogin.php
+
+		-
+			message: '#^Access to an undefined property App\\Filament\\Employee\\Pages\\ChangePasswordPage\:\:\$form\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Employee/Pages/ChangePasswordPage.php
+
+		-
+			message: '#^Access to an undefined property App\\Filament\\Employee\\Pages\\RequestEquipmentPage\:\:\$form\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Filament/Employee/Pages/RequestEquipmentPage.php
+
+		-
+			message: '#^Parameter \#1 \$exception of method Filament\\Pages\\Auth\\Login\:\:getRateLimitedNotification\(\) expects DanHarrin\\LivewireRateLimiting\\Exceptions\\TooManyRequestsException, Illuminate\\Http\\Exceptions\\ThrottleRequestsException given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Pages/Auth/Login.php
+
+		-
+			message: '#^Access to an undefined property App\\Filament\\Pages\\MyProfile\:\:\$form\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Pages/MyProfile.php
+
+		-
+			message: '#^Access to an undefined property App\\Filament\\Pages\\NotificationSettings\:\:\$form\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Pages/NotificationSettings.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$station_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/ApparatusResource.php
+
+		-
+			message: '#^Anonymous function never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Filament/Resources/ApparatusResource.php
+
+		-
+			message: '#^Offset ''hours_since_pm'' does not exist on array\{status\: string, hours\: float, miles\: int, overdue\: bool\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 3
+			path: app/Filament/Resources/ApparatusResource.php
+
+		-
+			message: '#^Offset ''interval_hours'' does not exist on array\{status\: string, hours\: float, miles\: int, overdue\: bool\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Filament/Resources/ApparatusResource.php
+
+		-
+			message: '#^Offset ''last_pm_date'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Filament/Resources/ApparatusResource.php
+
+		-
+			message: '#^Offset ''miles_since_pm'' does not exist on array\{status\: string, hours\: float, miles\: int, overdue\: bool\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Filament/Resources/ApparatusResource.php
+
+		-
+			message: '#^Cannot access property \$unit_id on App\\Models\\Apparatus\|int\|string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Filament/Resources/ApparatusResource/Pages/ApparatusInspections.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>designation" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/ApparatusResource/RelationManagers/InspectionsRelationManager.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>vehicle_number" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/ApparatusResource/RelationManagers/InspectionsRelationManager.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>value" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 4
+			path: app/Filament/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Resources/EquipmentItemResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$full_location\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Filament/Resources/EquipmentItemResource.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: mixed$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Filament/Resources/EquipmentItemResource.php
+
+		-
+			message: '#^Method App\\Models\\EquipmentItem\:\:decreaseStock\(\) invoked with 3 parameters, 0\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: app/Filament/Resources/EquipmentItemResource.php
+
+		-
+			message: '#^Method App\\Models\\EquipmentItem\:\:increaseStock\(\) invoked with 3 parameters, 0\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: app/Filament/Resources/EquipmentItemResource.php
+
+		-
+			message: '#^Method App\\Models\\EquipmentItem\:\:setStock\(\) invoked with 3 parameters, 1\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: app/Filament/Resources/EquipmentItemResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>full_location" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Filament/Resources/EquipmentItemResource.php
+
+		-
+			message: '#^Cannot access property \$status on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
+			identifier: property.nonObject
+			count: 4
+			path: app/Filament/Resources/FireEquipmentRequestResource/Pages/ViewFireEquipmentRequest.php
+
+		-
+			message: '#^Parameter \#1 \$record of method App\\Services\\OperationalForms\\OperationalFormDeletionService\:\:deleteRecord\(\) expects App\\Models\\OperationalFormRecord, Illuminate\\Database\\Eloquent\\Model\|int\|string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/OperationalFormRecordResource/Pages/ViewOperationalFormRecord.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EquipmentItem\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\EquipmentItem\>\:\:\$stock\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Filament/Resources/RecommendationResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$apparatus\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Resources/RecommendationResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$apparatus_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Resources/RecommendationResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$item\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/RecommendationResource.php
+
+		-
+			message: '#^Method App\\Models\\EquipmentItem\:\:decreaseStock\(\) invoked with 3 parameters, 0\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: app/Filament/Resources/RecommendationResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>compartment" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/RecommendationResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>item" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/RecommendationResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>unit_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/RecommendationResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$inventory_pin_hash\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/StationResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Resources/StationResource/RelationManagers/ApparatusesRelationManager.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$station_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/StationResource/RelationManagers/ApparatusesRelationManager.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Resources/StationResource/RelationManagers/CapitalProjectsRelationManager.php
+
+		-
+			message: '#^Call to static method getUrl\(\) on an unknown class App\\Filament\\Resources\\StationInventorySubmissionResource\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Filament/Resources/StationResource/RelationManagers/InventorySubmissionsRelationManager.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$station_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/StationResource/RelationManagers/SingleGasMetersRelationManager.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>par_quantity" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/StationResource/RelationManagers/StationInventoryItemsRelationManager.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>unit_label" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 4
+			path: app/Filament/Resources/StationResource/RelationManagers/StationInventoryItemsRelationManager.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Resources/StationResource/RelationManagers/Under25kProjectsRelationManager.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$role\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/TodoResource/Pages/ViewTodo.php
+
+		-
+			message: '#^Cannot access property \$id on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Filament/Resources/TodoResource/Pages/ViewTodo.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$isAdmin\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>isAdmin" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>value" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 4
+			path: app/Filament/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$isAdmin\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Under25kProjectResource/RelationManagers/UpdatesRelationManager.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>isAdmin" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/Under25kProjectResource/RelationManagers/UpdatesRelationManager.php
+
+		-
+			message: '#^Call to function method_exists\(\) with App\\Models\\User and ''assignRole'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Filament/Resources/Workgroup/Pages/CreateWorkgroupMember.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$workgroup_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Resources/Workgroup/RelationManagers/AttendanceRelationManager.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:attendees\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Filament/Resources/Workgroup/RelationManagers/AttendanceRelationManager.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Workgroup/WorkgroupMemberResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Workgroup/WorkgroupSessionResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/Workgroup/WorkgroupSessionResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$role\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Training/Resources/TrainingTodoResource/Pages/ViewTrainingTodo.php
+
+		-
+			message: '#^Cannot access property \$id on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Filament/Training/Resources/TrainingTodoResource/Pages/ViewTrainingTodo.php
+
+		-
+			message: '#^Comparison operation "\>" between 0 and 0 is always false\.$#'
+			identifier: greater.alwaysFalse
+			count: 2
+			path: app/Filament/Widgets/FireEquipmentStatsWidget.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Filament/Widgets/InventoryOverviewWidget.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Filament/Widgets/InventorySuppliesWidget.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$full_location\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Widgets/InventorySuppliesWidget.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\EquipmentItem\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Filament/Widgets/InventorySuppliesWidget.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>full_location" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Widgets/InventorySuppliesWidget.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ProjectMilestone\:\:\$capitalProject\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Widgets/PriorityNotificationsWidget.php
+
+		-
+			message: '#^Offset ''critical''\|''high'' on array\{critical\: 0, high\: 1, medium\: 2\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Filament/Widgets/PriorityNotificationsWidget.php
+
+		-
+			message: '#^Relation ''capitalProject'' is not found in App\\Models\\ProjectMilestone model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Filament/Widgets/PriorityNotificationsWidget.php
+
+		-
+			message: '#^Relation ''capitalProject'' is not found in App\\Models\\ProjectUpdate model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Filament/Widgets/RecentProjectUpdatesWidget.php
+
+		-
+			message: '#^Relation ''user'' is not found in App\\Models\\ProjectUpdate model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Filament/Widgets/RecentProjectUpdatesWidget.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$make\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$model\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$unit_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Apparatus\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\EquipmentItem\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusDefect model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Relation ''apparatus'' is not found in App\\Models\\ShopWork model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Relation ''inspections'' is not found in App\\Models\\Apparatus model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Relation ''milestones'' is not found in App\\Models\\CapitalProject model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Relation ''updates'' is not found in App\\Models\\CapitalProject model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''completed''\|''in_progress''\|''on_hold''\|''pending''\|App\\Enums\\ProjectStatus and ''at_risk'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>unit_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Filament/Widgets/SmartUpdatesWidget.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Widgets/StationOperationsHubWidget.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<\(int\|string\),mixed\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: app/Filament/Widgets/StationOperationsHubWidget.php
+
+		-
+			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusDefect model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Filament/Widgets/StationOperationsHubWidget.php
+
+		-
+			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusInspection model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Filament/Widgets/StationOperationsHubWidget.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>designation" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Filament/Widgets/StationOperationsHubWidget.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Filament/Widgets/StationOperationsHubWidget.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>unit_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Filament/Widgets/StationOperationsHubWidget.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 6
+			path: app/Filament/Widgets/UpcomingMilestonesWidget.php
+
+		-
+			message: '#^Relation ''capitalProject'' is not found in App\\Models\\ProjectMilestone model\.$#'
+			identifier: larastan.relationExistence
+			count: 2
+			path: app/Filament/Widgets/UpcomingMilestonesWidget.php
+
+		-
+			message: '#^Ternary operator condition is always true\.$#'
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: app/Filament/Widgets/UpcomingMilestonesWidget.php
+
+		-
+			message: '#^Undefined variable\: \$this$#'
+			identifier: variable.undefined
+			count: 6
+			path: app/Filament/Workgroup/Exports/WorkgroupCompletionStatusExporter.php
+
+		-
+			message: '#^Undefined variable\: \$this$#'
+			identifier: variable.undefined
+			count: 3
+			path: app/Filament/Workgroup/Exports/WorkgroupFinalistsExporter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$max_score\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Exports/WorkgroupScoresExporter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Exports/WorkgroupScoresExporter.php
+
+		-
+			message: '#^Anonymous function never returns float so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 6
+			path: app/Filament/Workgroup/Exports/WorkgroupScoresExporter.php
+
+		-
+			message: '#^Undefined variable\: \$this$#'
+			identifier: variable.undefined
+			count: 2
+			path: app/Filament/Workgroup/Exports/WorkgroupScoresExporter.php
+
+		-
+			message: '#^Call to an undefined static method Filament\\Pages\\Page\:\:mount\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Filament/Workgroup/Pages/AdminDashboard.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Pages/Dashboard.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Pages/Dashboard.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:files\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Filament/Workgroup/Pages/Dashboard.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:sessions\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Filament/Workgroup/Pages/Dashboard.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Workgroup/Pages/Dashboard.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Filament/Workgroup/Pages/Dashboard.php
+
+		-
+			message: '#^Property App\\Filament\\Workgroup\\Pages\\EvaluationFormPage\:\:\$notes \(array\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: app/Filament/Workgroup/Pages/EvaluationFormPage.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>manufacturer" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Workgroup/Pages/EvaluationFormPage.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>model" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Workgroup/Pages/EvaluationFormPage.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Workgroup/Pages/EvaluationFormPage.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:sessions\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Filament/Workgroup/Pages/Evaluations.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: app/Filament/Workgroup/Pages/Evaluations.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Workgroup/Pages/Evaluations.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\WorkgroupMember\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Workgroup/Pages/Evaluations.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Pages/Files.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:sessions\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Filament/Workgroup/Pages/Files.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\WorkgroupNote\:\:\$is_shared\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Workgroup/Pages/Notes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\WorkgroupNote\:\:\$shared_with_user_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Workgroup/Pages/Notes.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Workgroup/Pages/Notes.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:sessions\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Filament/Workgroup/Pages/Notes.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Filament/Workgroup/Pages/Notes.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\WorkgroupMember\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Workgroup/Pages/Notes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Pages/Profile.php
+
+		-
+			message: '#^Anonymous function has an unused use \$sessionId\.$#'
+			identifier: closure.unusedUse
+			count: 1
+			path: app/Filament/Workgroup/Pages/SessionResultsPage.php
+
+		-
+			message: '#^Anonymous function should return non\-empty\-array but returns non\-empty\-array\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Filament/Workgroup/Pages/SessionResultsPage.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Filament/Workgroup/Pages/SessionResultsPage.php
+
+		-
+			message: '#^Instanceof between Illuminate\\Support\\Collection and Illuminate\\Support\\Collection will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Filament/Workgroup/Pages/SessionResultsPage.php
+
+		-
+			message: '#^Offset ''brand_overall'' on array\{cutoff_saws\: array, t1_standalone\: array\|null, brand_overall\: array, spreaders\: array, cutters\: array, rams\: array\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Filament/Workgroup/Pages/SessionResultsPage.php
+
+		-
+			message: '#^Offset ''competitor_group…'' on array\{workgroup_id\: int, workgroup_name\: string, session_id\: int\|null, session_name\: string\|null, brand_aggregated_rankings\: array, competitor_group_rankings\: array, isolated_products\: array, standard_category_rankings\: array, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Filament/Workgroup/Pages/SessionResultsPage.php
+
+		-
+			message: '#^Offset ''isolated_products'' on array\{workgroup_id\: int, workgroup_name\: string, session_id\: int\|null, session_name\: string\|null, brand_aggregated_rankings\: array, competitor_group_rankings\: array, isolated_products\: array, standard_category_rankings\: array, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Filament/Workgroup/Pages/SessionResultsPage.php
+
+		-
+			message: '#^Offset ''non_rankable…'' on array\{workgroup_id\: int, workgroup_name\: string, session_id\: int\|null, session_name\: string\|null, brand_aggregated_rankings\: array, competitor_group_rankings\: array, isolated_products\: array, standard_category_rankings\: array, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Filament/Workgroup/Pages/SessionResultsPage.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<\(int\|string\),mixed\>\:\:map\(\) expects callable\(mixed, int\|string\)\: non\-empty\-array, Closure\(mixed\)\: non\-empty\-array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Workgroup/Pages/SessionResultsPage.php
+
+		-
+			message: '#^Parameter \#1 \$value of function collect contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Filament/Workgroup/Pages/SessionResultsPage.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Filament/Workgroup/Pages/SharedUploads.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:sessions\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Filament/Workgroup/Pages/SharedUploads.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$comment\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Widgets/NonRankableFeedbackWidget.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$manufacturer\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Widgets/NonRankableFeedbackWidget.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$model\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Widgets/NonRankableFeedbackWidget.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Widgets/NonRankableFeedbackWidget.php
+
+		-
+			message: '#^Parameter \#1 \$condition of method Filament\\Tables\\Table\:\:paginated\(\) expects array\<int\|string\>\|bool\|Closure, 10 given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Workgroup/Widgets/NonRankableFeedbackWidget.php
+
+		-
+			message: '#^Relation ''category'' is not found in App\\Models\\EvaluationSubmission model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Filament/Workgroup/Widgets/NonRankableFeedbackWidget.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Widgets/SessionProgressWidget.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Workgroup/Widgets/SessionProgressWidget.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Widgets/WorkgroupStatsWidget.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Workgroup/Widgets/WorkgroupStatsWidget.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:files\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Filament/Workgroup/Widgets/WorkgroupStatsWidget.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:sessions\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Filament/Workgroup/Widgets/WorkgroupStatsWidget.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Filament/Workgroup/Widgets/WorkgroupStatsWidget.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/LookupController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$unit_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Admin/LookupController.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Http/Controllers/Api/Admin/LookupController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Apparatus\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Admin/LookupController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Api/AdminMetricsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$full_location\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AdminMetricsController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\EquipmentItem\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/AdminMetricsController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>full_location" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/AdminMetricsController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ApparatusInspection\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\ApparatusInspection\>\:\:\$apparatus\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/ApparatusController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Apparatus\>\:\:\$openDefects\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/ApparatusController.php
+
+		-
+			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusInspection model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/ApparatusController.php
+
+		-
+			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Api/Bid/CredentialsController.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between int\<1, max\> and 0 will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Http/Controllers/Api/Bid/CredentialsController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/BigTicketRequestController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$guard_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/DatabaseAuditController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/DatabaseAuditController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$permissions\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/DatabaseAuditController.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Controllers\\Api\\DatabaseAuditController\:\:middleware\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/DatabaseAuditController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\User\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: app/Http/Controllers/Api/DatabaseAuditController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/DatabaseAuditController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Api/InventoryChatController.php
+
+		-
+			message: '#^Method App\\Models\\EquipmentItem\:\:decreaseStock\(\) invoked with 3 parameters, 0\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: app/Http/Controllers/Api/InventoryChatController.php
+
+		-
+			message: '#^Method App\\Models\\EquipmentItem\:\:increaseStock\(\) invoked with 3 parameters, 0\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: app/Http/Controllers/Api/InventoryChatController.php
+
+		-
+			message: '#^Method App\\Models\\EquipmentItem\:\:setStock\(\) invoked with 3 parameters, 1\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: app/Http/Controllers/Api/InventoryChatController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\EquipmentItem\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: app/Http/Controllers/Api/InventoryChatController.php
+
+		-
+			message: '#^Anonymous function should return Illuminate\\Support\\Collection\<int, array\{id\: mixed, label\: mixed, side\: mixed, dimensions\: mixed, shelfType\: mixed, shelfCount\: mixed, hasPegboard\: mixed, pegboardFaces\: mixed, \.\.\.\}\> but returns Illuminate\\Support\\Collection\<int, array\{id\: mixed, label\: mixed, side\: mixed, dimensions\: mixed, shelfType\: mixed, shelfCount\: mixed, hasPegboard\: mixed, pegboardFaces\: mixed, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Api/Public/ApparatusLayout/ApparatusLayoutController.php
+
+		-
+			message: '#^Anonymous function should return Illuminate\\Support\\Collection\<int, array\{id\: mixed, name\: mixed, category\: mixed, dimensions\: mixed, weight\: mixed, canRotate\: mixed, requiresClearance\: mixed, clearanceDepth\: mixed, \.\.\.\}\> but returns Illuminate\\Support\\Collection\<int, array\{id\: mixed, name\: mixed, category\: mixed, dimensions\: mixed, weight\: mixed, canRotate\: mixed, requiresClearance\: mixed, clearanceDepth\: mixed, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Api/Public/ApparatusLayout/ApparatusLayoutController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Station\:\:\$latitude\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Station\:\:\$longitude\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$actual_completion_date\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$apparatus_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$assigned_to\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$capacity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$currentDefects\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$designation\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$floor\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 9
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$priority\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$project_number\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$start_date\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$station_id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$target_completion_date\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$unit_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$vehicle_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Relations\\HasMany\:\:active\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 5
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusInspection model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/Api/StationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$station_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StationInventoryController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/StationInventoryController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/StationInventoryController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$par_quantity\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$par_units\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$sku\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$unit_label\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
+
+		-
+			message: '#^Anonymous function should return array\{category\: \(int\|string\), items\: Illuminate\\Support\\Collection\<int, array\{id\: mixed, inventory_item_id\: mixed, name\: mixed, sku\: mixed, unit_label\: mixed, par_quantity\: mixed, par_units\: mixed, on_hand\: mixed, \.\.\.\}\>\} but returns array\{category\: \(int\|string\), items\: Illuminate\\Support\\Collection\<int, array\{id\: mixed, inventory_item_id\: mixed, name\: mixed, sku\: mixed, unit_label\: mixed, par_quantity\: mixed, par_units\: mixed, on_hand\: mixed, \.\.\.\}\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\StationInventoryItem\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Http/Controllers/Api/SupportChatProxyController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/TrtInventoryController.php
+
+		-
+			message: '#^Anonymous function should return array\{category\: \(int\|string\), items\: Illuminate\\Support\\Collection\<int, array\{id\: mixed, name\: mixed, category\: mixed, expected_quantity\: mixed, sort_order\: mixed\}\>\} but returns array\{category\: \(int\|string\), items\: Illuminate\\Support\\Collection\<int, array\{id\: mixed, name\: mixed, category\: mixed, expected_quantity\: mixed, sort_order\: mixed\}\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Api/TrtInventoryController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\TrtInventoryEntry\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/TrtInventoryController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/TrtInventoryController.php
+
+		-
+			message: '#^Offset 0 on array\<string, mixed\> on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/CspReportController.php
+
+		-
+			message: '#^Offset ''calculated_totals'' on string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Employee/OperationalForms/FormGenerationController.php
+
+		-
+			message: '#^Parameter \#1 \$document of method App\\Http\\Controllers\\Employee\\OperationalForms\\FormGenerationController\:\:serializeDocument\(\) expects App\\Models\\OperationalFormDocument, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Employee/OperationalForms/FormGenerationController.php
+
+		-
+			message: '#^Parameter \#2 \$data of method App\\Services\\OperationalForms\\FormDataValidator\:\:validate\(\) expects array, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Employee/OperationalForms/FormGenerationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$result\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Employee/OperationalForms/FormRecordController.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 3
+			path: app/Http/Controllers/Employee/OperationalForms/FormRecordController.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: string$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Http/Controllers/Employee/OperationalForms/FormRecordController.php
+
+		-
+			message: '#^Comparison operation "\<\=" between 1\|2 and 2 is always true\.$#'
+			identifier: smallerOrEqual.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/IncidentsController.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Http/Controllers/IncidentsController.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Http/Controllers/ReportExportController.php
+
+		-
+			message: '#^Parameter \#1 \$workgroup of method App\\Services\\Workgroup\\WorkgroupAIService\:\:generateExecutiveReport\(\) expects App\\Models\\Workgroup, App\\Models\\WorkgroupSession given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Workgroup/WorkgroupAIController.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$assignment\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$class_description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$current_engine_hours\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$current_location\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$current_miles\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$designation\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$last_pm_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$last_pm_engine_hours\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$last_pm_mileage\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$last_service_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$last_service_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$make\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$mileage\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$model\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$pm_interval_hours\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$pm_interval_miles\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$reported_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$snipeit_asset_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$snipeit_asset_tag\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$station_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$unit_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$vehicle_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$vin\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$year\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/ApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$actual_completion\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$approved_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$approved_by\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$budget\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$estimated_completion\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$is_approved\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$priority\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$project_manager\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$project_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$spent\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$start_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$station_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\CapitalProjectResource\:\:\$vendor\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/CapitalProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusInspectionResource\:\:\$apparatus\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Resources/Public/PublicApparatusInspectionResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusInspectionResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicApparatusInspectionResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusInspectionResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicApparatusInspectionResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusInspectionResource\:\:\$shift\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicApparatusInspectionResource.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Resources\\Public\\PublicApparatusInspectionResource\:\:defects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicApparatusInspectionResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$currentDefects\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$designation\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$unit_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/Public/PublicApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$vehicle_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicApparatusResource.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Resources\\Public\\PublicApparatusResource\:\:relationLoaded\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicApparatusResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicEquipmentRequestResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicEquipmentRequestResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicEquipmentRequestResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicEquipmentRequestResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicEquipmentRequestResource\:\:\$equipment_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicEquipmentRequestResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicEquipmentRequestResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicEquipmentRequestResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicEquipmentRequestResource\:\:\$priority\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicEquipmentRequestResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicEquipmentRequestResource\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicEquipmentRequestResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicGasMeterResource\:\:\$activation_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicGasMeterResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicGasMeterResource\:\:\$apparatus\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Resources/Public/PublicGasMeterResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicGasMeterResource\:\:\$expiration_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicGasMeterResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicGasMeterResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicGasMeterResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicGasMeterResource\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicGasMeterResource.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Resources\\Public\\PublicGasMeterResource\:\:daysUntilExpiration\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicGasMeterResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicProjectResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicProjectResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/Public/PublicProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicProjectResource\:\:\$priority\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicProjectResource\:\:\$project_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicProjectResource\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicProjectResource\:\:\$target_completion_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicRoomAssetResource\:\:\$category\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicRoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicRoomAssetResource\:\:\$condition\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicRoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicRoomAssetResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicRoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicRoomAssetResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicRoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicRoomAssetResource\:\:\$quantity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicRoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicRoomAssetResource\:\:\$room_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicRoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicRoomResource\:\:\$capacity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicRoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicRoomResource\:\:\$floor\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicRoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicRoomResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicRoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicRoomResource\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicRoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicRoomResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicRoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicRoomResource\:\:\$station_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicRoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicStationInspectionResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicStationInspectionResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$inspection_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicStationInspectionResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$inspection_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicStationInspectionResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$overall_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicStationInspectionResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicStationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationResource\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicStationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicStationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationResource\:\:\$station_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicStationResource.php
+
+		-
+			message: '#^Call to an undefined method App\\Http\\Resources\\Public\\PublicStationResource\:\:getRawOriginal\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Resources/Public/PublicStationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$asset_tag\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$category\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$condition\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$location_within_room\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$manufacturer\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$model_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$purchase_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$purchase_price\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$quantity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$room_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$serial_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$unit\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAssetResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAssetResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$actual_quantity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$condition_found\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$discrepancy\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$expected_quantity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$finding_description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$finding_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$item_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$resolution_notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$resolved_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$resolved_by\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$room_asset_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$room_audit_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditItemResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditItemResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditResource\:\:\$audit_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditResource\:\:\$auditor_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditResource\:\:\$completed_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditResource\:\:\$findings_summary\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditResource\:\:\$notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditResource\:\:\$room_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditResource\:\:\$scheduled_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditResource\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomAuditResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomAuditResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomResource\:\:\$capacity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomResource\:\:\$floor\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomResource\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomResource\:\:\$notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomResource\:\:\$room_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomResource\:\:\$station_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\RoomResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/RoomResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\StationResource\:\:\$address\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/StationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\StationResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/StationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\StationResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/StationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\StationResource\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/StationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\StationResource\:\:\$latitude\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/StationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\StationResource\:\:\$longitude\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/StationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\StationResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/StationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\StationResource\:\:\$notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/StationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\StationResource\:\:\$phone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/StationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\StationResource\:\:\$station_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/StationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\StationResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/StationResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$actual_completion\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$approved_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$approved_by\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$budget\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$estimated_completion\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$is_approved\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$priority\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$project_lead\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$project_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$spent\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$start_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$station_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$vendor\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>employee_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Jobs/AuditEquipmentAfterInspection.php
+
+		-
+			message: '#^Offset ''fp'' on array\{fp\: string, summary\: array, at\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/GenerateCommandCenterSummaryJob.php
+
+		-
+			message: '#^Parameter \#1 \$record of method App\\Services\\OperationalForms\\PdfGenerationService\:\:generate\(\) expects App\\Models\\OperationalFormRecord, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Jobs/GenerateOperationalFormPdf.php
+
+		-
+			message: '#^Parameter \#2 \$employee of method App\\Services\\OperationalForms\\PdfGenerationService\:\:generate\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Jobs/GenerateOperationalFormPdf.php
+
+		-
+			message: '#^Offset ''hours_since_pm'' does not exist on array\{status\: string, hours\: float, miles\: int, overdue\: bool\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Jobs/PmAlertNotificationJob.php
+
+		-
+			message: '#^Offset ''interval_hours'' does not exist on array\{status\: string, hours\: float, miles\: int, overdue\: bool\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Jobs/PmAlertNotificationJob.php
+
+		-
+			message: '#^Method App\\Models\\Apparatus\:\:getPmHealthStatus\(\) should return array\{status\: string, hours\: float, miles\: int, overdue\: bool\} but returns array\{status\: ''green''\|''red''\|''yellow'', hours_since_pm\: float, miles_since_pm\: int, overdue\: bool, interval_hours\: int, last_pm_date\: non\-falsy\-string\|null\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Apparatus.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\CapitalProject\:\:\$actual_completion_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/CapitalProject.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/EquipmentItem.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$max_score\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/EvaluationScore.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$weight\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/EvaluationScore.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$criterion\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/EvaluationSubmission.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$score\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/EvaluationSubmission.php
+
+		-
+			message: '#^Method App\\Models\\EvaluationSubmission\:\:getCategoryScore\(\) should return float\|null but returns string\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/EvaluationSubmission.php
+
+		-
+			message: '#^Method App\\Models\\EvaluationSubmission\:\:getTotalScoreAttribute\(\) should return float\|null but returns string\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/EvaluationSubmission.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 1
+			path: app/Models/SingleGasMeter.php
+
+		-
+			message: '#^Negated boolean expression is always false\.$#'
+			identifier: booleanNot.alwaysFalse
+			count: 2
+			path: app/Models/SingleGasMeter.php
+
+		-
+			message: '#^Class App\\Models\\Personnel not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Models/Station.php
+
+		-
+			message: '#^Parameter \#1 \$related of method Illuminate\\Database\\Eloquent\\Model\:\:hasMany\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/Station.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$effective_low_threshold\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/StationInventoryItem.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$par_quantity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/StationInventoryItem.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/WorkgroupMember.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/WorkgroupMember.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ApparatusDefect\:\:\$apparatus\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Observers/ApparatusDefectObserver.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$apparatus\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Observers/ApparatusDefectObserver.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$item\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Observers/ApparatusDefectObserver.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Observers/ApparatusDefectObserver.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string\|null and int will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 2
+			path: app/Policies/TodoPolicy.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$station_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>designation" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>station_number" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Services/CloudflareAIService.php
+
+		-
+			message: '#^Method Illuminate\\Http\\Client\\Response\:\:header\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: app/Services/CloudflareAIService.php
+
+		-
+			message: '#^Parameter \#3 \$ttl of static method Illuminate\\Cache\\Repository\:\:put\(\) expects DateInterval\|DateTimeInterface\|int\|null, float given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/CloudflareAIService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$make\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$model\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$unit_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Offset ''fp'' on array\{fp\: string, summary\: array, at\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Apparatus\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\EquipmentItem\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusDefect model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Relation ''apparatus'' is not found in App\\Models\\ShopWork model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Relation ''inspections'' is not found in App\\Models\\Apparatus model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Relation ''milestones'' is not found in App\\Models\\CapitalProject model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Relation ''updates'' is not found in App\\Models\\CapitalProject model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''completed''\|''in_progress''\|''on_hold''\|''pending''\|App\\Enums\\ProjectStatus and ''at_risk'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>unit_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/CommandCenterAiService.php
+
+		-
+			message: '#^Offset ''brief'' on array\{fp\: string, brief\: array\<string, mixed\>, at\: string\} in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: app/Services/Display/DisplayAiService.php
+
+		-
+			message: '#^Offset ''brief'' on array\{fp\: string, brief\: array\<string, mixed\>, at\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Display/DisplayAiService.php
+
+		-
+			message: '#^Offset ''fp'' on array\{fp\: string, brief\: array\<string, mixed\>, at\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Display/DisplayAiService.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\{0\: ''No apparatus…''\|non\-falsy\-string, 1\: non\-falsy\-string, 2\: ''No pending…''\|non\-falsy\-string, 3\?\: non\-falsy\-string, 4\?\: non\-falsy\-string, 5\?\: non\-falsy\-string, 6\?\: non\-falsy\-string\}\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Services/Display/DisplayReadiness.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$openDefects\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$unit_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ApparatusDefect\:\:\$apparatus\.$#'
+			identifier: property.notFound
+			count: 6
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ApparatusInspection\:\:\$apparatus\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
+			identifier: property.notFound
+			count: 8
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Station\:\:\$latitude\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Station\:\:\$longitude\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$full_location\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 2
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Offset ''hours_since_pm'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Offset ''interval_hours'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Offset ''last_pm_date'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Offset ''miles_since_pm'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Offset ''overdue'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Offset ''status'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Parameter \#1 \$apparatus of method App\\Services\\Display\\DisplaySnapshotService\:\:classifyApparatusCollection\(\) expects Illuminate\\Support\\Collection\<int, App\\Models\\Apparatus\>, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\> given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Parameter \#1 \$apparatus of method App\\Services\\Display\\DisplaySnapshotService\:\:redactedApparatus\(\) expects Illuminate\\Support\\Collection\<int, App\\Models\\Apparatus\>, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\> given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\EquipmentItem\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,App\\Models\\Apparatus\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,App\\Models\\Station\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusDefect model\.$#'
+			identifier: larastan.relationExistence
+			count: 2
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusInspection model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>full_location" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/Display/DisplaySnapshotService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/EquipmentMatchingService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$station_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/GoogleSheets/ApparatusSheetSyncService.php
+
+		-
+			message: '#^Offset ''response'' on array\{response\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/LocalAIService.php
+
+		-
+			message: '#^Offset ''sender'' on array\{timestamp\: DateTimeImmutable\|null, date_known\: bool, sender\: string, text\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/OperationalForms/FrocImportService.php
+
+		-
+			message: '#^Offset ''text'' on array\{timestamp\: DateTimeImmutable\|null, date_known\: bool, sender\: string, text\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/OperationalForms/FrocImportService.php
+
+		-
+			message: '#^Parameter \#1 \$data of method App\\Services\\OperationalForms\\FrocImportMergeService\:\:merge\(\) expects array, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/OperationalForms/FrocRecordImportService.php
+
+		-
+			message: '#^Offset 1 on array\{0\: non\-empty\-string, 1\: ''''\|''\-'', 2\: numeric\-string, 3\?\: numeric\-string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/OperationalForms/FrocTotalsCalculator.php
+
+		-
+			message: '#^Call to function method_exists\(\) with ZipArchive and ''getExternalAttribut…'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/OperationalForms/FrocZipReader.php
+
+		-
+			message: '#^Call to function method_exists\(\) with ZipArchive and ''getStreamIndex'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/OperationalForms/FrocZipReader.php
+
+		-
+			message: '#^Offset ''comp_size'' on array\{name\: string, index\: int, crc\: int, size\: int, mtime\: int, comp_size\: int, comp_method\: int, encryption_method\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/OperationalForms/FrocZipReader.php
+
+		-
+			message: '#^Offset ''external_attrs'' on array\<int, mixed\> on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/OperationalForms/FrocZipReader.php
+
+		-
+			message: '#^Offset ''name'' on array\{name\: string, index\: int, crc\: int, size\: int, mtime\: int, comp_size\: int, comp_method\: int, encryption_method\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/OperationalForms/FrocZipReader.php
+
+		-
+			message: '#^Offset ''size'' on array\{name\: string, index\: int, crc\: int, size\: int, mtime\: int, comp_size\: int, comp_method\: int, encryption_method\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/OperationalForms/FrocZipReader.php
+
+		-
+			message: '#^Parameter \#3 \$stat of method App\\Services\\OperationalForms\\FrocZipReader\:\:isSymlink\(\) expects array\<int, mixed\>, array\<string, int\|string\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/OperationalForms/FrocZipReader.php
+
+		-
+			message: '#^Parameter \#4 \$stat of method App\\Services\\OperationalForms\\FrocZipReader\:\:isDirectory\(\) expects array\<int, mixed\>, array\<string, int\|string\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/OperationalForms/FrocZipReader.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between 0 and 0 will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: app/Services/OperationalForms/FrocZipReader.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Services/OperationalForms/FrocZipReader.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/OperationalForms/OperationalFormDeletionService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$source_revision\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/OperationalForms/OperationalFormDeletionService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$version_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/OperationalForms/OperationalFormDeletionService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{disk\: string, path\: string\}, Closure\(App\\Models\\OperationalFormDocument\)\: array\{disk\: string, path\: string\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/OperationalForms/OperationalFormDeletionService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$result\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/OperationalForms/OperationalFormRecordPresenter.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Services/OperationalForms/OperationalFormRecordPresenter.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array, Closure\(App\\Models\\OperationalFormDocument\)\: array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/OperationalForms/OperationalFormRecordPresenter.php
+
+		-
+			message: '#^Parameter \#1 \$document of method App\\Services\\OperationalForms\\PdfGenerationService\:\:metadataFromDocument\(\) expects App\\Models\\OperationalFormDocument, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/OperationalForms/PdfGenerationService.php
+
+		-
+			message: '#^Parameter \#2 \$data of method App\\Services\\OperationalForms\\FormDataValidator\:\:validate\(\) expects array, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/OperationalForms/PdfGenerationService.php
+
+		-
+			message: '#^Ternary operator condition is always true\.$#'
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: app/Services/OperationalForms/PdfGenerationService.php
+
+		-
+			message: '#^Parameter \#3 \$ttl of static method Illuminate\\Cache\\Repository\:\:put\(\) expects DateInterval\|DateTimeInterface\|int\|null, float given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/RateLimitService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$candidateProduct\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$category\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$comments\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$criterion\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$member\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$overall_score\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$score\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$submitted_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Anonymous function has an unused use \$category\.$#'
+			identifier: closure.unusedUse
+			count: 1
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\CandidateProduct\>\>\:\:filter\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\CandidateProduct\>, int\|string\)\: bool\)\|null, Closure\(mixed\)\: \(string\|null\) given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Workgroup/EvaluationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$advance_recommendation\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Workgroup/WorkgroupAIService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/Workgroup/WorkgroupAIService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$role\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Workgroup/WorkgroupAIService.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 2
+			path: app/Services/Workgroup/WorkgroupAIService.php
+
+		-
+			message: '#^Offset 0 on array\{list\<string\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Services/Workgroup/WorkgroupAIService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Services/Workgroup/WorkgroupAIService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>role" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Workgroup/WorkgroupAIService.php

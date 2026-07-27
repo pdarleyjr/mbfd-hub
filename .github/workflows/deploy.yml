@@ -82,6 +82,8 @@ jobs:
       - name: Pre-deploy backup
         run: |
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          # TIMESTAMP intentionally expands on the runner; remote values remain escaped.
+          # shellcheck disable=SC2029
           ssh deploy-target "
             PG=\$(docker ps --format '{{.Names}}' | grep pgsql | head -1)
             if [ -n \"\$PG\" ]; then
@@ -258,4 +260,6 @@ jobs:
           test_url "Snipe-IT"             "https://inventory.mbfdhub.com"  "200"
           echo ""
           echo "=== Results: $PASS passed, $FAIL failed ==="
-          [ "$FAIL" -gt 0 ] && exit 1 || true
+          if [ "$FAIL" -gt 0 ]; then
+            exit 1
+          fi
