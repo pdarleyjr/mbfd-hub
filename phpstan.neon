@@ -1,6 +1,9 @@
 includes:
     - vendor/larastan/larastan/extension.neon
 
+includes:
+    - phpstan-baseline.neon
+
 parameters:
     level: 5
     paths:

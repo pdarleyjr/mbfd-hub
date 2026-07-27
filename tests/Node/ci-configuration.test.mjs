@@ -27,14 +27,19 @@ test("every Dependabot package directory contains its ecosystem manifest", () =>
   assert.deepEqual(missing, []);
 });
 
-test("PHPStan executes without shell-level suppression", () => {
+test("PHPStan is a hard gate backed by a reviewed baseline", () => {
   const workflow = readFileSync(resolve(root, ".github/workflows/06-static-analysis.yml"), "utf8");
+  const config = readFileSync(resolve(root, "phpstan.neon"), "utf8");
   const phpstanCommand = workflow
     .split(/\r?\n/)
     .find((line) => line.includes("vendor/bin/phpstan"));
 
   assert.ok(phpstanCommand, "static-analysis workflow must invoke PHPStan");
   assert.doesNotMatch(phpstanCommand, /\|\|\s*true\b/);
+  assert.doesNotMatch(workflow, /continue-on-error:\s*(?:true|["']true["'])\b/);
+  assert.doesNotMatch(phpstanCommand, /--generate-baseline(?:=|\s)/);
+  assert.match(config, /includes:\s*\n\s+-\s+phpstan-baseline\.neon\b/);
+  assert.ok(existsSync(resolve(root, "phpstan-baseline.neon")));
 });
 
 test("missing PHPStan exclude paths are explicitly optional", () => {
