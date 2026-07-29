@@ -178,15 +178,26 @@ self.addEventListener('push', function (event) {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
+function sameOriginNavigation(value, fallback) {
+  try {
+    const candidate = new URL(String(value || fallback), self.location.origin);
+    if (candidate.origin !== self.location.origin) return fallback;
+    return candidate.pathname + candidate.search + candidate.hash;
+  } catch {
+    return fallback;
+  }
+}
+
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
 
   const data = event.notification.data || {};
-  let urlToOpen = data.url || '/admin';
+  let requestedUrl = data.url || '/admin';
 
-  if (event.action === 'open-chat' || urlToOpen.includes('/chat')) {
-    urlToOpen = data.url || '/admin/chat';
+  if (event.action === 'open-chat' || requestedUrl.includes('/chat')) {
+    requestedUrl = data.url || '/admin/chat';
   }
+  const urlToOpen = sameOriginNavigation(requestedUrl, '/admin');
 
   event.waitUntil(
     clients
@@ -194,7 +205,7 @@ self.addEventListener('notificationclick', function (event) {
       .then(function (clientList) {
         for (let i = 0; i < clientList.length; i++) {
           const client = clientList[i];
-          if (client.url.includes(self.location.origin) && 'focus' in client) {
+          if (new URL(client.url).origin === self.location.origin && 'focus' in client) {
             client.navigate(urlToOpen);
             return client.focus();
           }
@@ -206,20 +217,31 @@ self.addEventListener('notificationclick', function (event) {
 
 // Message event - handle offline submission queue
 self.addEventListener('message', (event) => {
+  let sourceUrl;
+  try {
+    sourceUrl = new URL(event.source?.url || '');
+  } catch {
+    return;
+  }
+  if (sourceUrl.origin !== self.location.origin) return;
+  const replyPort = event.ports?.[0];
+
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
     return;
   }
 
   if (event.data?.type === 'QUEUE_SUBMISSION') {
-    event.ports[0].postMessage({
+    if (!replyPort) return;
+    replyPort.postMessage({
       type: 'QUEUE_STORED',
       success: true,
     });
   }
 
   if (event.data?.type === 'SYNC_QUEUE') {
-    event.ports[0].postMessage({
+    if (!replyPort) return;
+    replyPort.postMessage({
       type: 'SYNC_STARTED',
       success: true,
     });

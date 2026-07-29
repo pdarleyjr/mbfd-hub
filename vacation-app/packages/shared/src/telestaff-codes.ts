@@ -149,9 +149,13 @@ export function classifyDescription(
   // SKIP categories explicitly: caller should drop the row.
   if (category && SKIP_CATEGORIES.has(category as TelestaffCategory)) return null;
   // Heuristic on the prefix.
-  const m = /^(LV|OT|SP)\s*-\s*(.+)$/i.exec(description.trim());
-  if (!m) return null;
-  const tail = m[2]!.toLowerCase();
+  const normalized = description.trim();
+  const separator = normalized.indexOf('-');
+  if (separator < 1) return null;
+  const prefix = normalized.slice(0, separator).trim().toUpperCase();
+  if (prefix !== 'LV' && prefix !== 'OT' && prefix !== 'SP') return null;
+  const tail = normalized.slice(separator + 1).trim().toLowerCase();
+  if (!tail) return null;
   if (tail.includes('vacation')) return 'V';
   if (tail.includes('sick')) return 'S';
   if (tail.includes('floating') || tail.includes('floater')) return 'FH';

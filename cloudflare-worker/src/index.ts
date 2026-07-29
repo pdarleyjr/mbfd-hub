@@ -234,7 +234,7 @@ export default {
         return json({ success: true, source, chunks: ids.length, ids });
       } catch (e: any) {
         console.error('Ingest error:', e);
-        return json({ error: 'Ingest failed', detail: String(e?.message || e) }, 500);
+        return json({ error: 'Ingest failed' }, 500);
       }
     }
 
@@ -251,7 +251,7 @@ export default {
         return json({ success: true, deleted: ids.length });
       } catch (e: any) {
         console.error('Delete error:', e);
-        return json({ error: 'Delete failed', detail: String(e?.message || e) }, 500);
+        return json({ error: 'Delete failed' }, 500);
       }
     }
 
