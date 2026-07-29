@@ -35,18 +35,29 @@ self.addEventListener('push', function(event) {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
+function sameOriginNavigation(value, fallback) {
+  try {
+    const candidate = new URL(String(value || fallback), self.location.origin);
+    if (candidate.origin !== self.location.origin) return fallback;
+    return candidate.pathname + candidate.search + candidate.hash;
+  } catch {
+    return fallback;
+  }
+}
+
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   const data = event.notification.data || {};
-  let urlToOpen = data.url || '/admin';
-  if (event.action === 'open-chat' || urlToOpen.includes('/chat')) {
-    urlToOpen = data.url || '/admin/chat';
+  let requestedUrl = data.url || '/admin';
+  if (event.action === 'open-chat' || requestedUrl.includes('/chat')) {
+    requestedUrl = data.url || '/admin/chat';
   }
+  const urlToOpen = sameOriginNavigation(requestedUrl, '/admin');
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       for (let i = 0; i < clientList.length; i++) {
         const client = clientList[i];
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
+        if (new URL(client.url).origin === self.location.origin && 'focus' in client) {
           client.navigate(urlToOpen);
           return client.focus();
         }
@@ -57,15 +68,23 @@ self.addEventListener('notificationclick', function(event) {
 });
 `;
 
-if (fs.existsSync(swPath)) {
-  const existing = fs.readFileSync(swPath, 'utf-8');
+let descriptor;
+try {
+  descriptor = fs.openSync(swPath, 'r+');
+  const existing = fs.readFileSync(descriptor, 'utf-8');
   if (!existing.includes("addEventListener('push'")) {
-    fs.appendFileSync(swPath, pushListeners);
+    fs.writeSync(descriptor, pushListeners, null, 'utf-8');
     console.log('[inject-push-sw] \u2713 Push listeners appended to sw.js');
   } else {
     console.log('[inject-push-sw] Push listeners already present, skipping.');
   }
-} else {
-  console.error('[inject-push-sw] \u2717 sw.js not found at', swPath);
-  process.exit(1);
+} catch (error) {
+  if (error?.code === 'ENOENT') {
+    console.error('[inject-push-sw] \u2717 sw.js not found at', swPath);
+    process.exitCode = 1;
+  } else {
+    throw error;
+  }
+} finally {
+  if (descriptor !== undefined) fs.closeSync(descriptor);
 }

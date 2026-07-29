@@ -12,7 +12,7 @@ if (import.meta.env.VITE_SENTRY_DSN) {
         integrations: [
             Sentry.browserTracingIntegration({
                 // Set sampling rate for performance monitoring
-                tracePropagationTargets: ["localhost", /^https:\/\/support\.darleyplex\.com/],
+                tracePropagationTargets: ["localhost", /^https:\/\/support\.darleyplex\.com(?:\/|$)/],
             }),
             Sentry.replayIntegration({
                 // Mask all text content for privacy

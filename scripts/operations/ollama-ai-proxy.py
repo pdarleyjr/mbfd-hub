@@ -2,15 +2,58 @@
 """Authenticated, loopback-only reverse proxy for the local Ollama API."""
 
 import http.server
+import hmac
+import ipaddress
 import json
 import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 
-UPSTREAM = os.environ.get("OLLAMA_PROXY_UPSTREAM", "http://127.0.0.1:11434")
+def validate_upstream(value: str) -> str:
+    """Accept one fixed HTTP loopback origin, never a request-selected host."""
+    parsed = urllib.parse.urlsplit(value)
+    if parsed.scheme != "http" or not parsed.hostname:
+        raise ValueError("OLLAMA_PROXY_UPSTREAM must be an HTTP loopback origin")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError("OLLAMA_PROXY_UPSTREAM must not contain credentials, query, or fragment")
+    if parsed.path not in ("", "/"):
+        raise ValueError("OLLAMA_PROXY_UPSTREAM must not contain a path")
+    if parsed.hostname != "localhost":
+        try:
+            if not ipaddress.ip_address(parsed.hostname).is_loopback:
+                raise ValueError("OLLAMA_PROXY_UPSTREAM must resolve to loopback")
+        except ValueError as error:
+            raise ValueError("OLLAMA_PROXY_UPSTREAM must resolve to loopback") from error
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise ValueError("OLLAMA_PROXY_UPSTREAM has an invalid port") from error
+    return urllib.parse.urlunsplit(("http", parsed.netloc, "", "", ""))
+
+
+def relative_request_target(value: str) -> str:
+    """Return one origin-form path/query and reject absolute or protocol-relative targets."""
+    parsed = urllib.parse.urlsplit(value)
+    if parsed.scheme or parsed.netloc or not parsed.path.startswith("/") or parsed.path.startswith("//"):
+        raise ValueError("request target must be a relative API path")
+    return urllib.parse.urlunsplit(("", "", parsed.path, parsed.query, ""))
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Ollama should not redirect; following redirects could escape loopback."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+UPSTREAM = validate_upstream(
+    os.environ.get("OLLAMA_PROXY_UPSTREAM", "http://127.0.0.1:11434")
+)
+OPENER = urllib.request.build_opener(NoRedirect)
 LISTEN_HOST = os.environ.get("OLLAMA_PROXY_HOST", "127.0.0.1")
 LISTEN_PORT = int(os.environ.get("OLLAMA_PROXY_PORT", "11440"))
 
@@ -33,7 +76,11 @@ def log(message: str) -> None:
 class Handler(http.server.BaseHTTPRequestHandler):
     def _check_auth(self) -> bool:
         authorization = self.headers.get("Authorization", "")
-        return authorization.startswith("Bearer ") and authorization[7:] == API_KEY
+        return bool(
+            API_KEY
+            and authorization.startswith("Bearer ")
+            and hmac.compare_digest(authorization[7:], API_KEY)
+        )
 
     def _send_json_error(self, status: int, message: str, error_type: str) -> None:
         data = json.dumps({"error": {"message": message, "type": error_type}}).encode()
@@ -57,16 +104,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if key.lower()
             not in ("host", "authorization", "content-length", "connection", "transfer-encoding")
         }
+        try:
+            target = relative_request_target(self.path)
+        except ValueError:
+            self._send_json_error(400, "Invalid request target", "invalid_request_error")
+            return
         request = urllib.request.Request(
-            UPSTREAM + self.path,
-            data=body,
-            method=method,
-            headers=headers,
+            f"{UPSTREAM}{target}", data=body, method=method, headers=headers
         )
         started = time.monotonic()
 
         try:
-            with urllib.request.urlopen(request, timeout=600) as response:
+            with OPENER.open(request, timeout=600) as response:
                 data = response.read()
                 self.send_response(response.status)
                 for key, value in response.headers.items():

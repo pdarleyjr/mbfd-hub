@@ -25,7 +25,7 @@ membersRoute.get('/members/search', async (c) => {
   const q = (c.req.query('q') ?? '').trim();
   const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 20), 1), 50);
   if (!q) return c.json({ matches: [] });
-  const like = `%${q.replace(/[%_]/g, '\\$&')}%`;
+  const like = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
 
   const rows = await db
     .select({
