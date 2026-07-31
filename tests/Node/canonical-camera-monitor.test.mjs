@@ -25,9 +25,10 @@ test('origin monitoring probes only the canonical Anpviz and Guest Computer stre
     assert.match(monitor, /"anpviz-audio", "\/hls\/anpviz-main\/audio2_stream\.m3u8"/);
     assert.match(monitor, /"guest-video", "\/hls\/guest-computer\/video1_stream\.m3u8"/);
     assert.match(monitor, /"guest-audio", "\/hls\/guest-computer\/audio2_stream\.m3u8"/);
-    assert.match(
-        monitor,
-        /https:\/\/cameras\.mbfdhub\.com\/hls\/anpviz-main\/index\.m3u8/,
+    assert.ok(
+        monitor.includes(
+            '"https://cameras.mbfdhub.com/hls/anpviz-main/index.m3u8"',
+        ),
     );
     assert.doesNotMatch(monitor, /\/hls\/cam[13]\//);
     assert.doesNotMatch(errorMonitor, /\/hls\/cam[13]\//);
