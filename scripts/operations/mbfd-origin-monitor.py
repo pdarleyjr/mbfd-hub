@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import http.cookiejar
 import json
 import os
 import re
@@ -26,6 +27,22 @@ STATUS_FILE = STATE_DIR / "status.json"
 EVENT_FILE = LOG_DIR / "events.jsonl"
 MAINTENANCE_DIR = Path("/run/mbfd-maintenance")
 COOLDOWN_SECONDS = 900
+
+
+class LoopbackCookiePolicy(http.cookiejar.DefaultCookiePolicy):
+    """Permit the proxy's Secure HLS cookie only on the trusted loopback port."""
+
+    def return_ok_secure(self, cookie: http.cookiejar.Cookie, request: Any) -> bool:
+        if cookie.secure and request.type not in self.secure_protocols:
+            return request.host in {"127.0.0.1:8120", "localhost:8120"}
+        return True
+
+
+HTTP_OPENER = urllib.request.build_opener(
+    urllib.request.HTTPCookieProcessor(
+        http.cookiejar.CookieJar(policy=LoopbackCookiePolicy())
+    )
+)
 
 BENIGN_PATTERNS = (
     "context canceled",
@@ -83,7 +100,7 @@ def fetch(url: str, timeout: float = 6.0, byte_range: bool = False) -> tuple[int
     request = urllib.request.Request(url, headers=headers)
     started = time.monotonic()
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with HTTP_OPENER.open(request, timeout=timeout) as response:
             body = response.read(1_000_000)
             return response.status, body, round((time.monotonic() - started) * 1000), ""
     except urllib.error.HTTPError as error:
@@ -291,17 +308,28 @@ def run() -> int:
 
     camera_probes: list[Probe] = []
     playlist_state: dict[str, Any] = {}
+    for name, url in (
+        ("anpviz-master", "http://127.0.0.1:8120/hls/anpviz-main/index.m3u8"),
+        ("guest-master", "http://127.0.0.1:8120/hls/guest-computer/index.m3u8"),
+    ):
+        # The master request establishes MediaMTX's path-scoped HLS cookies
+        # before the advancing video and audio playlists are inspected.
+        camera_probes.append(http_probe(name, "camera-hls", url))
     for name, path in (
-        ("cam1-video", "/hls/cam1/video1_stream.m3u8"),
-        ("cam1-audio", "/hls/cam1/audio2_stream.m3u8"),
-        ("cam3-video", "/hls/cam3/video1_stream.m3u8"),
-        ("cam3-audio", "/hls/cam3/audio2_stream.m3u8"),
+        ("anpviz-video", "/hls/anpviz-main/video1_stream.m3u8"),
+        ("anpviz-audio", "/hls/anpviz-main/audio2_stream.m3u8"),
+        ("guest-video", "/hls/guest-computer/video1_stream.m3u8"),
+        ("guest-audio", "/hls/guest-computer/audio2_stream.m3u8"),
     ):
         probe, marker = playlist_probe(name, path)
         camera_probes.append(probe)
         playlist_state[name] = marker
     camera_probes.append(
-        http_probe("camera-cloudflare", "camera-hls", "https://cameras.mbfdhub.com/hls/cam1/video1_stream.m3u8")
+        http_probe(
+            "camera-cloudflare",
+            "camera-hls",
+            "https://cameras.mbfdhub.com/hls/anpviz-main/index.m3u8",
+        )
     )
 
     services = state.setdefault("services", {})

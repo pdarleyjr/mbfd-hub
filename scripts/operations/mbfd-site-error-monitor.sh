@@ -262,7 +262,7 @@ case "${MODE}" in
     test-benign)
         test_file=$(mktemp)
         trap 'rm -f "${test_file}"' EXIT
-        echo 'ERR Request failed error="Incoming request ended abruptly: context canceled" dest=https://cameras.mbfdhub.com/hls/cam1/video1_stream.m3u8' > "${test_file}"
+        echo 'ERR Request failed error="Incoming request ended abruptly: context canceled" dest=https://cameras.mbfdhub.com/hls/anpviz-main/index.m3u8' > "${test_file}"
         if has_issue "${test_file}"; then
             echo "benign_classifier=fail" >&2
             exit 1
