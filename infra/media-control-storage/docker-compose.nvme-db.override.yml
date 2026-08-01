@@ -1,0 +1,6 @@
+services:
+  media-control:
+    # Keep latency-sensitive SQLite state on the GMKtec NVMe system disk.
+    # Large uploads, recordings, and backups remain on bulk storage.
+    volumes:
+      - "/var/lib/mbfd/media-control-db:/app/data/db"
