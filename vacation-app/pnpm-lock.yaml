@@ -50,7 +50,7 @@ importers:
         version: 3.1054.0(@aws-sdk/client-s3@3.1054.0)
       '@hono/node-server':
         specifier: 2.0.12
-        version: 2.0.12(hono@4.12.31)
+        version: 2.0.12(hono@4.12.34)
       '@mbfd-vacation/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -67,8 +67,8 @@ importers:
         specifier: ^0.45.2
         version: 0.45.2(@cloudflare/workers-types@4.20260518.1)(@types/pg@8.20.0)(pg@8.21.0)(postgres@3.4.9)
       hono:
-        specifier: ^4.12.25
-        version: 4.12.31
+        specifier: ^4.12.34
+        version: 4.12.34
       ioredis:
         specifier: 5.10.1
         version: 5.10.1
@@ -492,11 +492,11 @@ packages:
 
   '@esbuild-kit/core-utils@3.3.2':
     resolution: {integrity: sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==}
-    deprecated: 'Merged into tsx: https://tsx.is'
+    deprecated: 'Merged into tsx: https://tsx.hirok.io'
 
   '@esbuild-kit/esm-loader@2.6.5':
     resolution: {integrity: sha512-FxEMIkJKnodyA1OaCUoEvbYRkoZlLZ4d/eXFu9Fh8CbBBgP5EmZxrfTRyN0qpXZ4vOvqnE5YdRdcrmUUXuU+dA==}
-    deprecated: 'Merged into tsx: https://tsx.is'
+    deprecated: 'Merged into tsx: https://tsx.hirok.io'
 
   '@esbuild-plugins/node-globals-polyfill@0.2.3':
     resolution: {integrity: sha512-r3MIryXDeXDOZh7ih1l/yE9ZLORCd5e8vWg02azWRGj5SPTuoh69A2AIyn0Z31V/kHBfZ4HgWJ+OK3GTTwLmnw==}
@@ -1951,6 +1951,7 @@ packages:
   cron-parser@4.9.0:
     resolution: {integrity: sha512-p0SaNjrHOnQeR8/VnfGbmg9te2kfyYSQ7Sc/j/6DtPL3JQvKxmjO9TSjNFpujqV3vEYYBvNNvXSxzyksBWAx1Q==}
     engines: {node: '>=12.0.0'}
+    deprecated: v4 is no longer maintained, upgrade to v5
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -2307,8 +2308,8 @@ packages:
   help-me@5.0.0:
     resolution: {integrity: sha512-7xgomUX6ADmcYzFik0HzAxh/73YlKR9bmFzf51CZwR+b6YtzU2m0u49hQCqV6SvlqIqsaxovfwdvbnsw3b/zpg==}
 
-  hono@4.12.31:
-    resolution: {integrity: sha512-zJIHFrl6bq3RDd2YusFNCDlM8qUprxKswyi/OPzPyzKDdyBXDqWx8bZlZ7R+saTdSTatUmb3O7K4SspGPaEOQg==}
+  hono@4.12.34:
+    resolution: {integrity: sha512-GqXJqY/xJkJmuloTrnV1ZEXG3fqte+VjkUqoRNZXcrUidiUOP4fMSIHHY4tsqZBK++kVyWmt/AAfSUuy57/eSA==}
     engines: {node: '>=16.9.0'}
 
   ieee754@1.2.1:
@@ -3847,9 +3848,9 @@ snapshots:
       protobufjs: 7.6.5
       yargs: 17.7.3
 
-  '@hono/node-server@2.0.12(hono@4.12.31)':
+  '@hono/node-server@2.0.12(hono@4.12.34)':
     dependencies:
-      hono: 4.12.31
+      hono: 4.12.34
 
   '@img/colour@1.1.0':
     optional: true
@@ -5267,7 +5268,7 @@ snapshots:
 
   help-me@5.0.0: {}
 
-  hono@4.12.31: {}
+  hono@4.12.34: {}
 
   ieee754@1.2.1: {}
 
