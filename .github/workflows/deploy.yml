@@ -208,10 +208,10 @@ jobs:
 
       - name: Verify background services
         run: |
-          ssh deploy-target "
-            docker exec mbfd-hub-laravel bash -c 'pgrep -f \"reverb:start\" || nohup php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction > /tmp/reverb.log 2>&1 &'
-            docker exec mbfd-hub-laravel bash -c 'pgrep -f \"queue:work\" || nohup php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600 > /tmp/queue-worker.log 2>&1 &'
-            echo '✓ Reverb and queue worker running'
+          ssh deploy-target "set -e
+            docker exec mbfd-hub-laravel pgrep -af '^/usr/bin/php /var/www/html/artisan reverb:start '
+            docker exec mbfd-hub-laravel pgrep -af '^/usr/bin/php /var/www/html/artisan queue:work '
+            echo '✓ Supervised Reverb and queue worker verified'
           "
 
       - name: Wait for health
