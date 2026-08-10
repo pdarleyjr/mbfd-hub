@@ -158,11 +158,11 @@ class InspectionResource extends Resource
             ->orderBy('designation')
             ->get()
             ->mapWithKeys(fn (Apparatus $apparatus): array => [
-                $apparatus->id => (string) ($apparatus->designation
-                    ?: $apparatus->unit_id
-                    ?: $apparatus->vehicle_number
-                    ?: $apparatus->name
-                    ?: "Apparatus #{$apparatus->id}"),
+                $apparatus->getKey() => (string) ($apparatus->getAttribute('designation')
+                    ?: $apparatus->getAttribute('unit_id')
+                    ?: $apparatus->getAttribute('vehicle_number')
+                    ?: $apparatus->getAttribute('name')
+                    ?: 'Apparatus #'.$apparatus->getKey()),
             ])
             ->all();
     }
