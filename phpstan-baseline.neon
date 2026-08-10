@@ -55,12 +55,6 @@ parameters:
 			path: app/Console/Commands/ImportFireEquipment.php
 
 		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 1
-			path: app/Console/Commands/ImportPersonnel.php
-
-		-
 			message: '#^Negated boolean expression is always true\.$#'
 			identifier: booleanNot.alwaysTrue
 			count: 1
@@ -77,12 +71,6 @@ parameters:
 			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 4
 			path: app/Console/Commands/ProvisionUsers.php
-
-		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 1
-			path: app/Console/Commands/ResetEmployeePassword.php
 
 		-
 			message: '#^Access to an undefined property App\\Models\\ProjectMilestone\:\:\$project\.$#'
@@ -1129,12 +1117,6 @@ parameters:
 			path: app/Http/Controllers/Api/Bid/CredentialsController.php
 
 		-
-			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Http/Controllers/Api/BigTicketRequestController.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$guard_name\.$#'
 			identifier: property.notFound
 			count: 1
@@ -1389,12 +1371,6 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$station_number\.$#'
 			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/StationInventoryController.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Http/Controllers/Api/StationInventoryController.php
 
