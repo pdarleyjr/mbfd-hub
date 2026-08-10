@@ -97,7 +97,9 @@ Google Sheets apparatus synchronization is configured and healthy. API authentic
 ### Admin dashboard and backend
 
 - **Verified:** all 304 application routes are named; 114 are admin routes. Public attempts to read protected admin APIs return authentication failures rather than data.
-- **Verified:** a server-render smoke test covers the dashboard and 13 critical Employee, Uniform, Equipment Request, Apparatus, Inspection, Fire Equipment, Station Inspection, Station, and TRT admin surfaces.
+- **Verified:** a server-render smoke test covers the dashboard and 13 additional critical Employee, Uniform, Equipment Request, Apparatus, Inspection, Fire Equipment, Station Inspection, Station, and TRT admin surfaces (14 total routes).
+- **Fixed after authenticated browser inspection:** the Inspections index crashed when an apparatus had a null legacy `name`. Apparatus selectors now use a guaranteed non-null designation/unit/vehicle fallback, with a production-shaped regression fixture.
+- **Fixed after authenticated browser inspection:** the admin service worker was served from `/admin-pwa/` while requesting `/admin/` scope; production static-file handling bypassed Laravel's scope header and browsers rejected registration. The worker is now served from `/admin/service-worker.js`, inside its own scope, and deployment smoke checks that canonical URL.
 - **Fixed:** public employee identifiers and legacy station report reads were exposed more broadly than required.
 - **Fixed:** the test environment now explicitly uses in-memory SQLite for the application and web-push data and supplies a nonsecret test-only application key, eliminating accidental workstation MySQL coupling.
 - **Fixed:** `league/commonmark` was upgraded from 2.8.3 to 2.9.1 to clear six newly published parser advisories.
@@ -116,11 +118,12 @@ Google Sheets apparatus synchronization is configured and healthy. API authentic
 
 ## Verification evidence
 
-- PHPUnit: **281 tests, 1,220 assertions, all passing** after formatting and the dependency security upgrade.
+- PHPUnit: **283 tests, 1,226 assertions, all passing in CI** after formatting and the dependency security upgrade.
 - Added focused coverage for personnel imports, public directory redaction, public Fire Equipment requests, portal-to-admin employee requests, uniform stock issuance, SnipeIT unmatched-asset safety, critical apparatus defect linkage, and critical admin page rendering.
 - TypeScript: root and daily-checkout typechecks pass.
 - Node operational-forms regression: 1 test passes.
 - Production builds: root and daily-checkout pass.
+- Authenticated production browser transaction: all 14 critical admin surfaces were exercised; employee login, request submission, portal history, and admin request visibility passed. The uniquely identified request, notifications, test identities, role row, and automatically mirrored ScreenTinker workspace were removed after verification.
 - Security: root npm, daily npm, and locked Composer audit report zero known advisories after remediation.
 - Laravel: configuration, route, and Blade view caches compile successfully.
 - Formatting: all 37 changed PHP files pass Pint; repository-wide Pint remains a separate pre-existing backlog.

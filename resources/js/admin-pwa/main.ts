@@ -2,7 +2,7 @@
  * Admin PWA bootstrap.
  *
  * What it does:
- *   1. On admin pages, registers /admin-pwa/service-worker.js with scope /admin/.
+ *   1. On admin pages, registers /admin/service-worker.js with scope /admin/.
  *   2. Captures the `beforeinstallprompt` event and shows a custom prompt
  *      ONLY when the device is wide + pointer:fine (desktop with mouse).
  *      Touch-primary devices never see the prompt because the event listener
@@ -43,7 +43,7 @@ async function registerServiceWorker(): Promise<void> {
     if (!('serviceWorker' in navigator)) return;
 
     try {
-        const reg = await navigator.serviceWorker.register('/admin-pwa/service-worker.js', {
+        const reg = await navigator.serviceWorker.register('/admin/service-worker.js', {
             scope: '/admin/',
             updateViaCache: 'none',
         });

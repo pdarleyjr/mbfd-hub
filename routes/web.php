@@ -124,6 +124,17 @@ Route::get('/admin-pwa/manifest.webmanifest', function () {
     ]);
 });
 
+// Keep the worker URL inside its intended scope. Production web servers may
+// serve /admin-pwa/* directly and bypass Laravel's Service-Worker-Allowed
+// response header, which makes browsers reject an /admin/ scope.
+Route::get('/admin/service-worker.js', function () {
+    return response()->file(public_path('admin-pwa/service-worker.js'), [
+        'Content-Type' => 'application/javascript; charset=utf-8',
+        'Service-Worker-Allowed' => '/admin/',
+        'Cache-Control' => 'no-cache, must-revalidate',
+    ]);
+});
+
 Route::get('/admin-pwa/service-worker.js', function () {
     return response()->file(public_path('admin-pwa/service-worker.js'), [
         'Content-Type' => 'application/javascript; charset=utf-8',

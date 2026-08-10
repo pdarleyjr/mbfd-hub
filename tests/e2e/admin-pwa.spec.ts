@@ -46,7 +46,7 @@ test.describe('admin PWA unauthenticated', () => {
   });
 
   test('service worker is served and parses', async ({ request }) => {
-    const res = await request.get('/admin-pwa/service-worker.js');
+    const res = await request.get('/admin/service-worker.js');
     expect(res.status()).toBe(200);
     const ct = res.headers()['content-type'] ?? '';
     expect(ct).toMatch(/javascript/);

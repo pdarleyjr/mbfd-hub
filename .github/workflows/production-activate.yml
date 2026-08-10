@@ -458,7 +458,7 @@ jobs:
           check "Admin login"            "https://www.mbfdhub.com/admin/login"
           check "/up health"             "https://www.mbfdhub.com/up"
           check "Admin PWA manifest"     "https://www.mbfdhub.com/admin-pwa/manifest.webmanifest"
-          check "Admin PWA SW"           "https://www.mbfdhub.com/admin-pwa/service-worker.js"
+          check "Admin PWA SW"           "https://www.mbfdhub.com/admin/service-worker.js"
           check "Deploy marker"          "https://www.mbfdhub.com/deploy-marker.json"
           echo "=== $PASS passed, $FAIL failed ==="
           if [ "$FAIL" -gt 0 ]; then

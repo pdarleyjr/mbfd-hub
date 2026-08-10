@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
+use App\Models\Apparatus;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
@@ -23,6 +24,15 @@ class AdminCriticalSurfaceSmokeTest extends TestCase
         $admin->assignRole($role);
         Gate::before(fn (User $user): ?bool => $user->hasRole('super_admin') ? true : null);
         $this->actingAs($admin);
+
+        Apparatus::query()->create([
+            'unit_id' => 'AUDIT-E2',
+            'designation' => 'Audit Engine 2',
+            'slug' => 'audit-engine-2',
+            'name' => null,
+            'make' => 'Audit',
+            'model' => 'Fixture',
+        ]);
 
         $paths = [
             '/admin',
