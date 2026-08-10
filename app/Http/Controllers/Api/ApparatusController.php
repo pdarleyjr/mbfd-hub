@@ -97,11 +97,11 @@ class ApparatusController extends Controller
 
     public function storeInspection(Request $request, $id)
     {
-        $request->validate([
-            'operator_name' => 'required|string',
-            'rank' => 'required|string',
-            'shift' => 'nullable|string',
-            'unit_number' => 'nullable|string',
+        $validated = $request->validate([
+            'operator_name' => 'required|string|max:255',
+            'rank' => 'required|string|max:100',
+            'shift' => 'nullable|string|max:20',
+            'unit_number' => 'nullable|string|max:100',
             'engine_hours' => 'nullable|numeric|min:0',
             'miles' => 'nullable|integer|min:0',
             'compartments' => 'nullable|array',
@@ -131,30 +131,33 @@ class ApparatusController extends Controller
         // Resolve employee_id if provided
         $employeeId = $request->employee_id;
 
-        // Generate unique inspection reference
+        // The client may display a unit number, but the persisted identity must
+        // always come from the apparatus selected by its unique route ID.
         $today = now()->format('Y-m-d');
         $designation = $apparatus->designation ?? $apparatus->name ?? 'UNK';
         $designationTag = preg_replace('/[^A-Z0-9]/i', '', $designation);
-        $todayCount = ApparatusInspection::where('apparatus_id', $apparatus->id)
-            ->whereDate('created_at', $today)
-            ->count() + 1;
-        $inspectionRef = "INS-{$designationTag}-{$today}-".str_pad((string) $todayCount, 4, '0', STR_PAD_LEFT);
 
         $inspection = ApparatusInspection::create([
             'apparatus_id' => $apparatus->id,
-            'operator_name' => $request->operator_name,
-            'rank' => $request->rank,
-            'shift' => $request->shift,
-            'unit_number' => $request->unit_number,
+            'operator_name' => $validated['operator_name'],
+            'rank' => $validated['rank'],
+            'shift' => $validated['shift'] ?? null,
+            'unit_number' => $apparatus->vehicle_number,
+            'engine_hours' => $validated['engine_hours'] ?? null,
+            'miles' => $validated['miles'] ?? null,
             'vehicle_number' => $apparatus->vehicle_number,
             'designation_at_time' => $apparatus->designation,
-            'results' => $request->compartments,
+            'results' => $validated['compartments'] ?? null,
             'officer_signature' => $signaturePath,
             'employee_id' => $employeeId,
-            'inspection_reference' => $inspectionRef,
             'review_status' => 'approved',
             'completed_at' => now(),
         ]);
+
+        // The database ID is concurrency-safe, unlike a daily count. The unique
+        // index makes the invariant explicit for imports and future writers too.
+        $inspectionRef = "INS-{$designationTag}-{$today}-".str_pad((string) $inspection->id, 6, '0', STR_PAD_LEFT);
+        $inspection->update(['inspection_reference' => $inspectionRef]);
 
         // Track if any critical defects found
         $hasCriticalDefects = false;
@@ -182,7 +185,8 @@ class ApparatusController extends Controller
                 $defectData['item'],
                 $defectData['status'],
                 $defectData['notes'] ?? null,
-                $photoPath
+                $photoPath,
+                $inspection->id,
             );
         }
 
@@ -268,7 +272,9 @@ class ApparatusController extends Controller
      */
     public function employees()
     {
-        $employees = Employee::select('id', 'employee_id', 'name', 'rank')
+        // employee_id is also the portal login identifier. The public kiosk
+        // directory only needs an opaque database key to link the inspection.
+        $employees = Employee::select('id', 'name', 'rank')
             ->orderBy('name')
             ->get();
 

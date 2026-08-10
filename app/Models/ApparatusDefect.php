@@ -61,8 +61,15 @@ class ApparatusDefect extends Model
         return $this->hasMany(ApparatusInventoryAllocation::class, 'apparatus_defect_id');
     }
 
-    public static function recordDefect($apparatusId, $compartment, $item, $status, $notes, $photoPath = null)
-    {
+    public static function recordDefect(
+        $apparatusId,
+        $compartment,
+        $item,
+        $status,
+        $notes,
+        $photoPath = null,
+        $inspectionId = null,
+    ) {
         $existing = self::where('apparatus_id', $apparatusId)
             ->where('compartment', $compartment)
             ->where('item', $item)
@@ -80,10 +87,14 @@ class ApparatusDefect extends Model
             ];
             $existing->update([
                 'status' => $status,
+                'issue_type' => strtolower((string) $status),
                 'notes' => $notes,
                 'photo_path' => $photoPath,
+                'apparatus_inspection_id' => $inspectionId,
+                'reported_date' => now()->toDateString(),
                 'defect_history' => $history,
             ]);
+
             return $existing;
         } else {
             return self::create([
@@ -91,8 +102,11 @@ class ApparatusDefect extends Model
                 'compartment' => $compartment,
                 'item' => $item,
                 'status' => $status,
+                'issue_type' => strtolower((string) $status),
                 'notes' => $notes,
                 'photo_path' => $photoPath,
+                'apparatus_inspection_id' => $inspectionId,
+                'reported_date' => now()->toDateString(),
             ]);
         }
     }

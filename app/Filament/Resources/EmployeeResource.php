@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Models\Employee;
 use Filament\Forms;
@@ -13,8 +14,8 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 
-use App\Filament\Concerns\EnterpriseTable;
 class EmployeeResource extends Resource
 {
     use EnterpriseTable;
@@ -56,6 +57,7 @@ class EmployeeResource extends Resource
                             ->required(fn ($context) => $context === 'create')
                             ->dehydrated(fn ($state) => filled($state))
                             ->dehydrateStateUsing(fn ($state) => Hash::make($state))
+                            ->rule(Password::min(15)->uncompromised())
                             ->helperText(fn ($context) => $context === 'edit'
                                 ? 'Leave blank to keep current password.'
                                 : null)
@@ -121,8 +123,7 @@ class EmployeeResource extends Resource
                             ->password()
                             ->revealable()
                             ->required()
-                            ->minLength(6)
-                            ->default(config('employee.default_temp_password', '')),
+                            ->rule(Password::min(15)->uncompromised()),
                     ])
                     ->action(function (Employee $record, array $data): void {
                         $record->update([
@@ -135,39 +136,7 @@ class EmployeeResource extends Resource
                             ->send();
                     }),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkAction::make('resetPasswords')
-                    ->label('Reset Passwords')
-                    ->icon('heroicon-o-key')
-                    ->color('warning')
-                    ->requiresConfirmation()
-                    ->modalHeading('Reset Passwords for Selected Employees')
-                    ->modalDescription('All selected employees will have their password reset to the configured default and will be forced to change it on next login.')
-                    ->action(function ($records): void {
-                        $defaultPassword = config('employee.default_temp_password', '');
-                        if ($defaultPassword === '') {
-                            Notification::make()
-                                ->title('EMPLOYEE_DEFAULT_TEMP_PASSWORD is not configured')
-                                ->danger()
-                                ->send();
-                            return;
-                        }
-                        $hashed = Hash::make($defaultPassword);
-                        $count = 0;
-                        foreach ($records as $record) {
-                            $record->update([
-                                'password' => $hashed,
-                                'must_change_password' => true,
-                            ]);
-                            $count++;
-                        }
-                        Notification::make()
-                            ->title("Password reset for {$count} employees")
-                            ->success()
-                            ->send();
-                    })
-                    ->deselectRecordsAfterCompletion(),
-            ])
+            ->bulkActions([])
             ->searchPlaceholder('Search by name, ID, or rank...');
     }
 

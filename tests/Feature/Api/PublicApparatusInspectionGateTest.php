@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Api;
 
 use App\Models\Apparatus;
+use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
 use App\Models\User;
@@ -84,6 +85,7 @@ class PublicApparatusInspectionGateTest extends TestCase
         $inspection = ApparatusInspection::latest('id')->first();
         $this->assertNotNull($inspection);
         $this->assertSame('pending_review', $inspection->review_status);
+        $this->assertSame($inspection->id, ApparatusDefect::sole()->apparatus_inspection_id);
     }
 
     public function test_public_submission_without_critical_defect_is_approved_and_status_unchanged(): void
@@ -108,6 +110,34 @@ class PublicApparatusInspectionGateTest extends TestCase
         $this->assertSame('In Service', $apparatus->fresh()->status);
         $inspection = ApparatusInspection::latest('id')->first();
         $this->assertSame('approved', $inspection->review_status);
+    }
+
+    public function test_inspection_uses_authoritative_vehicle_identity_and_preserves_meter_history(): void
+    {
+        $apparatus = $this->makeApparatus('In Service');
+        $apparatus->update([
+            'current_engine_hours' => 100.0,
+            'current_miles' => 10_000,
+        ]);
+
+        $response = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", [
+            'operator_name' => 'Jane Roe',
+            'rank' => 'Firefighter',
+            'shift' => 'B',
+            'unit_number' => 'ATTACKER-CONTROLLED-VALUE',
+            'engine_hours' => 101.5,
+            'miles' => 10_025,
+            'defects' => [],
+        ]);
+
+        $response->assertCreated();
+
+        $inspection = ApparatusInspection::sole();
+        $this->assertSame($apparatus->vehicle_number, $inspection->unit_number);
+        $this->assertSame('101.5', $inspection->engine_hours);
+        $this->assertSame(10_025, $inspection->miles);
+        $this->assertSame('101.5', $apparatus->fresh()->current_engine_hours);
+        $this->assertSame(10_025, $apparatus->fresh()->current_miles);
     }
 
     public function test_unauthenticated_user_cannot_approve_pending_inspection(): void

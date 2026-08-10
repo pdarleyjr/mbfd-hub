@@ -1,19 +1,27 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router';
-import ApparatusList from './components/ApparatusList';
-import InspectionWizard from './components/InspectionWizard';
-import SuccessPage from './components/SuccessPage';
 import OfflineIndicator from './components/OfflineIndicator';
 import { IOSInstallPrompt } from './components/IOSInstallPrompt';
-import StationListPage from './components/StationListPage';
-import StationDetailPage from './components/StationDetailPage';
-import RoomAssetTracker from './components/RoomAssetTracker';
-import FormsHub from './components/FormsHub';
-import BigTicketRequestForm from './components/BigTicketRequestForm';
-import StationInventoryForm from './components/StationInventoryForm';
-import VehicleInspectionSelect from './components/VehicleInspectionSelect';
-import EquipmentRequestWizard from './components/forms/EquipmentRequestWizard';
-import StationInspectionWizard from './components/forms/StationInspectionWizard';
-import TrtInventoryWizard from './components/TrtInventoryWizard';
+
+const ApparatusList = lazy(() => import('./components/ApparatusList'));
+const InspectionWizard = lazy(() => import('./components/InspectionWizard'));
+const SuccessPage = lazy(() => import('./components/SuccessPage'));
+const StationListPage = lazy(() => import('./components/StationListPage'));
+const StationDetailPage = lazy(() => import('./components/StationDetailPage'));
+const RoomAssetTracker = lazy(() => import('./components/RoomAssetTracker'));
+const FormsHub = lazy(() => import('./components/FormsHub'));
+const BigTicketRequestForm = lazy(() => import('./components/BigTicketRequestForm'));
+const StationInventoryForm = lazy(() => import('./components/StationInventoryForm'));
+const VehicleInspectionSelect = lazy(() => import('./components/VehicleInspectionSelect'));
+const EquipmentRequestWizard = lazy(() => import('./components/forms/EquipmentRequestWizard'));
+const StationInspectionWizard = lazy(() => import('./components/forms/StationInspectionWizard'));
+const TrtInventoryWizard = lazy(() => import('./components/TrtInventoryWizard'));
+
+const PageLoading = () => (
+  <div className="flex min-h-48 items-center justify-center" role="status" aria-live="polite">
+    <span className="text-sm font-medium text-neutral-600">Loading form…</span>
+  </div>
+);
 
 const HomeNav = () => (
   <header className="sticky top-0 z-50 bg-neutral-900 border-b border-neutral-700/50 h-16 flex items-center justify-between px-4 lg:px-6" style={{ paddingTop: 'max(0px, env(safe-area-inset-top, 0px))' }}>
@@ -27,7 +35,7 @@ const HomeNav = () => (
     <div className="flex items-center gap-2">
       <a
         href="/"
-        className="min-h-[40px] px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+        className="min-h-[44px] px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
         aria-label="Return to MBFD Hub home page"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -51,6 +59,7 @@ function App() {
         <OfflineIndicator />
         <IOSInstallPrompt />
         <main id="main-content" className="max-w-5xl mx-auto py-8 px-4">
+          <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route path="/" element={<Navigate to="/stations" replace />} />
             {/* Vehicle Inspection Routes */}
@@ -74,6 +83,7 @@ function App() {
             <Route path="/forms-hub/trt-inventory" element={<TrtInventoryWizard />} />
             <Route path="/forms-hub/success" element={<SuccessPage />} />
           </Routes>
+          </Suspense>
         </main>
       </div>
     </Router>

@@ -100,6 +100,7 @@ Route::prefix('public')->middleware('throttle:10,1')->group(function () {
 // Public Station Inspection submission (stricter rate limit)
 Route::prefix('public')->middleware('throttle:10,1')->group(function () {
     Route::post('station_inspection', [StationInspectionController::class, 'storePublic']);
+    Route::post('fire_equipment_request', [FireEquipmentRequestController::class, 'storePublic']);
 });
 
 // TRT Trailer Inventory (public read)
@@ -175,11 +176,14 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin.role:super_admin,admi
 // Big Ticket Requests
 Route::middleware('throttle:60,1')->group(function () {
     Route::post('/big-ticket-requests', [BigTicketRequestController::class, 'store']);
-    Route::get('/stations/{station}/big-ticket-requests', [BigTicketRequestController::class, 'index']);
 
     // Station Inventory (v1 - legacy)
     Route::get('/station-inventory/categories', [StationInventoryController::class, 'categories']);
     Route::post('/station-inventory-submissions', [StationInventoryController::class, 'store']);
+});
+
+Route::middleware(['web', 'auth', 'admin.role:super_admin,admin,logistics_admin', 'throttle:60,1'])->group(function () {
+    Route::get('/stations/{station}/big-ticket-requests', [BigTicketRequestController::class, 'index']);
     Route::get('/stations/{station}/station-inventory-submissions', [StationInventoryController::class, 'index']);
     Route::get('/station-inventory-submissions/{submission}/pdf', [StationInventoryController::class, 'downloadPdf']);
 });

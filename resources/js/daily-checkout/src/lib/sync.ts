@@ -4,6 +4,10 @@ import { QueryClient } from '@tanstack/react-query';
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 1000;
 
+export type SubmissionOutcome = 'submitted' | 'queued';
+
+class PermanentSubmissionError extends Error {}
+
 function getBackoffDelay(retryCount: number): number {
   return Math.min(BASE_DELAY_MS * Math.pow(2, retryCount), 30000);
 }
@@ -11,18 +15,31 @@ function getBackoffDelay(retryCount: number): number {
 async function processSubmission(
   submission: PendingSubmission,
   apiBaseUrl: string,
-): Promise<boolean> {
+): Promise<void> {
   const response = await fetch(`${apiBaseUrl}/${submission.type}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(submission.data),
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
+    let detail = response.statusText;
+    try {
+      const body = await response.json() as { message?: string };
+      detail = body.message || detail;
+    } catch {
+      // A non-JSON error body still has a useful HTTP status.
+    }
 
-  return true;
+    const message = `HTTP ${response.status}: ${detail}`;
+    if (response.status < 500 && response.status !== 429) {
+      throw new PermanentSubmissionError(message);
+    }
+    throw new Error(message);
+  }
 }
 
 export async function enqueueSubmission(
@@ -36,6 +53,39 @@ export async function enqueueSubmission(
     status: 'pending',
     retryCount: 0,
   });
+}
+
+/**
+ * Submit immediately when possible, queue only recoverable connectivity/server
+ * failures, and surface permanent validation/route errors to the operator.
+ */
+export async function submitOrQueue(
+  type: string,
+  data: Record<string, unknown>,
+  apiBaseUrl: string,
+): Promise<SubmissionOutcome> {
+  if (!navigator.onLine) {
+    await enqueueSubmission(type, data);
+    return 'queued';
+  }
+
+  try {
+    await processSubmission({
+      type,
+      data,
+      createdAt: new Date(),
+      status: 'processing',
+      retryCount: 0,
+    }, apiBaseUrl);
+    return 'submitted';
+  } catch (error) {
+    if (error instanceof PermanentSubmissionError) {
+      throw error;
+    }
+
+    await enqueueSubmission(type, data);
+    return 'queued';
+  }
 }
 
 export async function processPendingSubmissions(
@@ -64,7 +114,8 @@ export async function processPendingSubmissions(
       await db.pendingSubmissions.delete(submission.id!);
       processed++;
     } catch (error) {
-      const newRetryCount = submission.retryCount + 1;
+      const isPermanent = error instanceof PermanentSubmissionError;
+      const newRetryCount = isPermanent ? MAX_RETRIES : submission.retryCount + 1;
       await db.pendingSubmissions.update(submission.id!, {
         status: newRetryCount >= MAX_RETRIES ? 'failed' : 'pending',
         retryCount: newRetryCount,

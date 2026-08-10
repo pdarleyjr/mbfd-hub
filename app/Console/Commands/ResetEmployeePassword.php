@@ -12,24 +12,23 @@ class ResetEmployeePassword extends Command
 {
     protected $signature = 'mbfd:reset-employee-password
                             {employee_id : The Employee ID to reset}
-                            {--password= : New password (defaults to config employee.default_temp_password / env EMPLOYEE_DEFAULT_TEMP_PASSWORD)}
-                            {--all : Reset ALL employee passwords}';
+                            {--password= : Unique temporary password for this employee (minimum 15 characters)}';
 
     protected $description = 'Reset an employee portal password and force password change on next login';
 
     public function handle(): int
     {
-        if ($this->option('all')) {
-            return $this->resetAll();
-        }
-
         $employeeId = $this->argument('employee_id');
         $password = $this->resolvePassword();
+        if ($password === null) {
+            return Command::FAILURE;
+        }
 
         $employee = Employee::where('employee_id', $employeeId)->first();
 
         if (! $employee) {
             $this->error("Employee with ID {$employeeId} not found.");
+
             return Command::FAILURE;
         }
 
@@ -45,39 +44,21 @@ class ResetEmployeePassword extends Command
         return Command::SUCCESS;
     }
 
-    private function resolvePassword(): string
+    private function resolvePassword(): ?string
     {
-        $password = $this->option('password')
-            ?: config('employee.default_temp_password', env('EMPLOYEE_DEFAULT_TEMP_PASSWORD', ''));
+        $password = (string) $this->option('password');
 
         if ($password === '') {
-            $this->error('No password specified. Pass --password=<value> or set config employee.default_temp_password / env EMPLOYEE_DEFAULT_TEMP_PASSWORD.');
-            exit(Command::FAILURE);
+            $this->error('Pass a unique temporary password with --password=<value>. Shared default passwords and mass resets are not supported.');
+
+            return null;
+        }
+        if (mb_strlen($password) < 15) {
+            $this->error('Temporary passwords must contain at least 15 characters.');
+
+            return null;
         }
 
         return $password;
-    }
-
-    private function resetAll(): int
-    {
-        $password = $this->resolvePassword();
-
-        if (! $this->confirm("Reset ALL employee passwords to the configured default?")) {
-            $this->info('Cancelled.');
-            return Command::SUCCESS;
-        }
-
-        $count = Employee::count();
-        $hashed = Hash::make($password);
-
-        Employee::query()->update([
-            'password' => $hashed,
-            'must_change_password' => true,
-        ]);
-
-        $this->info("Reset {$count} employee passwords to the configured default (not displayed)");
-        $this->warn('All employees will be required to change password on next login.');
-
-        return Command::SUCCESS;
     }
 }

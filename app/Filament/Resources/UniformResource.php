@@ -3,15 +3,12 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UniformResource\Pages;
-use App\Filament\Resources\UniformResource\RelationManagers;
 use App\Models\Uniform;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class UniformResource extends Resource
 {
@@ -28,18 +25,24 @@ class UniformResource extends Resource
                 Forms\Components\TextInput::make('item_name')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('size')
-                    ->maxLength(255),
+                Forms\Components\Select::make('size')
+                    ->options(array_combine(
+                        ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'],
+                        ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'],
+                    )),
                 Forms\Components\TextInput::make('quantity_on_hand')
                     ->required()
                     ->numeric()
+                    ->minValue(0)
                     ->default(0),
                 Forms\Components\TextInput::make('reorder_level')
                     ->required()
                     ->numeric()
+                    ->minValue(0)
                     ->default(10),
                 Forms\Components\TextInput::make('unit_cost')
-                    ->numeric(),
+                    ->numeric()
+                    ->minValue(0),
                 Forms\Components\TextInput::make('supplier')
                     ->maxLength(255),
                 Forms\Components\Textarea::make('notes')

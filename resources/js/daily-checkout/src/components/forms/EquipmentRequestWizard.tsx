@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router';
 import SignatureCanvas from 'react-signature-canvas';
-import { enqueueSubmission, processPendingSubmissions } from '../../lib/sync';
+import { submitOrQueue, type SubmissionOutcome } from '../../lib/sync';
 
 const STATIONS = [
   'Station 1',
@@ -49,7 +49,7 @@ function createItem(): RequestItem {
 export default function EquipmentRequestWizard() {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submissionOutcome, setSubmissionOutcome] = useState<SubmissionOutcome | null>(null);
   const memberSigRef = useRef<SignatureCanvas | null>(null);
   const officerSigRef = useRef<SignatureCanvas | null>(null);
 
@@ -122,7 +122,7 @@ export default function EquipmentRequestWizard() {
         photo: photoPreview || null,
       }));
 
-      await enqueueSubmission('fire_equipment_request', {
+      const outcome = await submitOrQueue('fire_equipment_request', {
         station: form.station,
         date: form.date,
         requested_by: form.requestedBy,
@@ -131,17 +131,16 @@ export default function EquipmentRequestWizard() {
         member_signature: form.memberSignature,
         officer_signature: form.officerSignature,
         submitted_at: new Date().toISOString(),
-      });
-      processPendingSubmissions('/api/admin').catch(() => {});
-      setSubmitted(true);
-    } catch {
-      alert('Failed to save. Your request will be retried automatically.');
+      }, '/api/public');
+      setSubmissionOutcome(outcome);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'The request could not be submitted. Please review the form and try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (submitted) {
+  if (submissionOutcome) {
     return (
       <div className="text-center py-16 space-y-6">
         <div className="w-20 h-20 mx-auto bg-emerald-50 rounded-full flex items-center justify-center">
@@ -149,8 +148,14 @@ export default function EquipmentRequestWizard() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-neutral-800 font-heading">Request Submitted</h2>
-        <p className="text-neutral-500 max-w-md mx-auto">Your fire equipment request has been queued and will sync when online.</p>
+        <h2 className="text-2xl font-bold text-neutral-800 font-heading">
+          {submissionOutcome === 'submitted' ? 'Request Submitted' : 'Request Saved Offline'}
+        </h2>
+        <p className="text-neutral-500 max-w-md mx-auto">
+          {submissionOutcome === 'submitted'
+            ? 'Your fire equipment request is available on the Admin Dashboard.'
+            : 'Your request is safely queued on this device and will sync automatically when the connection returns.'}
+        </p>
         <Link to="/forms-hub" className="inline-flex items-center min-h-[44px] px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors">
           Back to Forms Hub
         </Link>

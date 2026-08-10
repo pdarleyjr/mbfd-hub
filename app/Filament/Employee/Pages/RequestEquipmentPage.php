@@ -13,9 +13,13 @@ use Filament\Pages\Page;
 class RequestEquipmentPage extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-shopping-cart';
+
     protected static string $view = 'filament.employee.pages.request-equipment';
+
     protected static ?string $title = 'Request Equipment';
+
     protected static ?int $navigationSort = 2;
+
     protected static ?string $navigationLabel = 'Request Equipment';
 
     public ?array $data = [];
@@ -48,13 +52,21 @@ class RequestEquipmentPage extends Page
 
         EmployeeEquipmentRequest::create([
             'employee_portal_id' => $employee->id,
-            'user_id'            => null, // not linked to users table
-            'requested_items'    => $data['requested_items'],
-            'status'             => 'Pending',
+            'user_id' => null, // not linked to users table
+            'requested_items' => $data['requested_items'],
+            'status' => 'Pending',
         ]);
 
         // Notify admin users via their Filament notifications (users table)
-        $admins = User::role(['super_admin', 'admin', 'logistics_admin'])->get();
+        // Query role names directly so a partially seeded environment does not
+        // reject an otherwise valid request when one optional admin role is absent.
+        $admins = User::query()
+            ->whereHas('roles', fn ($query) => $query->whereIn('name', [
+                'super_admin',
+                'admin',
+                'logistics_admin',
+            ]))
+            ->get();
         foreach ($admins as $admin) {
             Notification::make()
                 ->title('New Employee Equipment Request')
@@ -98,6 +110,7 @@ class RequestEquipmentPage extends Page
         // Combine for blade — pass both
         $history = $active;
         $user = $employee;
+
         return compact('history', 'archived', 'user');
     }
 }

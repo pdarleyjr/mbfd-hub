@@ -17,11 +17,12 @@ class BigTicketRequestController extends Controller
     {
         $validated = $request->validate([
             'station_id' => 'required|exists:stations,id',
-            'room_type' => 'required|string',
-            'room_label' => 'nullable|string',
-            'items' => 'required|array',
-            'other_item' => 'nullable|string',
-            'notes' => 'nullable|string',
+            'room_type' => 'required|string|max:100',
+            'room_label' => 'nullable|string|max:255',
+            'items' => 'required|array|min:1|max:100',
+            'items.*' => 'required|string|max:255',
+            'other_item' => 'nullable|string|max:255',
+            'notes' => 'nullable|string|max:5000',
         ]);
 
         $bigTicketRequest = BigTicketRequest::create([
@@ -31,7 +32,7 @@ class BigTicketRequestController extends Controller
             'items' => $validated['items'],
             'other_item' => $validated['other_item'] ?? null,
             'notes' => $validated['notes'] ?? null,
-            'created_by' => $request->user()?->id ?? 1,
+            'created_by' => $request->user()?->id,
         ]);
 
         return response()->json([
