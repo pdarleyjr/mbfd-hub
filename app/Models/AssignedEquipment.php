@@ -10,6 +10,7 @@ class AssignedEquipment extends Model
     protected $fillable = [
         'user_id',
         'employee_portal_id',
+        'uniform_id',
         'category',
         'item_description',
         'quantity',
@@ -19,7 +20,7 @@ class AssignedEquipment extends Model
 
     protected $casts = [
         'issued_at' => 'date',
-        'quantity'  => 'integer',
+        'quantity' => 'integer',
     ];
 
     public function user(): BelongsTo
@@ -32,9 +33,15 @@ class AssignedEquipment extends Model
         return $this->belongsTo(Employee::class, 'employee_portal_id');
     }
 
+    public function uniform(): BelongsTo
+    {
+        return $this->belongsTo(Uniform::class);
+    }
+
     public static function categories(): array
     {
         return [
+            'Uniform Inventory',
             'T-Shirts',
             'Polo Shirts',
             'Uniform Pants',

@@ -1,4 +1,3 @@
-import { PDFDocument, PageSizes } from 'pdf-lib';
 import type Konva from 'konva';
 
 /**
@@ -10,6 +9,10 @@ export async function exportLayoutPdf(
   apparatusName: string,
   sideName: string,
 ): Promise<void> {
+  // PDF generation is an infrequent operator action; keep pdf-lib out of the
+  // initial apparatus-layout bundle and load it only when Export is pressed.
+  const { PDFDocument, rgb } = await import('pdf-lib');
+
   // 11×17 landscape in points (1 inch = 72 points)
   const PAGE_WIDTH = 17 * 72;  // 1224
   const PAGE_HEIGHT = 11 * 72; // 792
@@ -53,7 +56,6 @@ export async function exportLayoutPdf(
   });
 
   // Draw title
-  const { rgb } = await import('pdf-lib');
   page.drawText(`${apparatusName} — ${sideName} View`, {
     x: margin,
     y: PAGE_HEIGHT - margin,

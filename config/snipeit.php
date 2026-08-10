@@ -5,4 +5,8 @@ return [
     'token' => env('SNIPEIT_API_TOKEN', ''),
     'timeout' => env('SNIPEIT_API_TIMEOUT', 15),
     'admin_email' => env('SNIPEIT_ADMIN_EMAIL', 'PeterDarley@miamibeachfl.gov'),
+    'status_ids' => [
+        'out_for_repair' => (int) env('SNIPEIT_STATUS_OUT_FOR_REPAIR_ID', 4),
+        'missing' => (int) env('SNIPEIT_STATUS_MISSING_ID', 5),
+    ],
 ];

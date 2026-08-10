@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Station;
 use App\Models\StationInventorySubmission;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 
 class StationInventoryController extends Controller
@@ -111,15 +111,18 @@ class StationInventoryController extends Controller
             'station_id' => 'required|exists:stations,id',
             'employee_name' => 'nullable|string|max:255',
             'shift' => 'nullable|string|in:A,B,C',
-            'items' => 'required|array',
-            'notes' => 'nullable|string',
+            'items' => 'required|array|max:250',
+            'items.*.category_id' => 'required|string|max:100',
+            'items.*.item_id' => 'required|string|max:100',
+            'items.*.quantity' => 'required|integer|min:0|max:1000',
+            'notes' => 'nullable|string|max:5000',
         ]);
 
         $station = Station::findOrFail($validated['station_id']);
         $items = $validated['items'];
 
         // Filter items with quantity > 0
-        $orderedItems = array_filter($items, fn($item) => ($item['quantity'] ?? 0) > 0);
+        $orderedItems = array_filter($items, fn ($item) => ($item['quantity'] ?? 0) > 0);
 
         // Generate PDF
         $pdfData = [
@@ -137,8 +140,8 @@ class StationInventoryController extends Controller
 
         // Save PDF to the PRIVATE disk (not web-reachable). Served only via the
         // authenticated downloadPdf route below — never a public /storage URL.
-        $filename = 'inventory-' . $station->id . '-' . time() . '.pdf';
-        $pdfPath = 'inventory-submissions/' . $filename;
+        $filename = 'inventory-'.$station->id.'-'.time().'.pdf';
+        $pdfPath = 'inventory-submissions/'.$filename;
         Storage::disk($this->privateDisk())->put($pdfPath, $pdf->output());
 
         // Create submission record
@@ -149,7 +152,7 @@ class StationInventoryController extends Controller
             'items' => $orderedItems,
             'notes' => $validated['notes'] ?? null,
             'pdf_path' => $pdfPath,
-            'created_by' => $request->user()?->id ?? 1,
+            'created_by' => $request->user()?->id,
             'submitted_at' => now()->timezone('America/New_York'),
         ]);
 
@@ -200,7 +203,7 @@ class StationInventoryController extends Controller
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'attachment; filename="station-inventory-' . $submission->station->station_number . '.pdf"');
+            ->header('Content-Disposition', 'attachment; filename="station-inventory-'.$submission->station->station_number.'.pdf"');
     }
 
     /**

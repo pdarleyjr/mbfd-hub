@@ -4,16 +4,19 @@ namespace App\Filament\Employee\Pages;
 
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
-use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Validation\Rules\Password;
 
 class ChangePasswordPage extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-lock-closed';
+
     protected static string $view = 'filament.employee.pages.change-password';
+
     protected static ?string $title = 'Set Your Password';
+
     protected static ?int $navigationSort = 99;
+
     protected static bool $shouldRegisterNavigation = false;
 
     public ?array $data = [];
@@ -32,7 +35,7 @@ class ChangePasswordPage extends Page
                     ->password()
                     ->revealable()
                     ->required()
-                    ->rule(Password::min(8)->mixedCase()->numbers())
+                    ->rule(Password::min(15)->uncompromised())
                     ->same('password_confirmation'),
                 TextInput::make('password_confirmation')
                     ->label('Confirm New Password')
@@ -56,14 +59,14 @@ class ChangePasswordPage extends Page
         \Illuminate\Support\Facades\DB::table('employees')
             ->where('id', $employee->id)
             ->update([
-                'password'             => $hashedPassword,
+                'password' => $hashedPassword,
                 'must_change_password' => false,
-                'updated_at'           => now(),
+                'updated_at' => now(),
             ]);
 
         // Update the in-memory model without triggering the session guard's hash check
         $employee->setRawAttributes(array_merge($employee->getAttributes(), [
-            'password'             => $hashedPassword,
+            'password' => $hashedPassword,
             'must_change_password' => false,
         ]));
 

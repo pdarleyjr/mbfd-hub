@@ -34,7 +34,6 @@ export type Shift = 'A' | 'B' | 'C';
 
 export interface EmployeeOption {
   id: number;
-  employee_id: string;
   name: string;
   rank: string | null;
 }
@@ -373,7 +372,7 @@ export interface BigTicketRequest {
   items: string[];
   other_item?: string;
   notes?: string;
-  created_by: number;
+  created_by: number | null;
   created_at: string;
   updated_at: string;
 }

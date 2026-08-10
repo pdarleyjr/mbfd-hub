@@ -7,9 +7,9 @@ use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use Filament\Resources\Pages\Page;
 use Filament\Tables;
-use Filament\Tables\Table;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
 class ApparatusInspections extends Page implements HasTable
@@ -60,8 +60,15 @@ class ApparatusInspections extends Page implements HasTable
                 Tables\Columns\TextColumn::make('shift')
                     ->badge()
                     ->color('info'),
-                Tables\Columns\TextColumn::make('mileage')
+                Tables\Columns\TextColumn::make('engine_hours')
+                    ->label('Engine Hours')
+                    ->numeric(decimalPlaces: 1)
+                    ->placeholder('—')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('miles')
+                    ->label('Miles')
                     ->numeric()
+                    ->placeholder('—')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('defects_count')
                     ->label('Issues Found')
@@ -71,7 +78,7 @@ class ApparatusInspections extends Page implements HasTable
                 Tables\Columns\IconColumn::make('officer_signature')
                     ->label('Officer Signed')
                     ->boolean()
-                    ->getStateUsing(fn ($record) => !empty($record->officer_signature)),
+                    ->getStateUsing(fn ($record) => ! empty($record->officer_signature)),
             ])
             ->defaultSort('completed_at', 'desc')
             ->actions([

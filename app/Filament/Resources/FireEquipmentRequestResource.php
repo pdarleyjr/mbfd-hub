@@ -2,15 +2,17 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\FireEquipmentRequestResource\Pages;
 use App\Models\FireEquipmentRequest;
+use App\Support\Security\Base64Image;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
 
-use App\Filament\Concerns\EnterpriseTable;
 class FireEquipmentRequestResource extends Resource
 {
     use EnterpriseTable;
@@ -18,10 +20,15 @@ class FireEquipmentRequestResource extends Resource
     protected static ?string $model = FireEquipmentRequest::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+
     protected static ?string $navigationGroup = 'Station Management';
+
     protected static ?int $navigationSort = 2;
+
     protected static ?string $navigationLabel = 'Equipment Requests';
+
     protected static ?string $modelLabel = 'Equipment Request';
+
     protected static ?string $pluralModelLabel = 'Equipment Requests';
 
     public static function table(Table $table): Table
@@ -111,10 +118,10 @@ class FireEquipmentRequestResource extends Resource
                             }),
                         Infolists\Components\TextEntry::make('pd_case_number')
                             ->label('PD Case Number')
-                            ->visible(fn ($record) => !empty($record->pd_case_number)),
+                            ->visible(fn ($record) => ! empty($record->pd_case_number)),
                         Infolists\Components\TextEntry::make('explanation')->label('Explanation'),
                         Infolists\Components\TextEntry::make('description')->label('Legacy Description')
-                            ->visible(fn ($record) => !empty($record->description)),
+                            ->visible(fn ($record) => ! empty($record->description)),
                         Infolists\Components\TextEntry::make('approvedBy.name')->label('Approved By'),
                         Infolists\Components\TextEntry::make('approved_at')->label('Approved At')->dateTime(),
                         Infolists\Components\TextEntry::make('notes'),
@@ -130,12 +137,12 @@ class FireEquipmentRequestResource extends Resource
                                     return 'No items data';
                                 }
                                 $data = is_array($state) ? $state : json_decode($state, true);
-                                if (!is_array($data)) {
+                                if (! is_array($data)) {
                                     return (string) $state;
                                 }
 
                                 $items = $data['items'] ?? $data;
-                                if (!is_array($items) || empty($items)) {
+                                if (! is_array($items) || empty($items)) {
                                     // Fallback: render as key-value
                                     $lines = [];
                                     foreach ($data as $key => $value) {
@@ -143,6 +150,7 @@ class FireEquipmentRequestResource extends Resource
                                         $val = is_array($value) ? json_encode($value) : $value;
                                         $lines[] = "<strong>{$label}:</strong> {$val}";
                                     }
+
                                     return implode('<br>', $lines);
                                 }
 
@@ -160,15 +168,17 @@ class FireEquipmentRequestResource extends Resource
                                     $html .= "<div style='color: #6b7280; font-size: 0.875rem;'>Reason: <strong>{$reason}</strong></div>";
 
                                     if ($pdCase) {
-                                        $html .= "<div style='color: #dc2626; font-size: 0.875rem; margin-top: 4px;'>PD Case No: <strong>" . htmlspecialchars($pdCase) . "</strong></div>";
+                                        $html .= "<div style='color: #dc2626; font-size: 0.875rem; margin-top: 4px;'>PD Case No: <strong>".htmlspecialchars($pdCase).'</strong></div>';
                                     }
-                                    if ($photo && str_starts_with($photo, 'data:image')) {
-                                        $html .= "<div style='margin-top: 8px;'><img src=\"{$photo}\" alt=\"Damage Photo\" style=\"max-width: 300px; max-height: 200px; border: 1px solid #e5e7eb; border-radius: 8px;\" /></div>";
+                                    $photoHtml = self::renderStoredImage($photo, 'Damage photo', 'max-width: 300px; max-height: 200px;');
+                                    if ($photoHtml !== null) {
+                                        $html .= "<div style='margin-top: 8px;'>{$photoHtml}</div>";
                                     }
 
                                     $html .= '</div>';
                                 }
                                 $html .= '</div>';
+
                                 return $html;
                             })
                             ->html()
@@ -182,7 +192,8 @@ class FireEquipmentRequestResource extends Resource
                                 if (empty($state)) {
                                     return 'No signature';
                                 }
-                                return "<img src=\"{$state}\" alt=\"Member Signature\" style=\"max-width: 400px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px;\" />";
+
+                                return self::renderStoredImage($state, 'Member signature', 'max-width: 400px;') ?? 'Invalid signature image';
                             })
                             ->html(),
                         Infolists\Components\TextEntry::make('officer_signature')
@@ -191,7 +202,8 @@ class FireEquipmentRequestResource extends Resource
                                 if (empty($state)) {
                                     return 'No signature';
                                 }
-                                return "<img src=\"{$state}\" alt=\"Officer Signature\" style=\"max-width: 400px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px;\" />";
+
+                                return self::renderStoredImage($state, 'Officer signature', 'max-width: 400px;') ?? 'Invalid signature image';
                             })
                             ->html(),
                     ])->columns(2)
@@ -205,5 +217,26 @@ class FireEquipmentRequestResource extends Resource
             'index' => Pages\ListFireEquipmentRequests::route('/'),
             'view' => Pages\ViewFireEquipmentRequest::route('/{record}'),
         ];
+    }
+
+    private static function renderStoredImage(mixed $state, string $alt, string $sizeStyle): ?string
+    {
+        if (! is_string($state) || trim($state) === '') {
+            return null;
+        }
+
+        if (str_starts_with($state, 'data:image/')) {
+            if (Base64Image::decode($state) === null) {
+                return null;
+            }
+            $url = $state;
+        } elseif (! str_contains($state, '://') && ! str_starts_with($state, '//')) {
+            $url = Storage::disk('public')->url(ltrim($state, '/'));
+        } else {
+            return null;
+        }
+
+        return '<img src="'.e($url).'" alt="'.e($alt).'" style="'
+            .e($sizeStyle).' border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px;" />';
     }
 }

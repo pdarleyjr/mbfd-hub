@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router';
 import SignatureCanvas from 'react-signature-canvas';
-import { enqueueSubmission, processPendingSubmissions } from '../../lib/sync';
+import { submitOrQueue, type SubmissionOutcome } from '../../lib/sync';
 
 const STATIONS = [
   'Station 1',
@@ -61,7 +61,7 @@ interface FormData {
 export default function StationInspectionWizard() {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submissionOutcome, setSubmissionOutcome] = useState<SubmissionOutcome | null>(null);
   const sigRef = useRef<SignatureCanvas | null>(null);
 
   const [form, setForm] = useState<FormData>({
@@ -149,7 +149,7 @@ export default function StationInspectionWizard() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      await enqueueSubmission('station_inspection', {
+      const outcome = await submitOrQueue('station_inspection', {
         station: form.station,
         inspection_type: 'Saturday Station Inspection',
         date: form.date,
@@ -159,17 +159,16 @@ export default function StationInspectionWizard() {
         sog_mandate_acknowledged: form.sogMandate,
         signature: form.signature,
         submitted_at: new Date().toISOString(),
-      });
-      processPendingSubmissions('/api/public').catch(() => {});
-      setSubmitted(true);
-    } catch {
-      alert('Failed to save. Your inspection will be retried automatically.');
+      }, '/api/public');
+      setSubmissionOutcome(outcome);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'The inspection could not be submitted. Please review the form and try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (submitted) {
+  if (submissionOutcome) {
     return (
       <div className="text-center py-16 space-y-6">
         <div className="w-20 h-20 mx-auto bg-emerald-50 rounded-full flex items-center justify-center">
@@ -177,8 +176,14 @@ export default function StationInspectionWizard() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-neutral-800 font-heading">Inspection Submitted</h2>
-        <p className="text-neutral-500 max-w-md mx-auto">Your Saturday station inspection has been queued and will sync when online.</p>
+        <h2 className="text-2xl font-bold text-neutral-800 font-heading">
+          {submissionOutcome === 'submitted' ? 'Inspection Submitted' : 'Inspection Saved Offline'}
+        </h2>
+        <p className="text-neutral-500 max-w-md mx-auto">
+          {submissionOutcome === 'submitted'
+            ? 'Your Saturday station inspection is available on the Admin Dashboard.'
+            : 'Your inspection is safely queued on this device and will sync automatically when the connection returns.'}
+        </p>
         <Link to="/forms-hub" className="inline-flex items-center min-h-[44px] px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors">
           Back to Forms Hub
         </Link>

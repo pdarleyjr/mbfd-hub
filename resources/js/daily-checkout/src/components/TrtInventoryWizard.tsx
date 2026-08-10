@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Link } from 'react-router';
 import { useTrtCatalog } from '../hooks/useTrtCatalog';
-import { enqueueSubmission, processPendingSubmissions } from '../lib/sync';
+import { submitOrQueue, type SubmissionOutcome } from '../lib/sync';
 import type { TrtEntryDraft, ItemCondition, ItemAction, TrtCatalogItem } from '../types/trt-inventory';
 
 interface SearchResult {
@@ -33,6 +33,7 @@ export default function TrtInventoryWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [partialSubmitted, setPartialSubmitted] = useState(false);
+  const [submissionOutcome, setSubmissionOutcome] = useState<SubmissionOutcome | null>(null);
   const fileInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -129,11 +130,11 @@ export default function TrtInventoryWizard() {
         return;
       }
 
-      await enqueueSubmission('trt-inventory/submit', {
+      const outcome = await submitOrQueue('trt-inventory/submit', {
         entries: filledEntries,
         submitted_at: new Date().toISOString(),
-      });
-      processPendingSubmissions('/api/public').catch(() => {});
+      }, '/api/public');
+      setSubmissionOutcome(outcome);
 
       if (andFinish) {
         setSubmitted(true);
@@ -141,8 +142,8 @@ export default function TrtInventoryWizard() {
         setPartialSubmitted(true);
         setTimeout(() => setPartialSubmitted(false), 3000);
       }
-    } catch {
-      alert('Failed to save. Your inventory will be retried automatically when online.');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'The inventory could not be submitted. Please review it and try again.');
     } finally {
       setSubmitting(false);
     }
@@ -157,9 +158,13 @@ export default function TrtInventoryWizard() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-neutral-800 font-heading">Inventory Submitted</h2>
+        <h2 className="text-2xl font-bold text-neutral-800 font-heading">
+          {submissionOutcome === 'queued' ? 'Inventory Saved Offline' : 'Inventory Submitted'}
+        </h2>
         <p className="text-neutral-500 max-w-md mx-auto">
-          Your TRT trailer inventory has been queued and will sync when online. Other team members can submit their sections too.
+          {submissionOutcome === 'queued'
+            ? 'Your TRT trailer inventory is safely queued on this device and will sync when the connection returns.'
+            : 'Your TRT trailer inventory is available on the Admin Dashboard. Other team members can submit their sections too.'}
         </p>
         <Link
           to="/forms-hub"

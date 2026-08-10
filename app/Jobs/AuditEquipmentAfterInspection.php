@@ -21,7 +21,9 @@ class AuditEquipmentAfterInspection implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
     public array $backoff = [30, 120, 300];
+
     public int $timeout = 300;
 
     public function __construct(
@@ -39,16 +41,18 @@ class AuditEquipmentAfterInspection implements ShouldQueue
                 'inspection_id' => $this->inspectionId,
                 'apparatus_id' => $this->apparatusId,
             ]);
+
             return;
         }
 
         $snipeitAssetId = $apparatus->snipeit_asset_id;
-        $inspectionRef = $inspection->inspection_reference ?? ('INS-' . now()->format('Y-m-d') . '-' . $inspection->id);
+        $inspectionRef = $inspection->inspection_reference ?? ('INS-'.now()->format('Y-m-d').'-'.$inspection->id);
 
         // 1. Get all equipment checked out to this apparatus from Snipe-IT
         $equipment = $snipeIt->getAssetsCheckedOutTo($snipeitAssetId);
         if (empty($equipment)) {
             Log::info('[SnipeItAudit] No equipment found on apparatus', ['snipeit_asset_id' => $snipeitAssetId]);
+
             return;
         }
 
@@ -90,6 +94,20 @@ class AuditEquipmentAfterInspection implements ShouldQueue
             $compartment = $matchResult['compartment'] ?? 'General';
             $notes = $matchResult['notes'] ?? '';
 
+            // An asset on the SnipeIT manifest is not proof that it was seen on
+            // this inspection. Never certify unmatched equipment as inspected.
+            if ($status === 'unmatched') {
+                $unmatched++;
+                Log::warning('[SnipeItAudit] Asset skipped because it was not on the submitted checklist', [
+                    'inspection_ref' => $inspectionRef,
+                    'asset_id' => $assetId,
+                    'asset_tag' => $assetTag,
+                    'asset_name' => $assetName,
+                ]);
+
+                continue;
+            }
+
             // Rate limit: 100ms between API calls
             usleep(100_000);
 
@@ -110,16 +128,12 @@ class AuditEquipmentAfterInspection implements ShouldQueue
                     $inspectionDate, $inspectionRef
                 );
             } else {
-                // Present or unmatched — audit as verified
-                if ($status === 'unmatched') {
-                    $unmatched++;
-                }
                 $audited++;
                 $this->handlePresentAsset(
                     $snipeIt, $assetTag, $assetName, $compartment,
                     $apparatusName, $apparatusTag, $stationName,
                     $operatorName, $rank, $shift, $employeeId,
-                    $inspectionDate, $inspectionRef, $status === 'unmatched'
+                    $inspectionDate, $inspectionRef
                 );
             }
         }
@@ -203,7 +217,7 @@ class AuditEquipmentAfterInspection implements ShouldQueue
             }
         }
 
-        // No match found — treat as present (on the manifest but not individually checked)
+        // No match found. The caller must skip rather than infer physical presence.
         return ['status' => 'unmatched', 'compartment' => 'Manifest', 'notes' => ''];
     }
 
@@ -211,13 +225,10 @@ class AuditEquipmentAfterInspection implements ShouldQueue
         SnipeItService $snipeIt, string $assetTag, string $assetName, string $compartment,
         string $apparatusName, string $apparatusTag, string $stationName,
         string $operatorName, string $rank, string $shift, string $employeeId,
-        string $inspectionDate, string $inspectionRef, bool $isUnmatched
+        string $inspectionDate, string $inspectionRef
     ): void {
         $badgeInfo = $employeeId ? " (Badge #{$employeeId})" : '';
         $shiftInfo = $shift ? " | Shift: {$shift}" : '';
-        $unmatchedNote = $isUnmatched
-            ? "\nNote: This equipment is on the apparatus manifest but was not\nindividually listed on the compartment checklist. It remains\nassigned to this apparatus and is considered accounted for.\n"
-            : '';
 
         $note = <<<EOT
 DAILY APPARATUS INSPECTION — EQUIPMENT VERIFIED
@@ -228,7 +239,7 @@ Compartment: {$compartment}
 
 Inspected by: {$rank} {$operatorName}{$badgeInfo}
 Date: {$inspectionDate}{$shiftInfo}
-{$unmatchedNote}
+
 This equipment was physically located, visually inspected, and
 confirmed present, accounted for, and in serviceable operating
 condition during the daily apparatus checkout procedure conducted
@@ -280,15 +291,15 @@ EOT;
         // 1. Audit with damage note
         $snipeIt->auditAsset($assetTag, trim($note));
 
-        // 2. Change status to Out for Repair (ID: 4)
-        $snipeIt->updateAssetStatus($assetId, 4);
+        // 2. Change status to the configured Snipe-IT Out for Repair label.
+        $snipeIt->updateAssetStatus($assetId, (int) config('snipeit.status_ids.out_for_repair'));
 
         // 3. Create maintenance record
         $snipeIt->createMaintenanceRecord(
             $assetId,
             "Defect reported during daily inspection — {$apparatusName}",
             'Repair',
-            "Reported by {$rank} {$operatorName} during daily apparatus checkout of {$apparatusName}.\n\nDefect details: " . ($defectNotes ?: 'Damaged — see inspection report.') . "\n\nInspection Ref: {$inspectionRef}",
+            "Reported by {$rank} {$operatorName} during daily apparatus checkout of {$apparatusName}.\n\nDefect details: ".($defectNotes ?: 'Damaged — see inspection report.')."\n\nInspection Ref: {$inspectionRef}",
             now()->format('Y-m-d')
         );
 
@@ -329,8 +340,8 @@ EOT;
         // 1. Audit with missing note
         $snipeIt->auditAsset($assetTag, trim($note));
 
-        // 2. Change status to Missing (ID: 5)
-        $snipeIt->updateAssetStatus($assetId, 5);
+        // 2. Change status to the configured Snipe-IT Missing label.
+        $snipeIt->updateAssetStatus($assetId, (int) config('snipeit.status_ids.missing'));
 
         // 3. Send notification
         $this->notifyAdmin('missing', $assetName, $assetTag, $apparatusName, $operatorName, '', $inspectionRef);

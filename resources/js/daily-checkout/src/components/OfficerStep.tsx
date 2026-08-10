@@ -45,8 +45,7 @@ export default function OfficerStep({ initialData, onSubmit }: OfficerStepProps)
   };
 
   const filteredEmployees = employees.filter(emp =>
-    emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.employee_id.includes(searchTerm)
+    emp.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const hasEmployees = employees.length > 0;
@@ -77,7 +76,7 @@ export default function OfficerStep({ initialData, onSubmit }: OfficerStepProps)
                   setShowDropdown(true);
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Search by name or badge #..."
+                placeholder="Search by name..."
                 required
                 autoComplete="off"
               />
@@ -91,7 +90,7 @@ export default function OfficerStep({ initialData, onSubmit }: OfficerStepProps)
                     >
                       <span className="font-medium">{emp.name}</span>
                       <span className="text-gray-500 ml-2">
-                        {emp.rank ? `${emp.rank} ` : ''}(#{emp.employee_id})
+                        {emp.rank || ''}
                       </span>
                     </li>
                   ))}
@@ -99,7 +98,7 @@ export default function OfficerStep({ initialData, onSubmit }: OfficerStepProps)
               )}
               {formData.employeeId && (
                 <p className="text-xs text-green-600 mt-1">
-                  Selected: {formData.name} (Badge #{employees.find(e => e.id === formData.employeeId)?.employee_id})
+                  Selected: {formData.name}
                 </p>
               )}
             </>
@@ -149,26 +148,25 @@ export default function OfficerStep({ initialData, onSubmit }: OfficerStepProps)
 
         <div>
           <label htmlFor="unitNumber" className="block text-sm font-medium text-gray-700 mb-2">
-            Unit Number
+            Apparatus Vehicle Number
           </label>
           <input
             type="text"
             id="unitNumber"
             value={formData.unitNumber}
-            onChange={(e) => handleChange('unitNumber', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="e.g., E1, L1, R1"
+            readOnly
+            className="w-full min-h-[44px] px-3 py-2 border border-gray-300 bg-gray-50 rounded-md shadow-sm text-gray-700"
             required
           />
           <p className="text-sm text-gray-500 mt-1">
-            Enter the unit number as it appears on the apparatus
+            This value is mapped from the selected apparatus and cannot be changed here.
           </p>
         </div>
 
         <div className="pt-4">
           <button
             type="submit"
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium"
+            className="w-full min-h-[44px] px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium"
           >
             Continue to Inspection
           </button>

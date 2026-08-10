@@ -15,6 +15,7 @@ class ViewInspection extends Page
     protected static string $view = 'filament.resources.apparatus-resource.pages.view-inspection';
 
     public Apparatus $record;
+
     public ApparatusInspection $inspection;
 
     public function mount($record, $inspection): void
@@ -26,17 +27,17 @@ class ViewInspection extends Page
             $this->record = Apparatus::findOrFail($record);
         }
 
-        // $inspection is always an ID from the route
-        if ($inspection instanceof ApparatusInspection) {
-            $this->inspection = $inspection->load('defects');
-        } else {
-            $this->inspection = ApparatusInspection::with('defects')->findOrFail($inspection);
-        }
+        $inspectionId = $inspection instanceof ApparatusInspection ? $inspection->getKey() : $inspection;
+        $this->inspection = ApparatusInspection::query()
+            ->with('defects')
+            ->where('apparatus_id', $this->record->getKey())
+            ->findOrFail($inspectionId);
     }
 
     public function getTitle(): string
     {
         $designation = $this->record->designation ?? $this->inspection->designation_at_time ?? 'Unknown';
+
         return "Inspection Results — {$designation}";
     }
 
@@ -73,9 +74,13 @@ class ViewInspection extends Page
             foreach ($compartment['items'] ?? [] as $item) {
                 $totalItems++;
                 $status = $item['status'] ?? 'Present';
-                if ($status === 'Present') $presentCount++;
-                elseif ($status === 'Missing') $missingCount++;
-                elseif ($status === 'Damaged') $damagedCount++;
+                if ($status === 'Present') {
+                    $presentCount++;
+                } elseif ($status === 'Missing') {
+                    $missingCount++;
+                } elseif ($status === 'Damaged') {
+                    $damagedCount++;
+                }
             }
         }
 
