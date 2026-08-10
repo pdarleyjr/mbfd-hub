@@ -102,6 +102,7 @@ Google Sheets apparatus synchronization is configured and healthy. API authentic
 - **Fixed:** the test environment now explicitly uses in-memory SQLite for the application and web-push data and supplies a nonsecret test-only application key, eliminating accidental workstation MySQL coupling.
 - **Fixed:** `league/commonmark` was upgraded from 2.8.3 to 2.9.1 to clear six newly published parser advisories.
 - **Fixed:** the CI filesystem scanner also identified patched `brace-expansion` and `nanoid` releases in the separate vacation workspace lockfile; both high-severity transitives were updated and its high-severity package audit is clean.
+- **Fixed after live inspection:** Reverb was not supervised and the deploy check matched its own `pgrep` command, creating a false success. Reverb now runs under Supervisor with automatic restart, and deployment fails unless both exact Reverb and queue-worker processes exist.
 - **Observed:** the five production failed jobs are older `GenerateOperationalFormPdf` failures from July 21, 2026. They are unrelated to the audited request/checkout synchronization, but should be archived or retried after document-owner review.
 
 ## Performance and scalability
