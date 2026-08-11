@@ -106,6 +106,7 @@ Google Sheets apparatus synchronization is configured and healthy. API authentic
 - **Fixed:** the test environment now explicitly uses in-memory SQLite for the application and web-push data and supplies a nonsecret test-only application key, eliminating accidental workstation MySQL coupling.
 - **Fixed:** `league/commonmark` was upgraded from 2.8.3 to 2.9.1 to clear six newly published parser advisories.
 - **Fixed:** the CI filesystem scanner also identified patched `brace-expansion` and `nanoid` releases in the separate vacation workspace lockfile; both high-severity transitives were updated and its high-severity package audit is clean.
+- **Fixed after repository-alert reconciliation:** both Cloudflare Worker lockfiles carried the newly disclosed high-severity `undici` advisory through Wrangler/Miniflare. Wrangler 4.120.1 now resolves `undici` 7.29.0; both Worker audits are clean and both bundles pass Wrangler dry-run deployment.
 - **Fixed after live inspection:** Reverb was not supervised and the deploy check matched its own `pgrep` command, creating a false success. Reverb now runs under Supervisor with automatic restart, and deployment fails unless both exact Reverb and queue-worker processes exist.
 - **Fixed after queue replay:** the database queue's 90-second retry window was shorter than the Command Center summary job's 180-second timeout, while that job allowed no recovery attempt. The default retry window is now 240 seconds and the job permits one delayed retry, preventing an interrupted long-running generation from immediately exhausting its attempts.
 - **Observed:** the five production failed jobs are older `GenerateOperationalFormPdf` failures from July 21, 2026. They are unrelated to the audited request/checkout synchronization, but should be archived or retried after document-owner review.
@@ -126,7 +127,7 @@ Google Sheets apparatus synchronization is configured and healthy. API authentic
 - Node operational-forms regression: 1 test passes.
 - Production builds: root and daily-checkout pass.
 - Authenticated production browser transaction: all 14 critical admin surfaces were exercised; employee login, request submission, portal history, and admin request visibility passed. The uniquely identified request, notifications, test identities, role row, and automatically mirrored ScreenTinker workspace were removed after verification.
-- Security: root npm, daily npm, and locked Composer audit report zero known advisories after remediation.
+- Security: root npm, daily npm, both Cloudflare Worker npm audits, and locked Composer audit report zero known advisories after remediation; the separate vacation workspace has no remaining high-severity advisory.
 - Laravel: configuration, route, and Blade view caches compile successfully.
 - Formatting: all 37 changed PHP files pass Pint; repository-wide Pint remains a separate pre-existing backlog.
 
