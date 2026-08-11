@@ -21,7 +21,7 @@ class ConferenceWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const COMMAND_PIN = '246810';
+    private const COMMAND_PIN = '2468';
 
     private FakeConferenceProvider $provider;
 

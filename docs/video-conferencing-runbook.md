@@ -20,7 +20,7 @@ The GMKtec production host is behind Starlink CGNAT and its routed IPv6 is filte
 
 ## Install
 
-1. Generate a unique API key, at least 32 random API-secret characters, and a separate 6-8 digit 300 command PIN. Store the PIN only in the approved operator secret store and put a one-way application hash in `VIDEO_CONFERENCING_COMMAND_PIN_HASH`; never store or commit the plaintext PIN in `.env`.
+1. Generate a unique API key, at least 32 random API-secret characters, and a separate 4-8 digit 300 command PIN. Store the PIN only in the approved operator secret store and put a one-way application hash in `VIDEO_CONFERENCING_COMMAND_PIN_HASH`; never store or commit the plaintext PIN in `.env`.
 2. Obtain one trusted certificate covering both signaling and TURN names. For the GMKtec Tailnet deployment, use Cloudflare DNS-01 validation. Copy the resulting certificate to `fullchain.pem` and key to `privkey.pem` under the root-owned directory identified by `LIVEKIT_CERT_DIR`; never place the DNS API token in the repository or container environment.
 3. Copy `infra/livekit/caddy.yaml.example` to the path identified by `LIVEKIT_CADDY_CONFIG`, replace both example SNI names, and validate it with the pinned Caddy image. Copy `infra/livekit/.env.example` to an operator-owned secret file outside the repository and set all values. In the Tailnet-only topology, set `LIVEKIT_NODE_IP` to the LiveKit host's Tailscale address; do not use a CGNAT address discovered through STUN.
 4. Validate without starting services:
