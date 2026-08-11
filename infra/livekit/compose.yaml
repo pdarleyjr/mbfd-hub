@@ -1,0 +1,84 @@
+name: mbfd-livekit
+
+services:
+  caddy:
+    # Official LiveKit Layer 4 Caddy build, pinned to the tested image digest.
+    # It multiplexes HTTPS/WSS and TURN/TLS on public TCP 443 by SNI.
+    image: livekit/caddyl4@sha256:9dd090159a6042a907dbff0ce9dda27a21d2a559dc7b03b60a8e6b1b60b8348e
+    container_name: mbfd-livekit-caddy
+    restart: unless-stopped
+    network_mode: host
+    command: run --config /etc/caddy.yaml --adapter yaml
+    depends_on:
+      - livekit
+    volumes:
+      - ${LIVEKIT_CADDY_CONFIG:?Set LIVEKIT_CADDY_CONFIG to the rendered Caddy YAML}:/etc/caddy.yaml:ro
+      - ${LIVEKIT_CERT_DIR:?Set LIVEKIT_CERT_DIR to the trusted certificate directory}:/etc/caddy/certs:ro
+      - ${LIVEKIT_CADDY_DATA_DIR:?Set LIVEKIT_CADDY_DATA_DIR to a persistent Caddy data directory}:/data
+    healthcheck:
+      test: ["CMD", "caddy", "validate", "--config", "/etc/caddy.yaml", "--adapter", "yaml"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7.4.7-alpine
+    container_name: mbfd-livekit-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - livekit-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  livekit:
+    image: livekit/livekit-server:v1.13.5
+    container_name: mbfd-livekit-server
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        log_level: info
+        prometheus_port: 6789
+        rtc:
+          tcp_port: 7881
+          port_range_start: 50000
+          port_range_end: 60000
+          use_external_ip: true
+          advertise_internal_ip: true
+          interfaces:
+            includes:
+              - ${LIVEKIT_PRIMARY_INTERFACE:-eno1}
+              - ${LIVEKIT_TAILSCALE_INTERFACE:-tailscale0}
+        redis:
+          address: 127.0.0.1:6380
+        room:
+          auto_create: false
+          empty_timeout: 300
+          departure_timeout: 30
+          max_participants: 12
+          enable_remote_unmute: false
+        keys:
+          ${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET}
+        webhook:
+          api_key: ${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY}
+          urls:
+            - ${LIVEKIT_WEBHOOK_URL:?Set LIVEKIT_WEBHOOK_URL}
+        turn:
+          enabled: true
+          domain: ${LIVEKIT_TURN_DOMAIN:?Set LIVEKIT_TURN_DOMAIN}
+          udp_port: 3478
+          tls_port: 5349
+          external_tls: true
+
+volumes:
+  livekit-redis:

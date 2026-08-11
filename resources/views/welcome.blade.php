@@ -573,6 +573,25 @@
                     </div>
                 </a>
 
+                <!-- Video Conferencing — blue accent -->
+                <a href="{{ url('/employee/video-conferencing') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-blue-300 transition-all duration-200 overflow-hidden">
+                    <div class="flex">
+                        <div class="w-1.5 bg-blue-600 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="flex items-start gap-4 p-5 flex-1">
+                            <div class="w-11 h-11 rounded-lg bg-blue-50 flex items-center justify-center text-blue-700 flex-shrink-0 group-hover:scale-105 transition-transform">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="font-semibold text-neutral-800 group-hover:text-blue-700 font-heading text-base">Video Conferencing</h3>
+                                <p class="text-sm text-neutral-500 mt-0.5">Join Morning Lineup or connect directly with an MBFD station</p>
+                            </div>
+                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-blue-600 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </div>
+                    </div>
+                </a>
+
                 {{-- Hidden per admin request 2026-04-04 — re-enable when ready --}}
                 @if(false)
                 <!-- Apparatus Equipment Planner — teal accent -->

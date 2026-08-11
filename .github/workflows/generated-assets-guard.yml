@@ -52,4 +52,6 @@ jobs:
       - name: Verify deployment assets after build
         env:
           REQUIRE_GENERATED_ASSETS: '1'
-        run: node scripts/ci/guard-generated-assets.mjs
+        run: |
+          npm run test:video-conferencing-bundle
+          node scripts/ci/guard-generated-assets.mjs

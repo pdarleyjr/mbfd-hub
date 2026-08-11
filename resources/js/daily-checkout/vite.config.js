@@ -83,7 +83,7 @@ export default defineConfig({
   build: {
     outDir: dailyOutDir,
     emptyOutDir: true,
-    sourcemap: true,
+    sourcemap: false,
   },
   server: {
     fs: {

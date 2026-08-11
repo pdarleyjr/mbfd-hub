@@ -209,8 +209,8 @@ Desktop.ini
 
 # Playwright failure traces are local diagnostics; committed acceptance images live in tests/e2e/screenshots.
 /test-results/*/
+/playwright-report/
 
 # Generated reflection / local test artifact (not source)
 app/Services/OperationalForms/FrocZipReader.php.json
 /testing
-

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\VideoConferencing\ConferenceProvider;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\EvaluationSubmission;
@@ -20,7 +21,10 @@ use App\Observers\TrainingTodoObserver;
 use App\Observers\WorkgroupSharedUploadObserver;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
@@ -32,6 +36,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(ConferenceProvider::class, \App\Services\VideoConferencing\LiveKitConferenceProvider::class);
+
         $this->app->bind(
             \Filament\Http\Responses\Auth\Contracts\LoginResponse::class,
             \App\Http\Responses\LoginResponse::class,
@@ -59,6 +65,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('conference-tokens', function (Request $request): array {
+            $employeeId = $request->user('employee')?->getAuthIdentifier() ?? $request->ip();
+
+            return [
+                Limit::perMinute(12)->by('conference-token:'.$employeeId),
+                Limit::perMinute(60)->by('conference-ip:'.$request->ip()),
+            ];
+        });
+        RateLimiter::for('conference-controls', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by('conference-controls:'.($request->user('employee')?->getAuthIdentifier() ?? $request->ip())));
+
         if (str_contains(config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }

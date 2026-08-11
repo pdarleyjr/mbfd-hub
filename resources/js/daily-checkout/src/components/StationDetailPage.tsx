@@ -244,6 +244,17 @@ export default function StationDetailPage() {
 
         {/* Quick Links */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          {[1, 2, 3, 4, 6].includes(station.station_number) && (
+            <a
+              href={`/employee/video-conferencing?room=lineup&join_as=sta${station.station_number}`}
+              className="flex min-h-12 items-center gap-2.5 p-3 bg-blue-50 rounded-xl ring-1 ring-blue-200/80 hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 transition-colors text-sm font-semibold text-blue-800"
+            >
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Morning Lineup
+            </a>
+          )}
           <Link
             to={`/forms-hub/big-ticket-request`}
             className="flex items-center gap-2.5 p-3 bg-neutral-50 rounded-xl ring-1 ring-neutral-200/60 hover:bg-red-50 hover:ring-red-200 transition-all text-sm font-medium text-neutral-700 hover:text-red-700"

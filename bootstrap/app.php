@@ -35,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verify.bid.token' => \App\Http\Middleware\VerifyBidReaderToken::class,
             'display.readonly' => \App\Http\Middleware\EnsureDisplayReadOnly::class,
             'display.token' => \App\Http\Middleware\EnsureDisplayToken::class,
+            'conference.enabled' => \App\Http\Middleware\EnsureVideoConferencingEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
