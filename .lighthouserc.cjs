@@ -1,15 +1,15 @@
 /**
  * Lighthouse CI configuration.
  *
- * Two budgets:
- *  - mobile preset for non-admin routes (the regression guard)
- *  - desktop preset for /admin (the modernization-target dashboard)
+ * Local collection defaults to representative public routes. The production
+ * workflow overrides the URL list while retaining these settings and the
+ * assertions below.
  *
  * Run locally:
  *    npm i -g @lhci/cli
  *    lhci autorun --config=.lighthouserc.cjs
  *
- * CI: see .github/workflows/lighthouse-ci.yml
+ * CI: see .github/workflows/lighthouse.yml
  */
 module.exports = {
   ci: {
@@ -32,13 +32,30 @@ module.exports = {
       },
     },
     assert: {
-      // Soft thresholds while we capture the baseline. Tighten after
-      // the first successful CI run records actual numbers.
+      // Error-level thresholds are release gates. Category scores other than
+      // accessibility remain warnings because they can vary across runners;
+      // deterministic timing and transfer-size regressions fail the build.
       assertions: {
         'categories:performance': ['warn', { minScore: 0.85 }],
         'categories:accessibility': ['error', { minScore: 0.9 }],
         'categories:best-practices': ['warn', { minScore: 0.9 }],
         'categories:seo': ['warn', { minScore: 0.9 }],
+        interactive: ['error', { maxNumericValue: 3500 }],
+        'first-contentful-paint': ['error', { maxNumericValue: 1800 }],
+        'largest-contentful-paint': ['error', { maxNumericValue: 3000 }],
+        'cumulative-layout-shift': ['error', { maxNumericValue: 0.15 }],
+        'total-blocking-time': ['error', { maxNumericValue: 400 }],
+        'resource-summary:script:size': ['error', { maxNumericValue: 512000 }],
+        'resource-summary:stylesheet:size': ['error', { maxNumericValue: 102400 }],
+        'resource-summary:image:size': ['error', { maxNumericValue: 512000 }],
+        'resource-summary:font:size': ['error', { maxNumericValue: 153600 }],
+        'resource-summary:document:size': ['error', { maxNumericValue: 51200 }],
+        'resource-summary:total:size': ['error', { maxNumericValue: 1536000 }],
+        'resource-summary:script:count': ['error', { maxNumericValue: 15 }],
+        'resource-summary:stylesheet:count': ['error', { maxNumericValue: 5 }],
+        'resource-summary:font:count': ['error', { maxNumericValue: 5 }],
+        'resource-summary:third-party:count': ['error', { maxNumericValue: 10 }],
+        'resource-summary:total:count': ['error', { maxNumericValue: 75 }],
       },
     },
     upload: {

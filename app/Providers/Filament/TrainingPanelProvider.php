@@ -33,9 +33,9 @@ class TrainingPanelProvider extends PanelProvider
             ->homeUrl('/')
             ->login(Login::class)
             ->brandName('MBFD Training Division')
-            ->brandLogo(secure_asset('images/mbfd_logo.png'))
+            ->brandLogo(secure_asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
-            ->darkModeBrandLogo(secure_asset('images/mbfd_logo.png'))
+            ->darkModeBrandLogo(secure_asset('images/mbfd_logo-256.png'))
             ->favicon(secure_asset('favicon.ico'))
             ->darkMode(false)
             ->colors([

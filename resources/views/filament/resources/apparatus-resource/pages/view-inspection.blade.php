@@ -12,7 +12,7 @@
     <div class="space-y-6">
         {{-- Logo & Header --}}
         <div class="text-center print-only" style="display: block;">
-            <img src="/images/mbfd_logo.png" alt="MBFD Logo" class="mx-auto h-20 w-20 object-contain mb-2">
+            <img src="/images/mbfd_logo-256.png" alt="MBFD Logo" class="mx-auto h-20 w-20 object-contain mb-2" width="80" height="80">
             <h1 class="text-2xl font-bold text-gray-900">Miami Beach Fire Department</h1>
             <p class="text-sm text-gray-500">Daily Vehicle Inspection Report</p>
         </div>
@@ -20,7 +20,7 @@
         {{-- Inspection Summary Card --}}
         <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6 dark:bg-gray-900 dark:ring-white/10">
             <div class="flex items-center gap-4 mb-6">
-                <img src="/images/mbfd_logo.png" alt="MBFD Logo" class="h-16 w-16 object-contain">
+                <img src="/images/mbfd_logo-256.png" alt="MBFD Logo" class="h-16 w-16 object-contain" width="64" height="64">
                 <div>
                     <h2 class="text-xl font-bold text-gray-900 dark:text-white">
                         Inspection Report — {{ $currentDesignation }}

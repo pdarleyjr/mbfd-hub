@@ -109,6 +109,7 @@ Google Sheets apparatus synchronization is configured and healthy. API authentic
 - **Fixed after repository-alert reconciliation:** both Cloudflare Worker lockfiles carried the newly disclosed high-severity `undici` advisory through Wrangler/Miniflare. Wrangler 4.120.1 now resolves `undici` 7.29.0; both Worker audits are clean and both bundles pass Wrangler dry-run deployment.
 - **Fixed after live inspection:** Reverb was not supervised and the deploy check matched its own `pgrep` command, creating a false success. Reverb now runs under Supervisor with automatic restart, and deployment fails unless both exact Reverb and queue-worker processes exist.
 - **Fixed after queue replay:** the database queue's 90-second retry window was shorter than the Command Center summary job's 180-second timeout, while that job allowed no recovery attempt. The default retry window is now 240 seconds and the job permits one delayed retry, preventing an interrupted long-running generation from immediately exhausting its attempts.
+- **Fixed after CI artifact review:** the Lighthouse workflow passed even though LHCI rejected simultaneous budget and assertion configurations, and the wrapper did not propagate the assertion exit code. Performance budgets are now one assertion set, and an explicit pinned LHCI assertion step fails the workflow on an error-level regression.
 - **Observed:** the five production failed jobs are older `GenerateOperationalFormPdf` failures from July 21, 2026. They are unrelated to the audited request/checkout synchronization, but should be archived or retried after document-owner review.
 
 ## Performance and scalability
@@ -116,12 +117,13 @@ Google Sheets apparatus synchronization is configured and healthy. API authentic
 - Daily routes and large form wizards now load through `React.lazy`/dynamic imports.
 - Daily initial JavaScript: **620.57 kB → 341.61 kB minified** and **179.07 kB → 109.94 kB gzip** (about 45% and 39% reductions respectively).
 - Main application: PDF generation now loads only when Export is pressed; the prior 778.94 kB main bundle was replaced by chunks whose largest executable JS chunk is 420.05 kB.
+- Homepage logo transfer: **1.79 MB → 119 kB** by serving a visually verified 256 px UI asset while retaining the original source for the legacy startup-image use. Local Lighthouse total transfer fell from the 1.98 MB production baseline to about 448 kB before HTTP compression.
 - npm audits are clean in both package roots.
 - Queue-dependent integrations retain explicit attempts and backoff. Queue job timeouts now remain below both database and Redis `retry_after` settings to avoid duplicate processing.
 
 ## Verification evidence
 
-- PHPUnit: **285 tests, 1,232 assertions, all passing in CI** after formatting and the dependency security upgrade.
+- PHPUnit: **288 tests, 1,256 assertions** in the final suite, including static regression checks for the Lighthouse release gate and bounded logo asset.
 - Added focused coverage for personnel imports, public directory redaction, public Fire Equipment requests, portal-to-admin employee requests, uniform stock issuance, SnipeIT unmatched-asset safety, critical apparatus defect linkage, and critical admin page rendering.
 - TypeScript: root and daily-checkout typechecks pass.
 - Node operational-forms regression: 1 test passes.
@@ -149,4 +151,3 @@ These are intentionally not reported as verified by automated tests:
 2. Fleet/Logistics classification and mapping of the seven SnipeIT-unmapped apparatus records.
 3. Governance/design approval for employee-to-SnipeIT identity synchronization.
 4. Physical tablet/smartboard, camera/signature, printer/PDF, Safari, and poor-connectivity/offline acceptance.
-5. Authenticated live-browser traversal after the release, including cleanup of any isolated audit fixture.

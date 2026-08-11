@@ -69,7 +69,7 @@
     <header class="sticky top-0 z-50 bg-slate-850 border-b border-slate-700/50 backdrop-blur-md h-16 flex items-center justify-between px-4 lg:px-6" style="padding-top: max(0px, env(safe-area-inset-top, 0px));">
         <!-- Left: Logo + Title -->
         <div class="flex items-center gap-3">
-            <img src="/images/mbfd_logo.png" alt="MBFD Logo" class="h-10 w-10 object-contain">
+            <img src="/images/mbfd_logo-256.png" alt="MBFD Logo" class="h-10 w-10 object-contain" width="40" height="40">
             <div class="hidden sm:block">
                 <h1 class="text-white font-semibold text-base leading-tight font-heading">MBFD Support Hub</h1>
                 <p class="text-slate-400 text-xs">Enterprise Command Portal</p>

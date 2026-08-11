@@ -23,6 +23,12 @@ jobs:
         with:
           urls: |
             https://www.mbfdhub.com/
-          budgetPath: ./budget.json
+          configPath: ./.lighthouserc.cjs
           uploadArtifacts: true
           temporaryPublicStorage: false
+
+      # lighthouse-ci-action v12 currently records assertion failures without
+      # propagating the LHCI process exit code. Run the pinned official CLI
+      # against the collected reports so an error-level regression fails CI.
+      - name: Enforce Lighthouse assertions
+        run: npx --yes @lhci/cli@0.15.1 assert --config=.lighthouserc.cjs --includePassedAssertions
