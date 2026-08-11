@@ -10,7 +10,7 @@
 
 The audit found and remediated several material integrity defects: an equipment-request endpoint that could queue a permanently invalid URL while telling the operator it succeeded; SnipeIT assets that could be certified as physically inspected despite having no matching checklist item; vehicle meter readings that updated the current apparatus but disappeared from inspection history; collision-prone inspection references; and unsafe shared-password administration paths. The affected code now has explicit regression coverage.
 
-Production data was reviewed read-only before implementation. MBFD Hub had 237 employee portal records with no blank, malformed, or duplicate employee IDs. The tracked 229-person roster was fully represented with no name or rank mismatches. Eight additional live records need an HR owner to confirm because no newer authoritative roster was available. A mass reset to `Miamibeach!` is neither necessary nor recommended.
+Production data was reviewed read-only before implementation. MBFD Hub had 237 employee portal records with no blank, malformed, or duplicate employee IDs. The tracked roster now contains 235 people and is fully represented with no name or rank mismatches. On August 11, 2026, the department owner confirmed Jorge Linares, Digna Abello, Victor White, David Sola, Juan Mestas, and Miguel Anchia as Miami Beach employees; those six records are now authoritative roster members. The remaining two live-only records need an HR owner to confirm. A mass reset to `Miamibeach!` is neither necessary nor recommended.
 
 SnipeIT integration is **partial, not fleet-wide**: 19 of 26 apparatus records have SnipeIT mappings and all 19 mapped remote assets were verified by ID and tag. Seven apparatus records are unmapped. Employee portal identities are also not synchronized to SnipeIT: the portal has 237 employees, SnipeIT has 5 users, and the existing sync command targets the separate admin `users` table.
 
@@ -33,8 +33,9 @@ Google Sheets apparatus synchronization is configured and healthy. API authentic
 ### Authentication and employee access
 
 - **Verified:** 237 live employee records; zero blank, malformed, or duplicate employee IDs.
-- **Verified:** all 229 records in `scripts/mbfd-personnel.csv` exist in production with matching names and ranks.
-- **Needs owner confirmation:** employee IDs `18156`, `20487`, `16847`, `19952`, `16584`, `16573`, `19545`, and `21989` exist only in the live database relative to the tracked roster. They may be valid newer employees and were not altered.
+- **Verified:** all 235 records in `scripts/mbfd-personnel.csv` exist in production with matching names and ranks.
+- **Owner-confirmed:** employee IDs `16847`, `18156`, `19545`, `19952`, `20487`, and `21989` are Miami Beach employees and are included in the authoritative tracked roster.
+- **Needs owner confirmation:** employee IDs `16573` and `16584` exist only in the live database relative to the tracked roster. They may be valid newer employees and were not altered.
 - **Verified:** no employees are currently flagged `must_change_password`; hashes do not form a shared-password cluster, and no configured default matched.
 - **Fixed:** personnel re-import no longer overwrites existing passwords. Existing users receive profile updates only.
 - **Fixed:** new-user import requires an explicit new credential-output file, generates a unique 24-character temporary password per employee, avoids console disclosure, and writes with restrictive permissions where supported.
@@ -147,7 +148,7 @@ Google Sheets apparatus synchronization is configured and healthy. API authentic
 
 These are intentionally not reported as verified by automated tests:
 
-1. HR confirmation of the eight live-only employee records.
+1. HR confirmation of the two remaining live-only employee records (`16573` and `16584`).
 2. Fleet/Logistics classification and mapping of the seven SnipeIT-unmapped apparatus records.
 3. Governance/design approval for employee-to-SnipeIT identity synchronization.
 4. Physical tablet/smartboard, camera/signature, printer/PDF, Safari, and poor-connectivity/offline acceptance.
