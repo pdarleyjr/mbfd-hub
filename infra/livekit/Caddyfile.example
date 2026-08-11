@@ -1,8 +1,0 @@
-# Signaling/API TLS only. LiveKit's embedded TURN terminates its own TLS on
-# 5349 and UDP on 3478; those ports bypass Caddy and must reach the host.
-{$LIVEKIT_SIGNAL_DOMAIN} {
-    reverse_proxy 127.0.0.1:7880
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    }
-}

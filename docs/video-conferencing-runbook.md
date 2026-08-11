@@ -8,26 +8,28 @@ The application feature flag defaults to `false`. Keep it false until DNS, trust
 
 ## Production topology
 
-- `video.<domain>`: DNS-only record to the LiveKit host; Caddy terminates trusted HTTPS/WSS and proxies to `127.0.0.1:7880`.
-- `turn.<domain>`: DNS-only record to the same host; LiveKit terminates TURN/TLS on TCP 5349 and TURN/UDP on 3478.
+- `video.<domain>`: DNS-only record to the LiveKit host; the official LiveKit Layer 4 Caddy pattern terminates trusted HTTPS/WSS on TCP 443 and proxies to `127.0.0.1:7880`.
+- `turn.<domain>`: DNS-only record to the same host; Caddy selects it by SNI on TCP 443, terminates TLS, and proxies unencrypted TURN to LiveKit's loopback TCP 5349 listener. LiveKit advertises TURN/TLS to clients on 443.
 - RTC reaches the host directly on TCP 7881 and UDP 50000-60000.
 - Dedicated Redis is bound only to host loopback port 6380. It is not publicly reachable.
 - Cloudflare Tunnel/proxy cannot carry the required UDP media paths. Do not orange-cloud the LiveKit or TURN records.
 
-Required inbound firewall rules are TCP 80/443 for certificate issuance and signaling, TCP 5349 for TURN/TLS, UDP 3478 for TURN/UDP, TCP 7881 for RTC fallback, and UDP 50000-60000 for WebRTC. Restrict SSH and metrics port 6789 to the management network/Tailscale; never expose Redis.
+For a host with a public address, required inbound firewall rules are TCP 443 for signaling and TURN/TLS, UDP 3478 for TURN/UDP, TCP 7881 for RTC fallback, and UDP 50000-60000 for WebRTC. TCP 5349 is an internal Caddy-to-LiveKit hop and must not be exposed. TCP 80 is needed only when Caddy performs HTTP certificate issuance; DNS-01 issuance does not need it. Restrict SSH and metrics port 6789 to the management network/Tailscale; never expose Redis.
+
+The GMKtec production host is behind Starlink CGNAT and its routed IPv6 is filtered by the Starlink router. It therefore cannot accept general public-internet WebRTC traffic directly. Its supported deployment mode is Tailnet-only: both DNS-only records resolve to the GMKtec Tailscale address, all conference endpoints must have Tailscale connected, the host firewall remains default-deny off Tailnet, and certificates are issued by a public CA with Cloudflare DNS-01 validation. A future non-Tailscale deployment requires a public-IP VPS/L4 relay or LiveKit Cloud; a Cloudflare HTTP tunnel is not a substitute for LiveKit UDP/TURN reachability.
 
 ## Install
 
 1. Generate a unique API key and at least 32 random secret characters. Store them only in the host secret store and Laravel production environment. Never commit `.env`.
-2. Obtain trusted certificates for both signaling and TURN names. Place the TURN certificate as `fullchain.pem` and key as `privkey.pem` under the directory identified by `LIVEKIT_CERT_DIR`.
-3. Copy `infra/livekit/.env.example` to an operator-owned secret file outside the repository and set all values.
+2. Obtain one trusted certificate covering both signaling and TURN names. For the GMKtec Tailnet deployment, use Cloudflare DNS-01 validation. Copy the resulting certificate to `fullchain.pem` and key to `privkey.pem` under the root-owned directory identified by `LIVEKIT_CERT_DIR`; never place the DNS API token in the repository or container environment.
+3. Copy `infra/livekit/caddy.yaml.example` to the path identified by `LIVEKIT_CADDY_CONFIG`, replace both example SNI names, and validate it with the pinned Caddy image. Copy `infra/livekit/.env.example` to an operator-owned secret file outside the repository and set all values.
 4. Validate without starting services:
 
    ```sh
    docker compose --env-file /secure/path/livekit.env -f infra/livekit/compose.yaml config --quiet
    ```
 
-5. Start Redis and the pinned LiveKit server:
+5. Start Caddy, Redis, and the pinned LiveKit server:
 
    ```sh
    docker compose --env-file /secure/path/livekit.env -f infra/livekit/compose.yaml up -d
@@ -37,6 +39,8 @@ Required inbound firewall rules are TCP 80/443 for certificate issuance and sign
 
 6. Configure Laravel with `LIVEKIT_URL=wss://...`, `LIVEKIT_API_URL=https://...`, the matching key/secret, and an optional `VIDEO_CONFERENCING_LINEUP_TIME=HH:MM`. Keep `VIDEO_CONFERENCING_ENABLED=false`, then run migrations and clear cached config.
 7. Verify signed webhook delivery to `/webhooks/livekit`, then enable the feature and clear cached config again.
+
+The Caddy certificate reload hook should run `docker exec mbfd-livekit-caddy caddy reload --config /etc/caddy.yaml --adapter yaml` after renewal. Validate automatic renewal with the CA client's dry-run command before enabling the feature.
 
 Remote unmute must remain disabled in LiveKit. The 300 UI uses signed Laravel moderation calls for server-side mute and the `mbfd.stationMic` client RPC for a station to unmute its own microphone.
 
@@ -74,6 +78,8 @@ npx playwright test --config=playwright.video-conferencing.config.ts
 ```
 
 This opens independent 300, Station 1, and Station 2 contexts with fake media, joins the same opaque lineup, checks all three tiles, verifies station starts muted, and exercises the verified 300 RPC path. Afterward, stop the app and run `docker compose -f infra/livekit/compose.integration.yaml down`. Do not use `-v` unless intentionally deleting the disposable integration volume.
+
+For a production TURN/TLS acceptance run, set `VIDEO_CONFERENCING_E2E_FORCE_RELAY=true` before starting Playwright. The test then adds the non-sensitive `force_relay=1` diagnostic query, constructs all three LiveKit rooms with WebRTC `iceTransportPolicy: relay`, and fails unless the three endpoints connect and moderation still works. Successful connection in this mode proves that no host or server-reflexive candidate was used. Do not leave disposable production employee fixtures behind after the run.
 
 Physical acceptance remains separate: repeat on the 300 device, representative station devices, iPad/Safari, actual USB camera/microphone/speaker hardware, and a restricted-network/TURN-only path. Confirm speaker routing, hot-plug recovery, intelligibility, echo suppression, camera framing, touch targets, takeover messaging, and a sustained 30-minute lineup.
 

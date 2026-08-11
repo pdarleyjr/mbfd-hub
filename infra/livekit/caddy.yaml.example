@@ -1,0 +1,38 @@
+logging:
+  logs:
+    default:
+      level: INFO
+storage:
+  module: file_system
+  root: /data
+apps:
+  tls:
+    certificates:
+      load_files:
+        - certificate: /etc/caddy/certs/fullchain.pem
+          key: /etc/caddy/certs/privkey.pem
+  layer4:
+    servers:
+      main:
+        listen: [":443"]
+        routes:
+          - match:
+              - tls:
+                  sni:
+                    - "turn.example.invalid"
+            handle:
+              - handler: tls
+              - handler: proxy
+                upstreams:
+                  - dial: ["127.0.0.1:5349"]
+          - match:
+              - tls:
+                  sni:
+                    - "video.example.invalid"
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["127.0.0.1:7880"]

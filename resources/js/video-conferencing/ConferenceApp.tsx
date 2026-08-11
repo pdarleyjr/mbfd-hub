@@ -64,6 +64,10 @@ function initialSelection(bootstrap: ConferenceBootstrap): { mode: RoomMode; rol
 
 export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     const initial = useMemo(() => initialSelection(bootstrap), [bootstrap]);
+    const forceRelay = useMemo(
+        () => new URLSearchParams(window.location.search).get('force_relay') === '1',
+        [],
+    );
     const [phase, setPhase] = useState<ConferencePhase>('lobby');
     const [mode, setMode] = useState<RoomMode>(initial.mode);
     const [joinAs, setJoinAs] = useState<JoinRole>(initial.role);
@@ -248,6 +252,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             const nextRoom = new Room({
                 adaptiveStream: true,
                 dynacast: true,
+                rtcConfig: forceRelay ? { iceTransportPolicy: 'relay' } : undefined,
                 videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
                 publishDefaults: { simulcast: true },
             });
@@ -453,7 +458,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     }, [directStation, joinAs, mode]);
 
     return (
-        <div className="vc-shell" data-phase={phase}>
+        <div className="vc-shell" data-phase={phase} data-ice-policy={forceRelay ? 'relay' : 'all'}>
             <header className="vc-header">
                 <div>
                     <span className="vc-eyebrow"><ShieldCheck size={15} /> MBFD secure conference</span>

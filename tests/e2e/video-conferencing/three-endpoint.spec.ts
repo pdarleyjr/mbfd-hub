@@ -2,6 +2,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from '@pla
 
 const employeeId = process.env.VIDEO_CONFERENCING_E2E_EMPLOYEE_ID;
 const password = process.env.VIDEO_CONFERENCING_E2E_PASSWORD;
+const forceRelay = process.env.VIDEO_CONFERENCING_E2E_FORCE_RELAY === 'true';
 
 test.skip(!employeeId || !password, 'Set the explicit conference E2E employee credentials.');
 
@@ -16,11 +17,13 @@ async function loginAndPrepare(
         permissions: ['camera', 'microphone'],
     });
     const page = await context.newPage();
-    await page.goto(`/employee/video-conferencing?room=lineup&join_as=${joinAs}`);
+    const relayQuery = forceRelay ? '&force_relay=1' : '';
+    await page.goto(`/employee/video-conferencing?room=lineup&join_as=${joinAs}${relayQuery}`);
     await page.getByLabel('Employee ID').fill(employeeId!);
     await page.getByLabel('Password').fill(password!);
     await page.getByRole('button', { name: /sign in/i }).click();
     await expect(page.locator('#video-conferencing-root')).toBeVisible();
+    await expect(page.locator('.vc-shell')).toHaveAttribute('data-ice-policy', forceRelay ? 'relay' : 'all');
     await page.getByRole('button', { name: 'Test devices' }).click();
     await expect(page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
 
