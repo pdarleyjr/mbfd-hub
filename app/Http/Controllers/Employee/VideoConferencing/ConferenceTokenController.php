@@ -25,7 +25,7 @@ class ConferenceTokenController extends Controller
         $validated = $request->validate([
             'join_as' => ['required', Rule::enum(ConferenceJoinRole::class)],
             'confirmed_takeover' => ['sometimes', 'boolean'],
-            'command_pin' => ['nullable', 'string', 'regex:/^\d{6,8}$/'],
+            'command_pin' => ['nullable', 'string', 'regex:/^\d{4,8}$/'],
         ]);
         /** @var Employee $employee */
         $employee = $request->user('employee');

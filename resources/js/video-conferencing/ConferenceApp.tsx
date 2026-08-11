@@ -457,7 +457,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         ? [room.localParticipant, ...Array.from(room.remoteParticipants.values())]
         : [];
     const connected = phase === 'connected' || phase === 'reconnecting';
-    const commandPinReady = joinAs !== '300' || /^\d{6,8}$/.test(commandPin);
+    const commandPinReady = joinAs !== '300' || /^\d{4,8}$/.test(commandPin);
     const canJoin = phase === 'ready' && commandPinReady;
     const filteredRoles = mode === 'direct'
         ? bootstrap.roles.filter((role) => role.value === '300' || role.value === directStation)
@@ -557,8 +557,8 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                                 type="password"
                                 inputMode="numeric"
                                 autoComplete="off"
-                                pattern="[0-9]{6,8}"
-                                minLength={6}
+                                pattern="[0-9]{4,8}"
+                                minLength={4}
                                 maxLength={8}
                                 value={commandPin}
                                 onChange={(event) => setCommandPin(event.target.value.replace(/\D/g, '').slice(0, 8))}

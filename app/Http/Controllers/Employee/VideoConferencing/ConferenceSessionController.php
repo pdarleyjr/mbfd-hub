@@ -23,7 +23,7 @@ class ConferenceSessionController extends Controller
             'room' => ['required', Rule::in(['lineup', 'direct'])],
             'station' => ['required_if:room,direct', 'nullable', Rule::enum(ConferenceJoinRole::class)],
             'join_as' => ['required_if:room,direct', 'nullable', Rule::enum(ConferenceJoinRole::class)],
-            'command_pin' => ['nullable', 'string', 'regex:/^\d{6,8}$/'],
+            'command_pin' => ['nullable', 'string', 'regex:/^\d{4,8}$/'],
         ]);
         /** @var Employee $employee */
         $employee = $request->user('employee');
