@@ -17,7 +17,8 @@
 }
 
 .vc-shell button,
-.vc-shell select {
+.vc-shell select,
+.vc-shell input {
     min-height: 48px;
 }
 
@@ -278,6 +279,17 @@
 .vc-room-summary strong { display: block; font-size: .86rem; margin-bottom: .15rem; }
 .vc-room-summary span { color: #667085; display: block; font-size: .74rem; line-height: 1.45; }
 .vc-field { margin-bottom: 1rem; }
+.vc-field input {
+    background: #fff;
+    border: 1px solid #cfd7e3;
+    border-radius: 10px;
+    color: #25324a;
+    font-size: 1rem;
+    letter-spacing: .2em;
+    padding: 0 .8rem;
+    width: 100%;
+}
+.vc-command-pin small { color: #667085; font-size: .7rem; font-weight: 500; letter-spacing: 0; }
 
 .vc-role-list { border: 0; display: grid; gap: .5rem; margin: 0 0 1rem; padding: 0; }
 .vc-role-list legend { color: #475467; font-size: .74rem; font-weight: 750; margin-bottom: .4rem; }
@@ -373,6 +385,86 @@
 
 .vc-spin { animation: vc-spin .9s linear infinite; }
 @keyframes vc-spin { to { transform: rotate(360deg); } }
+
+.vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-header {
+    border-radius: 15px;
+    margin-bottom: .75rem;
+    padding: .75rem 1rem;
+}
+.vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-header h1 {
+    font-size: 1.15rem;
+    margin: .1rem 0 0;
+}
+.vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-header p { display: none; }
+.vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-header::after {
+    height: 9rem;
+    right: -3rem;
+    top: -5rem;
+    width: 9rem;
+}
+
+@media (min-width: 1100px) and (min-height: 700px) {
+    .vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-conference {
+        height: min(52rem, calc(100dvh - 16.5rem));
+        grid-template-rows: minmax(0, 1fr) auto;
+        min-height: 0;
+    }
+
+    .vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-conference--command {
+        grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    }
+
+    .vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-stage {
+        align-content: stretch;
+        grid-auto-rows: minmax(0, 1fr);
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-tile,
+    .vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-tile__focus {
+        aspect-ratio: auto;
+        height: 100%;
+        min-height: 0;
+    }
+
+    .vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-stage--focused .vc-tile:not(.vc-tile--focused) {
+        display: none;
+    }
+
+    .vc-conference--command .vc-stage { grid-column: 1; grid-row: 1; }
+    .vc-conference--command .vc-controls { bottom: auto; grid-column: 1; grid-row: 2; position: static; }
+    .vc-conference--command .vc-command {
+        align-content: start;
+        gap: .55rem;
+        grid-column: 2;
+        grid-row: 1 / 3;
+        grid-template-columns: 1fr;
+        min-height: 0;
+        overflow: hidden;
+        padding: .75rem;
+    }
+    .vc-conference--command .vc-command p { display: none; }
+    .vc-conference--command .vc-command > .vc-button { width: 100%; }
+    .vc-conference--command .vc-command__stations {
+        gap: .4rem;
+        grid-column: 1;
+        grid-template-columns: 1fr;
+        min-height: 0;
+    }
+    .vc-conference--command .vc-command__stations > div {
+        align-items: center;
+        display: grid;
+        gap: .45rem;
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding: .4rem .5rem;
+    }
+    .vc-conference--command .vc-command__stations strong { margin: 0; }
+    .vc-conference--command .vc-command__stations span { display: flex; gap: .35rem; }
+    .vc-conference--command .vc-command__stations button { min-width: 76px; padding: .35rem .5rem; }
+
+    .vc-conference:not(.vc-conference--command) .vc-controls { bottom: auto; grid-row: 2; position: static; }
+}
 
 @media (max-width: 960px) {
     .vc-lobby-grid { grid-template-columns: 1fr; }

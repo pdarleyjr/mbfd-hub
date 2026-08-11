@@ -12,12 +12,16 @@ use App\Models\VideoConferenceParticipation;
 use App\Models\VideoConferenceSession;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Tests\Fakes\FakeConferenceProvider;
 use Tests\TestCase;
 
 class ConferenceWorkflowTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const COMMAND_PIN = '246810';
 
     private FakeConferenceProvider $provider;
 
@@ -29,6 +33,7 @@ class ConferenceWorkflowTest extends TestCase
         config([
             'video-conferencing.enabled' => true,
             'video-conferencing.livekit.url' => 'wss://video.test.example',
+            'video-conferencing.command_pin_hash' => Hash::make(self::COMMAND_PIN),
         ]);
         $this->provider = new FakeConferenceProvider;
         $this->app->instance(ConferenceProvider::class, $this->provider);
@@ -139,14 +144,73 @@ class ConferenceWorkflowTest extends TestCase
         $this->assertCount(1, $this->provider->removedParticipants);
     }
 
+    public function test_300_token_requires_the_server_validated_command_pin(): void
+    {
+        $session = $this->postSession(['room' => 'lineup'])->json('session');
+        $url = "/employee/video-conferencing/api/sessions/{$session['id']}/token";
+
+        $this->actingAs($this->employee, 'employee')->postJson($url, ['join_as' => '300'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('command_pin');
+        $this->actingAs($this->employee, 'employee')->postJson($url, [
+            'join_as' => '300',
+            'command_pin' => '111111',
+        ])->assertUnprocessable()->assertJsonValidationErrors('command_pin');
+        $this->assertSame(0, VideoConferenceParticipation::query()->count());
+
+        $this->actingAs($this->employee, 'employee')->postJson($url, [
+            'join_as' => '300',
+            'command_pin' => self::COMMAND_PIN,
+        ])->assertOk()->assertJsonPath('participant.identity', 'mbfd:300');
+    }
+
+    public function test_300_must_supply_the_pin_before_starting_a_direct_call(): void
+    {
+        $payload = ['room' => 'direct', 'station' => 'sta3', 'join_as' => '300'];
+
+        $this->postSession($payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('command_pin');
+        $this->assertSame([], $this->provider->createdRooms);
+
+        $this->postSession([...$payload, 'command_pin' => self::COMMAND_PIN])->assertOk();
+        $this->assertCount(1, $this->provider->createdRooms);
+    }
+
+    public function test_incorrect_300_command_pin_attempts_are_rate_limited_by_employee_and_ip(): void
+    {
+        $session = $this->postSession(['room' => 'lineup'])->json('session');
+        $url = "/employee/video-conferencing/api/sessions/{$session['id']}/token";
+        $ipAddress = '203.0.113.10';
+        $employeeKey = 'conference-command-pin:employee:'.$this->employee->getKey();
+        $ipKey = 'conference-command-pin:ip:'.hash('sha256', $ipAddress);
+
+        try {
+            for ($attempt = 0; $attempt < 5; $attempt++) {
+                $this->actingAs($this->employee, 'employee')
+                    ->withServerVariables(['REMOTE_ADDR' => $ipAddress])
+                    ->postJson($url, ['join_as' => '300', 'command_pin' => '111111'])
+                    ->assertUnprocessable();
+            }
+
+            $this->actingAs($this->employee, 'employee')
+                ->withServerVariables(['REMOTE_ADDR' => $ipAddress])
+                ->postJson($url, ['join_as' => '300', 'command_pin' => self::COMMAND_PIN])
+                ->assertTooManyRequests();
+        } finally {
+            RateLimiter::clear($employeeKey);
+            RateLimiter::clear($ipKey);
+        }
+    }
+
     public function test_direct_calls_allow_only_300_and_the_selected_station(): void
     {
-        $session = $this->postSession(['room' => 'direct', 'station' => 'sta3', 'join_as' => '300'])->json('session');
+        $session = $this->postSession(['room' => 'direct', 'station' => 'sta3', 'join_as' => '300', 'command_pin' => self::COMMAND_PIN])->json('session');
         $url = "/employee/video-conferencing/api/sessions/{$session['id']}/token";
 
         $this->actingAs($this->employee, 'employee')->postJson($url, ['join_as' => 'sta1'])->assertForbidden();
         $this->actingAs($this->employee, 'employee')->postJson($url, ['join_as' => 'self'])->assertForbidden();
-        $this->actingAs($this->employee, 'employee')->postJson($url, ['join_as' => '300'])->assertOk();
+        $this->actingAs($this->employee, 'employee')->postJson($url, ['join_as' => '300', 'command_pin' => self::COMMAND_PIN])->assertOk();
     }
 
     public function test_a_station_cannot_start_a_direct_call_and_sta5_is_rejected(): void
@@ -159,7 +223,7 @@ class ConferenceWorkflowTest extends TestCase
 
     public function test_target_station_can_retrieve_but_other_stations_cannot_enter_a_300_started_direct_call(): void
     {
-        $started = $this->postSession(['room' => 'direct', 'station' => 'sta4', 'join_as' => '300'])
+        $started = $this->postSession(['room' => 'direct', 'station' => 'sta4', 'join_as' => '300', 'command_pin' => self::COMMAND_PIN])
             ->assertOk()
             ->json('session');
         $target = $this->postSession(['room' => 'direct', 'station' => 'sta4', 'join_as' => 'sta4'])
@@ -175,7 +239,7 @@ class ConferenceWorkflowTest extends TestCase
         $session = $this->postSession(['room' => 'lineup'])->json('session');
         $room = $this->provider->createdRooms[0]['room'];
         $tokenUrl = "/employee/video-conferencing/api/sessions/{$session['id']}/token";
-        $this->actingAs($this->employee, 'employee')->postJson($tokenUrl, ['join_as' => '300'])->assertOk();
+        $this->actingAs($this->employee, 'employee')->postJson($tokenUrl, ['join_as' => '300', 'command_pin' => self::COMMAND_PIN])->assertOk();
         $this->provider->roomParticipants[$room] = [new ConferenceParticipant('mbfd:300', '300 (Command)')];
 
         $this->actingAs($this->employee, 'employee')->postJson(

@@ -48,13 +48,18 @@ services:
       LIVEKIT_CONFIG: |
         port: 7880
         log_level: info
-        prometheus_port: 6789
+        prometheus:
+          port: 6789
         rtc:
           tcp_port: 7881
           port_range_start: 50000
           port_range_end: 60000
-          use_external_ip: true
-          advertise_internal_ip: true
+          # This deployment is intentionally Tailnet-only. Do not advertise the
+          # Starlink CGNAT address discovered through STUN; it is not routable
+          # by conference clients. LiveKit documents node_ip as the explicit
+          # advertised address when use_external_ip is disabled.
+          use_external_ip: false
+          node_ip: ${LIVEKIT_NODE_IP:?Set LIVEKIT_NODE_IP to the routable Tailscale address}
           interfaces:
             includes:
               - ${LIVEKIT_PRIMARY_INTERFACE:-eno1}

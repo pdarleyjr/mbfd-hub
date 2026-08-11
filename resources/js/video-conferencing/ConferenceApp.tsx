@@ -87,6 +87,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     const [forcedStationMic, setForcedStationMic] = useState(false);
     const [speakerTesting, setSpeakerTesting] = useState(false);
     const [actionBusy, setActionBusy] = useState<string | null>(null);
+    const [commandPin, setCommandPin] = useState('');
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [room, setRoom] = useState<Room | null>(null);
     const previewVideoRef = useRef<HTMLVideoElement>(null);
@@ -226,7 +227,11 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         return postJson<TokenResponse>(
             `${bootstrap.endpoints.api_base}/sessions/${activeSessionId}/token`,
             bootstrap.csrf_token,
-            { join_as: joinAs, confirmed_takeover: confirmedTakeover },
+            {
+                join_as: joinAs,
+                confirmed_takeover: confirmedTakeover,
+                ...(joinAs === '300' ? { command_pin: commandPin } : {}),
+            },
         );
     };
 
@@ -244,6 +249,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 room: mode,
                 station: mode === 'direct' ? directStation : undefined,
                 join_as: joinAs,
+                ...(joinAs === '300' ? { command_pin: commandPin } : {}),
             });
             const activeSessionId = sessionResponse.session.id;
             setSessionId(activeSessionId);
@@ -252,7 +258,6 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             const nextRoom = new Room({
                 adaptiveStream: true,
                 dynacast: true,
-                rtcConfig: forceRelay ? { iceTransportPolicy: 'relay' } : undefined,
                 videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
                 publishDefaults: { simulcast: true },
             });
@@ -273,7 +278,10 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             }
 
             roomRef.current = nextRoom;
-            await nextRoom.connect(credentials.server_url, credentials.token, { autoSubscribe: true });
+            await nextRoom.connect(credentials.server_url, credentials.token, {
+                autoSubscribe: true,
+                rtcConfig: forceRelay ? { iceTransportPolicy: 'relay' } : undefined,
+            });
 
             const preparedTracks = [...previewTracksRef.current];
             previewTracksRef.current = [];
@@ -294,6 +302,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             if (nextRoom.canPlaybackAudio) await nextRoom.startAudio().catch(() => setAudioBlocked(true));
             setForcedStationMic(stationRoles.includes(joinAs));
             setMicrophoneEnabled(!stationRoles.includes(joinAs) && microphoneEnabled);
+            setCommandPin('');
             setPhase('connected');
         } catch (joinError) {
             await cleanupRoom(true);
@@ -448,7 +457,8 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         ? [room.localParticipant, ...Array.from(room.remoteParticipants.values())]
         : [];
     const connected = phase === 'connected' || phase === 'reconnecting';
-    const canJoin = phase === 'ready';
+    const commandPinReady = joinAs !== '300' || /^\d{6,8}$/.test(commandPin);
+    const canJoin = phase === 'ready' && commandPinReady;
     const filteredRoles = mode === 'direct'
         ? bootstrap.roles.filter((role) => role.value === '300' || role.value === directStation)
         : bootstrap.roles;
@@ -541,6 +551,21 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                                 <span><strong>{role.label}</strong>{role.station && <small>Fixed station endpoint</small>}</span>
                             </label>)}
                         </fieldset>
+                        {joinAs === '300' && <label className="vc-field vc-command-pin">
+                            300 command PIN
+                            <input
+                                type="password"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                pattern="[0-9]{6,8}"
+                                minLength={6}
+                                maxLength={8}
+                                value={commandPin}
+                                onChange={(event) => setCommandPin(event.target.value.replace(/\D/g, '').slice(0, 8))}
+                                aria-describedby="vc-command-pin-help"
+                            />
+                            <small id="vc-command-pin-help">Required to join or start a call as 300.</small>
+                        </label>}
                         <button className="vc-button vc-button--primary" type="button" onClick={() => void joinConference(false)} disabled={!canJoin || phase === 'joining'}>
                             {phase === 'joining' ? <LoaderCircle size={20} className="vc-spin" /> : <Video size={20} />} Join conference
                         </button>
@@ -548,7 +573,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                     </section>
                 </div>
             ) : (
-                <div className="vc-conference">
+                <div className={`vc-conference ${joinAs === '300' ? 'vc-conference--command' : ''}`}>
                     <main className={`vc-stage ${focusedIdentity ? 'vc-stage--focused' : ''}`}>
                         {participants.map((participant) => <ParticipantTile
                             key={participant.identity}

@@ -3,6 +3,7 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
     testDir: './tests/e2e/video-conferencing',
     timeout: 120_000,
+    expect: { timeout: 20_000 },
     fullyParallel: false,
     retries: 0,
     outputDir: 'test-results/video-conferencing',

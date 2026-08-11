@@ -39,6 +39,7 @@ class ConferenceAccessTest extends TestCase
     {
         config([
             'video-conferencing.enabled' => true,
+            'video-conferencing.command_pin_hash' => 'private-command-pin-hash',
             'video-conferencing.livekit.api_key' => 'private-api-key',
             'video-conferencing.livekit.api_secret' => 'private-api-secret',
         ]);
@@ -49,6 +50,7 @@ class ConferenceAccessTest extends TestCase
             ->assertOk()
             ->assertSee('video-conferencing-root')
             ->assertDontSee($employee->employee_id)
+            ->assertDontSee('private-command-pin-hash')
             ->assertDontSee('private-api-key')
             ->assertDontSee('private-api-secret');
     }
