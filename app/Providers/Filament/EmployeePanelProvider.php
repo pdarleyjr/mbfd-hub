@@ -8,6 +8,7 @@ use App\Filament\Employee\Pages\EmployeeDashboard;
 use App\Filament\Employee\Pages\MyEquipmentPage;
 use App\Filament\Employee\Pages\OperationalForms;
 use App\Filament\Employee\Pages\RequestEquipmentPage;
+use App\Filament\Employee\Pages\VideoConferencing;
 use App\Http\Middleware\ForcePasswordChangeMiddleware;
 use App\Http\Middleware\RememberEmployeeIntendedPath;
 use Filament\Http\Middleware\Authenticate;
@@ -62,6 +63,7 @@ class EmployeePanelProvider extends PanelProvider
             ->pages([
                 EmployeeDashboard::class,
                 OperationalForms::class,
+                VideoConferencing::class,
                 MyEquipmentPage::class,
                 RequestEquipmentPage::class,
                 ChangePasswordPage::class,
@@ -76,6 +78,10 @@ class EmployeePanelProvider extends PanelProvider
                     ->label('Request Equipment')
                     ->url(fn (): string => RequestEquipmentPage::getUrl(panel: 'employee'))
                     ->icon('heroicon-o-shopping-cart'),
+                MenuItem::make()
+                    ->label('Video Conferencing')
+                    ->url(fn (): string => VideoConferencing::getUrl(panel: 'employee'))
+                    ->icon('heroicon-o-video-camera'),
                 MenuItem::make()
                     ->label('Change Password')
                     ->url(fn (): string => ChangePasswordPage::getUrl(panel: 'employee'))

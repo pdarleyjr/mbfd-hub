@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\OperationalFormDeletionController;
 use App\Http\Controllers\Admin\OperationalFormDocumentController;
 use App\Http\Controllers\Admin\QueueStatusController;
+use App\Http\Controllers\Admin\VideoConferenceHealthController;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
@@ -10,8 +11,14 @@ use App\Http\Controllers\Employee\OperationalForms\FormGenerationController;
 use App\Http\Controllers\Employee\OperationalForms\FormRecordController;
 use App\Http\Controllers\Employee\OperationalForms\FormUploadController;
 use App\Http\Controllers\Employee\OperationalForms\FrocImportController;
+use App\Http\Controllers\Employee\VideoConferencing\ConferenceLeaveController;
+use App\Http\Controllers\Employee\VideoConferencing\ConferenceSessionController;
+use App\Http\Controllers\Employee\VideoConferencing\ConferenceTokenController;
+use App\Http\Controllers\Employee\VideoConferencing\MuteAllStationsController;
+use App\Http\Controllers\Employee\VideoConferencing\StationMicrophoneController;
 use App\Http\Controllers\IncidentsController;
 use App\Http\Controllers\ReportExportController;
+use App\Http\Controllers\Webhooks\LiveKitWebhookController;
 use App\Http\Controllers\Workgroup\FileDownloadController;
 use App\Http\Middleware\ForcePasswordChangeMiddleware;
 use Illuminate\Support\Facades\Route;
@@ -42,6 +49,28 @@ Route::post('/_csp-report', [\App\Http\Controllers\CspReportController::class, '
 Route::get('/login', function () {
     return redirect('/admin/login');
 })->name('login');
+
+Route::prefix('employee/video-conferencing/api')
+    ->middleware(['auth:employee', ForcePasswordChangeMiddleware::class, 'conference.enabled', 'throttle:conference-controls'])
+    ->name('employee.video-conferencing.api.')
+    ->group(function (): void {
+        Route::post('/sessions', ConferenceSessionController::class)->name('sessions');
+        Route::post('/sessions/{session}/token', ConferenceTokenController::class)
+            ->middleware('throttle:conference-tokens')
+            ->name('tokens');
+        Route::post('/participations/{participation}/leave', ConferenceLeaveController::class)->name('leave');
+        Route::post('/sessions/{session}/moderation/mute-stations', MuteAllStationsController::class)->name('mute-stations');
+        Route::post('/sessions/{session}/moderation/stations/{station}/microphone', StationMicrophoneController::class)->name('station-microphone');
+    });
+
+Route::post('/webhooks/livekit', LiveKitWebhookController::class)
+    ->middleware(['conference.enabled', 'throttle:120,1'])
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
+    ->name('webhooks.livekit');
+
+Route::get('/admin/video-conferencing/health', VideoConferenceHealthController::class)
+    ->middleware(['auth:web', 'throttle:30,1'])
+    ->name('admin.video-conferencing.health');
 
 Route::prefix('employee/forms/api')
     ->middleware(['auth:employee', ForcePasswordChangeMiddleware::class, 'throttle:120,1'])

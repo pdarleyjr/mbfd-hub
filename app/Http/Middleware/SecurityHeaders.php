@@ -20,7 +20,14 @@ class SecurityHeaders
         // below covers the same use case and supersedes this header in all modern
         // browsers, so we omit it intentionally.
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        $conferencePath = $request->is('employee/video-conferencing')
+            || $request->is('employee/video-conferencing/*');
+        $response->headers->set(
+            'Permissions-Policy',
+            $conferencePath
+                ? 'camera=(self), microphone=(self), geolocation=()'
+                : 'camera=(), microphone=(), geolocation=()',
+        );
         $response->headers->set('X-XSS-Protection', '1; mode=block');
 
         if ($request->secure()) {

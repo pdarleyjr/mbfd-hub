@@ -86,4 +86,14 @@ class Employee extends Authenticatable implements FilamentUser
     {
         return $this->hasMany(OperationalFormDocument::class, 'created_by_employee_id');
     }
+
+    public function videoConferenceParticipations(): HasMany
+    {
+        return $this->hasMany(VideoConferenceParticipation::class);
+    }
+
+    public function createdVideoConferenceSessions(): HasMany
+    {
+        return $this->hasMany(VideoConferenceSession::class, 'created_by_employee_id');
+    }
 }

@@ -7,7 +7,9 @@
         "typecheck": "tsc --noEmit",
         "typecheck:operational-forms": "tsc -p tsconfig.operational-forms.json",
         "test:operational-forms-node": "node --test tests/Node/operational-forms/*.test.mjs",
-        "test:operational-forms-e2e": "playwright test --config=playwright.operational-forms.config.ts"
+        "test:operational-forms-e2e": "playwright test --config=playwright.operational-forms.config.ts",
+        "test:video-conferencing-bundle": "node scripts/ci/check-video-conferencing-bundle.mjs",
+        "test:video-conferencing-e2e": "playwright test --config=playwright.video-conferencing.config.ts"
     },
     "devDependencies": {
         "@playwright/test": "^1.59.1",
@@ -31,6 +33,7 @@
         "dexie": "^4.3.0",
         "framer-motion": "^12.34.5",
         "konva": "^10.2.1",
+        "livekit-client": "2.21.0",
         "lucide-react": "^0.500.0",
         "pdf-lib": "^1.17.1",
         "pdfjs-dist": "5.1.91",

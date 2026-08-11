@@ -19,6 +19,7 @@ export default defineConfig({
                 // gates install prompt by matchMedia, prefetches lookups).
                 'resources/js/admin-pwa/main.ts',
                 'resources/js/operational-forms/main.tsx',
+                'resources/js/video-conferencing/main.tsx',
             ],
             refresh: true,
         }),
@@ -41,6 +42,21 @@ export default defineConfig({
         }),
     ],
     build: {
-        sourcemap: 'hidden', // Generate source maps for Sentry
+        // Never publish browser-readable source maps. CI generates hidden maps
+        // only when Sentry can upload and delete them in the same build.
+        sourcemap: process.env.SENTRY_AUTH_TOKEN ? 'hidden' : false,
+        rolldownOptions: {
+            output: {
+                codeSplitting: {
+                    groups: [
+                        {
+                            name: 'livekit',
+                            test: /node_modules[\\/](?:livekit-client|@livekit)[\\/]/,
+                            priority: 10,
+                        },
+                    ],
+                },
+            },
+        },
     },
 });
