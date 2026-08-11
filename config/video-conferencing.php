@@ -9,6 +9,7 @@ return [
     'enabled' => (bool) env('VIDEO_CONFERENCING_ENABLED', false),
     'timezone' => 'America/New_York',
     'lineup_time' => $lineupTime,
+    'command_pin_hash' => env('VIDEO_CONFERENCING_COMMAND_PIN_HASH'),
     'livekit' => [
         'url' => env('LIVEKIT_URL'),
         'api_url' => env('LIVEKIT_API_URL'),

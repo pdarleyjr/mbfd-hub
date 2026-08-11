@@ -6,6 +6,7 @@ use App\Enums\VideoConferencing\ConferenceJoinRole;
 use App\Exceptions\VideoConferencing\ConferenceUnavailableException;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use App\Services\VideoConferencing\ConferenceCommandPinService;
 use App\Services\VideoConferencing\ConferenceSessionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,12 +14,16 @@ use Illuminate\Validation\Rule;
 
 class ConferenceSessionController extends Controller
 {
-    public function __invoke(Request $request, ConferenceSessionService $sessions): JsonResponse
-    {
+    public function __invoke(
+        Request $request,
+        ConferenceSessionService $sessions,
+        ConferenceCommandPinService $commandPin,
+    ): JsonResponse {
         $validated = $request->validate([
             'room' => ['required', Rule::in(['lineup', 'direct'])],
             'station' => ['required_if:room,direct', 'nullable', Rule::enum(ConferenceJoinRole::class)],
             'join_as' => ['required_if:room,direct', 'nullable', Rule::enum(ConferenceJoinRole::class)],
+            'command_pin' => ['nullable', 'string', 'regex:/^\d{6,8}$/'],
         ]);
         /** @var Employee $employee */
         $employee = $request->user('employee');
@@ -30,6 +35,9 @@ class ConferenceSessionController extends Controller
                 $station = ConferenceJoinRole::from((string) ($validated['station'] ?? ''));
                 $joiningAs = ConferenceJoinRole::from((string) ($validated['join_as'] ?? ''));
                 abort_unless($joiningAs === ConferenceJoinRole::Command || $joiningAs === $station, 403);
+                if ($joiningAs === ConferenceJoinRole::Command) {
+                    $commandPin->verify($employee, (string) $request->ip(), $validated['command_pin'] ?? null);
+                }
                 $session = $joiningAs === ConferenceJoinRole::Command
                     ? $sessions->direct($employee, $station)
                     : $sessions->activeDirectForStation($station);

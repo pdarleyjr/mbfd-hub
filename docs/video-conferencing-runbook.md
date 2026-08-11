@@ -16,13 +16,13 @@ The application feature flag defaults to `false`. Keep it false until DNS, trust
 
 For a host with a public address, required inbound firewall rules are TCP 443 for signaling and TURN/TLS, UDP 3478 for TURN/UDP, TCP 7881 for RTC fallback, and UDP 50000-60000 for WebRTC. TCP 5349 is an internal Caddy-to-LiveKit hop and must not be exposed. TCP 80 is needed only when Caddy performs HTTP certificate issuance; DNS-01 issuance does not need it. Restrict SSH and metrics port 6789 to the management network/Tailscale; never expose Redis.
 
-The GMKtec production host is behind Starlink CGNAT and its routed IPv6 is filtered by the Starlink router. It therefore cannot accept general public-internet WebRTC traffic directly. Its supported deployment mode is Tailnet-only: both DNS-only records resolve to the GMKtec Tailscale address, all conference endpoints must have Tailscale connected, the host firewall remains default-deny off Tailnet, and certificates are issued by a public CA with Cloudflare DNS-01 validation. A future non-Tailscale deployment requires a public-IP VPS/L4 relay or LiveKit Cloud; a Cloudflare HTTP tunnel is not a substitute for LiveKit UDP/TURN reachability.
+The GMKtec production host is behind Starlink CGNAT and its routed IPv6 is filtered by the Starlink router. It therefore cannot accept general public-internet WebRTC traffic directly. Its supported deployment mode is Tailnet-only: both DNS-only records resolve to the GMKtec Tailscale address, all conference endpoints must have Tailscale connected, `LIVEKIT_NODE_IP` is set to that routable Tailscale address while external-IP discovery remains disabled, the host firewall remains default-deny off Tailnet, and certificates are issued by a public CA with Cloudflare DNS-01 validation. A future non-Tailscale deployment requires a public-IP VPS/L4 relay or LiveKit Cloud; a Cloudflare HTTP tunnel is not a substitute for LiveKit UDP/TURN reachability.
 
 ## Install
 
-1. Generate a unique API key and at least 32 random secret characters. Store them only in the host secret store and Laravel production environment. Never commit `.env`.
+1. Generate a unique API key, at least 32 random API-secret characters, and a separate 6-8 digit 300 command PIN. Store the PIN only in the approved operator secret store and put a one-way application hash in `VIDEO_CONFERENCING_COMMAND_PIN_HASH`; never store or commit the plaintext PIN in `.env`.
 2. Obtain one trusted certificate covering both signaling and TURN names. For the GMKtec Tailnet deployment, use Cloudflare DNS-01 validation. Copy the resulting certificate to `fullchain.pem` and key to `privkey.pem` under the root-owned directory identified by `LIVEKIT_CERT_DIR`; never place the DNS API token in the repository or container environment.
-3. Copy `infra/livekit/caddy.yaml.example` to the path identified by `LIVEKIT_CADDY_CONFIG`, replace both example SNI names, and validate it with the pinned Caddy image. Copy `infra/livekit/.env.example` to an operator-owned secret file outside the repository and set all values.
+3. Copy `infra/livekit/caddy.yaml.example` to the path identified by `LIVEKIT_CADDY_CONFIG`, replace both example SNI names, and validate it with the pinned Caddy image. Copy `infra/livekit/.env.example` to an operator-owned secret file outside the repository and set all values. In the Tailnet-only topology, set `LIVEKIT_NODE_IP` to the LiveKit host's Tailscale address; do not use a CGNAT address discovered through STUN.
 4. Validate without starting services:
 
    ```sh
@@ -37,7 +37,7 @@ The GMKtec production host is behind Starlink CGNAT and its routed IPv6 is filte
    docker compose --env-file /secure/path/livekit.env -f infra/livekit/compose.yaml logs --tail=100 livekit
    ```
 
-6. Configure Laravel with `LIVEKIT_URL=wss://...`, `LIVEKIT_API_URL=https://...`, the matching key/secret, and an optional `VIDEO_CONFERENCING_LINEUP_TIME=HH:MM`. Keep `VIDEO_CONFERENCING_ENABLED=false`, then run migrations and clear cached config.
+6. Configure Laravel with browser-facing `LIVEKIT_URL=wss://...`, a server-side `LIVEKIT_API_URL`, the matching key/secret, `VIDEO_CONFERENCING_COMMAND_PIN_HASH`, and an optional `VIDEO_CONFERENCING_LINEUP_TIME=HH:MM`. A Laravel container co-located with host-networked LiveKit should use the host gateway (for example, `http://172.20.5.1:7880`) rather than hairpinning through its Tailscale/public DNS name. Permit TCP 7880 only from the exact application Docker subnet; keep it closed to public and Tailnet clients. A remote application host should use the trusted HTTPS API endpoint. Keep `VIDEO_CONFERENCING_ENABLED=false`, then run migrations and clear cached config.
 7. Verify signed webhook delivery to `/webhooks/livekit`, then enable the feature and clear cached config again.
 
 The Caddy certificate reload hook should run `docker exec mbfd-livekit-caddy caddy reload --config /etc/caddy.yaml --adapter yaml` after renewal. Validate automatic renewal with the CA client's dry-run command before enabling the feature.
@@ -47,6 +47,7 @@ Remote unmute must remain disabled in LiveKit. The 300 UI uses signed Laravel mo
 ## Health and observability
 
 - Alert on LiveKit process/container restarts, Redis health, host CPU, memory, packet loss, and network saturation.
+- Set `vm.overcommit_memory=1` persistently on the LiveKit host so Redis background persistence remains reliable under memory pressure.
 - Scrape Prometheus metrics from `127.0.0.1:6789/metrics` through the private monitoring network only.
 - Monitor Laravel for `ConferenceUnavailableException`, HTTP 409 takeover rates, 401 webhook failures, token endpoint throttles, and incomplete participation rows.
 - Probe `/admin/video-conferencing/health` with an authenticated administrator. It returns only `disabled`, `healthy`, or `unavailable` and never exposes configuration.
@@ -63,8 +64,10 @@ $env:LIVEKIT_URL='ws://127.0.0.1:7880'
 $env:LIVEKIT_API_URL='http://127.0.0.1:7880'
 $env:LIVEKIT_API_KEY='mbfd-integration-key'
 $env:LIVEKIT_API_SECRET='mbfd-integration-secret-not-for-production'
+$env:VIDEO_CONFERENCING_COMMAND_PIN_HASH = php -r "echo password_hash('246810', PASSWORD_BCRYPT);"
 $env:VIDEO_CONFERENCING_E2E_EMPLOYEE_ID='VC-E2E'
 $env:VIDEO_CONFERENCING_E2E_PASSWORD='<local-unique-password>'
+$env:VIDEO_CONFERENCING_E2E_COMMAND_PIN='246810'
 $env:VIDEO_CONFERENCING_E2E_BASE_URL='http://127.0.0.1:8000'
 php artisan migrate
 php artisan db:seed --class=VideoConferenceIntegrationSeeder
@@ -79,7 +82,7 @@ npx playwright test --config=playwright.video-conferencing.config.ts
 
 This opens independent 300, Station 1, and Station 2 contexts with fake media, joins the same opaque lineup, checks all three tiles, verifies station starts muted, and exercises the verified 300 RPC path. Afterward, stop the app and run `docker compose -f infra/livekit/compose.integration.yaml down`. Do not use `-v` unless intentionally deleting the disposable integration volume.
 
-For a production TURN/TLS acceptance run, set `VIDEO_CONFERENCING_E2E_FORCE_RELAY=true` before starting Playwright. The test then adds the non-sensitive `force_relay=1` diagnostic query, constructs all three LiveKit rooms with WebRTC `iceTransportPolicy: relay`, and fails unless the three endpoints connect and moderation still works. Successful connection in this mode proves that no host or server-reflexive candidate was used. Do not leave disposable production employee fixtures behind after the run.
+For a production TURN/TLS acceptance run, set the production fixture's `VIDEO_CONFERENCING_E2E_COMMAND_PIN` and `VIDEO_CONFERENCING_E2E_FORCE_RELAY=true` before starting Playwright. The test then adds the non-sensitive `force_relay=1` diagnostic query, connects all three LiveKit clients with WebRTC `iceTransportPolicy: relay`, verifies that every peer connection retained that policy, and fails unless the three endpoints connect and moderation still works. Successful connection in this mode proves that no host or server-reflexive candidate was used. Do not leave disposable production employee fixtures behind after the run.
 
 Physical acceptance remains separate: repeat on the 300 device, representative station devices, iPad/Safari, actual USB camera/microphone/speaker hardware, and a restricted-network/TURN-only path. Confirm speaker routing, hot-plug recovery, intelligibility, echo suppression, camera framing, touch targets, takeover messaging, and a sustained 30-minute lineup.
 

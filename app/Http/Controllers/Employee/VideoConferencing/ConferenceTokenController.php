@@ -8,6 +8,7 @@ use App\Exceptions\VideoConferencing\EndpointInUseException;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\VideoConferenceSession;
+use App\Services\VideoConferencing\ConferenceCommandPinService;
 use App\Services\VideoConferencing\ConferenceTokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,19 +20,25 @@ class ConferenceTokenController extends Controller
         Request $request,
         VideoConferenceSession $session,
         ConferenceTokenService $tokens,
+        ConferenceCommandPinService $commandPin,
     ): JsonResponse {
         $validated = $request->validate([
             'join_as' => ['required', Rule::enum(ConferenceJoinRole::class)],
             'confirmed_takeover' => ['sometimes', 'boolean'],
+            'command_pin' => ['nullable', 'string', 'regex:/^\d{6,8}$/'],
         ]);
         /** @var Employee $employee */
         $employee = $request->user('employee');
 
         try {
+            $role = ConferenceJoinRole::from($validated['join_as']);
+            if ($role === ConferenceJoinRole::Command) {
+                $commandPin->verify($employee, (string) $request->ip(), $validated['command_pin'] ?? null);
+            }
             $result = $tokens->issue(
                 session: $session,
                 employee: $employee,
-                role: ConferenceJoinRole::from($validated['join_as']),
+                role: $role,
                 confirmedTakeover: (bool) ($validated['confirmed_takeover'] ?? false),
             );
         } catch (EndpointInUseException $exception) {
