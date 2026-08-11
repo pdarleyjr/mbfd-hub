@@ -150,8 +150,11 @@ function bootstrap(): void {
     markBodyClasses();
     registerServiceWorker();
     setupInstallPrompt();
-    // Prefetch is best-effort and never blocks UI
-    prefetchAdminLookups().catch(() => {});
+    // Login and password-recovery pages share this bundle but must not call
+    // protected lookup APIs before the web guard has authenticated a user.
+    if (document.querySelector('meta[name="mbfd-admin-authenticated"]')) {
+        prefetchAdminLookups().catch(() => {});
+    }
 }
 
 if (document.readyState === 'loading') {

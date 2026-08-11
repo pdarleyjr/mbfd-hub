@@ -100,6 +100,8 @@ Google Sheets apparatus synchronization is configured and healthy. API authentic
 - **Verified:** a server-render smoke test covers the dashboard and 13 additional critical Employee, Uniform, Equipment Request, Apparatus, Inspection, Fire Equipment, Station Inspection, Station, and TRT admin surfaces (14 total routes).
 - **Fixed after authenticated browser inspection:** the Inspections index crashed when an apparatus had a null legacy `name`. Apparatus selectors now use a guaranteed non-null designation/unit/vehicle fallback, with a production-shaped regression fixture.
 - **Fixed after authenticated browser inspection:** the admin service worker was served from `/admin-pwa/` while requesting `/admin/` scope; production static-file handling bypassed Laravel's scope header and browsers rejected registration. The worker is now served from `/admin/service-worker.js`, inside its own scope, and deployment smoke checks that canonical URL.
+- **Fixed after network trace:** the status bar polled a nonexistent queue endpoint on every admin page, and the login page prefetched three protected lookup APIs before authentication. A role-checked queue-depth endpoint now serves the status bar, while lookup prefetch is gated by an authenticated marker.
+- **Hardened after storage audit:** 13 TRT inventory records reference April 4 photo files absent from active storage and all searched host backups. The records are preserved, but the admin page now reports `Missing photo file` and does not issue broken image requests; unrecoverable photos require recapture by the TRT data owner.
 - **Fixed:** public employee identifiers and legacy station report reads were exposed more broadly than required.
 - **Fixed:** the test environment now explicitly uses in-memory SQLite for the application and web-push data and supplies a nonsecret test-only application key, eliminating accidental workstation MySQL coupling.
 - **Fixed:** `league/commonmark` was upgraded from 2.8.3 to 2.9.1 to clear six newly published parser advisories.
@@ -118,7 +120,7 @@ Google Sheets apparatus synchronization is configured and healthy. API authentic
 
 ## Verification evidence
 
-- PHPUnit: **283 tests, 1,226 assertions, all passing in CI** after formatting and the dependency security upgrade.
+- PHPUnit: **285 tests, 1,232 assertions, all passing in CI** after formatting and the dependency security upgrade.
 - Added focused coverage for personnel imports, public directory redaction, public Fire Equipment requests, portal-to-admin employee requests, uniform stock issuance, SnipeIT unmatched-asset safety, critical apparatus defect linkage, and critical admin page rendering.
 - TypeScript: root and daily-checkout typechecks pass.
 - Node operational-forms regression: 1 test passes.

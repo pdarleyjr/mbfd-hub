@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\OperationalFormDeletionController;
 use App\Http\Controllers\Admin\OperationalFormDocumentController;
+use App\Http\Controllers\Admin\QueueStatusController;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
@@ -134,6 +135,10 @@ Route::get('/admin/service-worker.js', function () {
         'Cache-Control' => 'no-cache, must-revalidate',
     ]);
 });
+
+Route::get('/admin/pulse/queues.json', QueueStatusController::class)
+    ->middleware(['auth', 'throttle:60,1'])
+    ->name('admin.queue-status');
 
 Route::get('/admin-pwa/service-worker.js', function () {
     return response()->file(public_path('admin-pwa/service-worker.js'), [
