@@ -254,7 +254,7 @@ jobs:
           test_url "Daily SW"             "https://www.mbfdhub.com/daily/service-worker.js"
           test_url "Manifest"             "https://www.mbfdhub.com/manifest.json"
           test_url "Admin PWA manifest"   "https://www.mbfdhub.com/admin-pwa/manifest.webmanifest"
-          test_url "Admin PWA SW"         "https://www.mbfdhub.com/admin-pwa/service-worker.js"
+          test_url "Admin PWA SW"         "https://www.mbfdhub.com/admin/service-worker.js"
           test_url "Admin /up health"     "https://www.mbfdhub.com/up"
           test_url "Deploy marker"        "https://www.mbfdhub.com/deploy-marker.json"
           test_url "Snipe-IT"             "https://inventory.mbfdhub.com"  "200"

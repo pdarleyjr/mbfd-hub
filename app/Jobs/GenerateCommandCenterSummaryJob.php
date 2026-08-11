@@ -27,12 +27,13 @@ class GenerateCommandCenterSummaryJob implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public int $tries = 1;
+    public int $tries = 2;
+
     public int $timeout = 180; // allow for a cold model load + generation
 
-    public function __construct(public string $expectedFingerprint)
-    {
-    }
+    public int $backoff = 15;
+
+    public function __construct(public string $expectedFingerprint) {}
 
     public function handle(CommandCenterAiService $cc): void
     {

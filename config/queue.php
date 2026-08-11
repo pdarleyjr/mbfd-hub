@@ -39,7 +39,9 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // Must remain longer than the slowest job timeout. The Command
+            // Center summary permits 180 seconds for a cold model start.
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 240),
             'after_commit' => false,
         ],
 

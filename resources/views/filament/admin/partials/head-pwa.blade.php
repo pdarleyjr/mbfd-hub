@@ -7,5 +7,8 @@
 <meta name="apple-mobile-web-app-title" content="MBFD Admin">
 <link rel="manifest" href="/admin-pwa/manifest.webmanifest" crossorigin="use-credentials">
 <link rel="apple-touch-icon" sizes="180x180" href="/admin-pwa/icons/icon-192.png">
+@auth
+    <meta name="mbfd-admin-authenticated" content="true">
+@endauth
 
 @vite(['resources/js/admin-pwa/main.ts'])

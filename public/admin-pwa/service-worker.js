@@ -15,7 +15,7 @@
  *   to (per Service Worker spec).
  *
  * Kill-switch:
- *   Returning a 404 for /admin-pwa/service-worker.js + bumping the bust
+ *   Returning a 404 for /admin/service-worker.js + bumping the bust
  *   query param causes browsers to drop the registration on next visit.
  *   Or push a one-line SW that calls self.registration.unregister().
  *

@@ -37,6 +37,12 @@
                 <div style="font-size:1.5rem;font-weight:700;color:#1e40af;font-variant-numeric:tabular-nums;">{{ $stats['images'] }}</div>
                 <div style="font-size:0.75rem;color:#1e40af;">Photos</div>
             </div>
+            @if($stats['missing_images'] > 0)
+                <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:0.5rem;padding:0.75rem 1rem;text-align:center;">
+                    <div style="font-size:1.5rem;font-weight:700;color:#92400e;font-variant-numeric:tabular-nums;">{{ $stats['missing_images'] }}</div>
+                    <div style="font-size:0.75rem;color:#92400e;">Missing Photo Files</div>
+                </div>
+            @endif
         </div>
 
         {{-- Inventory Table --}}
@@ -144,6 +150,8 @@
                                                 />
                                             @endforeach
                                         </div>
+                                    @elseif($item['missing_images'] > 0)
+                                        <span style="color:#92400e;font-size:0.75rem;">Missing photo file</span>
                                     @else
                                         <span style="color:#a8a29e;font-size:0.75rem;">—</span>
                                     @endif
@@ -232,6 +240,8 @@
                                             loading="lazy"
                                         />
                                     </div>
+                                @elseif($entry['image_missing'])
+                                    <div style="margin-top:0.5rem;color:#92400e;font-size:0.75rem;">Missing photo file</div>
                                 @endif
                             </div>
                         @endforeach

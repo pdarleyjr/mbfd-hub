@@ -34,6 +34,23 @@ async function expectJsonLookup(res: APIResponse, expectedShape: string): Promis
 }
 
 test.describe('admin PWA unauthenticated', () => {
+  test('login does not prefetch protected admin lookups', async ({ browser }, testInfo) => {
+    const context = await browser.newContext({ baseURL: String(testInfo.project.use.baseURL) });
+    const page = await context.newPage();
+    const lookupResponses: string[] = [];
+    page.on('response', (response) => {
+      if (new URL(response.url()).pathname.startsWith('/api/admin/lookups/')) {
+        lookupResponses.push(response.url());
+      }
+    });
+
+    await page.goto('/admin/login');
+    await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
+
+    expect(lookupResponses).toHaveLength(0);
+    await context.close();
+  });
+
   test('manifest is served with correct content-type', async ({ request }) => {
     const res = await request.get('/admin-pwa/manifest.webmanifest');
     expect(res.status()).toBe(200);
@@ -46,7 +63,7 @@ test.describe('admin PWA unauthenticated', () => {
   });
 
   test('service worker is served and parses', async ({ request }) => {
-    const res = await request.get('/admin-pwa/service-worker.js');
+    const res = await request.get('/admin/service-worker.js');
     expect(res.status()).toBe(200);
     const ct = res.headers()['content-type'] ?? '';
     expect(ct).toMatch(/javascript/);

@@ -2,18 +2,19 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\InspectionResource\Pages;
+use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Table;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-use App\Filament\Concerns\EnterpriseTable;
 class InspectionResource extends Resource
 {
     use EnterpriseTable;
@@ -34,19 +35,19 @@ class InspectionResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Select::make('apparatus_id')
-                    ->relationship('apparatus', 'name')
+                    ->options(fn (): array => self::apparatusOptions())
                     ->required()
                     ->searchable()
                     ->preload(),
-                
+
                 Forms\Components\TextInput::make('operator_name')
                     ->label('Operator Name')
                     ->required()
                     ->maxLength(255),
-                
+
                 Forms\Components\TextInput::make('rank')
                     ->maxLength(50),
-                
+
                 Forms\Components\Select::make('shift')
                     ->options([
                         'A' => 'A Shift',
@@ -54,10 +55,10 @@ class InspectionResource extends Resource
                         'C' => 'C Shift',
                     ])
                     ->required(),
-                
+
                 Forms\Components\TextInput::make('unit_number')
                     ->maxLength(50),
-                
+
                 Forms\Components\DateTimePicker::make('completed_at')
                     ->label('Completed At')
                     ->default(now()),
@@ -72,19 +73,19 @@ class InspectionResource extends Resource
                     ->label('Date')
                     ->dateTime()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('apparatus.name')
                     ->label('Apparatus')
                     ->searchable()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('operator_name')
                     ->label('Operator')
                     ->searchable(),
-                
+
                 Tables\Columns\TextColumn::make('rank')
                     ->label('Rank'),
-                
+
                 Tables\Columns\TextColumn::make('shift')
                     ->badge()
                     ->colors([
@@ -92,7 +93,7 @@ class InspectionResource extends Resource
                         'warning' => 'B',
                         'success' => 'C',
                     ]),
-                
+
                 Tables\Columns\TextColumn::make('defects_count')
                     ->label('Issues')
                     ->counts('defects')
@@ -118,13 +119,13 @@ class InspectionResource extends Resource
                                 fn (Builder $query, $date): Builder => $query->whereDate('completed_at', '<=', $date),
                             );
                     }),
-                
+
                 SelectFilter::make('apparatus_id')
                     ->label('Apparatus')
-                    ->relationship('apparatus', 'name')
+                    ->options(fn (): array => self::apparatusOptions())
                     ->searchable()
                     ->preload(),
-                
+
                 SelectFilter::make('shift')
                     ->options([
                         'A' => 'A Shift',
@@ -148,6 +149,22 @@ class InspectionResource extends Resource
         return [
             //
         ];
+    }
+
+    /** @return array<int, string> */
+    private static function apparatusOptions(): array
+    {
+        return Apparatus::query()
+            ->orderBy('designation')
+            ->get()
+            ->mapWithKeys(fn (Apparatus $apparatus): array => [
+                $apparatus->getKey() => (string) ($apparatus->getAttribute('designation')
+                    ?: $apparatus->getAttribute('unit_id')
+                    ?: $apparatus->getAttribute('vehicle_number')
+                    ?: $apparatus->getAttribute('name')
+                    ?: 'Apparatus #'.$apparatus->getKey()),
+            ])
+            ->all();
     }
 
     public static function getPages(): array

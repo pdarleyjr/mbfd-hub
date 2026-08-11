@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\OperationalFormDeletionController;
 use App\Http\Controllers\Admin\OperationalFormDocumentController;
+use App\Http\Controllers\Admin\QueueStatusController;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
@@ -123,6 +124,21 @@ Route::get('/admin-pwa/manifest.webmanifest', function () {
         'Cache-Control' => 'public, max-age=300, must-revalidate',
     ]);
 });
+
+// Keep the worker URL inside its intended scope. Production web servers may
+// serve /admin-pwa/* directly and bypass Laravel's Service-Worker-Allowed
+// response header, which makes browsers reject an /admin/ scope.
+Route::get('/admin/service-worker.js', function () {
+    return response()->file(public_path('admin-pwa/service-worker.js'), [
+        'Content-Type' => 'application/javascript; charset=utf-8',
+        'Service-Worker-Allowed' => '/admin/',
+        'Cache-Control' => 'no-cache, must-revalidate',
+    ]);
+});
+
+Route::get('/admin/pulse/queues.json', QueueStatusController::class)
+    ->middleware(['auth', 'throttle:60,1'])
+    ->name('admin.queue-status');
 
 Route::get('/admin-pwa/service-worker.js', function () {
     return response()->file(public_path('admin-pwa/service-worker.js'), [
