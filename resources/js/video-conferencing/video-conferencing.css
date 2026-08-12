@@ -18,7 +18,7 @@
 
 .vc-shell button,
 .vc-shell select,
-.vc-shell input {
+.vc-shell input:not([type="radio"]):not([type="checkbox"]) {
     min-height: 48px;
 }
 
@@ -302,9 +302,26 @@
     gap: .75rem;
     min-height: 52px;
     padding: .65rem .8rem;
+    transition: background-color 160ms cubic-bezier(0, 0, .2, 1), border-color 160ms cubic-bezier(0, 0, .2, 1), box-shadow 160ms cubic-bezier(0, 0, .2, 1);
 }
+.vc-role-list label:hover { background: #f8fafc; border-color: #b8c5d8; }
+.vc-role-list label:has(input:focus-visible) { outline: 3px solid rgba(21, 94, 239, .35); outline-offset: 2px; }
 .vc-role-list label.is-selected { background: #eff6ff; border-color: #7db1f7; box-shadow: 0 0 0 1px #7db1f7; }
-.vc-role-list input { accent-color: var(--vc-blue); height: 1.15rem; width: 1.15rem; }
+.vc-role-list label.is-selected:hover { background: #e8f1ff; border-color: #5f9ef4; }
+.vc-role-list input[type="radio"] {
+    appearance: none;
+    background: var(--vc-surface);
+    border: 1.5px solid #7c8da6;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 4px var(--vc-surface);
+    flex: 0 0 20px;
+    height: 20px;
+    margin: 0;
+    min-height: 20px;
+    width: 20px;
+}
+.vc-role-list input[type="radio"]:checked { background: var(--vc-blue); border-color: var(--vc-blue); }
+.vc-role-list input[type="radio"]:focus-visible { outline: none; }
 .vc-role-list strong { display: block; font-size: .82rem; }
 .vc-role-list small { color: #667085; display: block; font-size: .68rem; margin-top: .1rem; }
 .vc-help { color: #667085; font-size: .71rem; line-height: 1.45; margin: .7rem 0 0; text-align: center; }
