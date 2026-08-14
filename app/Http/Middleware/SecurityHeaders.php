@@ -44,6 +44,9 @@ class SecurityHeaders
         //
         // Post-promotion monitoring: watch Sentry for CSP violation reports.
         //   docker exec mbfd-hub-laravel grep -F '[CSP]' storage/logs/laravel-$(date +%F).log
+        $livekitConnectSources = $conferencePath
+            ? ' https://video.mbfdhub.com wss://video.mbfdhub.com'
+            : '';
         $cspParts = [
             "default-src 'self'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://static.cloudflareinsights.com https://www.googletagmanager.com https://pulsepoint.org https://web.pulsepoint.org",
@@ -51,7 +54,7 @@ class SecurityHeaders
             "font-src 'self' data: https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com",
             "img-src 'self' data: blob: https:",
             "media-src 'self' blob: https:",
-            "connect-src 'self' wss: https://api.pulsepoint.org https://web.pulsepoint.org https://static.cloudflareinsights.com",
+            "connect-src 'self' wss: https://api.pulsepoint.org https://web.pulsepoint.org https://static.cloudflareinsights.com{$livekitConnectSources}",
             "frame-src 'self' https://www.pulsepoint.org https://web.pulsepoint.org https://inventory.mbfdhub.com",
             // Allow cloud.mbfdhub.com (Nextcloud) to embed this site as an
             // External Sites iframe. All other origins remain blocked.
@@ -61,7 +64,7 @@ class SecurityHeaders
             "object-src 'none'",
             "worker-src 'self' blob:",
             "manifest-src 'self'",
-            "upgrade-insecure-requests",
+            'upgrade-insecure-requests',
             // Legacy report-uri — supported by every browser. Reporting API v1
             // (report-to + Report-To header) is more powerful but adds a second
             // header and isn't supported by Safari yet; report-uri is enough for
