@@ -50,9 +50,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['legacy_source', 'legacy_id']);
-            $table->index(['station_id', 'status']);
+            $table->index(['station_id', 'status', 'created_at'], 'station_requests_station_status_created_idx');
             $table->index(['station_id', 'request_type']);
-            $table->index(['room_id', 'status']);
+            $table->index(['room_id', 'status', 'created_at'], 'station_requests_room_status_created_idx');
             $table->index(['requested_by_employee_id', 'created_at'], 'station_requests_employee_created_idx');
         });
 

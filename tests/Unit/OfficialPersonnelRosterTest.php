@@ -33,10 +33,10 @@ class OfficialPersonnelRosterTest extends TestCase
         $handle = fopen($path, 'rb');
 
         $this->assertNotFalse($handle);
-        $this->assertSame(['Name', 'Rank', 'Employee ID'], fgetcsv($handle));
+        $this->assertSame(['Name', 'Rank', 'Employee ID'], fgetcsv($handle, escape: ''));
 
         $employeeIds = [];
-        while (($row = fgetcsv($handle)) !== false) {
+        while (($row = fgetcsv($handle, escape: '')) !== false) {
             if (count($row) < 3 || trim($row[2]) === '') {
                 continue;
             }
@@ -55,10 +55,10 @@ class OfficialPersonnelRosterTest extends TestCase
     {
         $handle = fopen(__DIR__.'/../../scripts/mbfd-personnel.csv', 'rb');
         $this->assertNotFalse($handle);
-        $this->assertSame(['Name', 'Rank', 'Employee ID'], fgetcsv($handle));
+        $this->assertSame(['Name', 'Rank', 'Employee ID'], fgetcsv($handle, escape: ''));
 
         $roster = [];
-        while (($row = fgetcsv($handle)) !== false) {
+        while (($row = fgetcsv($handle, escape: '')) !== false) {
             if (count($row) < 3 || trim($row[2]) === '') {
                 continue;
             }

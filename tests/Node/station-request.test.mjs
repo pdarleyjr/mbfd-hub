@@ -26,7 +26,8 @@ test('legacy navigation only carries numeric station context and allowlisted int
   assert.match(navigation, /\^\\\/\(stations/);
   assert.match(navigation, /value\.startsWith\('\/\/'\)/);
   assert.match(navigation, /\^\\d\+\$/);
-  assert.match(navigation, /target\.set\('return_to', safeReturnTo\(returnTo\)\)/);
+  assert.match(navigation, /stationReturnPath = `\/stations\/\$\{rawStationId\}`/);
+  assert.match(navigation, /target\.set\('return_to', safeReturnTo\(returnTo, stationReturnPath\)\)/);
 });
 
 test('offline station requests keep a durable idempotency key and permanent 4xx errors are not queued for retry', () => {

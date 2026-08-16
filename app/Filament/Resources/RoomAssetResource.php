@@ -45,7 +45,7 @@ class RoomAssetResource extends Resource
                 Forms\Components\TextInput::make('name')->required()->maxLength(255),
                 Forms\Components\TextInput::make('location_within_room')->maxLength(255),
                 Forms\Components\TextInput::make('category')->maxLength(100),
-                Forms\Components\TextInput::make('quantity')->numeric()->minValue(1)->default(1)->required(),
+                Forms\Components\TextInput::make('quantity')->integer()->minValue(1)->default(1)->required(),
                 Forms\Components\TextInput::make('unit')->maxLength(50),
                 Forms\Components\Select::make('condition')->options([
                     'new' => 'New', 'excellent' => 'Excellent', 'good' => 'Good',
@@ -59,7 +59,7 @@ class RoomAssetResource extends Resource
                 Forms\Components\TextInput::make('model_number')->maxLength(255),
                 Forms\Components\TextInput::make('serial_number')->maxLength(255),
                 Forms\Components\DatePicker::make('purchase_date'),
-                Forms\Components\TextInput::make('purchase_price')->numeric()->prefix('$'),
+                Forms\Components\TextInput::make('purchase_price')->numeric()->minValue(0)->prefix('$'),
                 Forms\Components\Textarea::make('description')->columnSpanFull(),
                 Forms\Components\Textarea::make('notes')->columnSpanFull(),
             ])->columns(3),

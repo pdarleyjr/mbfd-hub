@@ -62,6 +62,9 @@ class StoreStationRequestRequest extends FormRequest
             }
 
             foreach ((array) $this->input('items', []) as $index => $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
                 $assetId = (int) ($item['room_asset_id'] ?? 0);
                 if ($assetId > 0) {
                     $validAsset = RoomAsset::query()

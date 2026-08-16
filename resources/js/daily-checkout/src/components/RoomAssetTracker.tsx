@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { RoomProfile, StationRequestSummary } from '../types';
 import { ApiClient } from '../utils/api';
@@ -15,18 +15,39 @@ export default function RoomAssetTracker() {
   const [activeTab, setActiveTab] = useState<ProfileTab>('assets');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const loadSequence = useRef(0);
+  const lastLoadedProfileKey = useRef('');
 
-  useEffect(() => {
+  const loadProfile = useCallback(() => {
     if (!stationId || !roomId) return;
+    const sequence = ++loadSequence.current;
     setLoading(true);
+    setError('');
     ApiClient.getRoomProfile(Number(stationId), Number(roomId))
-      .then((data) => { setProfile(data); setError(''); })
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'The room profile could not be loaded.'))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (sequence !== loadSequence.current) return;
+        setProfile(data);
+        setError('');
+      })
+      .catch((reason) => {
+        if (sequence === loadSequence.current) {
+          setError(reason instanceof Error ? reason.message : 'The room profile could not be loaded.');
+        }
+      })
+      .finally(() => {
+        if (sequence === loadSequence.current) setLoading(false);
+      });
   }, [stationId, roomId]);
 
+  useEffect(() => {
+    const profileKey = `${stationId}:${roomId}`;
+    if (lastLoadedProfileKey.current === profileKey) return;
+    lastLoadedProfileKey.current = profileKey;
+    loadProfile();
+  }, [loadProfile]);
+
   if (loading) return <div className="flex min-h-64 items-center justify-center text-sm font-semibold text-stone-600" role="status">Loading room profile…</div>;
-  if (error || !profile) return <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-800"><p className="font-semibold">{error || 'Room not found.'}</p><Link to={`/stations/${stationId}`} className="mt-4 inline-flex min-h-12 items-center font-semibold text-blue-800">← Back to station</Link></div>;
+  if (error || !profile) return <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-800"><p className="font-semibold">{error || 'Room not found.'}</p><div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={loadProfile} className="min-h-12 rounded-xl bg-blue-700 px-5 font-semibold text-white hover:bg-blue-800">Retry</button><Link to={`/stations/${stationId}`} className="inline-flex min-h-12 items-center px-2 font-semibold text-blue-800">← Back to station</Link></div></div>;
 
   const room = profile.room;
   const attention = profile.current_assets.filter((asset) => ['poor', 'critical', 'damaged', 'needs_repair', 'out_of_service'].includes(asset.condition)).length;

@@ -23,18 +23,26 @@ class FireEquipmentRequestController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'station_id' => ['nullable', 'integer', 'exists:stations,id'],
+            'status' => ['nullable', Rule::in([
+                'pending', 'approved', 'denied', 'fulfilled', 'completed',
+                'shift_chief_approved', 'support_services_approved',
+            ])],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
         $query = StationRequest::query()
             ->where('request_type', 'equipment')
             ->with(['station', 'requestedByEmployee:id,name,rank', 'assignedTo:id,name', 'items']);
 
-        if ($request->filled('station_id')) {
-            $query->where('station_id', $request->integer('station_id'));
+        if (isset($validated['station_id'])) {
+            $query->where('station_id', $validated['station_id']);
         }
-        if ($request->filled('status')) {
-            $query->where('status', $this->canonicalStatus((string) $request->input('status')));
+        if (isset($validated['status'])) {
+            $query->where('status', $this->canonicalStatus($validated['status']));
         }
 
-        return response()->json($query->latest()->paginate($request->integer('per_page', 15)));
+        return response()->json($query->latest()->paginate((int) ($validated['per_page'] ?? 15)));
     }
 
     public function store(Request $request, StationRequestLegacyAdapterService $adapter): JsonResponse
@@ -48,6 +56,15 @@ class FireEquipmentRequestController extends Controller
             'explanation' => ['nullable', 'string', 'max:5000'],
             'priority' => ['required', Rule::in(['low', 'medium', 'normal', 'high', 'critical'])],
             'form_data' => ['nullable', 'array'],
+            'form_data.items' => ['nullable', 'array', 'min:1', 'max:25'],
+            'form_data.items.*' => ['array'],
+            'form_data.items.*.item_name' => ['nullable', 'string', 'max:255'],
+            'form_data.items.*.description' => ['nullable', 'string', 'max:255'],
+            'form_data.items.*.category' => ['nullable', 'string', 'max:100'],
+            'form_data.items.*.quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'form_data.items.*.reason' => ['nullable', Rule::in(['Damaged/Broken', 'Lost', 'Stolen', 'Needed', 'Replacement', 'End of Service Life', 'Other'])],
+            'form_data.items.*.pd_case_number' => ['nullable', 'string', 'max:100'],
+            'form_data.items.*.photo' => ['nullable', 'string', 'max:7000000'],
             'signature' => ['nullable', 'string', 'max:7000000'],
             'officer_signature' => ['nullable', 'string', 'max:7000000'],
             'pd_case_number' => ['nullable', 'string', 'max:100'],

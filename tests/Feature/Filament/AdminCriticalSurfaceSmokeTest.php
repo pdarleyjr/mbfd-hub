@@ -11,10 +11,12 @@ use App\Models\StationRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
+#[RunTestsInSeparateProcesses]
 class AdminCriticalSurfaceSmokeTest extends TestCase
 {
     use RefreshDatabase;

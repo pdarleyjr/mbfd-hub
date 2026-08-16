@@ -42,8 +42,11 @@ async function processSubmission(
   if (!response.ok) {
     let detail = response.statusText;
     try {
-      const body = await response.json() as { message?: string };
-      detail = body.message || detail;
+      const body = await response.json() as { message?: string; errors?: Record<string, string[]> };
+      const firstValidationError = body.errors
+        ? Object.values(body.errors).flat().find((message) => typeof message === 'string')
+        : undefined;
+      detail = firstValidationError || body.message || detail;
     } catch {
       // A non-JSON error body still has a useful HTTP status.
     }

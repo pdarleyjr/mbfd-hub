@@ -8,6 +8,7 @@ use App\Enums\StationRequestStatus;
 use App\Models\Room;
 use App\Models\RoomAsset;
 use App\Models\StationRequest;
+use App\Models\StationRequestItem;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -23,11 +24,25 @@ class StationRequestWorkflowService
             /** @var StationRequest $request */
             $request = StationRequest::query()->lockForUpdate()->findOrFail($stationRequest->id);
             $newStatus = (string) $data['status'];
+            $wasCompleted = $request->status === StationRequestStatus::Completed->value;
+            $assetOperations = (array) ($data['asset_operations'] ?? []);
 
             if (in_array($request->status, StationRequestStatus::terminalValues(), true)
                 && $request->status !== $newStatus) {
                 throw ValidationException::withMessages([
                     'status' => 'A terminal request cannot be moved to another status.',
+                ]);
+            }
+            if ($assetOperations !== []
+                && $newStatus !== StationRequestStatus::Completed->value) {
+                throw ValidationException::withMessages([
+                    'asset_operations' => 'Asset fulfillment can only be recorded when completing a request.',
+                ]);
+            }
+            $itemIds = collect($assetOperations)->pluck('station_request_item_id')->filter()->values();
+            if ($itemIds->unique()->count() !== $itemIds->count()) {
+                throw ValidationException::withMessages([
+                    'asset_operations' => 'Each request item can have only one asset fulfillment operation.',
                 ]);
             }
 
@@ -67,11 +82,16 @@ class StationRequestWorkflowService
                 'metadata' => ['event' => 'workflow_transition'],
             ]);
 
-            foreach ((array) ($data['asset_operations'] ?? []) as $operation) {
-                $this->applyAssetOperation($request, $operation, $actor);
+            if (! $wasCompleted && $newStatus === StationRequestStatus::Completed->value) {
+                foreach ($assetOperations as $operation) {
+                    $this->applyAssetOperation($request, $operation, $actor);
+                }
             }
 
-            if ($newStatus === StationRequestStatus::Completed->value && $request->request_type === 'repair_service') {
+            if (! $wasCompleted
+                && $newStatus === StationRequestStatus::Completed->value
+                && $request->request_type === 'repair_service') {
+                $request->unsetRelation('items');
                 $this->recordRepairCompletionEvents($request, $actor);
             }
 
@@ -94,9 +114,11 @@ class StationRequestWorkflowService
     private function applyAssetOperation(StationRequest $request, array $operation, User $actor): void
     {
         $kind = $operation['operation'];
+        $item = $this->requestItem($request, (int) $operation['station_request_item_id']);
         if ($kind === 'create') {
             $room = $this->stationRoom($request, (int) $operation['room_id']);
             $asset = $room->assets()->create($this->assetAttributes($operation));
+            $item->update(['room_asset_id' => $asset->id]);
             $this->recordEvent($asset, $request, 'created_from_request', $operation, $actor);
 
             return;
@@ -110,6 +132,15 @@ class StationRequestWorkflowService
         }
 
         if ($kind === 'link') {
+            if (filled($operation['condition'] ?? null) && $asset->condition !== $operation['condition']) {
+                $previousCondition = $asset->condition;
+                $asset->update(['condition' => $operation['condition']]);
+                $this->recordEvent($asset, $request, 'condition_changed', $operation, $actor, [
+                    'previous_condition' => $previousCondition,
+                    'new_condition' => $operation['condition'],
+                ]);
+            }
+            $item->update(['room_asset_id' => $asset->id]);
             $this->recordEvent($asset, $request, 'linked_to_request', $operation, $actor);
 
             return;
@@ -127,12 +158,25 @@ class StationRequestWorkflowService
             'retired_at' => now(),
             'replaced_by_room_asset_id' => $replacement->id,
         ]);
+        $item->update(['room_asset_id' => $replacement->id]);
         $this->recordEvent($asset, $request, 'replaced', $operation, $actor, [
             'replacement_room_asset_id' => $replacement->id,
         ]);
         $this->recordEvent($replacement, $request, 'created_as_replacement', $operation, $actor, [
             'replaced_room_asset_id' => $asset->id,
         ]);
+    }
+
+    private function requestItem(StationRequest $request, int $itemId): StationRequestItem
+    {
+        $item = $request->items()->lockForUpdate()->whereKey($itemId)->first();
+        if ($item === null) {
+            throw ValidationException::withMessages([
+                'asset_operations' => 'Every asset operation must target an item on this request.',
+            ]);
+        }
+
+        return $item;
     }
 
     private function recordRepairCompletionEvents(StationRequest $request, User $actor): void

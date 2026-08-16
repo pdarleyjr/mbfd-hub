@@ -18,6 +18,7 @@ export default function StationDetailPage() {
   const [station, setStation] = useState<StationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stationLoadAttempt, setStationLoadAttempt] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>('requests');
 
   // Today's apparatus inspections
@@ -32,6 +33,7 @@ export default function StationDetailPage() {
   const [gasMeters, setGasMeters] = useState<SingleGasMeterSummary[]>([]);
   const [tabDataLoaded, setTabDataLoaded] = useState<Record<string, boolean>>({});
   const [tabDataLoading, setTabDataLoading] = useState<Record<string, boolean>>({});
+  const [tabDataError, setTabDataError] = useState<Record<string, string>>({});
 
   // Sliding underline refs
   const tabContainerRef = useRef<HTMLDivElement>(null);
@@ -69,33 +71,39 @@ export default function StationDetailPage() {
   useEffect(() => {
     if (!id) return;
     const stationId = parseInt(id);
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setTodayInspectionsLoading(true);
 
     const fetchStation = async () => {
       try {
         const data = await ApiClient.getStation(stationId);
+        if (cancelled) return;
         setStation(data);
         setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load station');
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load station');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     const fetchTodayInspections = async () => {
       try {
         const data = await ApiClient.getTodayApparatusInspections(stationId);
-        setTodayInspections(data);
+        if (!cancelled) setTodayInspections(data);
       } catch {
         // Non-critical, silently fail
       } finally {
-        setTodayInspectionsLoading(false);
+        if (!cancelled) setTodayInspectionsLoading(false);
       }
     };
 
     fetchStation();
     fetchTodayInspections();
-  }, [id]);
+    return () => { cancelled = true; };
+  }, [id, stationLoadAttempt]);
 
   // Lazy load tab data when tab changes
   useEffect(() => {
@@ -104,6 +112,7 @@ export default function StationDetailPage() {
 
     const loadTabData = async () => {
       setTabDataLoading(prev => ({ ...prev, [activeTab]: true }));
+      setTabDataError(prev => ({ ...prev, [activeTab]: '' }));
       try {
         switch (activeTab) {
           case 'inspections': {
@@ -127,8 +136,11 @@ export default function StationDetailPage() {
             break;
           }
         }
-      } catch {
-        // Tab data load failure is non-critical
+      } catch (reason) {
+        setTabDataError(prev => ({
+          ...prev,
+          [activeTab]: reason instanceof Error ? reason.message : 'This section could not be loaded.',
+        }));
       } finally {
         setTabDataLoaded(prev => ({ ...prev, [activeTab]: true }));
         setTabDataLoading(prev => ({ ...prev, [activeTab]: false }));
@@ -139,6 +151,11 @@ export default function StationDetailPage() {
       loadTabData();
     }
   }, [activeTab, id, tabDataLoaded]);
+
+  const retryTabData = (tab: TabId) => {
+    setTabDataError(prev => ({ ...prev, [tab]: '' }));
+    setTabDataLoaded(prev => ({ ...prev, [tab]: false }));
+  };
 
   const getStatusBadgeClass = (status: string): string => {
     const map: Record<string, string> = {
@@ -208,12 +225,10 @@ export default function StationDetailPage() {
           </svg>
         </div>
         <p className="text-red-600 font-medium mb-2">{error || 'Station not found'}</p>
-        <Link
-          to="/stations"
-          className="mt-4 inline-block px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-        >
-          Back to Stations
-        </Link>
+        <div className="mt-4 flex flex-wrap justify-center gap-3">
+          <button type="button" onClick={() => setStationLoadAttempt((attempt) => attempt + 1)} className="min-h-12 rounded-lg bg-blue-700 px-5 font-semibold text-white hover:bg-blue-800">Retry</button>
+          <Link to="/stations" className="inline-flex min-h-12 items-center rounded-lg bg-red-600 px-5 font-semibold text-white transition-colors hover:bg-red-700">Back to Stations</Link>
+        </div>
       </div>
     );
   }
@@ -506,7 +521,9 @@ export default function StationDetailPage() {
           {/* ========== GAS METERS TAB ========== */}
           {activeTab === 'gas-meters' && (
             <div>
-              {tabDataLoading['gas-meters'] ? (
+              {tabDataError['gas-meters'] ? (
+                <TabLoadError message={tabDataError['gas-meters']} onRetry={() => retryTabData('gas-meters')} />
+              ) : tabDataLoading['gas-meters'] ? (
                 <TabSkeleton />
               ) : gasMeters.length > 0 ? (
                 <div className="space-y-3 stagger-list">
@@ -554,7 +571,9 @@ export default function StationDetailPage() {
                   <button type="button" onClick={() => setRequestScope('all')} className={`min-h-11 rounded-lg px-4 text-sm font-semibold ${requestScope === 'all' ? 'bg-white text-blue-800 shadow-sm' : 'text-neutral-600'}`}>All history</button>
                 </div>
               </div>
-              {tabDataLoading.requests ? (
+              {tabDataError.requests ? (
+                <TabLoadError message={tabDataError.requests} onRetry={() => retryTabData('requests')} />
+              ) : tabDataLoading.requests ? (
                 <TabSkeleton />
               ) : stationRequests.filter((request) => requestScope === 'all' || request.is_open).length > 0 ? (
                 <div className="space-y-3 stagger-list">
@@ -596,7 +615,9 @@ export default function StationDetailPage() {
           {/* ========== STATION INSPECTIONS TAB ========== */}
           {activeTab === 'inspections' && (
             <div>
-              {tabDataLoading['inspections'] ? (
+              {tabDataError.inspections ? (
+                <TabLoadError message={tabDataError.inspections} onRetry={() => retryTabData('inspections')} />
+              ) : tabDataLoading['inspections'] ? (
                 <TabSkeleton />
               ) : stationInspections.length > 0 ? (
                 <div className="space-y-3 stagger-list">
@@ -634,7 +655,7 @@ export default function StationDetailPage() {
           {/* ========== UNIFIED STATION ACTIVITY TAB ========== */}
           {activeTab === 'activity' && (
             <div>
-              {tabDataLoading.activity ? <TabSkeleton /> : activity.length > 0 ? (
+              {tabDataError.activity ? <TabLoadError message={tabDataError.activity} onRetry={() => retryTabData('activity')} /> : tabDataLoading.activity ? <TabSkeleton /> : activity.length > 0 ? (
                 <ol className="space-y-3">
                   {activity.map((entry, index) => (
                     <li key={`${entry.type}-${entry.occurred_at}-${index}`} className="flex gap-3 rounded-xl border border-neutral-200 p-4">
@@ -668,6 +689,10 @@ function TabSkeleton() {
       ))}
     </div>
   );
+}
+
+function TabLoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-800"><p className="font-semibold">{message}</p><button type="button" onClick={onRetry} className="mt-4 min-h-12 rounded-xl bg-blue-700 px-5 font-semibold text-white hover:bg-blue-800">Retry</button></div>;
 }
 
 function EmptyState({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) {

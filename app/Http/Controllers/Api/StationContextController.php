@@ -9,6 +9,7 @@ use App\Http\Resources\Public\PublicRoomAssetResource;
 use App\Http\Resources\Public\PublicRoomResource;
 use App\Http\Resources\Public\PublicStationRequestResource;
 use App\Models\Room;
+use App\Models\RoomAssetEvent;
 use App\Models\Station;
 use App\Services\StationActivityService;
 use Illuminate\Http\JsonResponse;
@@ -30,18 +31,29 @@ class StationContextController extends Controller
     {
         abort_unless((int) $room->station_id === (int) $station->id, 404);
 
-        $room->load([
-            'assets' => fn ($query) => $query->active()->orderBy('category')->orderBy('name'),
-            'stationRequests' => fn ($query) => $query->with([
-                'items:id,station_request_id,room_asset_id,item_name,category,quantity,reason,requested_action,condition',
-                'updates:id,station_request_id,status,public_note,created_at',
-            ])->latest('created_at')->limit(50),
-        ]);
-        $events = $room->assets
-            ->flatMap(fn ($asset) => $asset->events()->with(['stationRequest:id,request_number', 'roomAsset:id,name'])->limit(50)->get())
-            ->sortByDesc('event_at')
-            ->take(100)
-            ->values()
+        $requestRelations = [
+            'items:id,station_request_id,room_asset_id,item_name,category,quantity,reason,requested_action,condition',
+            'updates:id,station_request_id,status,public_note,created_at',
+        ];
+        $room->load(['assets' => fn ($query) => $query->active()->orderBy('category')->orderBy('name')]);
+        $openRequests = $room->stationRequests()
+            ->open()
+            ->with($requestRelations)
+            ->latest('created_at')
+            ->limit(50)
+            ->get();
+        $requestHistory = $room->stationRequests()
+            ->with($requestRelations)
+            ->latest('created_at')
+            ->limit(50)
+            ->get();
+        $events = RoomAssetEvent::query()
+            ->whereHas('roomAsset', fn ($query) => $query->where('room_id', $room->id))
+            ->with(['stationRequest:id,request_number', 'roomAsset:id,room_id,name'])
+            ->latest('event_at')
+            ->latest('id')
+            ->limit(100)
+            ->get()
             ->map(fn ($event): array => [
                 'id' => $event->id,
                 'room_asset_id' => $event->room_asset_id,
@@ -54,8 +66,8 @@ class StationContextController extends Controller
         return response()->json([
             'room' => (new PublicRoomResource($room))->resolve($request),
             'current_assets' => PublicRoomAssetResource::collection($room->assets)->resolve($request),
-            'open_requests' => PublicStationRequestResource::collection($room->stationRequests->where('is_open', true))->resolve($request),
-            'request_history' => PublicStationRequestResource::collection($room->stationRequests)->resolve($request),
+            'open_requests' => PublicStationRequestResource::collection($openRequests)->resolve($request),
+            'request_history' => PublicStationRequestResource::collection($requestHistory)->resolve($request),
             'asset_events' => $events,
         ]);
     }

@@ -53,6 +53,13 @@ class ViewStationRequest extends ViewRecord
                         ->label('Asset Fulfillment (optional)')
                         ->helperText('Explicitly create, link, or replace a room asset in the same transaction.')
                         ->schema([
+                            Forms\Components\Select::make('station_request_item_id')
+                                ->options(fn (): array => $this->record->items()
+                                    ->get()
+                                    ->mapWithKeys(fn ($item) => [$item->id => "{$item->quantity}x {$item->item_name}"])
+                                    ->all())
+                                ->label('Request Item')
+                                ->required(),
                             Forms\Components\Select::make('operation')
                                 ->options(['create' => 'Create', 'link' => 'Link existing', 'replace' => 'Replace existing'])
                                 ->required(),

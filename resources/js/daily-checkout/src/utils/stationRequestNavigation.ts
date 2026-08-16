@@ -13,15 +13,19 @@ export function buildStationRequestPath(search: string, forcedType?: StationRequ
   const source = new URLSearchParams(search);
   const target = new URLSearchParams();
   const rawStationId = source.get('station_id') ?? source.get('station');
+  let stationReturnPath = '/forms-hub';
   if (rawStationId && /^\d+$/.test(rawStationId) && Number(rawStationId) > 0) {
     target.set('station_id', rawStationId);
+    stationReturnPath = `/stations/${rawStationId}`;
   }
   const requestType = forcedType ?? source.get('type');
   if (requestType === 'repair_service' || requestType === 'equipment') {
     target.set('type', requestType);
   }
   const returnTo = source.get('return_to');
-  if (returnTo) target.set('return_to', safeReturnTo(returnTo));
+  if (returnTo || stationReturnPath !== '/forms-hub') {
+    target.set('return_to', safeReturnTo(returnTo, stationReturnPath));
+  }
 
   const query = target.toString();
   return `/forms-hub/station-request${query ? `?${query}` : ''}`;

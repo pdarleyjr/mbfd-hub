@@ -60,6 +60,7 @@ class StationRequestController extends Controller
             'assigned_vendor' => ['nullable', 'string', 'max:255'],
             'asset_operations' => ['nullable', 'array', 'max:25'],
             'asset_operations.*.operation' => ['required', Rule::in(['create', 'link', 'replace'])],
+            'asset_operations.*.station_request_item_id' => ['required', 'integer', 'exists:station_request_items,id'],
             'asset_operations.*.room_id' => ['nullable', 'integer', 'exists:rooms,id'],
             'asset_operations.*.room_asset_id' => ['nullable', 'integer', 'exists:room_assets,id'],
             'asset_operations.*.asset_tag' => ['nullable', 'string', 'max:255'],
@@ -77,6 +78,13 @@ class StationRequestController extends Controller
             'asset_operations.*.cost' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'asset_operations.*.notes' => ['nullable', 'string', 'max:5000'],
         ]);
+
+        if (($validated['asset_operations'] ?? []) !== []
+            && $validated['status'] !== StationRequestStatus::Completed->value) {
+            throw ValidationException::withMessages([
+                'asset_operations' => 'Asset fulfillment can only be recorded when completing a request.',
+            ]);
+        }
 
         foreach (($validated['asset_operations'] ?? []) as $index => $operation) {
             if (in_array($operation['operation'], ['create', 'replace'], true) && blank($operation['name'] ?? null)) {

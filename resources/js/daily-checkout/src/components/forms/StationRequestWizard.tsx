@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import SignatureCanvas from 'react-signature-canvas';
 import type { EmployeeOption, Room, RoomAsset, Station, StationRequestSummary, StationRequestType } from '../../types';
@@ -65,8 +65,9 @@ export default function StationRequestWizard() {
   const [searchParams] = useSearchParams();
   const initialType = searchParams.get('type') === 'equipment' ? 'equipment' : 'repair_service';
   const initialStationId = /^\d+$/.test(searchParams.get('station_id') ?? '') ? searchParams.get('station_id')! : '';
-  const returnTo = safeReturnTo(searchParams.get('return_to'));
+  const returnTo = safeReturnTo(searchParams.get('return_to'), initialStationId ? `/stations/${initialStationId}` : '/forms-hub');
   const clientSubmissionId = useRef(createClientSubmissionId());
+  const initialOptionsLoadStarted = useRef(false);
   const memberSignature = useRef<SignatureCanvas>(null);
   const officerSignature = useRef<SignatureCanvas>(null);
 
@@ -96,6 +97,7 @@ export default function StationRequestWizard() {
   const [requestNumber, setRequestNumber] = useState('');
   const [memberSignatureData, setMemberSignatureData] = useState('');
   const [officerSignatureData, setOfficerSignatureData] = useState('');
+  const [processingPhotoIds, setProcessingPhotoIds] = useState<string[]>([]);
 
   const totalSteps = requestType === 'equipment' ? 4 : 3;
   const selectedStation = stations.find((station) => String(station.id) === stationId);
@@ -111,15 +113,24 @@ export default function StationRequestWizard() {
     ? ['Context', 'Request', 'Signatures', 'Review']
     : ['Context', 'Request', 'Review'];
 
-  useEffect(() => {
-    Promise.all([ApiClient.getStations(), ApiClient.getEmployees()])
+  const loadOptions = useCallback(() => {
+    setLoadingOptions(true);
+    setError('');
+    return Promise.all([ApiClient.getStations(), ApiClient.getEmployees()])
       .then(([stationRows, employeeRows]) => {
         setStations(stationRows);
         setEmployees(employeeRows);
+        setError('');
       })
       .catch(() => setError('Station and employee options could not be loaded. Check the connection and try again.'))
       .finally(() => setLoadingOptions(false));
   }, []);
+
+  useEffect(() => {
+    if (initialOptionsLoadStarted.current) return;
+    initialOptionsLoadStarted.current = true;
+    void loadOptions();
+  }, [loadOptions]);
 
   useEffect(() => {
     setRooms([]);
@@ -128,22 +139,51 @@ export default function StationRequestWizard() {
     setRoomNameSnapshot('');
     setAssets([]);
     if (!stationId) return;
-    fetch(`/api/public/stations/${stationId}/rooms`, { headers: { Accept: 'application/json' } })
+    const controller = new AbortController();
+    fetch(`/api/public/stations/${stationId}/rooms`, { headers: { Accept: 'application/json' }, signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error();
         return response.json();
       })
-      .then((payload) => setRooms(payload.rooms || []))
-      .catch(() => setError('Rooms for this station could not be loaded.'));
+      .then((payload) => {
+        setRooms(payload.rooms || []);
+        setError('');
+      })
+      .catch((fetchError) => {
+        if (fetchError instanceof DOMException && fetchError.name === 'AbortError') return;
+        setError('Rooms for this station could not be loaded.');
+      });
+    return () => controller.abort();
   }, [stationId]);
 
   useEffect(() => {
     setAssets([]);
     if (!stationId || !roomId) return;
+    let cancelled = false;
     ApiClient.getRoomAssets(Number(stationId), Number(roomId))
-      .then(setAssets)
-      .catch(() => setError('Assets for this room could not be loaded.'));
+      .then((assetRows) => {
+        if (cancelled) return;
+        setAssets(assetRows);
+        setError('');
+      })
+      .catch(() => {
+        if (!cancelled) setError('Assets for this room could not be loaded.');
+      });
+    return () => { cancelled = true; };
   }, [stationId, roomId]);
+
+  useEffect(() => {
+    if (step !== 3 || requestType !== 'equipment') return;
+    const frame = window.requestAnimationFrame(() => {
+      if (memberSignatureData && memberSignature.current?.isEmpty()) {
+        memberSignature.current.fromDataURL(memberSignatureData);
+      }
+      if (officerSignatureData && officerSignature.current?.isEmpty()) {
+        officerSignature.current.fromDataURL(officerSignatureData);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [step, requestType, memberSignatureData, officerSignatureData]);
 
   useEffect(() => {
     setItems([makeItem(requestType)]);
@@ -161,6 +201,18 @@ export default function StationRequestWizard() {
 
   const selectedAssetLabel = (assetId: string) => assets.find((asset) => String(asset.id) === assetId)?.name;
 
+  const preparePhoto = async (itemId: string, file: File) => {
+    setProcessingPhotoIds((current) => current.includes(itemId) ? current : [...current, itemId]);
+    setError('');
+    try {
+      updateItem(itemId, { photo: await fileToDataUrl(file) });
+    } catch {
+      setError('The selected photo could not be prepared. Choose a JPEG, PNG, or WebP image and try again.');
+    } finally {
+      setProcessingPhotoIds((current) => current.filter((id) => id !== itemId));
+    }
+  };
+
   const getValidationMessage = () => {
     if (step === 1) {
       if (!stationId) return 'Select the station responsible for this request.';
@@ -175,9 +227,12 @@ export default function StationRequestWizard() {
       }
       if (!title.trim()) return 'Enter a short request title.';
       if (!description.trim()) return 'Describe what is needed and why.';
+      if (items.length > 25) return 'A station request can include no more than 25 items.';
+      if (processingPhotoIds.length > 0) return 'Wait for each selected photo to finish preparing.';
       for (const item of items) {
         if (!item.itemName.trim()) return 'Enter a name for every requested item.';
         if (item.quantity < 1) return 'Every quantity must be at least one.';
+        if (item.quantity > 100) return 'Every quantity must be 100 or less.';
         if (item.reason === 'Stolen' && !item.pdCaseNumber.trim()) return 'A police case number is required for stolen equipment.';
       }
     }
@@ -266,7 +321,7 @@ export default function StationRequestWizard() {
         </p>
         {outcome === 'queued' && <p className="mt-3 font-mono text-xs text-stone-500">Offline reference {clientSubmissionId.current.slice(0, 8).toUpperCase()}</p>}
         <Link to={returnTo} className="mt-7 inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
-          Return to station
+          {returnTo.startsWith('/stations/') ? 'Back to station' : 'Back to Forms Hub'}
         </Link>
       </div>
     );
@@ -294,7 +349,7 @@ export default function StationRequestWizard() {
         })}
       </ol>
 
-      {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">{error}</div>}
+      {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">{error}{!stations.length && !loadingOptions && <button type="button" onClick={() => void loadOptions()} className="ml-3 min-h-11 rounded-lg border border-red-300 bg-white px-3 font-bold hover:bg-red-100">Retry</button>}</div>}
 
       <section className="rounded-2xl bg-white p-5 ring-1 ring-stone-200 sm:p-7">
         {step === 1 && (
@@ -334,7 +389,7 @@ export default function StationRequestWizard() {
               </div>
               <label className="text-sm font-semibold text-slate-800 sm:col-span-2">Requesting employee <span className="text-red-700">*</span>
                 <select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} disabled={loadingOptions} className="mt-2 min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-base focus:border-blue-700 focus:ring-blue-700">
-                  <option value="">Select employee</option>{filteredEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}{employee.rank ? ` — ${employee.rank}` : ''}</option>)}
+                  <option value="">{normalizedEmployeeSearch && filteredEmployees.length === 0 ? 'No matching employees' : 'Select employee'}</option>{filteredEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}{employee.rank ? ` — ${employee.rank}` : ''}</option>)}
                 </select>
               </label>
               <label className="text-sm font-semibold text-slate-800 sm:col-span-2">Room <span className="font-normal text-stone-500">(optional for station-wide work)</span>
@@ -383,7 +438,7 @@ export default function StationRequestWizard() {
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between"><h3 className="font-heading text-lg font-bold text-slate-900">{requestType === 'equipment' ? 'Equipment items' : 'Affected item or asset'}</h3>{requestType === 'equipment' && <button type="button" onClick={() => setItems((current) => [...current, makeItem('equipment')])} className="min-h-12 rounded-xl bg-blue-50 px-4 font-semibold text-blue-800 hover:bg-blue-100">+ Add item</button>}</div>
+              <div className="flex items-center justify-between gap-3"><h3 className="font-heading text-lg font-bold text-slate-900">{requestType === 'equipment' ? 'Equipment items' : 'Affected item or asset'}</h3>{requestType === 'equipment' && <button type="button" onClick={() => setItems((current) => current.length >= 25 ? current : [...current, makeItem('equipment')])} disabled={items.length >= 25} className="min-h-12 rounded-xl bg-blue-50 px-4 font-semibold text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" title={items.length >= 25 ? 'Maximum 25 items per request' : undefined}>+ Add item</button>}</div>
               {items.map((item, index) => (
                 <fieldset key={item.id} className="rounded-xl border border-stone-200 bg-stone-50/60 p-4">
                   <legend className="px-1 text-sm font-bold text-slate-800">Item {index + 1}</legend>
@@ -394,7 +449,7 @@ export default function StationRequestWizard() {
                     <label className="text-sm font-semibold text-slate-800">Quantity<input type="number" min={1} max={100} value={item.quantity} onChange={(event) => updateItem(item.id, { quantity: Math.max(1, Number(event.target.value)) })} className="mt-2 min-h-12 w-full rounded-xl border border-stone-300 px-3" /></label>
                     {requestType === 'repair_service' ? <label className="text-sm font-semibold text-slate-800">Requested action<select value={item.requestedAction} onChange={(event) => updateItem(item.id, { requestedAction: event.target.value as DraftItem['requestedAction'] })} className="mt-2 min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3"><option value="inspect">Inspect</option><option value="repair">Repair</option><option value="replace">Replace</option><option value="service">Service</option><option value="remove">Remove</option></select></label> : <label className="text-sm font-semibold text-slate-800">Reason<select value={item.reason} onChange={(event) => updateItem(item.id, { reason: event.target.value as Reason, pdCaseNumber: '' })} className="mt-2 min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3"><option value="Needed">New / Needed</option><option value="Replacement">Replacement</option><option value="Damaged/Broken">Damaged / Broken</option><option value="Lost">Lost</option><option value="Stolen">Stolen</option><option value="End of Service Life">End of Service Life</option><option value="Other">Other</option></select></label>}
                     {item.reason === 'Stolen' && <label className="text-sm font-semibold text-slate-800">Police case number <span className="text-red-700">*</span><input value={item.pdCaseNumber} onChange={(event) => updateItem(item.id, { pdCaseNumber: event.target.value })} className="mt-2 min-h-12 w-full rounded-xl border border-stone-300 px-3" /></label>}
-                    {(requestType === 'repair_service' || item.reason === 'Damaged/Broken') && <label className="text-sm font-semibold text-slate-800 sm:col-span-2">Damage photo <span className="font-normal text-stone-500">(optional)</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { updateItem(item.id, { photo: await fileToDataUrl(file) }); } catch { setError('The selected photo could not be prepared. Choose a JPEG, PNG, or WebP image and try again.'); } }} className="mt-2 block min-h-12 w-full rounded-xl border border-stone-300 bg-white p-2 text-sm" />{item.photo && <p className="mt-2 text-sm font-medium text-emerald-700">Photo attached</p>}</label>}
+                    {(requestType === 'repair_service' || item.reason === 'Damaged/Broken') && <label className="text-sm font-semibold text-slate-800 sm:col-span-2">Damage photo <span className="font-normal text-stone-500">(optional)</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) void preparePhoto(item.id, file); }} disabled={processingPhotoIds.includes(item.id)} className="mt-2 block min-h-12 w-full rounded-xl border border-stone-300 bg-white p-2 text-sm disabled:cursor-wait disabled:opacity-60" />{processingPhotoIds.includes(item.id) ? <p className="mt-2 text-sm font-medium text-blue-700">Preparing photo…</p> : item.photo && <p className="mt-2 text-sm font-medium text-emerald-700">Photo attached</p>}</label>}
                     {requestType === 'repair_service' && <label className="flex min-h-12 items-center gap-3 rounded-xl border border-stone-300 bg-white px-3 text-sm font-semibold text-slate-800 sm:col-span-2"><input type="checkbox" checked={outOfService} onChange={(event) => setOutOfService(event.target.checked)} className="h-5 w-5 rounded border-stone-400 text-blue-700 focus:ring-blue-700" />The item or area is unusable / out of service</label>}
                   </div>
                   {requestType === 'equipment' && items.length > 1 && <button type="button" onClick={() => setItems((current) => current.filter((row) => row.id !== item.id))} className="mt-4 min-h-12 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50">Remove item</button>}
@@ -405,7 +460,7 @@ export default function StationRequestWizard() {
         )}
 
         {step === 3 && requestType === 'equipment' && (
-          <div className="space-y-6"><div><h2 className="font-heading text-xl font-bold text-slate-900">Required signatures</h2><p className="mt-1 text-sm text-stone-600">Both signatures are retained with the request record.</p></div>{[['Requesting member', memberSignature], ['Company officer', officerSignature]].map(([label, ref]) => <div key={label as string}><div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold text-slate-800">{label as string} <span className="text-red-700">*</span></p><button type="button" onClick={() => (ref as React.RefObject<SignatureCanvas>).current?.clear()} className="min-h-12 px-3 text-sm font-semibold text-red-700">Clear</button></div><div className="overflow-hidden rounded-xl border-2 border-stone-300 bg-white"><SignatureCanvas ref={ref as React.RefObject<SignatureCanvas>} penColor="#0f172a" canvasProps={{ className: 'h-40 w-full touch-none', 'aria-label': `${label} signature pad` }} /></div></div>)}</div>
+          <div className="space-y-6"><div><h2 className="font-heading text-xl font-bold text-slate-900">Required signatures</h2><p className="mt-1 text-sm text-stone-600">Both signatures are retained with the request record.</p></div>{[['Requesting member', memberSignature], ['Company officer', officerSignature]].map(([label, ref], index) => <div key={label as string}><div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold text-slate-800">{label as string} <span className="text-red-700">*</span></p><button type="button" onClick={() => { (ref as React.RefObject<SignatureCanvas>).current?.clear(); if (index === 0) setMemberSignatureData(''); else setOfficerSignatureData(''); }} className="min-h-12 px-3 text-sm font-semibold text-red-700">Clear</button></div><div className="overflow-hidden rounded-xl border-2 border-stone-300 bg-white"><SignatureCanvas ref={ref as React.RefObject<SignatureCanvas>} penColor="#0f172a" canvasProps={{ className: 'h-40 w-full touch-none', 'aria-label': `${label} signature pad` }} /></div></div>)}</div>
         )}
 
         {step === totalSteps && (
@@ -415,7 +470,7 @@ export default function StationRequestWizard() {
 
       <div className="sticky bottom-3 flex gap-3 rounded-2xl bg-white/95 p-3 shadow-lg ring-1 ring-stone-200 backdrop-blur">
         {step > 1 && <button type="button" onClick={() => { setError(''); setStep((current) => current - 1); }} className="min-h-12 flex-1 rounded-xl border border-stone-300 px-4 font-semibold text-slate-800 hover:bg-stone-50">Back</button>}
-        {step < totalSteps ? <button type="button" onClick={advance} className="min-h-12 flex-[2] rounded-xl bg-blue-700 px-5 font-bold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">Continue</button> : <button type="button" onClick={handleSubmit} disabled={submitting} className="min-h-12 flex-[2] rounded-xl bg-orange-600 px-5 font-bold text-white hover:bg-orange-700 disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">{submitting ? 'Submitting…' : 'Submit station request'}</button>}
+        {step < totalSteps ? <button type="button" onClick={advance} disabled={processingPhotoIds.length > 0} className="min-h-12 flex-[2] rounded-xl bg-blue-700 px-5 font-bold text-white hover:bg-blue-800 disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">{processingPhotoIds.length > 0 ? 'Preparing photo…' : 'Continue'}</button> : <button type="button" onClick={handleSubmit} disabled={submitting} className="min-h-12 flex-[2] rounded-xl bg-orange-600 px-5 font-bold text-white hover:bg-orange-700 disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">{submitting ? 'Submitting…' : 'Submit station request'}</button>}
       </div>
     </div>
   );

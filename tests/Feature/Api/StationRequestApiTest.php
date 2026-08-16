@@ -119,6 +119,50 @@ class StationRequestApiTest extends TestCase
         $this->assertDatabaseCount('station_request_updates', 1);
     }
 
+    public function test_multi_item_submission_stores_photos_and_signatures_without_raw_image_payloads(): void
+    {
+        $payload = $this->equipmentPayload();
+        $payload['items'][0]['photo'] = $this->pngFixture();
+        $payload['items'][] = [
+            'item_name' => 'Thermal camera',
+            'category' => 'communications',
+            'quantity' => 2,
+            'reason' => 'Needed',
+        ];
+
+        $this->postJson('/api/public/station_request', $payload)->assertCreated();
+        $request = StationRequest::query()->with('items')->sole();
+
+        $this->assertCount(2, $request->items);
+        $this->assertSame(2, $request->items[1]->quantity);
+        $this->assertNotNull($request->items[0]->photo_path);
+        Storage::disk('public')->assertExists($request->items[0]->photo_path);
+        Storage::disk('public')->assertExists($request->metadata['signatures']['member']);
+        Storage::disk('public')->assertExists($request->metadata['signatures']['officer']);
+        $this->assertStringNotContainsString('data:image', json_encode($request->getAttributes(), JSON_THROW_ON_ERROR));
+    }
+
+    public function test_malformed_items_return_validation_errors_instead_of_server_errors(): void
+    {
+        $payload = $this->equipmentPayload();
+        $payload['items'] = ['not-an-item-object'];
+
+        $this->postJson('/api/public/station_request', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('items.0.item_name');
+
+        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+        $this->postJson('/api/admin/fire-equipment-requests', [
+            'station_id' => $this->station->id,
+            'equipment_type' => 'Radio',
+            'description' => 'Malformed legacy payload must be rejected.',
+            'priority' => 'normal',
+            'form_data' => ['items' => ['not-an-item-object']],
+        ])->assertUnprocessable()->assertJsonValidationErrors('form_data.items.0');
+
+        $this->assertDatabaseCount('station_requests', 0);
+    }
+
     public function test_unlisted_room_is_preserved_as_a_snapshot_without_creating_a_room(): void
     {
         $payload = $this->equipmentPayload();
@@ -225,7 +269,8 @@ class StationRequestApiTest extends TestCase
     public function test_authorized_workflow_transition_is_append_only_and_sets_terminal_timestamps(): void
     {
         $this->postJson('/api/public/station_request', $this->equipmentPayload())->assertCreated();
-        $request = StationRequest::query()->sole();
+        $request = StationRequest::query()->with('items')->sole();
+        $requestItem = $request->items->sole();
         $admin = $this->makeAdmin('logistics_admin');
         Sanctum::actingAs($admin);
 
@@ -240,6 +285,7 @@ class StationRequestApiTest extends TestCase
             'public_note' => 'Replacement delivered to Station 1.',
             'asset_operations' => [[
                 'operation' => 'create',
+                'station_request_item_id' => $requestItem->id,
                 'room_id' => $this->room->id,
                 'name' => 'Portable radio',
                 'asset_tag' => 'S1-RAD-009',
@@ -264,11 +310,163 @@ class StationRequestApiTest extends TestCase
             'station_request_id' => $request->id,
             'event_type' => 'created_from_request',
         ]);
+        $this->assertNotNull($requestItem->refresh()->room_asset_id);
 
         $this->getJson("/api/public/stations/{$this->station->id}/rooms/{$this->room->id}/profile")
             ->assertOk()
             ->assertJsonFragment(['name' => 'Portable radio'])
             ->assertJsonFragment(['event_type' => 'created_from_request']);
+    }
+
+    public function test_completed_asset_fulfillment_is_idempotent_and_only_runs_on_completion(): void
+    {
+        $this->postJson('/api/public/station_request', $this->equipmentPayload())->assertCreated();
+        $request = StationRequest::query()->with('items')->sole();
+        $requestItem = $request->items->sole();
+        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+        $operation = [
+            'operation' => 'create',
+            'station_request_item_id' => $requestItem->id,
+            'room_id' => $this->room->id,
+            'name' => 'Portable radio',
+            'asset_tag' => 'S1-RAD-IDEMPOTENT',
+        ];
+
+        $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
+            'status' => 'approved',
+            'asset_operations' => [$operation],
+        ])->assertUnprocessable()->assertJsonValidationErrors('asset_operations');
+
+        $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
+            'status' => 'completed',
+            'asset_operations' => [$operation],
+        ])->assertOk();
+        $linkedAssetId = $requestItem->refresh()->room_asset_id;
+
+        $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
+            'status' => 'completed',
+            'asset_operations' => [$operation],
+        ])->assertOk();
+
+        $this->assertSame($linkedAssetId, $requestItem->refresh()->room_asset_id);
+        $this->assertDatabaseCount('room_assets', 2);
+        $this->assertDatabaseCount('room_asset_events', 1);
+    }
+
+    public function test_asset_fulfillment_must_target_an_item_on_the_same_request(): void
+    {
+        $this->postJson('/api/public/station_request', $this->equipmentPayload())->assertCreated();
+        $request = StationRequest::query()->with('items')->sole();
+        $otherPayload = $this->equipmentPayload();
+        $otherPayload['client_submission_id'] = 'f0ec0e60-19f5-4379-a0b8-96b2c35a2485';
+        $this->postJson('/api/public/station_request', $otherPayload)->assertCreated();
+        $otherItem = StationRequest::query()->whereKeyNot($request->id)->firstOrFail()->items()->sole();
+        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+
+        $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
+            'status' => 'completed',
+            'asset_operations' => [[
+                'operation' => 'create',
+                'station_request_item_id' => $otherItem->id,
+                'room_id' => $this->room->id,
+                'name' => 'Wrong request asset',
+            ]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('asset_operations');
+
+        $this->assertDatabaseMissing('room_assets', ['name' => 'Wrong request asset']);
+        $this->assertSame('pending', $request->refresh()->status);
+    }
+
+    public function test_each_request_item_can_only_be_fulfilled_once_per_completion(): void
+    {
+        $this->postJson('/api/public/station_request', $this->equipmentPayload())->assertCreated();
+        $request = StationRequest::query()->with('items')->sole();
+        $item = $request->items->sole();
+        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+
+        $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
+            'status' => 'completed',
+            'asset_operations' => [
+                [
+                    'operation' => 'create',
+                    'station_request_item_id' => $item->id,
+                    'room_id' => $this->room->id,
+                    'name' => 'First duplicate fulfillment',
+                ],
+                [
+                    'operation' => 'create',
+                    'station_request_item_id' => $item->id,
+                    'room_id' => $this->room->id,
+                    'name' => 'Second duplicate fulfillment',
+                ],
+            ],
+        ])->assertUnprocessable()->assertJsonValidationErrors('asset_operations');
+
+        $this->assertSame('pending', $request->refresh()->status);
+        $this->assertDatabaseMissing('room_assets', ['name' => 'First duplicate fulfillment']);
+        $this->assertDatabaseMissing('room_assets', ['name' => 'Second duplicate fulfillment']);
+    }
+
+    public function test_link_and_replace_operations_update_item_mapping_condition_and_append_history(): void
+    {
+        $this->postJson('/api/public/station_request', $this->equipmentPayload())->assertCreated();
+        $request = StationRequest::query()->with('items')->sole();
+        $item = $request->items->sole();
+        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+
+        $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
+            'status' => 'completed',
+            'asset_operations' => [[
+                'operation' => 'link',
+                'station_request_item_id' => $item->id,
+                'room_asset_id' => $this->asset->id,
+                'condition' => 'good',
+                'notes' => 'Repair verified.',
+            ]],
+        ])->assertOk();
+
+        $this->assertSame($this->asset->id, $item->refresh()->room_asset_id);
+        $this->assertSame('good', $this->asset->refresh()->condition);
+        $this->assertDatabaseHas('room_asset_events', [
+            'room_asset_id' => $this->asset->id,
+            'station_request_id' => $request->id,
+            'event_type' => 'condition_changed',
+        ]);
+        $this->assertDatabaseHas('room_asset_events', [
+            'room_asset_id' => $this->asset->id,
+            'station_request_id' => $request->id,
+            'event_type' => 'linked_to_request',
+        ]);
+    }
+
+    public function test_replace_operation_retires_old_asset_and_maps_item_to_replacement(): void
+    {
+        $payload = $this->equipmentPayload();
+        $payload['items'][0]['room_asset_id'] = $this->asset->id;
+        $this->postJson('/api/public/station_request', $payload)->assertCreated();
+        $request = StationRequest::query()->with('items')->sole();
+        $item = $request->items->sole();
+        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+
+        $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
+            'status' => 'completed',
+            'asset_operations' => [[
+                'operation' => 'replace',
+                'station_request_item_id' => $item->id,
+                'room_asset_id' => $this->asset->id,
+                'room_id' => $this->room->id,
+                'name' => 'Replacement refrigerator',
+                'asset_tag' => 'S1-KIT-002',
+                'condition' => 'new',
+            ]],
+        ])->assertOk();
+
+        $replacement = RoomAsset::query()->where('asset_tag', 'S1-KIT-002')->sole();
+        $this->assertSame($replacement->id, $item->refresh()->room_asset_id);
+        $this->assertFalse($this->asset->refresh()->is_active);
+        $this->assertSame($replacement->id, $this->asset->replaced_by_room_asset_id);
+        $this->assertDatabaseHas('room_asset_events', ['room_asset_id' => $this->asset->id, 'event_type' => 'replaced']);
+        $this->assertDatabaseHas('room_asset_events', ['room_asset_id' => $replacement->id, 'event_type' => 'created_as_replacement']);
     }
 
     public function test_training_only_user_cannot_manage_station_requests(): void
@@ -281,6 +479,31 @@ class StationRequestApiTest extends TestCase
         $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
             'status' => 'acknowledged',
         ])->assertForbidden();
+    }
+
+    public function test_admin_mutation_requires_authentication_and_denial_and_cancellation_set_timestamps(): void
+    {
+        $this->postJson('/api/public/station_request', $this->equipmentPayload())->assertCreated();
+        $denied = StationRequest::query()->sole();
+
+        $this->patchJson("/api/admin/station-requests/{$denied->id}/transition", [
+            'status' => 'denied',
+        ])->assertUnauthorized();
+
+        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+        $this->patchJson("/api/admin/station-requests/{$denied->id}/transition", [
+            'status' => 'denied',
+        ])->assertOk();
+        $this->assertNotNull($denied->refresh()->denied_at);
+
+        $payload = $this->equipmentPayload();
+        $payload['client_submission_id'] = '2b232c61-ecc5-4df1-b980-3ec408088fbe';
+        $this->postJson('/api/public/station_request', $payload)->assertCreated();
+        $cancelled = StationRequest::query()->where('status', 'pending')->sole();
+        $this->patchJson("/api/admin/station-requests/{$cancelled->id}/transition", [
+            'status' => 'cancelled',
+        ])->assertOk();
+        $this->assertNotNull($cancelled->refresh()->cancelled_at);
     }
 
     public function test_request_updates_and_room_asset_events_are_append_only(): void
