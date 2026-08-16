@@ -28,6 +28,8 @@ class ViewStationRequest extends ViewRecord
                 ->label('Update Status')
                 ->icon('heroicon-o-arrow-path-rounded-square')
                 ->color('primary')
+                ->modalHeading('Update Station Request')
+                ->modalSubmitActionLabel('Update Status')
                 ->visible(fn (): bool => $this->stationRequest()->is_open)
                 ->fillForm(fn (): array => [
                     'status' => $this->stationRequest()->status,
@@ -39,9 +41,11 @@ class ViewStationRequest extends ViewRecord
                         ->options(collect(StationRequestStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->label()])->all())
                         ->required(),
                     Forms\Components\Select::make('assigned_to_user_id')
-                        ->relationship('assignedTo', 'name')
+                        ->options(fn (): array => User::query()
+                            ->orderBy('name')
+                            ->pluck('name', 'id')
+                            ->all())
                         ->searchable()
-                        ->preload()
                         ->label('Assigned To'),
                     Forms\Components\TextInput::make('assigned_vendor')->maxLength(255),
                     Forms\Components\Textarea::make('public_note')
