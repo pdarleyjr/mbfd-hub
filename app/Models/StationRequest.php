@@ -79,7 +79,7 @@ class StationRequest extends Model
         return $this->belongsTo(Station::class);
     }
 
-    /** @return BelongsTo<Station, $this> */
+    /** @return BelongsTo<Room, $this> */
     public function room(): BelongsTo
     {
         return $this->belongsTo(Room::class);
