@@ -96,6 +96,11 @@ class Room extends Model
         return $this->hasMany(RoomAudit::class);
     }
 
+    public function stationRequests(): HasMany
+    {
+        return $this->hasMany(StationRequest::class);
+    }
+
     /**
      * Get active assets in this room
      */

@@ -105,7 +105,7 @@ export interface InspectionData {
 export type ProjectStatus = 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
 export type ProjectPriority = 'low' | 'medium' | 'high' | 'critical';
 export type RoomType = 'apparatus_bay' | 'office' | 'dormitory' | 'kitchen' | 'restroom' | 'storage' | 'training_room' | 'meeting_room' | 'workshop' | 'other';
-export type AssetCondition = 'excellent' | 'good' | 'fair' | 'poor' | 'critical' | 'damaged' | 'obsolete';
+export type AssetCondition = 'new' | 'excellent' | 'good' | 'fair' | 'poor' | 'critical' | 'damaged' | 'needs_repair' | 'out_of_service' | 'obsolete' | 'retired';
 export type AuditStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type FindingType = 'surplus' | 'deficit' | 'damaged' | 'mislabeled' | 'expired' | 'other';
 export type FindingStatus = 'open' | 'resolved' | 'pending_approval' | 'accepted';
@@ -128,6 +128,13 @@ export interface Station {
   updated_at: string;
   apparatuses_count?: number;
   active_apparatuses_count?: number;
+  assigned_apparatus_count?: number | null;
+  in_service_assigned_count?: number | null;
+  assigned_personnel_count?: number | null;
+  assigned_units?: string[];
+  unavailable_assigned_units?: string[];
+  unmatched_assigned_units?: string[];
+  staffing_known?: boolean;
   rooms_count?: number;
   capital_projects_count?: number;
   under_25k_projects_count?: number;
@@ -173,6 +180,79 @@ export interface FireEquipmentRequestSummary {
   status: string;
   requested_by_name: string;
   created_at: string;
+}
+
+export type StationRequestType = 'repair_service' | 'equipment';
+export type StationRequestStatus =
+  | 'pending' | 'acknowledged' | 'under_review' | 'approved' | 'scheduled'
+  | 'ordered' | 'in_progress' | 'awaiting_parts' | 'awaiting_vendor'
+  | 'on_hold' | 'completed' | 'denied' | 'cancelled';
+
+export interface StationRequestItem {
+  id: number;
+  room_asset_id?: number | null;
+  item_name: string;
+  category?: string | null;
+  quantity: number;
+  reason?: string | null;
+  requested_action?: string | null;
+  condition?: string | null;
+}
+
+export interface StationRequestUpdate {
+  id: number;
+  status: StationRequestStatus;
+  public_note?: string | null;
+  created_at: string;
+}
+
+export interface StationRequestSummary {
+  id: number;
+  request_number: string;
+  station_id: number;
+  room_id?: number | null;
+  room_name_snapshot?: string | null;
+  room?: { id: number; name: string } | null;
+  request_type: StationRequestType;
+  subject_type?: string | null;
+  title: string;
+  description: string;
+  priority: 'low' | 'normal' | 'high' | 'critical';
+  status: StationRequestStatus;
+  is_open: boolean;
+  current_public_response?: string | null;
+  acknowledged_at?: string | null;
+  completed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  items?: StationRequestItem[];
+  updates?: StationRequestUpdate[];
+}
+
+export interface StationActivityEntry {
+  type: 'apparatus_inspection' | 'station_inspection' | 'inventory_submission' | 'supply_request' | 'station_request';
+  label: string;
+  status: string;
+  occurred_at: string;
+  request_type?: StationRequestType;
+  request_number?: string;
+}
+
+export interface RoomAssetEventSummary {
+  id: number;
+  room_asset_id: number;
+  asset_name: string;
+  request_number?: string | null;
+  event_type: string;
+  event_at: string;
+}
+
+export interface RoomProfile {
+  room: Room;
+  current_assets: RoomAsset[];
+  open_requests: StationRequestSummary[];
+  request_history: StationRequestSummary[];
+  asset_events: RoomAssetEventSummary[];
 }
 
 export interface SingleGasMeterSummary {
@@ -234,6 +314,7 @@ export interface RoomAsset {
   name: string;
   description?: string;
   asset_tag?: string;
+  category?: string;
   quantity: number;
   unit: 'each' | 'box' | 'case' | 'set' | 'gallon' | 'pound' | 'dozen';
   condition: AssetCondition;

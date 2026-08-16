@@ -37,7 +37,6 @@
         "lucide-react": "^0.500.0",
         "pdf-lib": "^1.17.1",
         "pdfjs-dist": "5.1.91",
-        "puppeteer": "^24.39.1",
         "react": "^19.2.4",
         "react-dom": "^19.2.4",
         "react-konva": "^19.2.3",
@@ -48,7 +47,7 @@
         "brace-expansion": "5.0.9",
         "ip-address": "10.4.0",
         "js-yaml": "4.3.1",
-        "nanoid": "3.3.17",
+        "nanoid": "3.3.18",
         "shell-quote": "1.10.0"
     }
 }

@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace App\Filament\Widgets;
 
 use App\Filament\Resources\DefectResource;
-use App\Filament\Resources\FireEquipmentRequestResource;
 use App\Filament\Resources\InspectionResource;
 use App\Filament\Resources\StationInspectionResource;
+use App\Filament\Resources\StationRequestResource;
 use App\Filament\Resources\StationResource;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
-use App\Models\BigTicketRequest;
-use App\Models\FireEquipmentRequest;
 use App\Models\Station;
 use App\Models\StationInspection;
+use App\Models\StationRequest;
 use App\Models\StationSupplyRequest;
+use App\Models\User;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -27,7 +27,7 @@ class StationOperationsHubWidget extends Widget
 
     protected static ?int $sort = 2;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     protected static ?string $pollingInterval = '30s';
 
@@ -70,8 +70,7 @@ class StationOperationsHubWidget extends Widget
         // Batch queries with eager loading
         $todayInspections = $this->getTodayVehicleInspections($allApparatusIds);
         $stationInspections = $this->getStationInspections($stationIds);
-        $equipmentRequests = $this->getFireEquipmentRequests($stationIds);
-        $bigTicketRequests = $this->getBigTicketRequests($stationIds);
+        $stationRequests = $this->getStationRequests($stationIds);
         $defects = $this->getUnresolvedDefects($allApparatusIds);
         $supplyRequests = $this->getOpenSupplyRequests($stationIds);
 
@@ -88,23 +87,20 @@ class StationOperationsHubWidget extends Widget
                 fn ($d) => in_array($d->apparatus_id, $apparatusIds)
             )->values();
 
-            $stationEquipReqs = $equipmentRequests->where('station_id', $sid)->values();
-            $stationBigTicket = $bigTicketRequests->where('station_id', $sid)->values();
+            $stationRequestRows = $stationRequests->where('station_id', $sid)->values();
             $stationStationInsp = $stationInspections->where('station_id', $sid)->values();
             $stationSupplyReqs = $supplyRequests->where('station_id', $sid)->values();
 
             $data[$sid] = [
                 'vehicleInspections' => $this->formatVehicleInspections($stationVehicleInspections),
                 'stationInspections' => $this->formatStationInspections($stationStationInsp),
-                'equipmentRequests' => $this->formatEquipmentRequests($stationEquipReqs),
-                'bigTicketRequests' => $this->formatBigTicketRequests($stationBigTicket, $sid),
+                'stationRequests' => $this->formatStationRequests($stationRequestRows),
                 'defects' => $this->formatDefects($stationDefects),
                 'supplyRequests' => $this->formatSupplyRequests($stationSupplyReqs, $sid),
                 'counts' => [
                     'vehicleInspections' => $stationVehicleInspections->count(),
                     'stationInspections' => $stationStationInsp->count(),
-                    'equipmentRequests' => $stationEquipReqs->count(),
-                    'bigTicketRequests' => $stationBigTicket->count(),
+                    'stationRequests' => $stationRequestRows->count(),
                     'defects' => $stationDefects->count(),
                     'supplyRequests' => $stationSupplyReqs->count(),
                 ],
@@ -140,22 +136,14 @@ class StationOperationsHubWidget extends Widget
             ->get(['id', 'station_id', 'inspector_id', 'inspection_date', 'inspection_type', 'overall_status']);
     }
 
-    private function getFireEquipmentRequests(array $stationIds): Collection
+    private function getStationRequests(array $stationIds): Collection
     {
-        return FireEquipmentRequest::whereIn('station_id', $stationIds)
-            ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
-            ->orderByDesc('created_at')
-            ->limit(50)
-            ->get(['id', 'station_id', 'equipment_type', 'requested_by_name', 'priority', 'status', 'created_at']);
-    }
-
-    private function getBigTicketRequests(array $stationIds): Collection
-    {
-        return BigTicketRequest::with('creator:id,name')
+        return StationRequest::with('room:id,name,station_id')
             ->whereIn('station_id', $stationIds)
+            ->orderByRaw("CASE WHEN status IN ('completed', 'denied', 'cancelled') THEN 1 ELSE 0 END")
             ->orderByDesc('created_at')
-            ->limit(50)
-            ->get(['id', 'station_id', 'room_type', 'items', 'created_by', 'created_at']);
+            ->limit(100)
+            ->get(['id', 'request_number', 'station_id', 'room_id', 'request_type', 'title', 'requester_name_snapshot', 'priority', 'status', 'created_at']);
     }
 
     private function getUnresolvedDefects(array $apparatusIds): Collection
@@ -197,40 +185,35 @@ class StationOperationsHubWidget extends Widget
         ])->toArray();
     }
 
+    /** @param Collection<int, StationInspection> $inspections */
     private function formatStationInspections(Collection $inspections): array
     {
-        return $inspections->map(fn (StationInspection $i) => [
-            'id' => $i->id,
-            'date' => Carbon::parse($i->inspection_date)->format('M j, Y'),
-            'type' => str_replace('_', ' ', ucfirst($i->inspection_type ?? '')),
-            'inspector' => $i->inspector?->name ?? 'Unknown',
-            'status' => $i->overall_status ?? 'pending',
-            'url' => StationInspectionResource::getUrl('view', ['record' => $i->id]),
-        ])->toArray();
+        return $inspections->map(function (StationInspection $i): array {
+            $inspector = $i->inspector;
+
+            return [
+                'id' => $i->id,
+                'date' => Carbon::parse($i->inspection_date)->format('M j, Y'),
+                'type' => str_replace('_', ' ', ucfirst($i->inspection_type ?? '')),
+                'inspector' => $inspector instanceof User ? $inspector->name : 'Unknown',
+                'status' => $i->overall_status ?? 'pending',
+                'url' => StationInspectionResource::getUrl('view', ['record' => $i->id]),
+            ];
+        })->toArray();
     }
 
-    private function formatEquipmentRequests(Collection $requests): array
+    private function formatStationRequests(Collection $requests): array
     {
-        return $requests->map(fn (FireEquipmentRequest $r) => [
+        return $requests->map(fn (StationRequest $r) => [
             'id' => $r->id,
-            'equipment_type' => $r->equipment_type ?? 'Unknown',
-            'requested_by' => $r->requested_by_name ?? 'Unknown',
-            'priority' => $r->priority ?? 'medium',
+            'number' => $r->request_number,
+            'type' => $r->request_type === 'repair_service' ? 'Repair / Service' : 'Equipment',
+            'title' => Str::limit($r->title, 45),
+            'requested_by' => $r->requester_name_snapshot,
+            'priority' => $r->priority ?? 'normal',
             'status' => $r->status ?? 'pending',
             'date' => $r->created_at?->format('M j, Y') ?? '',
-            'url' => FireEquipmentRequestResource::getUrl('view', ['record' => $r->id]),
-        ])->toArray();
-    }
-
-    private function formatBigTicketRequests(Collection $requests, int $stationId): array
-    {
-        return $requests->map(fn (BigTicketRequest $r) => [
-            'id' => $r->id,
-            'room' => str_replace('_', ' ', ucfirst($r->room_type ?? '')),
-            'items' => $this->summarizeBigTicketItems($r->items),
-            'created_by' => $r->creator?->name ?? 'Unknown',
-            'date' => $r->created_at?->format('M j, Y') ?? '',
-            'url' => StationResource::getUrl('view', ['record' => $stationId]) . '?activeRelationManager=bigTicketRequests',
+            'url' => StationRequestResource::getUrl('view', ['record' => $r->id]),
         ])->toArray();
     }
 
@@ -257,28 +240,7 @@ class StationOperationsHubWidget extends Widget
             'created_by' => $r->created_by_name ?? 'Unknown',
             'shift' => $r->created_by_shift ?? '',
             'date' => $r->created_at?->format('M j, Y') ?? '',
-            'url' => StationResource::getUrl('view', ['record' => $stationId]) . '?activeRelationManager=supplyRequests',
+            'url' => StationResource::getUrl('view', ['record' => $stationId]).'?activeRelationManager=supplyRequests',
         ])->toArray();
-    }
-
-    private function summarizeBigTicketItems(?array $items): string
-    {
-        if (empty($items)) {
-            return 'No items';
-        }
-
-        $names = collect($items)->pluck('name')->filter()->take(3)->toArray();
-
-        if (empty($names)) {
-            return count($items) . ' item(s)';
-        }
-
-        $summary = implode(', ', $names);
-
-        if (count($items) > 3) {
-            $summary .= ' +' . (count($items) - 3) . ' more';
-        }
-
-        return $summary;
     }
 }

@@ -5,19 +5,21 @@ import {
   Apparatus,
   ApparatusInspectionSummary,
   StationInspectionSummary,
-  FireEquipmentRequestSummary,
+  StationRequestSummary,
+  StationActivityEntry,
   SingleGasMeterSummary,
 } from '../types';
 import { ApiClient } from '../utils/api';
 
-type TabId = 'overview' | 'rooms' | 'apparatus' | 'gas-meters' | 'equipment-requests' | 'inspections';
+type TabId = 'requests' | 'overview' | 'rooms' | 'apparatus' | 'gas-meters' | 'inspections' | 'activity';
 
 export default function StationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [station, setStation] = useState<StationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [stationLoadAttempt, setStationLoadAttempt] = useState(0);
+  const [activeTab, setActiveTab] = useState<TabId>('requests');
 
   // Today's apparatus inspections
   const [todayInspections, setTodayInspections] = useState<ApparatusInspectionSummary[]>([]);
@@ -25,10 +27,13 @@ export default function StationDetailPage() {
 
   // Tab data (lazy loaded)
   const [stationInspections, setStationInspections] = useState<StationInspectionSummary[]>([]);
-  const [equipmentRequests, setEquipmentRequests] = useState<FireEquipmentRequestSummary[]>([]);
+  const [stationRequests, setStationRequests] = useState<StationRequestSummary[]>([]);
+  const [requestScope, setRequestScope] = useState<'open' | 'all'>('open');
+  const [activity, setActivity] = useState<StationActivityEntry[]>([]);
   const [gasMeters, setGasMeters] = useState<SingleGasMeterSummary[]>([]);
   const [tabDataLoaded, setTabDataLoaded] = useState<Record<string, boolean>>({});
   const [tabDataLoading, setTabDataLoading] = useState<Record<string, boolean>>({});
+  const [tabDataError, setTabDataError] = useState<Record<string, string>>({});
 
   // Sliding underline refs
   const tabContainerRef = useRef<HTMLDivElement>(null);
@@ -36,12 +41,13 @@ export default function StationDetailPage() {
   const [underlineStyle, setUnderlineStyle] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
 
   const tabs: { id: TabId; label: string }[] = [
+    { id: 'requests', label: 'Requests' },
     { id: 'overview', label: 'Overview' },
     { id: 'rooms', label: 'Rooms' },
     { id: 'apparatus', label: 'Apparatus' },
     { id: 'gas-meters', label: 'Gas Meters' },
-    { id: 'equipment-requests', label: 'Equipment Requests' },
     { id: 'inspections', label: 'Inspections' },
+    { id: 'activity', label: 'Activity' },
   ];
 
   const updateUnderline = useCallback(() => {
@@ -65,33 +71,39 @@ export default function StationDetailPage() {
   useEffect(() => {
     if (!id) return;
     const stationId = parseInt(id);
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setTodayInspectionsLoading(true);
 
     const fetchStation = async () => {
       try {
         const data = await ApiClient.getStation(stationId);
+        if (cancelled) return;
         setStation(data);
         setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load station');
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load station');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     const fetchTodayInspections = async () => {
       try {
         const data = await ApiClient.getTodayApparatusInspections(stationId);
-        setTodayInspections(data);
+        if (!cancelled) setTodayInspections(data);
       } catch {
         // Non-critical, silently fail
       } finally {
-        setTodayInspectionsLoading(false);
+        if (!cancelled) setTodayInspectionsLoading(false);
       }
     };
 
     fetchStation();
     fetchTodayInspections();
-  }, [id]);
+    return () => { cancelled = true; };
+  }, [id, stationLoadAttempt]);
 
   // Lazy load tab data when tab changes
   useEffect(() => {
@@ -100,6 +112,7 @@ export default function StationDetailPage() {
 
     const loadTabData = async () => {
       setTabDataLoading(prev => ({ ...prev, [activeTab]: true }));
+      setTabDataError(prev => ({ ...prev, [activeTab]: '' }));
       try {
         switch (activeTab) {
           case 'inspections': {
@@ -107,9 +120,14 @@ export default function StationDetailPage() {
             setStationInspections(data);
             break;
           }
-          case 'equipment-requests': {
-            const data = await ApiClient.getEquipmentRequests(stationId);
-            setEquipmentRequests(data);
+          case 'requests': {
+            const data = await ApiClient.getStationRequests(stationId, 'all');
+            setStationRequests(data);
+            break;
+          }
+          case 'activity': {
+            const data = await ApiClient.getStationActivity(stationId);
+            setActivity(data);
             break;
           }
           case 'gas-meters': {
@@ -118,18 +136,26 @@ export default function StationDetailPage() {
             break;
           }
         }
-      } catch {
-        // Tab data load failure is non-critical
+      } catch (reason) {
+        setTabDataError(prev => ({
+          ...prev,
+          [activeTab]: reason instanceof Error ? reason.message : 'This section could not be loaded.',
+        }));
       } finally {
         setTabDataLoaded(prev => ({ ...prev, [activeTab]: true }));
         setTabDataLoading(prev => ({ ...prev, [activeTab]: false }));
       }
     };
 
-    if (['inspections', 'equipment-requests', 'gas-meters'].includes(activeTab)) {
+    if (['inspections', 'requests', 'gas-meters', 'activity'].includes(activeTab)) {
       loadTabData();
     }
   }, [activeTab, id, tabDataLoaded]);
+
+  const retryTabData = (tab: TabId) => {
+    setTabDataError(prev => ({ ...prev, [tab]: '' }));
+    setTabDataLoaded(prev => ({ ...prev, [tab]: false }));
+  };
 
   const getStatusBadgeClass = (status: string): string => {
     const map: Record<string, string> = {
@@ -140,6 +166,16 @@ export default function StationDetailPage() {
       approved: 'bg-green-100 text-green-800',
       denied: 'bg-red-100 text-red-800',
       fulfilled: 'bg-teal-100 text-teal-800',
+      acknowledged: 'bg-amber-100 text-amber-800',
+      under_review: 'bg-amber-100 text-amber-800',
+      scheduled: 'bg-blue-100 text-blue-800',
+      ordered: 'bg-blue-100 text-blue-800',
+      in_progress: 'bg-blue-100 text-blue-800',
+      awaiting_parts: 'bg-stone-100 text-stone-700',
+      awaiting_vendor: 'bg-stone-100 text-stone-700',
+      on_hold: 'bg-stone-100 text-stone-700',
+      completed: 'bg-green-100 text-green-800',
+      cancelled: 'bg-red-100 text-red-800',
       low: 'bg-neutral-100 text-neutral-700',
       medium: 'bg-blue-100 text-blue-800',
       high: 'bg-orange-100 text-orange-800',
@@ -189,12 +225,10 @@ export default function StationDetailPage() {
           </svg>
         </div>
         <p className="text-red-600 font-medium mb-2">{error || 'Station not found'}</p>
-        <Link
-          to="/stations"
-          className="mt-4 inline-block px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-        >
-          Back to Stations
-        </Link>
+        <div className="mt-4 flex flex-wrap justify-center gap-3">
+          <button type="button" onClick={() => setStationLoadAttempt((attempt) => attempt + 1)} className="min-h-12 rounded-lg bg-blue-700 px-5 font-semibold text-white hover:bg-blue-800">Retry</button>
+          <Link to="/stations" className="inline-flex min-h-12 items-center rounded-lg bg-red-600 px-5 font-semibold text-white transition-colors hover:bg-red-700">Back to Stations</Link>
+        </div>
       </div>
     );
   }
@@ -256,22 +290,13 @@ export default function StationDetailPage() {
             </a>
           )}
           <Link
-            to={`/forms-hub/big-ticket-request`}
-            className="flex items-center gap-2.5 p-3 bg-neutral-50 rounded-xl ring-1 ring-neutral-200/60 hover:bg-red-50 hover:ring-red-200 transition-all text-sm font-medium text-neutral-700 hover:text-red-700"
+            to={`/forms-hub/station-request?station_id=${station.id}&return_to=${encodeURIComponent(`/stations/${station.id}`)}`}
+            className="flex min-h-12 items-center gap-2.5 p-3 bg-blue-50 rounded-xl ring-1 ring-blue-200/80 hover:bg-blue-100 transition-all text-sm font-semibold text-blue-800"
           >
             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            Big Ticket Request
-          </Link>
-          <Link
-            to={`/forms-hub/equipment-request`}
-            className="flex items-center gap-2.5 p-3 bg-neutral-50 rounded-xl ring-1 ring-neutral-200/60 hover:bg-sky-50 hover:ring-sky-200 transition-all text-sm font-medium text-neutral-700 hover:text-sky-700"
-          >
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-            Equipment Request
+            Station Request
           </Link>
           <Link
             to={`/forms-hub/station-inspection`}
@@ -380,16 +405,16 @@ export default function StationDetailPage() {
                     <dd className="font-medium text-neutral-800 tabular-nums">{station.station_number}</dd>
                   </div>
                   <div className="flex justify-between py-2.5 border-b border-neutral-200 bg-neutral-50/50">
-                    <dt className="text-neutral-500">Active Apparatuses</dt>
-                    <dd className="font-medium text-neutral-800 tabular-nums">{station.active_apparatuses_count || 0}</dd>
+                    <dt className="text-neutral-500">Assigned Apparatus</dt>
+                    <dd className="font-medium text-neutral-800 tabular-nums">{station.assigned_apparatus_count ?? 'Unknown'}</dd>
                   </div>
                   <div className="flex justify-between py-2.5 border-b border-neutral-200">
-                    <dt className="text-neutral-500">Personnel</dt>
-                    <dd className="font-medium text-neutral-800 tabular-nums">{station.personnel_count || 0}</dd>
+                    <dt className="text-neutral-500">Assigned Personnel</dt>
+                    <dd className="font-medium text-neutral-800 tabular-nums">{station.assigned_personnel_count ?? 'Unknown'}</dd>
                   </div>
                   <div className="flex justify-between py-2.5 border-b border-neutral-200 bg-neutral-50/50">
                     <dt className="text-neutral-500">Dorm Beds</dt>
-                    <dd className="font-medium text-neutral-800 tabular-nums">{station.dorm_beds_count || 0}</dd>
+                    <dd className="font-medium text-neutral-800 tabular-nums">{station.dorm_beds_count ?? 'Unknown'}</dd>
                   </div>
                   {station.fax && (
                     <div className="flex justify-between py-2.5 border-b border-neutral-200">
@@ -496,7 +521,9 @@ export default function StationDetailPage() {
           {/* ========== GAS METERS TAB ========== */}
           {activeTab === 'gas-meters' && (
             <div>
-              {tabDataLoading['gas-meters'] ? (
+              {tabDataError['gas-meters'] ? (
+                <TabLoadError message={tabDataError['gas-meters']} onRetry={() => retryTabData('gas-meters')} />
+              ) : tabDataLoading['gas-meters'] ? (
                 <TabSkeleton />
               ) : gasMeters.length > 0 ? (
                 <div className="space-y-3 stagger-list">
@@ -531,24 +558,38 @@ export default function StationDetailPage() {
             </div>
           )}
 
-          {/* ========== EQUIPMENT REQUESTS TAB ========== */}
-          {activeTab === 'equipment-requests' && (
+          {/* ========== CANONICAL STATION REQUESTS TAB ========== */}
+          {activeTab === 'requests' && (
             <div>
-              {tabDataLoading['equipment-requests'] ? (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-heading text-lg font-bold text-neutral-900">Station requests</h3>
+                  <p className="text-sm text-neutral-500">Repair, service, and equipment history in one queue.</p>
+                </div>
+                <div className="inline-flex rounded-xl bg-neutral-100 p-1" aria-label="Request history filter">
+                  <button type="button" onClick={() => setRequestScope('open')} className={`min-h-11 rounded-lg px-4 text-sm font-semibold ${requestScope === 'open' ? 'bg-white text-blue-800 shadow-sm' : 'text-neutral-600'}`}>Open</button>
+                  <button type="button" onClick={() => setRequestScope('all')} className={`min-h-11 rounded-lg px-4 text-sm font-semibold ${requestScope === 'all' ? 'bg-white text-blue-800 shadow-sm' : 'text-neutral-600'}`}>All history</button>
+                </div>
+              </div>
+              {tabDataError.requests ? (
+                <TabLoadError message={tabDataError.requests} onRetry={() => retryTabData('requests')} />
+              ) : tabDataLoading.requests ? (
                 <TabSkeleton />
-              ) : equipmentRequests.length > 0 ? (
+              ) : stationRequests.filter((request) => requestScope === 'all' || request.is_open).length > 0 ? (
                 <div className="space-y-3 stagger-list">
-                  {equipmentRequests.map((req) => (
+                  {stationRequests.filter((request) => requestScope === 'all' || request.is_open).map((req) => (
                     <div
                       key={req.id}
-                      className="p-4 border border-neutral-200 rounded-lg"
+                      className="rounded-xl border border-neutral-200 p-4"
                     >
-                      <div className="flex justify-between items-start mb-2">
+                      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                         <div>
-                          <p className="font-semibold text-neutral-800">{req.equipment_type}</p>
+                          <p className="font-mono text-xs font-semibold text-neutral-500">{req.request_number}</p>
+                          <p className="mt-1 font-semibold text-neutral-900">{req.title}</p>
                           <p className="text-sm text-neutral-600 mt-0.5">{req.description}</p>
                         </div>
-                        <div className="flex gap-2 flex-shrink-0 ml-4">
+                        <div className="flex flex-wrap gap-2 flex-shrink-0">
+                          <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">{req.request_type === 'repair_service' ? 'Repair / Service' : 'Equipment'}</span>
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(req.priority)}`}>
                             {req.priority}
                           </span>
@@ -557,14 +598,16 @@ export default function StationDetailPage() {
                           </span>
                         </div>
                       </div>
-                      <p className="text-xs text-neutral-500">
-                        Requested by {req.requested_by_name} &middot; {formatDate(req.created_at)}
+                      {req.current_public_response && <div className="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-900"><span className="font-semibold">Latest response:</span> {req.current_public_response}</div>}
+                      <p className="mt-3 text-xs text-neutral-500">
+                        {req.room?.name || req.room_name_snapshot || 'Station-wide'} &middot; Submitted {formatDate(req.created_at)}
                       </p>
+                      {req.updates && req.updates.length > 1 && <details className="mt-3"><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-blue-800">View {req.updates.length} updates</summary><ol className="mt-2 space-y-2 border-l-2 border-blue-100 pl-4">{req.updates.map((update) => <li key={update.id} className="text-sm text-neutral-600"><span className="font-semibold text-neutral-800">{update.status.replaceAll('_', ' ')}</span> · {formatDate(update.created_at)}{update.public_note && <p className="mt-0.5">{update.public_note}</p>}</li>)}</ol></details>}
                     </div>
                   ))}
                 </div>
               ) : (
-                <EmptyState icon="request" title="No equipment requests" subtitle="Fire equipment requests for this station will appear here." />
+                <EmptyState icon="request" title={requestScope === 'open' ? 'No open station requests' : 'No station request history'} subtitle="New repair, service, and equipment requests will appear here." />
               )}
             </div>
           )}
@@ -572,7 +615,9 @@ export default function StationDetailPage() {
           {/* ========== STATION INSPECTIONS TAB ========== */}
           {activeTab === 'inspections' && (
             <div>
-              {tabDataLoading['inspections'] ? (
+              {tabDataError.inspections ? (
+                <TabLoadError message={tabDataError.inspections} onRetry={() => retryTabData('inspections')} />
+              ) : tabDataLoading['inspections'] ? (
                 <TabSkeleton />
               ) : stationInspections.length > 0 ? (
                 <div className="space-y-3 stagger-list">
@@ -606,6 +651,28 @@ export default function StationDetailPage() {
               )}
             </div>
           )}
+
+          {/* ========== UNIFIED STATION ACTIVITY TAB ========== */}
+          {activeTab === 'activity' && (
+            <div>
+              {tabDataError.activity ? <TabLoadError message={tabDataError.activity} onRetry={() => retryTabData('activity')} /> : tabDataLoading.activity ? <TabSkeleton /> : activity.length > 0 ? (
+                <ol className="space-y-3">
+                  {activity.map((entry, index) => (
+                    <li key={`${entry.type}-${entry.occurred_at}-${index}`} className="flex gap-3 rounded-xl border border-neutral-200 p-4">
+                      <span className="mt-1 h-2.5 w-2.5 flex-none rounded-full bg-blue-600" aria-hidden="true" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <p className="font-semibold text-neutral-900">{entry.label}</p>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(entry.status)}`}>{entry.status.replaceAll('_', ' ')}</span>
+                        </div>
+                        <p className="mt-1 text-xs uppercase tracking-wide text-neutral-500">{entry.type.replaceAll('_', ' ')} · {formatDate(entry.occurred_at)}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              ) : <EmptyState icon="request" title="No station activity yet" subtitle="Inspections, inventory, supply requests, and station requests will appear here." />}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -622,6 +689,10 @@ function TabSkeleton() {
       ))}
     </div>
   );
+}
+
+function TabLoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-800"><p className="font-semibold">{message}</p><button type="button" onClick={onRetry} className="mt-4 min-h-12 rounded-xl bg-blue-700 px-5 font-semibold text-white hover:bg-blue-800">Retry</button></div>;
 }
 
 function EmptyState({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) {

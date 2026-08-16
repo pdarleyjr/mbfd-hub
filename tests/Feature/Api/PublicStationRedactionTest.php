@@ -7,12 +7,12 @@ namespace Tests\Feature\Api;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\CapitalProject;
-use App\Models\FireEquipmentRequest;
 use App\Models\Room;
 use App\Models\RoomAsset;
 use App\Models\SingleGasMeter;
 use App\Models\Station;
 use App\Models\StationInspection;
+use App\Models\StationRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -164,13 +164,15 @@ class PublicStationRedactionTest extends TestCase
 
     public function test_equipment_requests_redact_requester_name(): void
     {
-        FireEquipmentRequest::create([
+        StationRequest::create([
             'station_id' => $this->station->id,
-            'equipment_type' => 'Helmet',
+            'requester_name_snapshot' => 'Captain Secret Person',
+            'request_type' => 'equipment',
+            'subject_type' => 'PPE',
+            'title' => 'Helmet',
             'description' => 'New helmet',
             'priority' => 'high',
             'status' => 'pending',
-            'requested_by_name' => 'Captain Secret Person',
         ]);
 
         $response = $this->getJson("/api/public/stations/{$this->station->id}/equipment-requests");
@@ -183,7 +185,7 @@ class PublicStationRedactionTest extends TestCase
         $this->assertNotNull($request);
         $this->assertArrayNotHasKey('requested_by_name', $request);
         // Safe operational fields the UI renders.
-        $this->assertArrayHasKey('equipment_type', $request);
+        $this->assertArrayHasKey('title', $request);
         $this->assertArrayHasKey('priority', $request);
         $this->assertArrayHasKey('status', $request);
     }

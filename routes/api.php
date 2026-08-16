@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\StationRequestController as AdminStationRequestController;
 use App\Http\Controllers\Api\AdminMetricsController;
 use App\Http\Controllers\Api\ApparatusController;
 use App\Http\Controllers\Api\Bid\CredentialsController as BidCredentialsController;
@@ -9,8 +10,10 @@ use App\Http\Controllers\Api\Display\DisplayController;
 use App\Http\Controllers\Api\FireEquipmentRequestController;
 use App\Http\Controllers\Api\InventoryChatController;
 use App\Http\Controllers\Api\Public\ApparatusLayout\ApparatusLayoutController;
+use App\Http\Controllers\Api\PublicStationRequestController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\SmartUpdatesController;
+use App\Http\Controllers\Api\StationContextController;
 use App\Http\Controllers\Api\StationInspectionController;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Api\StationInventoryV2Controller;
@@ -53,6 +56,10 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('stations/{station}/inspections', [\App\Http\Controllers\Api\StationController::class, 'stationInspections']);
     Route::get('stations/{station}/apparatus-inspections', [\App\Http\Controllers\Api\StationController::class, 'apparatusInspections']);
     Route::get('stations/{station}/equipment-requests', [\App\Http\Controllers\Api\StationController::class, 'equipmentRequests']);
+    Route::get('stations/{station}/requests', [PublicStationRequestController::class, 'index']);
+    Route::get('stations/{station}/activity', [StationContextController::class, 'activity']);
+    Route::get('stations/{station}/rooms/{room}/profile', [StationContextController::class, 'roomProfile']);
+    Route::get('station-requests/{stationRequest}', [PublicStationRequestController::class, 'show']);
     Route::get('stations/{station}/gas-meters', [\App\Http\Controllers\Api\StationController::class, 'gasMeters']);
 
     // Apparatus Layout Planner (public read, auth write)
@@ -101,6 +108,7 @@ Route::prefix('public')->middleware('throttle:10,1')->group(function () {
 Route::prefix('public')->middleware('throttle:10,1')->group(function () {
     Route::post('station_inspection', [StationInspectionController::class, 'storePublic']);
     Route::post('fire_equipment_request', [FireEquipmentRequestController::class, 'storePublic']);
+    Route::post('station_request', [PublicStationRequestController::class, 'store']);
 });
 
 // TRT Trailer Inventory (public read)
@@ -144,6 +152,9 @@ Route::middleware(['web', 'auth', 'admin.role:super_admin,admin', 'throttle:60,1
 Route::prefix('admin')->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:60,1'])->group(function () {
     Route::get('metrics', [AdminMetricsController::class, 'index']);
     Route::get('smart-updates', [SmartUpdatesController::class, 'index'])->name('api.smart-updates');
+    Route::get('station-requests', [AdminStationRequestController::class, 'index']);
+    Route::get('station-requests/{stationRequest}', [AdminStationRequestController::class, 'show']);
+    Route::patch('station-requests/{stationRequest}/transition', [AdminStationRequestController::class, 'transition']);
 
     // NEW: Inventory Chat Assistant
     Route::post('ai/inventory-chat', [InventoryChatController::class, 'chat']);

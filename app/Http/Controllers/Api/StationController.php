@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Public\PublicApparatusInspectionResource;
 use App\Http\Resources\Public\PublicApparatusResource;
-use App\Http\Resources\Public\PublicEquipmentRequestResource;
 use App\Http\Resources\Public\PublicGasMeterResource;
 use App\Http\Resources\Public\PublicProjectResource;
 use App\Http\Resources\Public\PublicRoomAssetResource;
 use App\Http\Resources\Public\PublicRoomResource;
 use App\Http\Resources\Public\PublicStationInspectionResource;
+use App\Http\Resources\Public\PublicStationRequestResource;
 use App\Http\Resources\Public\PublicStationResource;
 use App\Models\ApparatusInspection;
 use App\Models\Room;
@@ -18,6 +18,7 @@ use App\Models\RoomAsset;
 use App\Models\RoomAudit;
 use App\Models\RoomAuditItem;
 use App\Models\Station;
+use App\Services\StationStaffingService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,6 +44,8 @@ class StationController extends Controller
         $stations = Station::with(['apparatuses', 'rooms'])
             ->withCount('apparatuses', 'rooms', 'capitalProjects', 'shopWorks')
             ->get();
+        $staffing = app(StationStaffingService::class);
+        $stations->each(fn (Station $station) => $station->setAttribute('staffing_summary', $staffing->summaryFor($station)));
 
         if ($this->isPublicRequest($request)) {
             return response()->json([
@@ -64,8 +67,6 @@ class StationController extends Controller
     {
         $roomTypeColumn = Schema::hasColumn('rooms', 'room_type') ? 'room_type' : 'type';
         $roomsHaveIsActive = Schema::hasColumn('rooms', 'is_active');
-        $personnelTableExists = Schema::hasTable('personnel');
-
         $station = Station::with([
             'apparatuses' => function ($query) {
                 $query->with('currentDefects')->orderBy('vehicle_number');
@@ -89,13 +90,9 @@ class StationController extends Controller
             ->withCount(['apparatuses', 'rooms', 'capitalProjects', 'under25kProjects'])
             ->findOrFail($id);
 
-        $dormBedsCount = $personnelTableExists
-            ? $station->personnel()->where('assignment', 'Dorm')->where('status', 'Active')->count()
-            : 0;
-
-        $personnelCount = $personnelTableExists
-            ? $station->personnel()->count()
-            : 0;
+        $staffing = app(StationStaffingService::class)->summaryFor($station);
+        $dormBedsCount = $staffing['dorm_beds_count'];
+        $personnelCount = $staffing['assigned_personnel_count'];
 
         $roomsByType = $station->rooms()
             ->select($roomTypeColumn)
@@ -178,14 +175,21 @@ class StationController extends Controller
             'notes' => $station->notes,
             'created_at' => $station->created_at,
             'updated_at' => $station->updated_at,
-            'apparatuses_count' => (int) ($station->apparatuses_count ?? $station->apparatuses->count()),
-            'active_apparatuses_count' => (int) $station->apparatuses->where('status', 'Active')->count(),
+            'apparatuses_count' => $staffing['assigned_apparatus_count'],
+            'assigned_apparatus_count' => $staffing['assigned_apparatus_count'],
+            'active_apparatuses_count' => $staffing['in_service_assigned_count'],
+            'in_service_assigned_count' => $staffing['in_service_assigned_count'],
+            'assigned_units' => $staffing['assigned_units'],
+            'unavailable_assigned_units' => $staffing['unavailable_assigned_units'],
+            'unmatched_assigned_units' => $staffing['unmatched_assigned_units'],
+            'staffing_known' => $staffing['known'],
             'rooms_count' => (int) ($station->rooms_count ?? $station->rooms->count()),
             'capital_projects_count' => (int) ($station->capital_projects_count ?? $station->capitalProjects->count()),
             'under_25k_projects_count' => (int) ($station->under_25k_projects_count ?? $station->under25kProjects->count()),
             'shop_works_count' => (int) $shopWorks->count(),
-            'personnel_count' => (int) $personnelCount,
-            'dorm_beds_count' => (int) $dormBedsCount,
+            'personnel_count' => $personnelCount,
+            'assigned_personnel_count' => $personnelCount,
+            'dorm_beds_count' => $dormBedsCount,
             'apparatuses' => $station->apparatuses->map(function ($apparatus) {
                 return [
                     'id' => $apparatus->id,
@@ -270,7 +274,10 @@ class StationController extends Controller
                 ];
             })->values()->all(),
             'summary' => [
-                'dorm_beds_count' => (int) $dormBedsCount,
+                'dorm_beds_count' => $dormBedsCount,
+                'assigned_personnel_count' => $personnelCount,
+                'assigned_apparatus_count' => $staffing['assigned_apparatus_count'],
+                'in_service_assigned_count' => $staffing['in_service_assigned_count'],
                 'rooms_by_type' => $roomsByType,
                 'apparatus_by_type' => $apparatusByType,
                 'project_totals' => $projectTotals,
@@ -698,14 +705,14 @@ class StationController extends Controller
         ]);
     }
 
-    /**
-     * Get fire equipment requests for a station
-     */
+    /** Canonical station equipment requests (legacy endpoint shape). */
     public function equipmentRequests(int $id): JsonResponse
     {
         $station = Station::findOrFail($id);
 
-        $requests = $station->fireEquipmentRequests()
+        $requests = $station->stationRequests()
+            ->where('request_type', 'equipment')
+            ->with(['room:id,station_id,name', 'items', 'updates'])
             ->orderBy('created_at', 'desc')
             ->limit(50)
             ->get();
@@ -713,7 +720,7 @@ class StationController extends Controller
         // SECURITY (H-02): public endpoint — redact requester identity & internals.
         return response()->json([
             'station_id' => $id,
-            'equipment_requests' => PublicEquipmentRequestResource::collection($requests)->resolve(request()),
+            'equipment_requests' => PublicStationRequestResource::collection($requests)->resolve(request()),
             'total' => $requests->count(),
         ]);
     }

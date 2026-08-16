@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\BigTicketRequest;
 use App\Models\Station;
+use App\Models\StationRequest;
+use App\Models\User;
+use App\Services\StationRequestLegacyAdapterService;
+use App\Services\StationRequestWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -13,7 +16,7 @@ class BigTicketRequestController extends Controller
     /**
      * Store a new big ticket request.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, StationRequestLegacyAdapterService $adapter): JsonResponse
     {
         $validated = $request->validate([
             'station_id' => 'required|exists:stations,id',
@@ -23,23 +26,18 @@ class BigTicketRequestController extends Controller
             'items.*' => 'required|string|max:255',
             'other_item' => 'nullable|string|max:255',
             'notes' => 'nullable|string|max:5000',
+            'client_submission_id' => 'nullable|uuid',
         ]);
 
-        $bigTicketRequest = BigTicketRequest::create([
-            'station_id' => $validated['station_id'],
-            'room_type' => $validated['room_type'],
-            'room_label' => $validated['room_label'] ?? null,
-            'items' => $validated['items'],
-            'other_item' => $validated['other_item'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-            'created_by' => $request->user()?->id,
-        ]);
+        /** @var User|null $user */
+        $user = $request->user();
+        $result = $adapter->submitBigTicket($validated, $user);
 
         return response()->json([
             'success' => true,
-            'message' => 'Big ticket request submitted successfully.',
-            'data' => $bigTicketRequest,
-        ], 201);
+            'message' => 'Station request submitted successfully.',
+            'data' => $result->request,
+        ], $result->created ? 201 : 200);
     }
 
     /**
@@ -47,8 +45,9 @@ class BigTicketRequestController extends Controller
      */
     public function index(Station $station): JsonResponse
     {
-        $requests = $station->bigTicketRequests()
-            ->with('creator:id,name')
+        $requests = $station->stationRequests()
+            ->where('request_type', 'repair_service')
+            ->with(['room:id,name,station_id', 'items'])
             ->orderByDesc('created_at')
             ->get();
 
@@ -61,13 +60,27 @@ class BigTicketRequestController extends Controller
     /**
      * Delete a big ticket request.
      */
-    public function destroy(BigTicketRequest $bigTicketRequest): JsonResponse
-    {
-        $bigTicketRequest->delete();
+    public function destroy(
+        Request $httpRequest,
+        int $bigTicketRequest,
+        StationRequestWorkflowService $workflow,
+    ): JsonResponse {
+        $canonical = StationRequest::query()
+            ->where(fn ($query) => $query
+                ->where(fn ($legacy) => $legacy->where('legacy_source', 'big_ticket_requests')->where('legacy_id', $bigTicketRequest))
+                ->orWhere(fn ($direct) => $direct->whereKey($bigTicketRequest)->where('request_type', 'repair_service')))
+            ->firstOrFail();
+        /** @var User $actor */
+        $actor = $httpRequest->user();
+        $workflow->transition($canonical, [
+            'status' => 'cancelled',
+            'public_note' => 'Request cancelled through the legacy compatibility endpoint.',
+            'internal_note' => 'Legacy delete mapped to a non-destructive canonical cancellation.',
+        ], $actor);
 
         return response()->json([
             'success' => true,
-            'message' => 'Request deleted successfully.',
+            'message' => 'Request cancelled successfully.',
         ]);
     }
 }

@@ -8,6 +8,20 @@ export type SubmissionOutcome = 'submitted' | 'queued';
 
 class PermanentSubmissionError extends Error {}
 
+export function createClientSubmissionId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function withIdempotencyKey(type: string, data: Record<string, unknown>): Record<string, unknown> {
+  if (type !== 'station_request' || typeof data.client_submission_id === 'string') return data;
+  return { ...data, client_submission_id: createClientSubmissionId() };
+}
+
 function getBackoffDelay(retryCount: number): number {
   return Math.min(BASE_DELAY_MS * Math.pow(2, retryCount), 30000);
 }
@@ -15,7 +29,7 @@ function getBackoffDelay(retryCount: number): number {
 async function processSubmission(
   submission: PendingSubmission,
   apiBaseUrl: string,
-): Promise<void> {
+): Promise<unknown> {
   const response = await fetch(`${apiBaseUrl}/${submission.type}`, {
     method: 'POST',
     headers: {
@@ -28,8 +42,11 @@ async function processSubmission(
   if (!response.ok) {
     let detail = response.statusText;
     try {
-      const body = await response.json() as { message?: string };
-      detail = body.message || detail;
+      const body = await response.json() as { message?: string; errors?: Record<string, string[]> };
+      const firstValidationError = body.errors
+        ? Object.values(body.errors).flat().find((message) => typeof message === 'string')
+        : undefined;
+      detail = firstValidationError || body.message || detail;
     } catch {
       // A non-JSON error body still has a useful HTTP status.
     }
@@ -40,15 +57,19 @@ async function processSubmission(
     }
     throw new Error(message);
   }
+
+  if (response.status === 204) return null;
+  return response.json().catch(() => null);
 }
 
 export async function enqueueSubmission(
   type: string,
   data: Record<string, unknown>,
 ): Promise<number> {
+  const durableData = withIdempotencyKey(type, data);
   return db.pendingSubmissions.add({
     type,
-    data,
+    data: durableData,
     createdAt: new Date(),
     status: 'pending',
     retryCount: 0,
@@ -64,27 +85,36 @@ export async function submitOrQueue(
   data: Record<string, unknown>,
   apiBaseUrl: string,
 ): Promise<SubmissionOutcome> {
+  return (await submitOrQueueWithResponse(type, data, apiBaseUrl)).outcome;
+}
+
+export async function submitOrQueueWithResponse(
+  type: string,
+  data: Record<string, unknown>,
+  apiBaseUrl: string,
+): Promise<{ outcome: SubmissionOutcome; response: unknown }> {
+  const durableData = withIdempotencyKey(type, data);
   if (!navigator.onLine) {
-    await enqueueSubmission(type, data);
-    return 'queued';
+    await enqueueSubmission(type, durableData);
+    return { outcome: 'queued', response: null };
   }
 
   try {
-    await processSubmission({
+    const response = await processSubmission({
       type,
-      data,
+      data: durableData,
       createdAt: new Date(),
       status: 'processing',
       retryCount: 0,
     }, apiBaseUrl);
-    return 'submitted';
+    return { outcome: 'submitted', response };
   } catch (error) {
     if (error instanceof PermanentSubmissionError) {
       throw error;
     }
 
-    await enqueueSubmission(type, data);
-    return 'queued';
+    await enqueueSubmission(type, durableData);
+    return { outcome: 'queued', response: null };
   }
 }
 

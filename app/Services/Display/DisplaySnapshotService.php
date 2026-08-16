@@ -8,13 +8,14 @@ use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectRecommendation;
 use App\Models\ApparatusInspection;
-use App\Models\BigTicketRequest;
 use App\Models\EmployeeEquipmentRequest;
 use App\Models\EquipmentItem;
-use App\Models\FireEquipmentRequest;
 use App\Models\Station;
 use App\Models\StationInspection;
+use App\Models\StationRequest;
+use App\Models\StationRequestUpdate;
 use App\Models\StationSupplyRequest;
+use App\Services\StationStaffingService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -143,8 +144,11 @@ final class DisplaySnapshotService
             ->where('station_id', $id)
             ->where('inspection_date', '>=', Carbon::now()->subDays(30))
             ->count();
-        $equipmentRequests = FireEquipmentRequest::query()->where('station_id', $id)->count();
-        $bigTicket = BigTicketRequest::query()->where('station_id', $id)->count();
+        $requestQuery = StationRequest::query()->where('station_id', $id);
+        $stationRequests = (clone $requestQuery)->count();
+        $openStationRequests = (clone $requestQuery)->open()->count();
+        $repairRequests = (clone $requestQuery)->where('request_type', 'repair_service')->count();
+        $equipmentRequests = (clone $requestQuery)->where('request_type', 'equipment')->count();
         $openDefects = $this->openDefectsForApparatus($apparatusIds);
         $supplyRequests = StationSupplyRequest::query()
             ->where('station_id', $id)
@@ -154,14 +158,15 @@ final class DisplaySnapshotService
         $statusCounts = $this->classifyApparatusCollection($station->apparatuses);
         $criticalDefectCount = $this->countCriticalDefects($apparatusIds);
         $lastInspection = $this->lastStationInspection($id);
-        $pendingEquip = $this->pendingFireEquipmentCounts([$id]);
+        $pendingEquip = $this->pendingStationEquipmentCounts([$id]);
+        $staffing = app(StationStaffingService::class)->summaryFor($station);
 
         $readiness = DisplayReadiness::compute(
-            apparatusCount: $station->apparatuses->count(),
+            apparatusCount: $staffing['assigned_apparatus_count'] ?? $station->apparatuses->count(),
             inspectionsToday: $inspectionsToday,
-            inServiceCount: $statusCounts['in_service'],
-            outOfServiceCount: $statusCounts['out_of_service'],
-            maintenanceCount: $statusCounts['maintenance'],
+            inServiceCount: $staffing['in_service_assigned_count'] ?? $statusCounts['in_service'],
+            outOfServiceCount: $staffing['out_of_service_assigned_count'] ?? $statusCounts['out_of_service'],
+            maintenanceCount: $staffing['maintenance_assigned_count'] ?? $statusCounts['maintenance'],
             openDefects: $openDefects,
             criticalDefects: $criticalDefectCount,
             lastStationInspectionStatus: $lastInspection['status'],
@@ -190,8 +195,10 @@ final class DisplaySnapshotService
             'counts' => [
                 'inspections_today' => $inspectionsToday,
                 'station_inspections_30d' => $stationInspections30d,
+                'station_requests' => $stationRequests,
+                'open_station_requests' => $openStationRequests,
+                'repair_service_requests' => $repairRequests,
                 'equipment_requests' => $equipmentRequests,
-                'big_ticket' => $bigTicket,
                 'open_defects' => $openDefects,
                 'supply_requests' => $supplyRequests,
             ],
@@ -252,6 +259,12 @@ final class DisplaySnapshotService
             ->orderByDesc('inspection_date')
             ->limit(25)
             ->get(['id', 'station_id', 'inspection_date', 'inspection_type', 'overall_status', 'created_at']);
+        $stationRequests = StationRequest::query()
+            ->where('station_id', $id)
+            ->with('updates:id,station_request_id,status,public_note,created_at')
+            ->orderByDesc('created_at')
+            ->limit(25)
+            ->get(['id', 'station_id', 'request_number', 'request_type', 'title', 'priority', 'status', 'current_public_response', 'created_at']);
 
         return [
             'found' => true,
@@ -273,6 +286,21 @@ final class DisplaySnapshotService
                 'inspection_type' => $i->inspection_type,
                 'overall_status' => $i->overall_status,
                 'created_at' => optional($i->created_at)->toISOString(),
+            ])->values()->all(),
+            'station_requests' => $stationRequests->map(fn (StationRequest $r): array => [
+                'id' => $r->id,
+                'request_number' => $r->request_number,
+                'request_type' => $r->request_type,
+                'title' => $r->title,
+                'priority' => $r->priority,
+                'status' => $r->status,
+                'public_response' => $r->current_public_response,
+                'created_at' => optional($r->created_at)->toISOString(),
+                'updates' => $r->updates->map(fn (StationRequestUpdate $update): array => [
+                    'status' => $update->status,
+                    'public_note' => $update->public_note,
+                    'created_at' => optional($update->created_at)->toISOString(),
+                ])->values()->all(),
             ])->values()->all(),
         ];
     }
@@ -361,14 +389,16 @@ final class DisplaySnapshotService
         $openDefectsByApparatus = $this->openDefectCountsByApparatus($allApparatusIds);
         $criticalDefectsByApparatus = $this->criticalDefectCountsByApparatus($allApparatusIds);
         $lastInspectionByStation = $this->lastStationInspectionByStation($stationIds);
-        $pendingEquipByStation = $this->pendingFireEquipmentCounts($stationIds);
+        $pendingEquipByStation = $this->pendingStationEquipmentCounts($stationIds);
+        $staffingService = app(StationStaffingService::class);
 
         $rows = $stations->map(function (Station $station) use (
             $todayInspectionsByApparatus,
             $openDefectsByApparatus,
             $criticalDefectsByApparatus,
             $lastInspectionByStation,
-            $pendingEquipByStation
+            $pendingEquipByStation,
+            $staffingService,
         ): array {
             $apparatusIds = $station->apparatuses->pluck('id')->all();
 
@@ -386,13 +416,14 @@ final class DisplaySnapshotService
                 ?? ['status' => null, 'age_days' => null];
             $pendingEquip = $pendingEquipByStation[$station->id]
                 ?? ['pending' => 0, 'critical' => 0];
+            $staffing = $staffingService->summaryFor($station);
 
             $readiness = DisplayReadiness::compute(
-                apparatusCount: $station->apparatuses->count(),
+                apparatusCount: $staffing['assigned_apparatus_count'] ?? $station->apparatuses->count(),
                 inspectionsToday: $inspectionsToday,
-                inServiceCount: $statusCounts['in_service'],
-                outOfServiceCount: $statusCounts['out_of_service'],
-                maintenanceCount: $statusCounts['maintenance'],
+                inServiceCount: $staffing['in_service_assigned_count'] ?? $statusCounts['in_service'],
+                outOfServiceCount: $staffing['out_of_service_assigned_count'] ?? $statusCounts['out_of_service'],
+                maintenanceCount: $staffing['maintenance_assigned_count'] ?? $statusCounts['maintenance'],
                 openDefects: $openDefects,
                 criticalDefects: $criticalDefects,
                 lastStationInspectionStatus: $lastInspection['status'],
@@ -408,10 +439,13 @@ final class DisplaySnapshotService
                 'name' => $station->getRawOriginal('name') ?: ('Station '.$station->station_number),
                 'latitude' => $station->latitude,
                 'longitude' => $station->longitude,
-                'apparatus_count' => $station->apparatuses->count(),
-                'in_service' => $statusCounts['in_service'],
-                'out_of_service' => $statusCounts['out_of_service'],
-                'maintenance' => $statusCounts['maintenance'],
+                'apparatus_count' => $staffing['assigned_apparatus_count'],
+                'assigned_apparatus_count' => $staffing['assigned_apparatus_count'],
+                'assigned_personnel_count' => $staffing['assigned_personnel_count'],
+                'dorm_beds_count' => $staffing['dorm_beds_count'],
+                'in_service' => $staffing['in_service_assigned_count'],
+                'out_of_service' => $staffing['out_of_service_assigned_count'],
+                'maintenance' => $staffing['maintenance_assigned_count'],
                 'open_defects' => $openDefects,
                 'readiness_percent' => $readiness['percent'],
                 'readiness_status' => $readiness['status'],
@@ -566,25 +600,21 @@ final class DisplaySnapshotService
      */
     private function requestSummary(array $stationIds): array
     {
-        $pendingFire = FireEquipmentRequest::query()->where('status', 'pending')->count();
-        $criticalPendingFire = FireEquipmentRequest::query()
-            ->where('status', 'pending')
+        $openRequests = StationRequest::query()->open();
+        $criticalOpen = StationRequest::query()->open()
             ->whereIn('priority', ['critical', 'high'])
             ->count();
-
-        $bigTicketOutstanding = BigTicketRequest::query()->count();
 
         $employeeEquipPending = EmployeeEquipmentRequest::query()
             ->where('status', 'Pending')
             ->count();
 
         return [
-            'fire_equipment' => [
-                'pending' => $pendingFire,
-                'critical_pending' => $criticalPendingFire,
-            ],
-            'big_ticket' => [
-                'outstanding' => $bigTicketOutstanding,
+            'station_requests' => [
+                'open' => (clone $openRequests)->count(),
+                'critical_open' => $criticalOpen,
+                'repair_service_open' => (clone $openRequests)->where('request_type', 'repair_service')->count(),
+                'equipment_open' => (clone $openRequests)->where('request_type', 'equipment')->count(),
             ],
             'employee_equipment' => [
                 'pending' => $employeeEquipPending,
@@ -891,15 +921,16 @@ final class DisplaySnapshotService
      * @param  list<int>  $stationIds
      * @return array<int, array{pending: int, critical: int}>
      */
-    private function pendingFireEquipmentCounts(array $stationIds): array
+    private function pendingStationEquipmentCounts(array $stationIds): array
     {
         if (empty($stationIds)) {
             return [];
         }
 
-        $rows = FireEquipmentRequest::query()
+        $rows = StationRequest::query()
             ->whereIn('station_id', $stationIds)
-            ->where('status', 'pending')
+            ->where('request_type', 'equipment')
+            ->open()
             ->get(['station_id', 'priority']);
 
         $result = [];

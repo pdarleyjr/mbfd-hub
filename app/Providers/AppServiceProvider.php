@@ -6,7 +6,6 @@ use App\Contracts\VideoConferencing\ConferenceProvider;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\EvaluationSubmission;
-use App\Models\FireEquipmentRequest;
 use App\Models\StationInspection;
 use App\Models\StationInventorySubmission;
 use App\Models\Todo;
@@ -49,8 +48,8 @@ class AppServiceProvider extends ServiceProvider
         // SmartUpdatesWidget, CapitalProject analysis, and the summary commands.
         $this->app->bind(\App\Services\CloudflareAIService::class, function () {
             return config('cloudflare.ai.driver') === 'local'
-                ? new \App\Services\LocalAIService()
-                : new \App\Services\CloudflareAIService();
+                ? new \App\Services\LocalAIService
+                : new \App\Services\CloudflareAIService;
         });
 
         // Spatie Permission ships with events_enabled=false. We need it on so
@@ -125,17 +124,7 @@ class AppServiceProvider extends ServiceProvider
                 'station_inspection',
                 'New Station Inspection Submitted',
                 "A station inspection for {$stationName} has been submitted.",
-                '/admin/station-inspections/' . $inspection->id,
-            );
-        });
-
-        FireEquipmentRequest::created(function (FireEquipmentRequest $request) {
-            $this->notifySubmissionRoles(
-                ['super_admin', 'logistics_admin'],
-                'fire_equipment_request',
-                'New Fire Equipment Request',
-                'A new fire equipment request has been submitted.',
-                '/admin/fire-equipment-requests/' . $request->id,
+                '/admin/station-inspections/'.$inspection->id,
             );
         });
 
@@ -146,7 +135,7 @@ class AppServiceProvider extends ServiceProvider
                 'evaluation_submission',
                 'New Evaluation Submitted',
                 "An evaluation for {$productName} has been submitted.",
-                '/admin/evaluation-submissions/' . $submission->id,
+                '/admin/evaluation-submissions/'.$submission->id,
             );
         });
 
@@ -160,7 +149,7 @@ class AppServiceProvider extends ServiceProvider
                 'apparatus_inspection',
                 'New Vehicle Inspection',
                 "A vehicle inspection for {$unitName} has been submitted.",
-                '/admin/inspections/' . $inspection->id,
+                '/admin/inspections/'.$inspection->id,
             );
         });
 
@@ -174,7 +163,7 @@ class AppServiceProvider extends ServiceProvider
                 'station_inventory_submission',
                 'New Station Inventory Submission',
                 "Station {$stationName} submitted an inventory alert for {$shift} shift by {$employeeName}.",
-                '/admin/stations/' . $submission->station_id . '?activeRelationManager=inventoryItems',
+                '/admin/stations/'.$submission->station_id.'?activeRelationManager=inventoryItems',
             );
         });
     }

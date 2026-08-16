@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
-use App\Models\FireEquipmentRequest;
 use App\Models\Station;
+use App\Models\StationRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -61,11 +61,13 @@ class PublicFireEquipmentRequestTest extends TestCase
             ->assertJsonPath('status', 'pending')
             ->assertJsonPath('priority', 'high');
 
-        $request = FireEquipmentRequest::sole();
-        $this->assertSame('Firefighter Test', $request->requested_by_name);
-        $this->assertSame('MBPD-2026-1001', $request->pd_case_number);
-        $this->assertCount(2, $request->form_data['items']);
-        $this->assertSame('Portable radio', $request->form_data['items'][1]['description']);
+        $request = StationRequest::query()->with('items')->sole();
+        $this->assertSame('Firefighter Test', $request->requester_name_snapshot);
+        $this->assertSame('equipment', $request->request_type);
+        $this->assertCount(2, $request->items);
+        $this->assertSame('MBPD-2026-1001', $request->items[1]->pd_case_number);
+        $this->assertSame('Portable radio', $request->items[1]->item_name);
+        $this->assertDatabaseCount('fire_equipment_requests', 0);
     }
 
     public function test_stolen_item_requires_a_police_case_number(): void
@@ -86,6 +88,6 @@ class PublicFireEquipmentRequestTest extends TestCase
             'explanation' => 'Radio could not be located.',
         ])->assertUnprocessable()->assertJsonValidationErrors('items.0.pd_case_number');
 
-        $this->assertDatabaseCount('fire_equipment_requests', 0);
+        $this->assertDatabaseCount('station_requests', 0);
     }
 }

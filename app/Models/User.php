@@ -3,32 +3,39 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Spatie\Permission\Traits\HasRoles;
-use Laravel\Sanctum\HasApiTokens;
+use App\Casts\HashedAndCaptured;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 use NotificationChannels\WebPush\HasPushSubscriptions;
-use App\Casts\HashedAndCaptured;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable, HasRoles, HasPushSubscriptions;
+    use HasApiTokens, HasFactory, HasPushSubscriptions, HasRoles, Notifiable;
 
     public const NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS = 'vehicle_inspections';
+
     public const NOTIFICATION_PREFERENCE_STATION_INSPECTIONS = 'station_inspections';
+
     public const NOTIFICATION_PREFERENCE_FIRE_EQUIPMENT_REQUESTS = 'fire_equipment_requests';
+
+    public const NOTIFICATION_PREFERENCE_STATION_REQUESTS = 'station_requests';
+
     public const NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS = 'workgroup_evaluations';
+
     public const NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS = 'station_inventory_alerts';
 
     public const DEFAULT_NOTIFICATION_PREFERENCES = [
         self::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS => true,
         self::NOTIFICATION_PREFERENCE_STATION_INSPECTIONS => true,
         self::NOTIFICATION_PREFERENCE_FIRE_EQUIPMENT_REQUESTS => true,
+        self::NOTIFICATION_PREFERENCE_STATION_REQUESTS => true,
         self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS => true,
         self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS => true,
     ];
@@ -106,6 +113,10 @@ class User extends Authenticatable implements FilamentUser
                 'label' => 'Fire Equipment Requests',
                 'description' => 'Receive alerts when a fire equipment request is submitted.',
             ],
+            self::NOTIFICATION_PREFERENCE_STATION_REQUESTS => [
+                'label' => 'Station Requests',
+                'description' => 'Receive alerts for station repair, service, and equipment requests.',
+            ],
             self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS => [
                 'label' => 'Workgroup Evaluations',
                 'description' => 'Receive alerts when a workgroup evaluation is submitted.',
@@ -123,6 +134,7 @@ class User extends Authenticatable implements FilamentUser
             'apparatus_inspection' => self::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS,
             'station_inspection' => self::NOTIFICATION_PREFERENCE_STATION_INSPECTIONS,
             'fire_equipment_request' => self::NOTIFICATION_PREFERENCE_FIRE_EQUIPMENT_REQUESTS,
+            'station_request' => self::NOTIFICATION_PREFERENCE_STATION_REQUESTS,
             'evaluation_submission' => self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS,
             'station_inventory_submission' => self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS,
             default => null,

@@ -1,4 +1,11 @@
-import { Apparatus, ChecklistData, InspectionSubmission, EmployeeOption, Station, StationDetail, Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData, StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse, InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest, StationInspectionSummary, ApparatusInspectionSummary, FireEquipmentRequestSummary, SingleGasMeterSummary } from '../types';
+import {
+  Apparatus, ChecklistData, InspectionSubmission, EmployeeOption, Station, StationDetail,
+  Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData,
+  StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse,
+  InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
+  StationInspectionSummary, ApparatusInspectionSummary, FireEquipmentRequestSummary,
+  SingleGasMeterSummary, StationRequestSummary, StationActivityEntry, RoomProfile,
+} from '../types';
 
 const API_BASE = '/api';
 
@@ -148,8 +155,11 @@ export class ApiClient {
     if (!response.ok) {
       throw new Error('Failed to fetch room');
     }
-    const rooms = await response.json();
-    return rooms.find((r: Room) => r.id === roomId);
+    const payload = await response.json();
+    const rooms: Room[] = payload.rooms || payload;
+    const room = rooms.find((entry: Room) => entry.id === roomId);
+    if (!room) throw new Error('Room not found');
+    return room;
   }
 
   static async getRoomAssets(stationId: number, roomId: number): Promise<RoomAsset[]> {
@@ -159,7 +169,8 @@ export class ApiClient {
     if (!response.ok) {
       throw new Error('Failed to fetch room assets');
     }
-    return response.json();
+    const payload = await response.json();
+    return payload.assets || payload;
   }
 
   static async getRoomAudits(stationId: number, roomId: number): Promise<RoomAudit[]> {
@@ -393,6 +404,38 @@ export class ApiClient {
     }
     const data = await response.json();
     return data.equipment_requests || [];
+  }
+
+  static async getStationRequests(stationId: number, scope: 'open' | 'all' = 'all'): Promise<StationRequestSummary[]> {
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/requests?scope=${scope}`, {
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch station requests');
+    }
+    const payload = await response.json();
+    return payload.data || [];
+  }
+
+  static async getStationActivity(stationId: number): Promise<StationActivityEntry[]> {
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/activity`, {
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch station activity');
+    }
+    const payload = await response.json();
+    return payload.activity || [];
+  }
+
+  static async getRoomProfile(stationId: number, roomId: number): Promise<RoomProfile> {
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/rooms/${roomId}/profile`, {
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch room profile');
+    }
+    return response.json();
   }
 
   static async getGasMeters(stationId: number): Promise<SingleGasMeterSummary[]> {

@@ -28,6 +28,8 @@ class RoomAsset extends Model
         'location_within_room',
         'is_active',
         'notes',
+        'retired_at',
+        'replaced_by_room_asset_id',
     ];
 
     protected $casts = [
@@ -35,6 +37,7 @@ class RoomAsset extends Model
         'purchase_date' => 'date',
         'purchase_price' => 'decimal:2',
         'is_active' => 'boolean',
+        'retired_at' => 'datetime',
     ];
 
     /**
@@ -59,6 +62,21 @@ class RoomAsset extends Model
     public function auditItems(): HasMany
     {
         return $this->hasMany(RoomAuditItem::class);
+    }
+
+    public function requestItems(): HasMany
+    {
+        return $this->hasMany(StationRequestItem::class);
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(RoomAssetEvent::class)->latest('event_at');
+    }
+
+    public function replacedBy(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'replaced_by_room_asset_id');
     }
 
     /**

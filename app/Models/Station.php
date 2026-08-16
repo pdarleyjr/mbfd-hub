@@ -53,7 +53,7 @@ class Station extends Model
      */
     public function getNameAttribute(): string
     {
-        return 'Station ' . $this->station_number;
+        return 'Station '.$this->station_number;
     }
 
     /**
@@ -70,7 +70,7 @@ class Station extends Model
      */
     public function apparatusesByLocation()
     {
-        return Apparatus::where('current_location', 'Station ' . $this->station_number);
+        return Apparatus::where('current_location', 'Station '.$this->station_number);
     }
 
     /**
@@ -222,6 +222,14 @@ class Station extends Model
     public function fireEquipmentRequests(): HasMany
     {
         return $this->hasMany(FireEquipmentRequest::class);
+    }
+
+    /**
+     * Get canonical repair/service and station equipment requests.
+     */
+    public function stationRequests(): HasMany
+    {
+        return $this->hasMany(StationRequest::class);
     }
 
     /**

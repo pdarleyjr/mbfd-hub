@@ -1,56 +1,86 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\FireEquipmentRequest;
-use App\Models\Station;
-use App\Support\Security\Base64Image;
+use App\Models\StationRequest;
+use App\Models\User;
+use App\Services\StationRequestLegacyAdapterService;
+use App\Services\StationRequestWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
+/**
+ * Compatibility adapter for the former FireEquipmentRequest API.
+ *
+ * All reads and writes resolve to StationRequest. The legacy table remains
+ * available only as immutable migration evidence.
+ */
 class FireEquipmentRequestController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = FireEquipmentRequest::with(['station', 'requestedBy', 'approvedBy']);
+        $validated = $request->validate([
+            'station_id' => ['nullable', 'integer', 'exists:stations,id'],
+            'status' => ['nullable', Rule::in([
+                'pending', 'approved', 'denied', 'fulfilled', 'completed',
+                'shift_chief_approved', 'support_services_approved',
+            ])],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $query = StationRequest::query()
+            ->where('request_type', 'equipment')
+            ->with(['station', 'requestedByEmployee:id,name,rank', 'assignedTo:id,name', 'items']);
 
-        if ($request->has('station_id')) {
-            $query->where('station_id', $request->station_id);
+        if (isset($validated['station_id'])) {
+            $query->where('station_id', $validated['station_id']);
         }
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
+        if (isset($validated['status'])) {
+            $query->where('status', $this->canonicalStatus($validated['status']));
         }
 
-        return response()->json($query->latest()->paginate($request->get('per_page', 15)));
+        return response()->json($query->latest()->paginate((int) ($validated['per_page'] ?? 15)));
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, StationRequestLegacyAdapterService $adapter): JsonResponse
     {
         $validated = $request->validate([
-            'station_id' => 'required|exists:stations,id',
-            'requested_by' => 'nullable|exists:users,id',
-            'equipment_type' => 'required|string|max:255',
-            'description' => 'required|string',
-            'priority' => 'required|in:low,medium,high,critical',
-            'status' => 'sometimes|in:pending,approved,denied,fulfilled',
-            'form_data' => 'nullable|array',
-            'signature' => 'nullable|string',
-            'notes' => 'nullable|string',
+            'station_id' => ['required', 'exists:stations,id'],
+            'requested_by' => ['nullable', 'exists:users,id'],
+            'requested_by_name' => ['nullable', 'string', 'max:255'],
+            'equipment_type' => ['required', 'string', 'max:255'],
+            'description' => ['required', 'string', 'max:5000'],
+            'explanation' => ['nullable', 'string', 'max:5000'],
+            'priority' => ['required', Rule::in(['low', 'medium', 'normal', 'high', 'critical'])],
+            'form_data' => ['nullable', 'array'],
+            'form_data.items' => ['nullable', 'array', 'min:1', 'max:25'],
+            'form_data.items.*' => ['array'],
+            'form_data.items.*.item_name' => ['nullable', 'string', 'max:255'],
+            'form_data.items.*.description' => ['nullable', 'string', 'max:255'],
+            'form_data.items.*.category' => ['nullable', 'string', 'max:100'],
+            'form_data.items.*.quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'form_data.items.*.reason' => ['nullable', Rule::in(['Damaged/Broken', 'Lost', 'Stolen', 'Needed', 'Replacement', 'End of Service Life', 'Other'])],
+            'form_data.items.*.pd_case_number' => ['nullable', 'string', 'max:100'],
+            'form_data.items.*.photo' => ['nullable', 'string', 'max:7000000'],
+            'signature' => ['nullable', 'string', 'max:7000000'],
+            'officer_signature' => ['nullable', 'string', 'max:7000000'],
+            'pd_case_number' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+            'client_submission_id' => ['nullable', 'uuid'],
         ]);
 
-        $record = FireEquipmentRequest::create($validated);
+        $requestingUser = isset($validated['requested_by'])
+            ? User::query()->find($validated['requested_by'])
+            : $request->user();
+        $result = $adapter->submitFireEquipment($validated, $requestingUser);
 
-        return response()->json($record->load(['station', 'requestedBy']), 201);
+        return response()->json($result->request, $result->created ? 201 : 200);
     }
 
-    /**
-     * Accept the public Daily Forms SPA payload and persist the complete request
-     * for the authenticated admin workflow.
-     */
-    public function storePublic(Request $request): JsonResponse
+    public function storePublic(Request $request, StationRequestLegacyAdapterService $adapter): JsonResponse
     {
         $validated = $request->validate([
             'station' => ['required', 'string', 'max:100'],
@@ -66,128 +96,103 @@ class FireEquipmentRequestController extends Controller
             'member_signature' => ['nullable', 'string', 'max:7000000'],
             'officer_signature' => ['nullable', 'string', 'max:7000000'],
             'submitted_at' => ['nullable', 'date'],
+            'client_submission_id' => ['nullable', 'uuid'],
         ]);
 
-        $stationNumber = $validated['station'];
-        if (preg_match('/^Station\s+(\d+)$/i', $stationNumber, $matches)) {
-            $stationNumber = $matches[1];
-        }
+        $result = $adapter->submitFireEquipment($validated);
 
-        $station = Station::query()->where('station_number', $stationNumber)->first();
-        if ($station === null) {
-            throw ValidationException::withMessages([
-                'station' => "Station not found: {$validated['station']}",
+        return response()->json($result->request, $result->created ? 201 : 200);
+    }
+
+    public function show(int $fireEquipmentRequest): JsonResponse
+    {
+        return response()->json($this->resolveCanonical($fireEquipmentRequest));
+    }
+
+    public function update(
+        Request $request,
+        int $fireEquipmentRequest,
+        StationRequestWorkflowService $workflow,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'equipment_type' => ['sometimes', 'string', 'max:255'],
+            'description' => ['sometimes', 'string', 'max:5000'],
+            'explanation' => ['nullable', 'string', 'max:5000'],
+            'priority' => ['sometimes', Rule::in(['low', 'medium', 'normal', 'high', 'critical'])],
+            'status' => ['sometimes', Rule::in([
+                'pending', 'approved', 'denied', 'fulfilled', 'completed',
+                'shift_chief_approved', 'support_services_approved',
+            ])],
+            'notes' => ['nullable', 'string', 'max:5000'],
+            'approved_by' => ['nullable', 'exists:users,id'],
+            'approved_at' => ['nullable', 'date'],
+        ]);
+        $canonical = $this->resolveCanonical($fireEquipmentRequest);
+        $canonical->update(array_filter([
+            'title' => $validated['equipment_type'] ?? null,
+            'subject_type' => $validated['equipment_type'] ?? null,
+            'description' => $validated['explanation'] ?? $validated['description'] ?? null,
+            'priority' => isset($validated['priority']) ? ($validated['priority'] === 'medium' ? 'normal' : $validated['priority']) : null,
+        ], static fn ($value): bool => $value !== null));
+
+        if (isset($validated['status'])) {
+            /** @var User $actor */
+            $actor = $request->user();
+            $canonical = $workflow->transition($canonical, [
+                'status' => $this->canonicalStatus($validated['status']),
+                'public_note' => $validated['notes'] ?? null,
+                'internal_note' => 'Updated through the legacy fire equipment compatibility endpoint.',
+                'assigned_to_user_id' => $validated['approved_by'] ?? null,
+            ], $actor);
+        } else {
+            $canonical->updates()->create([
+                'status' => $canonical->status,
+                'internal_note' => 'Request details updated through the legacy fire equipment compatibility endpoint.',
+                'changed_by_user_id' => $request->user()?->id,
             ]);
         }
 
-        $items = $validated['items'];
-        foreach ($items as $index => &$item) {
-            if (filled($item['photo'] ?? null)) {
-                $item['photo'] = $this->storeImageOrFail(
-                    $item['photo'],
-                    'fire-equipment-requests/photos',
-                    "request-item-{$index}",
-                    "items.{$index}.photo",
-                );
-            }
-        }
-        unset($item);
-
-        $memberSignature = filled($validated['member_signature'] ?? null)
-            ? $this->storeImageOrFail(
-                $validated['member_signature'],
-                'fire-equipment-requests/signatures',
-                'member-signature',
-                'member_signature',
-            )
-            : null;
-        $officerSignature = filled($validated['officer_signature'] ?? null)
-            ? $this->storeImageOrFail(
-                $validated['officer_signature'],
-                'fire-equipment-requests/signatures',
-                'officer-signature',
-                'officer_signature',
-            )
-            : null;
-
-        $reasons = collect($items)->pluck('reason');
-        $priority = $reasons->contains(fn (string $reason): bool => in_array($reason, ['Lost', 'Stolen'], true))
-            ? 'high'
-            : ($reasons->contains('Damaged/Broken') ? 'medium' : 'low');
-        $policeCases = collect($items)
-            ->pluck('pd_case_number')
-            ->filter()
-            ->unique()
-            ->implode(', ');
-        $description = collect($items)
-            ->map(fn (array $item): string => "{$item['quantity']}x {$item['description']}")
-            ->implode('; ');
-
-        $record = FireEquipmentRequest::create([
-            'station_id' => $station->id,
-            'requested_by' => null,
-            'requested_by_name' => $validated['requested_by'],
-            'equipment_type' => count($items) === 1 ? $items[0]['description'] : count($items).' requested items',
-            'description' => $description,
-            'explanation' => $validated['explanation'],
-            'priority' => $priority,
-            'status' => 'pending',
-            'form_data' => [
-                'date' => $validated['date'],
-                'submitted_at' => $validated['submitted_at'] ?? now()->toIso8601String(),
-                'items' => $items,
-            ],
-            'signature' => $memberSignature,
-            'officer_signature' => $officerSignature,
-            'pd_case_number' => $policeCases !== '' ? $policeCases : null,
-        ]);
-
-        return response()->json($record->load('station'), 201);
+        return response()->json($canonical->fresh(['station', 'requestedByEmployee', 'assignedTo', 'items', 'updates']));
     }
 
-    public function show(FireEquipmentRequest $fireEquipmentRequest): JsonResponse
-    {
-        return response()->json(
-            $fireEquipmentRequest->load(['station', 'requestedBy', 'approvedBy'])
-        );
-    }
-
-    public function update(Request $request, FireEquipmentRequest $fireEquipmentRequest): JsonResponse
-    {
-        $validated = $request->validate([
-            'equipment_type' => 'sometimes|string|max:255',
-            'description' => 'sometimes|string',
-            'priority' => 'sometimes|in:low,medium,high,critical',
-            'status' => 'sometimes|in:pending,approved,denied,fulfilled',
-            'form_data' => 'nullable|array',
-            'signature' => 'nullable|string',
-            'approved_by' => 'nullable|exists:users,id',
-            'approved_at' => 'nullable|date',
-            'notes' => 'nullable|string',
-        ]);
-
-        $fireEquipmentRequest->update($validated);
-
-        return response()->json($fireEquipmentRequest->load(['station', 'requestedBy', 'approvedBy']));
-    }
-
-    public function destroy(FireEquipmentRequest $fireEquipmentRequest): JsonResponse
-    {
-        $fireEquipmentRequest->delete();
+    public function destroy(
+        Request $request,
+        int $fireEquipmentRequest,
+        StationRequestWorkflowService $workflow,
+    ): JsonResponse {
+        $canonical = $this->resolveCanonical($fireEquipmentRequest);
+        /** @var User $actor */
+        $actor = $request->user();
+        $workflow->transition($canonical, [
+            'status' => 'cancelled',
+            'public_note' => 'Request cancelled.',
+            'internal_note' => 'Legacy delete mapped to a non-destructive canonical cancellation.',
+        ], $actor);
 
         return response()->json(null, 204);
     }
 
-    private function storeImageOrFail(string $payload, string $directory, string $prefix, string $field): string
+    private function resolveCanonical(int $legacyOrCanonicalId): StationRequest
     {
-        $path = Base64Image::store($payload, $directory, $prefix);
+        return StationRequest::query()
+            ->where('request_type', 'equipment')
+            ->where(fn ($query) => $query
+                ->whereKey($legacyOrCanonicalId)
+                ->orWhere(fn ($legacy) => $legacy
+                    ->where('legacy_source', 'fire_equipment_requests')
+                    ->where('legacy_id', $legacyOrCanonicalId)))
+            ->with(['station', 'requestedByEmployee:id,name,rank', 'assignedTo:id,name', 'items', 'updates'])
+            ->firstOrFail();
+    }
 
-        if ($path === null) {
-            throw ValidationException::withMessages([
-                $field => 'The uploaded image must be a valid JPEG, PNG, WebP, or GIF image.',
-            ]);
-        }
-
-        return $path;
+    private function canonicalStatus(string $status): string
+    {
+        return match ($status) {
+            'shift_chief_approved' => 'acknowledged',
+            'support_services_approved', 'approved' => 'approved',
+            'fulfilled', 'completed' => 'completed',
+            'denied' => 'denied',
+            default => 'pending',
+        };
     }
 }

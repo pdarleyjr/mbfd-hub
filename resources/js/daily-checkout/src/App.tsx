@@ -10,10 +10,10 @@ const StationListPage = lazy(() => import('./components/StationListPage'));
 const StationDetailPage = lazy(() => import('./components/StationDetailPage'));
 const RoomAssetTracker = lazy(() => import('./components/RoomAssetTracker'));
 const FormsHub = lazy(() => import('./components/FormsHub'));
-const BigTicketRequestForm = lazy(() => import('./components/BigTicketRequestForm'));
 const StationInventoryForm = lazy(() => import('./components/StationInventoryForm'));
 const VehicleInspectionSelect = lazy(() => import('./components/VehicleInspectionSelect'));
-const EquipmentRequestWizard = lazy(() => import('./components/forms/EquipmentRequestWizard'));
+const StationRequestWizard = lazy(() => import('./components/forms/StationRequestWizard'));
+const LegacyStationRequestRedirect = lazy(() => import('./components/LegacyStationRequestRedirect'));
 const StationInspectionWizard = lazy(() => import('./components/forms/StationInspectionWizard'));
 const TrtInventoryWizard = lazy(() => import('./components/TrtInventoryWizard'));
 
@@ -76,9 +76,10 @@ function App() {
             <Route path="/stations/:stationId/rooms/:roomId" element={<RoomAssetTracker />} />
             {/* Forms Hub Routes */}
             <Route path="/forms-hub" element={<FormsHub />} />
-            <Route path="/forms-hub/big-ticket-request" element={<BigTicketRequestForm />} />
+            <Route path="/forms-hub/station-request" element={<StationRequestWizard />} />
+            <Route path="/forms-hub/big-ticket-request" element={<LegacyStationRequestRedirect type="repair_service" />} />
             <Route path="/forms-hub/station-inventory" element={<StationInventoryForm />} />
-            <Route path="/forms-hub/equipment-request" element={<EquipmentRequestWizard />} />
+            <Route path="/forms-hub/equipment-request" element={<LegacyStationRequestRedirect type="equipment" />} />
             <Route path="/forms-hub/station-inspection" element={<StationInspectionWizard />} />
             <Route path="/forms-hub/trt-inventory" element={<TrtInventoryWizard />} />
             <Route path="/forms-hub/success" element={<SuccessPage />} />
