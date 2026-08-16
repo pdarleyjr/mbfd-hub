@@ -45,7 +45,6 @@ class ViewStationRequest extends ViewRecord
                             ->orderBy('name')
                             ->pluck('name', 'id')
                             ->all())
-                        ->searchable()
                         ->label('Assigned To'),
                     Forms\Components\TextInput::make('assigned_vendor')->maxLength(255),
                     Forms\Components\Textarea::make('public_note')
@@ -90,7 +89,6 @@ class ViewStationRequest extends ViewRecord
                                         return [$asset->id => "{$room->name} — {$asset->name}"];
                                     })
                                     ->all())
-                                ->searchable()
                                 ->label('Existing Asset'),
                             Forms\Components\TextInput::make('name')->maxLength(255),
                             Forms\Components\TextInput::make('asset_tag')->maxLength(255),
