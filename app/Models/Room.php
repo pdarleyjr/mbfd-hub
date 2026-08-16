@@ -15,6 +15,8 @@ class Room extends Model
     protected $fillable = [
         'station_id',
         'name',
+        'blueprint_key',
+        'sort_order',
         'floor',
         'room_type',
         'description',
@@ -25,6 +27,7 @@ class Room extends Model
 
     protected $casts = [
         'capacity' => 'integer',
+        'sort_order' => 'integer',
         'is_active' => 'boolean',
     ];
 

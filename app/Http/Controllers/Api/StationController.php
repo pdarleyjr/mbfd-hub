@@ -67,6 +67,7 @@ class StationController extends Controller
     {
         $roomTypeColumn = Schema::hasColumn('rooms', 'room_type') ? 'room_type' : 'type';
         $roomsHaveIsActive = Schema::hasColumn('rooms', 'is_active');
+        $roomsHaveBlueprintOrder = Schema::hasColumn('rooms', 'sort_order');
         $station = Station::with([
             'apparatuses' => function ($query) {
                 $query->with('currentDefects')->orderBy('vehicle_number');
@@ -77,14 +78,16 @@ class StationController extends Controller
             'under25kProjects' => function ($query) {
                 $query->active()->orderBy('target_completion_date');
             },
-            'rooms' => function ($query) use ($roomsHaveIsActive) {
+            'rooms' => function ($query) use ($roomsHaveBlueprintOrder, $roomsHaveIsActive) {
                 if ($roomsHaveIsActive) {
                     $query->where('is_active', true);
                 }
 
-                $query->withCount(['assets', 'audits'])
-                    ->orderBy('floor')
-                    ->orderBy('name');
+                $query->withCount(['assets', 'audits']);
+                if ($roomsHaveBlueprintOrder) {
+                    $query->orderBy('sort_order');
+                }
+                $query->orderBy('floor')->orderBy('name');
             },
         ])
             ->withCount(['apparatuses', 'rooms', 'capitalProjects', 'under25kProjects'])
@@ -207,6 +210,8 @@ class StationController extends Controller
                     'id' => $room->id,
                     'station_id' => $room->station_id,
                     'name' => $room->name,
+                    'blueprint_key' => $room->getAttribute('blueprint_key'),
+                    'sort_order' => (int) ($room->getAttribute('sort_order') ?? 1000),
                     'room_number' => null,
                     'floor' => $room->floor,
                     'type' => $room->type ?? $room->room_type ?? 'other',
@@ -401,10 +406,13 @@ class StationController extends Controller
         $station = Station::findOrFail($id);
 
         $rooms = $station->rooms()
-            ->withCount('assets')
-            ->orderBy('floor')
-            ->orderBy('name')
-            ->get();
+            ->withCount('assets');
+
+        if (Schema::hasColumn('rooms', 'sort_order')) {
+            $rooms->orderBy('sort_order');
+        }
+
+        $rooms = $rooms->orderBy('floor')->orderBy('name')->get();
 
         if ($this->isPublicRequest($request)) {
             return response()->json([

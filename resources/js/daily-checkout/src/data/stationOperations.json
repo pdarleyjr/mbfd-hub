@@ -1,0 +1,46 @@
+{
+  "stations": {
+    "1": {
+      "units": [
+        { "label": "E1", "aliases": ["E1", "E 1"], "kind": "engine", "personnel": 4, "officers": 1, "firefighters": 3 },
+        { "label": "L1", "aliases": ["L1", "L 1"], "kind": "ladder", "personnel": 4, "officers": 1, "firefighters": 3 },
+        { "label": "R1", "aliases": ["R1", "R 1"], "kind": "rescue", "personnel": 3, "officers": 1, "firefighters": 2 },
+        { "label": "R11", "aliases": ["R11", "R 11"], "kind": "rescue", "personnel": 3, "officers": 1, "firefighters": 2 }
+      ],
+      "dorm_beds": 14
+    },
+    "2": {
+      "units": [
+        { "label": "300", "aliases": ["300"], "kind": "single_member", "personnel": 1, "officers": 0, "firefighters": 0, "other_members": 1, "dorm_name": "300 dorm room" },
+        { "label": "Captain 5", "aliases": ["Captain 5", "Captain5"], "kind": "single_member", "personnel": 1, "officers": 1, "firefighters": 0, "dorm_name": "Captain 5 dorm room" },
+        { "label": "E2", "aliases": ["E2", "E 2"], "kind": "engine", "personnel": 4, "officers": 1, "firefighters": 3 },
+        { "label": "R2", "aliases": ["R2", "R 2"], "kind": "rescue", "personnel": 3, "officers": 1, "firefighters": 2 },
+        { "label": "R22", "aliases": ["R22", "R 22"], "kind": "rescue", "personnel": 3, "officers": 1, "firefighters": 2 },
+        { "label": "Air Truck", "aliases": ["Air Truck", "AirTruck"], "kind": "support", "personnel": 0, "officers": 0, "firefighters": 0 }
+      ],
+      "dorm_beds": 12
+    },
+    "3": {
+      "units": [
+        { "label": "E3", "aliases": ["E3", "E 3"], "kind": "engine", "personnel": 4, "officers": 1, "firefighters": 3 },
+        { "label": "L3", "aliases": ["L3", "L 3"], "kind": "ladder", "personnel": 4, "officers": 1, "firefighters": 3 },
+        { "label": "R3", "aliases": ["R3", "R 3"], "kind": "rescue", "personnel": 3, "officers": 1, "firefighters": 2 }
+      ],
+      "dorm_beds": 11
+    },
+    "4": {
+      "units": [
+        { "label": "E4", "aliases": ["E4", "E 4"], "kind": "engine", "personnel": 4, "officers": 1, "firefighters": 3 },
+        { "label": "R4", "aliases": ["R4", "R 4"], "kind": "rescue", "personnel": 3, "officers": 1, "firefighters": 2 },
+        { "label": "R44", "aliases": ["R44", "R 44"], "kind": "rescue", "personnel": 3, "officers": 1, "firefighters": 2 }
+      ],
+      "dorm_beds": 10
+    },
+    "6": {
+      "units": [
+        { "label": "FB6", "display_name": "Fire Boat 6", "aliases": ["FB6", "FB 6", "Fire Boat 6", "Fireboat 6"], "kind": "fireboat", "personnel": 4, "officers": 1, "firefighters": 3 }
+      ],
+      "dorm_beds": 4
+    }
+  }
+}

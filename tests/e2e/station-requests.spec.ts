@@ -9,7 +9,15 @@ const station = {
 };
 
 const employee = { id: 41, name: 'Firefighter Browser Test', rank: 'Firefighter' };
-const room = { id: 11, station_id: 1, name: 'Kitchen', room_type: 'kitchen' };
+const room = { id: 11, station_id: 1, name: 'Kitchen', type: 'kitchen', blueprint_key: 'kitchen.main', is_active: true };
+const blueprintRooms = [
+  room,
+  { id: 12, station_id: 1, name: 'Combat firefighter dorm room', type: 'dormitory', blueprint_key: 'dorm.combat_firefighters', capacity: 6, is_active: true },
+  { id: 13, station_id: 1, name: 'Combat officer dorm room', type: 'dormitory', blueprint_key: 'dorm.combat_officers', capacity: 2, is_active: true },
+  { id: 14, station_id: 1, name: 'Rescue dorm room', type: 'dormitory', blueprint_key: 'dorm.rescue', capacity: 6, is_active: true },
+  { id: 15, station_id: 1, name: 'E1 apparatus bay position', type: 'combat_apparatus_bay', blueprint_key: 'combat_apparatus_bay.e1', is_active: true },
+  { id: 16, station_id: 1, name: 'R1 apparatus bay position', type: 'rescue_apparatus_bay', blueprint_key: 'rescue_apparatus_bay.r1', is_active: true },
+];
 const asset = { id: 101, room_id: 11, name: 'Refrigerator', category: 'appliance', quantity: 1, condition: 'needs_repair' };
 
 interface MockApiOptions {
@@ -38,7 +46,7 @@ async function mockStationRequestApi(page: Page, options: MockApiOptions = {}): 
       return route.fulfill({ json: [employee] });
     }
     if (path === '/api/public/stations/1/rooms') {
-      return route.fulfill({ json: { rooms: [room] } });
+      return route.fulfill({ json: { rooms: blueprintRooms } });
     }
     if (path === '/api/public/stations/1/rooms/11/assets') {
       return route.fulfill({ json: { assets: [asset] } });
@@ -83,7 +91,8 @@ test('repair request is touch-safe, responsive, and submits the canonical payloa
   await expect(page.getByLabel('Station *')).toHaveCount(0);
   await page.getByLabel('Search employees').fill('Browser Test');
   await page.getByLabel('Requesting employee *').selectOption('41');
-  await page.getByLabel(/Room/).selectOption('11');
+  await page.getByLabel('Room area').selectOption('kitchen');
+  await page.getByLabel('Specific room / area *').selectOption('11');
 
   const continueButton = page.getByRole('button', { name: 'Continue' });
   const buttonBox = await continueButton.boundingBox();
@@ -141,7 +150,7 @@ test('unlisted room stays a snapshot and is not treated as a canonical room id',
 
   await page.goto('/daily/forms-hub/station-request?station_id=1');
   await page.getByLabel('Requesting employee *').selectOption('41');
-  await page.getByLabel(/Room/).selectOption('other');
+  await page.getByLabel('Room area').selectOption('other');
   await page.getByLabel('Room or location *').fill('Rear storage alcove');
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Item not in inventory Report an item without creating an inventory record.' }).click();
@@ -157,6 +166,47 @@ test('unlisted room stays a snapshot and is not treated as a canonical room id',
     room_id: null,
     room_name_snapshot: 'Rear storage alcove',
     subject_type: 'other',
+  });
+});
+
+test('room blueprint keeps station-wide and exposes valid dorm details without a rescue officer room', async ({ page }) => {
+  const submittedPayload = await mockStationRequestApi(page);
+
+  await page.goto('/daily/forms-hub/station-request?station_id=1');
+  await page.getByLabel('Requesting employee *').selectOption('41');
+  const area = page.getByLabel('Room area');
+  await expect(area.locator('option').first()).toHaveText('Station-wide / no single room');
+  await expect(area.locator('option')).toContainText([
+    'Station-wide / no single room',
+    'Kitchen',
+    'Dorm',
+    'Combat apparatus bay',
+    'Rescue apparatus bay',
+    'Room not listed / Other',
+  ]);
+
+  await area.selectOption('dormitory');
+  const detail = page.getByLabel('Specific room / area *');
+  await expect(detail.locator('option')).toContainText([
+    'Select a dorm',
+    'Combat firefighter dorm room',
+    'Combat officer dorm room',
+    'Rescue dorm room',
+  ]);
+  await expect(detail).not.toContainText('Rescue officer dorm room');
+  await detail.selectOption('12');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByLabel('Short title *').fill('Dorm light needs service');
+  await page.getByLabel('Description and operational impact *').fill('The overhead fixture flickers during evening hours.');
+  await page.getByLabel('Item name *').fill('Overhead light fixture');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByText('Combat firefighter dorm room')).toBeVisible();
+  await page.getByRole('button', { name: 'Submit station request' }).click();
+
+  expect(submittedPayload()).toMatchObject({
+    room_id: 12,
+    room_name_snapshot: null,
+    subject_type: 'room',
   });
 });
 
@@ -406,8 +456,9 @@ test('station request and activity tabs filter history and preserve station and 
   };
   const fullStation = {
     ...station, station_number: 1, city: 'Miami Beach', state: 'FL', zip_code: '33139', phone: '',
-    created_at: now, updated_at: now, rooms: [{ ...room, type: 'kitchen', is_active: true }], apparatuses: [],
-    assigned_apparatus_count: 0, assigned_personnel_count: 0, dorm_beds_count: 0,
+    created_at: now, updated_at: now, rooms: blueprintRooms, apparatuses: [],
+    assigned_apparatus_count: null, assigned_personnel_count: null, dorm_beds_count: null,
+    assigned_units: [], staffing_known: false,
   };
 
   await page.route('**/images/**', (route) => route.fulfill({ status: 204 }));
@@ -430,7 +481,14 @@ test('station request and activity tabs filter history and preserve station and 
   await expect(firstHistory.getByText('Vendor contacted.', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Station Request' })).toHaveAttribute('href', '/daily/forms-hub/station-request?station_id=1&return_to=%2Fstations%2F1');
 
+  await page.getByRole('button', { name: 'Overview' }).click();
+  await expect(page.getByText('E1 · L1 · R1 · R11')).toBeVisible();
+  await expect(page.getByText('4', { exact: true })).toBeVisible();
+  await expect(page.getByText('14', { exact: true })).toHaveCount(2);
+
   await page.getByRole('button', { name: 'Rooms' }).click();
+  await expect(page.getByRole('heading', { name: 'Dorm', exact: true })).toBeVisible();
+  await expect(page.getByText('14 dorm positions')).toBeVisible();
   await expect(page.getByRole('link', { name: /Kitchen/ })).toHaveAttribute('href', '/daily/stations/1/rooms/11');
   await page.getByRole('button', { name: 'Activity' }).click();
   await expect(page.getByText('SR-2026-000501 — Open refrigerator repair')).toBeVisible();

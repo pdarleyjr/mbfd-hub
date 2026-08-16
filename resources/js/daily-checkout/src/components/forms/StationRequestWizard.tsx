@@ -5,6 +5,7 @@ import type { EmployeeOption, Room, RoomAsset, Station, StationRequestSummary, S
 import { createClientSubmissionId, submitOrQueueWithResponse, type SubmissionOutcome } from '../../lib/sync';
 import { ApiClient } from '../../utils/api';
 import { safeReturnTo } from '../../utils/stationRequestNavigation';
+import { availableRoomAreas, roomDetailPrompt, roomsForArea, type RoomArea } from '../../utils/stationRoomBlueprint';
 
 type Priority = 'low' | 'normal' | 'high' | 'critical';
 type Reason = 'Damaged/Broken' | 'Lost' | 'Stolen' | 'Needed' | 'Replacement' | 'End of Service Life' | 'Other';
@@ -81,6 +82,7 @@ export default function StationRequestWizard() {
   const [employeeId, setEmployeeId] = useState('');
   const [employeeSearch, setEmployeeSearch] = useState('');
   const [roomId, setRoomId] = useState('');
+  const [roomArea, setRoomArea] = useState<RoomArea | ''>('');
   const [roomNotListed, setRoomNotListed] = useState(false);
   const [roomNameSnapshot, setRoomNameSnapshot] = useState('');
   const [subjectType, setSubjectType] = useState(initialType === 'repair_service' ? 'appliance' : 'equipment');
@@ -103,6 +105,8 @@ export default function StationRequestWizard() {
   const selectedStation = stations.find((station) => String(station.id) === stationId);
   const selectedRoom = rooms.find((room) => String(room.id) === roomId);
   const selectedEmployee = employees.find((employee) => String(employee.id) === employeeId);
+  const roomAreas = availableRoomAreas(rooms);
+  const selectedAreaRooms = roomArea ? roomsForArea(rooms, roomArea) : [];
   const normalizedEmployeeSearch = employeeSearch.trim().toLocaleLowerCase();
   const filteredEmployees = employees.filter((employee) => (
     String(employee.id) === employeeId
@@ -135,12 +139,13 @@ export default function StationRequestWizard() {
   useEffect(() => {
     setRooms([]);
     setRoomId('');
+    setRoomArea('');
     setRoomNotListed(false);
     setRoomNameSnapshot('');
     setAssets([]);
     if (!stationId) return;
     const controller = new AbortController();
-    fetch(`/api/public/stations/${stationId}/rooms`, { headers: { Accept: 'application/json' }, signal: controller.signal })
+    fetch(`/api/public/stations/${stationId}/rooms`, { headers: { Accept: 'application/json' }, cache: 'no-store', signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error();
         return response.json();
@@ -219,6 +224,7 @@ export default function StationRequestWizard() {
       if (!loadingOptions && !selectedStation) return 'The selected station is unavailable.';
       if (!employeeId) return 'Select the requesting employee.';
       if (roomNotListed && !roomNameSnapshot.trim()) return 'Enter the room or location that is not listed.';
+      if (roomArea && !roomNotListed && !roomId) return 'Select the specific room or area.';
     }
     if (step === 2) {
       if (requestType === 'repair_service' && repairTarget === 'existing_asset') {
@@ -392,18 +398,28 @@ export default function StationRequestWizard() {
                   <option value="">{normalizedEmployeeSearch && filteredEmployees.length === 0 ? 'No matching employees' : 'Select employee'}</option>{filteredEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}{employee.rank ? ` — ${employee.rank}` : ''}</option>)}
                 </select>
               </label>
-              <label className="text-sm font-semibold text-slate-800 sm:col-span-2">Room <span className="font-normal text-stone-500">(optional for station-wide work)</span>
-                <select value={roomNotListed ? 'other' : roomId} onChange={(event) => {
+              <label className="text-sm font-semibold text-slate-800 sm:col-span-2">Room area <span className="font-normal text-stone-500">(optional for station-wide work)</span>
+                <select value={roomNotListed ? 'other' : roomArea} onChange={(event) => {
                   const value = event.target.value;
                   setRoomNotListed(value === 'other');
-                  setRoomId(value === 'other' ? '' : value);
+                  setRoomArea(value === 'other' ? '' : value as RoomArea | '');
+                  setRoomId('');
                   if (value !== 'other') setRoomNameSnapshot('');
-                  if (value === 'other') setAssets([]);
+                  setAssets([]);
                   setItems((current) => current.map((item) => ({ ...item, roomAssetId: '' })));
                 }} disabled={!stationId} className="mt-2 min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-base focus:border-blue-700 focus:ring-blue-700">
-                  <option value="">Station-wide / no single room</option>{rooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}<option value="other">Room not listed / Other</option>
+                  <option value="">Station-wide / no single room</option>{roomAreas.map((area) => <option key={area.value} value={area.value}>{area.label}</option>)}<option value="other">Room not listed / Other</option>
                 </select>
               </label>
+              {roomArea && !roomNotListed && <label className="text-sm font-semibold text-slate-800 sm:col-span-2">Specific room / area <span className="text-red-700">*</span>
+                <select value={roomId} onChange={(event) => {
+                  setRoomId(event.target.value);
+                  setAssets([]);
+                  setItems((current) => current.map((item) => ({ ...item, roomAssetId: '' })));
+                }} className="mt-2 min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3 text-base focus:border-blue-700 focus:ring-blue-700">
+                  <option value="">{roomDetailPrompt(roomArea)}</option>{selectedAreaRooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
+                </select>
+              </label>}
               {roomNotListed && <label className="text-sm font-semibold text-slate-800 sm:col-span-2">Room or location <span className="text-red-700">*</span><input value={roomNameSnapshot} onChange={(event) => setRoomNameSnapshot(event.target.value)} maxLength={255} className="mt-2 min-h-12 w-full rounded-xl border border-stone-300 px-3 text-base" placeholder="Example: Rear storage alcove" /><span className="mt-2 block font-normal text-stone-500">This preserves the location on the request for later admin reconciliation; it does not create a room record.</span></label>}
             </div>
           </div>

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'mbfd-checkout-v4';
-const API_CACHE_NAME = 'mbfd-api-cache-v4';
+const CACHE_NAME = 'mbfd-checkout-v5';
+const API_CACHE_NAME = 'mbfd-api-cache-v5';
 const APP_SHELL_CACHE_KEYS = [
   '/daily/',
   '/daily/index.html',
@@ -65,6 +65,7 @@ self.addEventListener('fetch', (event) => {
   const isNavigationRequest = request.mode === 'navigate';
   const isDailyShellRequest = isSameOrigin && url.pathname.startsWith('/daily');
   const isApparatusApiRequest = isSameOrigin && url.pathname.startsWith('/api/public/apparatuses');
+  const isStationApiRequest = isSameOrigin && url.pathname.startsWith('/api/public/stations');
 
   if (isNavigationRequest && isDailyShellRequest) {
     event.respondWith(
@@ -94,7 +95,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (isApparatusApiRequest) {
+  if (isStationApiRequest || isApparatusApiRequest) {
     event.respondWith(
       (async () => {
         const cache = await caches.open(API_CACHE_NAME);

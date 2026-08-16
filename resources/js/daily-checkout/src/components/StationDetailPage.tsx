@@ -10,6 +10,7 @@ import {
   SingleGasMeterSummary,
 } from '../types';
 import { ApiClient } from '../utils/api';
+import { groupRoomsByArea, stationComplement } from '../utils/stationRoomBlueprint';
 
 type TabId = 'requests' | 'overview' | 'rooms' | 'apparatus' | 'gas-meters' | 'inspections' | 'activity';
 
@@ -233,6 +234,21 @@ export default function StationDetailPage() {
     );
   }
 
+  const configuredComplement = stationComplement(station.station_number);
+  const assignedUnits = station.assigned_units?.length
+    ? station.assigned_units
+    : configuredComplement?.assignedUnits ?? [];
+  const assignedApparatusCount = station.assigned_apparatus_count
+    ?? configuredComplement?.assignedApparatusCount
+    ?? null;
+  const assignedPersonnelCount = station.assigned_personnel_count
+    ?? configuredComplement?.assignedPersonnelCount
+    ?? null;
+  const dormBedsCount = station.dorm_beds_count
+    ?? configuredComplement?.dormBedsCount
+    ?? null;
+  const roomGroups = groupRoomsByArea(station.rooms ?? []);
+
   return (
     <div className="space-y-6">
       {/* Back button and header */}
@@ -406,15 +422,19 @@ export default function StationDetailPage() {
                   </div>
                   <div className="flex justify-between py-2.5 border-b border-neutral-200 bg-neutral-50/50">
                     <dt className="text-neutral-500">Assigned Apparatus</dt>
-                    <dd className="font-medium text-neutral-800 tabular-nums">{station.assigned_apparatus_count ?? 'Unknown'}</dd>
+                    <dd className="font-medium text-neutral-800 tabular-nums">{assignedApparatusCount ?? 'Unknown'}</dd>
                   </div>
                   <div className="flex justify-between py-2.5 border-b border-neutral-200">
                     <dt className="text-neutral-500">Assigned Personnel</dt>
-                    <dd className="font-medium text-neutral-800 tabular-nums">{station.assigned_personnel_count ?? 'Unknown'}</dd>
+                    <dd className="font-medium text-neutral-800 tabular-nums">{assignedPersonnelCount ?? 'Unknown'}</dd>
                   </div>
                   <div className="flex justify-between py-2.5 border-b border-neutral-200 bg-neutral-50/50">
                     <dt className="text-neutral-500">Dorm Beds</dt>
-                    <dd className="font-medium text-neutral-800 tabular-nums">{station.dorm_beds_count ?? 'Unknown'}</dd>
+                    <dd className="font-medium text-neutral-800 tabular-nums">{dormBedsCount ?? 'Unknown'}</dd>
+                  </div>
+                  <div className="grid gap-1 py-2.5 border-b border-neutral-200">
+                    <dt className="text-neutral-500">Assigned Units</dt>
+                    <dd className="font-medium text-neutral-800">{assignedUnits.length ? assignedUnits.join(' · ') : 'Unknown'}</dd>
                   </div>
                   {station.fax && (
                     <div className="flex justify-between py-2.5 border-b border-neutral-200">
@@ -458,27 +478,36 @@ export default function StationDetailPage() {
           {activeTab === 'rooms' && (
             <div>
               {station.rooms && station.rooms.length > 0 ? (
-                <div className="space-y-3 stagger-list">
-                  {station.rooms.map((room) => (
-                    <Link
-                      key={room.id}
-                      to={`/stations/${station.id}/rooms/${room.id}`}
-                      className="block p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 hover-lift transition-all duration-200"
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="font-semibold text-neutral-800">{room.name}</h4>
-                          <p className="text-sm text-neutral-600">
-                            {room.room_number && `Room ${room.room_number} \u2022 `}
-                            <span className="capitalize">{(room.type || '').replace('_', ' ')}</span>
-                          </p>
-                        </div>
-                        <div className="text-right text-sm text-neutral-500 tabular-nums">
-                          <p>{room.assets_count || 0} assets</p>
-                          <p>{room.audits_count || 0} audits</p>
-                        </div>
+                <div className="space-y-7 stagger-list">
+                  {roomGroups.map((group) => (
+                    <section key={group.key} aria-labelledby={`room-area-${group.key}`}>
+                      <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-neutral-200 pb-2">
+                        <h3 id={`room-area-${group.key}`} className="font-heading text-lg font-semibold text-neutral-800">{group.label}</h3>
+                        {group.key === 'dormitory' && <p aria-label="Dorm positions" className="text-sm font-semibold tabular-nums text-blue-800">{group.dormPositions} dorm positions</p>}
                       </div>
-                    </Link>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {group.rooms.map((room) => (
+                          <Link
+                            key={room.id}
+                            to={`/stations/${station.id}/rooms/${room.id}`}
+                            className="block min-h-24 rounded-xl border border-neutral-200 p-4 transition-all duration-200 hover-lift hover:border-blue-300 hover:bg-blue-50/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <h4 className="font-semibold text-neutral-800">{room.name}</h4>
+                                <p className="mt-1 text-sm text-neutral-600">
+                                  {room.capacity ? `${room.capacity} position${room.capacity === 1 ? '' : 's'}` : 'Station area'}
+                                </p>
+                              </div>
+                              <div className="shrink-0 text-right text-sm text-neutral-500 tabular-nums">
+                                <p>{room.assets_count || 0} assets</p>
+                                <p>{room.audits_count || 0} audits</p>
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </section>
                   ))}
                 </div>
               ) : (
