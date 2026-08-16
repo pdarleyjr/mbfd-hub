@@ -34,11 +34,13 @@ class StationRequestItem extends Model
         ];
     }
 
+    /** @return BelongsTo<StationRequest, $this> */
     public function stationRequest(): BelongsTo
     {
         return $this->belongsTo(StationRequest::class);
     }
 
+    /** @return BelongsTo<RoomAsset, $this> */
     public function roomAsset(): BelongsTo
     {
         return $this->belongsTo(RoomAsset::class);

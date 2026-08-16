@@ -11,6 +11,7 @@ use App\Http\Resources\Public\PublicStationRequestResource;
 use App\Models\Room;
 use App\Models\RoomAssetEvent;
 use App\Models\Station;
+use App\Models\StationRequest;
 use App\Services\StationActivityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,13 +37,15 @@ class StationContextController extends Controller
             'updates:id,station_request_id,status,public_note,created_at',
         ];
         $room->load(['assets' => fn ($query) => $query->active()->orderBy('category')->orderBy('name')]);
-        $openRequests = $room->stationRequests()
+        $openRequests = StationRequest::query()
+            ->where('room_id', $room->id)
             ->open()
             ->with($requestRelations)
             ->latest('created_at')
             ->limit(50)
             ->get();
-        $requestHistory = $room->stationRequests()
+        $requestHistory = StationRequest::query()
+            ->where('room_id', $room->id)
             ->with($requestRelations)
             ->latest('created_at')
             ->limit(50)
@@ -54,7 +57,7 @@ class StationContextController extends Controller
             ->latest('id')
             ->limit(100)
             ->get()
-            ->map(fn ($event): array => [
+            ->map(fn (RoomAssetEvent $event): array => [
                 'id' => $event->id,
                 'room_asset_id' => $event->room_asset_id,
                 'asset_name' => $event->roomAsset?->name,

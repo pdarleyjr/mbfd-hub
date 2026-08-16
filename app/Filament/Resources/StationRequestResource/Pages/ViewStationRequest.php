@@ -6,6 +6,10 @@ namespace App\Filament\Resources\StationRequestResource\Pages;
 
 use App\Enums\StationRequestStatus;
 use App\Filament\Resources\StationRequestResource;
+use App\Models\Room;
+use App\Models\RoomAsset;
+use App\Models\StationRequest;
+use App\Models\StationRequestItem;
 use App\Models\User;
 use App\Services\StationRequestWorkflowService;
 use Filament\Actions;
@@ -24,11 +28,11 @@ class ViewStationRequest extends ViewRecord
                 ->label('Update Status')
                 ->icon('heroicon-o-arrow-path-rounded-square')
                 ->color('primary')
-                ->visible(fn (): bool => $this->record->is_open)
+                ->visible(fn (): bool => $this->stationRequest()->is_open)
                 ->fillForm(fn (): array => [
-                    'status' => $this->record->status,
-                    'assigned_to_user_id' => $this->record->assigned_to_user_id,
-                    'assigned_vendor' => $this->record->assigned_vendor,
+                    'status' => $this->stationRequest()->status,
+                    'assigned_to_user_id' => $this->stationRequest()->assigned_to_user_id,
+                    'assigned_vendor' => $this->stationRequest()->assigned_vendor,
                 ])
                 ->form([
                     Forms\Components\Select::make('status')
@@ -54,9 +58,9 @@ class ViewStationRequest extends ViewRecord
                         ->helperText('Explicitly create, link, or replace a room asset in the same transaction.')
                         ->schema([
                             Forms\Components\Select::make('station_request_item_id')
-                                ->options(fn (): array => $this->record->items()
+                                ->options(fn (): array => $this->stationRequest()->items()
                                     ->get()
-                                    ->mapWithKeys(fn ($item) => [$item->id => "{$item->quantity}x {$item->item_name}"])
+                                    ->mapWithKeys(fn (StationRequestItem $item): array => [$item->id => "{$item->quantity}x {$item->item_name}"])
                                     ->all())
                                 ->label('Request Item')
                                 ->required(),
@@ -64,18 +68,23 @@ class ViewStationRequest extends ViewRecord
                                 ->options(['create' => 'Create', 'link' => 'Link existing', 'replace' => 'Replace existing'])
                                 ->required(),
                             Forms\Components\Select::make('room_id')
-                                ->options(fn (): array => \App\Models\Room::query()
-                                    ->where('station_id', $this->record->station_id)
+                                ->options(fn (): array => Room::query()
+                                    ->where('station_id', $this->stationRequest()->station_id)
                                     ->orderBy('name')
                                     ->pluck('name', 'id')
                                     ->all())
                                 ->label('Room'),
                             Forms\Components\Select::make('room_asset_id')
-                                ->options(fn (): array => \App\Models\RoomAsset::query()
-                                    ->whereHas('room', fn ($query) => $query->where('station_id', $this->record->station_id))
+                                ->options(fn (): array => RoomAsset::query()
+                                    ->whereHas('room', fn ($query) => $query->where('station_id', $this->stationRequest()->station_id))
                                     ->with('room:id,name')
                                     ->get()
-                                    ->mapWithKeys(fn ($asset) => [$asset->id => "{$asset->room->name} — {$asset->name}"])
+                                    ->mapWithKeys(function (RoomAsset $asset): array {
+                                        /** @var Room $room */
+                                        $room = $asset->room;
+
+                                        return [$asset->id => "{$room->name} — {$asset->name}"];
+                                    })
                                     ->all())
                                 ->searchable()
                                 ->label('Existing Asset'),
@@ -95,9 +104,17 @@ class ViewStationRequest extends ViewRecord
                 ->action(function (array $data): void {
                     /** @var User $actor */
                     $actor = auth()->user();
-                    $this->record = app(StationRequestWorkflowService::class)->transition($this->record, $data, $actor);
+                    $this->record = app(StationRequestWorkflowService::class)->transition($this->stationRequest(), $data, $actor);
                     Notification::make()->title('Station request updated')->success()->send();
                 }),
         ];
+    }
+
+    private function stationRequest(): StationRequest
+    {
+        $record = $this->getRecord();
+        assert($record instanceof StationRequest);
+
+        return $record;
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
 use App\Models\StationInspection;
@@ -18,19 +19,27 @@ class StationActivityService
     public function forStation(Station $station, int $limit = 50): Collection
     {
         $apparatusIds = $station->apparatuses()->pluck('id');
+        /** @var Collection<int, Apparatus> $apparatusById */
+        $apparatusById = Apparatus::query()
+            ->whereKey($apparatusIds)
+            ->get(['id', 'designation', 'unit_id'])
+            ->keyBy('id');
 
         $apparatusInspections = ApparatusInspection::query()
-            ->with('apparatus:id,designation,unit_id,name')
             ->whereIn('apparatus_id', $apparatusIds)
             ->latest('completed_at')
             ->limit($limit)
             ->get()
-            ->map(fn (ApparatusInspection $inspection): array => [
-                'type' => 'apparatus_inspection',
-                'label' => 'Apparatus inspection — '.($inspection->apparatus?->designation ?: $inspection->apparatus?->unit_id ?: 'Unit'),
-                'status' => $inspection->review_status ?: 'submitted',
-                'occurred_at' => $inspection->completed_at ?: $inspection->created_at,
-            ]);
+            ->map(function (ApparatusInspection $inspection) use ($apparatusById): array {
+                $apparatus = $apparatusById->get((int) $inspection->apparatus_id);
+
+                return [
+                    'type' => 'apparatus_inspection',
+                    'label' => 'Apparatus inspection — '.($apparatus?->designation ?: $apparatus?->getAttribute('unit_id') ?: 'Unit'),
+                    'status' => $inspection->review_status ?: 'submitted',
+                    'occurred_at' => $inspection->completed_at ?: $inspection->created_at,
+                ];
+            });
 
         $stationInspections = StationInspection::query()
             ->where('station_id', $station->id)
@@ -40,7 +49,7 @@ class StationActivityService
             ->map(fn (StationInspection $inspection): array => [
                 'type' => 'station_inspection',
                 'label' => 'Station inspection — '.str($inspection->inspection_type ?: 'inspection')->replace('_', ' ')->title(),
-                'status' => $inspection->overall_status ?: 'submitted',
+                'status' => $inspection->overall_status,
                 'occurred_at' => $inspection->created_at,
             ]);
 

@@ -649,18 +649,6 @@ parameters:
 			path: app/Filament/Widgets/SmartUpdatesWidget.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Filament/Widgets/StationOperationsHubWidget.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<\(int\|string\),mixed\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 2
-			path: app/Filament/Widgets/StationOperationsHubWidget.php
-
-		-
 			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusDefect model\.$#'
 			identifier: larastan.relationExistence
 			count: 1
@@ -674,12 +662,6 @@ parameters:
 
 		-
 			message: '#^Using nullsafe property access "\?\-\>designation" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 2
-			path: app/Filament/Widgets/StationOperationsHubWidget.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 2
 			path: app/Filament/Widgets/StationOperationsHubWidget.php

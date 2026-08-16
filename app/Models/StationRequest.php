@@ -73,41 +73,49 @@ class StationRequest extends Model
         });
     }
 
+    /** @return BelongsTo<Station, $this> */
     public function station(): BelongsTo
     {
         return $this->belongsTo(Station::class);
     }
 
+    /** @return BelongsTo<Station, $this> */
     public function room(): BelongsTo
     {
         return $this->belongsTo(Room::class);
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function requestedByEmployee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'requested_by_employee_id');
     }
 
+    /** @return BelongsTo<User, $this> */
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
     }
 
+    /** @return BelongsTo<User, $this> */
     public function acknowledgedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'acknowledged_by');
     }
 
+    /** @return HasMany<StationRequestItem, $this> */
     public function items(): HasMany
     {
         return $this->hasMany(StationRequestItem::class)->orderBy('id');
     }
 
+    /** @return HasMany<StationRequestUpdate, $this> */
     public function updates(): HasMany
     {
         return $this->hasMany(StationRequestUpdate::class)->orderBy('created_at')->orderBy('id');
     }
 
+    /** @return HasMany<RoomAssetEvent, $this> */
     public function assetEvents(): HasMany
     {
         return $this->hasMany(RoomAssetEvent::class)->latest('event_at');

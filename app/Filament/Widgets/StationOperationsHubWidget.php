@@ -15,6 +15,7 @@ use App\Models\Station;
 use App\Models\StationInspection;
 use App\Models\StationRequest;
 use App\Models\StationSupplyRequest;
+use App\Models\User;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -184,16 +185,21 @@ class StationOperationsHubWidget extends Widget
         ])->toArray();
     }
 
+    /** @param Collection<int, StationInspection> $inspections */
     private function formatStationInspections(Collection $inspections): array
     {
-        return $inspections->map(fn (StationInspection $i) => [
-            'id' => $i->id,
-            'date' => Carbon::parse($i->inspection_date)->format('M j, Y'),
-            'type' => str_replace('_', ' ', ucfirst($i->inspection_type ?? '')),
-            'inspector' => $i->inspector?->name ?? 'Unknown',
-            'status' => $i->overall_status ?? 'pending',
-            'url' => StationInspectionResource::getUrl('view', ['record' => $i->id]),
-        ])->toArray();
+        return $inspections->map(function (StationInspection $i): array {
+            $inspector = $i->inspector;
+
+            return [
+                'id' => $i->id,
+                'date' => Carbon::parse($i->inspection_date)->format('M j, Y'),
+                'type' => str_replace('_', ' ', ucfirst($i->inspection_type ?? '')),
+                'inspector' => $inspector instanceof User ? $inspector->name : 'Unknown',
+                'status' => $i->overall_status ?? 'pending',
+                'url' => StationInspectionResource::getUrl('view', ['record' => $i->id]),
+            ];
+        })->toArray();
     }
 
     private function formatStationRequests(Collection $requests): array

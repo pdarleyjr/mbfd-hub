@@ -37,16 +37,19 @@ class RoomAssetEvent extends Model
         static::deleting(static fn (): never => throw new LogicException('Room asset events are append-only.'));
     }
 
+    /** @return BelongsTo<RoomAsset, $this> */
     public function roomAsset(): BelongsTo
     {
         return $this->belongsTo(RoomAsset::class);
     }
 
+    /** @return BelongsTo<StationRequest, $this> */
     public function stationRequest(): BelongsTo
     {
         return $this->belongsTo(StationRequest::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function changedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'changed_by_user_id');

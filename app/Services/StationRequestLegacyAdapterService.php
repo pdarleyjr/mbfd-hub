@@ -66,7 +66,7 @@ class StationRequestLegacyAdapterService
     public function submitFireEquipment(array $data, ?User $user = null): StationRequestSubmissionResult
     {
         $station = $this->resolveStation($data);
-        $name = trim((string) ($data['requested_by_name'] ?? $data['requested_by'] ?? $user?->name ?? 'Legacy station requester'));
+        $name = trim((string) ($data['requested_by_name'] ?? $data['requested_by'] ?? $user->name ?? 'Legacy station requester'));
         $employee = $this->employeeForUser($user) ?? $this->uniqueEmployeeByName($name);
         $rawItems = $data['items'] ?? data_get($data, 'form_data.items');
         if (! is_array($rawItems) || $rawItems === []) {

@@ -56,7 +56,9 @@ class LegacyStationRequestBackfillService
             $legacy->room_label,
             $legacy->room_type,
         );
-        [$employee, $requesterName] = $this->resolveEmployee($legacy->creator, $legacy->creator?->name);
+        $creator = $legacy->creator;
+        $creator = $creator instanceof User ? $creator : null;
+        [$employee, $requesterName] = $this->resolveEmployee($creator, $creator?->name);
         $legacyItems = collect($legacy->items ?? [])->filter(fn ($item): bool => filled($item))->values();
         if (filled($legacy->other_item)) {
             $legacyItems->push($legacy->other_item);
@@ -111,9 +113,11 @@ class LegacyStationRequestBackfillService
             return;
         }
 
+        $requestedBy = $legacy->requestedBy;
+        $requestedBy = $requestedBy instanceof User ? $requestedBy : null;
         [$employee, $requesterName] = $this->resolveEmployee(
-            $legacy->requestedBy,
-            $legacy->requested_by_name ?: $legacy->requestedBy?->name,
+            $requestedBy,
+            $legacy->requested_by_name ?: $requestedBy?->name,
         );
         $legacyStatus = (string) ($legacy->status ?: 'pending');
         $status = $this->mapStatus($legacyStatus);
@@ -145,6 +149,11 @@ class LegacyStationRequestBackfillService
                 'quantity' => 1,
                 'reason' => null,
                 'pd_case_number' => $legacy->pd_case_number,
+                'photo_path' => null,
+                'metadata' => [
+                    'legacy_item' => [],
+                    'legacy_photo_present' => false,
+                ],
             ]);
         }
         $sanitizedFormData = $formData;
@@ -210,7 +219,11 @@ class LegacyStationRequestBackfillService
     private function persistLegacy(string $source, Model $legacy, array $attributes, array $items): void
     {
         DB::transaction(function () use ($source, $legacy, $attributes, $items): void {
-            if ($this->alreadyBackfilled($source, (int) $legacy->id)) {
+            $legacyId = (int) $legacy->getKey();
+            $legacyCreatedAt = $legacy->getAttribute('created_at') ?? now();
+            $legacyUpdatedAt = $legacy->getAttribute('updated_at') ?? $legacyCreatedAt;
+
+            if ($this->alreadyBackfilled($source, $legacyId)) {
                 $this->skipped++;
 
                 return;
@@ -219,9 +232,9 @@ class LegacyStationRequestBackfillService
             /** @var StationRequest $request */
             $request = StationRequest::query()->forceCreate(array_merge($attributes, [
                 'legacy_source' => $source,
-                'legacy_id' => $legacy->id,
-                'created_at' => $legacy->created_at ?? now(),
-                'updated_at' => $legacy->updated_at ?? $legacy->created_at ?? now(),
+                'legacy_id' => $legacyId,
+                'created_at' => $legacyCreatedAt,
+                'updated_at' => $legacyUpdatedAt,
             ]));
             $request->items()->createMany($items);
             $request->updates()->create([
@@ -230,11 +243,11 @@ class LegacyStationRequestBackfillService
                 'metadata' => [
                     'event' => 'legacy_import',
                     'legacy_source' => $source,
-                    'legacy_id' => $legacy->id,
+                    'legacy_id' => $legacyId,
                     'legacy_status' => data_get($request->metadata, 'legacy.status'),
                 ],
-                'created_at' => $legacy->created_at ?? now(),
-                'updated_at' => $legacy->created_at ?? now(),
+                'created_at' => $legacyCreatedAt,
+                'updated_at' => $legacyCreatedAt,
             ]);
             $this->created++;
         });

@@ -30,8 +30,9 @@ class StationStaffingService
      */
     public function summaryFor(Station $station): array
     {
+        /** @var Collection<int, Apparatus> $apparatuses */
         $apparatuses = $station->relationLoaded('apparatuses')
-            ? $station->apparatuses
+            ? $station->getRelation('apparatuses')
             : $station->apparatuses()->get();
 
         return $this->buildSummary((int) $station->station_number, $apparatuses);
@@ -45,7 +46,14 @@ class StationStaffingService
             ->with('apparatuses')
             ->first();
 
-        return $this->buildSummary($stationNumber, $station?->apparatuses ?? collect());
+        if ($station === null) {
+            return $this->buildSummary($stationNumber, collect());
+        }
+
+        /** @var Collection<int, Apparatus> $apparatuses */
+        $apparatuses = $station->getRelation('apparatuses');
+
+        return $this->buildSummary($stationNumber, $apparatuses);
     }
 
     /** @param Collection<int, Apparatus> $apparatuses */
@@ -92,7 +100,7 @@ class StationStaffingService
             $matches = $apparatuses->filter(function (Apparatus $apparatus) use ($aliases): bool {
                 $candidates = collect([
                     $apparatus->designation,
-                    $apparatus->unit_id,
+                    $apparatus->getAttribute('unit_id'),
                     $apparatus->name,
                 ])->filter()->map(fn (string $candidate): string => $this->normalize($candidate));
 
@@ -114,13 +122,14 @@ class StationStaffingService
             /** @var Apparatus $match */
             $match = $matches->first();
             $matchedIds[] = (int) $match->id;
-            if ($this->isInService($match->status)) {
+            $status = $match->getAttribute('status');
+            if ($this->isInService(is_string($status) ? $status : null)) {
                 $inService++;
             } else {
                 $unavailable[] = $unit['label'];
-                if ($this->isMaintenance($match->status)) {
+                if ($this->isMaintenance(is_string($status) ? $status : null)) {
                     $maintenance++;
-                } elseif ($this->isOutOfService($match->status)) {
+                } elseif ($this->isOutOfService(is_string($status) ? $status : null)) {
                     $outOfService++;
                 }
             }
@@ -179,6 +188,6 @@ class StationStaffingService
 
     private function apparatusLabel(Apparatus $apparatus): string
     {
-        return (string) ($apparatus->designation ?: $apparatus->unit_id ?: $apparatus->name ?: "Apparatus {$apparatus->id}");
+        return (string) ($apparatus->designation ?: $apparatus->getAttribute('unit_id') ?: $apparatus->name ?: "Apparatus {$apparatus->id}");
     }
 }

@@ -117,6 +117,7 @@ class StationRequestWorkflowService
         $item = $this->requestItem($request, (int) $operation['station_request_item_id']);
         if ($kind === 'create') {
             $room = $this->stationRoom($request, (int) $operation['room_id']);
+            /** @var RoomAsset $asset */
             $asset = $room->assets()->create($this->assetAttributes($operation));
             $item->update(['room_asset_id' => $asset->id]);
             $this->recordEvent($asset, $request, 'created_from_request', $operation, $actor);
@@ -125,7 +126,9 @@ class StationRequestWorkflowService
         }
 
         $asset = RoomAsset::query()->with('room')->lockForUpdate()->findOrFail($operation['room_asset_id']);
-        if ((int) $asset->room->station_id !== (int) $request->station_id) {
+        /** @var Room $assetRoom */
+        $assetRoom = $asset->room;
+        if ((int) $assetRoom->station_id !== (int) $request->station_id) {
             throw ValidationException::withMessages([
                 'asset_operations' => 'Every asset operation must remain within the request station.',
             ]);
@@ -152,6 +155,7 @@ class StationRequestWorkflowService
 
         $roomId = (int) ($operation['room_id'] ?? $asset->room_id);
         $room = $this->stationRoom($request, $roomId);
+        /** @var RoomAsset $replacement */
         $replacement = $room->assets()->create($this->assetAttributes($operation));
         $asset->update([
             'is_active' => false,
@@ -169,6 +173,7 @@ class StationRequestWorkflowService
 
     private function requestItem(StationRequest $request, int $itemId): StationRequestItem
     {
+        /** @var StationRequestItem|null $item */
         $item = $request->items()->lockForUpdate()->whereKey($itemId)->first();
         if ($item === null) {
             throw ValidationException::withMessages([
@@ -182,6 +187,7 @@ class StationRequestWorkflowService
     private function recordRepairCompletionEvents(StationRequest $request, User $actor): void
     {
         $request->loadMissing('items.roomAsset');
+        /** @var StationRequestItem $item */
         foreach ($request->items as $item) {
             if ($item->roomAsset === null) {
                 continue;

@@ -13,6 +13,7 @@ use App\Models\EquipmentItem;
 use App\Models\Station;
 use App\Models\StationInspection;
 use App\Models\StationRequest;
+use App\Models\StationRequestUpdate;
 use App\Models\StationSupplyRequest;
 use App\Services\StationStaffingService;
 use Illuminate\Support\Carbon;
@@ -295,7 +296,7 @@ final class DisplaySnapshotService
                 'status' => $r->status,
                 'public_response' => $r->current_public_response,
                 'created_at' => optional($r->created_at)->toISOString(),
-                'updates' => $r->updates->map(fn ($update): array => [
+                'updates' => $r->updates->map(fn (StationRequestUpdate $update): array => [
                     'status' => $update->status,
                     'public_note' => $update->public_note,
                     'created_at' => optional($update->created_at)->toISOString(),

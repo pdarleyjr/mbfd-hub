@@ -118,8 +118,8 @@ class StationRequestResource extends Resource
                 Tables\Filters\TernaryFilter::make('open')
                     ->label('Open requests')
                     ->queries(
-                        true: fn (Builder $query) => $query->open(),
-                        false: fn (Builder $query) => $query->terminal(),
+                        true: fn (Builder $query): Builder => $query->whereIn('status', StationRequestStatus::openValues()),
+                        false: fn (Builder $query): Builder => $query->whereIn('status', StationRequestStatus::terminalValues()),
                     )
                     ->default(true),
             ])
