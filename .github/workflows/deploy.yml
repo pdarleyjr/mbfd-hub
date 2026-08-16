@@ -85,6 +85,7 @@ jobs:
           # TIMESTAMP intentionally expands on the runner; remote values remain escaped.
           # shellcheck disable=SC2029
           ssh deploy-target "
+            umask 077
             PG=\$(docker ps --format '{{.Names}}' | grep pgsql | head -1)
             if [ -n \"\$PG\" ]; then
               docker exec \"\$PG\" pg_dump -U mbfd_user -Fc mbfd_hub > /tmp/pre_deploy_${TIMESTAMP}.dump
