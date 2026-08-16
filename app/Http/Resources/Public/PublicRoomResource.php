@@ -23,6 +23,8 @@ class PublicRoomResource extends JsonResource
             'id' => $this->id,
             'station_id' => $this->station_id,
             'name' => $this->name,
+            'blueprint_key' => $this->blueprint_key,
+            'sort_order' => (int) ($this->sort_order ?? 1000),
             'floor' => $this->floor,
             'type' => $this->type ?? $this->room_type ?? 'other',
             'capacity' => $this->capacity,

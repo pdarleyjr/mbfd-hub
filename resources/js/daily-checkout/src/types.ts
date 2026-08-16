@@ -104,7 +104,7 @@ export interface InspectionData {
 
 export type ProjectStatus = 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
 export type ProjectPriority = 'low' | 'medium' | 'high' | 'critical';
-export type RoomType = 'apparatus_bay' | 'office' | 'dormitory' | 'kitchen' | 'restroom' | 'storage' | 'training_room' | 'meeting_room' | 'workshop' | 'other';
+export type RoomType = 'combat_apparatus_bay' | 'rescue_apparatus_bay' | 'support_apparatus_bay' | 'fireboat_apparatus_area' | 'apparatus_bay' | 'office' | 'dormitory' | 'kitchen' | 'common_area' | 'restroom' | 'laundry' | 'fitness' | 'storage' | 'utility' | 'exterior' | 'training_room' | 'meeting_room' | 'workshop' | 'other';
 export type AssetCondition = 'new' | 'excellent' | 'good' | 'fair' | 'poor' | 'critical' | 'damaged' | 'needs_repair' | 'out_of_service' | 'obsolete' | 'retired';
 export type AuditStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type FindingType = 'surplus' | 'deficit' | 'damaged' | 'mislabeled' | 'expired' | 'other';
@@ -296,9 +296,12 @@ export interface Room {
   id: number;
   station_id: number;
   name: string;
+  blueprint_key?: string | null;
+  sort_order?: number;
   room_number?: string;
   floor?: string;
-  type: 'apparatus_bay' | 'office' | 'training_room' | 'kitchen' | 'dormitory' | 'restroom' | 'storage' | 'workshop' | 'other';
+  type: RoomType;
+  room_type?: RoomType;
   capacity?: number;
   is_active: boolean;
   notes?: string;

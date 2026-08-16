@@ -7,12 +7,11 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class RoomsRelationManager extends RelationManager
 {
     protected static string $relationship = 'rooms';
+
     protected static ?string $title = 'Station Rooms';
 
     public function form(Form $form): Form
@@ -24,22 +23,31 @@ class RoomsRelationManager extends RelationManager
                     ->maxLength(255)
                     ->label('Room Name'),
                 Forms\Components\TextInput::make('floor')
-                    ->numeric()
                     ->default(1),
                 Forms\Components\Select::make('room_type')
                     ->options([
-                        'bay' => 'Apparatus Bay',
+                        'combat_apparatus_bay' => 'Combat Apparatus Bay',
+                        'rescue_apparatus_bay' => 'Rescue Apparatus Bay',
+                        'support_apparatus_bay' => 'Support Apparatus Bay',
+                        'fireboat_apparatus_area' => 'Fireboat Berth / Apparatus Area',
                         'office' => 'Office',
                         'kitchen' => 'Kitchen',
-                        'bunk' => 'Bunk Room',
-                        'common' => 'Common Area',
+                        'dormitory' => 'Dorm',
+                        'common_area' => 'TV Room / Common Area',
+                        'restroom' => 'Bathroom',
+                        'laundry' => 'Laundry',
+                        'fitness' => 'Fitness / Workout Room',
                         'storage' => 'Storage',
-                        'workout' => 'Workout Room',
-                        'bathroom' => 'Bathroom',
+                        'utility' => 'Utility / Mechanical',
+                        'exterior' => 'Exterior / Grounds',
                         'other' => 'Other',
                     ])
                     ->required(),
-                Forms\Components\Textarea::make('description')
+                Forms\Components\TextInput::make('capacity')
+                    ->numeric()
+                    ->minValue(0)
+                    ->label('Positions / Capacity'),
+                Forms\Components\Textarea::make('notes')
                     ->columnSpanFull(),
             ]);
     }
@@ -55,10 +63,10 @@ class RoomsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('room_type')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'bay' => 'danger',
+                        'combat_apparatus_bay', 'rescue_apparatus_bay', 'support_apparatus_bay', 'fireboat_apparatus_area' => 'danger',
                         'office' => 'info',
                         'kitchen' => 'warning',
-                        'bunk' => 'success',
+                        'dormitory' => 'success',
                         'storage' => 'gray',
                         default => 'gray',
                     }),
@@ -71,14 +79,20 @@ class RoomsRelationManager extends RelationManager
             ->filters([
                 Tables\Filters\SelectFilter::make('room_type')
                     ->options([
-                        'bay' => 'Apparatus Bay',
+                        'combat_apparatus_bay' => 'Combat Apparatus Bay',
+                        'rescue_apparatus_bay' => 'Rescue Apparatus Bay',
+                        'support_apparatus_bay' => 'Support Apparatus Bay',
+                        'fireboat_apparatus_area' => 'Fireboat Berth / Apparatus Area',
                         'office' => 'Office',
                         'kitchen' => 'Kitchen',
-                        'bunk' => 'Bunk Room',
-                        'common' => 'Common Area',
+                        'dormitory' => 'Dorm',
+                        'common_area' => 'TV Room / Common Area',
+                        'restroom' => 'Bathroom',
+                        'laundry' => 'Laundry',
+                        'fitness' => 'Fitness / Workout Room',
                         'storage' => 'Storage',
-                        'workout' => 'Workout Room',
-                        'bathroom' => 'Bathroom',
+                        'utility' => 'Utility / Mechanical',
+                        'exterior' => 'Exterior / Grounds',
                         'other' => 'Other',
                     ]),
             ])

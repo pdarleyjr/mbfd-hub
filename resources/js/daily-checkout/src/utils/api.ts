@@ -95,6 +95,7 @@ export class ApiClient {
   static async getStations(): Promise<Station[]> {
     const response = await fetch(`${API_BASE}/public/stations`, {
       headers: { ...DEFAULT_HEADERS },
+      cache: 'no-store',
     });
     if (!response.ok) {
       throw new Error('Failed to fetch stations');
@@ -106,6 +107,7 @@ export class ApiClient {
   static async getStation(id: number): Promise<StationDetail> {
     const response = await fetch(`${API_BASE}/public/stations/${id}`, {
       headers: { ...DEFAULT_HEADERS },
+      cache: 'no-store',
     });
     if (!response.ok) {
       throw new Error('Failed to fetch station');
