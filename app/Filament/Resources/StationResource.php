@@ -2,10 +2,12 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\StationResource\Pages;
+use App\Filament\Concerns\EnterpriseTable;
 // FORCE UPDATE CHECK
+use App\Filament\Resources\StationResource\Pages;
 use App\Filament\Resources\StationResource\RelationManagers;
 use App\Models\Station;
+use App\Services\StationStaffingService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -13,10 +15,7 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-use App\Filament\Concerns\EnterpriseTable;
 class StationResource extends Resource
 {
     use EnterpriseTable;
@@ -24,7 +23,9 @@ class StationResource extends Resource
     protected static ?string $model = Station::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
+
     protected static ?string $navigationGroup = 'Station Management';
+
     protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
@@ -118,7 +119,7 @@ class StationResource extends Resource
                         Infolists\Components\TextEntry::make('inventory_link')
                             ->label('Inventory Tab')
                             ->state('Open on-hand inventory')
-                            ->url(fn ($record) => static::getUrl('view', ['record' => $record]) . '?activeRelationManager=inventoryItems')
+                            ->url(fn ($record) => static::getUrl('view', ['record' => $record]).'?activeRelationManager=inventoryItems')
                             ->color('primary'),
                     ])
                     ->columns(4),
@@ -143,12 +144,18 @@ class StationResource extends Resource
                 Infolists\Components\Section::make('Statistics')
                     ->schema([
                         Infolists\Components\TextEntry::make('apparatuses_count')
-                            ->label('Apparatus Count')
-                            ->state(fn ($record) => $record->apparatuses()->count()),
+                            ->label('Assigned Apparatus')
+                            ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['assigned_apparatus_count'] ?? 'Unknown'),
+                        Infolists\Components\TextEntry::make('assigned_personnel_count')
+                            ->label('Assigned Personnel')
+                            ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['assigned_personnel_count'] ?? 'Unknown'),
+                        Infolists\Components\TextEntry::make('dorm_beds_count')
+                            ->label('Dorm Beds')
+                            ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['dorm_beds_count'] ?? 'Unknown'),
                         Infolists\Components\TextEntry::make('rooms_count')
                             ->label('Rooms Count')
                             ->state(fn ($record) => $record->rooms()->count()),
-                    ])->columns(2),
+                    ])->columns(4),
                 Infolists\Components\Section::make('Notes')
                     ->schema([
                         Infolists\Components\TextEntry::make('notes')
@@ -174,8 +181,14 @@ class StationResource extends Resource
                 Tables\Columns\TextColumn::make('phone')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('apparatuses_count')
-                    ->counts('apparatuses')
-                    ->label('Apparatus'),
+                    ->label('Assigned Apparatus')
+                    ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['assigned_apparatus_count'] ?? 'Unknown'),
+                Tables\Columns\TextColumn::make('assigned_personnel')
+                    ->label('Personnel')
+                    ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['assigned_personnel_count'] ?? 'Unknown'),
+                Tables\Columns\TextColumn::make('dorm_beds')
+                    ->label('Beds')
+                    ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['dorm_beds_count'] ?? 'Unknown'),
                 Tables\Columns\TextColumn::make('rooms_count')
                     ->counts('rooms')
                     ->label('Rooms'),
@@ -209,7 +222,7 @@ class StationResource extends Resource
             RelationManagers\SingleGasMetersRelationManager::class,
             RelationManagers\StationInventoryItemsRelationManager::class,
             RelationManagers\StationSupplyRequestsRelationManager::class,
-            RelationManagers\EquipmentRequestsRelationManager::class,
+            RelationManagers\StationRequestsRelationManager::class,
             RelationManagers\StationInspectionsRelationManager::class,
         ];
     }

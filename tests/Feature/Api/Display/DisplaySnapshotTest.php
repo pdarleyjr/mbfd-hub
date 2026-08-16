@@ -84,8 +84,7 @@ class DisplaySnapshotTest extends TestCase
                     'inventory',
                 ],
                 'requests' => [
-                    'fire_equipment' => ['pending', 'critical_pending'],
-                    'big_ticket' => ['outstanding'],
+                    'station_requests' => ['open', 'critical_open', 'repair_service_open', 'equipment_open'],
                     'employee_equipment' => ['pending'],
                 ],
                 'inventory_exceptions' => ['total_active_items', 'out_of_stock', 'low_stock', 'items'],

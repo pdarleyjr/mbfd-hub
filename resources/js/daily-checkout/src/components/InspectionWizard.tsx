@@ -354,8 +354,8 @@ export default function InspectionWizard() {
           apparatusName={apparatus.name}
           vehicleNumber={apparatus.vehicle_number}
           initialData={meterData}
-          previousHours={apparatus.current_engine_hours}
-          previousMiles={apparatus.current_miles}
+          previousHours={apparatus.current_engine_hours ?? null}
+          previousMiles={apparatus.current_miles ?? null}
           onSubmit={handleMeterSubmit}
           onBack={goBack}
         />

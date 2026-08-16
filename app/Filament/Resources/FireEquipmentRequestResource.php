@@ -11,6 +11,7 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
 class FireEquipmentRequestResource extends Resource
@@ -30,6 +31,21 @@ class FireEquipmentRequestResource extends Resource
     protected static ?string $modelLabel = 'Equipment Request';
 
     protected static ?string $pluralModelLabel = 'Equipment Requests';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return false;
+    }
+
+    public static function canView(Model $record): bool
+    {
+        return false;
+    }
 
     public static function table(Table $table): Table
     {

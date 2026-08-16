@@ -53,26 +53,16 @@
                             'statusField' => 'status',
                         ])
 
-                        {{-- Fire Equipment Requests --}}
+                        {{-- Canonical Station Requests --}}
                         @include('filament.widgets.partials.station-hub-section', [
-                            'title' => 'Equipment Requests',
-                            'icon' => 'heroicon-o-fire',
-                            'count' => $counts['equipmentRequests'] ?? 0,
-                            'items' => $data['equipmentRequests'] ?? [],
-                            'emptyMessage' => 'No equipment requests',
-                            'columns' => ['equipment_type' => 'Type', 'requested_by' => 'Requested By', 'priority' => 'Priority', 'status' => 'Status'],
+                            'title' => 'Station Requests',
+                            'icon' => 'heroicon-o-wrench-screwdriver',
+                            'count' => $counts['stationRequests'] ?? 0,
+                            'items' => $data['stationRequests'] ?? [],
+                            'emptyMessage' => 'No station requests',
+                            'columns' => ['number' => 'Request', 'type' => 'Type', 'title' => 'Subject', 'requested_by' => 'Requested By', 'priority' => 'Priority', 'status' => 'Status'],
                             'statusField' => 'status',
                             'priorityField' => 'priority',
-                        ])
-
-                        {{-- Big Ticket Requests --}}
-                        @include('filament.widgets.partials.station-hub-section', [
-                            'title' => 'Big Ticket Requests',
-                            'icon' => 'heroicon-o-currency-dollar',
-                            'count' => $counts['bigTicketRequests'] ?? 0,
-                            'items' => $data['bigTicketRequests'] ?? [],
-                            'emptyMessage' => 'No big ticket requests',
-                            'columns' => ['room' => 'Room', 'items' => 'Items', 'created_by' => 'Created By', 'date' => 'Date'],
                         ])
 
                         {{-- Apparatus Defects --}}
