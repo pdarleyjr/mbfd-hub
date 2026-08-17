@@ -10,6 +10,7 @@ import {
   SingleGasMeterSummary,
 } from '../types';
 import { ApiClient } from '../utils/api';
+import PreviousPageButton from './PreviousPageButton';
 import { groupRoomsByArea, stationComplement } from '../utils/stationRoomBlueprint';
 
 type TabId = 'requests' | 'overview' | 'rooms' | 'apparatus' | 'gas-meters' | 'inspections' | 'activity';
@@ -228,7 +229,7 @@ export default function StationDetailPage() {
         <p className="text-red-600 font-medium mb-2">{error || 'Station not found'}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-3">
           <button type="button" onClick={() => setStationLoadAttempt((attempt) => attempt + 1)} className="min-h-12 rounded-lg bg-blue-700 px-5 font-semibold text-white hover:bg-blue-800">Retry</button>
-          <Link to="/stations" className="inline-flex min-h-12 items-center rounded-lg bg-red-600 px-5 font-semibold text-white transition-colors hover:bg-red-700">Back to Stations</Link>
+          <PreviousPageButton className="inline-flex min-h-12 items-center rounded-lg bg-red-600 px-5 font-semibold text-white transition-colors hover:bg-red-700" />
         </div>
       </div>
     );
@@ -253,15 +254,14 @@ export default function StationDetailPage() {
     <div className="space-y-6">
       {/* Back button and header */}
       <div className="flex items-center justify-between">
-        <Link
-          to="/stations"
+        <PreviousPageButton
           className="inline-flex items-center text-neutral-500 hover:text-neutral-800"
         >
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          Back to Stations
-        </Link>
+          Back to previous page
+        </PreviousPageButton>
         {station.is_active ? (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
         ) : (

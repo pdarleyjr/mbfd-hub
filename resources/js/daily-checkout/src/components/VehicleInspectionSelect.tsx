@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { Apparatus } from '../types';
 import { ApiClient } from '../utils/api';
+import PreviousPageButton from './PreviousPageButton';
 
 export default function VehicleInspectionSelect() {
   const [apparatuses, setApparatuses] = useState<Apparatus[]>([]);
@@ -171,15 +172,14 @@ export default function VehicleInspectionSelect() {
       )}
 
       <div className="mt-8 text-center">
-        <Link
-          to="/"
+        <PreviousPageButton
           className="inline-flex items-center px-4 py-2 text-neutral-500 hover:text-neutral-800"
         >
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          Back to MBFD Forms
-        </Link>
+          Back to previous page
+        </PreviousPageButton>
       </div>
     </div>
   );

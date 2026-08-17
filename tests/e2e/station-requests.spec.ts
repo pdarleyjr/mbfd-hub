@@ -7,6 +7,13 @@ const station = {
   address: '1051 Jefferson Avenue',
   is_active: true,
 };
+const stationSix = {
+  id: 33,
+  station_number: '6',
+  name: 'Station 6',
+  address: 'Indian Creek Waterway',
+  is_active: true,
+};
 
 const employee = { id: 41, name: 'Firefighter Browser Test', rank: 'Firefighter' };
 const room = { id: 11, station_id: 1, name: 'Kitchen', type: 'kitchen', blueprint_key: 'kitchen.main', is_active: true };
@@ -17,6 +24,11 @@ const blueprintRooms = [
   { id: 14, station_id: 1, name: 'Rescue dorm room', type: 'dormitory', blueprint_key: 'dorm.rescue', capacity: 6, is_active: true },
   { id: 15, station_id: 1, name: 'E1 apparatus bay position', type: 'combat_apparatus_bay', blueprint_key: 'combat_apparatus_bay.e1', is_active: true },
   { id: 16, station_id: 1, name: 'R1 apparatus bay position', type: 'rescue_apparatus_bay', blueprint_key: 'rescue_apparatus_bay.r1', is_active: true },
+];
+const stationSixRooms = [
+  { id: 61, station_id: 33, name: 'Fire Boat 6 berth / apparatus area', type: 'fireboat_apparatus_area', blueprint_key: 'fireboat_apparatus_area.fb6', sort_order: 200, is_active: true },
+  { id: 62, station_id: 33, name: 'Dock', type: 'fireboat_apparatus_area', blueprint_key: 'fireboat_apparatus_area.dock', sort_order: 210, is_active: true },
+  { id: 63, station_id: 33, name: 'Boat lift', type: 'fireboat_apparatus_area', blueprint_key: 'fireboat_apparatus_area.boat_lift', sort_order: 220, is_active: true },
 ];
 const asset = { id: 101, room_id: 11, name: 'Refrigerator', category: 'appliance', quantity: 1, condition: 'needs_repair' };
 
@@ -40,13 +52,16 @@ async function mockStationRequestApi(page: Page, options: MockApiOptions = {}): 
       if (options.failInitialOptionsOnce && stationOptionRequests === 1) {
         return route.fulfill({ status: 503, json: { message: 'Options temporarily unavailable.' } });
       }
-      return route.fulfill({ json: { stations: [station] } });
+      return route.fulfill({ json: { stations: [station, stationSix] } });
     }
     if (path === '/api/public/employees/list') {
       return route.fulfill({ json: [employee] });
     }
     if (path === '/api/public/stations/1/rooms') {
       return route.fulfill({ json: { rooms: blueprintRooms } });
+    }
+    if (path === '/api/public/stations/33/rooms') {
+      return route.fulfill({ json: { rooms: stationSixRooms } });
     }
     if (path === '/api/public/stations/1/rooms/11/assets') {
       return route.fulfill({ json: { assets: [asset] } });
@@ -120,7 +135,8 @@ test('repair request is touch-safe, responsive, and submits the canonical payloa
 
   await expect(page.getByRole('heading', { name: 'Request submitted' })).toBeVisible();
   await expect(page.getByText(/SR-2026-000501/)).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Back to station' })).toHaveAttribute('href', '/daily/stations/1');
+  await page.getByRole('button', { name: 'Back to previous page' }).click();
+  await expect(page).toHaveURL(/\/daily\/stations\/1$/);
 
   const payload = submittedPayload();
   expect(payload).toMatchObject({
@@ -205,6 +221,42 @@ test('room blueprint keeps station-wide and exposes valid dorm details without a
 
   expect(submittedPayload()).toMatchObject({
     room_id: 12,
+    room_name_snapshot: null,
+    subject_type: 'room',
+  });
+});
+
+test('Station 6 request can target the dock or boat lift as a marine service location', async ({ page }) => {
+  const submittedPayload = await mockStationRequestApi(page);
+
+  await page.goto('/daily/forms-hub/station-request?station_id=33');
+  await expect(page.getByLabel('Selected station')).toHaveText('Station 6');
+  await page.getByLabel('Requesting employee *').selectOption('41');
+
+  const area = page.getByLabel('Room area');
+  await expect(area).toContainText('Fireboat berth / apparatus area');
+  await area.selectOption('fireboat_apparatus_area');
+
+  const detail = page.getByLabel('Specific room / area *');
+  await expect(detail.locator('option')).toContainText([
+    'Select a fireboat apparatus area',
+    'Fire Boat 6 berth / apparatus area',
+    'Dock',
+    'Boat lift',
+  ]);
+  await detail.selectOption('63');
+
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByLabel('Short title *').fill('Boat lift needs service');
+  await page.getByLabel('Description and operational impact *').fill('The boat lift requires inspection and repair before the next marine operation.');
+  await page.getByLabel('Item name *').fill('Boat lift');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByText('Boat lift', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Submit station request' }).click();
+
+  expect(submittedPayload()).toMatchObject({
+    station_id: 33,
+    room_id: 63,
     room_name_snapshot: null,
     subject_type: 'room',
   });
@@ -299,7 +351,7 @@ test('legacy entry replaces history and rejects an external return target', asyn
   expect(redirected.searchParams.get('type')).toBe('repair_service');
   expect(redirected.searchParams.get('return_to')).toBe('/stations/1');
   expect(page.url()).not.toContain('example.com');
-  await expect(page.getByRole('link', { name: /Back/ })).toHaveAttribute('href', '/daily/stations/1');
+  await expect(page.getByRole('button', { name: 'Back to previous page' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Repair / service Report a facility, room, or asset issue.' })).toHaveAttribute('aria-pressed', 'true');
 
   await page.goto('/daily/forms-hub/equipment-request?station_id=1');
@@ -309,7 +361,7 @@ test('legacy entry replaces history and rejects an external return target', asyn
   await expect(page.getByRole('button', { name: 'Equipment Request one or more station equipment items.' })).toHaveAttribute('aria-pressed', 'true');
 
   await page.goto('/daily/forms-hub/station-request?station_id=1');
-  await expect(page.getByRole('link', { name: /Back/ })).toHaveAttribute('href', '/daily/stations/1');
+  await expect(page.getByRole('button', { name: 'Back to previous page' })).toBeVisible();
 });
 
 test('generic entry retries option loading and exposes keyboard-safe selectors and type toggles', async ({ page }) => {
@@ -333,7 +385,8 @@ test('generic entry retries option loading and exposes keyboard-safe selectors a
   await repair.focus();
   await page.keyboard.press('Space');
   await expect(repair).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('link', { name: /Back/ })).toHaveAttribute('href', '/daily/forms-hub');
+  await page.getByRole('button', { name: 'Back to previous page' }).click();
+  await expect(page).toHaveURL(/\/daily\/stations$/);
 
   const unnamedControls = await page.locator('button, a[href], input, select, textarea').evaluateAll((elements) => elements
     .filter((element) => {
@@ -418,10 +471,10 @@ test('equipment add remove quantity and signature controls preserve state across
   await drawSignature(page, 'Company officer signature pad');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Review and submit' })).toBeVisible();
-  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Review and submit' })).toBeVisible();
-  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByRole('button', { name: 'Clear' }).first().click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('alert')).toContainText('requesting member signature');
@@ -464,6 +517,7 @@ test('station request and activity tabs filter history and preserve station and 
   await page.route('**/images/**', (route) => route.fulfill({ status: 204 }));
   await page.route('**/api/**', (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path === '/api/public/stations') return route.fulfill({ json: [fullStation] });
     if (path === '/api/public/stations/1') return route.fulfill({ json: fullStation });
     if (path === '/api/public/stations/1/apparatus-inspections') return route.fulfill({ json: { inspections: [] } });
     if (path === '/api/public/stations/1/requests') return route.fulfill({ json: { data: [openRequest, closedRequest] } });
@@ -471,7 +525,11 @@ test('station request and activity tabs filter history and preserve station and 
     return route.fulfill({ status: 404, json: { message: `Unmocked API route: ${path}` } });
   });
 
-  await page.goto('/daily/stations/1');
+  await page.goto('/daily/stations?view=active');
+  await page.getByRole('link', { name: /Station 1/ }).click();
+  await page.getByRole('button', { name: 'Back to previous page' }).click();
+  await expect(page).toHaveURL(/\/daily\/stations\?view=active$/);
+  await page.getByRole('link', { name: /Station 1/ }).click();
   await expect(page.getByText('Open refrigerator repair')).toBeVisible();
   await expect(page.getByText('Closed radio request')).toHaveCount(0);
   await page.getByRole('button', { name: 'All history' }).click();
@@ -533,7 +591,7 @@ test('room profile retries failures and every asset request and event tab works'
   await page.getByRole('tab', { name: 'Asset events 1' }).click();
   await expect(page.getByText('repair completed')).toBeVisible();
   await expect(page.getByRole('link', { name: 'New room request' })).toHaveAttribute('href', '/daily/forms-hub/station-request?station_id=1&return_to=%2Fstations%2F1%2Frooms%2F11');
-  await expect(page.getByRole('link', { name: 'Back to station' })).toHaveAttribute('href', '/daily/stations/1');
+  await expect(page.getByRole('button', { name: 'Back to previous page' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 

@@ -72,6 +72,22 @@ final class StationRoomBlueprintService
             $rooms->push($this->room($area.'.'.Str::slug($label, '_'), $name, $area, null, 200 + $index));
         }
 
+        foreach ((array) ($definition['service_locations'] ?? []) as $location) {
+            if (! is_array($location)) {
+                continue;
+            }
+
+            $type = (string) ($location['type'] ?? 'other');
+            $key = (string) ($location['key'] ?? Str::slug((string) ($location['name'] ?? 'location'), '_'));
+            $rooms->push($this->room(
+                $type.'.'.$key,
+                (string) ($location['name'] ?? 'Service location'),
+                $type,
+                null,
+                (int) ($location['sort_order'] ?? 300),
+            ));
+        }
+
         return $rooms->sortBy('sort_order')->values()->all();
     }
 

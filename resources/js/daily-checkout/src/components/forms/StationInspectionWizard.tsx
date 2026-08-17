@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
-import { Link } from 'react-router';
 import SignatureCanvas from 'react-signature-canvas';
 import { submitOrQueue, type SubmissionOutcome } from '../../lib/sync';
+import PreviousPageButton from '../PreviousPageButton';
 
 const STATIONS = [
   'Station 1',
@@ -184,9 +184,7 @@ export default function StationInspectionWizard() {
             ? 'Your Saturday station inspection is available on the Admin Dashboard.'
             : 'Your inspection is safely queued on this device and will sync automatically when the connection returns.'}
         </p>
-        <Link to="/forms-hub" className="inline-flex items-center min-h-[44px] px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors">
-          Back to Forms Hub
-        </Link>
+        <PreviousPageButton className="inline-flex items-center min-h-[44px] px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors" />
       </div>
     );
   }
@@ -197,10 +195,10 @@ export default function StationInspectionWizard() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-8">
-        <Link to="/forms-hub" className="inline-flex items-center text-neutral-500 hover:text-neutral-700 mb-4 min-h-[44px]">
+        <PreviousPageButton className="inline-flex items-center text-neutral-500 hover:text-neutral-700 mb-4 min-h-[44px]">
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-          Back
-        </Link>
+          Back to previous page
+        </PreviousPageButton>
         <h1 className="text-2xl font-bold text-neutral-800 font-heading">Saturday Station Inspection</h1>
         <p className="text-sm text-neutral-500 mt-1">Miami Beach Fire Department — Weekly Facility & Apparatus Check</p>
       </div>
