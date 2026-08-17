@@ -2,7 +2,7 @@ import type { StationRequestType } from '../types';
 
 const ALLOWED_RETURN_PATH = /^\/(stations(?:\/\d+(?:\/rooms\/\d+)?)?|forms-hub)(?:[/?#]|$)/;
 
-export function safeReturnTo(value: string | null, fallback = '/forms-hub'): string {
+export function safeReturnTo(value: string | null, fallback = '/stations'): string {
   if (!value || !ALLOWED_RETURN_PATH.test(value) || value.startsWith('//') || value.includes('\\')) {
     return fallback;
   }
@@ -13,7 +13,7 @@ export function buildStationRequestPath(search: string, forcedType?: StationRequ
   const source = new URLSearchParams(search);
   const target = new URLSearchParams();
   const rawStationId = source.get('station_id') ?? source.get('station');
-  let stationReturnPath = '/forms-hub';
+  let stationReturnPath = '/stations';
   if (rawStationId && /^\d+$/.test(rawStationId) && Number(rawStationId) > 0) {
     target.set('station_id', rawStationId);
     stationReturnPath = `/stations/${rawStationId}`;
@@ -23,7 +23,7 @@ export function buildStationRequestPath(search: string, forcedType?: StationRequ
     target.set('type', requestType);
   }
   const returnTo = source.get('return_to');
-  if (returnTo || stationReturnPath !== '/forms-hub') {
+  if (returnTo || stationReturnPath !== '/stations') {
     target.set('return_to', safeReturnTo(returnTo, stationReturnPath));
   }
 

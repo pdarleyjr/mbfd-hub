@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { RoomProfile, StationRequestSummary } from '../types';
 import { ApiClient } from '../utils/api';
+import PreviousPageButton from './PreviousPageButton';
 
 type ProfileTab = 'assets' | 'open' | 'history' | 'events';
 
@@ -47,7 +48,7 @@ export default function RoomAssetTracker() {
   }, [loadProfile]);
 
   if (loading) return <div className="flex min-h-64 items-center justify-center text-sm font-semibold text-stone-600" role="status">Loading room profile…</div>;
-  if (error || !profile) return <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-800"><p className="font-semibold">{error || 'Room not found.'}</p><div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={loadProfile} className="min-h-12 rounded-xl bg-blue-700 px-5 font-semibold text-white hover:bg-blue-800">Retry</button><Link to={`/stations/${stationId}`} className="inline-flex min-h-12 items-center px-2 font-semibold text-blue-800">← Back to station</Link></div></div>;
+  if (error || !profile) return <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-800"><p className="font-semibold">{error || 'Room not found.'}</p><div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={loadProfile} className="min-h-12 rounded-xl bg-blue-700 px-5 font-semibold text-white hover:bg-blue-800">Retry</button><PreviousPageButton fallback={`/stations/${stationId}`} className="inline-flex min-h-12 items-center px-2 font-semibold text-blue-800">← Back to previous page</PreviousPageButton></div></div>;
 
   const room = profile.room;
   const attention = profile.current_assets.filter((asset) => ['poor', 'critical', 'damaged', 'needs_repair', 'out_of_service'].includes(asset.condition)).length;
@@ -63,7 +64,7 @@ export default function RoomAssetTracker() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link to={`/stations/${stationId}`} className="inline-flex min-h-12 items-center gap-2 px-2 text-sm font-semibold text-stone-600 hover:text-slate-900">← Back to station</Link>
+        <PreviousPageButton fallback={`/stations/${stationId}`} className="inline-flex min-h-12 items-center gap-2 px-2 text-sm font-semibold text-stone-600 hover:text-slate-900">← Back to previous page</PreviousPageButton>
         <Link to={`/forms-hub/station-request?station_id=${stationId}&return_to=${returnTo}`} className="inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-700 px-5 font-semibold text-white hover:bg-blue-800">New room request</Link>
       </div>
 

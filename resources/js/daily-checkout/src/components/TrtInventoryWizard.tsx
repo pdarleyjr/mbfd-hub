@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Link } from 'react-router';
 import { useTrtCatalog } from '../hooks/useTrtCatalog';
 import { submitOrQueue, type SubmissionOutcome } from '../lib/sync';
 import type { TrtEntryDraft, ItemCondition, ItemAction, TrtCatalogItem } from '../types/trt-inventory';
+import PreviousPageButton from './PreviousPageButton';
 
 interface SearchResult {
   item: TrtCatalogItem;
@@ -166,12 +166,9 @@ export default function TrtInventoryWizard() {
             ? 'Your TRT trailer inventory is safely queued on this device and will sync when the connection returns.'
             : 'Your TRT trailer inventory is available on the Admin Dashboard. Other team members can submit their sections too.'}
         </p>
-        <Link
-          to="/forms-hub"
+        <PreviousPageButton
           className="inline-flex items-center min-h-[44px] px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-        >
-          Back to Forms Hub
-        </Link>
+        />
       </div>
     );
   }
@@ -190,9 +187,7 @@ export default function TrtInventoryWizard() {
     return (
       <div className="text-center py-16 space-y-4">
         <p className="text-red-600 font-medium">{error}</p>
-        <Link to="/forms-hub" className="text-neutral-500 hover:text-neutral-700">
-          Back to Forms Hub
-        </Link>
+        <PreviousPageButton className="min-h-[44px] text-neutral-500 hover:text-neutral-700" />
       </div>
     );
   }
@@ -207,12 +202,12 @@ export default function TrtInventoryWizard() {
     <div className="max-w-2xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <Link to="/forms-hub" className="inline-flex items-center text-neutral-500 hover:text-neutral-700 mb-4 min-h-[44px]">
+        <PreviousPageButton className="inline-flex items-center text-neutral-500 hover:text-neutral-700 mb-4 min-h-[44px]">
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          Back
-        </Link>
+          Back to previous page
+        </PreviousPageButton>
         <h1 className="text-2xl font-bold text-neutral-800 font-heading">TRT Trailer Inventory</h1>
         <p className="text-sm text-neutral-500 mt-1">
           Collaborative equipment checkout — {filledCount}/{totalItems} items checked
@@ -652,7 +647,7 @@ export default function TrtInventoryWizard() {
           <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
-          <p className="text-sm text-emerald-700">Progress submitted! You can keep working or go back to Forms Hub.</p>
+          <p className="text-sm text-emerald-700">Progress submitted! You can keep working or return to the previous page.</p>
         </div>
       )}
 

@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
 import { Shift, PINVerifyResponse } from '../types';
 import InventoryUserInfoStep from './InventoryUserInfoStep';
 import InventoryPINStep from './InventoryPINStep';
 import InventoryCountPage from './InventoryCountPage';
+import PreviousPageButton from './PreviousPageButton';
 
 type Step = 'userInfo' | 'pin' | 'inventory';
 
 export default function StationInventoryForm() {
-  const navigate = useNavigate();
   const [step, setStep] = useState<Step>('userInfo');
   const [userInfo, setUserInfo] = useState<{
     employeeName: string;
@@ -45,15 +44,14 @@ export default function StationInventoryForm() {
         <div className="bg-green-600 text-white py-4 px-4">
           <div className="max-w-2xl mx-auto">
             {step === 'userInfo' && (
-              <button
-                onClick={() => navigate('/forms-hub')}
+              <PreviousPageButton
                 className="flex items-center text-green-100 hover:text-white mb-2"
               >
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-                Back to Forms Hub
-              </button>
+                Back to previous page
+              </PreviousPageButton>
             )}
             <h1 className="text-xl font-bold">Station Inventory</h1>
             <p className="text-green-100 text-sm">

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import SignatureCanvas from 'react-signature-canvas';
 import type { EmployeeOption, Room, RoomAsset, Station, StationRequestSummary, StationRequestType } from '../../types';
 import { createClientSubmissionId, submitOrQueueWithResponse, type SubmissionOutcome } from '../../lib/sync';
 import { ApiClient } from '../../utils/api';
 import { safeReturnTo } from '../../utils/stationRequestNavigation';
 import { availableRoomAreas, roomDetailPrompt, roomsForArea, type RoomArea } from '../../utils/stationRoomBlueprint';
+import PreviousPageButton from '../PreviousPageButton';
 
 type Priority = 'low' | 'normal' | 'high' | 'critical';
 type Reason = 'Damaged/Broken' | 'Lost' | 'Stolen' | 'Needed' | 'Replacement' | 'End of Service Life' | 'Other';
@@ -66,7 +67,7 @@ export default function StationRequestWizard() {
   const [searchParams] = useSearchParams();
   const initialType = searchParams.get('type') === 'equipment' ? 'equipment' : 'repair_service';
   const initialStationId = /^\d+$/.test(searchParams.get('station_id') ?? '') ? searchParams.get('station_id')! : '';
-  const returnTo = safeReturnTo(searchParams.get('return_to'), initialStationId ? `/stations/${initialStationId}` : '/forms-hub');
+  const returnTo = safeReturnTo(searchParams.get('return_to'), initialStationId ? `/stations/${initialStationId}` : '/stations');
   const clientSubmissionId = useRef(createClientSubmissionId());
   const initialOptionsLoadStarted = useRef(false);
   const memberSignature = useRef<SignatureCanvas>(null);
@@ -326,9 +327,7 @@ export default function StationRequestWizard() {
             : 'This request is safely stored on this device and will sync automatically when connectivity returns.'}
         </p>
         {outcome === 'queued' && <p className="mt-3 font-mono text-xs text-stone-500">Offline reference {clientSubmissionId.current.slice(0, 8).toUpperCase()}</p>}
-        <Link to={returnTo} className="mt-7 inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
-          {returnTo.startsWith('/stations/') ? 'Back to station' : 'Back to Forms Hub'}
-        </Link>
+        <PreviousPageButton fallback={returnTo} className="mt-7 inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" />
       </div>
     );
   }
@@ -336,9 +335,9 @@ export default function StationRequestWizard() {
   return (
     <div className="mx-auto max-w-3xl space-y-5 pb-[max(2rem,env(safe-area-inset-bottom))]">
       <div className="flex items-center justify-between gap-4">
-        <Link to={returnTo} className="inline-flex min-h-12 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-stone-600 hover:text-slate-900">
-          <span aria-hidden="true">←</span> Back
-        </Link>
+        <PreviousPageButton fallback={returnTo} className="inline-flex min-h-12 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-stone-600 hover:text-slate-900">
+          <span aria-hidden="true">←</span> Back to previous page
+        </PreviousPageButton>
         <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-800">Station request</span>
       </div>
 

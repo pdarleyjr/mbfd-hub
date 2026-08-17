@@ -63,3 +63,28 @@ test('station request uses area then station-specific room detail and the statio
   assert.match(station, /groupRoomsByArea/);
   assert.match(station, /Dorm positions/);
 });
+
+test('page-level back controls use browser history and never target the retired Forms Hub page', () => {
+  const previousPageButton = read('resources/js/daily-checkout/src/components/PreviousPageButton.tsx');
+  const pageLevelBackSources = [
+    'resources/js/daily-checkout/src/components/BigTicketRequestForm.tsx',
+    'resources/js/daily-checkout/src/components/FormsHub.tsx',
+    'resources/js/daily-checkout/src/components/InspectionWizard.tsx',
+    'resources/js/daily-checkout/src/components/RoomAssetTracker.tsx',
+    'resources/js/daily-checkout/src/components/StationDetailPage.tsx',
+    'resources/js/daily-checkout/src/components/StationInventoryForm.tsx',
+    'resources/js/daily-checkout/src/components/TrtInventoryWizard.tsx',
+    'resources/js/daily-checkout/src/components/VehicleInspectionSelect.tsx',
+    'resources/js/daily-checkout/src/components/forms/EquipmentRequestWizard.tsx',
+    'resources/js/daily-checkout/src/components/forms/StationInspectionWizard.tsx',
+    'resources/js/daily-checkout/src/components/forms/StationRequestWizard.tsx',
+  ].map(read);
+
+  assert.match(previousPageButton, /window\.history\.state/);
+  assert.match(previousPageButton, /navigate\(-1\)/);
+  assert.match(previousPageButton, /fallback = '\/stations'/);
+  for (const source of pageLevelBackSources) {
+    assert.doesNotMatch(source, /Back to Forms Hub/);
+    assert.doesNotMatch(source, /navigate\('\/forms-hub'\)/);
+  }
+});

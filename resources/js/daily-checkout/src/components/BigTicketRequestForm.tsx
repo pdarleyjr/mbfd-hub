@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Station, BigTicketRoomType, BigTicketRequestFormData } from '../types';
 import { ApiClient } from '../utils/api';
+import { usePreviousPage } from './PreviousPageButton';
 
 const ROOM_TYPES: { value: BigTicketRoomType; label: string; description: string }[] = [
   { value: 'kitchen', label: 'Kitchen', description: 'Appliances, cookware, dining supplies' },
@@ -43,6 +44,7 @@ const ITEMS_BY_CATEGORY = CURATED_ITEMS.reduce((acc, item) => {
 
 export default function BigTicketRequestForm() {
   const navigate = useNavigate();
+  const goToPreviousPage = usePreviousPage();
   const [step, setStep] = useState(1);
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,7 +122,7 @@ export default function BigTicketRequestForm() {
       <div className="bg-orange-600 text-white py-4 px-4">
         <div className="max-w-2xl mx-auto">
           <button
-            onClick={() => step > 1 ? setStep(step - 1) : navigate('/forms-hub')}
+            onClick={() => step > 1 ? setStep(step - 1) : goToPreviousPage()}
             className="flex items-center text-orange-100 hover:text-white mb-2"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

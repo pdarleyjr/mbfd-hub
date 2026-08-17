@@ -80,8 +80,16 @@ class StationRoomBlueprintTest extends TestCase
         $stationSix = $this->station(6);
         $service->sync($stationSix);
         $this->assertSame(
-            ['Fire Boat 6 berth / apparatus area'],
-            $stationSix->rooms()->where('type', 'fireboat_apparatus_area')->pluck('name')->all()
+            [
+                'Fire Boat 6 berth / apparatus area',
+                'Dock',
+                'Boat lift',
+            ],
+            $stationSix->rooms()->where('type', 'fireboat_apparatus_area')->orderBy('sort_order')->pluck('name')->all()
+        );
+        $this->assertSame(
+            ['fireboat_apparatus_area.fb6', 'fireboat_apparatus_area.dock', 'fireboat_apparatus_area.boat_lift'],
+            $stationSix->rooms()->where('type', 'fireboat_apparatus_area')->orderBy('sort_order')->pluck('blueprint_key')->all()
         );
     }
 
@@ -99,6 +107,23 @@ class StationRoomBlueprintTest extends TestCase
         $rooms = collect($response->json('rooms'));
         $this->assertSame(6, $rooms->firstWhere('blueprint_key', 'dorm.combat_firefighters')['capacity']);
         $this->assertNull($rooms->firstWhere('blueprint_key', 'office.station')['notes'] ?? null);
+    }
+
+    public function test_marine_location_upgrade_migration_syncs_an_existing_station_six_idempotently(): void
+    {
+        $station = $this->station(6);
+        $migration = require database_path('migrations/2026_08_16_000004_add_station_six_marine_service_locations.php');
+
+        $migration->up();
+        $firstCount = $station->rooms()->count();
+        $migration->up();
+
+        $this->assertSame($firstCount, $station->rooms()->count());
+        $this->assertSame([
+            'Fire Boat 6 berth / apparatus area',
+            'Dock',
+            'Boat lift',
+        ], $station->rooms()->where('type', 'fireboat_apparatus_area')->orderBy('sort_order')->pluck('name')->all());
     }
 
     private function station(int $stationNumber): Station

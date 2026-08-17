@@ -8,6 +8,7 @@ import OfficerStep from './OfficerStep';
 import MeterStep from './MeterStep';
 import CompartmentStep from './CompartmentStep';
 import SubmitStep from './SubmitStep';
+import PreviousPageButton from './PreviousPageButton';
 
 type Step = 'officer' | 'meter' | 'compartments' | 'submit';
 
@@ -250,12 +251,12 @@ export default function InspectionWizard() {
         </div>
         <p className="text-red-600 font-medium mb-2">Inspection Data Unavailable</p>
         <p className="text-neutral-500 text-sm mb-6">{error || 'Failed to load inspection data'}</p>
-        <button
-          onClick={() => navigate('/')}
+        <PreviousPageButton
+          fallback="/vehicle-inspections"
           className="px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors touch-manipulation font-medium"
         >
-          Back to Forms
-        </button>
+          Back to previous page
+        </PreviousPageButton>
       </div>
     );
   }

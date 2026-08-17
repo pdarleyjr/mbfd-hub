@@ -40,6 +40,10 @@
       "units": [
         { "label": "FB6", "display_name": "Fire Boat 6", "aliases": ["FB6", "FB 6", "Fire Boat 6", "Fireboat 6"], "kind": "fireboat", "personnel": 4, "officers": 1, "firefighters": 3 }
       ],
+      "service_locations": [
+        { "key": "dock", "name": "Dock", "type": "fireboat_apparatus_area", "sort_order": 210 },
+        { "key": "boat_lift", "name": "Boat lift", "type": "fireboat_apparatus_area", "sort_order": 220 }
+      ],
       "dorm_beds": 4
     }
   }
