@@ -84,13 +84,30 @@ docker exec -i mbfd-postgres sh -euc 'pg_restore --list >/dev/null' < "$nextclou
 [[ "$(sqlite3 "$openwebui_db" 'PRAGMA integrity_check;')" == ok ]] \
     || { echo "FATAL: openwebui SQLite integrity check failed" >&2; exit 1; }
 
-sha256sums_file="$(find "$work" -type f -name SHA256SUMS -print -quit)"
-if [[ -n "$sha256sums_file" && -s "$sha256sums_file" ]]; then
-    restored_dir="$(dirname "$sha256sums_file")"
-    verify_failures="$(cd "$restored_dir" && sha256sum -c SHA256SUMS 2>&1 | grep -c ': FAILED$' || true)"
-    [[ "$verify_failures" -eq 0 ]] || {
-        echo "FATAL: $verify_failures SHA256 mismatch(es) in restored artifacts" >&2; exit 1; }
-fi
+sha256_file="$(find "$work" -type f -name SHA256SUMS -print -quit)"
+[[ -s "$sha256_file" ]] || { echo 'FATAL: SHA256SUMS not found in restored snapshot' >&2; exit 1; }
+
+# The backup manifest covers the entire staging tree, while this smoke test
+# intentionally restores only four representative data artifacts. Build a
+# strict sub-manifest so omitted deployment/rollback files are not reported as
+# corrupt, and fail closed if any required artifact is absent from the manifest.
+manifest_dir="$(dirname "$sha256_file")"
+required_manifest="$work/required-SHA256SUMS"
+required_artifacts=("$mbfd_dump" "$nextcloud_dump" "$media_db" "$openwebui_db")
+: > "$required_manifest"
+for artifact in "${required_artifacts[@]}"; do
+    case "$artifact" in
+        "$manifest_dir"/*) ;;
+        *) echo "FATAL: restored artifact escaped manifest directory" >&2; exit 1 ;;
+    esac
+    relative="${artifact#"$manifest_dir"/}"
+    expected="./$relative"
+    awk -v expected="$expected" '$2 == expected { print; found=1 } END { exit(found ? 0 : 1) }' \
+        "$sha256_file" >> "$required_manifest" \
+        || { echo "FATAL: required artifact is absent from SHA256SUMS: $relative" >&2; exit 1; }
+done
+( cd "$manifest_dir" && sha256sum -c "$required_manifest" --quiet ) \
+    || { echo 'FATAL: SHA256SUMS verification failed' >&2; exit 1; }
 
 # --- 9. Log only safe metadata ---
 printf 'restore_smoke=pass snapshot=%s requested=%s\n' "$snapshot" "$requested"
