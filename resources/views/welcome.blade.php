@@ -535,7 +535,7 @@
                     Quick Launch
                 </h2>
 
-                <!-- Stations / Vehicles — purple accent -->
+                <!-- Station / Vehicles / Equipment — purple accent -->
                 <a href="{{ url('/daily/stations') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-purple-300 transition-all duration-200 overflow-hidden">
                     <div class="flex">
                         <div class="w-1.5 bg-purple-500 flex-shrink-0 rounded-l-xl"></div>
@@ -546,7 +546,7 @@
                                 </svg>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <h3 class="font-semibold text-neutral-800 group-hover:text-purple-700 font-heading text-base">Stations / Vehicles</h3>
+                                <h3 class="font-semibold text-neutral-800 group-hover:text-purple-700 font-heading text-base">Station / Vehicles / Equipment</h3>
                                 <p class="text-sm text-neutral-500 mt-0.5">Apparatus checkout, vehicle inspections, station inventory, and station requests</p>
                             </div>
                             <svg class="w-5 h-5 text-neutral-300 group-hover:text-purple-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
@@ -566,7 +566,7 @@
                             </div>
                             <div class="flex-1 min-w-0">
                                 <h3 class="font-semibold text-neutral-800 group-hover:text-emerald-700 font-heading text-base">Employee Portal</h3>
-                                <p class="text-sm text-neutral-500 mt-0.5">View assigned gear and uniforms, and submit equipment requests</p>
+                                <p class="text-sm text-neutral-500 mt-0.5">View assigned gear, track requests, and request approved uniform items</p>
                             </div>
                             <svg class="w-5 h-5 text-neutral-300 group-hover:text-emerald-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                         </div>

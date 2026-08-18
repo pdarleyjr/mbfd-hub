@@ -1,93 +1,95 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Employee\Pages;
 
 use App\Models\Employee;
-use App\Models\EmployeeEquipmentRequest;
-use App\Models\User;
-use Filament\Forms\Components\Textarea;
+use App\Services\PersonnelRequests\PersonnelCatalog;
+use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Support\Str;
 
 class RequestEquipmentPage extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-shopping-cart';
+    protected static ?string $navigationIcon = 'heroicon-o-shopping-bag';
 
     protected static string $view = 'filament.employee.pages.request-equipment';
 
-    protected static ?string $title = 'Request Equipment';
+    protected static ?string $title = 'Request Uniforms';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
-    protected static ?string $navigationLabel = 'Request Equipment';
+    protected static ?string $navigationLabel = 'Request Uniforms';
+
+    protected static ?string $slug = 'request-equipment';
 
     public ?array $data = [];
 
     public function mount(): void
     {
-        $this->form->fill();
+        $this->form->fill([
+            'items' => [['item_code' => null, 'size' => null, 'quantity' => 1]],
+            'idempotency_key' => (string) Str::uuid(),
+        ]);
     }
 
     public function form(Form $form): Form
     {
-        return $form
-            ->schema([
-                Textarea::make('requested_items')
-                    ->label('Describe the items you are requesting')
-                    ->placeholder("Example:\n- 2x T-Shirts (Size Large)\n- 1x Bunker Coat (replacement)\n- 1x Helmet liner")
-                    ->required()
-                    ->rows(6)
-                    ->helperText('Be specific — include item type, size, quantity, and reason if applicable.'),
-            ])
-            ->statePath('data');
+        return $form->schema([
+            Repeater::make('items')
+                ->label('Uniform items')
+                ->minItems(1)
+                ->maxItems(10)
+                ->addActionLabel('Add another uniform item')
+                ->reorderable(false)
+                ->schema([
+                    Select::make('item_code')
+                        ->label('Uniform item')
+                        ->options(fn (): array => collect(app(PersonnelCatalog::class)->uniforms())->mapWithKeys(fn (array $item, string $code) => [$code => $item['label']])->all())
+                        ->searchable()
+                        ->required(),
+                    TextInput::make('size')
+                        ->label('Size')
+                        ->placeholder('Examples: L, 34x32, 10.5')
+                        ->maxLength(30)
+                        ->required(),
+                    TextInput::make('quantity')
+                        ->numeric()
+                        ->minValue(1)
+                        ->maxValue(10)
+                        ->default(1)
+                        ->required(),
+                ])
+                ->columns(['sm' => 3]),
+            Hidden::make('idempotency_key')->required(),
+        ])->statePath('data');
     }
 
-    public function submit(): void
+    public function submit(PersonnelRequestSubmissionService $submissions): void
     {
-        $data = $this->form->getState();
-
         /** @var Employee $employee */
         $employee = auth('employee')->user();
+        $data = $this->form->getState();
+        $request = $submissions->submitUniform($employee, $data['items'], $data['idempotency_key']);
 
-        EmployeeEquipmentRequest::create([
-            'employee_portal_id' => $employee->id,
-            'user_id' => null, // not linked to users table
-            'requested_items' => $data['requested_items'],
-            'status' => 'Pending',
+        $this->form->fill([
+            'items' => [['item_code' => null, 'size' => null, 'quantity' => 1]],
+            'idempotency_key' => (string) Str::uuid(),
         ]);
-
-        // Notify admin users via their Filament notifications (users table)
-        // Query role names directly so a partially seeded environment does not
-        // reject an otherwise valid request when one optional admin role is absent.
-        $admins = User::query()
-            ->whereHas('roles', fn ($query) => $query->whereIn('name', [
-                'super_admin',
-                'admin',
-                'logistics_admin',
-            ]))
-            ->get();
-        foreach ($admins as $admin) {
-            Notification::make()
-                ->title('New Employee Equipment Request')
-                ->body("{$employee->name} (ID: {$employee->employee_id}) submitted an equipment request.")
-                ->icon('heroicon-o-shopping-cart')
-                ->iconColor('warning')
-                ->actions([
-                    \Filament\Notifications\Actions\Action::make('view')
-                        ->label('Review Request')
-                        ->url(route('filament.admin.resources.employee-equipment-requests.index'))
-                        ->markAsRead(),
-                ])
-                ->sendToDatabase($admin);
-        }
-
-        $this->form->fill();
-
         Notification::make()
-            ->title('Request submitted!')
-            ->body('Your equipment request has been received.')
+            ->title('Uniform request submitted')
+            ->body("{$request->request_number} is now visible in My Requests.")
             ->success()
+            ->actions([
+                \Filament\Notifications\Actions\Action::make('view')->url('/employee/my-requests/'.$request->public_id),
+            ])
             ->send();
     }
 
@@ -96,21 +98,6 @@ class RequestEquipmentPage extends Page
         /** @var Employee $employee */
         $employee = auth('employee')->user();
 
-        $active = EmployeeEquipmentRequest::where('employee_portal_id', $employee->id)
-            ->where('is_archived', false)
-            ->latest()
-            ->get();
-
-        $archived = EmployeeEquipmentRequest::where('employee_portal_id', $employee->id)
-            ->where('is_archived', true)
-            ->latest()
-            ->take(20)
-            ->get();
-
-        // Combine for blade — pass both
-        $history = $active;
-        $user = $employee;
-
-        return compact('history', 'archived', 'user');
+        return ['recentRequests' => $employee->personnelRequests()->where('type', 'uniform')->latest()->limit(5)->get()];
     }
 }

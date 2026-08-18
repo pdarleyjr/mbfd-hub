@@ -16,10 +16,18 @@ class AssignedEquipment extends Model
         'quantity',
         'issued_at',
         'notes',
+        'status',
+        'expires_at',
+        'returned_at',
+        'source_personnel_request_item_id',
+        'retired_by_id',
+        'retirement_reason',
     ];
 
     protected $casts = [
         'issued_at' => 'date',
+        'expires_at' => 'date',
+        'returned_at' => 'date',
         'quantity' => 'integer',
     ];
 
@@ -36,6 +44,11 @@ class AssignedEquipment extends Model
     public function uniform(): BelongsTo
     {
         return $this->belongsTo(Uniform::class);
+    }
+
+    public function sourcePersonnelRequestItem(): BelongsTo
+    {
+        return $this->belongsTo(PersonnelRequestItem::class, 'source_personnel_request_item_id');
     }
 
     public static function categories(): array

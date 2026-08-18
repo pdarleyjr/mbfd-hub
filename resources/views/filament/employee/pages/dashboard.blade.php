@@ -62,8 +62,8 @@
                 </svg>
             </div>
             <div class="ep-action-body">
-                <span class="ep-action-title">Request Equipment</span>
-                <span class="ep-action-desc">Submit a gear request</span>
+                <span class="ep-action-title">Request Uniforms</span>
+                <span class="ep-action-desc">Request approved department workwear</span>
             </div>
             <svg class="ep-action-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
@@ -104,7 +104,7 @@
         <div class="ep-panel">
             <div class="ep-panel-header">
                 <span class="ep-panel-title">My Requests</span>
-                <a href="{{ \App\Filament\Employee\Pages\RequestEquipmentPage::getUrl(panel: 'employee') }}" class="ep-panel-link">Submit new →</a>
+                <a href="{{ \App\Filament\Employee\Pages\MyRequestsPage::getUrl(panel: 'employee') }}" class="ep-panel-link">View all →</a>
             </div>
             @if($recentRequests->isEmpty())
                 <div class="ep-empty">
@@ -116,18 +116,18 @@
             @else
                 @foreach($recentRequests as $req)
                     <div class="ep-list-item">
-                        <div class="ep-list-dot {{ match($req->status) {
-                            'Approved' => 'ep-dot-green',
-                            'Pending' => 'ep-dot-amber',
-                            'Declined' => 'ep-dot-red',
-                            'Ordered' => 'ep-dot-blue',
+                        <div class="ep-list-dot {{ match($req->status->value) {
+                            'completed', 'ready_for_pickup' => 'ep-dot-green',
+                            'pending', 'needs_information' => 'ep-dot-amber',
+                            'denied', 'cancelled' => 'ep-dot-red',
+                            'ordered', 'arrived', 'acknowledged' => 'ep-dot-blue',
                             default => 'ep-dot-gray'
                         } }}"></div>
                         <div class="ep-list-body">
-                            <span class="ep-list-primary line-clamp-1">{{ Str::limit($req->requested_items, 45) }}</span>
+                            <span class="ep-list-primary line-clamp-1">{{ Str::limit($req->items->pluck('item_name')->join(', '), 45) }}</span>
                             <span class="ep-list-secondary">{{ $req->created_at->format('M j, Y') }}</span>
                         </div>
-                        <span class="ep-status-badge ep-status-{{ strtolower($req->status) }}">{{ $req->status }}</span>
+                        <span class="ep-status-badge">{{ $req->status->label() }}</span>
                     </div>
                 @endforeach
             @endif

@@ -21,6 +21,11 @@ class EmployeeEquipmentRequestResource extends Resource
 {
     use EnterpriseTable;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static ?string $model = EmployeeEquipmentRequest::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-shopping-cart';

@@ -8,7 +8,7 @@ const adminPassword = process.env.OPERATIONAL_FORMS_E2E_ADMIN_PASSWORD ?? 'Opera
 test('updated home exposes the exact operational destinations', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One desktop visual is sufficient for the home navigation acceptance.');
   await page.goto('/');
-  await expect(page.getByRole('link', { name: /Stations \/ Vehicles/i })).toHaveAttribute('href', /\/daily\/stations$/);
+  await expect(page.getByRole('link', { name: 'Station / Vehicles / Equipment' })).toHaveAttribute('href', /\/daily\/stations$/);
   await expect(page.getByRole('link', { name: /Open operational forms/i })).toHaveAttribute('href', /\/employee\/forms$/);
   await page.screenshot({ path: 'tests/e2e/screenshots/operational-forms-home-desktop.png', fullPage: true });
 });

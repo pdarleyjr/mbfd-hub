@@ -77,6 +77,16 @@ class Employee extends Authenticatable implements FilamentUser
         return $this->hasMany(EmployeeEquipmentRequest::class, 'employee_portal_id');
     }
 
+    public function personnelRequests(): HasMany
+    {
+        return $this->hasMany(PersonnelRequest::class, 'beneficiary_employee_id');
+    }
+
+    public function submittedPersonnelRequests(): HasMany
+    {
+        return $this->hasMany(PersonnelRequest::class, 'requester_employee_id');
+    }
+
     /** Station-scoped requests; intentionally separate from personal equipment requests. */
     public function stationRequests(): HasMany
     {

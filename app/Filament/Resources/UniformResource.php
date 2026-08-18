@@ -12,6 +12,11 @@ use Filament\Tables\Table;
 
 class UniformResource extends Resource
 {
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static ?string $model = Uniform::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';

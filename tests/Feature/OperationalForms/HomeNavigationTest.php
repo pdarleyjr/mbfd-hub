@@ -10,16 +10,18 @@ class HomeNavigationTest extends TestCase
 {
     public function test_home_links_stations_and_operational_forms_to_the_exact_destinations(): void
     {
+        $this->withoutVite();
         $response = $this->get('/');
 
         $response->assertOk();
-        $response->assertSee('Stations / Vehicles');
+        $response->assertSee('Station / Vehicles / Equipment');
         $response->assertSee('href="'.url('/daily/stations').'"', false);
-        $response->assertSee('Stations / Vehicles');
+        $response->assertSee('Station / Vehicles / Equipment');
         $response->assertSee('Apparatus checkout, vehicle inspections, station inventory, and station requests');
         $response->assertSee('href="'.url('/employee/forms').'"', false);
         $response->assertSee('ICS 214 &amp; F-ROC reports', false);
         $response->assertSee('Open operational forms');
+        $response->assertSee('request approved uniform items');
         $response->assertSee('href="'.url('/employee/forms').'"', false);
     }
 }

@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\AssignedEquipment;
 use App\Models\Employee;
+use App\Models\PersonnelRequestItem;
 use App\Models\Uniform;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -18,6 +19,8 @@ class UniformInventoryService
         int $quantity,
         string $issuedAt,
         ?string $notes = null,
+        ?PersonnelRequestItem $sourceItem = null,
+        ?string $expiresAt = null,
     ): AssignedEquipment {
         if ($quantity < 1) {
             throw ValidationException::withMessages([
@@ -25,7 +28,7 @@ class UniformInventoryService
             ]);
         }
 
-        return DB::transaction(function () use ($uniform, $employee, $quantity, $issuedAt, $notes): AssignedEquipment {
+        return DB::transaction(function () use ($uniform, $employee, $quantity, $issuedAt, $notes, $sourceItem, $expiresAt): AssignedEquipment {
             $inventory = Uniform::query()->lockForUpdate()->findOrFail($uniform->getKey());
 
             if ($inventory->quantity_on_hand < $quantity) {
@@ -47,6 +50,9 @@ class UniformInventoryService
                 'item_description' => $description,
                 'quantity' => $quantity,
                 'issued_at' => $issuedAt,
+                'expires_at' => $expiresAt,
+                'status' => 'active',
+                'source_personnel_request_item_id' => $sourceItem?->id,
                 'notes' => $notes,
             ]);
 
