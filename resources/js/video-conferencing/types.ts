@@ -19,9 +19,13 @@ export interface RoleOption {
 export interface ConferenceBootstrap {
     roles: RoleOption[];
     lineup_time: string | null;
+    connectivity_url: string;
+    connectivity_timeout_ms: number;
+    connectivity_help: string;
     endpoints: {
         sessions: string;
         api_base: string;
+        connectivity_failures: string;
     };
     csrf_token: string;
 }

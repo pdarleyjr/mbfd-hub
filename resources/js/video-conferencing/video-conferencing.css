@@ -10,6 +10,9 @@
     --vc-wash: #f5f7fa;
 }
 
+html.vc-conference-active,
+html.vc-conference-active body { overflow: hidden; }
+
 .vc-shell {
     color: var(--vc-ink);
     font-family: "Plus Jakarta Sans", "Source Sans 3", system-ui, sans-serif;
@@ -278,6 +281,8 @@
 .vc-room-summary svg { color: #2563eb; flex-shrink: 0; }
 .vc-room-summary strong { display: block; font-size: .86rem; margin-bottom: .15rem; }
 .vc-room-summary span { color: #667085; display: block; font-size: .74rem; line-height: 1.45; }
+.vc-network-check { margin-top: -.35rem; }
+.vc-network-check--unreachable { background: #fff4ed; border-color: #fed7aa; color: #b54708; }
 .vc-field { margin-bottom: 1rem; }
 .vc-field input {
     background: #fff;

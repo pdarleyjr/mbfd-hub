@@ -21,6 +21,12 @@ class VideoConferencing extends Page
 
     public function getViewData(): array
     {
+        $connectivityUrl = preg_replace(
+            '/^wss:/i',
+            'https:',
+            preg_replace('/^ws:/i', 'http:', (string) config('video-conferencing.livekit.url')) ?? '',
+        ) ?? '';
+
         return [
             'enabled' => (bool) config('video-conferencing.enabled'),
             'conferenceBootstrap' => [
@@ -30,9 +36,16 @@ class VideoConferencing extends Page
                     'station' => $role->isStation(),
                 ])->all(),
                 'lineup_time' => config('video-conferencing.lineup_time'),
+                'connectivity_url' => $connectivityUrl,
+                'connectivity_timeout_ms' => max(
+                    1000,
+                    min(10000, (int) config('video-conferencing.client_connectivity_timeout_ms', 5000)),
+                ),
+                'connectivity_help' => (string) config('video-conferencing.client_connectivity_help'),
                 'endpoints' => [
                     'sessions' => route('employee.video-conferencing.api.sessions'),
                     'api_base' => url('/employee/video-conferencing/api'),
+                    'connectivity_failures' => route('employee.video-conferencing.api.connectivity-failures'),
                 ],
                 'csrf_token' => csrf_token(),
             ],

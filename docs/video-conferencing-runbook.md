@@ -18,6 +18,8 @@ For a host with a public address, required inbound firewall rules are TCP 443 fo
 
 The GMKtec production host is behind Starlink CGNAT and its routed IPv6 is filtered by the Starlink router. It therefore cannot accept general public-internet WebRTC traffic directly. Its supported deployment mode is Tailnet-only: both DNS-only records resolve to the GMKtec Tailscale address, all conference endpoints must have Tailscale connected, `LIVEKIT_NODE_IP` is set to that routable Tailscale address while external-IP discovery remains disabled, the host firewall remains default-deny off Tailnet, and certificates are issued by a public CA with Cloudflare DNS-01 validation. A future non-Tailscale deployment requires a public-IP VPS/L4 relay or LiveKit Cloud; a Cloudflare HTTP tunnel is not a substitute for LiveKit UDP/TURN reachability.
 
+Current Chromium browsers classify the Tailscale endpoint as local address space. Chrome and Edge users must grant the employee portal's Local Network Access prompt in addition to connecting Tailscale; the application performs a bounded browser reachability check before it creates a room so this permission is requested explicitly and failures are actionable. Firefox does not currently enforce that Chromium permission. A failed preflight must not create a LiveKit room or participation row.
+
 ## Install
 
 1. Generate a unique API key, at least 32 random API-secret characters, and a separate 4-8 digit 300 command PIN. Store the PIN only in the approved operator secret store and put a one-way application hash in `VIDEO_CONFERENCING_COMMAND_PIN_HASH`; never store or commit the plaintext PIN in `.env`.
@@ -50,7 +52,7 @@ Remote unmute must remain disabled in LiveKit. The 300 UI uses signed Laravel mo
 - Set `vm.overcommit_memory=1` persistently on the LiveKit host so Redis background persistence remains reliable under memory pressure.
 - Scrape Prometheus metrics from `127.0.0.1:6789/metrics` through the private monitoring network only.
 - Monitor Laravel for `ConferenceUnavailableException`, HTTP 409 takeover rates, 401 webhook failures, token endpoint throttles, and incomplete participation rows.
-- Probe `/admin/video-conferencing/health` with an authenticated administrator. It returns only `disabled`, `healthy`, or `unavailable` and never exposes configuration.
+- Probe `/admin/video-conferencing/health` with an authenticated administrator. It returns `disabled`, `healthy`, `degraded`, or `unavailable` and never exposes secrets. Three or more sanitized browser connection failures in the rolling 15-minute window mark the client path degraded even when the server-side LiveKit API remains healthy.
 - Webhook rows store event ID/type, opaque session ID, participant identity, and timestamps. Raw payloads, employee IDs in participant names, API secrets, and tokens are not logged.
 
 ## Integration acceptance

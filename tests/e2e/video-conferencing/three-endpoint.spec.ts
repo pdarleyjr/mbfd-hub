@@ -16,7 +16,7 @@ async function loginAndPrepare(
     const context = await browser.newContext({
         baseURL,
         viewport: { width: 1280, height: 900 },
-        permissions: ['camera', 'microphone'],
+        permissions: ['camera', 'microphone', 'local-network-access'],
     });
     await context.addInitScript(() => {
         const NativePeerConnection = window.RTCPeerConnection;
@@ -63,6 +63,16 @@ async function everyPeerConnectionIsRelayOnly(page: Page): Promise<boolean> {
     });
 }
 
+async function conferenceFitsWithoutPageScroll(page: Page): Promise<boolean> {
+    return page.evaluate(() => {
+        const shell = document.querySelector('.vc-shell');
+
+        return shell !== null
+            && getComputedStyle(document.documentElement).overflowY === 'hidden'
+            && shell.getBoundingClientRect().bottom <= window.innerHeight + 1;
+    });
+}
+
 test('300, Station 1, and Station 2 share Morning Lineup and moderation works', async ({ browser, baseURL }) => {
     const command = await loginAndPrepare(browser, baseURL!, '300');
     const station1 = await loginAndPrepare(browser, baseURL!, 'sta1');
@@ -82,7 +92,7 @@ test('300, Station 1, and Station 2 share Morning Lineup and moderation works', 
         ]);
         await expect(command.page.locator('.vc-tile')).toHaveCount(3);
         await expect(station1.page.locator('.vc-station-mic')).toContainText('MUTED BY 300');
-        await expect.poll(() => command.page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1)).toBe(true);
+        await expect.poll(() => conferenceFitsWithoutPageScroll(command.page)).toBe(true);
 
         if (forceRelay) {
             await Promise.all([
@@ -108,7 +118,7 @@ test('300 PIN, relay-only direct call, and desktop no-scroll layout work togethe
     try {
         await command.page.getByRole('button', { name: 'Join conference' }).click();
         await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
-        await expect.poll(() => command.page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1)).toBe(true);
+        await expect.poll(() => conferenceFitsWithoutPageScroll(command.page)).toBe(true);
         await station1.page.getByRole('button', { name: 'Join conference' }).click();
         await expect(station1.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
         await expect(command.page.locator('.vc-tile')).toHaveCount(2);
@@ -126,5 +136,35 @@ test('300 PIN, relay-only direct call, and desktop no-scroll layout work togethe
         await expect(station1.page.locator('.vc-station-mic')).toContainText('MIC LIVE');
     } finally {
         await Promise.all([command.context.close(), station1.context.close()]);
+    }
+});
+
+test('an unreachable browser media endpoint fails before creating a room and remains retryable', async ({ browser, baseURL }) => {
+    const station = await loginAndPrepare(browser, baseURL!, 'sta1');
+    let sessionRequests = 0;
+
+    try {
+        const connectivityUrl = await station.page.locator('#video-conferencing-root').evaluate((element) => {
+            const bootstrap = JSON.parse((element as HTMLElement).dataset.bootstrap ?? '{}') as {
+                connectivity_url: string;
+            };
+
+            return bootstrap.connectivity_url;
+        });
+        await station.page.route(`${new URL(connectivityUrl).origin}/**`, (route) => route.abort('connectionrefused'));
+        station.page.on('request', (request) => {
+            if (request.method() === 'POST' && request.url().endsWith('/video-conferencing/api/sessions')) {
+                sessionRequests += 1;
+            }
+        });
+
+        await station.page.getByRole('button', { name: 'Join conference' }).click();
+
+        await expect(station.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
+        await expect(station.page.getByRole('alert')).toContainText('conference network');
+        await expect(station.page.getByRole('button', { name: 'Join conference' })).toBeEnabled();
+        expect(sessionRequests).toBe(0);
+    } finally {
+        await station.context.close();
     }
 });

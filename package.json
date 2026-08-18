@@ -9,6 +9,7 @@
         "test:operational-forms-node": "node --test tests/Node/operational-forms/*.test.mjs",
         "test:operational-forms-e2e": "playwright test --config=playwright.operational-forms.config.ts",
         "test:video-conferencing-bundle": "node scripts/ci/check-video-conferencing-bundle.mjs",
+        "test:video-conferencing-node": "node --test tests/Node/video-conferencing-*.test.mjs",
         "test:video-conferencing-e2e": "playwright test --config=playwright.video-conferencing.config.ts",
         "test:personnel-requests-e2e": "playwright test --config=playwright.personnel-requests.config.ts"
     },

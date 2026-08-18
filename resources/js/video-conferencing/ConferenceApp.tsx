@@ -14,6 +14,8 @@ import {
     ShieldCheck,
     Video,
     Volume2,
+    Wifi,
+    WifiOff,
 } from 'lucide-react';
 import {
     createLocalTracks,
@@ -27,6 +29,11 @@ import {
     VideoPresets,
 } from 'livekit-client';
 import { ApiError, postJson } from './api';
+import {
+    ConferenceConnectivityError,
+    verifyConferenceConnectivity,
+    type ConferenceConnectivityFailureCode,
+} from './connectivity';
 import {
     deviceLabel,
     enumerateMediaDevices,
@@ -50,6 +57,7 @@ interface ConferenceAppProps {
 
 const emptyDevices: MediaDevices = { cameras: [], microphones: [], speakers: [] };
 const stationRoles: JoinRole[] = ['sta1', 'sta2', 'sta3', 'sta4', 'sta6'];
+type ConnectivityStatus = 'unchecked' | 'checking' | 'reachable' | 'unreachable';
 
 function initialSelection(bootstrap: ConferenceBootstrap): { mode: RoomMode; role: JoinRole; station: JoinRole } {
     const params = new URLSearchParams(window.location.search);
@@ -89,6 +97,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     const [actionBusy, setActionBusy] = useState<string | null>(null);
     const [commandPin, setCommandPin] = useState('');
     const [sessionId, setSessionId] = useState<string | null>(null);
+    const [connectivityStatus, setConnectivityStatus] = useState<ConnectivityStatus>('unchecked');
     const [room, setRoom] = useState<Room | null>(null);
     const previewVideoRef = useRef<HTMLVideoElement>(null);
     const previewTracksRef = useRef<LocalTrack[]>([]);
@@ -115,6 +124,13 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
 
         return () => navigator.mediaDevices?.removeEventListener('devicechange', onDeviceChange);
     }, [refreshDevices]);
+
+    useEffect(() => {
+        const conferenceActive = phase === 'connected' || phase === 'reconnecting';
+        document.documentElement.classList.toggle('vc-conference-active', conferenceActive);
+
+        return () => document.documentElement.classList.remove('vc-conference-active');
+    }, [phase]);
 
     const stopPreview = useCallback(() => {
         previewTracksRef.current.forEach((track) => {
@@ -235,6 +251,20 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         );
     };
 
+    const reportClientFailure = (
+        stage: 'preflight' | 'signaling' | 'media_publication',
+        failureCode: ConferenceConnectivityFailureCode | 'livekit_signaling_failed' | 'media_publication_failed',
+        activeSessionId?: string,
+    ) => {
+        void postJson<void>(bootstrap.endpoints.connectivity_failures, bootstrap.csrf_token, {
+            stage,
+            room: mode,
+            join_as: joinAs,
+            failure_code: failureCode,
+            session_id: activeSessionId,
+        }).catch(() => undefined);
+    };
+
     const joinConference = async (confirmedTakeover = false) => {
         if (previewTracksRef.current.length === 0) {
             setError('Test your camera and microphone before joining.');
@@ -244,6 +274,27 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         setError(null);
         setPhase('joining');
 
+        setConnectivityStatus('checking');
+        try {
+            await verifyConferenceConnectivity(
+                bootstrap.connectivity_url,
+                bootstrap.connectivity_timeout_ms,
+            );
+            setConnectivityStatus('reachable');
+        } catch (connectivityError) {
+            const failureCode = connectivityError instanceof ConferenceConnectivityError
+                ? connectivityError.code
+                : 'conference_network_unreachable';
+            setConnectivityStatus('unreachable');
+            reportClientFailure('preflight', failureCode);
+            setError(`This browser cannot reach the conference network. ${bootstrap.connectivity_help} No room was created; your employee session is still signed in.`);
+            setPhase('ready');
+            return;
+        }
+
+        let failureStage: 'session' | 'signaling' | 'media_publication' = 'session';
+        let activeSessionId: string | undefined;
+
         try {
             const sessionResponse = await postJson<SessionResponse>(bootstrap.endpoints.sessions, bootstrap.csrf_token, {
                 room: mode,
@@ -251,7 +302,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 join_as: joinAs,
                 ...(joinAs === '300' ? { command_pin: commandPin } : {}),
             });
-            const activeSessionId = sessionResponse.session.id;
+            activeSessionId = sessionResponse.session.id;
             setSessionId(activeSessionId);
             const credentials = await issueToken(activeSessionId, confirmedTakeover);
             participationIdRef.current = credentials.participation_id;
@@ -278,13 +329,16 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             }
 
             roomRef.current = nextRoom;
+            failureStage = 'signaling';
             await nextRoom.connect(credentials.server_url, credentials.token, {
                 autoSubscribe: true,
                 rtcConfig: forceRelay ? { iceTransportPolicy: 'relay' } : undefined,
+                websocketTimeout: 8000,
             });
 
             const preparedTracks = [...previewTracksRef.current];
             previewTracksRef.current = [];
+            failureStage = 'media_publication';
             for (const track of preparedTracks) {
                 if (track.kind === Track.Kind.Audio && (stationRoles.includes(joinAs) || !microphoneEnabled)) {
                     await track.mute();
@@ -312,11 +366,24 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 setPhase('ready');
                 return;
             }
-            setError(joinError instanceof ApiError && joinError.status === 404 && mode === 'direct'
-                ? 'No active direct call from 300 was found for that station.'
-                : joinError instanceof Error ? joinError.message : 'The conference could not be joined.');
-            stopPreview();
-            setPhase('failed');
+            if (failureStage === 'signaling') {
+                reportClientFailure('signaling', 'livekit_signaling_failed', activeSessionId);
+            } else if (failureStage === 'media_publication') {
+                reportClientFailure('media_publication', 'media_publication_failed', activeSessionId);
+            }
+            setError(failureStage === 'signaling'
+                ? 'The secure media service was reachable, but the conference connection could not be established. Check Tailscale and Local Network Access, then retry.'
+                : failureStage === 'media_publication'
+                    ? 'The call connected, but this browser could not publish the selected camera or microphone. Retest the devices and try again.'
+                    : joinError instanceof ApiError && joinError.status === 404 && mode === 'direct'
+                        ? 'No active direct call from 300 was found for that station.'
+                        : joinError instanceof Error ? joinError.message : 'The conference could not be joined.');
+            if (failureStage === 'media_publication') {
+                stopPreview();
+                setPhase('failed');
+            } else {
+                setPhase('ready');
+            }
         }
     };
 
@@ -541,6 +608,13 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                         <div className="vc-room-summary">
                             {mode === 'lineup' ? <><Radio size={22} /><div><strong>Today’s Morning Lineup</strong><span>{bootstrap.lineup_time ? `Configured for ${bootstrap.lineup_time} America/New_York` : 'Lineup time is not configured'}</span></div></> : <><Cast size={22} /><div><strong>Private call with one station</strong><span>300 starts the call; only 300 and the selected station may enter.</span></div></>}
                         </div>
+                        <div className={`vc-room-summary vc-network-check vc-network-check--${connectivityStatus}`} role="status" aria-live="polite">
+                            {connectivityStatus === 'unreachable' ? <WifiOff size={20} /> : connectivityStatus === 'checking' ? <LoaderCircle size={20} className="vc-spin" /> : <Wifi size={20} />}
+                            <span>
+                                <strong>{connectivityStatus === 'reachable' ? 'Conference network ready' : connectivityStatus === 'unreachable' ? 'Conference network unavailable' : connectivityStatus === 'checking' ? 'Checking conference network…' : 'Conference network check pending'}</strong>
+                                <small>{connectivityStatus === 'unchecked' ? 'Connect MBFD Tailscale first. A reachability check runs before any room is created and may ask for Local Network Access.' : connectivityStatus === 'reachable' ? 'This browser can reach the secure media service.' : connectivityStatus === 'unreachable' ? bootstrap.connectivity_help : 'Allow Local Network Access if your browser asks. This normally takes less than five seconds.'}</small>
+                            </span>
+                        </div>
                         {mode === 'direct' && <label className="vc-field">Station<select value={directStation} onChange={(event) => setDirectStation(event.target.value as JoinRole)}>
                             {bootstrap.roles.filter((role) => role.station).map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
                         </select></label>}
@@ -566,7 +640,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                             />
                             <small id="vc-command-pin-help">Required to join or start a call as 300.</small>
                         </label>}
-                        <button className="vc-button vc-button--primary" type="button" onClick={() => void joinConference(false)} disabled={!canJoin || phase === 'joining'}>
+                        <button className="vc-button vc-button--primary" type="button" onClick={() => void joinConference(false)} disabled={!canJoin}>
                             {phase === 'joining' ? <LoaderCircle size={20} className="vc-spin" /> : <Video size={20} />} Join conference
                         </button>
                         {phase !== 'ready' && <p className="vc-help">Test devices first. Camera and microphone permission is requested only after you press the button.</p>}

@@ -16,6 +16,7 @@ use App\Http\Controllers\Employee\PersonnelRequestAttachmentController;
 use App\Http\Controllers\Employee\PersonnelRequestDetailController;
 use App\Http\Controllers\Employee\PersonnelRequestResponseController;
 use App\Http\Controllers\Employee\PersonnelRosterSearchController;
+use App\Http\Controllers\Employee\VideoConferencing\ConferenceConnectivityFailureController;
 use App\Http\Controllers\Employee\VideoConferencing\ConferenceLeaveController;
 use App\Http\Controllers\Employee\VideoConferencing\ConferenceSessionController;
 use App\Http\Controllers\Employee\VideoConferencing\ConferenceTokenController;
@@ -61,6 +62,8 @@ Route::prefix('employee/video-conferencing/api')
     ->name('employee.video-conferencing.api.')
     ->group(function (): void {
         Route::post('/sessions', ConferenceSessionController::class)->name('sessions');
+        Route::post('/connectivity-failures', ConferenceConnectivityFailureController::class)
+            ->name('connectivity-failures');
         Route::post('/sessions/{session}/token', ConferenceTokenController::class)
             ->middleware('throttle:conference-tokens')
             ->name('tokens');

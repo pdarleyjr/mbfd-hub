@@ -6,6 +6,8 @@ use App\Contracts\VideoConferencing\ConferenceProvider;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
+use Mockery;
 use Tests\Fakes\FakeConferenceProvider;
 use Tests\TestCase;
 
@@ -53,6 +55,69 @@ class ConferenceAccessTest extends TestCase
             ->assertDontSee('private-command-pin-hash')
             ->assertDontSee('private-api-key')
             ->assertDontSee('private-api-secret');
+    }
+
+    public function test_enabled_page_exposes_only_the_browser_connectivity_probe_url(): void
+    {
+        config([
+            'video-conferencing.enabled' => true,
+            'video-conferencing.livekit.url' => 'wss://video.test.example',
+            'video-conferencing.livekit.api_key' => 'private-api-key',
+            'video-conferencing.livekit.api_secret' => 'private-api-secret',
+        ]);
+        $this->withoutVite();
+
+        $this->actingAs($this->employee(), 'employee')->get('/employee/video-conferencing')
+            ->assertOk()
+            ->assertSee('video.test.example', false)
+            ->assertSee('connectivity_failures', false)
+            ->assertDontSee('private-api-key')
+            ->assertDontSee('private-api-secret');
+    }
+
+    public function test_authenticated_employee_can_report_a_sanitized_client_connection_failure(): void
+    {
+        config(['video-conferencing.enabled' => true]);
+        Log::spy();
+        $employee = $this->employee();
+
+        $this->actingAs($employee, 'employee')->postJson(
+            '/employee/video-conferencing/api/connectivity-failures',
+            [
+                'stage' => 'preflight',
+                'room' => 'lineup',
+                'join_as' => 'sta1',
+                'failure_code' => 'conference_network_unreachable',
+            ],
+        )->assertNoContent();
+
+        Log::shouldHaveReceived('warning')->once()->with(
+            'Video conference client connection failed',
+            Mockery::on(fn (array $context): bool => $context['employee_id'] === $employee->getKey()
+                && $context['stage'] === 'preflight'
+                && $context['room'] === 'lineup'
+                && $context['join_as'] === 'sta1'
+                && $context['failure_code'] === 'conference_network_unreachable'
+                && is_string($context['client_ip_hash'])
+                && strlen($context['client_ip_hash']) === 64
+                && ! array_key_exists('token', $context)),
+        );
+    }
+
+    public function test_client_failure_telemetry_rejects_unbounded_or_unknown_values(): void
+    {
+        config(['video-conferencing.enabled' => true]);
+
+        $this->actingAs($this->employee(), 'employee')->postJson(
+            '/employee/video-conferencing/api/connectivity-failures',
+            [
+                'stage' => 'arbitrary-stage',
+                'room' => 'arbitrary-room',
+                'join_as' => 'arbitrary-role',
+                'failure_code' => str_repeat('x', 100),
+            ],
+        )->assertUnprocessable()
+            ->assertJsonValidationErrors(['stage', 'room', 'join_as', 'failure_code']);
     }
 
     public function test_admin_guard_does_not_authorize_conference_api(): void
@@ -108,6 +173,38 @@ class ConferenceAccessTest extends TestCase
             ->assertOk()
             ->assertJsonPath('status', 'disabled');
         $this->assertSame([], $provider->createdRooms);
+    }
+
+    public function test_health_endpoint_reports_degraded_after_repeated_recent_client_failures(): void
+    {
+        config([
+            'video-conferencing.enabled' => true,
+            'video-conferencing.client_failure_degraded_threshold' => 3,
+        ]);
+        $provider = new FakeConferenceProvider;
+        $this->app->instance(ConferenceProvider::class, $provider);
+        Log::spy();
+        $employee = $this->employee();
+
+        foreach (range(1, 3) as $attempt) {
+            $this->actingAs($employee, 'employee')->postJson(
+                '/employee/video-conferencing/api/connectivity-failures',
+                [
+                    'stage' => 'preflight',
+                    'room' => 'lineup',
+                    'join_as' => 'sta1',
+                    'failure_code' => 'conference_network_unreachable',
+                ],
+            )->assertNoContent();
+        }
+
+        $this->actingAs(User::factory()->create(), 'web')
+            ->getJson('/admin/video-conferencing/health')
+            ->assertOk()
+            ->assertJsonPath('status', 'degraded')
+            ->assertJsonPath('checks.provider_api', 'healthy')
+            ->assertJsonPath('checks.recent_client_connection_failures', 3)
+            ->assertJsonPath('client_transport', 'tailnet');
     }
 
     private function employee(array $overrides = []): Employee

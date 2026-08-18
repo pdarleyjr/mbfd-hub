@@ -11,7 +11,7 @@ export default defineConfig({
     use: {
         baseURL: process.env.VIDEO_CONFERENCING_E2E_BASE_URL ?? 'http://127.0.0.1:8000',
         viewport: { width: 1280, height: 900 },
-        permissions: ['camera', 'microphone'],
+        permissions: ['camera', 'microphone', 'local-network-access'],
         trace: 'retain-on-failure',
         screenshot: 'only-on-failure',
         video: 'retain-on-failure',

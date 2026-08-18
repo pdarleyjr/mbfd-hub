@@ -10,6 +10,13 @@ return [
     'timezone' => 'America/New_York',
     'lineup_time' => $lineupTime,
     'command_pin_hash' => env('VIDEO_CONFERENCING_COMMAND_PIN_HASH'),
+    'client_connectivity_timeout_ms' => (int) env('VIDEO_CONFERENCING_CONNECTIVITY_TIMEOUT_MS', 5000),
+    'client_failure_degraded_threshold' => (int) env('VIDEO_CONFERENCING_CLIENT_FAILURE_DEGRADED_THRESHOLD', 3),
+    'client_transport' => env('VIDEO_CONFERENCING_CLIENT_TRANSPORT', 'tailnet'),
+    'client_connectivity_help' => env(
+        'VIDEO_CONFERENCING_CONNECTIVITY_HELP',
+        'Make sure MBFD Tailscale is connected. If Chrome or Edge asks for Local Network Access, choose Allow; if that permission is unavailable, use Firefox.',
+    ),
     'livekit' => [
         'url' => env('LIVEKIT_URL'),
         'api_url' => env('LIVEKIT_API_URL'),
