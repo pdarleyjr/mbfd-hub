@@ -6,6 +6,8 @@ namespace App\Http\Resources\Public;
 
 use App\Models\ApparatusServiceTicket;
 use App\Models\ApparatusServiceTicketUpdate;
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -30,19 +32,43 @@ class PublicApparatusServiceTicketResource extends JsonResource
             'priority' => $ticket->priority,
             'status' => $ticket->status,
             'is_open' => $ticket->is_open,
-            'scheduled_for' => $ticket->scheduled_for?->toIso8601String(),
+            'scheduled_for' => $this->iso8601($ticket->scheduled_for),
             'scheduled_location' => $ticket->scheduled_location,
-            'expected_return_at' => $ticket->expected_return_at?->toIso8601String(),
+            'expected_return_at' => $this->iso8601($ticket->expected_return_at),
             'current_public_response' => $ticket->current_public_response,
-            'created_at' => $ticket->created_at?->toIso8601String(),
-            'updated_at' => $ticket->updated_at?->toIso8601String(),
-            'updates' => $this->whenLoaded('updates', fn (): array => $ticket->updates->map(fn (ApparatusServiceTicketUpdate $update): array => [
+            'created_at' => $this->iso8601($ticket->created_at),
+            'updated_at' => $this->iso8601($ticket->updated_at),
+            'updates' => $this->whenLoaded('updates', fn (): array => $this->publicUpdates($ticket)),
+        ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function publicUpdates(ApparatusServiceTicket $ticket): array
+    {
+        $updates = [];
+
+        foreach ($ticket->updates as $update) {
+            /** @var ApparatusServiceTicketUpdate $update */
+            $updates[] = [
                 'id' => $update->id,
                 'status' => $update->status,
                 'public_note' => $update->public_note,
-                'scheduled_for' => $update->scheduled_for?->toIso8601String(),
-                'created_at' => $update->created_at?->toIso8601String(),
-            ])->all()),
-        ];
+                'scheduled_for' => $this->iso8601($update->scheduled_for),
+                'created_at' => $this->iso8601($update->created_at),
+            ];
+        }
+
+        return $updates;
+    }
+
+    private function iso8601(mixed $value): ?string
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value->format(DATE_ATOM);
+        }
+
+        return is_string($value) && $value !== ''
+            ? CarbonImmutable::parse($value)->toIso8601String()
+            : null;
     }
 }
