@@ -293,7 +293,7 @@ export default function StationDetailPage() {
         </div>
 
         {/* Quick Links */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 mb-6">
           {[1, 2, 3, 4, 6].includes(station.station_number) && (
             <a
               href={`/employee/video-conferencing?room=lineup&join_as=sta${station.station_number}`}
@@ -305,6 +305,15 @@ export default function StationDetailPage() {
               Morning Lineup
             </a>
           )}
+          <a
+            href={`/employee/personnel-equipment-request?station_id=${station.id}&return_to=${encodeURIComponent(`/daily/stations/${station.id}`)}`}
+            className="flex min-h-12 items-center gap-2.5 p-3 bg-amber-50 rounded-xl ring-1 ring-amber-300/80 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 transition-colors text-sm font-semibold text-amber-950"
+          >
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.955 11.955 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+            </svg>
+            Personnel Equipment Request
+          </a>
           <Link
             to={`/forms-hub/station-request?station_id=${station.id}&return_to=${encodeURIComponent(`/stations/${station.id}`)}`}
             className="flex min-h-12 items-center gap-2.5 p-3 bg-blue-50 rounded-xl ring-1 ring-blue-200/80 hover:bg-blue-100 transition-all text-sm font-semibold text-blue-800"

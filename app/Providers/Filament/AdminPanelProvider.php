@@ -53,9 +53,9 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login(Login::class)
             ->brandName('MBFD Support Hub')
-            ->brandLogo(secure_asset('images/mbfd_logo-256.png'))
+            ->brandLogo(asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
-            ->favicon(secure_asset('favicon.ico'))
+            ->favicon(asset('favicon.ico'))
             ->darkMode(false)
             ->colors([
                 'primary' => Color::Red,
@@ -78,6 +78,7 @@ class AdminPanelProvider extends PanelProvider
             // proven safe and we can move on to bisect step 2.
             ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
+            ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 Pages\Dashboard::class,

@@ -6,12 +6,10 @@ namespace Tests\Feature;
 
 use App\Filament\Employee\Pages\RequestEquipmentPage;
 use App\Models\Employee;
-use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
-use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class EmployeeEquipmentRequestWorkflowTest extends TestCase
@@ -20,10 +18,6 @@ class EmployeeEquipmentRequestWorkflowTest extends TestCase
 
     public function test_employee_request_reaches_admin_queue_without_losing_attribution_or_content(): void
     {
-        Role::create(['name' => 'logistics_admin', 'guard_name' => 'web']);
-        $admin = User::factory()->create();
-        $admin->assignRole('logistics_admin');
-
         $employee = Employee::query()->create([
             'employee_id' => '20810',
             'name' => 'Portal Request Test',
@@ -37,21 +31,27 @@ class EmployeeEquipmentRequestWorkflowTest extends TestCase
 
         Livewire::test(RequestEquipmentPage::class)
             ->fillForm([
-                'requested_items' => '2x navy T-shirts, size Large; replace torn station wear.',
+                'items' => [[
+                    'item_code' => 't_shirt',
+                    'size' => 'L',
+                    'quantity' => 2,
+                ]],
             ])
             ->call('submit')
             ->assertHasNoFormErrors();
 
-        $this->assertDatabaseHas('employee_equipment_requests', [
-            'employee_portal_id' => $employee->id,
-            'user_id' => null,
-            'requested_items' => '2x navy T-shirts, size Large; replace torn station wear.',
-            'status' => 'Pending',
+        $this->assertDatabaseHas('personnel_requests', [
+            'beneficiary_employee_id' => $employee->id,
+            'requester_employee_id' => $employee->id,
+            'type' => 'uniform',
+            'status' => 'pending',
         ]);
-
-        $this->assertDatabaseHas('notifications', [
-            'notifiable_type' => User::class,
-            'notifiable_id' => $admin->id,
+        $this->assertDatabaseHas('personnel_request_items', [
+            'item_code' => 't_shirt',
+            'item_name' => 'T-Shirt',
+            'size' => 'L',
+            'quantity' => 2,
         ]);
+        $this->assertDatabaseCount('employee_equipment_requests', 0);
     }
 }

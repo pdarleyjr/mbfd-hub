@@ -44,3 +44,9 @@ Schedule::command('projects:milestone-reminders')
 Schedule::command('model:prune', [
     '--model' => [\App\Models\NotificationTracking::class],
 ])->daily();
+
+Schedule::command('personnel-equipment:notify-expirations')
+    ->dailyAt('06:30')
+    ->timezone('America/New_York')
+    ->withoutOverlapping()
+    ->onOneServer();

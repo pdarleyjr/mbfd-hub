@@ -67,14 +67,28 @@ class Employee extends Authenticatable implements FilamentUser
     }
 
     // Relationships
+    /** @return HasMany<AssignedEquipment, $this> */
     public function assignedEquipment(): HasMany
     {
         return $this->hasMany(AssignedEquipment::class, 'employee_portal_id');
     }
 
+    /** @return HasMany<EmployeeEquipmentRequest, $this> */
     public function equipmentRequests(): HasMany
     {
         return $this->hasMany(EmployeeEquipmentRequest::class, 'employee_portal_id');
+    }
+
+    /** @return HasMany<PersonnelRequest, $this> */
+    public function personnelRequests(): HasMany
+    {
+        return $this->hasMany(PersonnelRequest::class, 'beneficiary_employee_id');
+    }
+
+    /** @return HasMany<PersonnelRequest, $this> */
+    public function submittedPersonnelRequests(): HasMany
+    {
+        return $this->hasMany(PersonnelRequest::class, 'requester_employee_id');
     }
 
     /** Station-scoped requests; intentionally separate from personal equipment requests. */

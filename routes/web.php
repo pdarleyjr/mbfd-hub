@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\OperationalFormDeletionController;
 use App\Http\Controllers\Admin\OperationalFormDocumentController;
+use App\Http\Controllers\Admin\PersonnelRequestAttachmentController as AdminPersonnelRequestAttachmentController;
 use App\Http\Controllers\Admin\QueueStatusController;
 use App\Http\Controllers\Admin\VideoConferenceHealthController;
 use App\Http\Controllers\Api\StationInventoryController;
@@ -11,6 +12,10 @@ use App\Http\Controllers\Employee\OperationalForms\FormGenerationController;
 use App\Http\Controllers\Employee\OperationalForms\FormRecordController;
 use App\Http\Controllers\Employee\OperationalForms\FormUploadController;
 use App\Http\Controllers\Employee\OperationalForms\FrocImportController;
+use App\Http\Controllers\Employee\PersonnelRequestAttachmentController;
+use App\Http\Controllers\Employee\PersonnelRequestDetailController;
+use App\Http\Controllers\Employee\PersonnelRequestResponseController;
+use App\Http\Controllers\Employee\PersonnelRosterSearchController;
 use App\Http\Controllers\Employee\VideoConferencing\ConferenceLeaveController;
 use App\Http\Controllers\Employee\VideoConferencing\ConferenceSessionController;
 use App\Http\Controllers\Employee\VideoConferencing\ConferenceTokenController;
@@ -20,6 +25,7 @@ use App\Http\Controllers\IncidentsController;
 use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\Webhooks\LiveKitWebhookController;
 use App\Http\Controllers\Workgroup\FileDownloadController;
+use App\Http\Middleware\EnsureEmployeeAuthenticated;
 use App\Http\Middleware\ForcePasswordChangeMiddleware;
 use Illuminate\Support\Facades\Route;
 
@@ -68,9 +74,32 @@ Route::post('/webhooks/livekit', LiveKitWebhookController::class)
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
     ->name('webhooks.livekit');
 
+Route::prefix('employee')
+    ->middleware([EnsureEmployeeAuthenticated::class, ForcePasswordChangeMiddleware::class])
+    ->name('employee.personnel-requests.')
+    ->group(function (): void {
+        Route::get('/personnel-roster/search', PersonnelRosterSearchController::class)
+            ->middleware('throttle:60,1')
+            ->name('roster.search');
+        Route::get('/my-requests/{personnelRequest}', PersonnelRequestDetailController::class)->name('show');
+        Route::post('/personnel-requests/{personnelRequest}/attachments', [PersonnelRequestAttachmentController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('attachments.store');
+        Route::post('/personnel-requests/{personnelRequest}/respond', PersonnelRequestResponseController::class)
+            ->middleware('throttle:20,1')
+            ->name('respond');
+        Route::get('/personnel-request-attachments/{attachment}', [PersonnelRequestAttachmentController::class, 'download'])
+            ->middleware('throttle:30,1')
+            ->name('attachments.download');
+    });
+
 Route::get('/admin/video-conferencing/health', VideoConferenceHealthController::class)
     ->middleware(['auth:web', 'throttle:30,1'])
     ->name('admin.video-conferencing.health');
+
+Route::get('/admin/personnel-request-attachments/{attachment}', AdminPersonnelRequestAttachmentController::class)
+    ->middleware(['auth:web', 'throttle:30,1'])
+    ->name('admin.personnel-request-attachments.download');
 
 Route::prefix('employee/forms/api')
     ->middleware(['auth:employee', ForcePasswordChangeMiddleware::class, 'throttle:120,1'])
@@ -138,6 +167,7 @@ Route::get('/manifest.json', function () {
     $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     $response->headers->set('Pragma', 'no-cache');
     $response->headers->set('Expires', '0');
+
     return $response;
 });
 
@@ -187,7 +217,7 @@ Route::get('/daily/{path?}', function () {
     ]);
 })->where('path', '.+');
 
-Route::get('/__version', function() {
+Route::get('/__version', function () {
     $shaFile = base_path('.git-sha');
     $sha = file_exists($shaFile) ? trim(file_get_contents($shaFile)) : 'unknown';
     $buildTimeFile = base_path('.build-time');
@@ -275,35 +305,53 @@ Route::get('/workgroup-export/{tableKey}', function (string $tableKey, \Illumina
     if (str_starts_with($tableKey, 'category_')) {
         $categoryName = urldecode(str_replace('category_', '', $tableKey));
         $results = $evalService->getSessionResults($sessionId);
-        $targetCat = collect($results['rankable_categories'])->first(fn($c) => $c['category_name'] === $categoryName);
+        $targetCat = collect($results['rankable_categories'])->first(fn ($c) => $c['category_name'] === $categoryName);
+
         return response()->streamDownload(function () use ($targetCat) {
             $h = fopen('php://output', 'w');
-            fputcsv($h, ['Rank','Product','Manufacturer','Model','Overall Score','Responses','Meets Threshold']);
-            if ($targetCat) { foreach ($targetCat['rankings'] as $i => $item) { fputcsv($h, [$i+1, $item['product']->name??'', $item['product']->manufacturer??'', $item['product']->model??'', $item['weighted_average']??'', $item['response_count']??'', $item['meets_threshold']?'Yes':'No']); } }
+            fputcsv($h, ['Rank', 'Product', 'Manufacturer', 'Model', 'Overall Score', 'Responses', 'Meets Threshold']);
+            if ($targetCat) {
+                foreach ($targetCat['rankings'] as $i => $item) {
+                    fputcsv($h, [$i + 1, $item['product']->name ?? '', $item['product']->manufacturer ?? '', $item['product']->model ?? '', $item['weighted_average'] ?? '', $item['response_count'] ?? '', $item['meets_threshold'] ? 'Yes' : 'No']);
+                }
+            }
             fclose($h);
-        }, strtolower(str_replace(' ','_',$categoryName)).'_rankings_'.now()->format('Y-m-d').'.csv', ['Content-Type'=>'text/csv']);
+        }, strtolower(str_replace(' ', '_', $categoryName)).'_rankings_'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv']);
     }
 
     if ($tableKey === 'competitor_groups') {
         $wg = \App\Models\Workgroup::first();
         $sess = $sessionId ? \App\Models\WorkgroupSession::find($sessionId) : null;
         $rankings = $wg ? $evalService->getCompetitorGroupRankings($wg, $sess) : [];
+
         return response()->streamDownload(function () use ($rankings) {
             $h = fopen('php://output', 'w');
-            fputcsv($h, ['Category','Group','Rank','Product','Brand','Avg Score','Responses']);
-            foreach ($rankings as $c) { foreach ($c['groups'] as $g) { foreach ($g['rankings'] as $i => $r) { fputcsv($h, [$c['category_name'], $g['group_name'], $i+1, $r['name']??'', $r['brand']??'', $r['avg_score']??'', $r['response_count']??'']); } } }
+            fputcsv($h, ['Category', 'Group', 'Rank', 'Product', 'Brand', 'Avg Score', 'Responses']);
+            foreach ($rankings as $c) {
+                foreach ($c['groups'] as $g) {
+                    foreach ($g['rankings'] as $i => $r) {
+                        fputcsv($h, [$c['category_name'], $g['group_name'], $i + 1, $r['name'] ?? '', $r['brand'] ?? '', $r['avg_score'] ?? '', $r['response_count'] ?? '']);
+                    }
+                }
+            }
             fclose($h);
-        }, 'competitor_groups_'.now()->format('Y-m-d').'.csv', ['Content-Type'=>'text/csv']);
+        }, 'competitor_groups_'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv']);
     }
 
     if ($tableKey === 'finalists') {
         $results = $evalService->getSessionResults($sessionId);
+
         return response()->streamDownload(function () use ($results) {
             $h = fopen('php://output', 'w');
-            fputcsv($h, ['Category','Rank','Product','Manufacturer','Avg Score','Responses']);
-            foreach ($results['rankable_categories'] as $c) { $top = collect($c['rankings'])->filter(fn($r)=>$r['meets_threshold'])->take(2); foreach ($top as $i => $item) { fputcsv($h, [$c['category_name'], $i+1, $item['product']->name??'', $item['product']->manufacturer??'', $item['weighted_average']??'', $item['response_count']??'']); } }
+            fputcsv($h, ['Category', 'Rank', 'Product', 'Manufacturer', 'Avg Score', 'Responses']);
+            foreach ($results['rankable_categories'] as $c) {
+                $top = collect($c['rankings'])->filter(fn ($r) => $r['meets_threshold'])->take(2);
+                foreach ($top as $i => $item) {
+                    fputcsv($h, [$c['category_name'], $i + 1, $item['product']->name ?? '', $item['product']->manufacturer ?? '', $item['weighted_average'] ?? '', $item['response_count'] ?? '']);
+                }
+            }
             fclose($h);
-        }, 'finalists_'.now()->format('Y-m-d').'.csv', ['Content-Type'=>'text/csv']);
+        }, 'finalists_'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv']);
     }
 
     $granular = $evalService->getGranularToolGroupings($sessionId);
@@ -311,31 +359,40 @@ Route::get('/workgroup-export/{tableKey}', function (string $tableKey, \Illumina
 
     if ($tableKey === 't1_standalone') {
         $t1 = $granular['t1_standalone'] ?? null;
+
         return response()->streamDownload(function () use ($t1) {
             $h = fopen('php://output', 'w');
-            fputcsv($h, ['Product','Brand','Overall','Capability','Usability','Affordability','Maintainability','Deployability','Responses']);
-            if ($t1) { fputcsv($h, [$t1['name']??'', $t1['brand']??'', $t1['avg_score']??'', $t1['saver_breakdown']['capability']??'', $t1['saver_breakdown']['usability']??'', $t1['saver_breakdown']['affordability']??'', $t1['saver_breakdown']['maintainability']??'', $t1['saver_breakdown']['deployability']??'', $t1['response_count']??'']); }
+            fputcsv($h, ['Product', 'Brand', 'Overall', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability', 'Responses']);
+            if ($t1) {
+                fputcsv($h, [$t1['name'] ?? '', $t1['brand'] ?? '', $t1['avg_score'] ?? '', $t1['saver_breakdown']['capability'] ?? '', $t1['saver_breakdown']['usability'] ?? '', $t1['saver_breakdown']['affordability'] ?? '', $t1['saver_breakdown']['maintainability'] ?? '', $t1['saver_breakdown']['deployability'] ?? '', $t1['response_count'] ?? '']);
+            }
             fclose($h);
-        }, $fn, ['Content-Type'=>'text/csv']);
+        }, $fn, ['Content-Type' => 'text/csv']);
     }
 
     if ($tableKey === 'brand_overall') {
         $brands = $granular['brand_overall'] ?? [];
+
         return response()->streamDownload(function () use ($brands) {
             $h = fopen('php://output', 'w');
-            fputcsv($h, ['Rank','Brand','Overall Avg','Tools','Capability','Usability','Affordability','Maintainability','Deployability']);
-            foreach ($brands as $b) { fputcsv($h, [$b['rank']??'', $b['brand']??'', $b['overall_avg']??'', $b['tool_count']??'', $b['saver_breakdown']['capability']??'', $b['saver_breakdown']['usability']??'', $b['saver_breakdown']['affordability']??'', $b['saver_breakdown']['maintainability']??'', $b['saver_breakdown']['deployability']??'']); }
+            fputcsv($h, ['Rank', 'Brand', 'Overall Avg', 'Tools', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability']);
+            foreach ($brands as $b) {
+                fputcsv($h, [$b['rank'] ?? '', $b['brand'] ?? '', $b['overall_avg'] ?? '', $b['tool_count'] ?? '', $b['saver_breakdown']['capability'] ?? '', $b['saver_breakdown']['usability'] ?? '', $b['saver_breakdown']['affordability'] ?? '', $b['saver_breakdown']['maintainability'] ?? '', $b['saver_breakdown']['deployability'] ?? '']);
+            }
             fclose($h);
-        }, $fn, ['Content-Type'=>'text/csv']);
+        }, $fn, ['Content-Type' => 'text/csv']);
     }
 
     $items = $granular[$tableKey] ?? [];
+
     return response()->streamDownload(function () use ($items) {
         $h = fopen('php://output', 'w');
-        fputcsv($h, ['Rank','Product','Brand','Overall','Capability','Usability','Affordability','Maintainability','Deployability','Advance Yes','Advance No','Deal Breakers','Responses']);
-        foreach ($items as $i => $item) { fputcsv($h, [$i+1, $item['name']??($item['product']->name??''), $item['brand']??'', $item['avg_score']??'', $item['capability_avg']??'', $item['usability_avg']??'', $item['affordability_avg']??'', $item['maintainability_avg']??'', $item['deployability_avg']??'', $item['advance_yes']??'', $item['advance_no']??'', $item['deal_breakers']??'', $item['response_count']??'']); }
+        fputcsv($h, ['Rank', 'Product', 'Brand', 'Overall', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability', 'Advance Yes', 'Advance No', 'Deal Breakers', 'Responses']);
+        foreach ($items as $i => $item) {
+            fputcsv($h, [$i + 1, $item['name'] ?? ($item['product']->name ?? ''), $item['brand'] ?? '', $item['avg_score'] ?? '', $item['capability_avg'] ?? '', $item['usability_avg'] ?? '', $item['affordability_avg'] ?? '', $item['maintainability_avg'] ?? '', $item['deployability_avg'] ?? '', $item['advance_yes'] ?? '', $item['advance_no'] ?? '', $item['deal_breakers'] ?? '', $item['response_count'] ?? '']);
+        }
         fclose($h);
-    }, $fn, ['Content-Type'=>'text/csv']);
+    }, $fn, ['Content-Type' => 'text/csv']);
 })->name('workgroup.export.csv')->middleware(['auth', 'workgroup.access']);
 
 // Workgroup Report PDF Exports (authenticated + workgroup-authorized)

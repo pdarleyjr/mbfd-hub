@@ -6,7 +6,9 @@ use App\Filament\Employee\Pages\Auth\EmployeeLogin;
 use App\Filament\Employee\Pages\ChangePasswordPage;
 use App\Filament\Employee\Pages\EmployeeDashboard;
 use App\Filament\Employee\Pages\MyEquipmentPage;
+use App\Filament\Employee\Pages\MyRequestsPage;
 use App\Filament\Employee\Pages\OperationalForms;
+use App\Filament\Employee\Pages\PersonnelEquipmentRequestPage;
 use App\Filament\Employee\Pages\RequestEquipmentPage;
 use App\Filament\Employee\Pages\VideoConferencing;
 use App\Http\Middleware\ForcePasswordChangeMiddleware;
@@ -19,6 +21,7 @@ use Filament\Navigation\MenuItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -46,12 +49,12 @@ class EmployeePanelProvider extends PanelProvider
             ->login(EmployeeLogin::class)
             ->authGuard('employee')
             ->brandName('MBFD Employee Portal')
-            ->brandLogo(secure_asset('images/mbfd_logo-256.png'))
+            ->brandLogo(asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
-            ->favicon(secure_asset('favicon.ico'))
+            ->favicon(asset('favicon.ico'))
             ->darkMode(false)
             ->colors([
-                'primary' => Color::Red,
+                'primary' => Color::Blue,
                 'danger' => Color::Rose,
                 'gray' => Color::Slate,
                 'info' => Color::Blue,
@@ -65,7 +68,9 @@ class EmployeePanelProvider extends PanelProvider
                 OperationalForms::class,
                 VideoConferencing::class,
                 MyEquipmentPage::class,
+                MyRequestsPage::class,
                 RequestEquipmentPage::class,
+                PersonnelEquipmentRequestPage::class,
                 ChangePasswordPage::class,
             ])
             ->widgets([])
@@ -75,7 +80,11 @@ class EmployeePanelProvider extends PanelProvider
                     ->url(fn (): string => MyEquipmentPage::getUrl(panel: 'employee'))
                     ->icon('heroicon-o-shield-check'),
                 MenuItem::make()
-                    ->label('Request Equipment')
+                    ->label('My Requests')
+                    ->url(fn (): string => MyRequestsPage::getUrl(panel: 'employee'))
+                    ->icon('heroicon-o-clipboard-document-list'),
+                MenuItem::make()
+                    ->label('Request Uniforms')
                     ->url(fn (): string => RequestEquipmentPage::getUrl(panel: 'employee'))
                     ->icon('heroicon-o-shopping-cart'),
                 MenuItem::make()
@@ -109,6 +118,10 @@ class EmployeePanelProvider extends PanelProvider
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('60s')
+            ->renderHook(
+                PanelsRenderHook::PAGE_START,
+                fn () => auth('employee')->check() ? view('filament.employee.partials.back-button') : '',
+            )
             ->sidebarCollapsibleOnDesktop();
     }
 }

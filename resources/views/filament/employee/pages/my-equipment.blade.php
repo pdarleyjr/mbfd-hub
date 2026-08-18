@@ -12,7 +12,7 @@
         </div>
     </div>
 
-    @if($equipment->isEmpty())
+    @if($activeEquipment->isEmpty() && $history->isEmpty())
         <div class="ep-empty-full">
             <div class="ep-empty-inner">
                 <svg class="ep-empty-big-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -21,14 +21,16 @@
                 <h3 class="ep-empty-heading">No equipment assigned yet</h3>
                 <p class="ep-empty-body">Your assigned gear and uniforms will appear here once assigned by a logistics administrator.</p>
                 <a href="{{ \App\Filament\Employee\Pages\RequestEquipmentPage::getUrl(panel: 'employee') }}" class="ep-empty-cta">
-                    Submit Equipment Request →
+                    Request Uniforms →
                 </a>
             </div>
         </div>
     @else
         {{-- Summary line --}}
         <div class="ep-eq-summary">
-            <strong>{{ $equipment->count() }}</strong> item{{ $equipment->count() === 1 ? '' : 's' }} assigned across <strong>{{ $byCategory->count() }}</strong> {{ $byCategory->count() === 1 ? 'category' : 'categories' }}
+            <strong>{{ $activeEquipment->count() }}</strong> active item{{ $activeEquipment->count() === 1 ? '' : 's' }} across <strong>{{ $byCategory->count() }}</strong> {{ $byCategory->count() === 1 ? 'category' : 'categories' }}
+            @if($expiringSoon->isNotEmpty()) · <strong>{{ $expiringSoon->count() }}</strong> expiring soon @endif
+            @if($expired->isNotEmpty()) · <strong class="ep-expired-text">{{ $expired->count() }}</strong> expired @endif
         </div>
 
         @foreach($byCategory as $category => $items)
@@ -41,9 +43,10 @@
                     <table class="ep-eq-table">
                         <thead>
                             <tr>
-                                <th class="ep-eq-th" style="width:55%">Item</th>
+                                <th class="ep-eq-th" style="width:40%">Item</th>
                                 <th class="ep-eq-th ep-eq-th-right" style="width:15%">Qty</th>
-                                <th class="ep-eq-th ep-eq-th-right" style="width:30%">Issued</th>
+                                <th class="ep-eq-th ep-eq-th-right" style="width:20%">Issued</th>
+                                <th class="ep-eq-th ep-eq-th-right" style="width:25%">Expiration</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -54,6 +57,17 @@
                                     <td class="ep-eq-td ep-eq-td-right ep-eq-date">
                                         {{ $item->issued_at ? $item->issued_at->format('M j, Y') : '—' }}
                                     </td>
+                                    <td class="ep-eq-td ep-eq-td-right ep-eq-date">
+                                        @if(!$item->expires_at)
+                                            —
+                                        @elseif($item->expires_at->isBefore(today()))
+                                            <span class="ep-expiration ep-expiration-expired">Expired · {{ $item->expires_at->format('M j, Y') }}</span>
+                                        @elseif($item->expires_at->lte(today()->addDays(60)))
+                                            <span class="ep-expiration ep-expiration-soon">Expiring Soon · {{ $item->expires_at->format('M j, Y') }}</span>
+                                        @else
+                                            {{ $item->expires_at->format('M j, Y') }}
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -61,6 +75,17 @@
                 </div>
             </div>
         @endforeach
+
+        @if($history->isNotEmpty())
+            <div class="ep-category">
+                <div class="ep-category-header"><span class="ep-category-name">Returned / Retired History</span><span class="ep-category-count">{{ $history->count() }}</span></div>
+                <div class="ep-eq-table-wrap">
+                    @foreach($history as $item)
+                        <div class="ep-history-row"><span><strong>{{ $item->item_description }}</strong><small>{{ $item->category }}</small></span><span>{{ $item->returned_at?->format('M j, Y') ?? str($item->status)->title() }}</span></div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
     @endif
 
     <style>
@@ -218,6 +243,7 @@
             color: #292524;
         }
         .ep-eq-td-right { text-align: right; }
+        .ep-expiration{display:inline-flex;border-radius:999px;padding:.2rem .45rem;font-size:.65rem;font-weight:800}.ep-expiration-soon{background:#fef3c7;color:#92400e}.ep-expiration-expired{background:#fee2e2;color:#991b1b}.ep-expired-text{color:#b91c1c}.ep-history-row{display:flex;min-height:3.5rem;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;border-bottom:1px solid #f0ede8;color:#57534e;font-size:.78rem}.ep-history-row:last-child{border:0}.ep-history-row strong,.ep-history-row small{display:block}.ep-history-row strong{color:#292524}.ep-history-row small{margin-top:.15rem;color:#78716c}
         .ep-eq-qty {
             font-weight: 700;
             font-variant-numeric: tabular-nums;
