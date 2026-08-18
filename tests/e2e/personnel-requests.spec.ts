@@ -21,8 +21,8 @@ async function expectViewportFit(page: Page): Promise<void> {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
 }
 
-async function screenshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
-  await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true });
+async function screenshot(page: Page, testInfo: TestInfo, name: string, fullPage = true): Promise<void> {
+  await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage });
 }
 
 test('homepage exposes the exact station and uniform-specific destinations', async ({ page }, testInfo) => {
@@ -67,6 +67,7 @@ test('officer PPE page preserves station return target and supports pointer sign
 
   await expect(page.getByRole('heading', { name: 'Personnel Equipment Request' })).toBeVisible();
   await expect(page.getByLabel('Authenticated officer Captain').getByText('Captain — Avery Officer — 99001')).toBeVisible();
+  await expect(page.getByText('Every station searches the same complete department roster.')).toBeVisible();
   const back = page.locator('.employee-global-back a');
   await expect(back).toHaveAttribute('href', '/daily/stations/1');
   await expect(back).toContainText('Back to Station');
@@ -83,11 +84,13 @@ test('officer PPE page preserves station return target and supports pointer sign
 
   const beneficiary = page.getByRole('combobox').nth(1);
   await beneficiary.click();
-  await page.keyboard.type('Morgan');
+  await page.keyboard.type('morgan');
   await page.getByRole('option', { name: 'Firefighter — Morgan Member — 99002' }).click();
   await page.getByRole('button', { name: 'Next' }).click();
+  const equipmentSelect = page.getByLabel('Equipment*', { exact: true });
+  await expect(equipmentSelect).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('A police report may be required')).toBeVisible();
-  await page.getByLabel('Equipment*', { exact: true }).selectOption('structural_firefighting_helmet');
+  await equipmentSelect.selectOption('structural_firefighting_helmet');
   await page.getByLabel('Reason*', { exact: true }).selectOption('damaged');
   await page.getByRole('button', { name: 'Next' }).click();
 
@@ -115,12 +118,12 @@ test('logistics administrator sees the single personnel workspace and lifecycle 
   await page.getByLabel('Password').fill(requiredPassword('PERSONNEL_REQUESTS_E2E_ADMIN_PASSWORD'));
   await page.getByRole('button', { name: /sign in/i }).click();
   await page.waitForURL(/\/admin(?!\/login)/, { timeout: 20_000 });
-  await page.goto('/admin/personnel-uniforms-equipment/overview', { waitUntil: 'networkidle' });
+  await page.goto('/admin/personnel-uniforms-equipment/overview', { waitUntil: 'domcontentloaded' });
 
   await expect(page.getByRole('heading', { name: 'Personnel Uniforms / Equipment' }).first()).toBeVisible();
   await expect(page.getByText('Uniform Requests')).toBeVisible();
   await expect(page.getByText('Equipment Requests')).toBeVisible();
   await expect(page.getByText('Expiring Soon')).toBeVisible();
   await expectViewportFit(page);
-  await screenshot(page, testInfo, 'admin-overview');
+  await screenshot(page, testInfo, 'admin-overview', false);
 });
