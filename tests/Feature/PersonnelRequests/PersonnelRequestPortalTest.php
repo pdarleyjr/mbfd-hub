@@ -12,7 +12,9 @@ use App\Models\Station;
 use App\Models\User;
 use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
@@ -22,21 +24,35 @@ class PersonnelRequestPortalTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_roster_search_is_private_officer_only_paginated_and_minimally_disclosed(): void
+    public function test_roster_search_is_private_officer_only_case_insensitive_complete_and_minimally_disclosed(): void
     {
         $firefighter = $this->employee('27001', 'Firefighter', 'Alex Firefighter');
         $officer = $this->employee('27002', 'Captain', 'Taylor Captain');
         $beneficiary = $this->employee('27003', 'Firefighter', 'Morgan Searchable');
 
+        foreach (range(1, 35) as $index) {
+            $this->employee((string) (28000 + $index), 'Firefighter', sprintf('Roster Member %02d', $index));
+        }
+
         $this->get('/employee/personnel-roster/search?q=Morgan')->assertRedirect('/employee/login');
         $this->actingAs($firefighter, 'employee')->getJson('/employee/personnel-roster/search?q=Morgan')->assertForbidden();
-        $response = $this->actingAs($officer, 'employee')->getJson('/employee/personnel-roster/search?q=Morgan')->assertOk();
 
-        $response->assertJsonPath('data.0.id', $beneficiary->id)
-            ->assertJsonPath('data.0.label', 'Firefighter — Morgan Searchable — 27003')
-            ->assertJsonMissingPath('data.0.password')
-            ->assertJsonMissingPath('data.0.remember_token')
-            ->assertHeader('Cache-Control', 'max-age=0, no-store, private');
+        DB::statement('PRAGMA case_sensitive_like = ON');
+
+        try {
+            $response = $this->actingAs($officer, 'employee')->getJson('/employee/personnel-roster/search?q=morgan')->assertOk();
+
+            $response->assertJsonPath('data.0.id', $beneficiary->id)
+                ->assertJsonPath('data.0.label', 'Firefighter — Morgan Searchable — 27003')
+                ->assertJsonMissingPath('data.0.password')
+                ->assertJsonMissingPath('data.0.remember_token')
+                ->assertHeader('Cache-Control', 'max-age=0, no-store, private');
+
+            $rankResponse = $this->getJson('/employee/personnel-roster/search?q=Firefighter')->assertOk();
+            $this->assertCount(37, $rankResponse->json('data'));
+        } finally {
+            DB::statement('PRAGMA case_sensitive_like = OFF');
+        }
     }
 
     public function test_officer_workflow_page_rejects_guests_and_firefighters(): void
@@ -51,6 +67,32 @@ class PersonnelRequestPortalTest extends TestCase
 
         $this->get("/employee/personnel-equipment-request?station_id={$station->id}")->assertRedirect('/employee/login');
         $this->actingAs($firefighter, 'employee')->get("/employee/personnel-equipment-request?station_id={$station->id}")->assertForbidden();
+    }
+
+    public function test_every_station_context_searches_the_same_complete_department_roster(): void
+    {
+        $officer = $this->employee('27110', 'Captain', 'Roster Officer');
+        $beneficiary = $this->employee('27111', 'Firefighter', 'Department Wide Member');
+        $stations = collect([
+            Station::query()->create(['station_number' => '1', 'address' => '1051 Jefferson Ave', 'zip_code' => '33139', 'is_active' => true]),
+            Station::query()->create(['station_number' => '6', 'address' => '2300 Collins Ave', 'zip_code' => '33139', 'is_active' => true]),
+        ]);
+
+        $this->actingAs($officer, 'employee');
+        Filament::setCurrentPanel(Filament::getPanel('employee'));
+
+        foreach ($stations as $station) {
+            $livewire = Livewire::withQueryParams(['station_id' => $station->id])
+                ->test(PersonnelEquipmentRequestPage::class);
+            $select = collect($livewire->instance()->form->getFlatComponents(withHidden: true))
+                ->first(fn ($component): bool => $component instanceof Select && $component->getName() === 'beneficiary_employee_id');
+
+            $this->assertInstanceOf(Select::class, $select);
+            $this->assertSame(
+                'Firefighter — Department Wide Member — 27111',
+                $select->getSearchResults('department wide')[$beneficiary->id] ?? null,
+            );
+        }
     }
 
     public function test_authorized_officer_page_contains_station_police_and_signature_guidance(): void

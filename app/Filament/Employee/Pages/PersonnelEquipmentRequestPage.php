@@ -9,6 +9,7 @@ use App\Models\Station;
 use App\Services\PersonnelRequests\OfficerAuthorizationService;
 use App\Services\PersonnelRequests\PersonnelCatalog;
 use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
+use App\Services\PersonnelRequests\PersonnelRosterSearch;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -75,6 +76,7 @@ class PersonnelEquipmentRequestPage extends Page
         /** @var Employee $officer */
         $officer = auth('employee')->user();
         $catalog = app(PersonnelCatalog::class);
+        $roster = app(PersonnelRosterSearch::class);
 
         return $form->schema([
             Wizard::make([
@@ -93,16 +95,18 @@ class PersonnelEquipmentRequestPage extends Page
                         Select::make('beneficiary_employee_id')
                             ->label('Member receiving the equipment')
                             ->searchable()
-                            ->getSearchResultsUsing(fn (string $search): array => Employee::query()
-                                ->where(fn ($query) => $query->where('name', 'like', "%{$search}%")->orWhere('employee_id', 'like', "%{$search}%")->orWhere('rank', 'like', "%{$search}%"))
-                                ->orderBy('name')->limit(30)->get()
-                                ->mapWithKeys(fn (Employee $employee) => [$employee->id => "{$employee->rank} — {$employee->name} — {$employee->employee_id}"])->all())
+                            ->getSearchResultsUsing(fn (string $search): array => $roster->options($search))
                             ->getOptionLabelUsing(function ($value): ?string {
                                 $employee = Employee::query()->find($value);
 
                                 return $employee ? "{$employee->rank} — {$employee->name} — {$employee->employee_id}" : null;
                             })
-                            ->helperText('Search by name, rank, or employee ID. The full roster is never preloaded.')
+                            ->optionsLimit(PersonnelRosterSearch::MAX_RESULTS)
+                            ->searchDebounce(350)
+                            ->searchPrompt('Type at least 2 characters to search the full department roster.')
+                            ->searchingMessage('Searching the department roster…')
+                            ->noSearchResultsMessage('No matching member found. Try a name, rank, or employee ID.')
+                            ->helperText('Search by name, rank, or employee ID. Every station searches the same complete department roster.')
                             ->required(),
                     ])->columns(2),
                 Step::make('Equipment items')
