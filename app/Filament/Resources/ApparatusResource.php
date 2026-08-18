@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\ApparatusPmServiceType;
 use App\Enums\ApparatusServiceTicketCategory;
 use App\Enums\ApparatusServiceTicketPriority;
 use App\Filament\Concerns\EnterpriseTable;
@@ -129,13 +130,7 @@ class ApparatusResource extends Resource
                                     ->helperText('Latest odometer reading'),
                                 Forms\Components\Select::make('last_service_type')
                                     ->label('Last Service Type')
-                                    ->options([
-                                        'PMA' => 'PMA — Oil/Fuel Filters, Engine Oil, Grease',
-                                        'PMC' => 'PMC — Oil/Fuel/Air/Trans Filters, Air Dryer',
-                                        '300-Hour PM' => '300-Hour PM',
-                                        'Annual Inspection' => 'Annual Inspection',
-                                        'Chassis Service' => 'Chassis Service',
-                                    ])
+                                    ->options(ApparatusPmServiceType::options())
                                     ->helperText('Most recent service type'),
                                 Forms\Components\DatePicker::make('last_service_date')
                                     ->label('Service Date')
@@ -598,13 +593,7 @@ class ApparatusResource extends Resource
                             ->required(),
                         Forms\Components\Select::make('service_type')
                             ->label('Service Type')
-                            ->options([
-                                'PMA' => 'PMA — Oil/Fuel Filters, Engine Oil, Grease',
-                                'PMC' => 'PMC — Oil/Fuel/Air/Trans Filters, Air Dryer',
-                                '300-Hour PM' => '300-Hour PM',
-                                'Annual Inspection' => 'Annual Inspection',
-                                'Chassis Service' => 'Chassis Service',
-                            ])
+                            ->options(ApparatusPmServiceType::options())
                             ->required(),
                         Forms\Components\TextInput::make('service_engine_hours')
                             ->label('Engine Hours at Service')

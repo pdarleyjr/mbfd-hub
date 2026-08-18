@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Data\ApparatusServiceTicketSubmissionResult;
+use App\Enums\ApparatusPmServiceType;
 use App\Enums\ApparatusServiceTicketCategory;
 use App\Enums\ApparatusServiceTicketPriority;
 use App\Enums\ApparatusServiceTicketStatus;
@@ -172,7 +173,7 @@ class ApparatusServiceTicketWorkflowService
         $validated = Validator::make($data, [
             'client_submission_id' => ['required', 'uuid'],
             'service_date' => ['required', 'date'],
-            'service_type' => ['required', 'string', 'max:255'],
+            'service_type' => ['required', Rule::in(ApparatusPmServiceType::values())],
             'service_engine_hours' => ['nullable', 'numeric', 'min:0'],
             'service_mileage' => ['nullable', 'integer', 'min:0'],
             'service_notes' => ['nullable', 'string', 'max:10000'],

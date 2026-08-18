@@ -200,6 +200,28 @@ class ApparatusServiceTicketWorkflowTest extends TestCase
         $this->assertDatabaseCount('apparatus_service_ticket_updates', 1);
     }
 
+    public function test_pm_log_rejects_service_types_outside_the_existing_apparatus_constraint(): void
+    {
+        $service = app(ApparatusServiceTicketWorkflowService::class);
+
+        try {
+            $service->logPmService($this->apparatus, $this->fleetAdmin, [
+                'client_submission_id' => '47942136-035a-493c-928e-38e924a50962',
+                'service_date' => '2026-08-18',
+                'service_type' => 'Unrecognized PM type',
+                'service_engine_hours' => 412.0,
+                'service_mileage' => 32125,
+            ]);
+            $this->fail('An unsupported PM service type was accepted.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('service_type', $exception->errors());
+        }
+
+        $this->assertDatabaseCount('apparatus_service_tickets', 0);
+        $this->assertDatabaseCount('apparatus_service_ticket_updates', 0);
+        $this->assertNull($this->apparatus->refresh()->last_service_type);
+    }
+
     public function test_operational_status_is_separate_preserves_maintenance_and_rejects_unknown_values(): void
     {
         $service = app(ApparatusServiceTicketWorkflowService::class);
