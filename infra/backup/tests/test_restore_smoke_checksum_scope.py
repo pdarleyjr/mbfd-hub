@@ -16,6 +16,9 @@ class RestoreChecksumScopeTests(unittest.TestCase):
             with self.subTest(script=script_path.relative_to(ROOT)):
                 source = script_path.read_text(encoding="utf-8")
                 self.assertIn("required_artifacts=(", source)
+                self.assertIn("stage_dir_candidates=(", source)
+                self.assertIn('"$candidate/databases/mbfd-hub.dump"', source)
+                self.assertIn('"${#stage_dir_candidates[@]}" -eq 1', source)
                 self.assertIn('relative="${artifact#"$manifest_dir"/}"', source)
                 self.assertRegex(
                     source,
@@ -23,6 +26,7 @@ class RestoreChecksumScopeTests(unittest.TestCase):
                 )
                 self.assertIn('sha256sum -c "$required_manifest" --quiet', source)
                 self.assertNotIn("sha256sum -c SHA256SUMS", source)
+                self.assertNotRegex(source, r'mbfd_dump="\$\(find .* -name mbfd-hub\.dump')
 
 
 if __name__ == "__main__":
