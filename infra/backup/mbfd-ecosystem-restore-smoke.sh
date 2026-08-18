@@ -68,12 +68,29 @@ restic restore "$snapshot" --target "$work" \
     --include='*/SHA256SUMS'
 
 # --- 5/6. Verify representative artifacts exist and hashes match ---
-mbfd_dump="$(find "$work" -type f -name mbfd-hub.dump -print -quit)"
-nextcloud_dump="$(find "$work" -type f -name nextcloud.dump -print -quit)"
-media_db="$(find "$work" -type f -name media-control.sqlite -print -quit)"
-openwebui_db="$(find "$work" -type f -name openwebui.sqlite -print -quit)"
-[[ -s "$mbfd_dump" && -s "$nextcloud_dump" && -s "$media_db" && -s "$openwebui_db" ]] || {
-    echo "FATAL: one or more restored artifacts are missing or empty" >&2; exit 1; }
+# A snapshot may also contain historical SHA256SUMS files below application
+# backup directories. Select one coherent staging root that contains the
+# manifest and all representative databases; never combine independent finds.
+stage_dir_candidates=()
+while IFS= read -r -d '' manifest_candidate; do
+    candidate="${manifest_candidate%/SHA256SUMS}"
+    if [[ -s "$candidate/databases/mbfd-hub.dump" \
+        && -s "$candidate/databases/nextcloud.dump" \
+        && -s "$candidate/sqlite/media-control.sqlite" \
+        && -s "$candidate/sqlite/openwebui.sqlite" ]]; then
+        stage_dir_candidates+=("$candidate")
+    fi
+done < <(find "$work" -type f -name SHA256SUMS -print0)
+[[ "${#stage_dir_candidates[@]}" -eq 1 ]] || {
+    echo "FATAL: expected one complete backup staging root, found ${#stage_dir_candidates[@]}" >&2
+    exit 1
+}
+stage_dir="${stage_dir_candidates[0]}"
+mbfd_dump="$stage_dir/databases/mbfd-hub.dump"
+nextcloud_dump="$stage_dir/databases/nextcloud.dump"
+media_db="$stage_dir/sqlite/media-control.sqlite"
+openwebui_db="$stage_dir/sqlite/openwebui.sqlite"
+sha256_file="$stage_dir/SHA256SUMS"
 
 docker exec -i mbfd-hub-pgsql sh -euc 'pg_restore --list >/dev/null' < "$mbfd_dump" \
     || { echo "FATAL: mbfd-hub dump failed pg_restore --list" >&2; exit 1; }
@@ -84,14 +101,11 @@ docker exec -i mbfd-postgres sh -euc 'pg_restore --list >/dev/null' < "$nextclou
 [[ "$(sqlite3 "$openwebui_db" 'PRAGMA integrity_check;')" == ok ]] \
     || { echo "FATAL: openwebui SQLite integrity check failed" >&2; exit 1; }
 
-sha256_file="$(find "$work" -type f -name SHA256SUMS -print -quit)"
-[[ -s "$sha256_file" ]] || { echo 'FATAL: SHA256SUMS not found in restored snapshot' >&2; exit 1; }
-
 # The backup manifest covers the entire staging tree, while this smoke test
 # intentionally restores only four representative data artifacts. Build a
 # strict sub-manifest so omitted deployment/rollback files are not reported as
 # corrupt, and fail closed if any required artifact is absent from the manifest.
-manifest_dir="$(dirname "$sha256_file")"
+manifest_dir="$stage_dir"
 required_manifest="$work/required-SHA256SUMS"
 required_artifacts=("$mbfd_dump" "$nextcloud_dump" "$media_db" "$openwebui_db")
 : > "$required_manifest"
