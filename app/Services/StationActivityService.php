@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
+use App\Models\ApparatusServiceTicketUpdate;
 use App\Models\Station;
 use App\Models\StationInspection;
 use App\Models\StationInventorySubmission;
@@ -91,12 +92,28 @@ class StationActivityService
                 'occurred_at' => $request->created_at,
             ]);
 
+        $apparatusServiceTicketUpdates = ApparatusServiceTicketUpdate::query()
+            ->whereHas('ticket', fn ($query) => $query->where('station_id', $station->id))
+            ->with('ticket:id,station_id,ticket_number,unit_designation_snapshot,title')
+            ->latest('created_at')
+            ->latest('id')
+            ->limit($limit)
+            ->get(['id', 'apparatus_service_ticket_id', 'status', 'created_at'])
+            ->map(fn (ApparatusServiceTicketUpdate $update): array => [
+                'type' => 'apparatus_service_ticket',
+                'label' => "{$update->ticket->ticket_number} — {$update->ticket->unit_designation_snapshot}: {$update->ticket->title}",
+                'status' => $update->status,
+                'request_number' => $update->ticket->ticket_number,
+                'occurred_at' => $update->created_at,
+            ]);
+
         return collect()
             ->concat($apparatusInspections)
             ->concat($stationInspections)
             ->concat($inventory)
             ->concat($supplyRequests)
             ->concat($stationRequests)
+            ->concat($apparatusServiceTicketUpdates)
             ->sortByDesc('occurred_at')
             ->take($limit)
             ->values();

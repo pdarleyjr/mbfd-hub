@@ -105,5 +105,20 @@ export default defineConfig({
       dependencies: ['setup'],
       testMatch: /admin-pwa\.spec\.ts/,
     },
+    {
+      name: 'apparatus-service-mobile',
+      use: { ...devices['iPhone 13'], serviceWorkers: 'block' },
+      testMatch: /apparatus-service-tickets\.spec\.ts/,
+    },
+    {
+      name: 'apparatus-service-tablet',
+      use: { ...devices['iPad (gen 7)'], serviceWorkers: 'block' },
+      testMatch: /apparatus-service-tickets\.spec\.ts/,
+    },
+    {
+      name: 'apparatus-service-desktop',
+      use: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, serviceWorkers: 'block' },
+      testMatch: /apparatus-service-tickets\.spec\.ts/,
+    },
   ],
 });

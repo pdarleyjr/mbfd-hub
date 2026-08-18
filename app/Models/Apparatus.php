@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class Apparatus extends Model
@@ -65,13 +66,13 @@ class Apparatus extends Model
     protected static function booted(): void
     {
         static::creating(function (Apparatus $apparatus) {
-            if (empty($apparatus->slug) && !empty($apparatus->designation)) {
+            if (empty($apparatus->slug) && ! empty($apparatus->designation)) {
                 $apparatus->slug = Str::slug($apparatus->designation);
             }
         });
 
         static::updating(function (Apparatus $apparatus) {
-            if (empty($apparatus->slug) && !empty($apparatus->designation)) {
+            if (empty($apparatus->slug) && ! empty($apparatus->designation)) {
                 $apparatus->slug = Str::slug($apparatus->designation);
             }
         });
@@ -93,6 +94,12 @@ class Apparatus extends Model
     public function defects()
     {
         return $this->hasMany(ApparatusDefect::class);
+    }
+
+    /** @return HasMany<ApparatusServiceTicket, $this> */
+    public function serviceTickets(): HasMany
+    {
+        return $this->hasMany(ApparatusServiceTicket::class);
     }
 
     public function openDefects()
@@ -133,6 +140,7 @@ class Apparatus extends Model
     {
         $current = $this->current_engine_hours ?? 0;
         $lastPm = $this->last_pm_engine_hours ?? 0;
+
         return max(0, round($current - $lastPm, 1));
     }
 
@@ -144,17 +152,18 @@ class Apparatus extends Model
     {
         $current = $this->current_miles ?? 0;
         $lastPm = $this->last_pm_mileage ?? 0;
+
         return max(0, $current - $lastPm);
     }
 
     /**
      * Get PM health status based on aggregate hours.
-     * 
+     *
      * Status Logic:
      *  - GREEN: < 250 hours since last PM
      *  - YELLOW: 250-300 hours (approaching PM window)
      *  - RED: > 300 hours (PM due) or > 305 hours (5+ hours overdue = critical)
-     * 
+     *
      * @return array{status: string, hours: float, miles: int, overdue: bool}
      */
     public function getPmHealthStatus(): array

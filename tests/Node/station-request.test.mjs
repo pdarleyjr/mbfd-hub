@@ -41,12 +41,15 @@ test('offline station requests keep a durable idempotency key and permanent 4xx 
   assert.match(wizard, /client_submission_id: clientSubmissionId\.current/);
 });
 
-test('station and room APIs are network first so staffing and blueprints cannot remain stale', () => {
+test('station, room, and apparatus service APIs cannot remain stale', () => {
   const serviceWorker = read('resources/js/daily-checkout/public/service-worker.js');
   const api = read('resources/js/daily-checkout/src/utils/api.ts');
 
-  assert.match(serviceWorker, /mbfd-checkout-v5/);
+  assert.match(serviceWorker, /mbfd-checkout-v6/);
   assert.match(serviceWorker, /url\.pathname\.startsWith\('\/api\/public\/stations'\)/);
+  assert.match(serviceWorker, /url\.pathname\.endsWith\('\/service-notices'\)/);
+  assert.match(serviceWorker, /url\.pathname\.endsWith\('\/service-tickets'\)/);
+  assert.match(serviceWorker, /if \(isLiveServiceRequest\) \{[\s\S]*fetch\(request, \{ cache: 'no-store' \}\)/);
   assert.match(serviceWorker, /if \(isStationApiRequest \|\| isApparatusApiRequest\)/);
   assert.match(api, /fetch\(`\$\{API_BASE\}\/public\/stations`, \{[\s\S]*cache: 'no-store'/);
   assert.match(api, /fetch\(`\$\{API_BASE\}\/public\/stations\/\$\{id\}`, \{[\s\S]*cache: 'no-store'/);

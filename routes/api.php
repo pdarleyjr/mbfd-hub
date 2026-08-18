@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\Display\DisplayController;
 use App\Http\Controllers\Api\FireEquipmentRequestController;
 use App\Http\Controllers\Api\InventoryChatController;
 use App\Http\Controllers\Api\Public\ApparatusLayout\ApparatusLayoutController;
+use App\Http\Controllers\Api\PublicApparatusServiceTicketController;
 use App\Http\Controllers\Api\PublicStationRequestController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\SmartUpdatesController;
@@ -43,6 +44,7 @@ Route::prefix('admin/audit')->middleware(['web', 'auth', 'admin.role:super_admin
 Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('apparatuses', [ApparatusController::class, 'index']);
     Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class, 'checklist']);
+    Route::get('apparatuses/{apparatus}/service-notices', [PublicApparatusServiceTicketController::class, 'apparatusNotices']);
     Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
     Route::get('employees/list', [ApparatusController::class, 'employees']);
 
@@ -57,6 +59,7 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('stations/{station}/apparatus-inspections', [\App\Http\Controllers\Api\StationController::class, 'apparatusInspections']);
     Route::get('stations/{station}/equipment-requests', [\App\Http\Controllers\Api\StationController::class, 'equipmentRequests']);
     Route::get('stations/{station}/requests', [PublicStationRequestController::class, 'index']);
+    Route::get('stations/{station}/service-tickets', [PublicApparatusServiceTicketController::class, 'stationIndex']);
     Route::get('stations/{station}/activity', [StationContextController::class, 'activity']);
     Route::get('stations/{station}/rooms/{room}/profile', [StationContextController::class, 'roomProfile']);
     Route::get('station-requests/{stationRequest}', [PublicStationRequestController::class, 'show']);

@@ -17,6 +17,7 @@ export interface Apparatus {
   vehicle_number: string;
   designation?: string;
   slug: string;
+  status?: string;
   // PM Maintenance fields
   current_engine_hours?: number | null;
   current_miles?: number | null;
@@ -229,8 +230,40 @@ export interface StationRequestSummary {
   updates?: StationRequestUpdate[];
 }
 
+export type ApparatusServiceTicketStatus = 'submitted' | 'acknowledged' | 'scheduled' | 'in_progress' | 'waiting_for_parts' | 'completed' | 'cancelled';
+
+export interface ApparatusServiceTicketUpdate {
+  id: number;
+  status: ApparatusServiceTicketStatus;
+  public_note?: string | null;
+  scheduled_for?: string | null;
+  created_at: string;
+}
+
+export interface ApparatusServiceTicketSummary {
+  id: number;
+  ticket_number: string;
+  apparatus_id: number;
+  station_id?: number | null;
+  unit_designation: string;
+  origin: 'station' | 'fleet' | 'pm';
+  category: 'repair_mechanical' | 'preventive_maintenance' | 'electrical' | 'specialty_system' | 'other';
+  service_type?: string | null;
+  title: string;
+  priority: 'routine' | 'attention' | 'urgent';
+  status: ApparatusServiceTicketStatus;
+  is_open: boolean;
+  scheduled_for?: string | null;
+  scheduled_location?: string | null;
+  expected_return_at?: string | null;
+  current_public_response?: string | null;
+  created_at: string;
+  updated_at: string;
+  updates?: ApparatusServiceTicketUpdate[];
+}
+
 export interface StationActivityEntry {
-  type: 'apparatus_inspection' | 'station_inspection' | 'inventory_submission' | 'supply_request' | 'station_request';
+  type: 'apparatus_inspection' | 'station_inspection' | 'inventory_submission' | 'supply_request' | 'station_request' | 'apparatus_service_ticket';
   label: string;
   status: string;
   occurred_at: string;

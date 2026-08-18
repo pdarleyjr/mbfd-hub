@@ -6,6 +6,7 @@ import {
   ApparatusInspectionSummary,
   StationInspectionSummary,
   StationRequestSummary,
+  ApparatusServiceTicketSummary,
   StationActivityEntry,
   SingleGasMeterSummary,
 } from '../types';
@@ -13,7 +14,7 @@ import { ApiClient } from '../utils/api';
 import PreviousPageButton from './PreviousPageButton';
 import { groupRoomsByArea, stationComplement } from '../utils/stationRoomBlueprint';
 
-type TabId = 'requests' | 'overview' | 'rooms' | 'apparatus' | 'gas-meters' | 'inspections' | 'activity';
+type TabId = 'requests' | 'service-repair' | 'overview' | 'rooms' | 'apparatus' | 'gas-meters' | 'inspections' | 'activity';
 
 export default function StationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +32,9 @@ export default function StationDetailPage() {
   const [stationInspections, setStationInspections] = useState<StationInspectionSummary[]>([]);
   const [stationRequests, setStationRequests] = useState<StationRequestSummary[]>([]);
   const [requestScope, setRequestScope] = useState<'open' | 'all'>('open');
+  const [serviceTickets, setServiceTickets] = useState<ApparatusServiceTicketSummary[]>([]);
+  const [serviceTicketScope, setServiceTicketScope] = useState<'open' | 'all'>('open');
+  const [openServiceTicketCount, setOpenServiceTicketCount] = useState(0);
   const [activity, setActivity] = useState<StationActivityEntry[]>([]);
   const [gasMeters, setGasMeters] = useState<SingleGasMeterSummary[]>([]);
   const [tabDataLoaded, setTabDataLoaded] = useState<Record<string, boolean>>({});
@@ -42,8 +46,9 @@ export default function StationDetailPage() {
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [underlineStyle, setUnderlineStyle] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
 
-  const tabs: { id: TabId; label: string }[] = [
+  const tabs: { id: TabId; label: string; badge?: number }[] = [
     { id: 'requests', label: 'Requests' },
+    { id: 'service-repair', label: 'Service / Repair', badge: openServiceTicketCount },
     { id: 'overview', label: 'Overview' },
     { id: 'rooms', label: 'Rooms' },
     { id: 'apparatus', label: 'Apparatus' },
@@ -102,8 +107,18 @@ export default function StationDetailPage() {
       }
     };
 
+    const fetchOpenServiceTicketCount = async () => {
+      try {
+        const count = await ApiClient.getOpenApparatusServiceTicketCount(stationId);
+        if (!cancelled) setOpenServiceTicketCount(count);
+      } catch {
+        // Secondary status data must never block the station workspace.
+      }
+    };
+
     fetchStation();
     fetchTodayInspections();
+    fetchOpenServiceTicketCount();
     return () => { cancelled = true; };
   }, [id, stationLoadAttempt]);
 
@@ -125,6 +140,12 @@ export default function StationDetailPage() {
           case 'requests': {
             const data = await ApiClient.getStationRequests(stationId, 'all');
             setStationRequests(data);
+            break;
+          }
+          case 'service-repair': {
+            const data = await ApiClient.getApparatusServiceTickets(stationId, 'all');
+            setServiceTickets(data);
+            setOpenServiceTicketCount(data.filter((ticket) => ticket.is_open).length);
             break;
           }
           case 'activity': {
@@ -149,7 +170,7 @@ export default function StationDetailPage() {
       }
     };
 
-    if (['inspections', 'requests', 'gas-meters', 'activity'].includes(activeTab)) {
+    if (['inspections', 'requests', 'service-repair', 'gas-meters', 'activity'].includes(activeTab)) {
       loadTabData();
     }
   }, [activeTab, id, tabDataLoaded]);
@@ -174,6 +195,8 @@ export default function StationDetailPage() {
       ordered: 'bg-blue-100 text-blue-800',
       in_progress: 'bg-blue-100 text-blue-800',
       awaiting_parts: 'bg-stone-100 text-stone-700',
+      waiting_for_parts: 'bg-stone-100 text-stone-700',
+      submitted: 'bg-amber-100 text-amber-900',
       awaiting_vendor: 'bg-stone-100 text-stone-700',
       on_hold: 'bg-stone-100 text-stone-700',
       completed: 'bg-green-100 text-green-800',
@@ -182,6 +205,9 @@ export default function StationDetailPage() {
       medium: 'bg-blue-100 text-blue-800',
       high: 'bg-orange-100 text-orange-800',
       critical: 'bg-red-100 text-red-800',
+      routine: 'bg-neutral-100 text-neutral-700',
+      attention: 'bg-amber-100 text-amber-900',
+      urgent: 'bg-red-100 text-red-800',
     };
     return map[status] ?? 'bg-neutral-100 text-neutral-700';
   };
@@ -293,7 +319,7 @@ export default function StationDetailPage() {
         </div>
 
         {/* Quick Links */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-3 mb-6">
           {[1, 2, 3, 4, 6].includes(station.station_number) && (
             <a
               href={`/employee/video-conferencing?room=lineup&join_as=sta${station.station_number}`}
@@ -323,6 +349,13 @@ export default function StationDetailPage() {
             </svg>
             Station Request
           </Link>
+          <a
+            href={`/employee/apparatus-service-request?station_id=${station.id}&return_to=${encodeURIComponent(`/daily/stations/${station.id}`)}`}
+            className="flex min-h-12 items-center gap-2.5 rounded-xl bg-orange-600 p-3 text-sm font-bold text-white ring-1 ring-orange-700/30 transition-colors hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+          >
+            <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.42 15.17 17.25 21A2.652 2.652 0 1 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26" /></svg>
+            Apparatus Service
+          </a>
           <Link
             to={`/forms-hub/station-inspection`}
             className="flex items-center gap-2.5 p-3 bg-neutral-50 rounded-xl ring-1 ring-neutral-200/60 hover:bg-teal-50 hover:ring-teal-200 transition-all text-sm font-medium text-neutral-700 hover:text-teal-700"
@@ -405,7 +438,8 @@ export default function StationDetailPage() {
                   : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-50'
               }`}
             >
-              {tab.label}
+              <span>{tab.label}</span>
+              {typeof tab.badge === 'number' && tab.badge > 0 && <span className="ml-2 inline-flex min-w-6 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-bold text-white">{tab.badge}</span>}
             </button>
           ))}
           <div
@@ -547,6 +581,12 @@ export default function StationDetailPage() {
                           <svg className="ml-1 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                         </Link>
                       )}
+                      <a
+                        href={`/employee/apparatus-service-request?station_id=${station.id}&apparatus_id=${apparatus.id}&return_to=${encodeURIComponent(`/daily/stations/${station.id}`)}`}
+                        className="mt-2 ml-4 inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 hover:text-blue-900"
+                      >
+                        Report Service Need
+                      </a>
                     </div>
                   ))}
                 </div>
@@ -650,6 +690,54 @@ export default function StationDetailPage() {
             </div>
           )}
 
+          {/* ========== APPARATUS SERVICE / REPAIR TAB ========== */}
+          {activeTab === 'service-repair' && (
+            <div>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-heading text-lg font-bold text-neutral-900">Apparatus service and repair</h3>
+                  <p className="text-sm text-neutral-500">Operationally safe ticket status for units attributed to this station.</p>
+                </div>
+                <div className="inline-flex rounded-xl bg-neutral-100 p-1" aria-label="Service ticket history filter">
+                  <button type="button" onClick={() => setServiceTicketScope('open')} className={`min-h-12 rounded-lg px-4 text-sm font-semibold ${serviceTicketScope === 'open' ? 'bg-white text-blue-800 shadow-sm' : 'text-neutral-600'}`}>Open</button>
+                  <button type="button" onClick={() => setServiceTicketScope('all')} className={`min-h-12 rounded-lg px-4 text-sm font-semibold ${serviceTicketScope === 'all' ? 'bg-white text-blue-800 shadow-sm' : 'text-neutral-600'}`}>All history</button>
+                </div>
+              </div>
+              {tabDataError['service-repair'] ? (
+                <TabLoadError message={tabDataError['service-repair']} onRetry={() => retryTabData('service-repair')} />
+              ) : tabDataLoading['service-repair'] ? (
+                <TabSkeleton />
+              ) : serviceTickets.filter((ticket) => serviceTicketScope === 'all' || ticket.is_open).length > 0 ? (
+                <div className="space-y-3 stagger-list">
+                  {serviceTickets.filter((ticket) => serviceTicketScope === 'all' || ticket.is_open).map((ticket) => (
+                    <article key={ticket.id} className={`rounded-xl border p-4 ${ticket.priority === 'urgent' && ticket.is_open ? 'border-red-300 bg-red-50/40' : 'border-neutral-200'}`}>
+                      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                        <div>
+                          <p className="font-mono text-xs font-semibold text-neutral-500">{ticket.ticket_number} · {ticket.unit_designation}</p>
+                          <h4 className="mt-1 font-semibold text-neutral-900">{ticket.title}</h4>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(ticket.priority)}`}>{ticket.priority}</span>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(ticket.status)}`}>{ticket.status.replaceAll('_', ' ')}</span>
+                        </div>
+                      </div>
+                      {ticket.current_public_response && <p className="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-950"><strong>Latest update:</strong> {ticket.current_public_response}</p>}
+                      <p className="mt-3 text-xs text-neutral-500">
+                        {ticket.service_type || ticket.category.replaceAll('_', ' ')} · Submitted {formatDate(ticket.created_at)}
+                        {ticket.scheduled_for ? ` · Scheduled ${formatDate(ticket.scheduled_for)} at ${formatTime(ticket.scheduled_for)}` : ''}
+                        {ticket.scheduled_location ? ` · ${ticket.scheduled_location}` : ''}
+                        {ticket.expected_return_at ? ` · Expected return ${formatDate(ticket.expected_return_at)} at ${formatTime(ticket.expected_return_at)}` : ''}
+                      </p>
+                      {ticket.updates && ticket.updates.length > 1 && <details className="mt-3"><summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold text-blue-800">View {ticket.updates.length} public updates</summary><ol className="space-y-2 border-l-2 border-blue-100 pl-4">{ticket.updates.map((update) => <li key={update.id} className="text-sm text-neutral-600"><strong className="text-neutral-800">{update.status.replaceAll('_', ' ')}</strong> · {formatDate(update.created_at)}{update.public_note && <p className="mt-0.5">{update.public_note}</p>}</li>)}</ol></details>}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState icon="apparatus" title={serviceTicketScope === 'open' ? 'No open apparatus service tickets' : 'No apparatus service history'} subtitle="Authenticated employee and Fleet requests will appear here." />
+              )}
+            </div>
+          )}
+
           {/* ========== STATION INSPECTIONS TAB ========== */}
           {activeTab === 'inspections' && (
             <div>
@@ -708,7 +796,7 @@ export default function StationDetailPage() {
                     </li>
                   ))}
                 </ol>
-              ) : <EmptyState icon="request" title="No station activity yet" subtitle="Inspections, inventory, supply requests, and station requests will appear here." />}
+              ) : <EmptyState icon="request" title="No station activity yet" subtitle="Inspections, inventory, supply requests, station requests, and apparatus service tickets will appear here." />}
             </div>
           )}
         </div>

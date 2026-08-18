@@ -1,5 +1,5 @@
-const CACHE_NAME = 'mbfd-checkout-v5';
-const API_CACHE_NAME = 'mbfd-api-cache-v5';
+const CACHE_NAME = 'mbfd-checkout-v6';
+const API_CACHE_NAME = 'mbfd-api-cache-v6';
 const APP_SHELL_CACHE_KEYS = [
   '/daily/',
   '/daily/index.html',
@@ -66,6 +66,17 @@ self.addEventListener('fetch', (event) => {
   const isDailyShellRequest = isSameOrigin && url.pathname.startsWith('/daily');
   const isApparatusApiRequest = isSameOrigin && url.pathname.startsWith('/api/public/apparatuses');
   const isStationApiRequest = isSameOrigin && url.pathname.startsWith('/api/public/stations');
+  const isLiveServiceRequest = isSameOrigin && (
+    url.pathname.endsWith('/service-notices') ||
+    url.pathname.endsWith('/service-tickets')
+  );
+
+  // Service state is operationally time-sensitive. Never satisfy it from a
+  // stale service-worker cache; callers render a non-blocking unavailable state.
+  if (isLiveServiceRequest) {
+    event.respondWith(fetch(request, { cache: 'no-store' }));
+    return;
+  }
 
   if (isNavigationRequest && isDailyShellRequest) {
     event.respondWith(

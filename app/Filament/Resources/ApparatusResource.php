@@ -2,10 +2,15 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\ApparatusServiceTicketCategory;
+use App\Enums\ApparatusServiceTicketPriority;
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\ApparatusResource\Pages;
 use App\Filament\Resources\ApparatusResource\RelationManagers;
 use App\Jobs\SyncApparatusToSheetJob;
 use App\Models\Apparatus;
+use App\Models\User;
+use App\Services\ApparatusServiceTicketWorkflowService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -14,9 +19,8 @@ use Filament\Tables;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Str;
 
-use App\Filament\Concerns\EnterpriseTable;
 class ApparatusResource extends Resource
 {
     use EnterpriseTable;
@@ -24,13 +28,13 @@ class ApparatusResource extends Resource
     protected static ?string $model = Apparatus::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-truck';
-    
+
     protected static ?string $navigationGroup = 'Fleet Management';
-    
+
     protected static ?string $modelLabel = 'Fire Apparatus';
-    
+
     protected static ?string $navigationLabel = 'Fire Apparatus';
-    
+
     protected static ?string $pluralModelLabel = 'Fire Apparatus';
 
     public static function form(Form $form): Form
@@ -63,9 +67,9 @@ class ApparatusResource extends Resource
                             ->options([
                                 'In Service' => 'In Service',
                                 'Out of Service' => 'Out of Service',
+                                'Maintenance' => 'Maintenance',
                                 'Available' => 'Available',
                                 'Reserve' => 'Reserve',
-                                'Maintenance' => 'Maintenance',
                             ])
                             ->default('In Service'),
                         Forms\Components\TextInput::make('assignment')
@@ -217,10 +221,12 @@ class ApparatusResource extends Resource
                         if ($health['status'] === 'yellow') {
                             return "~{$hours}h";
                         }
+
                         return "{$hours}h";
                     })
                     ->color(function (Apparatus $record): string {
                         $health = $record->getPmHealthStatus();
+
                         return match ($health['status']) {
                             'red' => 'danger',
                             'yellow' => 'warning',
@@ -233,6 +239,7 @@ class ApparatusResource extends Resource
                         $hours = $health['hours_since_pm'];
                         $miles = number_format($health['miles_since_pm']);
                         $lastPm = $health['last_pm_date'] ?? 'Never';
+
                         return "Hours: {$hours}/{$interval} | Miles since PM: {$miles} | Last PM: {$lastPm}";
                     })
                     ->placeholder('—'),
@@ -240,9 +247,9 @@ class ApparatusResource extends Resource
                     ->label('Location')
                     ->alignment(Alignment::Start)
                     ->getStateUsing(function (Apparatus $record): string {
-                        $stationLabel = $record->station ? 'Sta ' . $record->station->station_number : null;
-                        $assignment   = trim($record->assignment ?? '');
-                        $currentLoc  = trim($record->current_location ?? '');
+                        $stationLabel = $record->station ? 'Sta '.$record->station->station_number : null;
+                        $assignment = trim($record->assignment ?? '');
+                        $currentLoc = trim($record->current_location ?? '');
 
                         if ($currentLoc && $currentLoc === $assignment) {
                             $currentLoc = '';
@@ -257,7 +264,7 @@ class ApparatusResource extends Resource
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->where(function ($q) use ($search) {
                             $q->where('assignment', 'like', "%{$search}%")
-                              ->orWhere('current_location', 'like', "%{$search}%");
+                                ->orWhere('current_location', 'like', "%{$search}%");
                         });
                     })
                     ->placeholder('—'),
@@ -393,13 +400,13 @@ class ApparatusResource extends Resource
                         'ok' => '🟢 OK',
                     ])
                     ->query(function (Builder $query, array $data): Builder {
-                        if (!isset($data['value']) || $data['value'] === '') {
+                        if (! isset($data['value']) || $data['value'] === '') {
                             return $query;
                         }
-                        
+
                         $interval = 300;
                         $warningThreshold = $interval - 50;
-                        
+
                         return match ($data['value']) {
                             'overdue' => $query->whereRaw(
                                 '(current_engine_hours - COALESCE(last_pm_engine_hours, 0)) >= ?',
@@ -429,9 +436,9 @@ class ApparatusResource extends Resource
                     ->options([
                         'In Service' => 'In Service',
                         'Out of Service' => 'Out of Service',
+                        'Maintenance' => 'Maintenance',
                         'Available' => 'Available',
                         'Reserve' => 'Reserve',
-                        'Maintenance' => 'Maintenance',
                     ]),
                 Tables\Filters\SelectFilter::make('class_description')
                     ->label('Class')
@@ -478,22 +485,93 @@ class ApparatusResource extends Resource
                             ->options([
                                 'In Service' => 'In Service',
                                 'Out of Service' => 'Out of Service',
-                                'Available' => 'Available',
                                 'Maintenance' => 'Maintenance',
+                                'Available' => 'Available',
                                 'Reserve' => 'Reserve',
                             ])
                             ->default(fn ($record) => $record->status),
-                        Forms\Components\Textarea::make('notes')
-                            ->label('Reason / Notes')
-                            ->visible(fn ($get) => $get('status') !== 'In Service'),
                     ])
                     ->action(function (Apparatus $record, array $data) {
-                        $record->update(['status' => $data['status']]);
+                        /** @var User $actor */
+                        $actor = auth()->user();
+                        app(ApparatusServiceTicketWorkflowService::class)
+                            ->changeOperationalStatus($record, $actor, $data['status']);
 
                         \Filament\Notifications\Notification::make()
                             ->title('Status Updated')
                             ->success()
                             ->body("Status changed to: {$data['status']}")
+                            ->send();
+                    }),
+                Tables\Actions\Action::make('scheduleService')
+                    ->label('Schedule Service')
+                    ->icon('heroicon-o-calendar-days')
+                    ->color('primary')
+                    ->modalHeading(fn (Apparatus $record): string => 'Schedule Service · '.($record->designation ?: $record->name))
+                    ->modalSubmitActionLabel('Create Scheduled Ticket')
+                    ->form([
+                        Forms\Components\Hidden::make('client_submission_id')
+                            ->default(fn (): string => (string) Str::uuid())
+                            ->required(),
+                        Forms\Components\Select::make('category')
+                            ->options(ApparatusServiceTicketCategory::options())
+                            ->default('repair_mechanical')
+                            ->required(),
+                        Forms\Components\Select::make('priority')
+                            ->options(ApparatusServiceTicketPriority::options())
+                            ->default('routine')
+                            ->required(),
+                        Forms\Components\TextInput::make('service_type')
+                            ->label('Service Type')
+                            ->placeholder('Example: PMA, pump repair, aerial inspection')
+                            ->maxLength(255)
+                            ->required(),
+                        Forms\Components\TextInput::make('title')
+                            ->label('Service Summary')
+                            ->minLength(5)
+                            ->maxLength(255)
+                            ->required(),
+                        Forms\Components\Textarea::make('description')
+                            ->label('Service Scope / Observed Issue')
+                            ->minLength(10)
+                            ->maxLength(10000)
+                            ->rows(4)
+                            ->required(),
+                        Forms\Components\DateTimePicker::make('scheduled_for')->required(),
+                        Forms\Components\TextInput::make('scheduled_location')
+                            ->label('Service Location')
+                            ->helperText('Use the established Fleet/location name. No default is assumed.')
+                            ->maxLength(255)
+                            ->required(),
+                        Forms\Components\DateTimePicker::make('expected_return_at')
+                            ->label('Expected Return')
+                            ->afterOrEqual('scheduled_for'),
+                        Forms\Components\Select::make('assigned_to_user_id')
+                            ->label('Assigned To')
+                            ->options(fn (): array => User::query()->orderBy('name')->pluck('name', 'id')->all())
+                            ->searchable(),
+                        Forms\Components\TextInput::make('assigned_vendor')->maxLength(255),
+                        Forms\Components\Textarea::make('public_note')
+                            ->label('Public Update')
+                            ->helperText('Visible at the origin station and during vehicle checkout.')
+                            ->rows(2)
+                            ->required(),
+                        Forms\Components\Textarea::make('internal_note')
+                            ->label('Internal Note')
+                            ->helperText('Visible only to authorized Fleet and administrators.')
+                            ->rows(2),
+                    ])
+                    ->action(function (Apparatus $record, array $data): void {
+                        /** @var User $actor */
+                        $actor = auth()->user();
+                        $data['status'] = 'scheduled';
+                        $result = app(ApparatusServiceTicketWorkflowService::class)
+                            ->createFleetTicket($record, $actor, $data);
+
+                        \Filament\Notifications\Notification::make()
+                            ->title($result->created ? 'Service Scheduled' : 'Service Ticket Already Exists')
+                            ->success()
+                            ->body("{$result->ticket->ticket_number}: {$result->ticket->title}")
                             ->send();
                     }),
                 Tables\Actions\Action::make('logPmService')
@@ -502,12 +580,16 @@ class ApparatusResource extends Resource
                     ->color(fn (Apparatus $record): string => $record->isPmDue() ? 'danger' : 'gray')
                     ->tooltip('Log a completed PM service')
                     ->form([
+                        Forms\Components\Hidden::make('client_submission_id')
+                            ->default(fn (): string => (string) Str::uuid())
+                            ->required(),
                         Forms\Components\Placeholder::make('current_readings')
                             ->label('Current Meter Readings')
                             ->content(function (Apparatus $record): string {
                                 $hours = $record->current_engine_hours ?? 'N/A';
                                 $miles = number_format($record->current_miles ?? 0);
                                 $health = $record->getPmHealthStatus();
+
                                 return "Engine Hours: {$hours} | Miles: {$miles} | Hours since PM: {$health['hours_since_pm']}h";
                             }),
                         Forms\Components\DatePicker::make('service_date')
@@ -540,27 +622,16 @@ class ApparatusResource extends Resource
                             ->placeholder('Additional service details...'),
                     ])
                     ->action(function (Apparatus $record, array $data) {
-                        $record->update([
-                            'last_pm_date' => $data['service_date'],
-                            'last_pm_engine_hours' => $data['service_engine_hours'] ?? $record->current_engine_hours,
-                            'last_pm_mileage' => $data['service_mileage'] ?? $record->current_miles,
-                            'last_service_type' => $data['service_type'],
-                            'last_service_date' => $data['service_date'],
-                        ]);
-
-                        // Also update current readings if provided values are higher
-                        if (($data['service_engine_hours'] ?? 0) > ($record->current_engine_hours ?? 0)) {
-                            $record->update(['current_engine_hours' => $data['service_engine_hours']]);
-                        }
-                        if (($data['service_mileage'] ?? 0) > ($record->current_miles ?? 0)) {
-                            $record->update(['current_miles' => $data['service_mileage']]);
-                        }
-
+                        /** @var User $actor */
+                        $actor = auth()->user();
+                        $result = app(ApparatusServiceTicketWorkflowService::class)
+                            ->logPmService($record, $actor, $data);
                         $unit = $record->designation ?? $record->vehicle_number;
+                        $serviceHours = $result->ticket->service_engine_hours ?? $record->current_engine_hours ?? 0;
                         \Filament\Notifications\Notification::make()
-                            ->title('PM Service Logged')
+                            ->title($result->created ? 'PM Service Logged' : 'PM Service Already Logged')
                             ->success()
-                            ->body("{$unit}: PM cycle reset. Next service due at " . round(($data['service_engine_hours'] ?? 0) + 300, 1) . 'h')
+                            ->body("{$unit}: {$result->ticket->ticket_number} recorded. Next service due at ".round((float) $serviceHours + ($record->pm_interval_hours ?? 300), 1).'h')
                             ->send();
                     }),
                 Tables\Actions\EditAction::make(),
@@ -577,6 +648,7 @@ class ApparatusResource extends Resource
         return [
             RelationManagers\InspectionsRelationManager::class,
             RelationManagers\DefectsRelationManager::class,
+            RelationManagers\ServiceTicketsRelationManager::class,
         ];
     }
 

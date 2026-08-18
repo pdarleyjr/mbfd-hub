@@ -27,6 +27,8 @@ class User extends Authenticatable implements FilamentUser
 
     public const NOTIFICATION_PREFERENCE_STATION_REQUESTS = 'station_requests';
 
+    public const NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS = 'apparatus_service_tickets';
+
     public const NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS = 'workgroup_evaluations';
 
     public const NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS = 'station_inventory_alerts';
@@ -36,6 +38,7 @@ class User extends Authenticatable implements FilamentUser
         self::NOTIFICATION_PREFERENCE_STATION_INSPECTIONS => true,
         self::NOTIFICATION_PREFERENCE_FIRE_EQUIPMENT_REQUESTS => true,
         self::NOTIFICATION_PREFERENCE_STATION_REQUESTS => true,
+        self::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS => true,
         self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS => true,
         self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS => true,
     ];
@@ -117,6 +120,10 @@ class User extends Authenticatable implements FilamentUser
                 'label' => 'Station Requests',
                 'description' => 'Receive alerts for station repair, service, and equipment requests.',
             ],
+            self::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS => [
+                'label' => 'Apparatus Service Tickets',
+                'description' => 'Receive alerts for apparatus repair, maintenance, and service tickets.',
+            ],
             self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS => [
                 'label' => 'Workgroup Evaluations',
                 'description' => 'Receive alerts when a workgroup evaluation is submitted.',
@@ -135,6 +142,7 @@ class User extends Authenticatable implements FilamentUser
             'station_inspection' => self::NOTIFICATION_PREFERENCE_STATION_INSPECTIONS,
             'fire_equipment_request' => self::NOTIFICATION_PREFERENCE_FIRE_EQUIPMENT_REQUESTS,
             'station_request' => self::NOTIFICATION_PREFERENCE_STATION_REQUESTS,
+            'apparatus_service_ticket' => self::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS,
             'evaluation_submission' => self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS,
             'station_inventory_submission' => self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS,
             default => null,

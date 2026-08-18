@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Employee\Pages\ApparatusServiceRequestPage;
 use App\Filament\Employee\Pages\Auth\EmployeeLogin;
 use App\Filament\Employee\Pages\ChangePasswordPage;
 use App\Filament\Employee\Pages\EmployeeDashboard;
@@ -70,6 +71,7 @@ class EmployeePanelProvider extends PanelProvider
                 MyEquipmentPage::class,
                 MyRequestsPage::class,
                 RequestEquipmentPage::class,
+                ApparatusServiceRequestPage::class,
                 PersonnelEquipmentRequestPage::class,
                 ChangePasswordPage::class,
             ])
@@ -87,6 +89,10 @@ class EmployeePanelProvider extends PanelProvider
                     ->label('Request Uniforms')
                     ->url(fn (): string => RequestEquipmentPage::getUrl(panel: 'employee'))
                     ->icon('heroicon-o-shopping-cart'),
+                MenuItem::make()
+                    ->label('Apparatus Service')
+                    ->url(fn (): string => ApparatusServiceRequestPage::getUrl(panel: 'employee'))
+                    ->icon('heroicon-o-wrench-screwdriver'),
                 MenuItem::make()
                     ->label('Video Conferencing')
                     ->url(fn (): string => VideoConferencing::getUrl(panel: 'employee'))

@@ -4,7 +4,7 @@ import {
   StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse,
   InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
   StationInspectionSummary, ApparatusInspectionSummary, FireEquipmentRequestSummary,
-  SingleGasMeterSummary, StationRequestSummary, StationActivityEntry, RoomProfile,
+  SingleGasMeterSummary, StationRequestSummary, ApparatusServiceTicketSummary, StationActivityEntry, RoomProfile,
 } from '../types';
 
 const API_BASE = '/api';
@@ -414,6 +414,42 @@ export class ApiClient {
     });
     if (!response.ok) {
       throw new Error('Failed to fetch station requests');
+    }
+    const payload = await response.json();
+    return payload.data || [];
+  }
+
+  static async getApparatusServiceTickets(stationId: number, scope: 'open' | 'all' = 'open'): Promise<ApparatusServiceTicketSummary[]> {
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/service-tickets?scope=${scope}&per_page=100`, {
+      cache: 'no-store',
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch apparatus service tickets');
+    }
+    const payload = await response.json();
+    return payload.data || [];
+  }
+
+  static async getOpenApparatusServiceTicketCount(stationId: number): Promise<number> {
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/service-tickets?scope=open&per_page=1`, {
+      cache: 'no-store',
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch apparatus service ticket count');
+    }
+    const payload = await response.json();
+    return Number(payload.meta?.total ?? payload.data?.length ?? 0);
+  }
+
+  static async getApparatusServiceNotices(apparatusId: number): Promise<ApparatusServiceTicketSummary[]> {
+    const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/service-notices`, {
+      cache: 'no-store',
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch apparatus service notices');
     }
     const payload = await response.json();
     return payload.data || [];

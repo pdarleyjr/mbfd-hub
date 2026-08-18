@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { Apparatus, OfficerInfo, ChecklistData, Compartment, Defect, MeterData, InspectionSubmission } from '../types';
+import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, Compartment, Defect, MeterData, InspectionSubmission } from '../types';
 import { ApiClient } from '../utils/api';
 import { saveInspectionProgress, loadInspectionProgress, clearInspectionProgress, queueSubmission, getSubmissionQueue, removeFromQueue } from '../utils/storage';
 import { useOffline } from '../hooks/useOffline';
@@ -35,6 +35,8 @@ export default function InspectionWizard() {
   const [error, setError] = useState<string | null>(null);
   const [hasLoadedAutosave, setHasLoadedAutosave] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [serviceNotices, setServiceNotices] = useState<ApparatusServiceTicketSummary[]>([]);
+  const [serviceNoticesUnavailable, setServiceNoticesUnavailable] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,6 +53,18 @@ export default function InspectionWizard() {
 
         setApparatus(foundApparatus);
         setOfficerInfo(prev => ({ ...prev, unitNumber: foundApparatus.vehicle_number }));
+
+        // Service status is intentionally secondary. A network or API failure
+        // must never prevent the inspection checklist from loading.
+        ApiClient.getApparatusServiceNotices(foundApparatus.id)
+          .then((notices) => {
+            setServiceNotices(notices);
+            setServiceNoticesUnavailable(false);
+          })
+          .catch(() => {
+            setServiceNotices([]);
+            setServiceNoticesUnavailable(true);
+          });
 
         const checklistData = await ApiClient.getChecklist(foundApparatus.id);
         setChecklist(checklistData);
@@ -279,6 +293,15 @@ export default function InspectionWizard() {
     return stepIndex < currentIndex;
   };
 
+  const isOutOfService = apparatus.status === 'Out of Service';
+  const formatServiceDateTime = (value: string) => new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+
   return (
     <div>
       <div className="mb-8">
@@ -290,6 +313,50 @@ export default function InspectionWizard() {
           <p className="text-sm text-sky-600 mt-1">📝 Restored from autosave</p>
         )}
       </div>
+
+      {serviceNotices.length > 0 && (
+        <section aria-labelledby="service-notices-heading" className={`mb-8 rounded-2xl border p-4 ${isOutOfService ? 'border-red-400 bg-red-50 text-red-950' : 'border-amber-300 bg-amber-50 text-amber-950'}`}>
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+            <div>
+              <p className={`text-xs font-bold uppercase tracking-wider ${isOutOfService ? 'text-red-800' : 'text-amber-800'}`}>Fleet awareness</p>
+              <h2 id="service-notices-heading" className="mt-1 font-heading text-lg font-bold">
+                {isOutOfService ? 'Unit out of service' : `Open service ${serviceNotices.length === 1 ? 'notice' : 'notices'} for this unit`}
+              </h2>
+            </div>
+            {apparatus.status && <span className={`w-fit rounded-full bg-white px-3 py-1 text-xs font-bold ring-1 ${isOutOfService ? 'ring-red-300' : 'ring-amber-300'}`}>Operational status: {apparatus.status}</span>}
+          </div>
+          <ul className="mt-3 space-y-2">
+            {serviceNotices.map((notice) => (
+              <li key={notice.id} className={`rounded-xl bg-white/80 p-3 ring-1 ${isOutOfService ? 'ring-red-200' : 'ring-amber-200'}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <strong>{notice.status === 'scheduled' ? `${notice.service_type || notice.title} · ${notice.ticket_number}` : `${notice.ticket_number} · ${notice.title}`}</strong>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${isOutOfService ? 'bg-red-100' : 'bg-amber-100'}`}>
+                    {notice.status === 'scheduled' ? 'Service scheduled' : notice.status.replaceAll('_', ' ')}
+                  </span>
+                </div>
+                {notice.status === 'scheduled' && notice.scheduled_for && (
+                  <p className="mt-1 text-sm font-semibold">
+                    Scheduled{notice.scheduled_location ? ` at ${notice.scheduled_location}` : ''} · {formatServiceDateTime(notice.scheduled_for)}
+                  </p>
+                )}
+                {notice.expected_return_at && <p className="mt-1 text-xs">Expected return: {formatServiceDateTime(notice.expected_return_at)}</p>}
+                {notice.current_public_response && <p className="mt-1 text-sm">{notice.current_public_response}</p>}
+              </li>
+            ))}
+          </ul>
+          {isOutOfService ? (
+            <p className="mt-3 text-sm font-bold">Refer to {serviceNotices[0].ticket_number}. Follow established Fleet and officer direction before operation.</p>
+          ) : (
+            <p className="mt-3 text-xs">Continue the inspection and report observed conditions. A ticket does not by itself change the unit operational status.</p>
+          )}
+        </section>
+      )}
+
+      {serviceNoticesUnavailable && (
+        <p role="status" className="mb-6 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-600">
+          Live Fleet service notices are temporarily unavailable. You can continue this inspection.
+        </p>
+      )}
 
       {/* Progress indicator — 4 steps */}
       <div className="mb-8">
