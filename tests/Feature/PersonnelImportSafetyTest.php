@@ -70,7 +70,7 @@ class PersonnelImportSafetyTest extends TestCase
             $rows = array_map('str_getcsv', file($output, FILE_IGNORE_NEW_LINES));
             $this->assertSame(['employee_id', 'temporary_password'], $rows[0]);
             $this->assertSame('30001', $rows[1][0]);
-            $this->assertGreaterThanOrEqual(20, strlen($rows[1][1]));
+            $this->assertMatchesRegularExpression('/^[A-Za-z0-9]{24}$/', $rows[1][1]);
 
             $employee = Employee::where('employee_id', '30001')->sole();
             $this->assertTrue(password_verify($rows[1][1], $employee->password));

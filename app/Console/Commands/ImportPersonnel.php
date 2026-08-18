@@ -125,7 +125,10 @@ class ImportPersonnel extends Command
                     continue;
                 }
 
-                $temporaryPassword = Str::password(24);
+                // Keep generated credentials lossless across CSV readers. The
+                // default symbol set includes backslashes, which can escape a
+                // closing CSV quote and change the password an employee sees.
+                $temporaryPassword = Str::password(24, symbols: false);
                 Employee::create([
                     'name' => $data['name'],
                     'employee_id' => $data['employeeId'],
