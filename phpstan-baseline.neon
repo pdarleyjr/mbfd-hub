@@ -157,12 +157,6 @@ parameters:
 			path: app/Filament/Concerns/HasExportActions.php
 
 		-
-			message: '#^Parameter \#1 \$exception of method Filament\\Pages\\Auth\\Login\:\:getRateLimitedNotification\(\) expects DanHarrin\\LivewireRateLimiting\\Exceptions\\TooManyRequestsException, Illuminate\\Http\\Exceptions\\ThrottleRequestsException given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Filament/Employee/Pages/Auth/EmployeeLogin.php
-
-		-
 			message: '#^Access to an undefined property App\\Filament\\Employee\\Pages\\ChangePasswordPage\:\:\$form\.$#'
 			identifier: property.notFound
 			count: 2
