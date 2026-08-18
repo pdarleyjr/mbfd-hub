@@ -25,7 +25,7 @@ final class SignatureImageService
         $dimensions = @getimagesizefromstring($bytes);
         if (
             $dimensions === false
-            || ($dimensions[2] ?? null) !== IMAGETYPE_PNG
+            || $dimensions[2] !== IMAGETYPE_PNG
             || $dimensions[0] < 2
             || $dimensions[1] < 2
             || $dimensions[0] > 1600

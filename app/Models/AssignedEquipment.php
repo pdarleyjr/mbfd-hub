@@ -31,21 +31,25 @@ class AssignedEquipment extends Model
         'quantity' => 'integer',
     ];
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'employee_portal_id');
     }
 
+    /** @return BelongsTo<Uniform, $this> */
     public function uniform(): BelongsTo
     {
         return $this->belongsTo(Uniform::class);
     }
 
+    /** @return BelongsTo<PersonnelRequestItem, $this> */
     public function sourcePersonnelRequestItem(): BelongsTo
     {
         return $this->belongsTo(PersonnelRequestItem::class, 'source_personnel_request_item_id');

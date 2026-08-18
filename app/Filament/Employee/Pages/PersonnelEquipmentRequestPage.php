@@ -23,6 +23,7 @@ use Filament\Pages\Page;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 
+/** @property Form $form */
 class PersonnelEquipmentRequestPage extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-shield-exclamation';

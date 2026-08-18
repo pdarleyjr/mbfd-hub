@@ -6,6 +6,7 @@ namespace App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelEm
 
 use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelEmployeeResource;
 use App\Models\AssignedEquipment;
+use App\Models\Employee;
 use App\Models\Uniform;
 use App\Services\UniformInventoryService;
 use Filament\Actions\Action;
@@ -25,6 +26,9 @@ class ViewPersonnelEmployee extends ViewRecord
 
     protected function getHeaderActions(): array
     {
+        /** @var Employee $employee */
+        $employee = $this->record;
+
         return [
             Action::make('issue_uniform')->label('Issue Uniform')->icon('heroicon-o-shopping-bag')->color('primary')->form([
                 Select::make('uniform_id')->label('Uniform inventory')->options(fn () => Uniform::query()->where('quantity_on_hand', '>', 0)->orderBy('item_name')->get()->mapWithKeys(fn (Uniform $uniform) => [$uniform->id => "{$uniform->item_name} — {$uniform->size} — {$uniform->quantity_on_hand} on hand"]))->searchable()->required(),
@@ -32,8 +36,8 @@ class ViewPersonnelEmployee extends ViewRecord
                 DatePicker::make('issued_at')->default(today())->required(),
                 DatePicker::make('expires_at')->afterOrEqual('issued_at'),
                 Textarea::make('notes')->maxLength(2000),
-            ])->action(function (array $data): void {
-                app(UniformInventoryService::class)->issue(Uniform::findOrFail($data['uniform_id']), $this->record, (int) $data['quantity'], $data['issued_at'], $data['notes'] ?? null, null, $data['expires_at'] ?? null);
+            ])->action(function (array $data) use ($employee): void {
+                app(UniformInventoryService::class)->issue(Uniform::findOrFail($data['uniform_id']), $employee, (int) $data['quantity'], $data['issued_at'], $data['notes'] ?? null, null, $data['expires_at'] ?? null);
                 Notification::make()->title('Uniform assigned and stock decremented')->success()->send();
             }),
             Action::make('assign_ppe')->label('Assign PPE / Equipment')->icon('heroicon-o-shield-check')->color('success')->form([
@@ -43,8 +47,8 @@ class ViewPersonnelEmployee extends ViewRecord
                 DatePicker::make('issued_at')->default(today())->required(),
                 DatePicker::make('expires_at')->afterOrEqual('issued_at'),
                 Textarea::make('notes')->maxLength(2000),
-            ])->action(function (array $data): void {
-                DB::transaction(fn () => $this->record->assignedEquipment()->create([
+            ])->action(function (array $data) use ($employee): void {
+                DB::transaction(fn () => $employee->assignedEquipment()->create([
                     ...$data,
                     'user_id' => null,
                     'status' => 'active',
@@ -56,6 +60,7 @@ class ViewPersonnelEmployee extends ViewRecord
 
     protected function getViewData(): array
     {
+        /** @var Employee $employee */
         $employee = $this->record;
         $assignments = $employee->assignedEquipment()->latest('issued_at')->get();
 

@@ -14,6 +14,7 @@ class PersonnelRequestUpdate extends Model
 
     protected $casts = ['status' => PersonnelRequestStatus::class, 'metadata' => 'array'];
 
+    /** @return BelongsTo<PersonnelRequest, $this> */
     public function request(): BelongsTo
     {
         return $this->belongsTo(PersonnelRequest::class, 'personnel_request_id');

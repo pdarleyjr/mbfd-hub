@@ -16,6 +16,7 @@ class PersonnelRequestAttachment extends Model
         return 'public_id';
     }
 
+    /** @return BelongsTo<PersonnelRequest, $this> */
     public function request(): BelongsTo
     {
         return $this->belongsTo(PersonnelRequest::class, 'personnel_request_id');

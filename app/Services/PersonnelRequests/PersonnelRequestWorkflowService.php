@@ -29,7 +29,7 @@ final class PersonnelRequestWorkflowService
 
     public function canTransition(PersonnelRequest $request, PersonnelRequestStatus $to): bool
     {
-        return in_array($to->value, self::TRANSITIONS[$request->status->value] ?? [], true);
+        return in_array($to->value, self::TRANSITIONS[$request->status->value], true);
     }
 
     public function transition(
@@ -42,7 +42,7 @@ final class PersonnelRequestWorkflowService
     ): PersonnelRequest {
         return DB::transaction(function () use ($request, $to, $actor, $employeeVisibleNote, $internalNote, $metadata): PersonnelRequest {
             $locked = PersonnelRequest::query()->lockForUpdate()->findOrFail($request->id);
-            if (! in_array($to->value, self::TRANSITIONS[$locked->status->value] ?? [], true)) {
+            if (! in_array($to->value, self::TRANSITIONS[$locked->status->value], true)) {
                 throw ValidationException::withMessages(['status' => "Cannot move {$locked->status->label()} to {$to->label()}."]);
             }
             if ($to === PersonnelRequestStatus::Completed && $locked->items()->where('fulfillment_status', '!=', 'fulfilled')->exists()) {
