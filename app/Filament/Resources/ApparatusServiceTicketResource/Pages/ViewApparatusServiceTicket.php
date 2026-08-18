@@ -6,6 +6,7 @@ namespace App\Filament\Resources\ApparatusServiceTicketResource\Pages;
 
 use App\Enums\ApparatusServiceTicketStatus;
 use App\Filament\Resources\ApparatusServiceTicketResource;
+use App\Models\Apparatus;
 use App\Models\ApparatusServiceTicket;
 use App\Models\User;
 use App\Services\ApparatusServiceTicketWorkflowService;
@@ -136,7 +137,7 @@ class ViewApparatusServiceTicket extends ViewRecord
                         'Available' => 'Available',
                         'Reserve' => 'Reserve',
                     ])
-                    ->default(fn (): ?string => $this->ticket()->apparatus?->status)
+                    ->default(fn (): ?string => $this->apparatus()->getAttribute('status'))
                     ->required(),
                 Forms\Components\Textarea::make('public_note')
                     ->label('Station-facing Status Message')
@@ -152,7 +153,7 @@ class ViewApparatusServiceTicket extends ViewRecord
                 $actor = auth()->user();
                 $ticket = $this->ticket();
                 app(ApparatusServiceTicketWorkflowService::class)->changeOperationalStatus(
-                    $ticket->apparatus,
+                    $this->apparatus(),
                     $actor,
                     $data['status'],
                     $ticket,
@@ -170,5 +171,13 @@ class ViewApparatusServiceTicket extends ViewRecord
         assert($record instanceof ApparatusServiceTicket);
 
         return $record;
+    }
+
+    private function apparatus(): Apparatus
+    {
+        $apparatus = $this->ticket()->apparatus;
+        assert($apparatus instanceof Apparatus);
+
+        return $apparatus;
     }
 }

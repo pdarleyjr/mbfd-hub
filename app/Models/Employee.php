@@ -97,7 +97,7 @@ class Employee extends Authenticatable implements FilamentUser
         return $this->hasMany(StationRequest::class, 'requested_by_employee_id');
     }
 
-    /** Apparatus service requests submitted by this authenticated employee. */
+    /** @return HasMany<ApparatusServiceTicket, $this> */
     public function apparatusServiceTickets(): HasMany
     {
         return $this->hasMany(ApparatusServiceTicket::class, 'requested_by_employee_id');

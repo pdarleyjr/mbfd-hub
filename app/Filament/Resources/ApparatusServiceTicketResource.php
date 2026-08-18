@@ -87,8 +87,8 @@ class ApparatusServiceTicketResource extends Resource
                 Tables\Filters\TernaryFilter::make('open')
                     ->label('Open tickets')
                     ->queries(
-                        true: fn (Builder $query): Builder => $query->open(),
-                        false: fn (Builder $query): Builder => $query->terminal(),
+                        true: fn (Builder $query): Builder => $query->whereIn('status', ApparatusServiceTicketStatus::openValues()),
+                        false: fn (Builder $query): Builder => $query->whereIn('status', ApparatusServiceTicketStatus::terminalValues()),
                     ),
             ])
             ->defaultSort('created_at', 'desc')

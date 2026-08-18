@@ -36,16 +36,19 @@ class ApparatusServiceTicketUpdate extends Model
         static::deleting(static fn (): never => throw new LogicException('Apparatus service ticket updates are append-only.'));
     }
 
+    /** @return BelongsTo<ApparatusServiceTicket, $this> */
     public function ticket(): BelongsTo
     {
         return $this->belongsTo(ApparatusServiceTicket::class, 'apparatus_service_ticket_id');
     }
 
+    /** @return BelongsTo<User, $this> */
     public function changedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'changed_by_user_id');
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function changedByEmployee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'changed_by_employee_id');

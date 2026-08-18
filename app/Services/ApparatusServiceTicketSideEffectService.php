@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\ApparatusServiceTicket;
+use App\Models\Employee;
 use App\Models\User;
 use App\Notifications\ApparatusServiceTicketEmployeeNotification;
 use App\Notifications\NewSubmissionNotification;
@@ -38,8 +39,9 @@ class ApparatusServiceTicketSideEffectService
     {
         $this->forgetReadModels($ticket);
 
-        if ($notifyRequester && $ticket->requestedByEmployee !== null) {
-            $ticket->requestedByEmployee->notify(new ApparatusServiceTicketEmployeeNotification(
+        $requester = $ticket->requestedByEmployee;
+        if ($notifyRequester && $requester instanceof Employee) {
+            $requester->notify(new ApparatusServiceTicketEmployeeNotification(
                 ticketNumber: (string) $ticket->ticket_number,
                 unit: $ticket->unit_designation_snapshot,
                 status: $ticket->status,

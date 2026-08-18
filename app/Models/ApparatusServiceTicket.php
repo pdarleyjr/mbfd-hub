@@ -91,31 +91,37 @@ class ApparatusServiceTicket extends Model
         });
     }
 
+    /** @return BelongsTo<Apparatus, $this> */
     public function apparatus(): BelongsTo
     {
         return $this->belongsTo(Apparatus::class);
     }
 
+    /** @return BelongsTo<Station, $this> */
     public function station(): BelongsTo
     {
         return $this->belongsTo(Station::class);
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function requestedByEmployee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'requested_by_employee_id');
     }
 
+    /** @return BelongsTo<User, $this> */
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
+    /** @return BelongsTo<User, $this> */
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
     }
 
+    /** @return HasMany<ApparatusServiceTicketUpdate, $this> */
     public function updates(): HasMany
     {
         return $this->hasMany(ApparatusServiceTicketUpdate::class)->orderBy('created_at')->orderBy('id');

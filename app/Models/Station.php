@@ -232,9 +232,7 @@ class Station extends Model
         return $this->hasMany(StationRequest::class);
     }
 
-    /**
-     * Apparatus service history attributed to this station when submitted.
-     */
+    /** @return HasMany<ApparatusServiceTicket, $this> */
     public function apparatusServiceTickets(): HasMany
     {
         return $this->hasMany(ApparatusServiceTicket::class);

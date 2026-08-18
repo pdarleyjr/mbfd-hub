@@ -18,9 +18,9 @@ class ListApparatusServiceTickets extends ListRecords
     public function getTabs(): array
     {
         return [
-            'open' => Tab::make('Open')->modifyQueryUsing(fn (Builder $query): Builder => $query->open()),
+            'open' => Tab::make('Open')->modifyQueryUsing(fn (Builder $query): Builder => $query->whereIn('status', ApparatusServiceTicketStatus::openValues())),
             'needs_review' => Tab::make('Needs Review')->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', ApparatusServiceTicketStatus::Submitted->value)),
-            'urgent' => Tab::make('Urgent')->modifyQueryUsing(fn (Builder $query): Builder => $query->open()->where('priority', 'urgent')),
+            'urgent' => Tab::make('Urgent')->modifyQueryUsing(fn (Builder $query): Builder => $query->whereIn('status', ApparatusServiceTicketStatus::openValues())->where('priority', 'urgent')),
             'scheduled' => Tab::make('Scheduled')->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', ApparatusServiceTicketStatus::Scheduled->value)),
             'in_progress' => Tab::make('In Progress')->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', ApparatusServiceTicketStatus::InProgress->value)),
             'waiting_for_parts' => Tab::make('Waiting for Parts')->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', ApparatusServiceTicketStatus::WaitingForParts->value)),

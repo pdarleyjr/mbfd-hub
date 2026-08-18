@@ -99,13 +99,17 @@ class StationActivityService
             ->latest('id')
             ->limit($limit)
             ->get(['id', 'apparatus_service_ticket_id', 'status', 'created_at'])
-            ->map(fn (ApparatusServiceTicketUpdate $update): array => [
-                'type' => 'apparatus_service_ticket',
-                'label' => "{$update->ticket->ticket_number} — {$update->ticket->unit_designation_snapshot}: {$update->ticket->title}",
-                'status' => $update->status,
-                'request_number' => $update->ticket->ticket_number,
-                'occurred_at' => $update->created_at,
-            ]);
+            ->map(function (ApparatusServiceTicketUpdate $update): array {
+                $ticket = $update->ticket;
+
+                return [
+                    'type' => 'apparatus_service_ticket',
+                    'label' => "{$ticket->ticket_number} — {$ticket->unit_designation_snapshot}: {$ticket->title}",
+                    'status' => $update->status,
+                    'request_number' => $ticket->ticket_number,
+                    'occurred_at' => $update->created_at,
+                ];
+            });
 
         return collect()
             ->concat($apparatusInspections)

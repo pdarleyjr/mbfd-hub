@@ -274,7 +274,7 @@ class ApparatusServiceTicketWorkflowService
 
         return DB::transaction(function () use ($apparatus, $actor, $validated, $ticket): Apparatus {
             $locked = Apparatus::query()->lockForUpdate()->findOrFail($apparatus->id);
-            $previousStatus = $locked->status;
+            $previousStatus = $locked->getAttribute('status');
             $locked->update(['status' => $validated['status']]);
 
             if ($ticket !== null) {
@@ -408,7 +408,7 @@ class ApparatusServiceTicketWorkflowService
 
     private function unitLabel(Apparatus $apparatus): string
     {
-        return trim((string) ($apparatus->designation ?: $apparatus->vehicle_number ?: $apparatus->name ?: $apparatus->unit_id));
+        return trim((string) ($apparatus->designation ?: $apparatus->vehicle_number ?: $apparatus->name ?: $apparatus->getAttribute('unit_id')));
     }
 
     private function nullableTrim(mixed $value): ?string
