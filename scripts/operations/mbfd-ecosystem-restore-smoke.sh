@@ -51,8 +51,26 @@ sha256_file="$(find "$work" -type f -name SHA256SUMS -print -quit)"
 [[ -s "$mbfd_dump" && -s "$nextcloud_dump" && -s "$media_db" && -s "$openwebui_db" ]]
 [[ -s "$sha256_file" ]] || { echo 'FATAL: SHA256SUMS not found in restored snapshot' >&2; exit 1; }
 
-# Verify SHA256SUMS for the restored staging artifacts.
-( cd "$(dirname "$sha256_file")" && sha256sum -c SHA256SUMS --quiet ) \
+# The backup manifest covers the entire staging tree, while this smoke test
+# intentionally restores only four representative data artifacts. Build a
+# strict sub-manifest so omitted deployment/rollback files are not reported as
+# corrupt, and fail closed if any required artifact is absent from the manifest.
+manifest_dir="$(dirname "$sha256_file")"
+required_manifest="$work/required-SHA256SUMS"
+required_artifacts=("$mbfd_dump" "$nextcloud_dump" "$media_db" "$openwebui_db")
+: > "$required_manifest"
+for artifact in "${required_artifacts[@]}"; do
+    case "$artifact" in
+        "$manifest_dir"/*) ;;
+        *) echo "FATAL: restored artifact escaped manifest directory" >&2; exit 1 ;;
+    esac
+    relative="${artifact#"$manifest_dir"/}"
+    expected="./$relative"
+    awk -v expected="$expected" '$2 == expected { print; found=1 } END { exit(found ? 0 : 1) }' \
+        "$sha256_file" >> "$required_manifest" \
+        || { echo "FATAL: required artifact is absent from SHA256SUMS: $relative" >&2; exit 1; }
+done
+( cd "$manifest_dir" && sha256sum -c "$required_manifest" --quiet ) \
     || { echo 'FATAL: SHA256SUMS verification failed' >&2; exit 1; }
 
 docker exec -i mbfd-hub-pgsql sh -euc 'pg_restore --list >/dev/null' < "$mbfd_dump"
