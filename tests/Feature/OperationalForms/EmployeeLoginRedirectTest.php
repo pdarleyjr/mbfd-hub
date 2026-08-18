@@ -55,6 +55,72 @@ class EmployeeLoginRedirectTest extends TestCase
             ->assertRedirect(route('filament.employee.pages.dashboard'));
     }
 
+    public function test_repeated_failures_are_throttled_without_an_exception_page(): void
+    {
+        $employee = $this->employee();
+        Filament::setCurrentPanel(Filament::getPanel('employee'));
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            Livewire::test(EmployeeLogin::class)
+                ->fillForm(['email' => $employee->employee_id, 'password' => 'incorrect-password'])
+                ->call('authenticate')
+                ->assertHasErrors(['data.email']);
+        }
+
+        Livewire::test(EmployeeLogin::class)
+            ->fillForm(['email' => $employee->employee_id, 'password' => 'incorrect-password'])
+            ->call('authenticate')
+            ->assertNotified();
+    }
+
+    public function test_one_employee_cannot_exhaust_another_employees_shared_ip_limit(): void
+    {
+        $firstEmployee = $this->employee();
+        $secondEmployee = $this->employee('20732');
+        Filament::setCurrentPanel(Filament::getPanel('employee'));
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            Livewire::test(EmployeeLogin::class)
+                ->fillForm(['email' => $firstEmployee->employee_id, 'password' => 'incorrect-password'])
+                ->call('authenticate')
+                ->assertHasErrors(['data.email']);
+        }
+
+        Livewire::test(EmployeeLogin::class)
+            ->fillForm(['email' => $secondEmployee->employee_id, 'password' => 'password'])
+            ->call('authenticate')
+            ->assertRedirect(route('filament.employee.pages.dashboard'));
+
+        $this->assertAuthenticatedAs($secondEmployee, 'employee');
+    }
+
+    public function test_successful_login_clears_its_failed_attempt_counter(): void
+    {
+        $employee = $this->employee();
+        Filament::setCurrentPanel(Filament::getPanel('employee'));
+
+        for ($attempt = 0; $attempt < 4; $attempt++) {
+            Livewire::test(EmployeeLogin::class)
+                ->fillForm(['email' => $employee->employee_id, 'password' => 'incorrect-password'])
+                ->call('authenticate')
+                ->assertHasErrors(['data.email']);
+        }
+
+        Livewire::test(EmployeeLogin::class)
+            ->fillForm(['email' => $employee->employee_id, 'password' => 'password'])
+            ->call('authenticate')
+            ->assertRedirect(route('filament.employee.pages.dashboard'));
+
+        auth('employee')->logout();
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            Livewire::test(EmployeeLogin::class)
+                ->fillForm(['email' => $employee->employee_id, 'password' => 'incorrect-password'])
+                ->call('authenticate')
+                ->assertHasErrors(['data.email']);
+        }
+    }
+
     #[DataProvider('unsafePaths')]
     public function test_safe_path_filter_rejects_external_and_out_of_panel_paths(string $path): void
     {
@@ -73,10 +139,10 @@ class EmployeeLoginRedirectTest extends TestCase
         ];
     }
 
-    private function employee(): Employee
+    private function employee(string $employeeId = '20731'): Employee
     {
         return Employee::query()->create([
-            'employee_id' => '20731',
+            'employee_id' => $employeeId,
             'name' => 'Employee Login Test',
             'password' => Hash::make('password'),
             'must_change_password' => false,

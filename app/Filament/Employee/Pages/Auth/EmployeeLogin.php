@@ -2,11 +2,11 @@
 
 namespace App\Filament\Employee\Pages\Auth;
 
+use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Forms\Components\Component;
 use Filament\Forms\Components\TextInput;
 use Filament\Http\Responses\Auth\Contracts\LoginResponse;
 use Filament\Pages\Auth\Login as BaseLogin;
-use Illuminate\Http\Exceptions\ThrottleRequestsException;
 
 /**
  * Custom Employee Portal login page.
@@ -86,7 +86,7 @@ class EmployeeLogin extends BaseLogin
     {
         try {
             $this->rateLimit(5);
-        } catch (ThrottleRequestsException $exception) {
+        } catch (TooManyRequestsException $exception) {
             $this->getRateLimitedNotification($exception)?->send();
 
             return null;
@@ -101,6 +101,9 @@ class EmployeeLogin extends BaseLogin
             $this->throwFailureValidationException();
         }
 
+        // Count consecutive failed attempts, not legitimate successful sign-ins.
+        $this->clearRateLimiter('authenticate');
+
         session()->regenerate();
 
         $intended = session()->pull('employee.intended_path') ?? session()->pull('url.intended');
@@ -108,5 +111,25 @@ class EmployeeLogin extends BaseLogin
         $this->redirect($target, navigate: false);
 
         return app(LoginResponse::class);
+    }
+
+    /**
+     * Isolate failed-login counters by employee identity as well as source IP.
+     * This prevents one user behind a shared station/network from locking out
+     * every other employee while retaining brute-force protection per account.
+     */
+    protected function getRateLimitKey($method, $component = null): string
+    {
+        $component ??= static::class;
+
+        $employeeId = mb_strtolower(trim((string) ($this->data['email'] ?? '')));
+        $fingerprint = implode('|', [
+            $component,
+            (string) $method,
+            request()->ip(),
+            $employeeId,
+        ]);
+
+        return 'livewire-rate-limiter:'.hash_hmac('sha256', $fingerprint, (string) config('app.key'));
     }
 }
