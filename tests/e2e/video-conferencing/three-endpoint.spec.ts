@@ -27,6 +27,36 @@ async function endpointContext(browser: Browser, baseURL: string): Promise<Endpo
             },
         });
         Object.defineProperty(window, '__mbfdPeerConnections', { value: peerConnections });
+
+        const nativeGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        let gainNode: GainNode | undefined;
+        navigator.mediaDevices.getUserMedia = async (constraints) => {
+            const stream = await nativeGetUserMedia(constraints);
+            if (!constraints.audio) return stream;
+
+            for (const track of stream.getAudioTracks()) {
+                stream.removeTrack(track);
+                track.stop();
+            }
+            const audio = new AudioContext();
+            const oscillator = audio.createOscillator();
+            gainNode = audio.createGain();
+            gainNode.gain.value = 0;
+            oscillator.frequency.value = 440;
+            oscillator.connect(gainNode);
+            const destination = audio.createMediaStreamDestination();
+            gainNode.connect(destination);
+            oscillator.start();
+            await audio.resume();
+            stream.addTrack(destination.stream.getAudioTracks()[0]);
+
+            return stream;
+        };
+        Object.defineProperty(window, '__mbfdSetAudioLevel', {
+            value: (level: number) => {
+                if (gainNode) gainNode.gain.value = level;
+            },
+        });
     });
 
     return { context, page: await context.newPage() };
@@ -60,14 +90,40 @@ async function prepareCommand(browser: Browser, baseURL: string): Promise<Endpoi
     return endpoint;
 }
 
-async function everyPeerConnectionIsRelayOnly(page: Page): Promise<boolean> {
-    return page.evaluate(() => {
+async function selectedCandidatePairsUseRelayOnly(page: Page): Promise<boolean> {
+    return page.evaluate(async () => {
         const peerConnections = (window as Window & { __mbfdPeerConnections?: RTCPeerConnection[] })
             .__mbfdPeerConnections ?? [];
+        if (peerConnections.length === 0) return false;
 
-        return peerConnections.length > 0
-            && peerConnections.every((peerConnection) => peerConnection.getConfiguration().iceTransportPolicy === 'relay');
+        for (const peerConnection of peerConnections) {
+            if (peerConnection.getConfiguration().iceTransportPolicy !== 'relay') return false;
+            const stats = await peerConnection.getStats();
+            const transports = [...stats.values()].filter((report) => report.type === 'transport');
+            const selectedPairIds = transports
+                .map((transport) => transport.selectedCandidatePairId as string | undefined)
+                .filter((id): id is string => Boolean(id));
+            const selectedPairs = selectedPairIds.length > 0
+                ? selectedPairIds.map((id) => stats.get(id)).filter(Boolean)
+                : [...stats.values()].filter((report) => report.type === 'candidate-pair'
+                    && report.state === 'succeeded'
+                    && (report.selected === true || report.nominated === true));
+
+            if (selectedPairs.length === 0) return false;
+            for (const pair of selectedPairs) {
+                const localCandidate = stats.get(pair.localCandidateId as string);
+                if (localCandidate?.candidateType !== 'relay') return false;
+            }
+        }
+
+        return true;
     });
+}
+
+async function setSyntheticAudioLevel(page: Page, level: number): Promise<void> {
+    await page.evaluate((nextLevel) => {
+        (window as Window & { __mbfdSetAudioLevel?: (value: number) => void }).__mbfdSetAudioLevel?.(nextLevel);
+    }, level);
 }
 
 async function conferenceFitsWithoutPageScroll(page: Page): Promise<boolean> {
@@ -126,23 +182,36 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
         await expect.poll(() => conferenceFitsWithoutPageScroll(command.page)).toBe(true);
         for (const station of stations) await expect(station.page.locator('.vc-station-mic')).toContainText('MIC MUTED');
 
+        await setSyntheticAudioLevel(command.page, 0.45);
+        await expect(command.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /300 video/);
+
         if (forceRelay) {
-            await expect.poll(() => everyPeerConnectionIsRelayOnly(command.page)).toBe(true);
+            await expect.poll(() => selectedCandidatePairsUseRelayOnly(command.page)).toBe(true);
             for (const station of stations) {
-                await expect.poll(() => everyPeerConnectionIsRelayOnly(station.page)).toBe(true);
+                await expect.poll(() => selectedCandidatePairsUseRelayOnly(station.page)).toBe(true);
             }
         }
 
         const stationOne = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 1' });
         const stationThree = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 3' });
         await stationOne.getByRole('button', { name: 'Give Floor' }).click();
+        await setSyntheticAudioLevel(stations[0].page, 0.8);
         await expect(stations[0].page.locator('.vc-station-mic')).toContainText('MIC LIVE');
+        await expect(command.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /Station 1 video/);
         await stationThree.getByRole('button', { name: 'Give Floor' }).click();
+        await setSyntheticAudioLevel(stations[2].page, 0.9);
         await expect(stations[2].page.locator('.vc-station-mic')).toContainText('MIC LIVE');
+        await expect(command.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /Station 3 video/);
         await stationOne.getByRole('button', { name: 'Mute' }).click();
         await expect(stations[0].page.locator('.vc-station-mic')).toContainText('MIC MUTED');
         await command.page.getByRole('button', { name: 'Mute all stations' }).click();
         await expect(stations[2].page.locator('.vc-station-mic')).toContainText('MIC MUTED');
+
+        await command.page.locator('.vc-controls').getByRole('button', { name: 'Mute' }).click();
+        const stationTwo = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 2' });
+        await stationTwo.getByRole('button', { name: 'Give Floor' }).click();
+        await setSyntheticAudioLevel(stations[1].page, 0.9);
+        await expect(command.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /Station 2 video/);
 
         await command.page.getByRole('button', { name: 'Share screen' }).click();
         await expect(stations[0].page.locator('.vc-focus-bar')).toContainText('Screen share');
