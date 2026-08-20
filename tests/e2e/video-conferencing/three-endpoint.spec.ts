@@ -68,7 +68,7 @@ async function prepareStation(browser: Browser, baseURL: string, station: 1 | 2 
     await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-entry-mode', 'station');
     await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'standing_by');
     await expect(endpoint.page.getByText(`Station ${station}`, { exact: true }).first()).toBeVisible();
-    await expect(endpoint.page.getByText('READY — STANDING BY')).toBeVisible();
+    await expect(endpoint.page.getByText('READY — STANDING BY', { exact: true })).toBeVisible();
 
     return endpoint;
 }
