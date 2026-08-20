@@ -122,6 +122,8 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
         await Promise.all(stations.map(({ page }) => expect(page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected')));
         await expect(command.page.locator('.vc-tile')).toHaveCount(6);
         await expect.poll(() => conferenceFitsWithoutPageScroll(command.page)).toBe(true);
+        await command.page.setViewportSize({ width: 1280, height: 800 });
+        await expect.poll(() => conferenceFitsWithoutPageScroll(command.page)).toBe(true);
         for (const station of stations) await expect(station.page.locator('.vc-station-mic')).toContainText('MIC MUTED');
 
         if (forceRelay) {
@@ -141,6 +143,11 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
         await expect(stations[0].page.locator('.vc-station-mic')).toContainText('MIC MUTED');
         await command.page.getByRole('button', { name: 'Mute all stations' }).click();
         await expect(stations[2].page.locator('.vc-station-mic')).toContainText('MIC MUTED');
+
+        await command.page.getByRole('button', { name: 'Share screen' }).click();
+        await expect(stations[0].page.locator('.vc-focus-bar')).toContainText('Screen share');
+        await command.page.getByRole('button', { name: 'Stop sharing' }).click();
+        await expect(stations[0].page.locator('.vc-focus-bar')).toContainText('Auto speaker');
 
         await command.page.getByRole('button', { name: 'End Morning Lineup' }).click();
         await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
