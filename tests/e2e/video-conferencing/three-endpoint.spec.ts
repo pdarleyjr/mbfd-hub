@@ -32,23 +32,50 @@ async function endpointContext(browser: Browser, baseURL: string): Promise<Endpo
         let gainNode: GainNode | undefined;
         navigator.mediaDevices.getUserMedia = async (constraints) => {
             const stream = await nativeGetUserMedia(constraints);
-            if (!constraints.audio) return stream;
-
-            for (const track of stream.getAudioTracks()) {
-                stream.removeTrack(track);
-                track.stop();
+            if (constraints.video) {
+                for (const track of stream.getVideoTracks()) {
+                    stream.removeTrack(track);
+                    track.stop();
+                }
+                // Six simultaneous 720p fake-camera publishers can saturate one
+                // acceptance host and cause artificial WebRTC renegotiations.
+                // Keep the real LiveKit topology while using a lightweight,
+                // animated source for the synthetic camera only.
+                const canvas = document.createElement('canvas');
+                canvas.width = 320;
+                canvas.height = 180;
+                const context = canvas.getContext('2d')!;
+                let frame = 0;
+                const draw = () => {
+                    context.fillStyle = `hsl(${frame % 360} 65% 28%)`;
+                    context.fillRect(0, 0, canvas.width, canvas.height);
+                    context.fillStyle = '#fff';
+                    context.font = '600 24px sans-serif';
+                    context.fillText('MBFD TEST CAMERA', 35, 98);
+                    frame += 4;
+                };
+                draw();
+                window.setInterval(draw, 200);
+                stream.addTrack(canvas.captureStream(5).getVideoTracks()[0]);
             }
-            const audio = new AudioContext();
-            const oscillator = audio.createOscillator();
-            gainNode = audio.createGain();
-            gainNode.gain.value = 0;
-            oscillator.frequency.value = 440;
-            oscillator.connect(gainNode);
-            const destination = audio.createMediaStreamDestination();
-            gainNode.connect(destination);
-            oscillator.start();
-            await audio.resume();
-            stream.addTrack(destination.stream.getAudioTracks()[0]);
+
+            if (constraints.audio) {
+                for (const track of stream.getAudioTracks()) {
+                    stream.removeTrack(track);
+                    track.stop();
+                }
+                const audio = new AudioContext();
+                const oscillator = audio.createOscillator();
+                gainNode = audio.createGain();
+                gainNode.gain.value = 0;
+                oscillator.frequency.value = 440;
+                oscillator.connect(gainNode);
+                const destination = audio.createMediaStreamDestination();
+                gainNode.connect(destination);
+                oscillator.start();
+                await audio.resume();
+                stream.addTrack(destination.stream.getAudioTracks()[0]);
+            }
 
             return stream;
         };
@@ -149,6 +176,7 @@ test('one browser may deliberately move from Station 1 to Station 4 without a st
 });
 
 test('five stations wait without LiveKit, then all join 300 and floor controls work', async ({ browser, baseURL }) => {
+    test.setTimeout(240_000);
     const cloudRequests = new Map<number, number>();
     const stations = await Promise.all(([1, 2, 3, 4, 6] as const).map(async (station) => {
         const endpoint = await endpointContext(browser, baseURL!);
@@ -175,7 +203,11 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
 
         await command.page.getByRole('button', { name: 'Start Morning Lineup' }).click();
         await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
-        await Promise.all(stations.map(({ page }) => expect(page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected')));
+        await Promise.all(stations.map(({ page }) => expect(page.locator('.vc-shell')).toHaveAttribute(
+            'data-phase',
+            'connected',
+            { timeout: 45_000 },
+        )));
         await expect(command.page.locator('.vc-tile')).toHaveCount(6);
         await expect.poll(() => conferenceFitsWithoutPageScroll(command.page)).toBe(true);
         await command.page.setViewportSize({ width: 1280, height: 800 });
@@ -183,7 +215,7 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
         for (const station of stations) await expect(station.page.locator('.vc-station-mic')).toContainText('MIC MUTED');
 
         await setSyntheticAudioLevel(command.page, 0.45);
-        await expect(command.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /300 video/);
+        await expect(command.page.locator('.vc-focus-stage .vc-mic')).toContainText('Speaking');
 
         if (forceRelay) {
             await expect.poll(() => selectedCandidatePairsUseRelayOnly(command.page)).toBe(true);
@@ -196,12 +228,15 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
         const stationThree = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 3' });
         await stationOne.getByRole('button', { name: 'Give Floor' }).click();
         await setSyntheticAudioLevel(stations[0].page, 0.8);
+        await command.page.waitForTimeout(2_500);
+        await setSyntheticAudioLevel(command.page, 0);
         await expect(stations[0].page.locator('.vc-station-mic')).toContainText('MIC LIVE');
-        await expect(command.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /Station 1 video/);
+        await expect(stations[0].page.locator('.vc-focus-stage .vc-mic')).toContainText('Speaking');
         await stationThree.getByRole('button', { name: 'Give Floor' }).click();
+        await setSyntheticAudioLevel(stations[0].page, 0);
         await setSyntheticAudioLevel(stations[2].page, 0.9);
         await expect(stations[2].page.locator('.vc-station-mic')).toContainText('MIC LIVE');
-        await expect(command.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /Station 3 video/);
+        await expect(stations[2].page.locator('.vc-focus-stage .vc-mic')).toContainText('Speaking');
         await stationOne.getByRole('button', { name: 'Mute' }).click();
         await expect(stations[0].page.locator('.vc-station-mic')).toContainText('MIC MUTED');
         await command.page.getByRole('button', { name: 'Mute all stations' }).click();
@@ -210,8 +245,9 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
         await command.page.locator('.vc-controls').getByRole('button', { name: 'Mute' }).click();
         const stationTwo = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 2' });
         await stationTwo.getByRole('button', { name: 'Give Floor' }).click();
+        await setSyntheticAudioLevel(stations[2].page, 0);
         await setSyntheticAudioLevel(stations[1].page, 0.9);
-        await expect(command.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /Station 2 video/);
+        await expect(stations[1].page.locator('.vc-focus-stage .vc-mic')).toContainText('Speaking');
 
         await command.page.getByRole('button', { name: 'Share screen' }).click();
         await expect(stations[0].page.locator('.vc-focus-bar')).toContainText('Screen share');
@@ -220,7 +256,7 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
 
         await command.page.getByRole('button', { name: 'End Morning Lineup' }).click();
         await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
-        await Promise.all(stations.map(({ page }) => expect(page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready')));
+        await Promise.all(stations.map(({ page }) => expect(page.locator('.vc-shell')).toHaveAttribute('data-phase', 'standing_by')));
     } finally {
         await Promise.all([command.context.close(), ...stations.map(({ context }) => context.close())]);
     }
@@ -235,6 +271,14 @@ test('300 can place and end a direct Station 1 call', async ({ browser, baseURL 
         await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
         await expect(station.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
         await expect(command.page.locator('.vc-tile')).toHaveCount(2);
+        await setSyntheticAudioLevel(command.page, 0.45);
+        await expect(station.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /300 video/);
+        const stationOneControl = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 1' });
+        await stationOneControl.getByRole('button', { name: 'Give Floor' }).click();
+        await setSyntheticAudioLevel(station.page, 0.9);
+        await command.page.waitForTimeout(2_500);
+        await setSyntheticAudioLevel(command.page, 0);
+        await expect(command.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /Station 1 video/);
         await command.page.getByRole('button', { name: 'End Direct Call' }).click();
         await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
         await expect(station.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'standing_by');

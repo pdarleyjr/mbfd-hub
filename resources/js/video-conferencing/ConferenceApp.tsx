@@ -287,10 +287,26 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                     }
                     const payload = JSON.parse(invocation.payload) as { enabled?: boolean };
                     const enabled = payload.enabled === true;
-                    await nextRoom!.localParticipant.setMicrophoneEnabled(enabled);
+                    // Applying the browser track change can wait on WebRTC
+                    // renegotiation. Reflect 300's command immediately so a
+                    // station never appears muted while its live track is
+                    // already reaching the room.
                     setMicrophoneEnabled(enabled);
                     setForcedStationMic(!enabled);
                     setParticipantRefresh((value) => value + 1);
+                    try {
+                        await nextRoom!.localParticipant.setMicrophoneEnabled(enabled);
+                    } catch (microphoneError) {
+                        // A failed remote unmute must remain visibly muted.
+                        // Remote mute is also enforced by the server, so its
+                        // safe UI state remains valid if the local call fails.
+                        if (enabled) {
+                            setMicrophoneEnabled(false);
+                            setForcedStationMic(true);
+                            setParticipantRefresh((value) => value + 1);
+                        }
+                        throw microphoneError;
+                    }
 
                     return JSON.stringify({ enabled });
                 });

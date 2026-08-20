@@ -28,3 +28,17 @@ test('focused videos request HIGH and thumbnails request LOW with adaptive deliv
   assert.match(app, /VideoPresets\.h720/);
   assert.match(app, /setVideoQuality\(high \? VideoQuality\.HIGH : VideoQuality\.LOW\)/);
 });
+
+test('station microphone RPC reflects floor state before WebRTC renegotiation completes', () => {
+  const start = app.indexOf("registerRpcMethod('mbfd.stationMic'");
+  const end = app.indexOf('return JSON.stringify({ enabled });', start);
+  const handler = app.slice(start, end);
+
+  assert.ok(start >= 0 && end > start, 'station microphone RPC handler is present');
+  assert.ok(
+    handler.indexOf('setMicrophoneEnabled(enabled);')
+      < handler.indexOf('await nextRoom!.localParticipant.setMicrophoneEnabled(enabled);'),
+    'station state is updated before the potentially slow WebRTC operation',
+  );
+  assert.match(handler, /if \(enabled\) \{[\s\S]*?setMicrophoneEnabled\(false\);[\s\S]*?setForcedStationMic\(true\);/);
+});
