@@ -17,6 +17,14 @@ test("conference entry mode is server-bound and all controls remain touch safe",
   assert.match(css, /env\(safe-area-inset-bottom\)/);
 });
 
+test("station polling and Reverb events share a single token request in flight", () => {
+    const source = readFileSync("resources/js/video-conferencing/ConferenceApp.tsx", "utf8");
+
+    assert.match(source, /stationTokenRequestRef\.current \|\| joiningRef\.current/);
+    assert.match(source, /stationTokenRequestRef\.current = true/);
+    assert.match(source, /finally \{\s*stationTokenRequestRef\.current = false/);
+});
+
 test("station detail launches fixed station context without bundling LiveKit", () => {
   assert.match(stationDetail, /href=\{`\/video-conferencing\/stations\/\$\{station\.station_number\}`\}/);
   assert.match(stationDetail, /Morning Lineup Video Conference — Station 2/);

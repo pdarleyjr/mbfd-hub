@@ -127,6 +127,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     const roomRef = useRef<Room | null>(null);
     const participationIdRef = useRef<string | null>(null);
     const joiningRef = useRef(false);
+    const stationTokenRequestRef = useRef(false);
     const isLeavingRef = useRef(false);
     const autoMediaStartedRef = useRef(false);
     const activeLineupSeenRef = useRef(false);
@@ -358,7 +359,8 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     }, [attachRoomEvents, bootstrap, cameraEnabled, forceRelay, lineup.session_id, microphoneEnabled]);
 
     const requestStationToken = useCallback(async (requestedRoom: 'lineup' | 'direct', confirmedTakeover = false) => {
-        if (!bootstrap.launch_context || joiningRef.current || roomRef.current) return;
+        if (!bootstrap.launch_context || stationTokenRequestRef.current || joiningRef.current || roomRef.current) return;
+        stationTokenRequestRef.current = true;
         try {
             const credentials = await postJson<TokenResponse>(
                 bootstrap.endpoints.station_token,
@@ -377,6 +379,8 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             }
             setError(tokenError instanceof Error ? tokenError.message : 'The station could not join Morning Lineup.');
             setPhase('standing_by');
+        } finally {
+            stationTokenRequestRef.current = false;
         }
     }, [bootstrap, connectWithCredentials]);
 
