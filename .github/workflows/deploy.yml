@@ -207,6 +207,24 @@ jobs:
             echo '✓ All frontend assets built'
           "
 
+      # Reverb and the queue worker start with the config cache that exists
+      # when the container boots. Restart after config:cache so both supervised
+      # processes use the same app credentials and runtime drivers as Laravel.
+      - name: Restart services with current config cache
+        run: |
+          ssh deploy-target "set -e
+            docker restart mbfd-hub-laravel >/dev/null
+            for i in \$(seq 1 45); do
+              if docker inspect --format='{{.State.Health.Status}}' mbfd-hub-laravel | grep -q '^healthy$'; then
+                echo '✓ Services restarted with current config cache'
+                exit 0
+              fi
+              sleep 1
+            done
+            echo 'Laravel container did not become healthy after config-cache restart' >&2
+            exit 1
+          "
+
       - name: Verify background services
         run: |
           ssh deploy-target "set -e
