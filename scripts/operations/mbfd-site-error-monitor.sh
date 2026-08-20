@@ -7,6 +7,7 @@ readonly BASE=/opt/mbfd/site-monitor
 readonly STATE=${BASE}/state.env
 readonly REPORT_DIR=${BASE}/reports
 readonly LARAVEL_LOG=/opt/mbfd/mbfd-hub/storage/logs/laravel.log
+readonly LARAVEL_EVENT_FILTER=/opt/mbfd/runbooks/filter_laravel_monitor_events.py
 readonly ALERT_COOLDOWN_SECONDS=900
 readonly HERMES_ENV="HOME=/var/lib/mbfd-aiops HERMES_HOME=/opt/mbfd/hermes/home PATH=/var/lib/mbfd-aiops/.local/bin:/opt/mbfd/hermes/home/node/bin:/opt/mbfd/hermes/home/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -98,6 +99,28 @@ for name, url, expected in checks:
 PY
 }
 
+probe_runtime() {
+    local container details status health
+    for container in mbfd-hub-laravel mbfd-hub-pgsql mbfd-hub-redis mbfd-livekit-server; do
+        if ! details=$(docker inspect --format '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}|{{.State.StartedAt}}|{{.RestartCount}}' "${container}" 2>/dev/null); then
+            echo "ISSUE runtime_probe container=${container} state=unavailable"
+            continue
+        fi
+        IFS='|' read -r status health started_at restart_count <<< "${details}"
+        if [[ "${status}" == "running" && ( "${health}" == "healthy" || "${health}" == "none" ) ]]; then
+            echo "OK runtime_probe container=${container} status=${status} health=${health} started_at=${started_at} restarts=${restart_count}"
+        else
+            echo "ISSUE runtime_probe container=${container} status=${status} health=${health} started_at=${started_at} restarts=${restart_count}"
+        fi
+    done
+
+    if [[ "$(systemctl is-active cloudflared.service 2>/dev/null || true)" == "active" ]]; then
+        echo "OK runtime_probe service=cloudflared status=active"
+    else
+        echo "ISSUE runtime_probe service=cloudflared status=inactive_or_unknown"
+    fi
+}
+
 collect_events() {
     local output=$1 since="@${LAST_EPOCH}" current_offset=0
     {
@@ -106,10 +129,13 @@ collect_events() {
         echo "collection_time=$(date -Is)"
         echo "report_generation_time=$(date -Is)"
         echo "time_zone=$(date +%:z)"
-        echo "data_source=synthetic_http,cloudflared_journal,laravel_log"
+        echo "data_source=synthetic_http,docker_runtime,systemd,cloudflared_journal,laravel_log"
         echo
         echo "===== HTTP PROBES ====="
         probe_sites
+        echo
+        echo "===== RUNTIME PROBES ====="
+        probe_runtime
         echo
         echo "===== ACTIONABLE CLOUDFLARED ERRORS FOR MAIN/ADMIN ====="
         journalctl -u cloudflared.service --since "${since}" --no-pager 2>/dev/null \
@@ -122,11 +148,14 @@ collect_events() {
         if [[ -f "${LARAVEL_LOG}" ]]; then
             current_offset=$(stat -c %s "${LARAVEL_LOG}")
             if (( current_offset < LARAVEL_OFFSET )); then LARAVEL_OFFSET=0; fi
-            tail -c +$((LARAVEL_OFFSET + 1)) "${LARAVEL_LOG}" 2>/dev/null \
-                | grep -E '^\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9:]+\] production\.(ERROR|CRITICAL|ALERT|EMERGENCY):' \
-                | grep -Eiv 'A target FIFA Bronze or Gold record already exists; no duplicate was created|Psy\\\\Shell\\\\Exception\\\\ParseErrorException' \
-                | tail -200 \
-                | redact || true
+            if [[ -r "${LARAVEL_EVENT_FILTER}" ]]; then
+                tail -c +$((LARAVEL_OFFSET + 1)) "${LARAVEL_LOG}" 2>/dev/null \
+                    | python3 "${LARAVEL_EVENT_FILTER}" \
+                    | tail -400 \
+                    | redact || true
+            else
+                echo "ISSUE laravel_event_filter source_unavailable"
+            fi
         else
             echo "UNKNOWN laravel_log source_unavailable"
         fi
@@ -152,25 +181,41 @@ event_key() {
 }
 
 severity_for() {
-    if grep -Eq '^ISSUE http_probe|Unable to reach|connection refused|connection reset by peer|HTTP 50[234]' "$1"; then
+    if grep -Eq '^ISSUE http_probe|^ISSUE runtime_probe (container=mbfd-hub-(laravel|pgsql|redis)|service=cloudflared)|Unable to reach|connection refused|connection reset by peer|HTTP 50[234]' "$1"; then
         echo high
     else
         echo warning
     fi
 }
 
+observed_state_for() {
+    if [[ "$(severity_for "$1")" == "high" ]]; then
+        echo "Degraded"
+    else
+        echo "ApplicationEvent"
+    fi
+}
+
 diagnose_and_notify() {
-    local event_file=$1 timestamp=$2 severity=$3 correlation_id=$4
+    local event_file=$1 timestamp=$2 severity=$3 correlation_id=$4 observed_state=$5
     local prompt=${REPORT_DIR}/prompt-${timestamp}.txt assessment=${REPORT_DIR}/assessment-${timestamp}.txt
     cat > "${prompt}" <<PROMPT
 /no_think
 Diagnose this NEW MBFD main/admin incident. Do not include chain-of-thought or secrets.
 Return: Severity, Current State, Historical State, Affected Service, User Impact, Evidence, Confidence, Correlation ID, Recovery State, Safe Checks, and Approval-Gated Remediation.
 severity=${severity}
-current_state=Degraded
+current_state=${observed_state}
 historical_state=${CURRENT_STATE}
 correlation_id=${correlation_id}
 deduplication_key=site-admin:${correlation_id}
+
+EVIDENCE RULES:
+- Use only the supplied observations. Do not infer container, process, secret, or configuration state when it is absent; report it as unknown.
+- Successful HTTP probes are current availability evidence. Do not claim a global site or login outage from an isolated application log event when those probes pass.
+- A LiveKit webhook JWT failure is not employee or admin authentication. Identify the route from evidence frames before naming the affected authentication flow.
+- A missing LiveKit room does not prove LiveKit is down. Runtime probe evidence controls container-state claims.
+- php artisan serve is the expected process inside the mbfd-hub-laravel Docker container and does not prove a non-Docker deployment.
+- Keep log occurrence time separate from collection/report time and lower confidence when evidence is incomplete.
 
 NEW EVENTS:
 $(tail -c 30000 "${event_file}")
@@ -190,7 +235,10 @@ PROMPT
 }
 
 notify_recovery() {
-    local timestamp=$1 correlation_id=$2 assessment=${REPORT_DIR}/recovery-${timestamp}.txt
+    local timestamp=$1 correlation_id=$2 assessment=${REPORT_DIR}/recovery-${timestamp}.txt recovery_state="recovered"
+    if [[ "${CURRENT_STATE}" == "ApplicationEvent" ]]; then
+        recovery_state="application event cleared; main/admin availability remained healthy"
+    fi
     cat > "${assessment}" <<RECOVERY
 Severity: informational
 Affected service: MBFD Hub main/admin
@@ -200,7 +248,7 @@ Recovery time: $(date -Is)
 Correlation ID: ${correlation_id}
 User impact: No current impact; all synthetic probes pass.
 Evidence: main=200, www=200, admin=302, admin-login=200
-Recovery state: recovered
+Recovery state: ${recovery_state}
 RECOVERY
     chmod 0640 "${assessment}"
     sudo -u mbfd-aiops env ${HERMES_ENV} ASSESSMENT_FILE="${assessment}" bash -lc \
@@ -210,7 +258,7 @@ RECOVERY
 
 run_monitor() {
     load_state
-    local timestamp event_file current_offset key severity now correlation incident_epoch
+    local timestamp event_file current_offset key severity event_state now correlation incident_epoch
     timestamp=$(date +%Y%m%d-%H%M%S)
     event_file=${REPORT_DIR}/event-${timestamp}.txt
     collect_events "${event_file}"
@@ -221,23 +269,24 @@ run_monitor() {
     if has_issue "${event_file}"; then
         key=$(event_key "${event_file}")
         severity=$(severity_for "${event_file}")
+        event_state=$(observed_state_for "${event_file}")
         correlation=${CORRELATION_ID}
         incident_epoch=${INCIDENT_START_EPOCH}
-        if [[ "${CURRENT_STATE}" != "Degraded" || -z "${correlation}" ]]; then
+        if [[ "${CURRENT_STATE}" != "${event_state}" || -z "${correlation}" ]]; then
             correlation=$(cat /proc/sys/kernel/random/uuid)
             incident_epoch=${now}
         fi
         if [[ "${key}" == "${LAST_ALERT_KEY}" && $((now - LAST_ALERT_EPOCH)) -lt ${ALERT_COOLDOWN_SECONDS} ]]; then
             echo "issues_detected=1 notification=deduplicated key=${key} event_file=${event_file}"
-            write_state "Degraded" "${key}" "${LAST_ALERT_EPOCH}" "${incident_epoch}" "${correlation}" "${current_offset}"
+            write_state "${event_state}" "${key}" "${LAST_ALERT_EPOCH}" "${incident_epoch}" "${correlation}" "${current_offset}"
         else
-            diagnose_and_notify "${event_file}" "${timestamp}" "${severity}" "${correlation}"
-            echo "issues_detected=1 notification=sent severity=${severity} correlation_id=${correlation} event_file=${event_file}"
-            write_state "Degraded" "${key}" "${now}" "${incident_epoch}" "${correlation}" "${current_offset}"
+            diagnose_and_notify "${event_file}" "${timestamp}" "${severity}" "${correlation}" "${event_state}"
+            echo "issues_detected=1 notification=sent severity=${severity} state=${event_state} correlation_id=${correlation} event_file=${event_file}"
+            write_state "${event_state}" "${key}" "${now}" "${incident_epoch}" "${correlation}" "${current_offset}"
         fi
     else
         rm -f "${event_file}"
-        if [[ "${CURRENT_STATE}" == "Degraded" ]]; then
+        if [[ "${CURRENT_STATE}" == "Degraded" || "${CURRENT_STATE}" == "ApplicationEvent" ]]; then
             notify_recovery "${timestamp}" "${CORRELATION_ID}"
             echo "issues_detected=0 recovery_notification=sent correlation_id=${CORRELATION_ID}"
         else

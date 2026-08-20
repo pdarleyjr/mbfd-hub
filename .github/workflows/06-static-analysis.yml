@@ -42,6 +42,9 @@ jobs:
       - name: CI configuration contract tests
         run: node --test tests/Node/*.test.mjs
 
+      - name: Operations monitor regression tests
+        run: python3 -m unittest discover -s tests/Python -p 'test_*.py' -v
+
       - name: Run actionlint
         uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2.1.2
         with:
