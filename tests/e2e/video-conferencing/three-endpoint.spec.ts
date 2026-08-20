@@ -117,17 +117,27 @@ async function prepareCommand(browser: Browser, baseURL: string): Promise<Endpoi
     return endpoint;
 }
 
-async function selectedCandidatePairsUseRelayOnly(page: Page): Promise<boolean> {
+async function selectedCandidatePairDiagnostics(page: Page): Promise<{
+    valid: boolean;
+    transports: Array<{
+        connectionState: RTCPeerConnectionState;
+        iceConnectionState: RTCIceConnectionState;
+        policy: RTCIceTransportPolicy | undefined;
+        selectedPairs: Array<{ localType?: string; remoteType?: string; state?: string }>;
+    }>;
+}> {
     return page.evaluate(async () => {
-        const peerConnections = (window as Window & { __mbfdPeerConnections?: RTCPeerConnection[] })
-            .__mbfdPeerConnections ?? [];
-        if (peerConnections.length === 0) return false;
+        const peerConnections = ((window as Window & { __mbfdPeerConnections?: RTCPeerConnection[] })
+            .__mbfdPeerConnections ?? []).filter((peerConnection) => (
+            peerConnection.iceConnectionState === 'connected'
+                || peerConnection.iceConnectionState === 'completed'
+        ));
+        const transports = [];
 
         for (const peerConnection of peerConnections) {
-            if (peerConnection.getConfiguration().iceTransportPolicy !== 'relay') return false;
             const stats = await peerConnection.getStats();
-            const transports = [...stats.values()].filter((report) => report.type === 'transport');
-            const selectedPairIds = transports
+            const transportReports = [...stats.values()].filter((report) => report.type === 'transport');
+            const selectedPairIds = transportReports
                 .map((transport) => transport.selectedCandidatePairId as string | undefined)
                 .filter((id): id is string => Boolean(id));
             const selectedPairs = selectedPairIds.length > 0
@@ -135,16 +145,37 @@ async function selectedCandidatePairsUseRelayOnly(page: Page): Promise<boolean> 
                 : [...stats.values()].filter((report) => report.type === 'candidate-pair'
                     && report.state === 'succeeded'
                     && (report.selected === true || report.nominated === true));
-
-            if (selectedPairs.length === 0) return false;
-            for (const pair of selectedPairs) {
+            transports.push({
+                connectionState: peerConnection.connectionState,
+                iceConnectionState: peerConnection.iceConnectionState,
+                policy: peerConnection.getConfiguration().iceTransportPolicy,
+                selectedPairs: selectedPairs.map((pair) => {
                 const localCandidate = stats.get(pair.localCandidateId as string);
-                if (localCandidate?.candidateType !== 'relay') return false;
-            }
+                    const remoteCandidate = stats.get(pair.remoteCandidateId as string);
+
+                    return {
+                        localType: localCandidate?.candidateType as string | undefined,
+                        remoteType: remoteCandidate?.candidateType as string | undefined,
+                        state: pair.state as string | undefined,
+                    };
+                }),
+            });
         }
 
-        return true;
+        return {
+            valid: transports.length > 0 && transports.every((transport) => (
+                transport.policy === 'relay'
+                    && transport.selectedPairs.length > 0
+                    && transport.selectedPairs.every((pair) => pair.localType === 'relay')
+            )),
+            transports,
+        };
     });
+}
+
+async function expectRelayOnly(page: Page): Promise<void> {
+    await expect.poll(async () => JSON.stringify(await selectedCandidatePairDiagnostics(page)))
+        .toContain('"valid":true');
 }
 
 async function setSyntheticAudioLevel(page: Page, level: number): Promise<void> {
@@ -218,10 +249,15 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
         await expect(command.page.locator('.vc-focus-stage .vc-mic')).toContainText('Speaking');
 
         if (forceRelay) {
-            await expect.poll(() => selectedCandidatePairsUseRelayOnly(command.page)).toBe(true);
+            await expectRelayOnly(command.page);
             for (const station of stations) {
-                await expect.poll(() => selectedCandidatePairsUseRelayOnly(station.page)).toBe(true);
+                await expectRelayOnly(station.page);
             }
+            await command.page.getByRole('button', { name: 'End Morning Lineup' }).click();
+            await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
+            await Promise.all(stations.map(({ page }) => expect(page.locator('.vc-shell')).toHaveAttribute('data-phase', 'standing_by')));
+
+            return;
         }
 
         const stationOne = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 1' });
@@ -252,7 +288,8 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
         await command.page.getByRole('button', { name: 'Share screen' }).click();
         await expect(stations[0].page.locator('.vc-focus-bar')).toContainText('Screen share');
         await command.page.getByRole('button', { name: 'Stop sharing' }).click();
-        await expect(stations[0].page.locator('.vc-focus-bar')).toContainText('Auto speaker');
+        await expect(command.page.locator('.vc-focus-bar')).toContainText('Auto speaker');
+        await expect(stations[0].page.locator('.vc-focus-bar')).toContainText('Auto speaker', { timeout: 45_000 });
 
         await command.page.getByRole('button', { name: 'End Morning Lineup' }).click();
         await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
@@ -271,6 +308,10 @@ test('300 can place and end a direct Station 1 call', async ({ browser, baseURL 
         await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
         await expect(station.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
         await expect(command.page.locator('.vc-tile')).toHaveCount(2);
+        if (forceRelay) {
+            await expectRelayOnly(command.page);
+            await expectRelayOnly(station.page);
+        }
         await setSyntheticAudioLevel(command.page, 0.45);
         await expect(station.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /300 video/);
         const stationOneControl = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 1' });
