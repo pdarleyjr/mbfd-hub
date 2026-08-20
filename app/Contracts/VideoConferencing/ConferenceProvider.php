@@ -10,6 +10,8 @@ interface ConferenceProvider
 {
     public function createRoom(string $roomName, string $metadata): void;
 
+    public function closeRoom(string $roomName): void;
+
     public function issueToken(
         string $roomName,
         string $identity,

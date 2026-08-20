@@ -20,8 +20,16 @@ class ConferenceIdentityService
         return trim($rank.' '.$name);
     }
 
-    public function identity(ConferenceJoinRole $role): string
+    public function identity(ConferenceJoinRole $role, ?Employee $employee = null): string
     {
-        return $role->fixedIdentity() ?? 'mbfd:member:'.(string) Str::ulid();
+        if ($role->fixedIdentity() !== null) {
+            return $role->fixedIdentity();
+        }
+
+        if ($employee === null || $employee->getKey() === null) {
+            throw new \LogicException('An authenticated employee is required for self identity.');
+        }
+
+        return 'mbfd:member:'.$employee->getKey();
     }
 }

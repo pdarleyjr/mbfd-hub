@@ -13,7 +13,7 @@ class VideoConferenceSession extends Model
     use HasUlids;
 
     protected $fillable = [
-        'type', 'logical_key', 'active_key', 'livekit_room_name', 'target_station',
+        'type', 'logical_key', 'active_key', 'livekit_profile', 'livekit_room_name', 'target_station',
         'scheduled_for', 'created_by_employee_id', 'started_at', 'ended_at',
         'provisioned_at',
     ];

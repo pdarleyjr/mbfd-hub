@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Services\VideoConferencing\LiveKitProfileConfiguration;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -20,7 +21,8 @@ class SecurityHeaders
         // below covers the same use case and supersedes this header in all modern
         // browsers, so we omit it intentionally.
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        $conferencePath = $request->is('employee/video-conferencing')
+        $conferencePath = $request->is('video-conferencing/*')
+            || $request->is('employee/video-conferencing')
             || $request->is('employee/video-conferencing/*');
         $response->headers->set(
             'Permissions-Policy',
@@ -44,9 +46,26 @@ class SecurityHeaders
         //
         // Post-promotion monitoring: watch Sentry for CSP violation reports.
         //   docker exec mbfd-hub-laravel grep -F '[CSP]' storage/logs/laravel-$(date +%F).log
-        $livekitConnectSources = $conferencePath
-            ? ' https://video.mbfdhub.com wss://video.mbfdhub.com'
-            : '';
+        $connectSources = ["'self'"];
+        if ($conferencePath) {
+            try {
+                $livekit = app(LiveKitProfileConfiguration::class);
+                $connectSources = array_merge($connectSources, array_filter([
+                    $this->origin($livekit->clientUrl()),
+                    $this->origin($livekit->apiUrl()),
+                    $this->reverbOrigin(),
+                ]));
+            } catch (\Throwable) {
+                $connectSources = array_merge($connectSources, array_filter([$this->reverbOrigin()]));
+            }
+        } else {
+            $connectSources[] = 'wss:';
+        }
+        $connectSources = implode(' ', array_unique(array_merge($connectSources, [
+            'https://api.pulsepoint.org',
+            'https://web.pulsepoint.org',
+            'https://static.cloudflareinsights.com',
+        ])));
         $cspParts = [
             "default-src 'self'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://static.cloudflareinsights.com https://www.googletagmanager.com https://pulsepoint.org https://web.pulsepoint.org",
@@ -54,7 +73,7 @@ class SecurityHeaders
             "font-src 'self' data: https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com",
             "img-src 'self' data: blob: https:",
             "media-src 'self' blob: https:",
-            "connect-src 'self' wss: https://api.pulsepoint.org https://web.pulsepoint.org https://static.cloudflareinsights.com{$livekitConnectSources}",
+            "connect-src {$connectSources}",
             "frame-src 'self' https://www.pulsepoint.org https://web.pulsepoint.org https://inventory.mbfdhub.com",
             // Allow cloud.mbfdhub.com (Nextcloud) to embed this site as an
             // External Sites iframe. All other origins remain blocked.
@@ -83,5 +102,31 @@ class SecurityHeaders
         }
 
         return $response;
+    }
+
+    private function reverbOrigin(): ?string
+    {
+        $scheme = (string) config('video-conferencing.realtime.scheme', 'https');
+        $host = (string) config('video-conferencing.realtime.host', '');
+        $port = (int) config('video-conferencing.realtime.port', 443);
+        if ($host === '' || ! in_array($scheme, ['http', 'https', 'ws', 'wss'], true)) {
+            return null;
+        }
+        $websocketScheme = in_array($scheme, ['https', 'wss'], true) ? 'wss' : 'ws';
+        $defaultPort = $websocketScheme === 'wss' ? 443 : 80;
+
+        return $websocketScheme.'://'.$host.($port === $defaultPort ? '' : ':'.$port);
+    }
+
+    private function origin(string $url): ?string
+    {
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        $host = parse_url($url, PHP_URL_HOST);
+        $port = parse_url($url, PHP_URL_PORT);
+        if (! is_string($scheme) || ! is_string($host) || $host === '') {
+            return null;
+        }
+
+        return $scheme.'://'.$host.(is_int($port) ? ':'.$port : '');
     }
 }

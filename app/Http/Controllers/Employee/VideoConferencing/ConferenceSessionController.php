@@ -30,17 +30,19 @@ class ConferenceSessionController extends Controller
 
         try {
             if ($validated['room'] === 'lineup') {
-                $session = $sessions->lineup($employee);
+                $session = $sessions->activeLineup();
+                if ($session === null) {
+                    return response()->json([
+                        'message' => 'Morning Lineup has not started.',
+                        'code' => 'lineup_not_started',
+                    ], 409)->header('Cache-Control', 'no-store');
+                }
             } else {
                 $station = ConferenceJoinRole::from((string) ($validated['station'] ?? ''));
                 $joiningAs = ConferenceJoinRole::from((string) ($validated['join_as'] ?? ''));
-                abort_unless($joiningAs === ConferenceJoinRole::Command || $joiningAs === $station, 403);
-                if ($joiningAs === ConferenceJoinRole::Command) {
-                    $commandPin->verify($employee, (string) $request->ip(), $validated['command_pin'] ?? null);
-                }
-                $session = $joiningAs === ConferenceJoinRole::Command
-                    ? $sessions->direct($employee, $station)
-                    : $sessions->activeDirectForStation($station);
+                abort_unless($joiningAs === ConferenceJoinRole::Command, 403);
+                $commandPin->verify($employee, (string) $request->ip(), $validated['command_pin'] ?? null);
+                $session = $sessions->direct($employee, $station);
             }
         } catch (ConferenceUnavailableException $exception) {
             return response()->json([
@@ -49,14 +51,7 @@ class ConferenceSessionController extends Controller
             ], 503)->header('Cache-Control', 'no-store');
         }
 
-        return response()->json([
-            'session' => [
-                'id' => $session->id,
-                'type' => $session->type->value,
-                'target_station' => $session->target_station,
-                'scheduled_for' => $session->scheduled_for?->toIso8601String(),
-                'lineup_time_configured' => config('video-conferencing.lineup_time') !== null,
-            ],
-        ])->header('Cache-Control', 'no-store');
+        return response()->json(['session' => $sessions->sessionPayload($session)])
+            ->header('Cache-Control', 'no-store');
     }
 }

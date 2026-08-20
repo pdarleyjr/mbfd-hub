@@ -65,15 +65,33 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         RateLimiter::for('conference-tokens', function (Request $request): array {
-            $employeeId = $request->user('employee')?->getAuthIdentifier() ?? $request->ip();
+            $employeeId = $request->user('employee')?->getAuthIdentifier();
+            $launchContext = $request->input('launch_context');
+            $subject = $employeeId !== null
+                ? 'employee:'.$employeeId
+                : (is_string($launchContext) && $launchContext !== ''
+                    ? 'launch:'.hash('sha256', $launchContext)
+                    : 'ip:'.$request->ip());
 
             return [
-                Limit::perMinute(12)->by('conference-token:'.$employeeId),
+                Limit::perMinute(12)->by('conference-token:'.$subject),
                 Limit::perMinute(60)->by('conference-ip:'.$request->ip()),
             ];
         });
-        RateLimiter::for('conference-controls', fn (Request $request): Limit => Limit::perMinute(60)
-            ->by('conference-controls:'.($request->user('employee')?->getAuthIdentifier() ?? $request->ip())));
+        RateLimiter::for('conference-controls', function (Request $request): array {
+            $employeeId = $request->user('employee')?->getAuthIdentifier();
+            $launchContext = $request->input('launch_context');
+            $subject = $employeeId !== null
+                ? 'employee:'.$employeeId
+                : (is_string($launchContext) && $launchContext !== ''
+                    ? 'launch:'.hash('sha256', $launchContext)
+                    : 'ip:'.$request->ip());
+
+            return [
+                Limit::perMinute(60)->by('conference-controls:'.$subject),
+                Limit::perMinute(300)->by('conference-controls-ip:'.$request->ip()),
+            ];
+        });
 
         if (str_contains(config('app.url'), 'https://')) {
             URL::forceScheme('https');

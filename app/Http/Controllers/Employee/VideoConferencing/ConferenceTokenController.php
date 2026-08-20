@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\VideoConferenceSession;
 use App\Services\VideoConferencing\ConferenceCommandPinService;
 use App\Services\VideoConferencing\ConferenceTokenService;
+use App\Services\VideoConferencing\LiveKitProfileConfiguration;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -21,6 +22,7 @@ class ConferenceTokenController extends Controller
         VideoConferenceSession $session,
         ConferenceTokenService $tokens,
         ConferenceCommandPinService $commandPin,
+        LiveKitProfileConfiguration $livekit,
     ): JsonResponse {
         $validated = $request->validate([
             'join_as' => ['required', Rule::enum(ConferenceJoinRole::class)],
@@ -31,7 +33,11 @@ class ConferenceTokenController extends Controller
         $employee = $request->user('employee');
 
         try {
-            $role = ConferenceJoinRole::from($validated['join_as']);
+            $requestedRole = ConferenceJoinRole::from($validated['join_as']);
+            $role = $session->type->value === 'lineup' ? ConferenceJoinRole::Self : $requestedRole;
+            if ($session->type->value === 'direct') {
+                abort_unless($role === ConferenceJoinRole::Command, 403);
+            }
             if ($role === ConferenceJoinRole::Command) {
                 $commandPin->verify($employee, (string) $request->ip(), $validated['command_pin'] ?? null);
             }
@@ -56,7 +62,7 @@ class ConferenceTokenController extends Controller
 
         return response()->json([
             'token' => $result['issued']->token,
-            'server_url' => config('video-conferencing.livekit.url'),
+            'server_url' => $livekit->clientUrl(),
             'expires_at' => $result['issued']->expiresAt->toIso8601String(),
             'participation_id' => $result['participation']->id,
             'participant' => [
