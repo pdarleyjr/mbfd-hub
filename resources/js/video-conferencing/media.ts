@@ -1,4 +1,5 @@
 import { MediaDeviceFailure, Room } from 'livekit-client';
+import { mediaFailureMessage, type MediaFailureKind } from './media-policy';
 
 export interface MediaDevices {
     cameras: MediaDeviceInfo[];
@@ -17,16 +18,20 @@ export async function enumerateMediaDevices(requestPermissions = false): Promise
 }
 
 export function mediaErrorMessage(error: unknown): string {
-    switch (MediaDeviceFailure.getFailure(error)) {
+    const failure: MediaFailureKind = (() => {
+        switch (MediaDeviceFailure.getFailure(error)) {
         case MediaDeviceFailure.PermissionDenied:
-            return 'Camera or microphone permission was denied. Allow access in browser settings, then try again.';
+            return 'permission_denied';
         case MediaDeviceFailure.NotFound:
-            return 'No matching camera or microphone was found. Reconnect the USB device and try again.';
+            return 'not_found';
         case MediaDeviceFailure.DeviceInUse:
-            return 'A camera or microphone is already being used by another application.';
+            return 'device_in_use';
         default:
-            return error instanceof Error ? error.message : 'The camera or microphone could not be started.';
-    }
+            return 'unknown';
+        }
+    })();
+
+    return mediaFailureMessage(failure, error instanceof Error ? error.message : undefined);
 }
 
 export function isMediaPermissionDenied(error: unknown): boolean {
