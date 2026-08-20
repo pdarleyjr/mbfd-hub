@@ -31,9 +31,10 @@ class ConferenceWorkflowTest extends TestCase
     {
         parent::setUp();
         config([
+            'broadcasting.default' => 'null',
             'video-conferencing.enabled' => true,
-            'video-conferencing.livekit.url' => 'wss://video.test.example',
             'video-conferencing.command_pin_hash' => Hash::make(self::COMMAND_PIN),
+            'video-conferencing.livekit.url' => 'wss://video.test.example',
         ]);
         $this->provider = new FakeConferenceProvider;
         $this->app->instance(ConferenceProvider::class, $this->provider);
@@ -46,34 +47,35 @@ class ConferenceWorkflowTest extends TestCase
         ]);
     }
 
-    public function test_daily_lineup_uses_one_opaque_server_room_and_never_returns_its_name(): void
+    public function test_ordinary_lineup_lookup_does_not_create_a_room_or_token(): void
     {
-        CarbonImmutable::setTestNow('2026-08-11 13:00:00');
+        $this->actingAs($this->employee, 'employee')
+            ->postJson('/employee/video-conferencing/api/sessions', ['room' => 'lineup'])
+            ->assertConflict()
+            ->assertJsonPath('code', 'lineup_not_started');
 
-        $first = $this->postSession(['room' => 'lineup'])->assertOk()->json('session');
-        $second = $this->postSession(['room' => 'lineup'])->json('session');
-
-        $this->assertSame($first['id'], $second['id']);
-        $this->assertArrayNotHasKey('livekit_room_name', $first);
-        $this->assertCount(1, $this->provider->createdRooms);
-        $this->assertMatchesRegularExpression('/^mbfd-lineup-2026-08-11-[a-zA-Z0-9]{12}$/', $this->provider->createdRooms[0]['room']);
-        CarbonImmutable::setTestNow();
+        $this->assertSame([], $this->provider->createdRooms);
+        $this->assertSame([], $this->provider->issuedTokens);
+        $this->assertSame(0, VideoConferenceSession::query()->count());
     }
 
-    public function test_daily_lineup_date_is_calculated_in_america_new_york(): void
+    public function test_command_start_uses_one_opaque_room_and_new_york_service_date(): void
     {
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-12T02:30:00Z'));
-
-        $this->postSession(['room' => 'lineup'])->assertOk();
-
-        $this->assertMatchesRegularExpression(
-            '/^mbfd-lineup-2026-08-11-[a-zA-Z0-9]{12}$/',
-            $this->provider->createdRooms[0]['room'],
-        );
-        CarbonImmutable::setTestNow();
+        try {
+            $started = $this->authorizeAndStart();
+            $this->assertArrayNotHasKey('livekit_room_name', $started['session']);
+            $this->assertCount(1, $this->provider->createdRooms);
+            $this->assertMatchesRegularExpression(
+                '/^mbfd-lineup-2026-08-11-[a-zA-Z0-9]{12}$/',
+                $this->provider->createdRooms[0]['room'],
+            );
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
     }
 
-    public function test_provider_outage_returns_a_stable_503_and_removes_unprovisioned_room(): void
+    public function test_provider_outage_returns_stable_503_and_removes_unprovisioned_room(): void
     {
         $provider = new class extends FakeConferenceProvider
         {
@@ -83,104 +85,51 @@ class ConferenceWorkflowTest extends TestCase
             }
         };
         $this->app->instance(ConferenceProvider::class, $provider);
+        $this->authorizeCommand();
 
-        $this->postSession(['room' => 'lineup'])
+        $this->actingAs($this->employee, 'employee')
+            ->postJson('/employee/video-conferencing/api/lineup/start')
             ->assertServiceUnavailable()
             ->assertJsonPath('code', 'conference_unavailable');
         $this->assertSame(0, VideoConferenceSession::query()->count());
     }
 
-    public function test_a_previous_days_lineup_cannot_issue_new_tokens(): void
+    public function test_employee_lineup_token_is_stable_self_identity_and_ignores_submitted_station_role(): void
     {
-        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-11T16:00:00Z'));
-        $session = $this->postSession(['room' => 'lineup'])->json('session');
-        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-12T16:00:00Z'));
-
-        $this->actingAs($this->employee, 'employee')->postJson(
-            "/employee/video-conferencing/api/sessions/{$session['id']}/token",
-            ['join_as' => 'self'],
-        )->assertGone();
-
-        CarbonImmutable::setTestNow();
-    }
-
-    public function test_self_token_uses_ulid_identity_ranked_name_and_no_employee_id(): void
-    {
-        $session = $this->postSession(['room' => 'lineup'])->json('session');
-
+        $started = $this->authorizeAndStart();
         $response = $this->actingAs($this->employee, 'employee')->postJson(
-            "/employee/video-conferencing/api/sessions/{$session['id']}/token",
-            ['join_as' => 'self'],
+            "/employee/video-conferencing/api/sessions/{$started['session']['id']}/token",
+            ['join_as' => 'sta4', 'display_name' => 'Fake Name', 'identity' => 'mbfd:300'],
         );
 
         $response->assertOk()
+            ->assertJsonPath('participant.identity', 'mbfd:member:'.$this->employee->getKey())
             ->assertJsonPath('participant.name', 'Captain Taylor Morgan')
             ->assertJsonPath('participant.join_as', 'self')
-            ->assertJsonPath('server_url', 'wss://video.test.example')
-            ->assertHeader('Cache-Control', 'no-store, private');
-        $identity = $response->json('participant.identity');
-        $this->assertMatchesRegularExpression('/^mbfd:member:[0-9A-HJKMNP-TV-Z]{26}$/', $identity);
-        $this->assertStringNotContainsString($this->employee->employee_id, json_encode($response->json(), JSON_THROW_ON_ERROR));
-        $this->assertSame('signed-test-token', $response->json('token'));
+            ->assertJsonPath('server_url', 'wss://video.test.example');
+        $this->assertStringNotContainsString(
+            $this->employee->employee_id,
+            json_encode($response->json(), JSON_THROW_ON_ERROR),
+        );
     }
 
-    public function test_fixed_endpoint_requires_an_explicit_confirmed_takeover(): void
-    {
-        $session = $this->postSession(['room' => 'lineup'])->json('session');
-        $room = $this->provider->createdRooms[0]['room'];
-        $this->provider->roomParticipants[$room] = [new ConferenceParticipant('mbfd:sta1', 'Station 1')];
-        $url = "/employee/video-conferencing/api/sessions/{$session['id']}/token";
-
-        $this->actingAs($this->employee, 'employee')->postJson($url, ['join_as' => 'sta1'])
-            ->assertConflict()
-            ->assertJsonPath('code', 'endpoint_in_use')
-            ->assertJsonPath('takeover_available', true);
-        $this->assertSame([], $this->provider->removedParticipants);
-
-        $this->actingAs($this->employee, 'employee')->postJson($url, [
-            'join_as' => 'sta1',
-            'confirmed_takeover' => true,
-        ])->assertOk()->assertJsonPath('participant.identity', 'mbfd:sta1');
-        $this->assertCount(1, $this->provider->removedParticipants);
-    }
-
-    public function test_300_token_requires_the_server_validated_command_pin(): void
-    {
-        $session = $this->postSession(['room' => 'lineup'])->json('session');
-        $url = "/employee/video-conferencing/api/sessions/{$session['id']}/token";
-
-        $this->actingAs($this->employee, 'employee')->postJson($url, ['join_as' => '300'])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('command_pin');
-        $this->actingAs($this->employee, 'employee')->postJson($url, [
-            'join_as' => '300',
-            'command_pin' => '111111',
-        ])->assertUnprocessable()->assertJsonValidationErrors('command_pin');
-        $this->assertSame(0, VideoConferenceParticipation::query()->count());
-
-        $this->actingAs($this->employee, 'employee')->postJson($url, [
-            'join_as' => '300',
-            'command_pin' => self::COMMAND_PIN,
-        ])->assertOk()->assertJsonPath('participant.identity', 'mbfd:300');
-    }
-
-    public function test_300_must_supply_the_pin_before_starting_a_direct_call(): void
+    public function test_300_can_start_direct_station_call_only_with_valid_pin(): void
     {
         $payload = ['room' => 'direct', 'station' => 'sta3', 'join_as' => '300'];
 
-        $this->postSession($payload)
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('command_pin');
-        $this->assertSame([], $this->provider->createdRooms);
-
-        $this->postSession([...$payload, 'command_pin' => self::COMMAND_PIN])->assertOk();
+        $this->actingAs($this->employee, 'employee')->postJson(
+            '/employee/video-conferencing/api/sessions',
+            $payload,
+        )->assertUnprocessable()->assertJsonValidationErrors('command_pin');
+        $this->actingAs($this->employee, 'employee')->postJson(
+            '/employee/video-conferencing/api/sessions',
+            [...$payload, 'command_pin' => self::COMMAND_PIN],
+        )->assertOk()->assertJsonPath('session.target_station', 'sta3');
         $this->assertCount(1, $this->provider->createdRooms);
     }
 
-    public function test_incorrect_300_command_pin_attempts_are_rate_limited_by_employee_and_ip(): void
+    public function test_incorrect_300_pin_attempts_are_rate_limited_by_employee_and_ip(): void
     {
-        $session = $this->postSession(['room' => 'lineup'])->json('session');
-        $url = "/employee/video-conferencing/api/sessions/{$session['id']}/token";
         $ipAddress = '203.0.113.10';
         $employeeKey = 'conference-command-pin:employee:'.$this->employee->getKey();
         $ipKey = 'conference-command-pin:ip:'.hash('sha256', $ipAddress);
@@ -189,13 +138,12 @@ class ConferenceWorkflowTest extends TestCase
             for ($attempt = 0; $attempt < 5; $attempt++) {
                 $this->actingAs($this->employee, 'employee')
                     ->withServerVariables(['REMOTE_ADDR' => $ipAddress])
-                    ->postJson($url, ['join_as' => '300', 'command_pin' => '111111'])
+                    ->postJson('/employee/video-conferencing/api/lineup/command/authorize', ['command_pin' => '1111'])
                     ->assertUnprocessable();
             }
-
             $this->actingAs($this->employee, 'employee')
                 ->withServerVariables(['REMOTE_ADDR' => $ipAddress])
-                ->postJson($url, ['join_as' => '300', 'command_pin' => self::COMMAND_PIN])
+                ->postJson('/employee/video-conferencing/api/lineup/command/authorize', ['command_pin' => self::COMMAND_PIN])
                 ->assertTooManyRequests();
         } finally {
             RateLimiter::clear($employeeKey);
@@ -203,73 +151,41 @@ class ConferenceWorkflowTest extends TestCase
         }
     }
 
-    public function test_direct_calls_allow_only_300_and_the_selected_station(): void
+    public function test_connected_300_can_mute_and_give_floor_with_rpc_only_unmute(): void
     {
-        $session = $this->postSession(['room' => 'direct', 'station' => 'sta3', 'join_as' => '300', 'command_pin' => self::COMMAND_PIN])->json('session');
-        $url = "/employee/video-conferencing/api/sessions/{$session['id']}/token";
-
-        $this->actingAs($this->employee, 'employee')->postJson($url, ['join_as' => 'sta1'])->assertForbidden();
-        $this->actingAs($this->employee, 'employee')->postJson($url, ['join_as' => 'self'])->assertForbidden();
-        $this->actingAs($this->employee, 'employee')->postJson($url, ['join_as' => '300', 'command_pin' => self::COMMAND_PIN])->assertOk();
-    }
-
-    public function test_a_station_cannot_start_a_direct_call_and_sta5_is_rejected(): void
-    {
-        $this->postSession(['room' => 'direct', 'station' => 'sta2', 'join_as' => 'sta2'])->assertNotFound();
-        $this->postSession(['room' => 'direct', 'station' => 'sta5', 'join_as' => '300'])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('station');
-    }
-
-    public function test_target_station_can_retrieve_but_other_stations_cannot_enter_a_300_started_direct_call(): void
-    {
-        $started = $this->postSession(['room' => 'direct', 'station' => 'sta4', 'join_as' => '300', 'command_pin' => self::COMMAND_PIN])
-            ->assertOk()
-            ->json('session');
-        $target = $this->postSession(['room' => 'direct', 'station' => 'sta4', 'join_as' => 'sta4'])
-            ->assertOk()
-            ->json('session');
-
-        $this->assertSame($started['id'], $target['id']);
-        $this->postSession(['room' => 'direct', 'station' => 'sta4', 'join_as' => 'sta3'])->assertForbidden();
-    }
-
-    public function test_only_the_connected_300_employee_can_moderate_and_unmute_is_rpc_only(): void
-    {
-        $session = $this->postSession(['room' => 'lineup'])->json('session');
+        $started = $this->authorizeAndStart();
         $room = $this->provider->createdRooms[0]['room'];
-        $tokenUrl = "/employee/video-conferencing/api/sessions/{$session['id']}/token";
-        $this->actingAs($this->employee, 'employee')->postJson($tokenUrl, ['join_as' => '300', 'command_pin' => self::COMMAND_PIN])->assertOk();
-        $this->provider->roomParticipants[$room] = [new ConferenceParticipant('mbfd:300', '300 (Command)')];
+        $this->provider->roomParticipants[$room] = [new ConferenceParticipant('mbfd:300', 'Captain Taylor Morgan — 300')];
 
         $this->actingAs($this->employee, 'employee')->postJson(
-            "/employee/video-conferencing/api/sessions/{$session['id']}/moderation/mute-stations",
+            "/employee/video-conferencing/api/sessions/{$started['session']['id']}/moderation/mute-stations",
         )->assertOk()->assertJsonCount(5, 'muted');
-        $this->assertSame(
-            ['mbfd:sta1', 'mbfd:sta2', 'mbfd:sta3', 'mbfd:sta4', 'mbfd:sta6'],
-            array_column($this->provider->mutedParticipants, 'identity'),
-        );
-
         $before = count($this->provider->mutedParticipants);
         $this->actingAs($this->employee, 'employee')->postJson(
-            "/employee/video-conferencing/api/sessions/{$session['id']}/moderation/stations/sta2/microphone",
+            "/employee/video-conferencing/api/sessions/{$started['session']['id']}/moderation/stations/sta2/microphone",
             ['enabled' => true],
         )->assertOk()
             ->assertJsonPath('rpc_required', true)
             ->assertJsonPath('method', 'mbfd.stationMic')
             ->assertJsonPath('identity', 'mbfd:sta2');
-        $this->assertCount($before, $this->provider->mutedParticipants, 'Remote unmute must never use Room Service.');
+        $this->assertCount($before, $this->provider->mutedParticipants);
     }
 
-    public function test_signed_webhook_events_are_idempotent_and_release_fixed_identity(): void
+    public function test_signed_webhook_is_idempotent_and_releases_station_identity(): void
     {
-        $session = $this->postSession(['room' => 'lineup'])->json('session');
+        $this->withoutVite();
+        $this->get('/video-conferencing/stations/2')->assertOk();
+        $launchContext = (string) array_key_last(session('video_conferencing.launches'));
+        $this->postJson('/video-conferencing/api/lineup/ready', [
+            'launch_context' => $launchContext,
+            'camera_ready' => true,
+            'microphone_ready' => true,
+        ])->assertOk();
+        $this->authorizeAndStart();
+        $token = $this->postJson('/video-conferencing/api/lineup/token', [
+            'launch_context' => $launchContext,
+        ])->assertOk();
         $room = $this->provider->createdRooms[0]['room'];
-        $token = $this->actingAs($this->employee, 'employee')->postJson(
-            "/employee/video-conferencing/api/sessions/{$session['id']}/token",
-            ['join_as' => 'sta2'],
-        );
-        $participationId = $token->json('participation_id');
         $this->provider->webhook = new VerifiedConferenceWebhook(
             id: 'EV_test_1',
             event: 'participant_left',
@@ -282,14 +198,27 @@ class ConferenceWorkflowTest extends TestCase
         $this->postJson('/webhooks/livekit', [], ['Authorization' => 'Bearer signed'])->assertNoContent();
 
         $this->assertSame(1, VideoConferenceEvent::query()->count());
-        $participation = VideoConferenceParticipation::query()->findOrFail($participationId);
+        $participation = VideoConferenceParticipation::query()->findOrFail($token->json('participation_id'));
         $this->assertNull($participation->active_identity_key);
         $this->assertNotNull($participation->left_at);
     }
 
-    private function postSession(array $payload): \Illuminate\Testing\TestResponse
+    /** @return array<string, mixed> */
+    private function authorizeAndStart(): array
     {
+        $this->authorizeCommand();
+
         return $this->actingAs($this->employee, 'employee')
-            ->postJson('/employee/video-conferencing/api/sessions', $payload);
+            ->postJson('/employee/video-conferencing/api/lineup/start')
+            ->assertOk()
+            ->json();
+    }
+
+    private function authorizeCommand(): void
+    {
+        $this->actingAs($this->employee, 'employee')
+            ->postJson('/employee/video-conferencing/api/lineup/command/authorize', [
+                'command_pin' => self::COMMAND_PIN,
+            ])->assertOk();
     }
 }

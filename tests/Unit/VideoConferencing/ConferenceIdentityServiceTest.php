@@ -36,4 +36,15 @@ class ConferenceIdentityServiceTest extends TestCase
             (new ConferenceIdentityService)->displayName($employee),
         );
     }
+
+    public function test_employee_identity_is_stable_and_derived_only_from_the_internal_key(): void
+    {
+        $employee = new Employee(['name' => 'Taylor Morgan', 'employee_id' => 'F043']);
+        $employee->id = 42;
+
+        $identity = (new ConferenceIdentityService)->identity(ConferenceJoinRole::Self, $employee);
+
+        $this->assertSame('mbfd:member:42', $identity);
+        $this->assertStringNotContainsString('F043', $identity);
+    }
 }

@@ -16,14 +16,28 @@ use App\Http\Controllers\Employee\PersonnelRequestAttachmentController;
 use App\Http\Controllers\Employee\PersonnelRequestDetailController;
 use App\Http\Controllers\Employee\PersonnelRequestResponseController;
 use App\Http\Controllers\Employee\PersonnelRosterSearchController;
+use App\Http\Controllers\Employee\VideoConferencing\CommandAuthorizationController;
+use App\Http\Controllers\Employee\VideoConferencing\CommandLineupStatusController;
 use App\Http\Controllers\Employee\VideoConferencing\ConferenceConnectivityFailureController;
 use App\Http\Controllers\Employee\VideoConferencing\ConferenceLeaveController;
 use App\Http\Controllers\Employee\VideoConferencing\ConferenceSessionController;
+use App\Http\Controllers\Employee\VideoConferencing\ConferenceStatsController;
 use App\Http\Controllers\Employee\VideoConferencing\ConferenceTokenController;
+use App\Http\Controllers\Employee\VideoConferencing\EndConferenceSessionController;
+use App\Http\Controllers\Employee\VideoConferencing\EndMorningLineupController;
 use App\Http\Controllers\Employee\VideoConferencing\MuteAllStationsController;
+use App\Http\Controllers\Employee\VideoConferencing\StartDirectCallController;
+use App\Http\Controllers\Employee\VideoConferencing\StartMorningLineupController;
 use App\Http\Controllers\Employee\VideoConferencing\StationMicrophoneController;
 use App\Http\Controllers\IncidentsController;
 use App\Http\Controllers\ReportExportController;
+use App\Http\Controllers\VideoConferencing\ConferencePageController;
+use App\Http\Controllers\VideoConferencing\StationHeartbeatController;
+use App\Http\Controllers\VideoConferencing\StationLineupStatusController;
+use App\Http\Controllers\VideoConferencing\StationLineupTokenController;
+use App\Http\Controllers\VideoConferencing\StationParticipationController;
+use App\Http\Controllers\VideoConferencing\StationReadyController;
+use App\Http\Controllers\VideoConferencing\StationStandDownController;
 use App\Http\Controllers\Webhooks\LiveKitWebhookController;
 use App\Http\Controllers\Workgroup\FileDownloadController;
 use App\Http\Middleware\EnsureEmployeeAuthenticated;
@@ -57,10 +71,45 @@ Route::get('/login', function () {
     return redirect('/admin/login');
 })->name('login');
 
+Route::get('/video-conferencing/stations/{station}', [ConferencePageController::class, 'station'])
+    ->where('station', '1|2|3|4|6')
+    ->name('video-conferencing.station');
+Route::prefix('video-conferencing/api/lineup')
+    ->middleware(['conference.enabled', 'throttle:conference-controls'])
+    ->name('video-conferencing.api.lineup.')
+    ->group(function (): void {
+        Route::get('/status', StationLineupStatusController::class)->name('status');
+        Route::post('/ready', StationReadyController::class)->name('ready');
+        Route::post('/heartbeat', StationHeartbeatController::class)->name('heartbeat');
+        Route::post('/stand-down', StationStandDownController::class)->name('stand-down');
+        Route::post('/token', StationLineupTokenController::class)
+            ->middleware('throttle:conference-tokens')
+            ->name('token');
+    });
+Route::prefix('video-conferencing/api/participations')
+    ->middleware(['conference.enabled', 'throttle:conference-controls'])
+    ->name('video-conferencing.api.participations.')
+    ->group(function (): void {
+        Route::post('/{participation}/leave', [StationParticipationController::class, 'leave'])->name('leave');
+        Route::post('/{participation}/stats', [StationParticipationController::class, 'stats'])->name('stats');
+    });
+
+Route::get('/employee/video-conferencing/command', [ConferencePageController::class, 'command'])
+    ->middleware([EnsureEmployeeAuthenticated::class, ForcePasswordChangeMiddleware::class])
+    ->name('employee.video-conferencing.command');
+
 Route::prefix('employee/video-conferencing/api')
     ->middleware(['auth:employee', ForcePasswordChangeMiddleware::class, 'conference.enabled', 'throttle:conference-controls'])
     ->name('employee.video-conferencing.api.')
     ->group(function (): void {
+        Route::post('/lineup/command/authorize', CommandAuthorizationController::class)
+            ->name('lineup.command.authorize');
+        Route::get('/lineup/command/status', CommandLineupStatusController::class)
+            ->name('lineup.command.status');
+        Route::post('/lineup/start', StartMorningLineupController::class)->name('lineup.start');
+        Route::post('/lineup/end', EndMorningLineupController::class)->name('lineup.end');
+        Route::post('/direct/start', StartDirectCallController::class)->name('direct.start');
+        Route::post('/sessions/{session}/end', EndConferenceSessionController::class)->name('sessions.end');
         Route::post('/sessions', ConferenceSessionController::class)->name('sessions');
         Route::post('/connectivity-failures', ConferenceConnectivityFailureController::class)
             ->name('connectivity-failures');
@@ -68,6 +117,7 @@ Route::prefix('employee/video-conferencing/api')
             ->middleware('throttle:conference-tokens')
             ->name('tokens');
         Route::post('/participations/{participation}/leave', ConferenceLeaveController::class)->name('leave');
+        Route::post('/participations/{participation}/stats', ConferenceStatsController::class)->name('stats');
         Route::post('/sessions/{session}/moderation/mute-stations', MuteAllStationsController::class)->name('mute-stations');
         Route::post('/sessions/{session}/moderation/stations/{station}/microphone', StationMicrophoneController::class)->name('station-microphone');
     });

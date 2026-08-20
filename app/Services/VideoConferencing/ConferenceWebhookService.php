@@ -6,6 +6,7 @@ use App\Contracts\VideoConferencing\ConferenceProvider;
 use App\Models\VideoConferenceEvent;
 use App\Models\VideoConferenceParticipation;
 use App\Models\VideoConferenceSession;
+use Illuminate\Support\Facades\Cache;
 
 class ConferenceWebhookService
 {
@@ -14,6 +15,7 @@ class ConferenceWebhookService
     public function handle(string $body, ?string $authorization): bool
     {
         $event = $this->provider->verifyWebhook($body, $authorization);
+        Cache::put('video-conferencing:last-valid-webhook-at', now()->toIso8601String(), now()->addDays(2));
         $session = $event->roomName === null ? null : VideoConferenceSession::query()
             ->where('livekit_room_name', $event->roomName)
             ->first();

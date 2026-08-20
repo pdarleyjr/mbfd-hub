@@ -19,6 +19,8 @@ use Throwable;
 
 class LiveKitConferenceProvider implements ConferenceProvider
 {
+    public function __construct(private readonly ?LiveKitProfileConfiguration $configuration = null) {}
+
     public function createRoom(string $roomName, string $metadata): void
     {
         try {
@@ -28,6 +30,15 @@ class LiveKitConferenceProvider implements ConferenceProvider
                 ->setEmptyTimeout((int) config('video-conferencing.livekit.empty_timeout_seconds'))
                 ->setMaxParticipants((int) config('video-conferencing.livekit.max_participants'));
             $this->roomService()->createRoom($options);
+        } catch (Throwable $exception) {
+            throw $this->unavailable($exception);
+        }
+    }
+
+    public function closeRoom(string $roomName): void
+    {
+        try {
+            $this->roomService()->deleteRoom($roomName);
         } catch (Throwable $exception) {
             throw $this->unavailable($exception);
         }
@@ -169,46 +180,27 @@ class LiveKitConferenceProvider implements ConferenceProvider
 
     private function apiUrl(): string
     {
-        $url = (string) config('video-conferencing.livekit.api_url');
-        if ($url === '') {
-            $url = preg_replace('/^wss:/', 'https:', (string) config('video-conferencing.livekit.url')) ?? '';
-        }
-
-        if (! preg_match('#^https?://[^\s]+$#i', $url)) {
-            throw new ConferenceUnavailableException('LiveKit API URL is not configured.');
-        }
-
-        return rtrim($url, '/');
+        return $this->profileConfiguration()->apiUrl();
     }
 
-    private function clientUrl(): string
+    public function clientUrl(): string
     {
-        $url = (string) config('video-conferencing.livekit.url');
-        if (! preg_match('#^wss?://[^\s]+$#i', $url)) {
-            throw new ConferenceUnavailableException('LiveKit client URL is not configured.');
-        }
-
-        return $url;
+        return $this->profileConfiguration()->clientUrl();
     }
 
     private function apiKey(): string
     {
-        return $this->requiredConfig('api_key');
+        return $this->profileConfiguration()->apiKey();
     }
 
     private function apiSecret(): string
     {
-        return $this->requiredConfig('api_secret');
+        return $this->profileConfiguration()->apiSecret();
     }
 
-    private function requiredConfig(string $key): string
+    private function profileConfiguration(): LiveKitProfileConfiguration
     {
-        $value = (string) config("video-conferencing.livekit.{$key}");
-        if ($value === '') {
-            throw new ConferenceUnavailableException("LiveKit {$key} is not configured.");
-        }
-
-        return $value;
+        return $this->configuration ?? app(LiveKitProfileConfiguration::class);
     }
 
     private function unavailable(Throwable $exception): ConferenceUnavailableException

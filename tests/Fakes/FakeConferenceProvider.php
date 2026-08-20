@@ -13,6 +13,9 @@ class FakeConferenceProvider implements ConferenceProvider
     /** @var list<array{room: string, metadata: string}> */
     public array $createdRooms = [];
 
+    /** @var list<string> */
+    public array $closedRooms = [];
+
     /** @var list<array{room: string, identity: string, name: string, metadata: string}> */
     public array $issuedTokens = [];
 
@@ -32,6 +35,12 @@ class FakeConferenceProvider implements ConferenceProvider
     public function createRoom(string $roomName, string $metadata): void
     {
         $this->createdRooms[] = ['room' => $roomName, 'metadata' => $metadata];
+    }
+
+    public function closeRoom(string $roomName): void
+    {
+        $this->closedRooms[] = $roomName;
+        unset($this->roomParticipants[$roomName]);
     }
 
     public function issueToken(string $roomName, string $identity, string $displayName, string $metadata): IssuedConferenceToken

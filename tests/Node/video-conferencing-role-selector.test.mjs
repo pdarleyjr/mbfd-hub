@@ -6,10 +6,20 @@ import test from "node:test";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const css = readFileSync(resolve(root, "resources/js/video-conferencing/video-conferencing.css"), "utf8");
+const app = readFileSync(resolve(root, "resources/js/video-conferencing/ConferenceApp.tsx"), "utf8");
+const stationDetail = readFileSync(resolve(root, "resources/js/daily-checkout/src/components/StationDetailPage.tsx"), "utf8");
 
-test("conference role radios stay circular without shrinking their touch rows", () => {
-  assert.match(css, /\.vc-shell input:not\(\[type="radio"\]\):not\(\[type="checkbox"\]\)\s*\{\s*min-height:\s*48px;/s);
-  assert.match(css, /\.vc-role-list label\s*\{[^}]*min-height:\s*52px;/s);
-  assert.match(css, /\.vc-role-list input\[type="radio"\]\s*\{[^}]*border-radius:\s*50%;[^}]*height:\s*20px;[^}]*min-height:\s*20px;[^}]*width:\s*20px;/s);
-  assert.match(css, /\.vc-role-list label:has\(input:focus-visible\)/);
+test("conference entry mode is server-bound and all controls remain touch safe", () => {
+  assert.doesNotMatch(app, /type="radio"|vc-role-list|Choose how to join/);
+  assert.match(app, /bootstrap\.entry_mode/);
+  assert.match(app, /bootstrap\.join_as/);
+  assert.match(css, /\.vc-shell button,[\s\S]*?\.vc-shell input\s*\{[^}]*min-height:\s*48px;/s);
+  assert.match(css, /env\(safe-area-inset-bottom\)/);
+});
+
+test("station detail launches fixed station context without bundling LiveKit", () => {
+  assert.match(stationDetail, /href=\{`\/video-conferencing\/stations\/\$\{station\.station_number\}`\}/);
+  assert.match(stationDetail, /Morning Lineup Video Conference — Station 2/);
+  assert.match(stationDetail, /href="\/employee\/video-conferencing\/command"/);
+  assert.doesNotMatch(stationDetail, /from ['"]livekit-client['"]/);
 });

@@ -44,4 +44,38 @@ class LiveKitConferenceProviderTest extends TestCase
         $this->assertLessThanOrEqual(600, $claims['exp'] - time());
         $this->assertGreaterThan(590, $claims['exp'] - time());
     }
+
+    public function test_active_cloud_profile_is_isolated_from_self_hosted_credentials(): void
+    {
+        config([
+            'video-conferencing.livekit.profile' => 'cloud',
+            'video-conferencing.livekit.profiles.cloud' => [
+                'url' => 'wss://cloud.video.test.example',
+                'api_url' => 'https://cloud.video.test.example',
+                'api_key' => 'cloud-key',
+                'api_secret' => 'cloud-secret-at-least-32-characters',
+            ],
+            'video-conferencing.livekit.profiles.self_hosted' => [
+                'url' => 'wss://fallback.video.test.example',
+                'api_url' => 'https://fallback.video.test.example',
+                'api_key' => 'fallback-key',
+                'api_secret' => 'fallback-secret-at-least-32-characters',
+            ],
+            'video-conferencing.livekit.token_ttl_seconds' => 600,
+        ]);
+
+        $issued = (new LiveKitConferenceProvider)->issueToken(
+            'profile-room',
+            'mbfd:sta3',
+            'Station 3',
+            '{"join_as":"sta3"}',
+        );
+        $claims = (array) JWT::decode(
+            $issued->token,
+            new Key('cloud-secret-at-least-32-characters', 'HS256'),
+        );
+
+        $this->assertSame('cloud-key', $claims['iss']);
+        $this->assertSame('wss://cloud.video.test.example', (new LiveKitConferenceProvider)->clientUrl());
+    }
 }

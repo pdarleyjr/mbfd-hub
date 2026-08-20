@@ -322,13 +322,24 @@ export default function StationDetailPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-3 mb-6">
           {[1, 2, 3, 4, 6].includes(station.station_number) && (
             <a
-              href={`/employee/video-conferencing?room=lineup&join_as=sta${station.station_number}`}
+              href={`/video-conferencing/stations/${station.station_number}`}
               className="flex min-h-12 items-center gap-2.5 p-3 bg-blue-50 rounded-xl ring-1 ring-blue-200/80 hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 transition-colors text-sm font-semibold text-blue-800"
             >
               <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
-              Morning Lineup
+              {station.station_number === 2 ? 'Morning Lineup Video Conference — Station 2' : 'Morning Lineup Video Conference'}
+            </a>
+          )}
+          {station.station_number === 2 && (
+            <a
+              href="/employee/video-conferencing/command"
+              className="flex min-h-12 items-center gap-2.5 rounded-xl bg-orange-600 p-3 text-sm font-bold text-white ring-1 ring-orange-700/30 transition-colors hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+            >
+              <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75 11.25 15 15 9.75m6-4.5A9 9 0 1 1 3 12a9 9 0 0 1 18 0Z" />
+              </svg>
+              Morning Lineup — 300 Command
             </a>
           )}
           <a

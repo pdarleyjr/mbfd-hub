@@ -23,14 +23,20 @@ class ConferenceTokenService
     /** @return array{issued: IssuedConferenceToken, participation: VideoConferenceParticipation} */
     public function issue(
         VideoConferenceSession $session,
-        Employee $employee,
+        ?Employee $employee,
         ConferenceJoinRole $role,
         bool $confirmedTakeover = false,
+        ?string $launchContext = null,
     ): array {
         abort_if($session->active_key === null || $session->ended_at !== null, 410, 'This conference has ended.');
         abort_if($session->provisioned_at === null, 503, 'The conference room is not ready.');
+        abort_if(
+            in_array($role, [ConferenceJoinRole::Self, ConferenceJoinRole::Command], true) && $employee === null,
+            401,
+            'Employee authentication is required for this conference role.',
+        );
         $this->authorizeRoleForSession($session, $role);
-        $identity = $this->identities->identity($role);
+        $identity = $this->identities->identity($role, $employee);
         $activeKey = $session->id.':'.$identity;
 
         if ($role->fixedIdentity() !== null && $this->provider->participantExists($session->livekit_room_name, $identity)) {
@@ -46,18 +52,23 @@ class ConferenceTokenService
                 ->update(['active_identity_key' => null, 'left_at' => now()]);
         }
 
-        $displayName = $role === ConferenceJoinRole::Self
-            ? $this->identities->displayName($employee)
-            : $role->label();
+        $displayName = match ($role) {
+            ConferenceJoinRole::Self => $this->identities->displayName($employee),
+            ConferenceJoinRole::Command => $this->identities->displayName($employee).' — 300',
+            default => $role->label(),
+        };
 
         try {
             $participation = DB::transaction(fn (): VideoConferenceParticipation => VideoConferenceParticipation::query()->create([
                 'session_id' => $session->id,
-                'employee_id' => $employee->getKey(),
+                'employee_id' => $employee?->getKey(),
                 'participant_identity' => $identity,
                 'active_identity_key' => $activeKey,
                 'join_as' => $role,
                 'display_name' => $displayName,
+                'launch_context_hash' => $launchContext === null
+                    ? null
+                    : hash_hmac('sha256', $launchContext, (string) config('app.key')),
                 'token_issued_at' => now(),
             ]));
         } catch (UniqueConstraintViolationException $exception) {

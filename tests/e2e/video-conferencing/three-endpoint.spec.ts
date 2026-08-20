@@ -5,23 +5,19 @@ const password = process.env.VIDEO_CONFERENCING_E2E_PASSWORD;
 const commandPin = process.env.VIDEO_CONFERENCING_E2E_COMMAND_PIN;
 const forceRelay = process.env.VIDEO_CONFERENCING_E2E_FORCE_RELAY === 'true';
 
-test.skip(!employeeId || !password || !commandPin, 'Set the explicit conference E2E employee credentials and 300 command PIN.');
+test.skip(!employeeId || !password || !commandPin, 'Set explicit disposable conference E2E credentials and the 300 command PIN.');
 
-async function loginAndPrepare(
-    browser: Browser,
-    baseURL: string,
-    joinAs: '300' | 'sta1' | 'sta2',
-    mode: 'lineup' | 'direct' = 'lineup',
-): Promise<{ context: BrowserContext; page: Page }> {
+type Endpoint = { context: BrowserContext; page: Page };
+
+async function endpointContext(browser: Browser, baseURL: string): Promise<Endpoint> {
     const context = await browser.newContext({
         baseURL,
         viewport: { width: 1280, height: 900 },
-        permissions: ['camera', 'microphone', 'local-network-access'],
+        permissions: ['camera', 'microphone'],
     });
     await context.addInitScript(() => {
         const NativePeerConnection = window.RTCPeerConnection;
         const peerConnections: RTCPeerConnection[] = [];
-
         window.RTCPeerConnection = new Proxy(NativePeerConnection, {
             construct(target, argumentsList) {
                 const peerConnection = Reflect.construct(target, argumentsList) as RTCPeerConnection;
@@ -30,27 +26,38 @@ async function loginAndPrepare(
                 return peerConnection;
             },
         });
-
-        Object.defineProperty(window, '__mbfdPeerConnections', {
-            value: peerConnections,
-            configurable: false,
-            enumerable: false,
-            writable: false,
-        });
+        Object.defineProperty(window, '__mbfdPeerConnections', { value: peerConnections });
     });
-    const page = await context.newPage();
-    const relayQuery = forceRelay ? '&force_relay=1' : '';
-    await page.goto(`/employee/video-conferencing?room=${mode}&join_as=${joinAs}${relayQuery}`);
-    await page.getByLabel('Employee ID').fill(employeeId!);
-    await page.getByLabel('Password').fill(password!);
-    await page.getByRole('button', { name: /sign in/i }).click();
-    await expect(page.locator('.vc-shell')).toBeVisible();
-    await expect(page.locator('.vc-shell')).toHaveAttribute('data-ice-policy', forceRelay ? 'relay' : 'all');
-    await page.getByRole('button', { name: 'Test devices' }).click();
-    await expect(page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
-    if (joinAs === '300') await page.getByLabel('300 command PIN').fill(commandPin!);
 
-    return { context, page };
+    return { context, page: await context.newPage() };
+}
+
+async function prepareStation(browser: Browser, baseURL: string, station: 1 | 2 | 3 | 4 | 6): Promise<Endpoint> {
+    const endpoint = await endpointContext(browser, baseURL);
+    await endpoint.page.goto(`/video-conferencing/stations/${station}${forceRelay ? '?force_relay=1' : ''}`);
+    await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-entry-mode', 'station');
+    await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'standing_by');
+    await expect(endpoint.page.getByText(`Station ${station}`, { exact: true }).first()).toBeVisible();
+    await expect(endpoint.page.getByText('READY — STANDING BY')).toBeVisible();
+
+    return endpoint;
+}
+
+async function prepareCommand(browser: Browser, baseURL: string): Promise<Endpoint> {
+    const endpoint = await endpointContext(browser, baseURL);
+    await endpoint.page.goto(`/employee/video-conferencing/command${forceRelay ? '?force_relay=1' : ''}`);
+    if (endpoint.page.url().includes('/employee/login')) {
+        await endpoint.page.getByLabel('Employee ID').fill(employeeId!);
+        await endpoint.page.getByLabel('Password').fill(password!);
+        await endpoint.page.getByRole('button', { name: /sign in/i }).click();
+    }
+    await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-entry-mode', 'command');
+    await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
+    await endpoint.page.getByLabel('300 command PIN').fill(commandPin!);
+    await endpoint.page.getByRole('button', { name: 'Continue as 300' }).click();
+    await expect(endpoint.page.getByText(/LiveKit Cloud API: Healthy/)).toBeVisible();
+
+    return endpoint;
 }
 
 async function everyPeerConnectionIsRelayOnly(page: Page): Promise<boolean> {
@@ -73,98 +80,89 @@ async function conferenceFitsWithoutPageScroll(page: Page): Promise<boolean> {
     });
 }
 
-test('300, Station 1, and Station 2 share Morning Lineup and moderation works', async ({ browser, baseURL }) => {
-    const command = await loginAndPrepare(browser, baseURL!, '300');
-    const station1 = await loginAndPrepare(browser, baseURL!, 'sta1');
-    const station2 = await loginAndPrepare(browser, baseURL!, 'sta2');
-
+test('one browser may deliberately move from Station 1 to Station 4 without a station login', async ({ browser, baseURL }) => {
+    const endpoint = await prepareStation(browser, baseURL!, 1);
     try {
-        await command.page.getByRole('button', { name: 'Join conference' }).click();
-        await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
-
-        await Promise.all([
-            station1.page.getByRole('button', { name: 'Join conference' }).click(),
-            station2.page.getByRole('button', { name: 'Join conference' }).click(),
-        ]);
-        await Promise.all([
-            expect(station1.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected'),
-            expect(station2.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected'),
-        ]);
-        await expect(command.page.locator('.vc-tile')).toHaveCount(3);
-        await expect(station1.page.locator('.vc-station-mic')).toContainText('MUTED BY 300');
-        await expect.poll(() => conferenceFitsWithoutPageScroll(command.page)).toBe(true);
-
-        if (forceRelay) {
-            await Promise.all([
-                expect.poll(() => everyPeerConnectionIsRelayOnly(command.page)).toBe(true),
-                expect.poll(() => everyPeerConnectionIsRelayOnly(station1.page)).toBe(true),
-                expect.poll(() => everyPeerConnectionIsRelayOnly(station2.page)).toBe(true),
-            ]);
-        }
-
-        await command.page.getByRole('button', { name: 'Mute all stations' }).click();
-        const station1Control = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 1' });
-        await station1Control.getByRole('button', { name: 'Request mic on' }).click();
-        await expect(station1.page.locator('.vc-station-mic')).toContainText('MIC LIVE');
+        await endpoint.page.goto('/video-conferencing/stations/4');
+        await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'standing_by');
+        await expect(endpoint.page.getByText('Station 4', { exact: true }).first()).toBeVisible();
+        await expect(endpoint.page.getByLabel('Employee ID')).toHaveCount(0);
     } finally {
-        await Promise.all([command.context.close(), station1.context.close(), station2.context.close()]);
+        await endpoint.context.close();
     }
 });
 
-test('300 PIN, relay-only direct call, and desktop no-scroll layout work together', async ({ browser, baseURL }) => {
-    const command = await loginAndPrepare(browser, baseURL!, '300', 'direct');
-    const station1 = await loginAndPrepare(browser, baseURL!, 'sta1', 'direct');
-
-    try {
-        await command.page.getByRole('button', { name: 'Join conference' }).click();
-        await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
-        await expect.poll(() => conferenceFitsWithoutPageScroll(command.page)).toBe(true);
-        await station1.page.getByRole('button', { name: 'Join conference' }).click();
-        await expect(station1.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
-        await expect(command.page.locator('.vc-tile')).toHaveCount(2);
-
-        if (forceRelay) {
-            await Promise.all([
-                expect.poll(() => everyPeerConnectionIsRelayOnly(command.page)).toBe(true),
-                expect.poll(() => everyPeerConnectionIsRelayOnly(station1.page)).toBe(true),
-            ]);
-        }
-
-        await command.page.getByRole('button', { name: 'Mute all stations' }).click();
-        const station1Control = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 1' });
-        await station1Control.getByRole('button', { name: 'Request mic on' }).click();
-        await expect(station1.page.locator('.vc-station-mic')).toContainText('MIC LIVE');
-    } finally {
-        await Promise.all([command.context.close(), station1.context.close()]);
-    }
-});
-
-test('an unreachable browser media endpoint fails before creating a room and remains retryable', async ({ browser, baseURL }) => {
-    const station = await loginAndPrepare(browser, baseURL!, 'sta1');
-    let sessionRequests = 0;
-
-    try {
-        const connectivityUrl = await station.page.locator('#video-conferencing-root').evaluate((element) => {
-            const bootstrap = JSON.parse((element as HTMLElement).dataset.bootstrap ?? '{}') as {
-                connectivity_url: string;
-            };
-
-            return bootstrap.connectivity_url;
-        });
-        await station.page.route(`${new URL(connectivityUrl).origin}/**`, (route) => route.abort('connectionrefused'));
-        station.page.on('request', (request) => {
-            if (request.method() === 'POST' && request.url().endsWith('/video-conferencing/api/sessions')) {
-                sessionRequests += 1;
+test('five stations wait without LiveKit, then all join 300 and floor controls work', async ({ browser, baseURL }) => {
+    const cloudRequests = new Map<number, number>();
+    const stations = await Promise.all(([1, 2, 3, 4, 6] as const).map(async (station) => {
+        const endpoint = await endpointContext(browser, baseURL!);
+        cloudRequests.set(station, 0);
+        endpoint.page.on('request', (request) => {
+            if (request.url().includes('.livekit.cloud')) {
+                cloudRequests.set(station, (cloudRequests.get(station) ?? 0) + 1);
             }
         });
+        await endpoint.page.goto(`/video-conferencing/stations/${station}${forceRelay ? '?force_relay=1' : ''}`);
+        await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'standing_by');
 
-        await station.page.getByRole('button', { name: 'Join conference' }).click();
+        return { station, ...endpoint };
+    }));
+    const command = await prepareCommand(browser, baseURL!);
 
-        await expect(station.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
-        await expect(station.page.getByRole('alert')).toContainText('conference network');
-        await expect(station.page.getByRole('button', { name: 'Join conference' })).toBeEnabled();
-        expect(sessionRequests).toBe(0);
+    try {
+        await new Promise((resolve) => setTimeout(resolve, 6_000));
+        for (const station of stations) expect(cloudRequests.get(station.station)).toBe(0);
+        for (const station of stations) {
+            const row = command.page.locator('.vc-ready-list > div').filter({ hasText: `Station ${station.station}` });
+            await expect(row).toContainText('READY');
+        }
+
+        await command.page.getByRole('button', { name: 'Start Morning Lineup' }).click();
+        await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
+        await Promise.all(stations.map(({ page }) => expect(page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected')));
+        await expect(command.page.locator('.vc-tile')).toHaveCount(6);
+        await expect.poll(() => conferenceFitsWithoutPageScroll(command.page)).toBe(true);
+        for (const station of stations) await expect(station.page.locator('.vc-station-mic')).toContainText('MIC MUTED');
+
+        if (forceRelay) {
+            await expect.poll(() => everyPeerConnectionIsRelayOnly(command.page)).toBe(true);
+            for (const station of stations) {
+                await expect.poll(() => everyPeerConnectionIsRelayOnly(station.page)).toBe(true);
+            }
+        }
+
+        const stationOne = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 1' });
+        const stationThree = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 3' });
+        await stationOne.getByRole('button', { name: 'Give Floor' }).click();
+        await expect(stations[0].page.locator('.vc-station-mic')).toContainText('MIC LIVE');
+        await stationThree.getByRole('button', { name: 'Give Floor' }).click();
+        await expect(stations[2].page.locator('.vc-station-mic')).toContainText('MIC LIVE');
+        await stationOne.getByRole('button', { name: 'Mute' }).click();
+        await expect(stations[0].page.locator('.vc-station-mic')).toContainText('MIC MUTED');
+        await command.page.getByRole('button', { name: 'Mute all stations' }).click();
+        await expect(stations[2].page.locator('.vc-station-mic')).toContainText('MIC MUTED');
+
+        await command.page.getByRole('button', { name: 'End Morning Lineup' }).click();
+        await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
+        await Promise.all(stations.map(({ page }) => expect(page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready')));
     } finally {
-        await station.context.close();
+        await Promise.all([command.context.close(), ...stations.map(({ context }) => context.close())]);
+    }
+});
+
+test('300 can place and end a direct Station 1 call', async ({ browser, baseURL }) => {
+    const station = await prepareStation(browser, baseURL!, 1);
+    const command = await prepareCommand(browser, baseURL!);
+    try {
+        const stationOne = command.page.locator('.vc-ready-list > div').filter({ hasText: 'Station 1' });
+        await stationOne.getByRole('button', { name: 'Direct call' }).click();
+        await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
+        await expect(station.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
+        await expect(command.page.locator('.vc-tile')).toHaveCount(2);
+        await command.page.getByRole('button', { name: 'End Direct Call' }).click();
+        await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
+        await expect(station.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'standing_by');
+    } finally {
+        await Promise.all([command.context.close(), station.context.close()]);
     }
 });

@@ -29,3 +29,20 @@ export async function postJson<T>(url: string, csrfToken: string, payload: unkno
 
     return body as T;
 }
+
+export async function getJson<T>(url: string): Promise<T> {
+    const response = await fetch(url, {
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        const message = typeof body.message === 'string' ? body.message : 'The request could not be completed.';
+        throw new ApiError(message, response.status, body);
+    }
+
+    return body as T;
+}

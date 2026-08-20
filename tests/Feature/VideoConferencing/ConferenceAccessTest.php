@@ -57,7 +57,7 @@ class ConferenceAccessTest extends TestCase
             ->assertDontSee('private-api-secret');
     }
 
-    public function test_enabled_page_exposes_only_the_browser_connectivity_probe_url(): void
+    public function test_enabled_employee_page_exposes_self_context_without_livekit_credentials_or_url(): void
     {
         config([
             'video-conferencing.enabled' => true,
@@ -69,8 +69,10 @@ class ConferenceAccessTest extends TestCase
 
         $this->actingAs($this->employee(), 'employee')->get('/employee/video-conferencing')
             ->assertOk()
-            ->assertSee('video.test.example', false)
+            ->assertSee('"entry_mode":"self"', false)
+            ->assertSee('"join_as":"self"', false)
             ->assertSee('connectivity_failures', false)
+            ->assertDontSee('video.test.example', false)
             ->assertDontSee('private-api-key')
             ->assertDontSee('private-api-secret');
     }
@@ -153,13 +155,12 @@ class ConferenceAccessTest extends TestCase
             ->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     }
 
-    public function test_homepage_exposes_the_full_width_video_conferencing_launch(): void
+    public function test_homepage_does_not_expose_a_video_conferencing_launch(): void
     {
         $this->get('/')
             ->assertOk()
-            ->assertSee('Video Conferencing')
-            ->assertSee('Join Morning Lineup or connect directly with an MBFD station')
-            ->assertSee('/employee/video-conferencing', false);
+            ->assertDontSee('Join Morning Lineup or connect directly with an MBFD station')
+            ->assertDontSee('/employee/video-conferencing', false);
     }
 
     public function test_health_endpoint_is_admin_only_and_reports_disabled_without_provider_access(): void

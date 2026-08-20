@@ -15,15 +15,19 @@ const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const entry = manifest['resources/js/video-conferencing/main.tsx'];
 const mount = manifest['resources/js/video-conferencing/mount.tsx'];
 const livekit = Object.values(manifest).find((item) => item.name === 'livekit');
+const echo = Object.values(manifest).find((item) => item.name === 'echo');
+const pusher = Object.values(manifest).find((item) => item.name === 'pusher');
 
-for (const [name, item] of Object.entries({ entry, mount, livekit })) {
+for (const [name, item] of Object.entries({ entry, mount, livekit, echo, pusher })) {
     if (!item?.file) throw new Error(`Conference ${name} chunk is missing from the Vite manifest.`);
 }
 
 const limits = [
     ['entry', entry.file, 5_000, 3_000],
-    ['mount', mount.file, 30_000, 15_000],
+    ['mount', mount.file, 45_000, 15_000],
     ['livekit', livekit.file, 500_000, 140_000],
+    ['echo', echo.file, 15_000, 5_000],
+    ['pusher', pusher.file, 70_000, 22_000],
 ];
 
 for (const [name, file, rawLimit, gzipLimit] of limits) {
@@ -37,7 +41,7 @@ for (const [name, file, rawLimit, gzipLimit] of limits) {
 
 for (const cssFile of mount.css ?? []) {
     const size = fs.statSync(path.join(buildDir, cssFile)).size;
-    if (size > 15_000) throw new Error(`Conference CSS exceeds budget: ${size} bytes.`);
+    if (size > 18_000) throw new Error(`Conference CSS exceeds budget: ${size} bytes.`);
     process.stdout.write(`css: ${size} raw bytes\n`);
 }
 

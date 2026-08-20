@@ -29,6 +29,10 @@ export function mediaErrorMessage(error: unknown): string {
     }
 }
 
+export function isMediaPermissionDenied(error: unknown): boolean {
+    return MediaDeviceFailure.getFailure(error) === MediaDeviceFailure.PermissionDenied;
+}
+
 export function deviceLabel(device: MediaDeviceInfo, index: number, fallback: string): string {
     return device.label || `${fallback} ${index + 1}`;
 }
