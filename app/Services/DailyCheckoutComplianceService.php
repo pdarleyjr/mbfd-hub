@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusOperationalStatusEvent;
+use App\Models\Station;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
@@ -21,7 +23,7 @@ final class DailyCheckoutComplianceService
     public const TIMEZONE = 'America/New_York';
 
     /**
-     * @param  Collection<int, object>  $apparatuses
+     * @param  Collection<int, Apparatus>  $apparatuses
      * @return array<string, mixed>
      */
     public function summaryForApparatuses(Collection $apparatuses, ?CarbonImmutable $now = null): array
@@ -40,27 +42,39 @@ final class DailyCheckoutComplianceService
      * Builds each station's summary from batched signal queries. Callers should
      * eager-load the apparatuses relation before invoking this method.
      *
-     * @param  Collection<int, object>  $stations
+     * @param  Collection<int, Station>  $stations
      * @return array<int, array<string, mixed>>
      */
     public function summariesForStations(Collection $stations, ?CarbonImmutable $now = null): array
     {
         [$startOfDay, $startOfNextDay] = $this->localDayWindow($now);
-        $apparatusByStation = $stations->mapWithKeys(
-            fn (object $station): array => [(int) $station->id => $station->apparatuses]
-        );
+        /** @var Collection<int, Collection<int, Apparatus>> $apparatusByStation */
+        $apparatusByStation = $stations->mapWithKeys(function (Station $station): array {
+            /** @var Collection<int, Apparatus> $apparatuses */
+            $apparatuses = $station->apparatuses;
+
+            return [(int) $station->id => $apparatuses];
+        });
+        /** @var Collection<int, Apparatus> $allApparatuses */
         $allApparatuses = $apparatusByStation->flatten(1);
         $inspectionSignals = $this->inspectionSignals($allApparatuses, $startOfDay, $startOfNextDay);
         $criticalDefectApparatusIds = $this->unresolvedCriticalDefectApparatusIds($allApparatuses);
         $statusTransitionSignals = $this->statusTransitionSignals($allApparatuses, $startOfDay, $startOfNextDay);
 
         return $apparatusByStation
-            ->map(fn (Collection $stationApparatuses): array => $this->summary(
-                $stationApparatuses,
+            ->map(function (Collection $stationApparatuses) use (
                 $inspectionSignals,
                 $criticalDefectApparatusIds,
                 $statusTransitionSignals,
-            ))
+            ): array {
+                /** @var Collection<int, Apparatus> $stationApparatuses */
+                return $this->summary(
+                    $stationApparatuses,
+                    $inspectionSignals,
+                    $criticalDefectApparatusIds,
+                    $statusTransitionSignals,
+                );
+            })
             ->all();
     }
 
@@ -71,7 +85,7 @@ final class DailyCheckoutComplianceService
      * - completed = checked + attention
      * - completion_percent is null (never 100/NaN) when required_total is zero
      *
-     * @param  Collection<int, object>  $apparatuses
+     * @param  Collection<int, Apparatus>  $apparatuses
      * @param  array<int, array{latest_approved_completed_at: ?CarbonImmutable, has_pending_submission: bool}>  $inspectionSignals
      * @param  list<int>  $criticalDefectApparatusIds
      * @param  array<int, array{return_checkout_required: bool, return_checkout_cutoff: ?CarbonImmutable}>  $statusTransitionSignals
@@ -101,7 +115,7 @@ final class DailyCheckoutComplianceService
         $matrix = [];
         $criticalDefectLookup = array_fill_keys($criticalDefectApparatusIds, true);
 
-        foreach ($apparatuses->unique(fn (object $apparatus): int => (int) $apparatus->id) as $apparatus) {
+        foreach ($apparatuses->unique(fn (Apparatus $apparatus): int => (int) $apparatus->id) as $apparatus) {
             $apparatusId = (int) $apparatus->id;
             $requirement = $this->requirementValue($apparatus);
             $isOutOfService = $this->isOutOfService((string) $apparatus->getAttribute('status'));
@@ -319,7 +333,7 @@ final class DailyCheckoutComplianceService
     }
 
     /**
-     * @param  Collection<int, object>  $apparatuses
+     * @param  Collection<int, Apparatus>  $apparatuses
      * @return array<int, array{latest_approved_completed_at: ?CarbonImmutable, has_pending_submission: bool}>
      */
     private function inspectionSignals(
@@ -377,7 +391,7 @@ final class DailyCheckoutComplianceService
      * generic apparatus updated_at may be a notes, meter, or policy edit and
      * must never be misclassified as an operational-status transition.
      *
-     * @param  Collection<int, object>  $apparatuses
+     * @param  Collection<int, Apparatus>  $apparatuses
      * @return array<int, array{return_checkout_required: bool, return_checkout_cutoff: ?CarbonImmutable}>
      */
     private function statusTransitionSignals(
@@ -400,7 +414,7 @@ final class DailyCheckoutComplianceService
             ->groupBy('apparatus_id');
 
         $signals = [];
-        foreach ($apparatuses->unique(fn (object $apparatus): int => (int) $apparatus->id) as $apparatus) {
+        foreach ($apparatuses->unique(fn (Apparatus $apparatus): int => (int) $apparatus->id) as $apparatus) {
             $apparatusId = (int) $apparatus->id;
             $openOutOfServiceEpisodeAt = null;
             $returnCheckoutCutoff = null;
@@ -452,7 +466,7 @@ final class DailyCheckoutComplianceService
     }
 
     /**
-     * @param  Collection<int, object>  $apparatuses
+     * @param  Collection<int, Apparatus>  $apparatuses
      * @return list<int>
      */
     private function unresolvedCriticalDefectApparatusIds(Collection $apparatuses): array
@@ -512,7 +526,7 @@ final class DailyCheckoutComplianceService
     }
 
     /**
-     * @param  Collection<int, object>  $apparatuses
+     * @param  Collection<int, Apparatus>  $apparatuses
      * @return list<int>
      */
     private function apparatusIds(Collection $apparatuses): array
@@ -526,7 +540,7 @@ final class DailyCheckoutComplianceService
             ->all();
     }
 
-    private function requirementValue(object $apparatus): string
+    private function requirementValue(Apparatus $apparatus): string
     {
         $value = $apparatus->getRawOriginal('daily_checkout_requirement');
         $normalized = strtolower(trim((string) $value));

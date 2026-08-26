@@ -304,7 +304,7 @@ final class DailyCheckoutChecklistResolver
     private function identityFor(Apparatus $apparatus): array
     {
         $identities = [];
-        foreach ([$apparatus->unit_id, $apparatus->designation, $apparatus->name] as $value) {
+        foreach ([$apparatus->getAttribute('unit_id'), $apparatus->designation, $apparatus->name] as $value) {
             $identity = $this->identityFromValue($value);
             if ($identity !== null) {
                 $identities[$identity] = true;
@@ -351,12 +351,13 @@ final class DailyCheckoutChecklistResolver
             'E' => 'engine',
             'R' => 'rescue',
             'L' => 'ladder',
+            default => throw new \LogicException("Unsupported apparatus identity family: {$identity}"),
         };
     }
 
     private function specialtyFor(Apparatus $apparatus): ?string
     {
-        foreach ([$apparatus->unit_id, $apparatus->designation, $apparatus->name, $apparatus->type, $apparatus->class_description] as $value) {
+        foreach ([$apparatus->getAttribute('unit_id'), $apparatus->designation, $apparatus->name, $apparatus->type, $apparatus->class_description] as $value) {
             if (! is_string($value)) {
                 continue;
             }

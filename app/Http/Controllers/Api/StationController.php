@@ -12,6 +12,7 @@ use App\Http\Resources\Public\PublicRoomResource;
 use App\Http\Resources\Public\PublicStationInspectionResource;
 use App\Http\Resources\Public\PublicStationRequestResource;
 use App\Http\Resources\Public\PublicStationResource;
+use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\Room;
 use App\Models\RoomAsset;
@@ -23,6 +24,7 @@ use App\Services\StationStaffingService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 class StationController extends Controller
@@ -95,8 +97,10 @@ class StationController extends Controller
             ->findOrFail($id);
 
         $staffing = app(StationStaffingService::class)->summaryFor($station);
+        /** @var Collection<int, Apparatus> $stationApparatuses */
+        $stationApparatuses = $station->apparatuses;
         $dailyCheckout = app(DailyCheckoutComplianceService::class)
-            ->summaryForApparatuses($station->apparatuses);
+            ->summaryForApparatuses($stationApparatuses);
         $dormBedsCount = $staffing['dorm_beds_count'];
         $personnelCount = $staffing['assigned_personnel_count'];
 

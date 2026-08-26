@@ -57,9 +57,15 @@ class StationOperationsHubWidget extends Widget
 
         $dailyCheckoutByStation = app(DailyCheckoutComplianceService::class)
             ->summariesForStations($stationModels);
+        /** @var Collection<int, Apparatus> $apparatusById */
         $apparatusById = $stationModels
-            ->flatMap(fn (Station $station): Collection => $station->apparatuses)
-            ->keyBy('id');
+            ->flatMap(function (Station $station): Collection {
+                /** @var Collection<int, Apparatus> $apparatuses */
+                $apparatuses = $station->apparatuses;
+
+                return $apparatuses;
+            })
+            ->keyBy(static fn (Apparatus $apparatus): int => (int) $apparatus->getKey());
         $stationData = $this->loadAllStationData($stations, $dailyCheckoutByStation, $apparatusById);
 
         return [
@@ -175,7 +181,10 @@ class StationOperationsHubWidget extends Widget
      */
     private function formatDailyCheckoutMatrix(array $dailyCheckout, Collection $apparatusById): array
     {
-        return collect($dailyCheckout['matrix'])
+        /** @var list<array{apparatus_id: int, state: string, included_in_completed: bool}> $matrix */
+        $matrix = $dailyCheckout['matrix'];
+
+        return collect($matrix)
             ->map(function (array $row) use ($apparatusById): array {
                 $apparatusId = (int) $row['apparatus_id'];
                 $apparatus = $apparatusById->get($apparatusId);
@@ -183,7 +192,7 @@ class StationOperationsHubWidget extends Widget
 
                 return [
                     'id' => $apparatusId,
-                    'unit' => $apparatus?->designation ?? $apparatus?->unit_id ?? "Apparatus {$apparatusId}",
+                    'unit' => $apparatus?->designation ?? $apparatus?->getAttribute('unit_id') ?? "Apparatus {$apparatusId}",
                     'state' => $state,
                     'completion' => $row['included_in_completed']
                         ? 'completed'

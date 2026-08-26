@@ -65,7 +65,7 @@ final class ApparatusInspectionApprovalService
 
                     $hasCriticalDefects = $isLegacyPendingInspection
                         || (bool) ($pendingEffects['has_critical_defects'] ?? false);
-                    if ($hasCriticalDefects && $apparatus->status !== 'Out of Service') {
+                    if ($hasCriticalDefects && $apparatus->getAttribute('status') !== 'Out of Service') {
                         $apparatus->update(['status' => 'Out of Service']);
                     }
 

@@ -234,7 +234,7 @@ final class DisplayReadiness
         return [
             'percent' => $percent,
             'status' => $status,
-            'reasons' => array_values($reasons),
+            'reasons' => $reasons,
         ];
     }
 

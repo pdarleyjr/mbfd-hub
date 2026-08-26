@@ -143,9 +143,11 @@ final class DisplaySnapshotService
             return ['found' => false];
         }
 
-        $apparatusIds = $station->apparatuses->pluck('id')->all();
+        /** @var Collection<int, Apparatus> $apparatuses */
+        $apparatuses = $station->apparatuses;
+        $apparatusIds = $apparatuses->pluck('id')->all();
         $dailyCheckout = app(DailyCheckoutComplianceService::class)
-            ->summaryForApparatuses($station->apparatuses);
+            ->summaryForApparatuses($apparatuses);
         $inspectionsToday = $dailyCheckout['completed'];
         $stationInspections30d = StationInspection::query()
             ->where('station_id', $id)
@@ -162,7 +164,7 @@ final class DisplaySnapshotService
             ->where('status', 'open')
             ->count();
 
-        $statusCounts = $this->classifyApparatusCollection($station->apparatuses);
+        $statusCounts = $this->classifyApparatusCollection($apparatuses);
         $criticalDefectCount = $this->countCriticalDefects($apparatusIds);
         $lastInspection = $this->lastStationInspection($id);
         $pendingEquip = $this->pendingStationEquipmentCounts([$id]);
@@ -202,7 +204,7 @@ final class DisplaySnapshotService
                 'longitude' => $station->longitude,
                 'is_active' => (bool) $station->is_active,
             ],
-            'apparatus' => $this->redactedApparatus($station->apparatuses),
+            'apparatus' => $this->redactedApparatus($apparatuses),
             'counts' => [
                 'inspections_today' => $inspectionsToday,
                 'station_inspections_30d' => $stationInspections30d,
@@ -234,13 +236,16 @@ final class DisplaySnapshotService
             return ['found' => false];
         }
 
+        /** @var Collection<int, Apparatus> $apparatuses */
+        $apparatuses = $station->apparatuses;
+
         return [
             'found' => true,
             'generated_at' => Carbon::now()->toISOString(),
             'station_id' => $station->id,
-            'apparatus' => $this->redactedApparatus($station->apparatuses),
+            'apparatus' => $this->redactedApparatus($apparatuses),
             'daily_checkout' => app(DailyCheckoutComplianceService::class)
-                ->summaryForApparatuses($station->apparatuses),
+                ->summaryForApparatuses($apparatuses),
         ];
     }
 
@@ -256,9 +261,11 @@ final class DisplaySnapshotService
             return ['found' => false];
         }
 
-        $apparatusIds = $station->apparatuses->pluck('id')->all();
+        /** @var Collection<int, Apparatus> $apparatuses */
+        $apparatuses = $station->apparatuses;
+        $apparatusIds = $apparatuses->pluck('id')->all();
         $dailyCheckout = app(DailyCheckoutComplianceService::class)
-            ->summaryForApparatuses($station->apparatuses);
+            ->summaryForApparatuses($apparatuses);
 
         $apparatusInspections = empty($apparatusIds)
             ? collect()
@@ -423,7 +430,9 @@ final class DisplaySnapshotService
             $staffingService,
             $dailyCheckoutByStation,
         ): array {
-            $apparatusIds = $station->apparatuses->pluck('id')->all();
+            /** @var Collection<int, Apparatus> $apparatuses */
+            $apparatuses = $station->apparatuses;
+            $apparatusIds = $apparatuses->pluck('id')->all();
 
             $openDefects = 0;
             $criticalDefects = 0;
@@ -433,7 +442,7 @@ final class DisplaySnapshotService
             }
 
             $dailyCheckout = $dailyCheckoutByStation[$station->id];
-            $statusCounts = $this->classifyApparatusCollection($station->apparatuses);
+            $statusCounts = $this->classifyApparatusCollection($apparatuses);
             $lastInspection = $lastInspectionByStation[$station->id]
                 ?? ['status' => null, 'age_days' => null];
             $pendingEquip = $pendingEquipByStation[$station->id]
