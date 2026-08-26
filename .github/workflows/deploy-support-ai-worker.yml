@@ -6,7 +6,10 @@ on:
     branches:
       - main
     paths:
-      - "cloudflare-worker/**"
+      - "cloudflare-worker/src/**"
+      - "cloudflare-worker/package.json"
+      - "cloudflare-worker/package-lock.json"
+      - "cloudflare-worker/wrangler.toml"
       - ".github/workflows/deploy-support-ai-worker.yml"
 
 concurrency:
@@ -40,11 +43,6 @@ jobs:
 
       - name: Audit production dependency tree
         run: npm audit --audit-level=high
-
-      - name: Validate Worker bundle
-        run: npm exec -- wrangler deploy --dry-run
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Deploy Worker
         run: npm exec -- wrangler deploy

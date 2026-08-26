@@ -111,9 +111,45 @@ class DailyCheckoutComplianceServiceTest extends TestCase
         $this->assertSame(0, $summary['checked_count']);
         $this->assertSame(1, $summary['attention_count']);
         $this->assertSame(1, $summary['review_pending_count']);
-        $this->assertSame(0, $summary['not_checked_count']);
+        $this->assertSame(1, $summary['not_checked_count']);
+        $this->assertSame(1, $summary['completed_required_count']);
         $this->assertSame('review_pending', $matrix[$pendingReview->id]['state']);
         $this->assertSame('attention', $matrix[$damaged->id]['state']);
+    }
+
+    public function test_a_pending_public_submission_cannot_override_an_already_approved_checkout(): void
+    {
+        $station = Station::query()->create([
+            'station_number' => 4,
+            'name' => 'Station 4',
+            'address' => '4 Test Street',
+            'is_active' => true,
+        ]);
+        $apparatus = $this->makeApparatus($station, 'E41', 'required', 'In Service');
+        $now = CarbonImmutable::parse('2026-08-25 12:00:00', 'America/New_York');
+
+        $this->recordInspection(
+            $apparatus,
+            CarbonImmutable::parse('2026-08-25 07:00:00', 'America/New_York')->utc(),
+            'approved',
+        );
+        $this->recordInspection(
+            $apparatus,
+            CarbonImmutable::parse('2026-08-25 11:00:00', 'America/New_York')->utc(),
+            'pending_review',
+        );
+
+        $summary = app(DailyCheckoutComplianceService::class)->summaryForApparatuses(
+            $station->apparatuses()->get(),
+            $now,
+        );
+        $matrix = collect($summary['matrix'])->keyBy('apparatus_id');
+
+        $this->assertSame(1, $summary['checked_count']);
+        $this->assertSame(1, $summary['completed_required_count']);
+        $this->assertSame(0, $summary['not_checked_count']);
+        $this->assertSame(1, $summary['review_pending_count']);
+        $this->assertSame('checked', $matrix[$apparatus->id]['state']);
     }
 
     public function test_it_respects_the_mbfd_dst_day_boundaries_for_completed_at(): void

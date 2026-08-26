@@ -78,6 +78,21 @@ test("the production deployment PHP syntax check is a hard gate", () => {
   assert.doesNotMatch(syntaxStep, /\|\|\s*true\b/);
 });
 
+test("deployment treats the post-migration Daily Checkout audit as a hard failure", () => {
+  const workflow = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
+
+  const migration = workflow.indexOf("php artisan migrate --force");
+  const gate = workflow.indexOf("php artisan daily-checkout:audit");
+  const optimize = workflow.indexOf("php artisan optimize:clear");
+
+  assert.ok(migration >= 0, "deployment must run migrations before the audit");
+  assert.ok(gate >= 0, "deployment must run the Daily Checkout gate");
+  assert.ok(optimize >= 0, "deployment must optimize only after the audit");
+  assert.ok(migration < gate, "the gate requires the migrated schema");
+  assert.ok(gate < optimize, "a failed audit must stop the remaining deployment command");
+  assert.doesNotMatch(workflow, /daily-checkout:audit[^\r\n]*\|\|\s*true\b/);
+});
+
 test("CI runs PHPUnit against its provisioned PostgreSQL service", () => {
   const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
   const phpunit = readFileSync(resolve(root, "phpunit.xml"), "utf8");
@@ -92,4 +107,23 @@ test("CI runs PHPUnit against its provisioned PostgreSQL service", () => {
   assert.match(testStep, /DB_DATABASE:\s*testing/);
   assert.match(testStep, /php artisan test/);
   assert.match(phpunit, /<directory>tests\/Integration<\/directory>/);
+});
+
+test("the Support AI deployment cannot be triggered by a PulsePoint-only change", () => {
+  const workflow = readFileSync(resolve(root, ".github/workflows/deploy-support-ai-worker.yml"), "utf8");
+  const pulsePointVerification = resolve(root, ".github/workflows/verify-pulsepoint-proxy.yml");
+
+  assert.doesNotMatch(workflow, /-\s+"cloudflare-worker\/\*\*"/);
+  assert.match(workflow, /-\s+"cloudflare-worker\/src\/\*\*"/);
+  assert.match(workflow, /-\s+"cloudflare-worker\/package-lock\.json"/);
+  assert.doesNotMatch(workflow, /wrangler deploy --dry-run/);
+  assert.match(workflow, /npm exec -- wrangler deploy/);
+  assert.ok(existsSync(pulsePointVerification), "PulsePoint proxy needs a dedicated verification workflow");
+
+  const verification = readFileSync(pulsePointVerification, "utf8");
+  assert.match(verification, /working-directory:\s*cloudflare-worker\/pulsepoint-proxy/);
+  assert.match(verification, /npm ci --ignore-scripts/);
+  assert.match(verification, /npm run typecheck/);
+  assert.match(verification, /npm test/);
+  assert.doesNotMatch(verification, /wrangler deploy/);
 });

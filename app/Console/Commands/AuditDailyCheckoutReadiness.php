@@ -16,7 +16,7 @@ use JsonException;
 use stdClass;
 
 /**
- * Read-only deployment gate for Daily Truck Checkout policy and checklist data.
+ * Read-only readiness audit for Daily Truck Checkout policy and checklist data.
  *
  * It intentionally does not infer a policy from status, type, station, or prior
  * inspections. Approved family mappings are visible in the matrix, but specialty

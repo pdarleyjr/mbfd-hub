@@ -79,6 +79,15 @@ class InspectionsRelationManager extends RelationManager
                         'C' => 'success',
                         default => 'gray',
                     }),
+
+                Tables\Columns\TextColumn::make('review_status')
+                    ->label('Review')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'pending_review' => 'warning',
+                        'approved' => 'success',
+                        default => 'gray',
+                    }),
                 
                 Tables\Columns\TextColumn::make('defects_count')
                     ->label('Issues')

@@ -178,17 +178,13 @@ function concatBytes(...arrays: Uint8Array[]): Uint8Array {
 
 // ─── Decryption ───────────────────────────────────────────────────────────────
 
-// Resolved from env at request time (see fetchIncidents). Declared here for
-// module scope; the actual value is injected from the CF Worker secret.
-let _hashPassword: Uint8Array | null = null;
-
 /**
  * EVP_BytesToKey: derives a 32-byte AES key using iterated MD5 hashes with
  * password + salt, matching PulsePoint's encryption scheme.
  */
 async function deriveAesKey(salt: Uint8Array, hashPassword: Uint8Array): Promise<CryptoKey> {
-  let key = new Uint8Array(0);
-  let prev = new Uint8Array(0);
+  let key: Uint8Array = new Uint8Array(0);
+  let prev: Uint8Array = new Uint8Array(0);
 
   while (key.length < 32) {
     prev = md5(concatBytes(prev, hashPassword, salt));

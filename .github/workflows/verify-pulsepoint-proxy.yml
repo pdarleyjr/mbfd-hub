@@ -1,0 +1,48 @@
+name: Verify PulsePoint Proxy
+
+on:
+  pull_request:
+    paths:
+      - "cloudflare-worker/pulsepoint-proxy/**"
+      - ".github/workflows/verify-pulsepoint-proxy.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "cloudflare-worker/pulsepoint-proxy/**"
+      - ".github/workflows/verify-pulsepoint-proxy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck and test PulsePoint proxy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: cloudflare-worker/pulsepoint-proxy
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: cloudflare-worker/pulsepoint-proxy/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Audit dependency tree
+        run: npm audit --audit-level=high
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run unit tests
+        run: npm test

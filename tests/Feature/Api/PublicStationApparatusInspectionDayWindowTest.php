@@ -92,15 +92,41 @@ final class PublicStationApparatusInspectionDayWindowTest extends TestCase
         $this->assertSame([$included->id], collect($response->json('inspections'))->pluck('id')->all());
     }
 
-    private function createInspection(?CarbonImmutable $completedAt, CarbonImmutable $createdAt): ApparatusInspection
+    public function test_public_station_inspections_exclude_pending_review_submissions(): void
     {
+        $now = CarbonImmutable::parse('2026-08-25 12:00:00', self::OPERATIONAL_TIMEZONE);
+        Carbon::setTestNow($now);
+        CarbonImmutable::setTestNow($now);
+
+        $approved = $this->createInspection(
+            completedAt: $this->newYorkTime('2026-08-25 08:00:00'),
+            createdAt: $this->newYorkTime('2026-08-25 08:00:00'),
+        );
+        $pending = $this->createInspection(
+            completedAt: $this->newYorkTime('2026-08-25 09:00:00'),
+            createdAt: $this->newYorkTime('2026-08-25 09:00:00'),
+            reviewStatus: 'pending_review',
+        );
+
+        $response = $this->getJson("/api/public/stations/{$this->station->id}/apparatus-inspections");
+
+        $response->assertOk()->assertJsonPath('total', 1);
+        $this->assertSame([$approved->id], collect($response->json('inspections'))->pluck('id')->all());
+        $this->assertNotContains($pending->id, collect($response->json('inspections'))->pluck('id')->all());
+    }
+
+    private function createInspection(
+        ?CarbonImmutable $completedAt,
+        CarbonImmutable $createdAt,
+        string $reviewStatus = 'approved',
+    ): ApparatusInspection {
         $inspection = ApparatusInspection::create([
             'apparatus_id' => $this->apparatus->id,
             'operator_name' => 'Test Operator',
             'rank' => 'Firefighter',
             'shift' => 'A',
             'completed_at' => $completedAt,
-            'review_status' => 'approved',
+            'review_status' => $reviewStatus,
         ]);
 
         $inspection->forceFill([

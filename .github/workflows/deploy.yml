@@ -164,9 +164,14 @@ jobs:
 
       - name: Run migrations and optimize
         run: |
-          ssh deploy-target "
+          ssh deploy-target "set -e
             docker exec -u sail mbfd-hub-laravel php artisan storage:link --force 2>/dev/null || true
             docker exec -u sail mbfd-hub-laravel php artisan migrate --force
+            # This is a post-migration audit, not a pre-activation gate: the
+            # application source is bind-mounted into the current container
+            # before this workflow step. A staged, read-only preflight remains
+            # required before this result can be treated as release approval.
+            docker exec -u sail mbfd-hub-laravel php artisan daily-checkout:audit
             docker exec -u sail mbfd-hub-laravel php artisan optimize:clear
             docker exec -u sail mbfd-hub-laravel php artisan config:cache
             docker exec -u sail mbfd-hub-laravel php artisan route:cache

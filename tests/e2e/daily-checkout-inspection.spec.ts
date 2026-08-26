@@ -65,6 +65,7 @@ async function mockInspectionApi(
     readonly checklistVersionMismatchOnSubmit?: boolean;
     readonly omitChecklistVersion?: boolean;
     readonly checklistVersion?: string;
+    readonly reviewPendingOnSubmit?: boolean;
   } = {},
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
@@ -115,7 +116,11 @@ async function mockInspectionApi(
             }
           : submitStatus >= 400
           ? { message: 'Retry later.' }
-          : { success: true, message: 'Inspection recorded.' },
+          : {
+              success: true,
+              message: 'Inspection recorded.',
+              review_status: options.reviewPendingOnSubmit ? 'pending_review' : 'approved',
+            },
       });
     }
 
@@ -286,6 +291,17 @@ test('non-empty checklist permits a complete inspection and sends its submission
   });
 });
 
+test('a pending-review receipt tells the operator that readiness is not yet changed', async ({ page }) => {
+  await mockInspectionApi(page, { reviewPendingOnSubmit: true });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inspection Submitted for Review!' })).toBeVisible();
+  await expect(page.getByText('before it changes readiness, defects, or meter records.')).toBeVisible();
+});
+
 test('a checklist without an immutable version fails closed before inspection entry', async ({ page }) => {
   const api = await mockInspectionApi(page, { omitChecklistVersion: true });
 
@@ -398,6 +414,24 @@ test('queued inspection syncs after reconnect while the queued success page rema
   expect(api.submissions.map((submission) => submission.client_submission_id)).toEqual([
     clientSubmissionId,
   ]);
+});
+
+test('queued inspection reports pending review after reconnect without retaining a duplicate queue item', async ({ page, context }) => {
+  const api = await mockInspectionApi(page, { reviewPendingOnSubmit: true });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(1);
+
+  await context.setOffline(false);
+  await expect.poll(() => api.submissions.length).toBe(1);
+  await expect(page.getByRole('heading', { name: 'Inspection Submitted for Review!' })).toBeVisible();
+  await expect(page.getByText('before it changes readiness, defects, or meter records.')).toBeVisible();
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
 });
 
 test('reload replays an ambiguous submission with its original durable client id', async ({ page }) => {

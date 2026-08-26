@@ -2,8 +2,8 @@
 
 namespace App\Policies;
 
-use App\Models\User;
 use App\Models\ApparatusInspection;
+use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class ApparatusInspectionPolicy
@@ -43,11 +43,28 @@ class ApparatusInspectionPolicy
     }
 
     /**
+     * Determine whether the user can apply a pending inspection's operational effects.
+     */
+    public function approve(User $user, ApparatusInspection $apparatusInspection): bool
+    {
+        return $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+    }
+
+    /**
+     * Determine whether the user can reject a pending inspection without
+     * applying its operational effects.
+     */
+    public function reject(User $user, ApparatusInspection $apparatusInspection): bool
+    {
+        return $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+    }
+
+    /**
      * Determine whether the user can delete the model.
      */
     public function delete(User $user, ApparatusInspection $apparatusInspection): bool
     {
-        return $user->can('delete_inspection');
+        return $user->can('delete_inspection') && ! $apparatusInspection->reviewEvents()->exists();
     }
 
     /**

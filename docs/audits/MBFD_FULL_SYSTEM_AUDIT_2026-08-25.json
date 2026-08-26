@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-26T01:01:38.663Z",
+  "generatedAt": "2026-08-26T03:09:35.541Z",
   "inventoryType": "static-source-inventory",
   "limitations": [
     "Laravel route groups and dynamic routes require php artisan route:list once dependencies and a test configuration are available.",
@@ -10,52 +10,67 @@
   "workspace": {
     "root": "D:\\CodexWorktrees\\mbfd-hub-full-system-20260825",
     "branch": "audit/mbfd-hub-full-system-20260825",
-    "commit": "0e607342b518bf1baa6d321914edbb336bf7b154",
+    "commit": "db284c7b9dfe3dee1a996222a0778f71a1b55df0",
     "originMain": "ac6965f88f7d8ed441e08996b93d7cdb9f9b99c0",
     "status": [
-      "M app/Console/Commands/AuditDailyCheckoutReadiness.php",
-      " M app/Filament/Resources/ApparatusResource.php",
+      "M .github/dependabot.yml",
+      " M .github/workflows/deploy-support-ai-worker.yml",
+      " M .github/workflows/deploy.yml",
+      " M app/Console/Commands/AuditDailyCheckoutReadiness.php",
+      " M app/Console/Commands/ProvisionWorkgroupMembers.php",
+      " M app/Filament/Resources/ApparatusResource/Pages/ViewInspection.php",
+      " M app/Filament/Resources/ApparatusResource/RelationManagers/InspectionsRelationManager.php",
+      " M app/Filament/Resources/InspectionResource/Pages/ViewInspection.php",
       " M app/Http/Controllers/Api/ApparatusController.php",
-      " M app/Models/Apparatus.php",
+      " M app/Http/Controllers/Api/StationController.php",
+      " M app/Http/Controllers/Api/StationInventoryV2Controller.php",
       " M app/Models/ApparatusInspection.php",
-      " M app/Services/DailyCheckoutChecklistResolver.php",
+      " M app/Policies/ApparatusInspectionPolicy.php",
+      " M app/Services/DailyCheckoutComplianceService.php",
+      " M cloudflare-worker/pulsepoint-proxy/package.json",
+      " M cloudflare-worker/pulsepoint-proxy/src/index.ts",
+      " M cloudflare-worker/pulsepoint-proxy/tsconfig.json",
+      " M docs/audits/MBFD_FULL_SYSTEM_AUDIT_2026-08-25.json",
+      " M resources/js/daily-checkout/src/components/DailyCheckoutQueueProcessor.tsx",
       " M resources/js/daily-checkout/src/components/InspectionWizard.tsx",
-      " M resources/js/daily-checkout/src/components/OfflineIndicator.tsx",
-      " M resources/js/daily-checkout/src/lib/db.ts",
+      " M resources/js/daily-checkout/src/components/StationDetailPage.tsx",
+      " M resources/js/daily-checkout/src/components/SuccessPage.tsx",
       " M resources/js/daily-checkout/src/types.ts",
       " M resources/js/daily-checkout/src/utils/api.ts",
       " M resources/js/daily-checkout/src/utils/dailyCheckoutSubmissionQueue.ts",
-      " M resources/js/daily-checkout/src/utils/storage.ts",
-      " M resources/views/filament/employee/pages/dashboard.blade.php",
-      " M scripts/audit/generate-full-system-inventory.mjs",
+      " M resources/views/filament/resources/apparatus-resource/pages/view-inspection.blade.php",
+      " M routes/api.php",
       " M tests/Feature/Api/DailyCheckoutIntegrityTest.php",
-      " M tests/Feature/Api/PublicApparatusIndexRedactionTest.php",
       " M tests/Feature/Api/PublicApparatusInspectionGateTest.php",
-      " M tests/Feature/Console/AuditDailyCheckoutReadinessTest.php",
-      " M tests/Feature/InspectionApiTest.php",
-      " M tests/Unit/Services/DailyCheckoutChecklistResolverTest.php",
+      " M tests/Feature/Api/PublicStationApparatusInspectionDayWindowTest.php",
+      " M tests/Feature/Api/StationInventoryV2SignedUrlTest.php",
+      " M tests/Feature/Console/ProvisionWorkgroupMembersTest.php",
+      " M tests/Node/ci-configuration.test.mjs",
+      " M tests/Unit/Services/DailyCheckoutComplianceServiceTest.php",
       " M tests/e2e/daily-checkout-inspection.spec.ts",
-      " M tests/e2e/operational-forms.spec.ts",
-      "?? app/Enums/DailyCheckoutChecklistTemplate.php",
-      "?? database/migrations/2026_08_25_000003_add_daily_checkout_template_to_apparatuses_table.php",
-      "?? database/migrations/2026_08_25_000004_add_checklist_version_to_apparatus_inspections_table.php",
-      "?? docs/audits/DAILY_CHECKOUT_PRODUCTION_APPARATUS_MATRIX_2026-08-25.md",
-      "?? tests/Integration/"
+      "?? .github/workflows/verify-pulsepoint-proxy.yml",
+      "?? app/Models/ApparatusInspectionReviewEvent.php",
+      "?? app/Services/ApparatusInspectionApprovalService.php",
+      "?? cloudflare-worker/pulsepoint-proxy/package-lock.json",
+      "?? database/migrations/2026_08_25_000005_add_submission_payload_hash_to_apparatus_inspections_table.php",
+      "?? database/migrations/2026_08_25_000006_add_pending_effects_to_apparatus_inspections_table.php",
+      "?? database/migrations/2026_08_25_000007_create_apparatus_inspection_review_events_table.php",
+      "?? tests/Feature/Filament/ApparatusInspectionApprovalActionTest.php"
     ]
   },
   "sourceCounts": {
-    "files": 2105,
+    "files": 2182,
     "routeFiles": 3,
-    "staticRouteDeclarations": 177,
+    "staticRouteDeclarations": 178,
     "dailySpaRoutes": 18,
     "dailyApiClientEndpoints": 32,
     "controllers": 66,
-    "models": 79,
-    "migrations": 155,
+    "models": 80,
+    "migrations": 158,
     "filamentResources": 155,
-    "filamentPages": 7,
-    "featureTests": 68,
-    "e2eSpecs": 14
+    "filamentPages": 8,
+    "featureTests": 73,
+    "e2eSpecs": 15
   },
   "manifests": [
     {
@@ -782,61 +797,67 @@
     },
     {
       "source": "routes/api.php",
-      "line": 223,
+      "line": 212,
+      "declaration": "post",
+      "uri": "/apparatus-inspections/{inspection}/reject"
+    },
+    {
+      "source": "routes/api.php",
+      "line": 225,
       "declaration": "post",
       "uri": "/verify-credentials"
     },
     {
       "source": "routes/api.php",
-      "line": 229,
+      "line": 231,
       "declaration": "post",
       "uri": "/station-inventory/verify-pin"
     },
     {
       "source": "routes/api.php",
-      "line": 234,
+      "line": 238,
       "declaration": "get",
       "uri": "/station-inventory/{stationId}"
     },
     {
       "source": "routes/api.php",
-      "line": 238,
+      "line": 242,
       "declaration": "put",
       "uri": "/station-inventory/{stationId}/item/{itemId}"
     },
     {
       "source": "routes/api.php",
-      "line": 241,
+      "line": 245,
       "declaration": "get",
       "uri": "/station-inventory/{stationId}/supply-requests"
     },
     {
       "source": "routes/api.php",
-      "line": 243,
+      "line": 247,
       "declaration": "post",
       "uri": "/station-inventory/{stationId}/supply-requests"
     },
     {
       "source": "routes/api.php",
-      "line": 252,
+      "line": 256,
       "declaration": "post",
       "uri": "analyze-product/{productId}"
     },
     {
       "source": "routes/api.php",
-      "line": 253,
+      "line": 257,
       "declaration": "post",
       "uri": "category-summary"
     },
     {
       "source": "routes/api.php",
-      "line": 254,
+      "line": 258,
       "declaration": "post",
       "uri": "executive-report"
     },
     {
       "source": "routes/api.php",
-      "line": 255,
+      "line": 259,
       "declaration": "post",
       "uri": "vectorize-upload/{uploadId}"
     },
@@ -1432,147 +1453,147 @@
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 122,
+        "line": 125,
         "endpoint": "/public/apparatuses/${apparatusId}/inspections"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 142,
+        "line": 145,
         "endpoint": "/public/stations"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 154,
+        "line": 157,
         "endpoint": "/public/stations/${id}"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 165,
+        "line": 168,
         "endpoint": "/admin/stations"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 177,
+        "line": 180,
         "endpoint": "/admin/stations/${id}"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 189,
+        "line": 192,
         "endpoint": "/admin/stations/${id}"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 200,
+        "line": 203,
         "endpoint": "/public/stations/${stationId}/rooms"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 214,
+        "line": 217,
         "endpoint": "/public/stations/${stationId}/rooms/${roomId}/assets"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 225,
+        "line": 228,
         "endpoint": "/admin/stations/${stationId}/rooms/${roomId}/audits"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 235,
+        "line": 238,
         "endpoint": "/admin/stations/${stationId}/rooms/${roomId}/assets"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 247,
+        "line": 250,
         "endpoint": "/admin/stations/${stationId}/rooms/${roomId}/audits"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 259,
+        "line": 262,
         "endpoint": "/admin/stations/${stationId}/rooms/${roomId}/audits/${auditId}/complete"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 275,
+        "line": 278,
         "endpoint": "/big-ticket-requests"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 288,
+        "line": 291,
         "endpoint": "/stations/${stationId}/big-ticket-requests"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 302,
+        "line": 305,
         "endpoint": "/station-inventory/categories"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 319,
+        "line": 322,
         "endpoint": "/station-inventory-submissions"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 338,
+        "line": 341,
         "endpoint": "/station-inventory-submissions/${submissionId}/pdf"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 348,
+        "line": 351,
         "endpoint": "/stations/${stationId}/station-inventory-submissions"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 363,
+        "line": 366,
         "endpoint": "/v2/station-inventory/verify-pin"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 425,
+        "line": 428,
         "endpoint": "/public/stations/${stationId}/inspections"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 436,
+        "line": 439,
         "endpoint": "/public/stations/${stationId}/apparatus-inspections"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 447,
+        "line": 450,
         "endpoint": "/public/stations/${stationId}/equipment-requests"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 458,
+        "line": 461,
         "endpoint": "/public/stations/${stationId}/requests?scope=${scope}"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 469,
+        "line": 472,
         "endpoint": "/public/stations/${stationId}/service-tickets?scope=${scope}&per_page=100"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 481,
+        "line": 484,
         "endpoint": "/public/stations/${stationId}/service-tickets?scope=open&per_page=1"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 493,
+        "line": 496,
         "endpoint": "/public/apparatuses/${apparatusId}/service-notices"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 505,
+        "line": 508,
         "endpoint": "/public/stations/${stationId}/activity"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 516,
+        "line": 519,
         "endpoint": "/public/stations/${stationId}/rooms/${roomId}/profile"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 526,
+        "line": 529,
         "endpoint": "/public/stations/${stationId}/gas-meters"
       }
     ]
@@ -1656,38 +1677,48 @@
         "excerpt": "directory: \"/cloudflare-worker/vision-agent\""
       },
       {
-        "source": ".github/workflows/deploy-support-ai-worker.yml",
-        "line": 9,
-        "excerpt": "- \"cloudflare-worker/**\""
+        "source": ".github/dependabot.yml",
+        "line": 54,
+        "excerpt": "directory: \"/cloudflare-worker/pulsepoint-proxy\""
       },
       {
         "source": ".github/workflows/deploy-support-ai-worker.yml",
-        "line": 26,
+        "line": 9,
+        "excerpt": "- \"cloudflare-worker/src/**\""
+      },
+      {
+        "source": ".github/workflows/deploy-support-ai-worker.yml",
+        "line": 10,
+        "excerpt": "- \"cloudflare-worker/package.json\""
+      },
+      {
+        "source": ".github/workflows/deploy-support-ai-worker.yml",
+        "line": 11,
+        "excerpt": "- \"cloudflare-worker/package-lock.json\""
+      },
+      {
+        "source": ".github/workflows/deploy-support-ai-worker.yml",
+        "line": 12,
+        "excerpt": "- \"cloudflare-worker/wrangler.toml\""
+      },
+      {
+        "source": ".github/workflows/deploy-support-ai-worker.yml",
+        "line": 29,
         "excerpt": "working-directory: cloudflare-worker"
       },
       {
         "source": ".github/workflows/deploy-support-ai-worker.yml",
-        "line": 36,
+        "line": 39,
         "excerpt": "cache-dependency-path: cloudflare-worker/package-lock.json"
       },
       {
         "source": ".github/workflows/deploy-support-ai-worker.yml",
-        "line": 45,
-        "excerpt": "run: npm exec -- wrangler deploy --dry-run"
-      },
-      {
-        "source": ".github/workflows/deploy-support-ai-worker.yml",
-        "line": 47,
-        "excerpt": "CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}"
-      },
-      {
-        "source": ".github/workflows/deploy-support-ai-worker.yml",
-        "line": 50,
+        "line": 48,
         "excerpt": "run: npm exec -- wrangler deploy"
       },
       {
         "source": ".github/workflows/deploy-support-ai-worker.yml",
-        "line": 52,
+        "line": 50,
         "excerpt": "CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}"
       },
       {
@@ -1769,6 +1800,26 @@
         "source": ".github/workflows/troubleshoot.yml",
         "line": 26,
         "excerpt": "sudo fail2ban-client status || echo \"Fail2ban not installed or accessible\""
+      },
+      {
+        "source": ".github/workflows/verify-pulsepoint-proxy.yml",
+        "line": 6,
+        "excerpt": "- \"cloudflare-worker/pulsepoint-proxy/**\""
+      },
+      {
+        "source": ".github/workflows/verify-pulsepoint-proxy.yml",
+        "line": 12,
+        "excerpt": "- \"cloudflare-worker/pulsepoint-proxy/**\""
+      },
+      {
+        "source": ".github/workflows/verify-pulsepoint-proxy.yml",
+        "line": 26,
+        "excerpt": "working-directory: cloudflare-worker/pulsepoint-proxy"
+      },
+      {
+        "source": ".github/workflows/verify-pulsepoint-proxy.yml",
+        "line": 36,
+        "excerpt": "cache-dependency-path: cloudflare-worker/pulsepoint-proxy/package-lock.json"
       },
       {
         "source": "app/Console/Commands/AnalyzeProjectPriorities.php",
@@ -1887,37 +1938,37 @@
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 17,
+        "line": 18,
         "excerpt": "* Mirrors the bid app's \"Bid Access PIN\" setting (KV-backed, default 2300)."
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 26,
+        "line": 27,
         "excerpt": "class BidAccessPin extends Page implements HasForms"
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 32,
+        "line": 33,
         "excerpt": "protected static ?string $navigationLabel = 'Bid Access PIN';"
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 34,
+        "line": 35,
         "excerpt": "protected static ?string $title = 'Bid Access PIN';"
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 36,
+        "line": 37,
         "excerpt": "protected static ?string $slug = 'bid-access-pin';"
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 42,
+        "line": 43,
         "excerpt": "protected static string $view = 'filament.admin.pages.bid-access-pin';"
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 56,
+        "line": 57,
         "excerpt": "public static function canAccess(): bool"
       },
       {
@@ -1947,7 +1998,7 @@
       },
       {
         "source": "app/Filament/Employee/Pages/MyBidCertificationsPage.php",
-        "line": 15,
+        "line": 16,
         "excerpt": "* The bid Cloudflare Worker is the system-of-record for bid credentials —"
       },
       {
@@ -2114,36 +2165,6 @@
         "source": "app/Http/Controllers/Api/Display/DisplayController.php",
         "line": 81,
         "excerpt": "* behind Cloudflare Access. Falls back to the full department roster when"
-      },
-      {
-        "source": "app/Http/Controllers/Api/InventoryChatController.php",
-        "line": 45,
-        "excerpt": "// Call Cloudflare Worker"
-      },
-      {
-        "source": "app/Http/Controllers/Api/InventoryChatController.php",
-        "line": 47,
-        "excerpt": "'x-api-secret' => config('cloudflare.worker_api_secret'),"
-      },
-      {
-        "source": "app/Http/Controllers/Api/InventoryChatController.php",
-        "line": 48,
-        "excerpt": "])->post(config('cloudflare.worker_url') . '/ai/inventory-chat', ["
-      },
-      {
-        "source": "app/Http/Controllers/Api/Public/ApparatusLayout/ApparatusLayoutController.php",
-        "line": 125,
-        "excerpt": "// Check access"
-      },
-      {
-        "source": "app/Http/Controllers/Api/SmartUpdatesController.php",
-        "line": 13,
-        "excerpt": "* Get AI-generated smart updates from Cloudflare Worker"
-      },
-      {
-        "source": "app/Http/Controllers/Api/SmartUpdatesController.php",
-        "line": 18,
-        "excerpt": "$workerUrl = config('services.cloudflare.worker_url');"
       }
     ],
     "Command Display": [
@@ -3586,17 +3607,17 @@
     "Reverb": [
       {
         "source": ".github/workflows/deploy.yml",
-        "line": 210,
+        "line": 215,
         "excerpt": "# Reverb and the queue worker start with the config cache that exists"
       },
       {
         "source": ".github/workflows/deploy.yml",
-        "line": 231,
+        "line": 236,
         "excerpt": "docker exec mbfd-hub-laravel pgrep -af '^/usr/bin/php /var/www/html/artisan reverb:start '"
       },
       {
         "source": ".github/workflows/deploy.yml",
-        "line": 233,
+        "line": 238,
         "excerpt": "echo '✓ Supervised Reverb and queue worker verified'"
       },
       {
@@ -4088,22 +4109,22 @@
       },
       {
         "source": "app/Providers/Filament/AdminPanelProvider.php",
-        "line": 206,
+        "line": 211,
         "excerpt": "// reported to Sentry and silently degrades. If /admin/login stays 200"
       },
       {
         "source": "app/Providers/Filament/AdminPanelProvider.php",
-        "line": 223,
+        "line": 228,
         "excerpt": "* crashing the entire admin page. Errors are reported to Sentry so we"
       },
       {
         "source": "app/Providers/Filament/AdminPanelProvider.php",
-        "line": 235,
+        "line": 240,
         "excerpt": "if (app()->bound('sentry')) {"
       },
       {
         "source": "app/Providers/Filament/AdminPanelProvider.php",
-        "line": 237,
+        "line": 242,
         "excerpt": "app('sentry')->captureException($e);"
       },
       {
@@ -4480,7 +4501,7 @@
     "Snipe-IT": [
       {
         "source": ".github/workflows/deploy.yml",
-        "line": 279,
+        "line": 284,
         "excerpt": "test_url \"Snipe-IT\"             \"https://inventory.mbfdhub.com\"  \"200\""
       },
       {
@@ -4657,21 +4678,6 @@
         "source": "app/Http/Controllers/Api/Admin/LookupController.php",
         "line": 114,
         "excerpt": "// The 'personnel' table is loaded externally (Snipe-IT integration)"
-      },
-      {
-        "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 258,
-        "excerpt": "$hasSnipeItAsset = filled($lockedApparatus->snipeit_asset_id);"
-      },
-      {
-        "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 259,
-        "excerpt": "DB::afterCommit(function () use ($inspectionId, $apparatusId, $previousHealth, $shouldDispatchPmAlert, $hasSnipeItAsset): void {"
-      },
-      {
-        "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 266,
-        "excerpt": "if ($hasSnipeItAsset) {"
       },
       {
         "source": "app/Http/Resources/ApparatusResource.php",
@@ -4910,8 +4916,28 @@
       },
       {
         "source": "app/Providers/Filament/AdminPanelProvider.php",
-        "line": 186,
+        "line": 191,
         "excerpt": "NavigationItem::make('Snipe-IT Inventory')"
+      },
+      {
+        "source": "app/Services/ApparatusInspectionApprovalService.php",
+        "line": 38,
+        "excerpt": "$hasSnipeItAsset = false;"
+      },
+      {
+        "source": "app/Services/ApparatusInspectionApprovalService.php",
+        "line": 66,
+        "excerpt": "$hasSnipeItAsset = filled($apparatus->snipeit_asset_id);"
+      },
+      {
+        "source": "app/Services/ApparatusInspectionApprovalService.php",
+        "line": 76,
+        "excerpt": "DB::afterCommit(function () use ($inspectionId, $apparatusId, $previousHealth, $shouldDispatchPmAlert, $hasSnipeItAsset): void {"
+      },
+      {
+        "source": "app/Services/ApparatusInspectionApprovalService.php",
+        "line": 84,
+        "excerpt": "if ($hasSnipeItAsset) {"
       },
       {
         "source": "app/Services/Display/DisplaySnapshotService.php",
@@ -4972,17 +4998,12 @@
         "source": "app/Services/SnipeItService.php",
         "line": 288,
         "excerpt": "Log::info(\"Snipe-IT {$endpoint} created\", ['response' => $response->json()]);"
-      },
-      {
-        "source": "app/Services/SnipeItService.php",
-        "line": 292,
-        "excerpt": "Log::warning(\"Snipe-IT {$endpoint} creation failed\", ["
       }
     ],
     "Vacation": [
       {
         "source": ".github/dependabot.yml",
-        "line": 54,
+        "line": 64,
         "excerpt": "directory: \"/vacation-app\""
       },
       {
@@ -5018,32 +5039,40 @@
         "line": 44
       },
       {
+        "source": ".github/dependabot.yml",
+        "line": 54
+      },
+      {
         "source": ".github/workflows/deploy-support-ai-worker.yml",
         "line": 9
       },
       {
         "source": ".github/workflows/deploy-support-ai-worker.yml",
-        "line": 26
+        "line": 10
       },
       {
         "source": ".github/workflows/deploy-support-ai-worker.yml",
-        "line": 36
+        "line": 11
       },
       {
         "source": ".github/workflows/deploy-support-ai-worker.yml",
-        "line": 45
+        "line": 12
       },
       {
         "source": ".github/workflows/deploy-support-ai-worker.yml",
-        "line": 47
+        "line": 29
+      },
+      {
+        "source": ".github/workflows/deploy-support-ai-worker.yml",
+        "line": 39
+      },
+      {
+        "source": ".github/workflows/deploy-support-ai-worker.yml",
+        "line": 48
       },
       {
         "source": ".github/workflows/deploy-support-ai-worker.yml",
         "line": 50
-      },
-      {
-        "source": ".github/workflows/deploy-support-ai-worker.yml",
-        "line": 52
       },
       {
         "source": ".github/workflows/production-activate.yml",
@@ -5108,6 +5137,22 @@
       {
         "source": ".github/workflows/troubleshoot.yml",
         "line": 26
+      },
+      {
+        "source": ".github/workflows/verify-pulsepoint-proxy.yml",
+        "line": 6
+      },
+      {
+        "source": ".github/workflows/verify-pulsepoint-proxy.yml",
+        "line": 12
+      },
+      {
+        "source": ".github/workflows/verify-pulsepoint-proxy.yml",
+        "line": 26
+      },
+      {
+        "source": ".github/workflows/verify-pulsepoint-proxy.yml",
+        "line": 36
       },
       {
         "source": "app/Console/Commands/AnalyzeProjectPriorities.php",
@@ -5203,31 +5248,31 @@
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 17
+        "line": 18
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 26
+        "line": 27
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 32
+        "line": 33
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 34
+        "line": 35
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 36
+        "line": 37
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 42
+        "line": 43
       },
       {
         "source": "app/Filament/Admin/Pages/BidAccessPin.php",
-        "line": 56
+        "line": 57
       },
       {
         "source": "app/Filament/Admin/Pages/EquipmentIntake.php",
@@ -5251,7 +5296,7 @@
       },
       {
         "source": "app/Filament/Employee/Pages/MyBidCertificationsPage.php",
-        "line": 15
+        "line": 16
       },
       {
         "source": "app/Filament/Pages/HealthCheckResults.php",
@@ -5384,30 +5429,6 @@
       {
         "source": "app/Http/Controllers/Api/Display/DisplayController.php",
         "line": 81
-      },
-      {
-        "source": "app/Http/Controllers/Api/InventoryChatController.php",
-        "line": 45
-      },
-      {
-        "source": "app/Http/Controllers/Api/InventoryChatController.php",
-        "line": 47
-      },
-      {
-        "source": "app/Http/Controllers/Api/InventoryChatController.php",
-        "line": 48
-      },
-      {
-        "source": "app/Http/Controllers/Api/Public/ApparatusLayout/ApparatusLayoutController.php",
-        "line": 125
-      },
-      {
-        "source": "app/Http/Controllers/Api/SmartUpdatesController.php",
-        "line": 13
-      },
-      {
-        "source": "app/Http/Controllers/Api/SmartUpdatesController.php",
-        "line": 18
       }
     ],
     "Command Display": [
@@ -6565,15 +6586,15 @@
     "Reverb": [
       {
         "source": ".github/workflows/deploy.yml",
-        "line": 210
+        "line": 215
       },
       {
         "source": ".github/workflows/deploy.yml",
-        "line": 231
+        "line": 236
       },
       {
         "source": ".github/workflows/deploy.yml",
-        "line": 233
+        "line": 238
       },
       {
         "source": ".github/workflows/production-activate.yml",
@@ -6967,19 +6988,19 @@
       },
       {
         "source": "app/Providers/Filament/AdminPanelProvider.php",
-        "line": 206
+        "line": 211
       },
       {
         "source": "app/Providers/Filament/AdminPanelProvider.php",
-        "line": 223
+        "line": 228
       },
       {
         "source": "app/Providers/Filament/AdminPanelProvider.php",
-        "line": 235
+        "line": 240
       },
       {
         "source": "app/Providers/Filament/AdminPanelProvider.php",
-        "line": 237
+        "line": 242
       },
       {
         "source": "config/sentry.php",
@@ -7281,7 +7302,7 @@
     "Snipe-IT": [
       {
         "source": ".github/workflows/deploy.yml",
-        "line": 279
+        "line": 284
       },
       {
         "source": "app/Console/Commands/EnsureAdminRoles.php",
@@ -7422,18 +7443,6 @@
       {
         "source": "app/Http/Controllers/Api/Admin/LookupController.php",
         "line": 114
-      },
-      {
-        "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 258
-      },
-      {
-        "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 259
-      },
-      {
-        "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 266
       },
       {
         "source": "app/Http/Resources/ApparatusResource.php",
@@ -7625,7 +7634,23 @@
       },
       {
         "source": "app/Providers/Filament/AdminPanelProvider.php",
-        "line": 186
+        "line": 191
+      },
+      {
+        "source": "app/Services/ApparatusInspectionApprovalService.php",
+        "line": 38
+      },
+      {
+        "source": "app/Services/ApparatusInspectionApprovalService.php",
+        "line": 66
+      },
+      {
+        "source": "app/Services/ApparatusInspectionApprovalService.php",
+        "line": 76
+      },
+      {
+        "source": "app/Services/ApparatusInspectionApprovalService.php",
+        "line": 84
       },
       {
         "source": "app/Services/Display/DisplaySnapshotService.php",
@@ -7674,16 +7699,12 @@
       {
         "source": "app/Services/SnipeItService.php",
         "line": 288
-      },
-      {
-        "source": "app/Services/SnipeItService.php",
-        "line": 292
       }
     ],
     "Vacation": [
       {
         "source": ".github/dependabot.yml",
-        "line": 54
+        "line": 64
       },
       {
         "source": ".github/workflows/security.yml",

@@ -209,6 +209,8 @@ Route::delete('/big-ticket-requests/{bigTicketRequest}', [BigTicketRequestContro
 // path that may flip an apparatus Out of Service. Authenticated + authorized only.
 Route::post('/apparatus-inspections/{inspection}/approve', [ApparatusController::class, 'approveInspection'])
     ->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:30,1']);
+Route::post('/apparatus-inspections/{inspection}/reject', [ApparatusController::class, 'rejectInspection'])
+    ->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:30,1']);
 
 // Station Inventory V2 (PIN-protected, real-time inventory management)
 // =========================================================================

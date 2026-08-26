@@ -6,12 +6,15 @@ import { ApiClient, ApiRequestError, isChecklistVersion } from './api';
 const LEGACY_QUEUE_KEY = 'mbfd_submission_queue';
 const LEGACY_MIGRATION_KEY = 'daily-checkout-queue-migration-v1';
 const QUEUE_UPDATED_EVENT = 'mbfd:daily-checkout-queue-updated';
+export const DAILY_CHECKOUT_QUEUE_SYNC_EVENT = 'mbfd:daily-checkout-queue-synced';
 const CLIENT_ERROR_RETENTION_DAYS = 30;
 
-export type QueuedInspectionSubmissionResult = 'submitted' | 'not_found';
+export type QueuedInspectionSubmissionResult = 'submitted' | 'pending_review' | 'not_found';
 
 export interface DailyCheckoutQueueSyncResult {
   submitted: number;
+  submittedQueueIds: string[];
+  pendingReviewQueueIds: string[];
   remaining: number;
 }
 
@@ -406,10 +409,12 @@ export const submitQueuedInspection = (queueId: string): Promise<QueuedInspectio
     });
 
     try {
-      await ApiClient.submitInspection(queuedSubmission.apparatusId, queuedSubmission.data);
+      const receipt = await ApiClient.submitInspection(queuedSubmission.apparatusId, queuedSubmission.data);
       await removeFromQueue(queueId);
 
-      return 'submitted' as const;
+      return receipt.review_status === 'pending_review'
+        ? 'pending_review' as const
+        : 'submitted' as const;
     } catch (error) {
       await recordSubmissionFailure(queueId, error);
       throw error;
@@ -435,6 +440,8 @@ export const synchronizeDailyCheckoutQueue = (): Promise<DailyCheckoutQueueSyncR
 
   activeQueueSynchronization = (async () => {
     let submitted = 0;
+    const submittedQueueIds: string[] = [];
+    const pendingReviewQueueIds: string[] = [];
 
     for (const queuedSubmission of await getSubmissionQueue()) {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -447,8 +454,13 @@ export const synchronizeDailyCheckoutQueue = (): Promise<DailyCheckoutQueueSyncR
 
       try {
         const result = await submitQueuedInspection(queuedSubmission.id);
-        if (result === 'submitted') {
+        if (result === 'submitted' || result === 'pending_review') {
           submitted += 1;
+          submittedQueueIds.push(queuedSubmission.id);
+        }
+
+        if (result === 'pending_review') {
+          pendingReviewQueueIds.push(queuedSubmission.id);
         }
       } catch (error) {
         if (isPermanentSubmissionFailure(error)) {
@@ -462,6 +474,8 @@ export const synchronizeDailyCheckoutQueue = (): Promise<DailyCheckoutQueueSyncR
 
     return {
       submitted,
+      submittedQueueIds,
+      pendingReviewQueueIds,
       remaining: (await getSubmissionQueue()).length,
     };
   })().finally(() => {

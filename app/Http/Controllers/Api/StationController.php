@@ -706,6 +706,9 @@ class StationController extends Controller
 
         $inspections = ApparatusInspection::whereIn('apparatus_id', $apparatusIds)
             ->whereNotNull('completed_at')
+            // Pending public submissions are evidence for officer review, not
+            // an operationally completed checkout for the public station view.
+            ->where('review_status', 'approved')
             ->where('completed_at', '>=', $startOfDay->utc())
             ->where('completed_at', '<', $startOfNextDay->utc())
             ->with('apparatus')

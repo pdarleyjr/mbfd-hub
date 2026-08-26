@@ -410,7 +410,7 @@ export default function StationDetailPage() {
                     <div>
                       <p className="text-sm font-medium text-neutral-800">{inspection.apparatus_name}</p>
                       <p className="text-xs text-neutral-500">
-                        {inspection.operator_name} &middot; {inspection.shift} Shift
+                        {inspection.shift ? `${inspection.shift} Shift` : 'Shift not reported'}
                       </p>
                     </div>
                   </div>

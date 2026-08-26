@@ -1,5 +1,8 @@
 import { useEffect } from 'react';
-import { synchronizeDailyCheckoutQueue } from '../utils/dailyCheckoutSubmissionQueue';
+import {
+  DAILY_CHECKOUT_QUEUE_SYNC_EVENT,
+  synchronizeDailyCheckoutQueue,
+} from '../utils/dailyCheckoutSubmissionQueue';
 
 /**
  * Remains mounted on every Daily route, including the queued success page.
@@ -12,8 +15,14 @@ export default function DailyCheckoutQueueProcessor() {
         return;
       }
 
-      void synchronizeDailyCheckoutQueue().then(({ submitted }) => {
-        if (submitted > 0 && 'vibrate' in navigator) {
+      void synchronizeDailyCheckoutQueue().then((result) => {
+        if (result.submitted > 0) {
+          window.dispatchEvent(new CustomEvent(DAILY_CHECKOUT_QUEUE_SYNC_EVENT, {
+            detail: result,
+          }));
+        }
+
+        if (result.submitted > 0 && 'vibrate' in navigator) {
           navigator.vibrate(200);
         }
       });

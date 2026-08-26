@@ -8,8 +8,12 @@ use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
+use App\Models\User;
 use App\Services\DailyCheckoutChecklistResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 class DailyCheckoutIntegrityTest extends TestCase
@@ -136,8 +140,9 @@ class DailyCheckoutIntegrityTest extends TestCase
             app(DailyCheckoutChecklistResolver::class)->resolve($apparatus)['checklist_version'],
             ApparatusInspection::sole()->checklist_version,
         );
-        $this->assertSame('101.5', $apparatus->fresh()->current_engine_hours);
-        $this->assertSame(10_025, $apparatus->fresh()->current_miles);
+        $this->assertSame('100.0', $apparatus->fresh()->current_engine_hours);
+        $this->assertSame(10_000, $apparatus->fresh()->current_miles);
+        $this->assertSame('pending_review', ApparatusInspection::sole()->review_status);
     }
 
     public function test_client_submission_id_cannot_be_reused_for_another_apparatus(): void
@@ -155,6 +160,73 @@ class DailyCheckoutIntegrityTest extends TestCase
             "/api/public/apparatuses/{$secondApparatus->id}/inspections",
             $this->submissionWithChecklist($secondApparatus, $clientSubmissionId)
         )->assertStatus(409);
+
+        $this->assertDatabaseCount('apparatus_inspections', 1);
+    }
+
+    public function test_client_submission_id_cannot_be_reused_with_a_changed_payload(): void
+    {
+        $apparatus = $this->makeApparatus('required');
+        $clientSubmissionId = '34343434-3434-4343-8343-343434343434';
+        $payload = $this->submissionWithChecklist($apparatus, $clientSubmissionId, [
+            'miles' => 10_000,
+        ]);
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)
+            ->assertCreated();
+
+        $changedPayload = $payload;
+        $changedPayload['miles'] = 10_001;
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $changedPayload)
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'DAILY_CHECKOUT_SUBMISSION_REPLAY_CONFLICT');
+
+        $this->assertDatabaseCount('apparatus_inspections', 1);
+        $this->assertSame(10_000, ApparatusInspection::sole()->miles);
+    }
+
+    public function test_client_submission_id_replay_accepts_equivalent_payload_key_order(): void
+    {
+        $apparatus = $this->makeApparatus('required');
+        $clientSubmissionId = '35353535-3535-4353-8353-353535353535';
+        $payload = $this->submissionWithChecklist($apparatus, $clientSubmissionId);
+
+        $first = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)
+            ->assertCreated();
+
+        $reorderedPayload = array_reverse($payload, true);
+        $reorderedPayload['compartments'] = array_map(
+            static fn (array $compartment): array => array_reverse($compartment, true),
+            $payload['compartments'],
+        );
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $reorderedPayload)
+            ->assertOk()
+            ->assertJsonPath('id', $first->json('id'));
+
+        $this->assertDatabaseCount('apparatus_inspections', 1);
+    }
+
+    public function test_legacy_submission_without_a_payload_hash_cannot_be_blindly_replayed(): void
+    {
+        $apparatus = $this->makeApparatus('required');
+        $clientSubmissionId = '36363636-3636-4363-8363-363636363636';
+        $payload = $this->submissionWithChecklist($apparatus, $clientSubmissionId);
+
+        ApparatusInspection::query()->create([
+            'apparatus_id' => $apparatus->id,
+            'client_submission_id' => $clientSubmissionId,
+            'operator_name' => 'Historical operator',
+            'rank' => 'Firefighter',
+            'shift' => 'A',
+            'review_status' => 'approved',
+            'completed_at' => now(),
+        ]);
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'DAILY_CHECKOUT_SUBMISSION_REPLAY_CONFLICT');
 
         $this->assertDatabaseCount('apparatus_inspections', 1);
     }
@@ -247,6 +319,14 @@ class DailyCheckoutIntegrityTest extends TestCase
             ->assertCreated();
 
         $this->assertDatabaseCount('apparatus_inspections', 3);
+
+        $this->actingAsAdmin();
+        $defectInspections = ApparatusInspection::query()->orderBy('id')->get()->slice(1);
+        foreach ($defectInspections as $inspection) {
+            $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve")
+                ->assertOk();
+        }
+
         $this->assertDatabaseCount('apparatus_defects', 1);
         $defect = ApparatusDefect::sole();
         $this->assertSame($canonical['compartments'][0]['name'], $defect->compartment);
@@ -314,6 +394,19 @@ class DailyCheckoutIntegrityTest extends TestCase
         $this->assertIsString($version);
 
         return $version;
+    }
+
+    private function actingAsAdmin(): User
+    {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $role = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        $user = User::factory()->create();
+        $user->assignRole($role);
+
+        Sanctum::actingAs($user);
+
+        return $user;
     }
 
     /** @return list<array{id: string, name: string, items: list<array{id: string, name: string, status: string, notes: null}>}> */

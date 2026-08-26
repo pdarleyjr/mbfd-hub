@@ -118,7 +118,10 @@ export class ApiClient {
     return checklist;
   }
 
-  static async submitInspection(apparatusId: number, data: InspectionSubmission): Promise<{ success: boolean; message: string }> {
+  static async submitInspection(
+    apparatusId: number,
+    data: InspectionSubmission,
+  ): Promise<{ review_status?: 'approved' | 'pending_review' }> {
     const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/inspections`, {
       method: 'POST',
       headers: { ...DEFAULT_HEADERS },

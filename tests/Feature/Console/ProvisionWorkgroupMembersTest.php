@@ -45,6 +45,13 @@ final class ProvisionWorkgroupMembersTest extends TestCase
             ->assertExitCode(Command::SUCCESS);
 
         $this->assertTrue(Hash::check($password, $member->fresh()->password));
+        $this->assertTrue($member->fresh()->must_change_password);
+        $this->assertTrue(
+            User::query()
+                ->whereRaw('LOWER(email) = ?', ['davidgarcia@miamibeachfl.gov'])
+                ->sole()
+                ->must_change_password,
+        );
     }
 
     public function test_it_uses_an_explicit_password_environment_source_for_base_member_resets(): void
@@ -76,5 +83,37 @@ final class ProvisionWorkgroupMembersTest extends TestCase
         }
 
         $this->assertTrue(Hash::check($password, $member->fresh()->password));
+        $this->assertTrue($member->fresh()->must_change_password);
+    }
+
+    public function test_it_does_not_reset_or_enroll_a_protected_account_that_matches_a_new_member_email(): void
+    {
+        $owner = User::factory()->create();
+        $workgroup = Workgroup::query()->create([
+            'name' => 'Active test workgroup',
+            'is_active' => true,
+            'created_by' => $owner->id,
+        ]);
+        Role::findOrCreate('admin');
+        Role::findOrCreate('workgroup_member');
+        $protected = User::factory()->create([
+            'email' => 'DavidGarcia@miamibeachfl.gov',
+            'must_change_password' => false,
+        ]);
+        $protected->assignRole('admin');
+        $password = Str::random(24);
+
+        $this->artisan('mbfd:provision-workgroup-members', ['--password' => $password])
+            ->assertExitCode(Command::SUCCESS);
+
+        $protected->refresh();
+
+        $this->assertFalse(Hash::check($password, $protected->password));
+        $this->assertFalse($protected->must_change_password);
+        $this->assertFalse($protected->hasRole('workgroup_member'));
+        $this->assertDatabaseMissing('workgroup_members', [
+            'workgroup_id' => $workgroup->id,
+            'user_id' => $protected->id,
+        ]);
     }
 }

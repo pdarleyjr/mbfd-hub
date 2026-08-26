@@ -128,13 +128,17 @@ final class DailyCheckoutComplianceService
 
             $requiredCount++;
             $signal = $inspectionSignals[$apparatusId] ?? ['completed' => false, 'pending_review' => false];
+            if ($signal['pending_review']) {
+                $reviewPendingCount++;
+            }
+
+            // A public pending-review receipt is evidence for an officer queue,
+            // never a negative override of an already authorized checkout.
+            // Otherwise an unauthenticated client could suppress readiness after
+            // an approved inspection has already satisfied the operational day.
             if (! $signal['completed']) {
                 $notCheckedCount++;
-                $state = 'not_checked';
-            } elseif ($signal['pending_review']) {
-                $completedRequiredCount++;
-                $reviewPendingCount++;
-                $state = 'review_pending';
+                $state = $signal['pending_review'] ? 'review_pending' : 'not_checked';
             } elseif (isset($criticalDefectLookup[$apparatusId])) {
                 $completedRequiredCount++;
                 $attentionCount++;
@@ -208,9 +212,12 @@ final class DailyCheckoutComplianceService
 
         foreach ($inspections as $inspection) {
             $apparatusId = (int) $inspection->apparatus_id;
-            $signals[$apparatusId] ??= ['completed' => true, 'pending_review' => false];
-            if (strtolower((string) $inspection->review_status) === 'pending_review') {
+            $signals[$apparatusId] ??= ['completed' => false, 'pending_review' => false];
+            $reviewStatus = strtolower((string) $inspection->review_status);
+            if ($reviewStatus === 'pending_review') {
                 $signals[$apparatusId]['pending_review'] = true;
+            } elseif ($reviewStatus === 'approved') {
+                $signals[$apparatusId]['completed'] = true;
             }
         }
 

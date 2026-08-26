@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
+use App\Jobs\AuditEquipmentAfterInspection;
+use App\Jobs\PmAlertNotificationJob;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
@@ -11,16 +13,16 @@ use App\Models\Station;
 use App\Models\User;
 use App\Services\DailyCheckoutChecklistResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 /**
- * H-01: an unauthenticated public inspection submission must not be able to
- * directly drive an apparatus Out of Service. Critical defects are recorded as
- * a pending-review submission; only an authenticated/authorized approval mutates
- * operational status.
+ * H-01: an unauthenticated public inspection submission is evidence only.
+ * It cannot change Daily Checkout compliance, defects, meter state, maintenance
+ * signals, or operational status until an authorized reviewer approves it.
  */
 class PublicApparatusInspectionGateTest extends TestCase
 {
@@ -78,6 +80,7 @@ class PublicApparatusInspectionGateTest extends TestCase
     public function test_public_submission_with_critical_defect_does_not_set_out_of_service(): void
     {
         $apparatus = $this->makeApparatus('In Service');
+        Queue::fake();
 
         $response = $this->postJson(
             "/api/public/apparatuses/{$apparatus->id}/inspections",
@@ -89,14 +92,17 @@ class PublicApparatusInspectionGateTest extends TestCase
         // Operational status must be unchanged by an anonymous submission.
         $this->assertSame('In Service', $apparatus->fresh()->status);
 
-        // The submission is recorded but held for review.
+        // The submission is recorded but no defect is operational until review.
         $inspection = ApparatusInspection::latest('id')->first();
         $this->assertNotNull($inspection);
         $this->assertSame('pending_review', $inspection->review_status);
-        $this->assertSame($inspection->id, ApparatusDefect::sole()->apparatus_inspection_id);
+        $this->assertNotNull($inspection->pending_effects);
+        $this->assertDatabaseCount('apparatus_defects', 0);
+        Queue::assertNotPushed(PmAlertNotificationJob::class);
+        Queue::assertNotPushed(AuditEquipmentAfterInspection::class);
     }
 
-    public function test_public_submission_without_critical_defect_is_approved_and_status_unchanged(): void
+    public function test_public_submission_without_critical_defect_is_held_for_review(): void
     {
         $apparatus = $this->makeApparatus('In Service');
 
@@ -114,10 +120,10 @@ class PublicApparatusInspectionGateTest extends TestCase
 
         $this->assertSame('In Service', $apparatus->fresh()->status);
         $inspection = ApparatusInspection::latest('id')->first();
-        $this->assertSame('approved', $inspection->review_status);
+        $this->assertSame('pending_review', $inspection->review_status);
     }
 
-    public function test_inspection_uses_authoritative_vehicle_identity_and_preserves_meter_history(): void
+    public function test_public_submission_defers_meter_updates_until_authorized_approval(): void
     {
         $apparatus = $this->makeApparatus('In Service');
         $apparatus->update([
@@ -144,8 +150,16 @@ class PublicApparatusInspectionGateTest extends TestCase
         $this->assertSame($apparatus->vehicle_number, $inspection->unit_number);
         $this->assertSame('101.5', $inspection->engine_hours);
         $this->assertSame(10_025, $inspection->miles);
+        $this->assertSame('100.0', $apparatus->fresh()->current_engine_hours);
+        $this->assertSame(10_000, $apparatus->fresh()->current_miles);
+
+        $this->actingAsAdmin();
+        $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve")
+            ->assertOk();
+
         $this->assertSame('101.5', $apparatus->fresh()->current_engine_hours);
         $this->assertSame(10_025, $apparatus->fresh()->current_miles);
+        $this->assertSame('In Service', $apparatus->fresh()->status);
     }
 
     public function test_unauthenticated_user_cannot_approve_pending_inspection(): void
@@ -166,6 +180,26 @@ class PublicApparatusInspectionGateTest extends TestCase
         $this->assertSame('pending_review', $inspection->fresh()->review_status);
     }
 
+    public function test_non_reviewer_cannot_approve_pending_inspection(): void
+    {
+        $apparatus = $this->makeApparatus('In Service');
+
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspections",
+            $this->criticalDefectPayload($apparatus)
+        )->assertCreated();
+
+        $inspection = ApparatusInspection::sole();
+        $this->actingAsRole('training_admin');
+
+        $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve")
+            ->assertForbidden();
+
+        $this->assertSame('pending_review', $inspection->fresh()->review_status);
+        $this->assertSame('In Service', $apparatus->fresh()->status);
+        $this->assertDatabaseCount('apparatus_inspection_review_events', 0);
+    }
+
     public function test_authorized_user_can_approve_pending_inspection_and_set_out_of_service(): void
     {
         $apparatus = $this->makeApparatus('In Service');
@@ -177,20 +211,81 @@ class PublicApparatusInspectionGateTest extends TestCase
 
         $inspection = ApparatusInspection::latest('id')->first();
 
-        $this->actingAsAdmin();
+        $reviewer = $this->actingAsAdmin();
 
         $response = $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve");
 
         $response->assertStatus(200);
         $this->assertSame('Out of Service', $apparatus->fresh()->status);
         $this->assertSame('approved', $inspection->fresh()->review_status);
+        $this->assertSame($inspection->id, ApparatusDefect::sole()->apparatus_inspection_id);
+        $this->assertDatabaseHas('apparatus_inspection_review_events', [
+            'apparatus_inspection_id' => $inspection->id,
+            'previous_status' => 'pending_review',
+            'status' => 'approved',
+            'changed_by_user_id' => $reviewer->id,
+        ]);
+    }
+
+    public function test_authorized_user_can_reject_pending_inspection_without_operational_effects(): void
+    {
+        $apparatus = $this->makeApparatus('In Service');
+
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspections",
+            $this->criticalDefectPayload($apparatus)
+        )->assertCreated();
+
+        $inspection = ApparatusInspection::sole();
+        $reviewer = $this->actingAsAdmin();
+
+        $this->postJson("/api/apparatus-inspections/{$inspection->id}/reject", [
+            'review_notes' => 'Rejected after officer verification: duplicate evidence.',
+        ])->assertOk();
+
+        $this->assertSame('rejected', $inspection->fresh()->review_status);
+        $this->assertNotNull($inspection->fresh()->pending_effects);
+        $this->assertSame('In Service', $apparatus->fresh()->status);
+        $this->assertDatabaseCount('apparatus_defects', 0);
+        $this->assertDatabaseHas('apparatus_inspection_review_events', [
+            'apparatus_inspection_id' => $inspection->id,
+            'previous_status' => 'pending_review',
+            'status' => 'rejected',
+            'internal_note' => 'Rejected after officer verification: duplicate evidence.',
+            'changed_by_user_id' => $reviewer->id,
+        ]);
+    }
+
+    public function test_non_reviewer_cannot_reject_pending_inspection(): void
+    {
+        $apparatus = $this->makeApparatus('In Service');
+
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspections",
+            $this->criticalDefectPayload($apparatus)
+        )->assertCreated();
+
+        $inspection = ApparatusInspection::sole();
+        $this->actingAsRole('training_admin');
+
+        $this->postJson("/api/apparatus-inspections/{$inspection->id}/reject", [
+            'review_notes' => 'Attempted unauthorized rejection.',
+        ])->assertForbidden();
+
+        $this->assertSame('pending_review', $inspection->fresh()->review_status);
+        $this->assertDatabaseCount('apparatus_inspection_review_events', 0);
     }
 
     private function actingAsAdmin(): User
     {
+        return $this->actingAsRole('admin');
+    }
+
+    private function actingAsRole(string $roleName): User
+    {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        $role = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
         $user = User::factory()->create();
         $user->assignRole($role);
 

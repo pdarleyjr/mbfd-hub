@@ -51,6 +51,19 @@ class StationInventoryV2Controller extends Controller
         return false;
     }
 
+    /** @return array{name: string, shift: string}|null */
+    private function signedActor(Request $request): ?array
+    {
+        $actorName = $request->query('actor_name');
+        $actorShift = $request->query('actor_shift');
+
+        if (! is_string($actorName) || ! is_string($actorShift) || $actorName === '' || $actorShift === '') {
+            return null;
+        }
+
+        return ['name' => $actorName, 'shift' => $actorShift];
+    }
+
     /**
      * Verify station PIN and generate access token
      *
@@ -210,10 +223,16 @@ class StationInventoryV2Controller extends Controller
             ], 401);
         }
 
+        $actor = $this->signedActor($request);
+        if ($actor === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired token',
+            ], 401);
+        }
+
         $validator = Validator::make($request->all(), [
             'on_hand' => 'required|integer|min:0',
-            'actor_name' => 'required|string|max:255',
-            'actor_shift' => 'required|string|max:50',
         ]);
 
         if ($validator->fails()) {
@@ -256,8 +275,8 @@ class StationInventoryV2Controller extends Controller
         StationInventoryAudit::create([
             'station_id' => $stationId,
             'inventory_item_id' => $stationItem->inventory_item_id,
-            'actor_name' => $request->actor_name,
-            'actor_shift' => $request->actor_shift,
+            'actor_name' => $actor['name'],
+            'actor_shift' => $actor['shift'],
             'action' => 'count_updated',
             'from_value' => $oldValues,
             'to_value' => [
@@ -334,10 +353,16 @@ class StationInventoryV2Controller extends Controller
             ], 401);
         }
 
+        $actor = $this->signedActor($request);
+        if ($actor === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired token',
+            ], 401);
+        }
+
         $validator = Validator::make($request->all(), [
             'request_text' => 'required|string|max:1000',
-            'actor_name' => 'required|string|max:255',
-            'actor_shift' => 'required|string|max:50',
         ]);
 
         if ($validator->fails()) {
@@ -352,16 +377,16 @@ class StationInventoryV2Controller extends Controller
             'station_id' => $stationId,
             'request_text' => $request->request_text,
             'status' => 'open',
-            'created_by_name' => $request->actor_name,
-            'created_by_shift' => $request->actor_shift,
+            'created_by_name' => $actor['name'],
+            'created_by_shift' => $actor['shift'],
         ]);
 
         // Create audit log
         StationInventoryAudit::create([
             'station_id' => $stationId,
             'inventory_item_id' => null,
-            'actor_name' => $request->actor_name,
-            'actor_shift' => $request->actor_shift,
+            'actor_name' => $actor['name'],
+            'actor_shift' => $actor['shift'],
             'action' => 'note_added',
             'from_value' => null,
             'to_value' => [

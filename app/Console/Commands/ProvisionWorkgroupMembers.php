@@ -58,37 +58,49 @@ class ProvisionWorkgroupMembers extends Command
 
         $activeWorkgroup = Workgroup::where('is_active', true)->first();
 
-        if (!$activeWorkgroup) {
+        if (! $activeWorkgroup) {
             $this->error('No active workgroup found! Cannot provision members.');
+
             return self::FAILURE;
         }
 
         $this->line("Active workgroup: [{$activeWorkgroup->id}] {$activeWorkgroup->name}");
 
+        $protectedProvisionSkips = 0;
         foreach ($this->newMembers as $memberData) {
             $email = strtolower($memberData['email']);
-            $name  = $memberData['name'];
+            $name = $memberData['name'];
 
             // Find or create the User (case-insensitive email lookup)
             $user = User::whereRaw('LOWER(email) = ?', [$email])->first();
 
+            if ($user && $user->hasAnyRole($this->protectedRoles)) {
+                $this->line("  [SKIP]  {$user->email} — has protected role(s): ".
+                    implode(', ', array_filter($this->protectedRoles, fn ($role) => $user->hasRole($role))));
+                $protectedProvisionSkips++;
+
+                continue;
+            }
+
             if ($user) {
                 $user->update([
-                    'password'       => $hashedPassword,
+                    'password' => $hashedPassword,
+                    'must_change_password' => true,
                 ]);
                 $this->line("  [UPDATE] User found: {$user->email} — password reset.");
             } else {
                 $user = User::create([
-                    'name'           => $name,
-                    'email'          => $memberData['email'],
-                    'password'       => $hashedPassword,
+                    'name' => $name,
+                    'email' => $memberData['email'],
+                    'password' => $hashedPassword,
+                    'must_change_password' => true,
                     'email_verified_at' => now(),
                 ]);
                 $this->line("  [CREATE] User created: {$user->email}");
             }
 
             // Ensure workgroup_member role is assigned (only this role — do not strip others)
-            if (!$user->hasRole('workgroup_member')) {
+            if (! $user->hasRole('workgroup_member')) {
                 $user->assignRole('workgroup_member');
                 $this->line("    → Role 'workgroup_member' assigned.");
             } else {
@@ -104,10 +116,10 @@ class ProvisionWorkgroupMembers extends Command
                 $this->line("    → WorkgroupMember record already exists (ID: {$existingMember->id}).");
             } else {
                 $wm = WorkgroupMember::create([
-                    'workgroup_id'      => $activeWorkgroup->id,
-                    'user_id'           => $user->id,
-                    'role'              => 'member',
-                    'is_active'         => true,
+                    'workgroup_id' => $activeWorkgroup->id,
+                    'user_id' => $user->id,
+                    'role' => 'member',
+                    'is_active' => true,
                     'count_evaluations' => true,
                 ]);
                 $this->line("    → WorkgroupMember record created (ID: {$wm->id}).");
@@ -130,24 +142,26 @@ class ProvisionWorkgroupMembers extends Command
         foreach ($candidateUsers as $user) {
             // Skip anyone holding a protected/elevated role
             if ($user->hasAnyRole($this->protectedRoles)) {
-                $this->line("  [SKIP]  {$user->email} — has protected role(s): " .
-                    implode(', ', array_filter($this->protectedRoles, fn($r) => $user->hasRole($r))));
+                $this->line("  [SKIP]  {$user->email} — has protected role(s): ".
+                    implode(', ', array_filter($this->protectedRoles, fn ($r) => $user->hasRole($r))));
                 $skippedCount++;
+
                 continue;
             }
 
             $user->update([
-                'password'       => $hashedPassword,
+                'password' => $hashedPassword,
+                'must_change_password' => true,
             ]);
             $this->line("  [RESET] {$user->email}");
             $resetCount++;
         }
 
         $this->info('');
-        $this->info("=== SUMMARY ===");
-        $this->line("New accounts provisioned : " . count($this->newMembers));
+        $this->info('=== SUMMARY ===');
+        $this->line('New accounts provisioned : '.(count($this->newMembers) - $protectedProvisionSkips));
         $this->line("Passwords reset          : {$resetCount}");
-        $this->line("Protected accounts skipped: {$skippedCount}");
+        $this->line('Protected accounts skipped: '.($protectedProvisionSkips + $skippedCount));
         $this->info('All workgroup member passwords were reset using the supplied credential material.');
 
         return self::SUCCESS;

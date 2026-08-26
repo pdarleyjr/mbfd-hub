@@ -172,8 +172,6 @@ export interface StationInspectionSummary {
 export interface ApparatusInspectionSummary {
   id: number;
   apparatus_name: string;
-  operator_name: string;
-  rank: string;
   shift: string;
   completed_at: string;
   defect_count: number;

@@ -217,10 +217,12 @@ export default function InspectionWizard() {
         // Clear autosave
         clearInspectionProgress(slug, checklist.checklist_version);
         
-        navigate('/success?queued=true');
+        navigate('/success?queued=true', {
+          state: { queuedSubmissionId: queueId },
+        });
       } else {
         const submissionResult = await submitQueuedInspection(queueId);
-        if (submissionResult !== 'submitted') {
+        if (submissionResult !== 'submitted' && submissionResult !== 'pending_review') {
           throw new Error('The queued inspection could not be located for submission. Please try again.');
         }
         
@@ -232,7 +234,7 @@ export default function InspectionWizard() {
         // Clear autosave
         clearInspectionProgress(slug, checklist.checklist_version);
         
-        navigate('/success');
+        navigate(submissionResult === 'pending_review' ? '/success?review=pending' : '/success');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit inspection');

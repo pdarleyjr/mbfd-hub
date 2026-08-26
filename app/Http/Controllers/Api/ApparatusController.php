@@ -7,12 +7,11 @@ namespace App\Http\Controllers\Api;
 use App\Enums\DailyCheckoutRequirement;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Public\PublicApparatusResource;
-use App\Jobs\AuditEquipmentAfterInspection;
-use App\Jobs\PmAlertNotificationJob;
 use App\Models\Apparatus;
-use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\Employee;
+use App\Models\User;
+use App\Services\ApparatusInspectionApprovalService;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\Display\DisplaySnapshotService;
 use App\Support\Security\Base64Image;
@@ -110,9 +109,10 @@ class ApparatusController extends Controller
 
         $clientSubmissionId = (string) $validated['client_submission_id'];
         $validated['checklist_version'] = strtolower((string) $validated['checklist_version']);
+        $submissionPayloadHash = $this->submissionPayloadHash($validated);
         $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId);
         if ($existing !== null) {
-            return $this->idempotentInspectionResponse($existing, $id);
+            return $this->idempotentInspectionResponse($existing, $id, $submissionPayloadHash);
         }
 
         $apparatus = Apparatus::findOrFail($id);
@@ -145,7 +145,7 @@ class ApparatusController extends Controller
         $storedPaths = [];
         try {
             $prepared = $this->prepareImages($validated, $storedPaths);
-            $result = DB::transaction(function () use ($id, $clientSubmissionId, $prepared, $checklistResolver): array {
+            $result = DB::transaction(function () use ($id, $clientSubmissionId, $prepared, $checklistResolver, $submissionPayloadHash): array {
                 $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId, true);
                 if ($existing !== null) {
                     return ['inspection' => $existing, 'created' => false];
@@ -182,9 +182,16 @@ class ApparatusController extends Controller
                 $today = now()->format('Y-m-d');
                 $designation = $lockedApparatus->designation ?? $lockedApparatus->name ?? 'UNK';
                 $designationTag = preg_replace('/[^A-Z0-9]/i', '', $designation) ?: 'UNK';
+                $hasCriticalDefects = false;
+                foreach ($prepared['defects'] ?? [] as $defectData) {
+                    if (in_array($defectData['status'], ['Missing', 'Damaged'], true)) {
+                        $hasCriticalDefects = true;
+                    }
+                }
 
                 $inspection = $this->createInspection([
                     'client_submission_id' => $clientSubmissionId,
+                    'submission_payload_hash' => $submissionPayloadHash,
                     'checklist_version' => $lockedResolution['checklist_version'],
                     'apparatus_id' => $lockedApparatus->id,
                     'operator_name' => $prepared['operator_name'],
@@ -198,75 +205,22 @@ class ApparatusController extends Controller
                     'results' => $prepared['compartments'] ?? null,
                     'officer_signature' => $prepared['officer_signature_path'] ?? null,
                     'employee_id' => $prepared['employee_id'] ?? null,
-                    'review_status' => 'approved',
+                    // The public route has no authenticated device or user context.
+                    // Retain its validated evidence, but never apply operational
+                    // effects until an authorized reviewer approves it.
+                    'pending_effects' => [
+                        'defects' => $prepared['defects'] ?? [],
+                        'has_critical_defects' => $hasCriticalDefects,
+                    ],
+                    'review_status' => 'pending_review',
                     'completed_at' => now(),
                 ]);
 
                 $inspectionRef = "INS-{$designationTag}-{$today}-".str_pad((string) $inspection->id, 6, '0', STR_PAD_LEFT);
                 $inspection->update(['inspection_reference' => $inspectionRef]);
 
-                $hasCriticalDefects = false;
-                foreach ($prepared['defects'] ?? [] as $defectData) {
-                    if (in_array($defectData['status'], ['Missing', 'Damaged'], true)) {
-                        $hasCriticalDefects = true;
-                    }
-
-                    ApparatusDefect::recordDefect(
-                        $lockedApparatus->id,
-                        $defectData['compartment'],
-                        $defectData['item'],
-                        $defectData['status'],
-                        $defectData['notes'] ?? null,
-                        $defectData['photo_path'] ?? null,
-                        $inspection->id,
-                    );
-                }
-
-                // SECURITY (H-01): a public, unauthenticated submission must NOT directly
-                // drive an apparatus Out of Service. Critical defects are held for review.
-                if ($hasCriticalDefects) {
-                    $inspection->update(['review_status' => 'pending_review']);
-                }
-
-                if (($prepared['engine_hours'] ?? null) !== null) {
-                    $newHours = (float) $prepared['engine_hours'];
-                    if ($newHours > (float) ($lockedApparatus->current_engine_hours ?? 0)) {
-                        $lockedApparatus->current_engine_hours = $newHours;
-                    }
-                }
-
-                if (($prepared['miles'] ?? null) !== null) {
-                    $newMiles = (int) $prepared['miles'];
-                    if ($newMiles > (int) ($lockedApparatus->current_miles ?? 0)) {
-                        $lockedApparatus->current_miles = $newMiles;
-                    }
-                }
-
-                $shouldDispatchPmAlert = false;
-                $previousHealth = 'green';
-                if ($lockedApparatus->isDirty('current_engine_hours') || $lockedApparatus->isDirty('current_miles')) {
-                    $previousHealth = $lockedApparatus->getOriginal('current_engine_hours')
-                        ? (new Apparatus(array_merge($lockedApparatus->getOriginal(), ['current_engine_hours' => $lockedApparatus->getOriginal('current_engine_hours')])))->getPmHealthStatus()['status']
-                        : 'green';
-                    $lockedApparatus->reported_at = now();
-                    $lockedApparatus->save();
-                    $shouldDispatchPmAlert = true;
-                }
-
-                $inspectionId = (int) $inspection->id;
-                $apparatusId = (int) $lockedApparatus->id;
-                $hasSnipeItAsset = filled($lockedApparatus->snipeit_asset_id);
-                DB::afterCommit(function () use ($inspectionId, $apparatusId, $previousHealth, $shouldDispatchPmAlert, $hasSnipeItAsset): void {
+                DB::afterCommit(function (): void {
                     $this->forgetDisplayReadModels();
-
-                    if ($shouldDispatchPmAlert) {
-                        PmAlertNotificationJob::dispatch($apparatusId, $previousHealth);
-                    }
-
-                    if ($hasSnipeItAsset) {
-                        AuditEquipmentAfterInspection::dispatch($inspectionId, $apparatusId)
-                            ->delay(now()->addSeconds(5));
-                    }
                 });
 
                 return ['inspection' => $inspection, 'created' => true];
@@ -283,7 +237,7 @@ class ApparatusController extends Controller
             if (! $result['created']) {
                 $this->deleteStoredPaths($storedPaths);
 
-                return $this->idempotentInspectionResponse($inspection, $id);
+                return $this->idempotentInspectionResponse($inspection, $id, $submissionPayloadHash);
             }
 
             return response()->json($this->inspectionReceipt($inspection), 201);
@@ -295,7 +249,7 @@ class ApparatusController extends Controller
 
             $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId);
             if ($existing !== null) {
-                return $this->idempotentInspectionResponse($existing, $id);
+                return $this->idempotentInspectionResponse($existing, $id, $submissionPayloadHash);
             }
 
             throw $exception;
@@ -314,20 +268,41 @@ class ApparatusController extends Controller
      * submission endpoint records the inspection as 'pending_review'; an
      * authorized reviewer confirms it here, which applies the operational hold.
      */
-    public function approveInspection(Request $request, $id)
-    {
-        $inspection = ApparatusInspection::with('apparatus')->findOrFail($id);
+    public function approveInspection(
+        Request $request,
+        ApparatusInspection $inspection,
+        ApparatusInspectionApprovalService $approvalService,
+    ): JsonResponse {
+        $reviewer = $request->user();
+        abort_unless($reviewer instanceof User && $reviewer->can('approve', $inspection), 403);
 
-        if ($inspection->review_status === 'pending_review') {
-            $apparatus = $inspection->apparatus;
+        $inspection = $approvalService->approve((int) $inspection->getKey(), $reviewer);
 
-            if ($apparatus !== null && $apparatus->status !== 'Out of Service') {
-                $apparatus->update(['status' => 'Out of Service']);
-            }
-        }
+        return response()->json($inspection->fresh()->load('apparatus'));
+    }
 
-        $inspection->update(['review_status' => 'approved']);
-        $this->forgetDisplayReadModels();
+    /**
+     * Reject a pending-review inspection without applying any reported
+     * apparatus effects. A reviewer note is retained in the append-only
+     * decision history with the authenticated actor.
+     */
+    public function rejectInspection(
+        Request $request,
+        ApparatusInspection $inspection,
+        ApparatusInspectionApprovalService $approvalService,
+    ): JsonResponse {
+        $reviewer = $request->user();
+        abort_unless($reviewer instanceof User && $reviewer->can('reject', $inspection), 403);
+
+        $validated = $request->validate([
+            'review_notes' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $inspection = $approvalService->reject(
+            (int) $inspection->getKey(),
+            $reviewer,
+            trim($validated['review_notes']),
+        );
 
         return response()->json($inspection->fresh()->load('apparatus'));
     }
@@ -383,15 +358,54 @@ class ApparatusController extends Controller
         return str_contains(strtolower($exception->getMessage()), 'client_submission_id');
     }
 
-    private function idempotentInspectionResponse(ApparatusInspection $inspection, int $apparatusId): JsonResponse
-    {
+    private function idempotentInspectionResponse(
+        ApparatusInspection $inspection,
+        int $apparatusId,
+        string $submissionPayloadHash,
+    ): JsonResponse {
         if ((int) $inspection->apparatus_id !== $apparatusId) {
             return response()->json([
                 'message' => 'This submission identifier was already used for a different apparatus.',
             ], 409);
         }
 
+        if (! is_string($inspection->submission_payload_hash)
+            || ! hash_equals($inspection->submission_payload_hash, $submissionPayloadHash)) {
+            return response()->json([
+                'message' => 'This submission identifier was already used with different inspection data.',
+                'code' => 'DAILY_CHECKOUT_SUBMISSION_REPLAY_CONFLICT',
+            ], 409);
+        }
+
         return response()->json($this->inspectionReceipt($inspection));
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function submissionPayloadHash(array $payload): string
+    {
+        return hash('sha256', json_encode(
+            $this->canonicalizeSubmissionPayload($payload),
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+        ));
+    }
+
+    private function canonicalizeSubmissionPayload(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (array_is_list($value)) {
+            return array_map($this->canonicalizeSubmissionPayload(...), $value);
+        }
+
+        ksort($value, SORT_STRING);
+
+        foreach ($value as $key => $item) {
+            $value[$key] = $this->canonicalizeSubmissionPayload($item);
+        }
+
+        return $value;
     }
 
     private function inspectionReceipt(ApparatusInspection $inspection): array
