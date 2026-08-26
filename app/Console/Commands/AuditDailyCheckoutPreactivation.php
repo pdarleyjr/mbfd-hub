@@ -614,9 +614,6 @@ final class AuditDailyCheckoutPreactivation extends Command
         ?string $expectedChecklistVersion,
     ): array {
         $latest = null;
-        $latestMatchesCurrent = $latest === null
-            ? null
-            : $this->normalizedStatus($latest->status) === $this->normalizedStatus($apparatus->status);
         $openOutOfService = null;
         $returnEvent = null;
 
@@ -641,6 +638,9 @@ final class AuditDailyCheckoutPreactivation extends Command
                 $openOutOfService = null;
             }
         }
+        $latestMatchesCurrent = $latest === null
+            ? null
+            : $this->normalizedStatus($latest->status) === $this->normalizedStatus($apparatus->status);
 
         $return = null;
         if ($returnEvent !== null) {
