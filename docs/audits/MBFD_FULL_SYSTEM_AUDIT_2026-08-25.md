@@ -3,7 +3,8 @@
 - **Audit dates:** 2026-08-25–2026-08-26
 - **Static source inventory:** [MBFD_FULL_SYSTEM_AUDIT_2026-08-25.json](MBFD_FULL_SYSTEM_AUDIT_2026-08-25.json)
 - **Isolated worktree:** `D:\CodexWorktrees\mbfd-hub-full-system-20260825`
-- **Audited branch HEAD:** `audit/mbfd-hub-full-system-20260825` / `74b3020c4`
+- **Pre-resume local baseline:** `audit/mbfd-hub-full-system-20260825` / `74b3020c4`
+- **Current repair checkpoint:** local commits on `audit/mbfd-hub-full-system-20260825`; not pushed or deployed.
 - **Hub repair commit:** `2ac7645a47db0b0225f5dab6fbe3eb8f47101560` (local only; not pushed or deployed)
 - **Verified source baseline:** cached `origin/main` at `ac6965f88f7d8ed441e08996b93d7cdb9f9b99c0`
 - **Current resumed repair set:** isolated local Workgroup/PG/test-isolation changes in this branch; not pushed or deployed.
