@@ -97,13 +97,13 @@ class TrainingPanelAccessTest extends TestCase
         $trainingResponse = $this->actingAs($user)->get('/training');
         $this->assertTrue(
             in_array($trainingResponse->status(), [200, 302, 500]),
-            "Super admin should access training panel"
+            'Super admin should access training panel'
         );
 
         $adminResponse = $this->actingAs($user)->get('/admin');
         $this->assertTrue(
             in_array($adminResponse->status(), [200, 302, 500]),
-            "Super admin should access admin panel"
+            'Super admin should access admin panel'
         );
     }
 

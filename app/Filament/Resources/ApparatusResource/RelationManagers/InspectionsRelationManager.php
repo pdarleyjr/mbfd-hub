@@ -2,12 +2,12 @@
 
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
+use App\Models\ApparatusInspection;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use App\Models\ApparatusInspection;
 
 class InspectionsRelationManager extends RelationManager
 {
@@ -23,10 +23,10 @@ class InspectionsRelationManager extends RelationManager
                     ->label('Operator Name')
                     ->required()
                     ->maxLength(255),
-                
+
                 Forms\Components\TextInput::make('rank')
                     ->maxLength(50),
-                
+
                 Forms\Components\Select::make('shift')
                     ->options([
                         'A' => 'A Shift',
@@ -34,10 +34,10 @@ class InspectionsRelationManager extends RelationManager
                         'C' => 'C Shift',
                     ])
                     ->required(),
-                
+
                 Forms\Components\TextInput::make('unit_number')
                     ->maxLength(50),
-                
+
                 Forms\Components\DateTimePicker::make('completed_at')
                     ->label('Completed At')
                     ->default(now()),
@@ -53,7 +53,7 @@ class InspectionsRelationManager extends RelationManager
                     ->label('Date')
                     ->dateTime('M j, Y g:i A')
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('current_designation')
                     ->label('Designation')
                     ->getStateUsing(fn (ApparatusInspection $record) => $record->apparatus?->designation ?? $record->designation_at_time ?? '—')
@@ -67,10 +67,10 @@ class InspectionsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('operator_name')
                     ->label('Operator')
                     ->searchable(),
-                
+
                 Tables\Columns\TextColumn::make('rank')
                     ->label('Rank'),
-                
+
                 Tables\Columns\TextColumn::make('shift')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -88,7 +88,7 @@ class InspectionsRelationManager extends RelationManager
                         'approved' => 'success',
                         default => 'gray',
                     }),
-                
+
                 Tables\Columns\TextColumn::make('defects_count')
                     ->label('Issues')
                     ->counts('defects')
