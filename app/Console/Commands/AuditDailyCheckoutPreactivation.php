@@ -637,9 +637,12 @@ final class AuditDailyCheckoutPreactivation extends Command
                 $openOutOfService = null;
             }
         }
-        $latestMatchesCurrent = $latest === null
-            ? null
-            : $this->normalizedStatus($latest->status) === $this->normalizedStatus($apparatus->status);
+        $latestEvidence = $latest === null
+            ? ['event' => null, 'matches_current_status' => null]
+            : [
+                'event' => $this->eventShape($latest),
+                'matches_current_status' => $this->normalizedStatus($latest->status) === $this->normalizedStatus($apparatus->status),
+            ];
 
         $return = null;
         if ($returnEvent !== null) {
@@ -689,7 +692,7 @@ final class AuditDailyCheckoutPreactivation extends Command
         if ($operationalState === 'ambiguous') {
             $issues[] = 'operational_status_ambiguous';
         }
-        if ($latestMatchesCurrent === false) {
+        if ($latestEvidence['matches_current_status'] === false) {
             $issues[] = 'operational_status_ledger_mismatch';
         }
         if ($preLedgerReview === null) {
@@ -717,8 +720,8 @@ final class AuditDailyCheckoutPreactivation extends Command
 
         return [
             'state' => $operationalState,
-            'latest_event' => $latest === null ? null : $this->eventShape($latest),
-            'latest_event_matches_current_status' => $latestMatchesCurrent,
+            'latest_event' => $latestEvidence['event'],
+            'latest_event_matches_current_status' => $latestEvidence['matches_current_status'],
             'pre_ledger_review' => $preLedgerReview,
             'return_to_service' => $publicReturn,
             'qualifying_post_return_inspection' => $qualifying,
