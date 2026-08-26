@@ -9,6 +9,8 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -143,19 +145,39 @@ class StationInventoryController extends Controller
         // authenticated downloadPdf route below — never a public /storage URL.
         $filename = 'inventory-'.$station->id.'-'.Str::ulid().'.pdf';
         $pdfPath = 'inventory-submissions/'.$filename;
-        Storage::disk($this->privateDisk())->put($pdfPath, $pdf->output());
+        $disk = Storage::disk($this->privateDisk());
 
-        // Create submission record
-        $submission = StationInventorySubmission::create([
-            'station_id' => $validated['station_id'],
-            'employee_name' => $validated['employee_name'] ?? null,
-            'shift' => $validated['shift'] ?? null,
-            'items' => $orderedItems,
-            'notes' => $validated['notes'] ?? null,
-            'pdf_path' => $pdfPath,
-            'created_by' => $request->user()?->id,
-            'submitted_at' => now()->timezone('America/New_York'),
-        ]);
+        if (! $disk->put($pdfPath, $pdf->output())) {
+            throw new \RuntimeException('Unable to save the inventory submission PDF.');
+        }
+
+        try {
+            $submission = DB::transaction(fn (): StationInventorySubmission => StationInventorySubmission::create([
+                'station_id' => $validated['station_id'],
+                'employee_name' => $validated['employee_name'] ?? null,
+                'shift' => $validated['shift'] ?? null,
+                'items' => $orderedItems,
+                'notes' => $validated['notes'] ?? null,
+                'pdf_path' => $pdfPath,
+                'created_by' => $request->user()?->id,
+                'submitted_at' => now()->timezone('America/New_York'),
+            ]));
+        } catch (\Throwable $exception) {
+            try {
+                if (! $disk->delete($pdfPath)) {
+                    Log::error('[StationInventory] Failed to clean up PDF after submission persistence failure', [
+                        'pdf_path' => $pdfPath,
+                    ]);
+                }
+            } catch (\Throwable $cleanupException) {
+                Log::error('[StationInventory] PDF cleanup threw after submission persistence failure', [
+                    'pdf_path' => $pdfPath,
+                    'error' => $cleanupException->getMessage(),
+                ]);
+            }
+
+            throw $exception;
+        }
 
         return response()->json([
             'success' => true,
