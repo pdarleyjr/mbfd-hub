@@ -1,0 +1,2 @@
+# Intentionally comment-only: this file prevents Laravel from probing a missing
+# worktree .env while tests/bootstrap.php supplies the complete isolated environment.
