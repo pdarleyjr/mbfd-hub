@@ -1,16 +1,16 @@
 name: Deploy Support AI Worker
 
+# This is a separate Hub worker release path. It has no push trigger: a
+# maintainer must explicitly dispatch from main, confirm the activation, pass
+# locked dependency validation, and receive production approval.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - "cloudflare-worker/src/**"
-      - "cloudflare-worker/package.json"
-      - "cloudflare-worker/package-lock.json"
-      - "cloudflare-worker/wrangler.toml"
-      - ".github/workflows/deploy-support-ai-worker.yml"
+    inputs:
+      confirm_production_activation:
+        description: 'I confirm this approved main-ref Support AI Worker release may run.'
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-support-ai-worker-production
@@ -20,8 +20,21 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
-    name: Validate and deploy mbfd-support-ai
+  assert-main:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require main and explicit activation confirmation
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "${{ inputs.confirm_production_activation }}" = "true"
+          test -n "$GITHUB_SHA"
+
+  validate:
+    name: Validate mbfd-support-ai candidate
+    needs: assert-main
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -30,20 +43,43 @@ jobs:
     steps:
       - name: Checkout exact source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
+        with:
+          ref: ${{ github.sha }}
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: cloudflare-worker/package-lock.json
-
       - name: Install locked dependencies
-        run: npm ci
-
+        run: npm ci --ignore-scripts
       - name: Audit production dependency tree
         run: npm audit --audit-level=high
 
+  deploy:
+    name: Deploy approved mbfd-support-ai candidate
+    needs: validate
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+    defaults:
+      run:
+        working-directory: cloudflare-worker
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: cloudflare-worker/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
       - name: Deploy Worker
         run: npm exec -- wrangler deploy
         env:

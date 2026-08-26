@@ -6,6 +6,34 @@ import test from "node:test";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
+function workflowJob(workflow, name) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const body = workflow.match(
+    new RegExp(
+      `^  ${escapedName}:\\r?\\n(?<body>[\\s\\S]*?)(?=^  [A-Za-z0-9_-]+:\\r?$|(?![\\s\\S]))`,
+      "m",
+    ),
+  )?.groups?.body;
+
+  assert.ok(body, `workflow must define the ${name} job`);
+
+  return body;
+}
+
+function workflowStep(job, name) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const body = job.match(
+    new RegExp(
+      `^      - name: ${escapedName}\\r?\\n(?<body>[\\s\\S]*?)(?=^      - name:|(?![\\s\\S]))`,
+      "m",
+    ),
+  )?.groups?.body;
+
+  assert.ok(body, `workflow job must define the ${name} step`);
+
+  return body;
+}
+
 test("every Dependabot package directory contains its ecosystem manifest", () => {
   const config = readFileSync(resolve(root, ".github/dependabot.yml"), "utf8");
   const updateBlocks = config.split(/\n(?=\s{2}- package-ecosystem:)/);
@@ -38,6 +66,7 @@ test("PHPStan is a hard gate backed by a reviewed baseline", () => {
   assert.doesNotMatch(phpstanCommand, /\|\|\s*true\b/);
   assert.doesNotMatch(workflow, /continue-on-error:\s*(?:true|["']true["'])\b/);
   assert.doesNotMatch(phpstanCommand, /--generate-baseline(?:=|\s)/);
+  assert.doesNotMatch(workflow, /composer require[^\r\n]*larastan/i);
   assert.match(config, /^\s+-\s+phpstan-baseline\.neon\s*$/m);
   assert.ok(existsSync(resolve(root, "phpstan-baseline.neon")));
 });
@@ -67,48 +96,175 @@ test("Actionlint failures fail the static-analysis job", () => {
   assert.doesNotMatch(workflow, /fail-on-error:\s*(?:false|["']false["'])\b/);
 });
 
-test("the production deployment PHP syntax check is a hard gate", () => {
-  const workflow = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
-  const syntaxStep = workflow.match(
-    /- name: Syntax check\r?\n\s+run:\s*(?<command>[^\r\n]+)/,
-  )?.groups?.command;
+test("production activation is manual, main-only, and blocked by every Hub release gate", () => {
+  const deploy = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
+  const gates = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
+  const requiredGateJobs = [
+    "ci-configuration",
+    "php-quality",
+    "static-analysis",
+    "phpunit-postgres",
+    "daily-contract-integrity",
+    "generated-assets",
+    "security-dependencies",
+    "security-secrets",
+    "security-filesystem",
+    "php-85-compatibility",
+  ];
 
-  assert.ok(syntaxStep, "deployment workflow must include a PHP syntax step");
-  assert.match(syntaxStep, /php -l/);
-  assert.doesNotMatch(syntaxStep, /\|\|\s*true\b/);
+  assert.match(deploy, /^on:\r?\n  workflow_dispatch:/m);
+  assert.doesNotMatch(deploy, /^  push:/m);
+  assert.match(deploy, /confirm_production_activation:/);
+
+  const assertMain = workflowJob(deploy, "assert-main");
+  assert.match(assertMain, /if:\s*\$\{\{\s*github\.ref\s*==\s*'refs\/heads\/main'\s*\}\}/);
+  assert.match(assertMain, /test "\$GITHUB_REF" = "refs\/heads\/main"/);
+  assert.match(assertMain, /inputs\.confirm_production_activation/);
+
+  const releaseGateCaller = workflowJob(deploy, "release-gates");
+  assert.match(releaseGateCaller, /needs:\s*assert-main/);
+  assert.match(releaseGateCaller, /uses:\s*\.\/\.github\/workflows\/hub-release-gates\.yml/);
+
+  const deployment = workflowJob(deploy, "deploy");
+  assert.match(deployment, /needs:\s*release-gates/);
+  assert.match(deployment, /if:\s*\$\{\{\s*github\.ref\s*==\s*'refs\/heads\/main'\s*\}\}/);
+  assert.match(deployment, /environment:\s*\r?\n\s+name:\s*production/);
+  assert.doesNotMatch(deployment, /if:\s*\$\{\{\s*always\(\)\s*\}\}/);
+
+  const exactCandidate = workflowStep(deployment, "Checkout exact approved candidate");
+  assert.match(exactCandidate, /RELEASE_SHA="\$GITHUB_SHA"/);
+  assert.match(exactCandidate, /git merge-base --is-ancestor "\$RELEASE_SHA" origin\/main/);
+  assert.match(exactCandidate, /git checkout --detach "\$RELEASE_SHA"/);
+  assert.match(exactCandidate, /git rev-parse HEAD/);
+  assert.doesNotMatch(exactCandidate, /deploy-marker/);
+
+  const successfulActivation = workflowStep(deployment, "Record successful Hub candidate activation");
+  assert.match(successfulActivation, /RELEASE_SHA="\$GITHUB_SHA"/);
+  assert.match(successfulActivation, /git rev-parse HEAD/);
+  assert.match(successfulActivation, /deploy-marker\.json/);
+
+  const databaseBackup = workflowStep(deployment, "Verify targeted Hub database backup");
+  assert.match(databaseBackup, /HUB_PG_CONTAINER=mbfd-hub-pgsql/);
+  assert.match(databaseBackup, /HUB_PG_DATABASE=mbfd_hub/);
+  assert.match(databaseBackup, /HUB_PG_USER=mbfd_user/);
+  assert.match(databaseBackup, /docker inspect/);
+  assert.match(databaseBackup, /pg_dump/);
+  assert.match(databaseBackup, /test -s/);
+  assert.match(databaseBackup, /pg_restore --list/);
+  assert.doesNotMatch(databaseBackup, /docker ps|restic/i);
+  assert.doesNotMatch(deploy, /media-control|mediamtx|\bobs\b|restic/i);
+
+  const aggregate = workflowJob(gates, "release-gates");
+  assert.doesNotMatch(aggregate, /if:\s*\$\{\{\s*always\(\)\s*\}\}/);
+  assert.doesNotMatch(aggregate, /continue-on-error:\s*(?:true|["']true["'])/);
+
+  for (const gateJob of requiredGateJobs) {
+    assert.match(aggregate, new RegExp(`- ${gateJob}\\b`));
+    const gate = workflowJob(gates, gateJob);
+    assert.doesNotMatch(gate, /continue-on-error:\s*(?:true|["']true["'])/);
+  }
 });
 
-test("deployment treats the post-migration Daily Checkout audit as a hard failure", () => {
-  const workflow = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
+test("independent Hub operations activation cannot run from an audit ref or without confirmation", () => {
+  const activation = readFileSync(resolve(root, ".github/workflows/production-activate.yml"), "utf8");
 
-  const migration = workflow.indexOf("php artisan migrate --force");
-  const gate = workflow.indexOf("php artisan daily-checkout:audit");
-  const optimize = workflow.indexOf("php artisan optimize:clear");
+  assert.match(activation, /^on:\r?\n  workflow_dispatch:/m);
+  assert.doesNotMatch(activation, /^  push:/m);
+  assert.match(activation, /confirm_production_activation:/);
 
-  assert.ok(migration >= 0, "deployment must run migrations before the audit");
-  assert.ok(gate >= 0, "deployment must run the Daily Checkout gate");
-  assert.ok(optimize >= 0, "deployment must optimize only after the audit");
-  assert.ok(migration < gate, "the gate requires the migrated schema");
-  assert.ok(gate < optimize, "a failed audit must stop the remaining deployment command");
-  assert.doesNotMatch(workflow, /daily-checkout:audit[^\r\n]*\|\|\s*true\b/);
+  const job = workflowJob(activation, "activate");
+  assert.match(job, /if:\s*\$\{\{\s*github\.ref\s*==\s*'refs\/heads\/main'\s*\}\}/);
+  const confirmation = workflowStep(job, "Require main and explicit activation confirmation");
+  assert.match(confirmation, /test "\$GITHUB_REF" = "refs\/heads\/main"/);
+  assert.match(confirmation, /inputs\.confirm_production_activation/);
+  assert.match(job, /environment:\s*\r?\n\s+name:\s*production/);
+});
+
+test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset, security, and runtime-compatibility checks", () => {
+  const gates = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
+
+  const ciConfiguration = workflowJob(gates, "ci-configuration");
+  assert.match(workflowStep(ciConfiguration, "Verify CI configuration"), /npm run test:ci-configuration/);
+
+  const phpQuality = workflowJob(gates, "php-quality");
+  const lint = workflowStep(phpQuality, "PHP lint");
+  assert.match(lint, /set -euo pipefail/);
+  assert.match(lint, /php -l/);
+  assert.doesNotMatch(lint, /\|\|\s*true\b/);
+  assert.match(workflowStep(phpQuality, "Run Pint"), /vendor\/bin\/pint --test/);
+  assert.match(workflowStep(phpQuality, "Validate Composer lockfile"), /composer validate --strict --no-check-publish/);
+  assert.match(workflowStep(phpQuality, "Run Composer security audit"), /composer audit --locked/);
+  assert.match(workflowStep(phpQuality, "Root TypeScript typecheck"), /npm run typecheck/);
+  assert.match(workflowStep(phpQuality, "Root production build"), /npm run build/);
+
+  const staticAnalysis = workflowJob(gates, "static-analysis");
+  assert.match(staticAnalysis, /composer install/);
+  assert.match(workflowStep(staticAnalysis, "Run PHPStan"), /vendor\/bin\/phpstan analyse/);
+  assert.doesNotMatch(staticAnalysis, /composer require[^\r\n]*larastan/i);
+
+  const postgres = workflowJob(gates, "phpunit-postgres");
+  assert.match(postgres, /POSTGRES_DB:\s*mbfd_hub_test_ci/);
+  assert.match(postgres, /MBFD_ALLOW_DISPOSABLE_POSTGRES:\s*["']1["']/);
+  assert.match(workflowStep(postgres, "Run PHPUnit suite"), /php artisan test --exclude-group=postgres/);
+  assert.match(
+    workflowStep(postgres, "Run PostgreSQL concurrency and integrity tests"),
+    /php artisan test --group=postgres/,
+  );
+
+  const daily = workflowJob(gates, "daily-contract-integrity");
+  assert.match(workflowStep(daily, "Daily TypeScript typecheck"), /npm run typecheck/);
+  assert.match(workflowStep(daily, "Daily production build"), /npm run build/);
+  assert.match(
+    workflowStep(daily, "Run Daily Checkout contract and integrity tests"),
+    /DailyCheckoutIntegrityTest\.php/,
+  );
+
+  const assets = workflowJob(gates, "generated-assets");
+  assert.match(workflowStep(assets, "Verify generated assets after build"), /REQUIRE_GENERATED_ASSETS:\s*["']1["']/);
+  assert.match(workflowStep(assets, "Verify generated assets after build"), /guard-generated-assets\.mjs/);
+  assert.match(
+    readFileSync(resolve(root, "scripts/ci/guard-generated-assets.mjs"), "utf8"),
+    /hub-release-gates\.yml/,
+  );
+
+  const securityDependencies = workflowJob(gates, "security-dependencies");
+  assert.match(securityDependencies, /npm audit --audit-level=high/);
+  assert.match(securityDependencies, /composer audit --locked/);
+  const securitySecrets = workflowJob(gates, "security-secrets");
+  assert.match(securitySecrets, /gitleaks\/gitleaks-action@/);
+  const securityFilesystem = workflowJob(gates, "security-filesystem");
+  assert.match(securityFilesystem, /severity:\s*CRITICAL,HIGH/);
+  assert.match(securityFilesystem, /exit-code:\s*1/);
+
+  const php85 = workflowJob(gates, "php-85-compatibility");
+  assert.match(php85, /php-version:\s*["']8\.5["']/);
+  assert.match(workflowStep(php85, "Run PHP 8.5 PHPUnit compatibility suite"), /php artisan test --exclude-group=postgres/);
+  assert.match(workflowStep(php85, "Run PHP 8.5 PostgreSQL compatibility tests"), /php artisan test --group=postgres/);
+});
+
+test("CI invokes the deploy-free shared release gate for main and pull requests", () => {
+  const ci = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
+
+  assert.match(ci, /^  push:\r?\n    branches: \[main\]/m);
+  assert.match(ci, /^  pull_request:\r?\n    branches: \[main\]/m);
+  assert.match(ci, /uses:\s*\.\/\.github\/workflows\/hub-release-gates\.yml/);
+  assert.doesNotMatch(ci, /^\s*runs-on:\s*self-hosted\s*$/m);
+  assert.doesNotMatch(ci, /^\s*environment:\s*$/m);
+  assert.doesNotMatch(ci, /^\s*DEPLOY_SSH_KEY:/m);
+  assert.doesNotMatch(ci, /^\s*run:.*\bssh\s+deploy-target\b/im);
 });
 
 test("CI runs a required PostgreSQL group against its dedicated disposable service", () => {
-  const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const workflow = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
   const phpunit = readFileSync(resolve(root, "phpunit.xml"), "utf8");
-  const defaultTestStep = workflow.match(
-    /- name: Run non-PostgreSQL tests\r?\n(?<body>[\s\S]*?)(?=\r?\n\s+- name:|\r?\n\s{2}[A-Za-z][\w-]*:|$)/,
-  )?.groups?.body;
-  const postgresTestStep = workflow.match(
-    /- name: Run required disposable PostgreSQL integration tests\r?\n(?<body>[\s\S]*?)(?=\r?\n\s+- name:|\r?\n\s{2}[A-Za-z][\w-]*:|$)/,
-  )?.groups?.body;
+  const postgresJob = workflowJob(workflow, "phpunit-postgres");
+  const defaultTestStep = workflowStep(postgresJob, "Run PHPUnit suite");
+  const postgresTestStep = workflowStep(postgresJob, "Run PostgreSQL concurrency and integrity tests");
 
   assert.match(workflow, /POSTGRES_DB:\s*mbfd_hub_test_ci/);
   assert.match(workflow, /POSTGRES_USER:\s*mbfd_test_ci/);
   assert.match(workflow, /POSTGRES_HOST_AUTH_METHOD:\s*trust/);
-  assert.ok(defaultTestStep, "CI must define its non-PostgreSQL PHPUnit step");
   assert.match(defaultTestStep, /php artisan test --exclude-group=postgres/);
-  assert.ok(postgresTestStep, "CI must define its required disposable PostgreSQL PHPUnit step");
   assert.match(postgresTestStep, /MBFD_ALLOW_DISPOSABLE_POSTGRES:\s*["']1["']/);
   assert.match(postgresTestStep, /REQUIRE_POSTGRES_INTEGRATION:\s*["']true["']/);
   assert.match(postgresTestStep, /DISPOSABLE_POSTGRES_HOST:\s*127\.0\.0\.1/);
@@ -123,9 +279,8 @@ test("the Support AI deployment cannot be triggered by a PulsePoint-only change"
   const workflow = readFileSync(resolve(root, ".github/workflows/deploy-support-ai-worker.yml"), "utf8");
   const pulsePointVerification = resolve(root, ".github/workflows/verify-pulsepoint-proxy.yml");
 
-  assert.doesNotMatch(workflow, /-\s+"cloudflare-worker\/\*\*"/);
-  assert.match(workflow, /-\s+"cloudflare-worker\/src\/\*\*"/);
-  assert.match(workflow, /-\s+"cloudflare-worker\/package-lock\.json"/);
+  assert.doesNotMatch(workflow, /^  push:/m);
+  assert.doesNotMatch(workflow, /cloudflare-worker\/pulsepoint-proxy/i);
   assert.doesNotMatch(workflow, /wrangler deploy --dry-run/);
   assert.match(workflow, /npm exec -- wrangler deploy/);
   assert.ok(existsSync(pulsePointVerification), "PulsePoint proxy needs a dedicated verification workflow");
@@ -136,6 +291,28 @@ test("the Support AI deployment cannot be triggered by a PulsePoint-only change"
   assert.match(verification, /npm run typecheck/);
   assert.match(verification, /npm test/);
   assert.doesNotMatch(verification, /wrangler deploy/);
+});
+
+test("Support AI worker activation is manual, main-only, and environment-approved", () => {
+  const workflow = readFileSync(resolve(root, ".github/workflows/deploy-support-ai-worker.yml"), "utf8");
+
+  assert.match(workflow, /^on:\r?\n  workflow_dispatch:/m);
+  assert.doesNotMatch(workflow, /^  push:/m);
+  assert.match(workflow, /confirm_production_activation:/);
+
+  const assertMain = workflowJob(workflow, "assert-main");
+  assert.match(assertMain, /if:\s*\$\{\{\s*github\.ref\s*==\s*'refs\/heads\/main'\s*\}\}/);
+  assert.match(workflowStep(assertMain, "Require main and explicit activation confirmation"), /inputs\.confirm_production_activation/);
+
+  const validate = workflowJob(workflow, "validate");
+  assert.match(validate, /needs:\s*assert-main/);
+  assert.match(validate, /npm audit --audit-level=high/);
+
+  const deploy = workflowJob(workflow, "deploy");
+  assert.match(deploy, /needs:\s*validate/);
+  assert.match(deploy, /if:\s*\$\{\{\s*github\.ref\s*==\s*'refs\/heads\/main'\s*\}\}/);
+  assert.match(deploy, /environment:\s*\r?\n\s+name:\s*production/);
+  assert.match(deploy, /npm exec -- wrangler deploy/);
 });
 
 test("the PulsePoint verification workflow cannot acquire deployment capability", () => {
@@ -155,13 +332,13 @@ test("the PulsePoint verification workflow cannot acquire deployment capability"
 
 test("CI executes the deploy-free configuration regression suite", () => {
   const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
-  const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const gates = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
 
   assert.equal(
     packageJson.scripts["test:ci-configuration"],
     "node --test tests/Node/ci-configuration.test.mjs",
   );
-  assert.match(workflow, /- name: Verify CI configuration\r?\n\s+run: npm run test:ci-configuration/);
+  assert.match(workflowStep(workflowJob(gates, "ci-configuration"), "Verify CI configuration"), /npm run test:ci-configuration/);
 });
 
 test("browser and local-server test harnesses reject production endpoints and inherited integrations", () => {
@@ -199,12 +376,9 @@ test("browser and local-server test harnesses reject production endpoints and in
 });
 
 test("ordinary CI builds cannot inherit Sentry upload capability or production integration secrets", () => {
-  const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
-  const buildStep = workflow.match(
-    /- name: Build Vite assets for HTTP tests\r?\n(?<body>[\s\S]*?)(?=\r?\n\s+- name:|\r?\n\s{2}[A-Za-z][\w-]*:|$)/,
-  )?.groups?.body;
+  const workflow = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
+  const buildStep = workflowStep(workflowJob(workflow, "php-quality"), "Root production build");
 
-  assert.ok(buildStep, "CI must define its Vite build step");
   for (const variable of [
     "SENTRY_AUTH_TOKEN",
     "SENTRY_ORG",

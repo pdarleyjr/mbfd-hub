@@ -26,9 +26,6 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-interaction --no-progress --no-scripts
 
-      - name: Install Larastan
-        run: composer require --dev "larastan/larastan:^3.0" --no-interaction --no-progress
-
       - name: Run PHPStan
         run: vendor/bin/phpstan analyse --memory-limit=512M --no-progress -c phpstan.neon
 
