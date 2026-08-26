@@ -13,6 +13,7 @@ use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
+use App\Http\Middleware\ForceFilamentPasswordChange;
 use App\Http\Middleware\RedirectTrainingUsers;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
@@ -178,6 +179,10 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 RedirectTrainingUsers::class,
+                ForceFilamentPasswordChange::class,
+            ])
+            ->persistentMiddleware([
+                ForceFilamentPasswordChange::class,
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')

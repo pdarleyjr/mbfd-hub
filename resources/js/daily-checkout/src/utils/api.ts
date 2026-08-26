@@ -24,11 +24,19 @@ const normalizeItemStatus = (status?: string): 'Present' | 'Missing' | 'Damaged'
 };
 
 export class ApiRequestError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
     super(message);
     this.name = 'ApiRequestError';
   }
 }
+
+export const isChecklistVersion = (value: unknown): value is string => (
+  typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)
+);
 
 const responseMessage = async (response: Response, fallback: string): Promise<string> => {
   const payload = await response.json().catch(() => null);
@@ -69,10 +77,19 @@ export class ApiClient {
     }
 
     const payload = await response.json();
+    const checklistVersion = payload?.checklist_version;
+    if (!isChecklistVersion(checklistVersion)) {
+      throw new ApiRequestError(
+        'The Daily Checkout checklist version is unavailable. Contact an officer before continuing.',
+        503,
+      );
+    }
+
     const rawChecklist = payload?.checklist ?? payload;
     const rawCompartments = Array.isArray(rawChecklist?.compartments) ? rawChecklist.compartments : [];
 
     const checklist: ChecklistData = {
+      checklist_version: checklistVersion.toLowerCase(),
       compartments: rawCompartments.map((compartment: any, compartmentIndex: number) => {
         const compartmentId = compartment?.id ?? `compartment-${compartmentIndex + 1}`;
 
@@ -109,9 +126,11 @@ export class ApiClient {
     });
 
     if (!response.ok) {
+      const payload = await response.json().catch(() => null);
       throw new ApiRequestError(
-        await responseMessage(response, 'Failed to submit inspection'),
+        typeof payload?.message === 'string' ? payload.message : 'Failed to submit inspection',
         response.status,
+        typeof payload?.code === 'string' ? payload.code : undefined,
       );
     }
 
@@ -366,14 +385,14 @@ export class ApiClient {
 
   static async updateInventoryItem(
     inventoryUrl: string,
-    itemId: number,
+    stationInventoryItemId: number,
     data: UpdateItemRequest
   ): Promise<{ success: boolean; message: string }> {
-    // IMPORTANT: Do NOT modify the signed URL path - signature will fail
-    // Extract base URL and signature, then append the item path
+    // Reuse the PIN-issued base signature and append the station inventory item.
+    // The API validates that signature against the base URL server-side.
     const baseUrl = inventoryUrl.split('?')[0]; // Get everything before query string
     const queryString = inventoryUrl.split('?')[1]; // Get query string with signature
-    const url = `${baseUrl}/item/${itemId}?${queryString}`;
+    const url = `${baseUrl}/item/${stationInventoryItemId}?${queryString}`;
     
     const response = await fetch(url, {
       method: 'PUT',

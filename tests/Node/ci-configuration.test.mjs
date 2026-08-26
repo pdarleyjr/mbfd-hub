@@ -66,3 +66,30 @@ test("Actionlint failures fail the static-analysis job", () => {
 
   assert.doesNotMatch(workflow, /fail-on-error:\s*(?:false|["']false["'])\b/);
 });
+
+test("the production deployment PHP syntax check is a hard gate", () => {
+  const workflow = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
+  const syntaxStep = workflow.match(
+    /- name: Syntax check\r?\n\s+run:\s*(?<command>[^\r\n]+)/,
+  )?.groups?.command;
+
+  assert.ok(syntaxStep, "deployment workflow must include a PHP syntax step");
+  assert.match(syntaxStep, /php -l/);
+  assert.doesNotMatch(syntaxStep, /\|\|\s*true\b/);
+});
+
+test("CI runs PHPUnit against its provisioned PostgreSQL service", () => {
+  const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const phpunit = readFileSync(resolve(root, "phpunit.xml"), "utf8");
+  const testStep = workflow.match(
+    /- name: Run Tests\r?\n(?<body>[\s\S]*?)(?=\r?\n\s+- name:|\r?\n\s{2}[A-Za-z][\w-]*:|$)/,
+  )?.groups?.body;
+
+  assert.ok(testStep, "CI must define its PHPUnit step");
+  assert.match(testStep, /DB_CONNECTION:\s*pgsql/);
+  assert.match(testStep, /EXPECTED_TEST_DB_CONNECTION:\s*pgsql/);
+  assert.match(testStep, /DB_HOST:\s*127\.0\.0\.1/);
+  assert.match(testStep, /DB_DATABASE:\s*testing/);
+  assert.match(testStep, /php artisan test/);
+  assert.match(phpunit, /<directory>tests\/Integration<\/directory>/);
+});

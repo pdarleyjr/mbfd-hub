@@ -8,6 +8,7 @@ export default function OfflineIndicator() {
   const [pendingCount, setPendingCount] = useState(0);
   const [attentionCount, setAttentionCount] = useState(0);
   const [attentionError, setAttentionError] = useState<string | undefined>();
+  const [attentionErrorCode, setAttentionErrorCode] = useState<string | undefined>();
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
@@ -24,6 +25,7 @@ export default function OfflineIndicator() {
         setPendingCount(summary.pending);
         setAttentionCount(summary.requiresAttention);
         setAttentionError(summary.firstAttentionError);
+        setAttentionErrorCode(summary.firstAttentionErrorCode);
       } catch (error) {
         console.error('Failed to read the Daily Checkout submission queue:', error);
       }
@@ -82,6 +84,11 @@ export default function OfflineIndicator() {
           <p>
             {attentionCount} saved Daily Checkout submission{attentionCount > 1 ? 's need' : ' needs'} review before it can be sent. The payload remains saved on this device.
           </p>
+          {attentionErrorCode === 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED' && (
+            <p className="mt-1 text-red-100">
+              The checklist changed after this inspection was saved. An officer must reconcile it with the current checklist before a new submission is created.
+            </p>
+          )}
           {attentionError && <p className="mt-1 text-red-100">Latest server response: {attentionError}</p>}
         </div>
       )}

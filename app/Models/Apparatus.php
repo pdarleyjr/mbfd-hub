@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Enums\DailyCheckoutRequirement;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -31,6 +32,7 @@ class Apparatus extends Model
         'year',
         'status',
         'daily_checkout_requirement',
+        'daily_checkout_template',
         'mileage',
         'last_service_date',
         'notes',
@@ -52,6 +54,7 @@ class Apparatus extends Model
 
     protected $casts = [
         'daily_checkout_requirement' => DailyCheckoutRequirement::class,
+        'daily_checkout_template' => DailyCheckoutChecklistTemplate::class,
         'mileage' => 'decimal:2',
         'last_service_date' => 'date',
         'reported_at' => 'datetime',

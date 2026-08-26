@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Api;
 
 use App\Models\Apparatus;
+use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
 use App\Services\DailyCheckoutChecklistResolver;
@@ -24,10 +25,16 @@ class DailyCheckoutIntegrityTest extends TestCase
         $response->assertOk();
 
         $compartments = $response->json('checklist.compartments');
+        $checklistVersion = $response->json('checklist_version');
 
         $this->assertIsArray($compartments);
         $this->assertNotEmpty($compartments);
         $this->assertNotEmpty($compartments[0]['items'] ?? []);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', (string) $checklistVersion);
+        $this->assertSame(
+            app(DailyCheckoutChecklistResolver::class)->resolve($apparatus)['checklist_version'],
+            $checklistVersion,
+        );
     }
 
     public function test_public_daily_checkout_catalog_only_exposes_explicitly_required_apparatus(): void
@@ -71,6 +78,36 @@ class DailyCheckoutIntegrityTest extends TestCase
         $this->assertDatabaseCount('apparatus_inspections', 0);
     }
 
+    public function test_checklist_version_is_required_before_any_inspection_is_written(): void
+    {
+        $apparatus = $this->makeApparatus('required');
+        $payload = $this->submissionWithChecklist($apparatus, 'aaaaaaaa-1111-4111-8111-111111111111');
+        unset($payload['checklist_version']);
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['checklist_version']);
+
+        $this->assertDatabaseCount('apparatus_inspections', 0);
+    }
+
+    public function test_stale_checklist_version_requires_review_without_writing_an_inspection(): void
+    {
+        $apparatus = $this->makeApparatus('required');
+        $payload = $this->submissionWithChecklist($apparatus, 'bbbbbbbb-1111-4111-8111-111111111111');
+        $payload['checklist_version'] = str_repeat('a', 64);
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED')
+            ->assertJsonPath(
+                'current_checklist_version',
+                app(DailyCheckoutChecklistResolver::class)->resolve($apparatus)['checklist_version'],
+            );
+
+        $this->assertDatabaseCount('apparatus_inspections', 0);
+    }
+
     public function test_same_client_submission_id_is_recorded_once_when_the_response_is_retried(): void
     {
         $apparatus = $this->makeApparatus('required');
@@ -95,6 +132,10 @@ class DailyCheckoutIntegrityTest extends TestCase
 
         $this->assertDatabaseCount('apparatus_inspections', 1);
         $this->assertSame('101.5', ApparatusInspection::sole()->engine_hours);
+        $this->assertSame(
+            app(DailyCheckoutChecklistResolver::class)->resolve($apparatus)['checklist_version'],
+            ApparatusInspection::sole()->checklist_version,
+        );
         $this->assertSame('101.5', $apparatus->fresh()->current_engine_hours);
         $this->assertSame(10_025, $apparatus->fresh()->current_miles);
     }
@@ -144,12 +185,19 @@ class DailyCheckoutIntegrityTest extends TestCase
         $complete = $this->submissionWithChecklist($apparatus, '55555555-5555-4555-8555-555555555555');
 
         $cases = [
-            'missing' => $this->submissionPayload('66666666-6666-4666-8666-666666666666'),
-            'empty' => $this->submissionPayload('77777777-7777-4777-8777-777777777777', ['compartments' => []]),
+            'missing' => $this->submissionPayload('66666666-6666-4666-8666-666666666666', [
+                'checklist_version' => $complete['checklist_version'],
+            ]),
+            'empty' => $this->submissionPayload('77777777-7777-4777-8777-777777777777', [
+                'checklist_version' => $complete['checklist_version'],
+                'compartments' => [],
+            ]),
             'partial' => $this->submissionPayload('88888888-8888-4888-8888-888888888888', [
+                'checklist_version' => $complete['checklist_version'],
                 'compartments' => [reset($complete['compartments'])],
             ]),
             'tampered' => $this->submissionPayload('99999999-9999-4999-8999-999999999999', [
+                'checklist_version' => $complete['checklist_version'],
                 'compartments' => array_map(static function (array $compartment): array {
                     if ($compartment['items'] !== []) {
                         $compartment['items'][0]['name'] = 'Untracked item';
@@ -167,6 +215,42 @@ class DailyCheckoutIntegrityTest extends TestCase
         }
 
         $this->assertDatabaseCount('apparatus_inspections', 0);
+    }
+
+    public function test_submission_canonicalizes_whitespace_before_persistence_and_does_not_bypass_defect_deduplication(): void
+    {
+        $apparatus = $this->makeApparatus('required');
+        $canonical = $this->submissionWithChecklist($apparatus, 'abababab-abab-4bab-8bab-abababababab');
+
+        $tamperedCompartmentId = $canonical;
+        $tamperedCompartmentId['compartments'][0]['id'] .= ' ';
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $tamperedCompartmentId)
+            ->assertCreated();
+        $this->assertSame(
+            $canonical['compartments'][0]['id'],
+            ApparatusInspection::sole()->results[0]['id'],
+        );
+
+        $tamperedDefect = $this->submissionWithChecklist($apparatus, 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+        $tamperedDefect['compartments'][0]['items'][0]['status'] = 'Missing';
+        $tamperedDefect['defects'] = [[
+            'compartment' => ' '.$tamperedDefect['compartments'][0]['name'],
+            'item' => $tamperedDefect['compartments'][0]['items'][0]['name'].' ',
+            'status' => 'Missing',
+        ]];
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $tamperedDefect)
+            ->assertCreated();
+
+        $repeatDefect = $tamperedDefect;
+        $repeatDefect['client_submission_id'] = 'dededede-dede-4ede-8ede-dededededede';
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $repeatDefect)
+            ->assertCreated();
+
+        $this->assertDatabaseCount('apparatus_inspections', 3);
+        $this->assertDatabaseCount('apparatus_defects', 1);
+        $defect = ApparatusDefect::sole();
+        $this->assertSame($canonical['compartments'][0]['name'], $defect->compartment);
+        $this->assertSame($canonical['compartments'][0]['items'][0]['name'], $defect->item);
     }
 
     public function test_non_present_checklist_item_requires_a_matching_defect_record(): void
@@ -219,8 +303,17 @@ class DailyCheckoutIntegrityTest extends TestCase
     private function submissionWithChecklist(Apparatus $apparatus, string $clientSubmissionId, array $overrides = []): array
     {
         return $this->submissionPayload($clientSubmissionId, array_merge([
+            'checklist_version' => $this->canonicalChecklistVersion($apparatus),
             'compartments' => $this->canonicalCompartments($apparatus),
         ], $overrides));
+    }
+
+    private function canonicalChecklistVersion(Apparatus $apparatus): string
+    {
+        $version = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus)['checklist_version'];
+        $this->assertIsString($version);
+
+        return $version;
     }
 
     /** @return list<array{id: string, name: string, items: list<array{id: string, name: string, status: string, notes: null}>}> */

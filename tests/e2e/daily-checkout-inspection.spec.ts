@@ -14,6 +14,7 @@ const apparatus = {
 };
 
 const checklist = {
+  checklist_version: 'a'.repeat(64),
   checklist: {
     compartments: [
       {
@@ -30,17 +31,27 @@ const checklist = {
 interface QueuedInspection {
   id: string;
   apparatusId: number;
+  checklistVersion?: string;
+  createdAt?: string;
+  updatedAt?: string;
   status: 'pending' | 'requires_attention';
   retryCount: number;
   lastError?: string;
   lastErrorStatus?: number;
+  lastErrorCode?: string;
   retentionExpiresAt?: string;
   data: {
     client_submission_id?: unknown;
+    checklist_version?: unknown;
     operator_name?: unknown;
     compartments?: unknown;
   };
 }
+
+type SeededQueuedInspection = QueuedInspection & {
+  createdAt: string;
+  updatedAt: string;
+};
 
 interface InspectionApiMock {
   readonly submissions: Array<Record<string, unknown>>;
@@ -48,7 +59,13 @@ interface InspectionApiMock {
 
 async function mockInspectionApi(
   page: Page,
-  options: { readonly submitStatus?: number; readonly abortFirstSubmit?: boolean } = {},
+  options: {
+    readonly submitStatus?: number;
+    readonly abortFirstSubmit?: boolean;
+    readonly checklistVersionMismatchOnSubmit?: boolean;
+    readonly omitChecklistVersion?: boolean;
+    readonly checklistVersion?: string;
+  } = {},
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
   const submitStatus = options.submitStatus ?? 201;
@@ -68,7 +85,11 @@ async function mockInspectionApi(
     }
 
     if (path === `/api/public/apparatuses/${apparatus.id}/checklist`) {
-      return route.fulfill({ json: checklist });
+      return route.fulfill({
+        json: options.omitChecklistVersion
+          ? { checklist: checklist.checklist }
+          : { ...checklist, checklist_version: options.checklistVersion ?? checklist.checklist_version },
+      });
     }
 
     if (path === `/api/public/apparatuses/${apparatus.id}/service-notices`) {
@@ -85,8 +106,14 @@ async function mockInspectionApi(
       }
 
       return route.fulfill({
-        status: submitStatus,
-        json: submitStatus >= 400
+        status: options.checklistVersionMismatchOnSubmit ? 409 : submitStatus,
+        json: options.checklistVersionMismatchOnSubmit
+          ? {
+              message: 'The checklist changed after this inspection was saved. Officer review is required.',
+              code: 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED',
+              current_checklist_version: 'b'.repeat(64),
+            }
+          : submitStatus >= 400
           ? { message: 'Retry later.' }
           : { success: true, message: 'Inspection recorded.' },
       });
@@ -166,6 +193,75 @@ async function queuedInspections(page: Page): Promise<QueuedInspection[]> {
   });
 }
 
+async function addQueuedInspection(page: Page, record: SeededQueuedInspection): Promise<void> {
+  await page.evaluate(async (queuedRecord) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('mbfd-daily-checkout');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    const transaction = database.transaction('dailyCheckoutSubmissions', 'readwrite');
+    const request = transaction.objectStore('dailyCheckoutSubmissions').add({
+      ...queuedRecord,
+      createdAt: new Date(queuedRecord.createdAt),
+      updatedAt: new Date(queuedRecord.updatedAt),
+    });
+    await new Promise<void>((resolve, reject) => {
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+  }, record);
+}
+
+async function createVersionThreeQueue(page: Page, record: Omit<SeededQueuedInspection, 'checklistVersion'>): Promise<void> {
+  await page.goto('/images/mbfd_logo_new.png');
+  await page.evaluate(async (queuedRecord) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      // Dexie stores semantic schema version 3 as native IndexedDB version 30.
+      const request = indexedDB.open('mbfd-daily-checkout', 30);
+      request.onupgradeneeded = () => {
+        const legacyDatabase = request.result;
+        const pendingSubmissions = legacyDatabase.createObjectStore('pendingSubmissions', { keyPath: 'id', autoIncrement: true });
+        pendingSubmissions.createIndex('type', 'type');
+        pendingSubmissions.createIndex('status', 'status');
+        pendingSubmissions.createIndex('createdAt', 'createdAt');
+        pendingSubmissions.createIndex('retryCount', 'retryCount');
+
+        const cachedData = legacyDatabase.createObjectStore('cachedData', { keyPath: 'key' });
+        cachedData.createIndex('updatedAt', 'updatedAt');
+
+        const trtCatalog = legacyDatabase.createObjectStore('trtCatalog', { keyPath: 'id' });
+        trtCatalog.createIndex('category', 'category');
+        trtCatalog.createIndex('sort_order', 'sort_order');
+
+        const dailyQueue = legacyDatabase.createObjectStore('dailyCheckoutSubmissions', { keyPath: 'id' });
+        dailyQueue.createIndex('apparatusId', 'apparatusId', { unique: true });
+        dailyQueue.createIndex('status', 'status');
+        dailyQueue.createIndex('createdAt', 'createdAt');
+        dailyQueue.createIndex('updatedAt', 'updatedAt');
+        dailyQueue.createIndex('retentionExpiresAt', 'retentionExpiresAt');
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    const transaction = database.transaction('dailyCheckoutSubmissions', 'readwrite');
+    transaction.objectStore('dailyCheckoutSubmissions').add({
+      ...queuedRecord,
+      createdAt: new Date(queuedRecord.createdAt),
+      updatedAt: new Date(queuedRecord.updatedAt),
+    });
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(transaction.error);
+      transaction.onerror = () => reject(transaction.error);
+    });
+    database.close();
+  }, record);
+}
+
 test('non-empty checklist permits a complete inspection and sends its submission', async ({ page }) => {
   const api = await mockInspectionApi(page);
 
@@ -177,6 +273,7 @@ test('non-empty checklist permits a complete inspection and sends its submission
   expect(api.submissions).toHaveLength(1);
   expect(api.submissions[0]).toMatchObject({
     client_submission_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    checklist_version: checklist.checklist_version,
     operator_name: 'Captain Browser',
     compartments: [
       {
@@ -186,6 +283,87 @@ test('non-empty checklist permits a complete inspection and sends its submission
         ],
       },
     ],
+  });
+});
+
+test('a checklist without an immutable version fails closed before inspection entry', async ({ page }) => {
+  const api = await mockInspectionApi(page, { omitChecklistVersion: true });
+
+  await page.goto('/daily/apparatus/engine-1');
+
+  await expect(page.getByText('Inspection Data Unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByText('The Daily Checkout checklist version is unavailable. Contact an officer before continuing.')).toBeVisible();
+  expect(api.submissions).toHaveLength(0);
+});
+
+test('upgrades a version-three queue record without losing its immutable checklist version', async ({ page }) => {
+  const legacyVersion = 'a'.repeat(64);
+  await createVersionThreeQueue(page, {
+    id: 'daily-legacy-version-three',
+    apparatusId: apparatus.id,
+    status: 'requires_attention',
+    retryCount: 1,
+    lastError: 'The checklist changed after this inspection was saved. Officer review is required.',
+    lastErrorStatus: 409,
+    lastErrorCode: 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED',
+    data: {
+      client_submission_id: 'abababab-abab-4bab-8bab-abababababab',
+      checklist_version: legacyVersion,
+      operator_name: 'Captain Previous',
+      compartments: [],
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  expect(await queuedInspections(page)).toHaveLength(1);
+  await mockInspectionApi(page);
+
+  await page.goto('/daily/apparatus/engine-1');
+
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(1);
+  const saved = await queuedInspections(page);
+  expect(saved).toHaveLength(1);
+  expect(saved[0]).toMatchObject({
+    checklistVersion: legacyVersion,
+    data: { checklist_version: legacyVersion },
+  });
+  await expect(page.getByText('A saved Daily Checkout using this checklist version needs officer review.')).toBeVisible();
+});
+
+test('a changed checklist preserves the older autosave while a current-version draft is created separately', async ({ page }) => {
+  const staleAutosave = {
+    checklist_version: 'b'.repeat(64),
+    officer: { name: 'Captain Previous', rank: 'Captain', shift: 'A', unitNumber: 'E1' },
+    meter: { engine_hours: 99, miles: 999 },
+    compartments: [{ id: 'cab', name: 'Cab', items: [{ id: 'portable-radio', name: 'Portable Radio', status: 'Missing' }] }],
+    timestamp: Date.now(),
+  };
+  const legacyAutosaveKey = 'mbfd_autosave_inspection_engine-1';
+  await page.addInitScript(({ key, data }) => {
+    window.localStorage.setItem(key, JSON.stringify(data));
+  }, { key: legacyAutosaveKey, data: staleAutosave });
+  await mockInspectionApi(page);
+
+  await page.goto('/daily/apparatus/engine-1');
+  await expect(page.getByRole('alert')).toContainText('A previously saved inspection uses a different checklist version');
+  await completeInspection(page);
+
+  const persisted = await page.evaluate(({ legacyKey, currentKey }) => ({
+    legacy: JSON.parse(window.localStorage.getItem(legacyKey) ?? 'null'),
+    current: JSON.parse(window.localStorage.getItem(currentKey) ?? 'null'),
+  }), {
+    legacyKey: legacyAutosaveKey,
+    currentKey: `${legacyAutosaveKey}_${checklist.checklist_version}`,
+  });
+
+  expect(persisted.legacy).toMatchObject({
+    checklist_version: staleAutosave.checklist_version,
+    officer: { name: 'Captain Previous' },
+    compartments: [{ items: [{ status: 'Missing' }] }],
+  });
+  expect(persisted.current).toMatchObject({
+    checklist_version: checklist.checklist_version,
+    officer: { name: 'Captain Browser' },
   });
 });
 
@@ -204,6 +382,7 @@ test('queued inspection syncs after reconnect while the queued success page rema
     apparatusId: apparatus.id,
     data: {
       client_submission_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      checklist_version: checklist.checklist_version,
       operator_name: 'Captain Browser',
       compartments: expect.any(Array),
     },
@@ -274,6 +453,96 @@ test('a validation 422 retains the payload and durable client id for review', as
   expect(queuedAfterValidationFailure[0].retentionExpiresAt).toBeTruthy();
 });
 
+test('an offline checklist version is retained for review when the server changes to a new version', async ({ page, context }) => {
+  const api = await mockInspectionApi(page, { checklistVersionMismatchOnSubmit: true });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  const queuedBeforeReconnect = await queuedInspections(page);
+  expect(queuedBeforeReconnect).toHaveLength(1);
+  const savedClientSubmissionId = queuedBeforeReconnect[0].data.client_submission_id;
+  expect(queuedBeforeReconnect[0].data.checklist_version).toBe(checklist.checklist_version);
+
+  await context.setOffline(false);
+  await expect.poll(() => api.submissions.length).toBe(1);
+  await expect.poll(async () => (await queuedInspections(page))[0]?.status).toBe('requires_attention');
+  const retainedSubmission = (await queuedInspections(page))[0];
+
+  expect(retainedSubmission).toMatchObject({
+    apparatusId: apparatus.id,
+    status: 'requires_attention',
+    retryCount: 1,
+    lastErrorStatus: 409,
+    lastErrorCode: 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED',
+    data: {
+      client_submission_id: savedClientSubmissionId,
+      checklist_version: checklist.checklist_version,
+    },
+  });
+  await expect(page.getByRole('alert')).toContainText('The checklist changed after this inspection was saved');
+  expect(api.submissions[0]).toMatchObject({
+    client_submission_id: savedClientSubmissionId,
+    checklist_version: checklist.checklist_version,
+  });
+});
+
+test('a current checklist submission is queued separately while an older version remains retained for officer review', async ({ page, context }) => {
+  const olderVersion = 'a'.repeat(64);
+  const currentVersion = 'b'.repeat(64);
+  const olderClientSubmissionId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const api = await mockInspectionApi(page, { checklistVersion: currentVersion });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await addQueuedInspection(page, {
+    id: `daily_${olderClientSubmissionId}`,
+    apparatusId: apparatus.id,
+    checklistVersion: olderVersion,
+    status: 'requires_attention',
+    retryCount: 1,
+    lastError: 'The checklist changed after this inspection was saved. Officer review is required.',
+    lastErrorStatus: 409,
+    lastErrorCode: 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED',
+    data: {
+      client_submission_id: olderClientSubmissionId,
+      checklist_version: olderVersion,
+      operator_name: 'Captain Previous',
+      compartments: [],
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  await context.setOffline(true);
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  const saved = await queuedInspections(page);
+  expect(saved).toHaveLength(2);
+
+  const older = saved.find((submission) => submission.checklistVersion === olderVersion);
+  const current = saved.find((submission) => submission.checklistVersion === currentVersion);
+  expect(older).toMatchObject({
+    status: 'requires_attention',
+    data: { client_submission_id: olderClientSubmissionId, checklist_version: olderVersion },
+  });
+  expect(current).toMatchObject({
+    status: 'pending',
+    apparatusId: apparatus.id,
+    data: {
+      client_submission_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      checklist_version: currentVersion,
+      operator_name: 'Captain Browser',
+    },
+  });
+  expect(current?.data.client_submission_id).not.toBe(olderClientSubmissionId);
+  expect(api.submissions).toHaveLength(0);
+});
+
 test('migrates a legacy localStorage inspection only after IndexedDB retains it', async ({ page }) => {
   const legacyInspection = {
     id: 'legacy-inspection-1',
@@ -306,6 +575,8 @@ test('migrates a legacy localStorage inspection only after IndexedDB retains it'
     data: {
       client_submission_id: legacyInspection.data.client_submission_id,
     },
+    status: 'requires_attention',
+    lastErrorCode: 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED',
   });
   await expect.poll(() => page.evaluate(() => window.localStorage.getItem('mbfd_submission_queue'))).toBeNull();
 });

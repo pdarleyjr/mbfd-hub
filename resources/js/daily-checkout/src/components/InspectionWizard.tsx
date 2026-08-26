@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, Compartment, Defect, MeterData, InspectionSubmission } from '../types';
 import { ApiClient } from '../utils/api';
-import { getQueuedSubmission, getQueuedSubmissionForApparatus, queueSubmission, submitQueuedInspection } from '../utils/dailyCheckoutSubmissionQueue';
+import { getQueuedSubmission, getQueuedSubmissionForApparatusAndChecklistVersion, onDailyCheckoutQueueChanged, queueSubmission, submitQueuedInspection } from '../utils/dailyCheckoutSubmissionQueue';
+import type { DailyCheckoutQueuedSubmission } from '../lib/db';
 import { createClientSubmissionId, saveInspectionProgress, loadInspectionProgress, clearInspectionProgress } from '../utils/storage';
 import { useOffline } from '../hooks/useOffline';
 import OfficerStep from './OfficerStep';
@@ -35,16 +36,24 @@ export default function InspectionWizard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasLoadedAutosave, setHasLoadedAutosave] = useState(false);
+  const [autosaveReviewMessage, setAutosaveReviewMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [serviceNotices, setServiceNotices] = useState<ApparatusServiceTicketSummary[]>([]);
   const [serviceNoticesUnavailable, setServiceNoticesUnavailable] = useState(false);
+  const [queuedSubmissionBlocker, setQueuedSubmissionBlocker] = useState<DailyCheckoutQueuedSubmission | null>(null);
+  const [queueRevision, setQueueRevision] = useState(0);
   const clientSubmissionIdRef = useRef<string | null>(null);
+
+  useEffect(() => onDailyCheckoutQueueChanged(() => {
+    setQueueRevision((revision) => revision + 1);
+  }), []);
 
   useEffect(() => {
     const fetchData = async () => {
       if (!slug) return;
 
       try {
+        setQueuedSubmissionBlocker(null);
         // For now, we'll fetch all apparatuses and find the one by slug
         const apparatuses = await ApiClient.getApparatuses();
         const foundApparatus = apparatuses.find(a => a.slug === slug);
@@ -54,10 +63,6 @@ export default function InspectionWizard() {
         }
 
         setApparatus(foundApparatus);
-        const queuedSubmission = await getQueuedSubmissionForApparatus(foundApparatus.id);
-        if (queuedSubmission) {
-          clientSubmissionIdRef.current = queuedSubmission.data.client_submission_id;
-        }
         setOfficerInfo(prev => ({ ...prev, unitNumber: foundApparatus.vehicle_number }));
 
         // Service status is intentionally secondary. A network or API failure
@@ -76,20 +81,34 @@ export default function InspectionWizard() {
         setChecklist(checklistData);
         setCompartments(checklistData.compartments);
 
+        const queuedSubmission = await getQueuedSubmissionForApparatusAndChecklistVersion(
+          foundApparatus.id,
+          checklistData.checklist_version,
+        );
+        if (queuedSubmission) {
+          setQueuedSubmissionBlocker(queuedSubmission);
+
+          return;
+        }
+
         // Load autosaved data if available
         if (!hasLoadedAutosave) {
-          const saved = loadInspectionProgress(slug);
+          const saved = loadInspectionProgress(slug, checklistData.checklist_version);
           if (saved) {
-            setOfficerInfo(saved.officer);
-            if (saved.meter) {
-              setMeterData(saved.meter);
+            if (saved.checklist_version === checklistData.checklist_version) {
+              setOfficerInfo(saved.officer);
+              if (saved.meter) {
+                setMeterData(saved.meter);
+              }
+              setCompartments(saved.compartments);
+              // Resume at meter step if officer info exists
+              if (saved.officer.name) {
+                setCurrentStep(saved.compartments.some(c => c.items.some(i => i.status !== 'Present')) ? 'compartments' : 'meter');
+              }
+              setHasLoadedAutosave(true);
+            } else {
+              setAutosaveReviewMessage('A previously saved inspection uses a different checklist version. It remains saved on this device and requires officer review; this form is using the current checklist.');
             }
-            setCompartments(saved.compartments);
-            // Resume at meter step if officer info exists
-            if (saved.officer.name) {
-              setCurrentStep(saved.compartments.some(c => c.items.some(i => i.status !== 'Present')) ? 'compartments' : 'meter');
-            }
-            setHasLoadedAutosave(true);
           }
         }
       } catch (err) {
@@ -100,19 +119,20 @@ export default function InspectionWizard() {
     };
 
     fetchData();
-  }, [slug, hasLoadedAutosave]);
+  }, [slug, hasLoadedAutosave, queueRevision]);
 
   // Autosave progress
   useEffect(() => {
-    if (slug && apparatus && (currentStep === 'meter' || currentStep === 'compartments' || currentStep === 'submit')) {
+    if (slug && apparatus && checklist && (currentStep === 'meter' || currentStep === 'compartments' || currentStep === 'submit')) {
       const saveData = {
+        checklist_version: checklist.checklist_version,
         officer: officerInfo,
         meter: meterData,
         compartments,
       };
       saveInspectionProgress(slug, saveData);
     }
-  }, [officerInfo, meterData, compartments, currentStep, slug, apparatus]);
+  }, [officerInfo, meterData, compartments, currentStep, slug, apparatus, checklist]);
 
   const handleOfficerSubmit = (info: OfficerInfo) => {
     setOfficerInfo(info);
@@ -130,7 +150,7 @@ export default function InspectionWizard() {
   };
 
   const handleSubmit = async (signature: string | null) => {
-    if (!apparatus || !slug) return;
+    if (!apparatus || !slug || !checklist) return;
 
     setSubmitting(true);
     try {
@@ -152,6 +172,7 @@ export default function InspectionWizard() {
 
       const submission: InspectionSubmission = {
         client_submission_id: clientSubmissionIdRef.current ?? createClientSubmissionId(),
+        checklist_version: checklist.checklist_version,
         operator_name: officerInfo.name,
         rank: officerInfo.rank,
         shift: officerInfo.shift,
@@ -178,7 +199,14 @@ export default function InspectionWizard() {
       if (!queuedSubmission) {
         throw new Error('Unable to retain this inspection for submission. Please try again.');
       }
-      clientSubmissionIdRef.current = queuedSubmission.data.client_submission_id;
+      if (
+        queuedSubmission.apparatusId !== apparatus.id
+        || queuedSubmission.data.client_submission_id !== submission.client_submission_id
+        || queuedSubmission.data.checklist_version !== submission.checklist_version
+        || JSON.stringify(queuedSubmission.data) !== JSON.stringify(submission)
+      ) {
+        throw new Error('A different saved Daily Checkout was found. This inspection remains in the current autosave and was not submitted.');
+      }
 
       if (isOffline) {
         // Vibrate to indicate queued
@@ -187,7 +215,7 @@ export default function InspectionWizard() {
         }
         
         // Clear autosave
-        clearInspectionProgress(slug);
+        clearInspectionProgress(slug, checklist.checklist_version);
         
         navigate('/success?queued=true');
       } else {
@@ -202,7 +230,7 @@ export default function InspectionWizard() {
         }
         
         // Clear autosave
-        clearInspectionProgress(slug);
+        clearInspectionProgress(slug, checklist.checklist_version);
         
         navigate('/success');
       }
@@ -237,6 +265,29 @@ export default function InspectionWizard() {
           ))}
         </div>
         <div className="skeleton h-64 w-full"></div>
+      </div>
+    );
+  }
+
+  if (queuedSubmissionBlocker !== null && apparatus !== null && checklist !== null) {
+    const requiresOfficerReview = queuedSubmissionBlocker.status === 'requires_attention';
+
+    return (
+      <div className="max-w-md mx-auto text-center p-8 bg-amber-50 rounded-xl ring-1 ring-amber-300">
+        <p role="alert" className="text-amber-950 font-medium mb-3">
+          {requiresOfficerReview
+            ? 'A saved Daily Checkout using this checklist version needs officer review.'
+            : 'A saved Daily Checkout using this checklist version is still awaiting synchronization.'}
+        </p>
+        <p className="text-amber-900 text-sm mb-6">
+          Its original payload remains saved on this device. To prevent a duplicate or overwritten inspection, do not begin another checkout for {apparatus.name} until this record is submitted or reconciled.
+        </p>
+        <PreviousPageButton
+          fallback="/vehicle-inspections"
+          className="px-5 py-2.5 bg-amber-700 text-white rounded-lg hover:bg-amber-800 transition-colors touch-manipulation font-medium"
+        >
+          Back to vehicle inspections
+        </PreviousPageButton>
       </div>
     );
   }
@@ -297,6 +348,11 @@ export default function InspectionWizard() {
         <p className="text-neutral-500">Unit: {apparatus.vehicle_number}</p>
         {hasLoadedAutosave && (
           <p className="text-sm text-sky-600 mt-1">📝 Restored from autosave</p>
+        )}
+        {autosaveReviewMessage && (
+          <p role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            {autosaveReviewMessage}
+          </p>
         )}
       </div>
 

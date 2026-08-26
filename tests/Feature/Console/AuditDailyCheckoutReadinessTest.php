@@ -4,23 +4,38 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Models\Apparatus;
 use App\Models\Station;
 use Illuminate\Console\Command;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 final class AuditDailyCheckoutReadinessTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_passes_when_each_required_apparatus_has_an_explicit_policy_slug_and_usable_checklist(): void
+    public function test_it_passes_for_a_required_standard_family_apparatus_and_reports_its_pending_template_transparently(): void
     {
-        $this->makeApparatus('required');
+        $apparatus = $this->makeApparatus('required', 'engine-3', [
+            'unit_id' => 'E3',
+            'name' => 'Engine 3',
+            'designation' => 'E3',
+        ]);
 
-        $this->artisan('daily-checkout:audit', ['--json' => true])
-            ->expectsOutputToContain('"gate_passed": true')
-            ->assertExitCode(Command::SUCCESS);
+        $this->assertSame(DailyCheckoutChecklistTemplate::Pending, $apparatus->fresh()->daily_checkout_template);
+
+        [$status, $report] = $this->audit();
+
+        $this->assertSame(Command::SUCCESS, $status);
+        $this->assertTrue($report['gate_passed']);
+        $this->assertSame('pending', $report['apparatus'][0]['daily_checkout_template']);
+        $this->assertSame('family', $report['apparatus'][0]['resolution_source']);
+        $this->assertSame('/daily/vehicle-inspections/engine-3', $report['apparatus'][0]['checkout_url']);
+        $this->assertNull($report['apparatus'][0]['ambiguity']);
     }
 
     public function test_it_blocks_deployment_when_an_apparatus_has_not_been_classified_by_an_authorized_owner(): void
@@ -32,6 +47,27 @@ final class AuditDailyCheckoutReadinessTest extends TestCase
             ->assertExitCode(Command::FAILURE);
     }
 
+    public function test_it_reports_the_pre_migration_schema_as_a_read_only_policy_blocker(): void
+    {
+        $this->makeApparatus('required');
+
+        Schema::table('apparatuses', function (Blueprint $table): void {
+            $table->dropIndex(['daily_checkout_requirement']);
+            $table->dropIndex(['daily_checkout_template']);
+            $table->dropColumn(['daily_checkout_requirement', 'daily_checkout_template']);
+        });
+
+        [$status, $report] = $this->audit();
+
+        $this->assertSame(Command::FAILURE, $status);
+        $this->assertFalse($report['schema']['daily_checkout_requirement_column_present']);
+        $this->assertFalse($report['schema']['daily_checkout_template_column_present']);
+        $this->assertSame('unknown', $report['apparatus'][0]['daily_checkout_requirement']);
+        $this->assertNull($report['apparatus'][0]['checkout_url']);
+        $this->assertContains('daily_checkout_requirement_schema_absent', $report['apparatus'][0]['issues']);
+        $this->assertContains('daily_checkout_template_schema_absent', $report['apparatus'][0]['issues']);
+    }
+
     public function test_it_blocks_deployment_when_a_required_apparatus_has_no_routable_daily_checkout_slug(): void
     {
         $this->makeApparatus('required', null);
@@ -41,17 +77,37 @@ final class AuditDailyCheckoutReadinessTest extends TestCase
             ->assertExitCode(Command::FAILURE);
     }
 
-    public function test_it_blocks_deployment_when_a_required_apparatus_has_no_explicit_checklist_mapping(): void
+    public function test_it_blocks_deployment_when_a_required_specialty_apparatus_has_no_explicit_template(): void
     {
-        $this->makeApparatus('required', 'engine-9', [
-            'unit_id' => 'E9',
-            'name' => 'Engine 9',
-            'designation' => 'E9',
+        $this->makeApparatus('required', 'air-1', [
+            'unit_id' => 'AIR1',
+            'name' => 'Air Truck 1',
+            'type' => 'Air Truck',
+            'class_description' => 'Air Support',
+            'designation' => 'Air 1',
         ]);
 
         $this->artisan('daily-checkout:audit', ['--json' => true])
-            ->expectsOutputToContain('required_apparatus_checklist_unmapped')
+            ->expectsOutputToContain('required_apparatus_checklist_specialty_pending')
             ->assertExitCode(Command::FAILURE);
+    }
+
+    public function test_it_accepts_an_explicit_approved_template_for_a_required_specialty_apparatus(): void
+    {
+        $this->makeApparatus('required', 'air-1', [
+            'unit_id' => 'AIR1',
+            'name' => 'Air Truck 1',
+            'type' => 'Air Truck',
+            'class_description' => 'Air Support',
+            'designation' => 'Air 1',
+            'daily_checkout_template' => DailyCheckoutChecklistTemplate::Rescue->value,
+        ]);
+
+        [$status, $report] = $this->audit();
+
+        $this->assertSame(Command::SUCCESS, $status);
+        $this->assertTrue($report['gate_passed']);
+        $this->assertSame('configured_template', $report['apparatus'][0]['resolution_source']);
     }
 
     /** @param array<string, mixed> $overrides */
@@ -78,5 +134,15 @@ final class AuditDailyCheckoutReadinessTest extends TestCase
             'status' => 'In Service',
             'daily_checkout_requirement' => $requirement,
         ], $overrides)));
+    }
+
+    /** @return array{int, array<string, mixed>} */
+    private function audit(): array
+    {
+        $status = Artisan::call('daily-checkout:audit', ['--json' => true]);
+        /** @var array<string, mixed> $report */
+        $report = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+        return [$status, $report];
     }
 }

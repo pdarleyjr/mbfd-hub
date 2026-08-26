@@ -17,7 +17,7 @@ interface Env {
   PULSEPOINT_AGENCY: string;
   CACHE_TTL: string;
   /** CF Worker secret: set via `wrangler secret put PULSEPOINT_HASH_PASSWORD` */
-  PULSEPOINT_HASH_PASSWORD: string;
+  PULSEPOINT_HASH_PASSWORD?: string;
   /** Optional: set to "development" to allow localhost CORS origins */
   ENVIRONMENT?: string;
 }
@@ -389,9 +389,13 @@ export default {
       return jsonResponse({ error: "Not found" }, 404, cors, 0);
     }
 
-    // Resolve password from secret; fall back to the public default so the
-    // worker degrades gracefully if the secret was not yet configured.
-    const rawPassword = env.PULSEPOINT_HASH_PASSWORD ?? "tombrady5rings";
+    // The decryption password is a Worker secret. Do not provide a source fallback:
+    // a missing secret must fail closed without contacting the upstream provider.
+    const rawPassword = env.PULSEPOINT_HASH_PASSWORD;
+    if (!rawPassword) {
+      console.error('[pulsepoint-proxy] PULSEPOINT_HASH_PASSWORD is not configured');
+      return jsonResponse({ error: 'Service unavailable' }, 503, cors, 0);
+    }
     const hashPassword = new TextEncoder().encode(rawPassword);
 
     try {

@@ -66,6 +66,7 @@ class ApparatusController extends Controller
         return response()->json([
             'apparatus' => (new PublicApparatusResource($apparatus))->resolve(request()),
             'checklist' => $checklist,
+            'checklist_version' => $resolution['checklist_version'],
             'checklist_type' => $resolution['checklist_type'],
             'checklist_item_count' => $resolution['item_count'],
             // This unauthenticated route only needs a warning count. Never
@@ -78,10 +79,10 @@ class ApparatusController extends Controller
         Request $request,
         int $id,
         DailyCheckoutChecklistResolver $checklistResolver,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $validated = $request->validate([
             'client_submission_id' => ['required', 'uuid'],
+            'checklist_version' => ['required', 'string', 'regex:/\\A[a-f0-9]{64}\\z/i'],
             'operator_name' => ['required', 'string', 'max:255'],
             'rank' => ['required', 'string', 'max:100'],
             'shift' => ['nullable', 'string', 'max:20'],
@@ -108,6 +109,7 @@ class ApparatusController extends Controller
         ]);
 
         $clientSubmissionId = (string) $validated['client_submission_id'];
+        $validated['checklist_version'] = strtolower((string) $validated['checklist_version']);
         $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId);
         if ($existing !== null) {
             return $this->idempotentInspectionResponse($existing, $id);
@@ -134,6 +136,10 @@ class ApparatusController extends Controller
             ], 503);
         }
 
+        if (! hash_equals((string) $resolution['checklist_version'], $validated['checklist_version'])) {
+            return $this->checklistVersionMismatchResponse((string) $resolution['checklist_version']);
+        }
+
         $this->validateCompleteChecklist($validated, $resolution['checklist']);
 
         $storedPaths = [];
@@ -145,7 +151,7 @@ class ApparatusController extends Controller
                     return ['inspection' => $existing, 'created' => false];
                 }
 
-                $lockedApparatus = Apparatus::query()->lockForUpdate()->findOrFail($id);
+                $lockedApparatus = $this->lockApparatusForInspection($id);
                 if (! $lockedApparatus->isDailyCheckoutRequired()) {
                     abort(409, 'This apparatus is not configured for Daily Checkout.');
                 }
@@ -160,6 +166,15 @@ class ApparatusController extends Controller
 
                     abort(503, 'The Daily Checkout checklist is unavailable. Contact an officer before continuing.');
                 }
+
+                if (! hash_equals((string) $lockedResolution['checklist_version'], (string) $prepared['checklist_version'])) {
+                    return [
+                        'inspection' => null,
+                        'created' => false,
+                        'checklist_version_mismatch' => true,
+                        'checklist_version' => $lockedResolution['checklist_version'],
+                    ];
+                }
                 $this->validateCompleteChecklist($prepared, $lockedResolution['checklist']);
 
                 // The client may display a unit number, but the persisted identity must
@@ -168,8 +183,9 @@ class ApparatusController extends Controller
                 $designation = $lockedApparatus->designation ?? $lockedApparatus->name ?? 'UNK';
                 $designationTag = preg_replace('/[^A-Z0-9]/i', '', $designation) ?: 'UNK';
 
-                $inspection = ApparatusInspection::query()->create([
+                $inspection = $this->createInspection([
                     'client_submission_id' => $clientSubmissionId,
+                    'checklist_version' => $lockedResolution['checklist_version'],
                     'apparatus_id' => $lockedApparatus->id,
                     'operator_name' => $prepared['operator_name'],
                     'rank' => $prepared['rank'],
@@ -256,6 +272,12 @@ class ApparatusController extends Controller
                 return ['inspection' => $inspection, 'created' => true];
             }, 3);
 
+            if (($result['checklist_version_mismatch'] ?? false) === true) {
+                $this->deleteStoredPaths($storedPaths);
+
+                return $this->checklistVersionMismatchResponse((string) $result['checklist_version']);
+            }
+
             /** @var ApparatusInspection $inspection */
             $inspection = $result['inspection'];
             if (! $result['created']) {
@@ -266,8 +288,12 @@ class ApparatusController extends Controller
 
             return response()->json($this->inspectionReceipt($inspection), 201);
         } catch (QueryException $exception) {
-            $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId);
             $this->deleteStoredPaths($storedPaths);
+            if (! $this->isClientSubmissionIdUniqueConstraintViolation($exception)) {
+                throw $exception;
+            }
+
+            $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId);
             if ($existing !== null) {
                 return $this->idempotentInspectionResponse($existing, $id);
             }
@@ -325,6 +351,36 @@ class ApparatusController extends Controller
         $query = ApparatusInspection::query()->where('client_submission_id', $clientSubmissionId);
 
         return ($lock ? $query->lockForUpdate() : $query)->first();
+    }
+
+    /** @param array<string, mixed> $attributes */
+    protected function createInspection(array $attributes): ApparatusInspection
+    {
+        return ApparatusInspection::query()->create($attributes);
+    }
+
+    protected function lockApparatusForInspection(int $id): Apparatus
+    {
+        return Apparatus::query()->lockForUpdate()->findOrFail($id);
+    }
+
+    private function checklistVersionMismatchResponse(string $currentChecklistVersion): JsonResponse
+    {
+        return response()->json([
+            'message' => 'The Daily Checkout checklist changed after this inspection was saved. Officer review is required before a new submission.',
+            'code' => 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED',
+            'current_checklist_version' => $currentChecklistVersion,
+        ], 409);
+    }
+
+    private function isClientSubmissionIdUniqueConstraintViolation(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+        if (! in_array($sqlState, ['23000', '23505'], true)) {
+            return false;
+        }
+
+        return str_contains(strtolower($exception->getMessage()), 'client_submission_id');
     }
 
     private function idempotentInspectionResponse(ApparatusInspection $inspection, int $apparatusId): JsonResponse
@@ -419,8 +475,8 @@ class ApparatusController extends Controller
      * server-resolved checklist, and every non-present row must have a matching
      * defect record for the review workflow.
      *
-     * @param array<string, mixed> $submission
-     * @param array<string, mixed>|null $checklist
+     * @param  array<string, mixed>  $submission
+     * @param  array<string, mixed>|null  $checklist
      */
     private function validateCompleteChecklist(array $submission, ?array $checklist): void
     {
@@ -438,9 +494,9 @@ class ApparatusController extends Controller
                 ]);
             }
 
-            $compartmentId = trim((string) ($compartment['id'] ?? ''));
-            $compartmentName = trim((string) ($compartment['name'] ?? $compartment['title'] ?? ''));
-            if ($compartmentId === '' || $compartmentName === '' || ! is_array($compartment['items'] ?? null)) {
+            $compartmentId = $this->canonicalChecklistString($compartment['id'] ?? null);
+            $compartmentName = $this->canonicalChecklistString($compartment['name'] ?? $compartment['title'] ?? null);
+            if ($compartmentId === null || $compartmentName === null || ! is_array($compartment['items'] ?? null)) {
                 throw ValidationException::withMessages([
                     'compartments' => 'The Daily Checkout checklist could not be validated.',
                 ]);
@@ -448,8 +504,8 @@ class ApparatusController extends Controller
 
             $itemNames = [];
             foreach ($compartment['items'] as $item) {
-                $itemName = is_array($item) ? trim((string) ($item['name'] ?? '')) : '';
-                if ($itemName === '') {
+                $itemName = is_array($item) ? $this->canonicalChecklistString($item['name'] ?? null) : null;
+                if ($itemName === null) {
                     throw ValidationException::withMessages([
                         'compartments' => 'The Daily Checkout checklist could not be validated.',
                     ]);
@@ -465,8 +521,8 @@ class ApparatusController extends Controller
 
         $submittedById = [];
         foreach ($submission['compartments'] as $compartment) {
-            $compartmentId = trim((string) ($compartment['id'] ?? ''));
-            if ($compartmentId === '' || isset($submittedById[$compartmentId])) {
+            $compartmentId = $this->canonicalChecklistString($compartment['id'] ?? null);
+            if ($compartmentId === null || isset($submittedById[$compartmentId])) {
                 throw ValidationException::withMessages([
                     'compartments' => 'Each current Daily Checkout compartment must be submitted exactly once.',
                 ]);
@@ -484,7 +540,7 @@ class ApparatusController extends Controller
         foreach ($expected as $compartmentId => $expectedCompartment) {
             /** @var array<string, mixed> $submittedCompartment */
             $submittedCompartment = $submittedById[$compartmentId];
-            $submittedName = trim((string) ($submittedCompartment['name'] ?? ''));
+            $submittedName = $this->canonicalChecklistString($submittedCompartment['name'] ?? null);
             if ($submittedName !== $expectedCompartment['name']) {
                 throw ValidationException::withMessages([
                     'compartments' => 'The submitted inspection does not match the current Daily Checkout checklist.',
@@ -499,10 +555,17 @@ class ApparatusController extends Controller
             }
 
             $expectedItemNames = $expectedCompartment['item_names'];
-            $submittedItemNames = array_map(
-                static fn (mixed $item): string => is_array($item) ? trim((string) ($item['name'] ?? '')) : '',
-                $submittedItems,
-            );
+            $submittedItemNames = [];
+            foreach ($submittedItems as $item) {
+                $itemName = is_array($item) ? $this->canonicalChecklistString($item['name'] ?? null) : null;
+                if ($itemName === null) {
+                    throw ValidationException::withMessages([
+                        'compartments' => 'The submitted inspection must contain every current Daily Checkout item exactly once.',
+                    ]);
+                }
+
+                $submittedItemNames[] = $itemName;
+            }
             sort($expectedItemNames);
             sort($submittedItemNames);
             if ($submittedItemNames !== $expectedItemNames) {
@@ -525,7 +588,7 @@ class ApparatusController extends Controller
 
                 $key = $this->defectKey(
                     $expectedCompartment['name'],
-                    trim((string) ($item['name'] ?? '')),
+                    $this->canonicalChecklistString($item['name'] ?? null) ?? '',
                     $status,
                 );
                 $requiredDefects[$key] = ($requiredDefects[$key] ?? 0) + 1;
@@ -534,9 +597,17 @@ class ApparatusController extends Controller
 
         $submittedDefects = [];
         foreach ($submission['defects'] ?? [] as $defect) {
+            $compartment = $this->canonicalChecklistString($defect['compartment'] ?? null);
+            $item = $this->canonicalChecklistString($defect['item'] ?? null);
+            if ($compartment === null || $item === null) {
+                throw ValidationException::withMessages([
+                    'defects' => 'Every Missing or Damaged checklist item must have one matching defect record.',
+                ]);
+            }
+
             $key = $this->defectKey(
-                trim((string) ($defect['compartment'] ?? '')),
-                trim((string) ($defect['item'] ?? '')),
+                $compartment,
+                $item,
                 (string) ($defect['status'] ?? ''),
             );
             $submittedDefects[$key] = ($submittedDefects[$key] ?? 0) + 1;
@@ -554,5 +625,14 @@ class ApparatusController extends Controller
     private function defectKey(string $compartment, string $item, string $status): string
     {
         return implode("\0", [$compartment, $item, $status]);
+    }
+
+    private function canonicalChecklistString(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return $value;
     }
 }

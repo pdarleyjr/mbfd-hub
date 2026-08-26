@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-25T22:50:02.405Z",
+  "generatedAt": "2026-08-26T01:01:38.663Z",
   "inventoryType": "static-source-inventory",
   "limitations": [
     "Laravel route groups and dynamic routes require php artisan route:list once dependencies and a test configuration are available.",
@@ -10,26 +10,52 @@
   "workspace": {
     "root": "D:\\CodexWorktrees\\mbfd-hub-full-system-20260825",
     "branch": "audit/mbfd-hub-full-system-20260825",
-    "commit": "779b252160f39456cbfa85d4fe9e52dbb5e4b656",
+    "commit": "0e607342b518bf1baa6d321914edbb336bf7b154",
+    "originMain": "ac6965f88f7d8ed441e08996b93d7cdb9f9b99c0",
     "status": [
-      "?? docs/audits/MBFD_FULL_SYSTEM_AUDIT_2026-08-25.json",
-      "?? docs/audits/MBFD_FULL_SYSTEM_AUDIT_2026-08-25.md",
-      "?? scripts/audit/"
+      "M app/Console/Commands/AuditDailyCheckoutReadiness.php",
+      " M app/Filament/Resources/ApparatusResource.php",
+      " M app/Http/Controllers/Api/ApparatusController.php",
+      " M app/Models/Apparatus.php",
+      " M app/Models/ApparatusInspection.php",
+      " M app/Services/DailyCheckoutChecklistResolver.php",
+      " M resources/js/daily-checkout/src/components/InspectionWizard.tsx",
+      " M resources/js/daily-checkout/src/components/OfflineIndicator.tsx",
+      " M resources/js/daily-checkout/src/lib/db.ts",
+      " M resources/js/daily-checkout/src/types.ts",
+      " M resources/js/daily-checkout/src/utils/api.ts",
+      " M resources/js/daily-checkout/src/utils/dailyCheckoutSubmissionQueue.ts",
+      " M resources/js/daily-checkout/src/utils/storage.ts",
+      " M resources/views/filament/employee/pages/dashboard.blade.php",
+      " M scripts/audit/generate-full-system-inventory.mjs",
+      " M tests/Feature/Api/DailyCheckoutIntegrityTest.php",
+      " M tests/Feature/Api/PublicApparatusIndexRedactionTest.php",
+      " M tests/Feature/Api/PublicApparatusInspectionGateTest.php",
+      " M tests/Feature/Console/AuditDailyCheckoutReadinessTest.php",
+      " M tests/Feature/InspectionApiTest.php",
+      " M tests/Unit/Services/DailyCheckoutChecklistResolverTest.php",
+      " M tests/e2e/daily-checkout-inspection.spec.ts",
+      " M tests/e2e/operational-forms.spec.ts",
+      "?? app/Enums/DailyCheckoutChecklistTemplate.php",
+      "?? database/migrations/2026_08_25_000003_add_daily_checkout_template_to_apparatuses_table.php",
+      "?? database/migrations/2026_08_25_000004_add_checklist_version_to_apparatus_inspections_table.php",
+      "?? docs/audits/DAILY_CHECKOUT_PRODUCTION_APPARATUS_MATRIX_2026-08-25.md",
+      "?? tests/Integration/"
     ]
   },
   "sourceCounts": {
-    "files": 1803,
+    "files": 2105,
     "routeFiles": 3,
     "staticRouteDeclarations": 177,
     "dailySpaRoutes": 18,
     "dailyApiClientEndpoints": 32,
     "controllers": 66,
     "models": 79,
-    "migrations": 151,
+    "migrations": 155,
     "filamentResources": 155,
     "filamentPages": 7,
-    "featureTests": 62,
-    "e2eSpecs": 13
+    "featureTests": 68,
+    "e2eSpecs": 14
   },
   "manifests": [
     {
@@ -1299,254 +1325,254 @@
     "routes": [
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 64,
+        "line": 66,
         "path": "/"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 66,
+        "line": 68,
         "path": "/vehicle-inspections"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 67,
+        "line": 69,
         "path": "/vehicle-inspections/:slug"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 68,
+        "line": 70,
         "path": "/vehicle-inspections/success"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 70,
+        "line": 72,
         "path": "/apparatuses"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 71,
+        "line": 73,
         "path": "/apparatus/:slug"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 72,
+        "line": 74,
         "path": "/success"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 74,
+        "line": 76,
         "path": "/stations"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 75,
+        "line": 77,
         "path": "/stations/:id"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 76,
+        "line": 78,
         "path": "/stations/:stationId/rooms/:roomId"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 78,
+        "line": 80,
         "path": "/forms-hub"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 79,
+        "line": 81,
         "path": "/forms-hub/station-request"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 80,
+        "line": 82,
         "path": "/forms-hub/big-ticket-request"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 81,
+        "line": 83,
         "path": "/forms-hub/station-inventory"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 82,
+        "line": 84,
         "path": "/forms-hub/equipment-request"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 83,
+        "line": 85,
         "path": "/forms-hub/station-inspection"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 84,
+        "line": 86,
         "path": "/forms-hub/trt-inventory"
       },
       {
         "source": "resources/js/daily-checkout/src/App.tsx",
-        "line": 85,
+        "line": 87,
         "path": "/forms-hub/success"
       }
     ],
     "apiClientEndpoints": [
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 28,
+        "line": 49,
         "endpoint": "/public/apparatuses"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 38,
+        "line": 59,
         "endpoint": "/public/employees/list"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 48,
+        "line": 69,
         "endpoint": "/public/apparatuses/${apparatusId}/checklist"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 80,
+        "line": 122,
         "endpoint": "/public/apparatuses/${apparatusId}/inspections"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 96,
+        "line": 142,
         "endpoint": "/public/stations"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 108,
+        "line": 154,
         "endpoint": "/public/stations/${id}"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 119,
+        "line": 165,
         "endpoint": "/admin/stations"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 131,
+        "line": 177,
         "endpoint": "/admin/stations/${id}"
-      },
-      {
-        "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 143,
-        "endpoint": "/admin/stations/${id}"
-      },
-      {
-        "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 154,
-        "endpoint": "/public/stations/${stationId}/rooms"
-      },
-      {
-        "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 168,
-        "endpoint": "/public/stations/${stationId}/rooms/${roomId}/assets"
-      },
-      {
-        "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 179,
-        "endpoint": "/admin/stations/${stationId}/rooms/${roomId}/audits"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
         "line": 189,
-        "endpoint": "/admin/stations/${stationId}/rooms/${roomId}/assets"
+        "endpoint": "/admin/stations/${id}"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 201,
+        "line": 200,
+        "endpoint": "/public/stations/${stationId}/rooms"
+      },
+      {
+        "source": "resources/js/daily-checkout/src/utils/api.ts",
+        "line": 214,
+        "endpoint": "/public/stations/${stationId}/rooms/${roomId}/assets"
+      },
+      {
+        "source": "resources/js/daily-checkout/src/utils/api.ts",
+        "line": 225,
         "endpoint": "/admin/stations/${stationId}/rooms/${roomId}/audits"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 213,
+        "line": 235,
+        "endpoint": "/admin/stations/${stationId}/rooms/${roomId}/assets"
+      },
+      {
+        "source": "resources/js/daily-checkout/src/utils/api.ts",
+        "line": 247,
+        "endpoint": "/admin/stations/${stationId}/rooms/${roomId}/audits"
+      },
+      {
+        "source": "resources/js/daily-checkout/src/utils/api.ts",
+        "line": 259,
         "endpoint": "/admin/stations/${stationId}/rooms/${roomId}/audits/${auditId}/complete"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 229,
+        "line": 275,
         "endpoint": "/big-ticket-requests"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 242,
+        "line": 288,
         "endpoint": "/stations/${stationId}/big-ticket-requests"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 256,
+        "line": 302,
         "endpoint": "/station-inventory/categories"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 273,
+        "line": 319,
         "endpoint": "/station-inventory-submissions"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 292,
+        "line": 338,
         "endpoint": "/station-inventory-submissions/${submissionId}/pdf"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 302,
+        "line": 348,
         "endpoint": "/stations/${stationId}/station-inventory-submissions"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 317,
+        "line": 363,
         "endpoint": "/v2/station-inventory/verify-pin"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 379,
+        "line": 425,
         "endpoint": "/public/stations/${stationId}/inspections"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 390,
+        "line": 436,
         "endpoint": "/public/stations/${stationId}/apparatus-inspections"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 401,
+        "line": 447,
         "endpoint": "/public/stations/${stationId}/equipment-requests"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 412,
+        "line": 458,
         "endpoint": "/public/stations/${stationId}/requests?scope=${scope}"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 423,
+        "line": 469,
         "endpoint": "/public/stations/${stationId}/service-tickets?scope=${scope}&per_page=100"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 435,
+        "line": 481,
         "endpoint": "/public/stations/${stationId}/service-tickets?scope=open&per_page=1"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 447,
+        "line": 493,
         "endpoint": "/public/apparatuses/${apparatusId}/service-notices"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 459,
+        "line": 505,
         "endpoint": "/public/stations/${stationId}/activity"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 470,
+        "line": 516,
         "endpoint": "/public/stations/${stationId}/rooms/${roomId}/profile"
       },
       {
         "source": "resources/js/daily-checkout/src/utils/api.ts",
-        "line": 480,
+        "line": 526,
         "endpoint": "/public/stations/${stationId}/gas-meters"
       }
     ]
@@ -1555,50 +1581,65 @@
     {
       "id": "MBFD-AUDIT-001",
       "severity": "P0",
-      "status": "open",
-      "evidenceType": "static-source",
-      "title": "Daily checklist source path is not the tracked deployment path and can yield an empty checkout.",
+      "baselineStatus": "open",
+      "currentStatus": "remediated_in_audit_worktree",
+      "productionStatus": "not_deployed",
+      "evidenceType": "static-source-and-local-regression",
+      "title": "Daily checklist source resolution could yield an empty checkout.",
+      "remediation": "The resolver now reads the tracked checklist directory, requires an unambiguous non-empty schema, and the API fails closed when a source is unavailable.",
       "sources": [
-        "app/Http/Controllers/Api/ApparatusController.php:72-83",
+        "app/Services/DailyCheckoutChecklistResolver.php",
+        "app/Http/Controllers/Api/ApparatusController.php",
         "storage/checklists/*.json",
-        ".github/workflows/deploy.yml:165-206",
-        "resources/js/daily-checkout/src/utils/api.ts:55-76"
+        "tests/Feature/Api/DailyCheckoutIntegrityTest.php"
       ]
     },
     {
       "id": "MBFD-AUDIT-002",
       "severity": "P0",
-      "status": "open",
-      "evidenceType": "static-source",
-      "title": "Daily checkout submissions have no durable idempotency key, so acknowledgement loss can create duplicates.",
+      "baselineStatus": "open",
+      "currentStatus": "remediated_in_audit_worktree",
+      "productionStatus": "not_deployed",
+      "evidenceType": "static-source-and-local-regression",
+      "title": "Daily checkout acknowledgement loss could create duplicate or lost submissions.",
+      "remediation": "Submissions carry a durable UUID and immutable checklist version; the server handles replay/unique-collision recovery, and the client preserves review-required and newer-version records separately.",
       "sources": [
-        "app/Http/Controllers/Api/ApparatusController.php:100-160",
-        "resources/js/daily-checkout/src/components/InspectionWizard.tsx:99-194",
-        "resources/js/daily-checkout/src/utils/storage.ts:51-72"
+        "app/Http/Controllers/Api/ApparatusController.php",
+        "resources/js/daily-checkout/src/components/InspectionWizard.tsx",
+        "resources/js/daily-checkout/src/utils/dailyCheckoutSubmissionQueue.ts",
+        "tests/Integration/DailyCheckoutPostgresIdempotencyRaceTest.php",
+        "tests/e2e/daily-checkout-inspection.spec.ts"
       ]
     },
     {
       "id": "MBFD-AUDIT-003",
       "severity": "P0",
-      "status": "open",
-      "evidenceType": "static-source",
-      "title": "No canonical Daily check-required apparatus rule is represented in the tracked application model.",
+      "baselineStatus": "open",
+      "currentStatus": "implementation_complete_policy_classification_pending",
+      "productionStatus": "not_deployed",
+      "evidenceType": "static-source-and-read-only-production-matrix",
+      "title": "No canonical Daily check-required apparatus rule was represented in the tracked application model.",
+      "remediation": "The audit worktree adds separate requirement and template fields without backfilling production rows. Owner classification remains a release gate.",
       "sources": [
-        "app/Http/Controllers/Api/ApparatusController.php:26-37",
-        "resources/js/daily-checkout/src/components/VehicleInspectionSelect.tsx:27-160",
-        "app/Models/Apparatus.php:15-61"
+        "app/Enums/DailyCheckoutRequirement.php",
+        "database/migrations/2026_08_25_000001_add_daily_checkout_requirement_to_apparatuses_table.php",
+        "database/migrations/2026_08_25_000003_add_daily_checkout_template_to_apparatuses_table.php",
+        "docs/audits/DAILY_CHECKOUT_PRODUCTION_APPARATUS_MATRIX_2026-08-25.md"
       ]
     },
     {
       "id": "MBFD-AUDIT-004",
       "severity": "P0",
-      "status": "open",
-      "evidenceType": "static-source",
-      "title": "Command Display computes daily readiness from event counts and a static complement, allowing false completion.",
+      "baselineStatus": "open",
+      "currentStatus": "hub_remediated_display_consumer_unmerged",
+      "productionStatus": "not_deployed",
+      "evidenceType": "static-source-and-separate-local-contract-tests",
+      "title": "Command Display readiness could be derived from event counts and a static complement, allowing false completion.",
+      "remediation": "Hub compliance is policy and apparatus-identity based; the separate Command Display consumer has local contract coverage but remains unmerged and undeployed.",
       "sources": [
-        "app/Services/Display/DisplaySnapshotService.php:164-176,772-801",
-        "app/Services/Display/DisplayReadiness.php:72-80",
-        "app/Services/StationStaffingService.php:62-166"
+        "app/Services/Display/DisplaySnapshotService.php",
+        "app/Services/Display/DisplayReadiness.php",
+        "D:/CodexWorktrees/mbfd-command-display-current-main-20260825/tests/contract/display-contract.test.mjs"
       ]
     }
   ],
@@ -2143,7 +2184,7 @@
       },
       {
         "source": "app/Http/Middleware/EnsureDisplayToken.php",
-        "line": 36,
+        "line": 41,
         "excerpt": "$provided = (string) $request->header('X-Display-Token', '');"
       },
       {
@@ -2163,13 +2204,13 @@
       },
       {
         "source": "app/Services/Display/DisplaySnapshotService.php",
-        "line": 24,
+        "line": 25,
         "excerpt": "* Read-only snapshot rollup for the command display dashboard."
       },
       {
         "source": "config/services.php",
         "line": 35,
-        "excerpt": "// Shared secret guarding the read-only /api/display/* surface. When set, the"
+        "excerpt": "// Shared secret guarding the read-only /api/display/* surface. The"
       },
       {
         "source": "config/services.php",
@@ -2188,12 +2229,22 @@
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 55,
-        "excerpt": "title: 'Command Display computes daily readiness from event counts and a static complement, allowing false completion.',"
+        "line": 69,
+        "excerpt": "title: 'Command Display readiness could be derived from event counts and a static complement, allowing false completion.',"
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 207,
+        "line": 70,
+        "excerpt": "remediation: 'Hub compliance is policy and apparatus-identity based; the separate Command Display consumer has local contract coverage but remains unmerged and undeployed.',"
+      },
+      {
+        "source": "scripts/audit/generate-full-system-inventory.mjs",
+        "line": 74,
+        "excerpt": "'D:/CodexWorktrees/mbfd-command-display-current-main-20260825/tests/contract/display-contract.test.mjs',"
+      },
+      {
+        "source": "scripts/audit/generate-full-system-inventory.mjs",
+        "line": 223,
         "excerpt": "'Command Display': /command[- ]display|display[_-]token|api\\/display/i,"
       }
     ],
@@ -2220,17 +2271,17 @@
       },
       {
         "source": "app/Filament/Resources/ApparatusResource.php",
-        "line": 451,
+        "line": 483,
         "excerpt": "->label('Sync to Google Sheet')"
       },
       {
         "source": "app/Filament/Resources/ApparatusResource.php",
-        "line": 454,
+        "line": 486,
         "excerpt": "->visible(fn () => config('google_sheets.apparatus_sync_enabled'))"
       },
       {
         "source": "app/Filament/Resources/ApparatusResource.php",
-        "line": 456,
+        "line": 488,
         "excerpt": "->modalHeading('Sync Fire Apparatus to Google Sheet')"
       },
       {
@@ -2245,7 +2296,7 @@
       },
       {
         "source": "app/Observers/ApparatusObserver.php",
-        "line": 43,
+        "line": 69,
         "excerpt": "if (config('google_sheets.apparatus_sync_enabled')) {"
       },
       {
@@ -2380,7 +2431,7 @@
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 208,
+        "line": 224,
         "excerpt": "'Google Sheets': /google.*sheet|sheet.*google/i,"
       }
     ],
@@ -2999,7 +3050,7 @@
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 210,
+        "line": 226,
         "excerpt": "'Media Control': /media[- ]control/i,"
       }
     ],
@@ -3026,7 +3077,7 @@
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 211,
+        "line": 227,
         "excerpt": "'PeerTube': /peertube/i,"
       }
     ],
@@ -3920,7 +3971,7 @@
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 213,
+        "line": 229,
         "excerpt": "'Reverb': /reverb/i,"
       }
     ],
@@ -4609,28 +4660,18 @@
       },
       {
         "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 22,
-        "excerpt": "// Snipe-IT asset identifiers, internal notes, and physical location are not"
+        "line": 258,
+        "excerpt": "$hasSnipeItAsset = filled($lockedApparatus->snipeit_asset_id);"
       },
       {
         "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 24,
-        "excerpt": "$hidden = ['vin', 'snipeit_asset_id', 'snipeit_asset_tag', 'notes', 'current_location'];"
+        "line": 259,
+        "excerpt": "DB::afterCommit(function () use ($inspectionId, $apparatusId, $previousHealth, $shouldDispatchPmAlert, $hasSnipeItAsset): void {"
       },
       {
         "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 87,
-        "excerpt": "foreach (['vin', 'snipeit_asset_id', 'snipeit_asset_tag', 'notes', 'current_location'] as $key) {"
-      },
-      {
-        "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 236,
-        "excerpt": "// Dispatch Snipe-IT equipment audit job (async — does not slow the form)"
-      },
-      {
-        "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 237,
-        "excerpt": "if ($apparatus->snipeit_asset_id) {"
+        "line": 266,
+        "excerpt": "if ($hasSnipeItAsset) {"
       },
       {
         "source": "app/Http/Resources/ApparatusResource.php",
@@ -4645,7 +4686,7 @@
       {
         "source": "app/Http/Resources/Public/PublicApparatusResource.php",
         "line": 14,
-        "excerpt": "* Never exposes VIN, internal notes, Snipe-IT asset ids, financials, meter"
+        "excerpt": "* Never exposes VIN, internal notes, Snipe-IT asset ids, financials, or PM"
       },
       {
         "source": "app/Jobs/AuditEquipmentAfterInspection.php",
@@ -4839,17 +4880,17 @@
       },
       {
         "source": "app/Models/Apparatus.php",
-        "line": 44,
+        "line": 50,
         "excerpt": "// Snipe-IT integration"
       },
       {
         "source": "app/Models/Apparatus.php",
-        "line": 45,
+        "line": 51,
         "excerpt": "'snipeit_asset_id',"
       },
       {
         "source": "app/Models/Apparatus.php",
-        "line": 46,
+        "line": 52,
         "excerpt": "'snipeit_asset_tag',"
       },
       {
@@ -4874,7 +4915,7 @@
       },
       {
         "source": "app/Services/Display/DisplaySnapshotService.php",
-        "line": 696,
+        "line": 708,
         "excerpt": "* Redacted apparatus list — strips vin, snipeit ids, notes, current_location."
       },
       {
@@ -4926,6 +4967,16 @@
         "source": "app/Services/SnipeItService.php",
         "line": 278,
         "excerpt": "// Strip null values to avoid Snipe-IT validation errors"
+      },
+      {
+        "source": "app/Services/SnipeItService.php",
+        "line": 288,
+        "excerpt": "Log::info(\"Snipe-IT {$endpoint} created\", ['response' => $response->json()]);"
+      },
+      {
+        "source": "app/Services/SnipeItService.php",
+        "line": 292,
+        "excerpt": "Log::warning(\"Snipe-IT {$endpoint} creation failed\", ["
       }
     ],
     "Vacation": [
@@ -4946,12 +4997,12 @@
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 216,
+        "line": 232,
         "excerpt": "'Vacation': /vacation/i,"
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 252,
+        "line": 268,
         "excerpt": "jsonManifest('vacation-app/package.json'),"
       }
     ]
@@ -5390,7 +5441,7 @@
       },
       {
         "source": "app/Http/Middleware/EnsureDisplayToken.php",
-        "line": 36
+        "line": 41
       },
       {
         "source": "app/Jobs/GenerateDisplayAiSnapshotJob.php",
@@ -5406,7 +5457,7 @@
       },
       {
         "source": "app/Services/Display/DisplaySnapshotService.php",
-        "line": 24
+        "line": 25
       },
       {
         "source": "config/services.php",
@@ -5426,11 +5477,19 @@
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 55
+        "line": 69
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 207
+        "line": 70
+      },
+      {
+        "source": "scripts/audit/generate-full-system-inventory.mjs",
+        "line": 74
+      },
+      {
+        "source": "scripts/audit/generate-full-system-inventory.mjs",
+        "line": 223
       }
     ],
     "Google Sheets": [
@@ -5452,15 +5511,15 @@
       },
       {
         "source": "app/Filament/Resources/ApparatusResource.php",
-        "line": 451
+        "line": 483
       },
       {
         "source": "app/Filament/Resources/ApparatusResource.php",
-        "line": 454
+        "line": 486
       },
       {
         "source": "app/Filament/Resources/ApparatusResource.php",
-        "line": 456
+        "line": 488
       },
       {
         "source": "app/Jobs/SyncApparatusToSheetJob.php",
@@ -5472,7 +5531,7 @@
       },
       {
         "source": "app/Observers/ApparatusObserver.php",
-        "line": 43
+        "line": 69
       },
       {
         "source": "app/Services/GoogleSheets/ApparatusSheetSyncService.php",
@@ -5580,7 +5639,7 @@
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 208
+        "line": 224
       }
     ],
     "LiveKit": [
@@ -6076,7 +6135,7 @@
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 210
+        "line": 226
       }
     ],
     "PeerTube": [
@@ -6098,7 +6157,7 @@
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 211
+        "line": 227
       }
     ],
     "Redis": [
@@ -6814,7 +6873,7 @@
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 213
+        "line": 229
       }
     ],
     "Sentry": [
@@ -7366,23 +7425,15 @@
       },
       {
         "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 22
+        "line": 258
       },
       {
         "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 24
+        "line": 259
       },
       {
         "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 87
-      },
-      {
-        "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 236
-      },
-      {
-        "source": "app/Http/Controllers/Api/ApparatusController.php",
-        "line": 237
+        "line": 266
       },
       {
         "source": "app/Http/Resources/ApparatusResource.php",
@@ -7550,15 +7601,15 @@
       },
       {
         "source": "app/Models/Apparatus.php",
-        "line": 44
+        "line": 50
       },
       {
         "source": "app/Models/Apparatus.php",
-        "line": 45
+        "line": 51
       },
       {
         "source": "app/Models/Apparatus.php",
-        "line": 46
+        "line": 52
       },
       {
         "source": "app/Notifications/EquipmentDefectNotification.php",
@@ -7578,7 +7629,7 @@
       },
       {
         "source": "app/Services/Display/DisplaySnapshotService.php",
-        "line": 696
+        "line": 708
       },
       {
         "source": "app/Services/SnipeItService.php",
@@ -7619,6 +7670,14 @@
       {
         "source": "app/Services/SnipeItService.php",
         "line": 278
+      },
+      {
+        "source": "app/Services/SnipeItService.php",
+        "line": 288
+      },
+      {
+        "source": "app/Services/SnipeItService.php",
+        "line": 292
       }
     ],
     "Vacation": [
@@ -7636,11 +7695,11 @@
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 216
+        "line": 232
       },
       {
         "source": "scripts/audit/generate-full-system-inventory.mjs",
-        "line": 252
+        "line": 268
       }
     ]
   }

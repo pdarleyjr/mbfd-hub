@@ -50,8 +50,9 @@ class TrainingPanelAccessTest extends TestCase
 
         $response = $this->actingAs($user)->get('/training');
 
-        // Should get 200, 302 redirect to dashboard, or 500 if plugins fail in test env
-        $this->assertTrue(in_array($response->status(), [200, 302, 500]));
+        $response
+            ->assertOk()
+            ->assertSee('New Training Todo');
     }
 
     public function test_training_user_without_super_admin_cannot_access_admin_panel(): void
@@ -113,6 +114,8 @@ class TrainingPanelAccessTest extends TestCase
 
         $response = $this->actingAs($user)->get('/training');
 
-        $this->assertTrue(in_array($response->status(), [200, 302, 500]));
+        $response
+            ->assertOk()
+            ->assertDontSee('New Training Todo');
     }
 }

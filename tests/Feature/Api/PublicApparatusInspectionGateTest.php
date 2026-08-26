@@ -58,6 +58,7 @@ class PublicApparatusInspectionGateTest extends TestCase
 
         return [
             'client_submission_id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            'checklist_version' => $this->canonicalChecklistVersion($apparatus),
             'operator_name' => 'John Doe',
             'rank' => 'Lieutenant',
             'shift' => 'A',
@@ -101,6 +102,7 @@ class PublicApparatusInspectionGateTest extends TestCase
 
         $response = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", [
             'client_submission_id' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            'checklist_version' => $this->canonicalChecklistVersion($apparatus),
             'operator_name' => 'Jane Roe',
             'rank' => 'Firefighter',
             'shift' => 'B',
@@ -125,6 +127,7 @@ class PublicApparatusInspectionGateTest extends TestCase
 
         $response = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", [
             'client_submission_id' => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            'checklist_version' => $this->canonicalChecklistVersion($apparatus),
             'operator_name' => 'Jane Roe',
             'rank' => 'Firefighter',
             'shift' => 'B',
@@ -194,6 +197,15 @@ class PublicApparatusInspectionGateTest extends TestCase
         Sanctum::actingAs($user);
 
         return $user;
+    }
+
+    /** @return list<array{id: string, name: string, items: list<array{id: string, name: string, status: string, notes: null}>}> */
+    private function canonicalChecklistVersion(Apparatus $apparatus): string
+    {
+        $version = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus)['checklist_version'];
+        $this->assertIsString($version);
+
+        return $version;
     }
 
     /** @return list<array{id: string, name: string, items: list<array{id: string, name: string, status: string, notes: null}>}> */

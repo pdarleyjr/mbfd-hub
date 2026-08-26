@@ -66,6 +66,7 @@ export interface Compartment {
 }
 
 export interface ChecklistData {
+  checklist_version: string;
   compartments: Compartment[];
 }
 
@@ -79,6 +80,7 @@ export interface Defect {
 
 export interface InspectionSubmission {
   client_submission_id: string;
+  checklist_version: string;
   operator_name: string;
   rank: string;
   shift: string;
@@ -97,6 +99,7 @@ export interface MeterData {
 }
 
 export interface InspectionData {
+  checklist_version: string;
   officer: OfficerInfo;
   meter: MeterData;
   compartments: Compartment[];

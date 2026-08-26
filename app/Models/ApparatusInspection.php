@@ -15,6 +15,7 @@ class ApparatusInspection extends Model
 
     protected $fillable = [
         'client_submission_id',
+        'checklist_version',
         'apparatus_id',
         'operator_name',
         'rank',

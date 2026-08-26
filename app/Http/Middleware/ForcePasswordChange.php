@@ -27,6 +27,7 @@ class ForcePasswordChange
                 !$request->is('admin/logout') &&
                 !$request->routeIs('filament.admin.auth.login') &&
                 !$request->routeIs('filament.admin.auth.logout') &&
+                !$request->is('livewire/*') &&
                 !$request->is('*/livewire/*') &&
                 !$request->is('*/filament/assets/*') &&
                 !$request->routeIs('logout')) {

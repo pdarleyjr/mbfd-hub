@@ -45,6 +45,7 @@ class InspectionApiTest extends TestCase
         // Inspection data payload
         $inspectionData = [
             'client_submission_id' => 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            'checklist_version' => $this->canonicalChecklistVersion($apparatus),
             'operator_name' => 'John Doe',
             'rank' => 'Lieutenant',
             'completed_at' => now()->toDateTimeString(),
@@ -131,6 +132,15 @@ class InspectionApiTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['operator_name']);
+    }
+
+    /** @return list<array{id: string, name: string, items: list<array{id: string, name: string, status: string, notes: null}>}> */
+    private function canonicalChecklistVersion(Apparatus $apparatus): string
+    {
+        $version = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus)['checklist_version'];
+        $this->assertIsString($version);
+
+        return $version;
     }
 
     /** @return list<array{id: string, name: string, items: list<array{id: string, name: string, status: string, notes: null}>}> */

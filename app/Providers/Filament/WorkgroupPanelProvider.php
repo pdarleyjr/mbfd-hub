@@ -20,9 +20,11 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Http\Middleware\EnsureWorkgroupPanelAccess;
+use App\Http\Middleware\ForceFilamentPasswordChange;
 use Filament\View\PanelsRenderHook;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\NotificationSettings;
+use App\Filament\Pages\SetPasswordPage;
 use App\Filament\Workgroup\Pages\Dashboard;
 use App\Filament\Workgroup\Pages\Files;
 use App\Filament\Workgroup\Pages\Notes;
@@ -76,6 +78,7 @@ class WorkgroupPanelProvider extends PanelProvider
                 SessionResultsPage::class,
                 NotificationSettings::class,
                 Links::class,
+                SetPasswordPage::class,
             ])
             ->widgets([
                 \App\Filament\Workgroup\Widgets\WorkgroupStatsWidget::class,
@@ -132,6 +135,10 @@ class WorkgroupPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 EnsureWorkgroupPanelAccess::class,
+                ForceFilamentPasswordChange::class,
+            ])
+            ->persistentMiddleware([
+                ForceFilamentPasswordChange::class,
             ])
             ->sidebarCollapsibleOnDesktop()
             ->renderHook(

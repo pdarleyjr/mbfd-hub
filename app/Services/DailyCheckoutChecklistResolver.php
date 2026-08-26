@@ -4,24 +4,31 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Models\Apparatus;
 use JsonException;
 
 /**
- * Resolves the one tracked checklist that applies to an apparatus.
+ * Resolves one tracked Daily Checkout checklist for an apparatus.
  *
- * Specialized apparatus never silently fall back to the generic checklist:
- * a missing, unreadable, invalid, or empty source is an unusable resolution.
+ * A configured template is an explicit operational choice. Otherwise, only the
+ * approved Engine, Rescue, and Ladder family rules (plus E2 and L3 overrides)
+ * may select a checklist. Specialty, administrative, and ambiguous records stay
+ * unusable until an authorized owner configures a tracked template.
  */
 final class DailyCheckoutChecklistResolver
 {
-    /** @var array<string, array{checklist_type: string, category: string}> */
-    private const CHECKLISTS_BY_APPARATUS_IDENTITY = [
-        'E1' => ['checklist_type' => 'engine', 'category' => 'engine'],
-        'E2' => ['checklist_type' => 'engine2', 'category' => 'engine'],
-        'L1' => ['checklist_type' => 'ladder1', 'category' => 'ladder'],
-        'L3' => ['checklist_type' => 'ladder3', 'category' => 'ladder'],
-        'R1' => ['checklist_type' => 'rescue', 'category' => 'rescue'],
+    /** @var array<string, string> */
+    private const CHECKLISTS_BY_FAMILY = [
+        'engine' => DailyCheckoutChecklistTemplate::Engine->value,
+        'rescue' => DailyCheckoutChecklistTemplate::Rescue->value,
+        'ladder' => DailyCheckoutChecklistTemplate::Ladder1->value,
+    ];
+
+    /** @var array<string, string> */
+    private const CHECKLISTS_BY_IDENTITY_OVERRIDE = [
+        'E2' => DailyCheckoutChecklistTemplate::Engine2->value,
+        'L3' => DailyCheckoutChecklistTemplate::Ladder3->value,
     ];
 
     private readonly string $checklistDirectory;
@@ -34,9 +41,15 @@ final class DailyCheckoutChecklistResolver
     /**
      * @return array{
      *     checklist_type: string,
+     *     configured_template: string,
+     *     resolution_source: 'configured_template'|'family'|'family_override'|'pending',
+     *     family: string|null,
+     *     identity: string|null,
+     *     ambiguity: string|null,
      *     path: string,
-     *     fallback_used: bool,
+     *     fallback_used: false,
      *     item_count: int,
+     *     checklist_version: string|null,
      *     checklist: array<string, mixed>|null,
      *     usable: bool,
      *     error: string|null
@@ -48,41 +61,46 @@ final class DailyCheckoutChecklistResolver
         $checklistType = $mapping['checklist_type'];
 
         if ($mapping['error'] !== null) {
-            return $this->unusable($checklistType, '', $mapping['error']);
+            return $this->unusable($mapping, '', $mapping['error']);
         }
 
         $path = "{$this->checklistDirectory}/{$checklistType}_checklist.json";
 
         if (! is_file($path) || ! is_readable($path)) {
-            return $this->unusable($checklistType, $path, is_file($path) ? 'unreadable' : 'missing');
+            return $this->unusable($mapping, $path, is_file($path) ? 'unreadable' : 'missing');
         }
 
         $contents = file_get_contents($path);
         if ($contents === false) {
-            return $this->unusable($checklistType, $path, 'unreadable');
+            return $this->unusable($mapping, $path, 'unreadable');
         }
 
         try {
             $checklist = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException) {
-            return $this->unusable($checklistType, $path, 'invalid_json');
+            return $this->unusable($mapping, $path, 'invalid_json');
         }
 
         if (! is_array($checklist)) {
-            return $this->unusable($checklistType, $path, 'invalid_json');
+            return $this->unusable($mapping, $path, 'invalid_json');
         }
 
         if (! $this->hasUnambiguousSubmissionSchema($checklist)) {
-            return $this->unusable($checklistType, $path, 'invalid_schema');
+            return $this->unusable($mapping, $path, 'invalid_schema');
         }
 
-        $itemCount = $this->itemCount($checklist);
+        try {
+            $checklistVersion = $this->checklistVersion($checklist);
+        } catch (JsonException) {
+            return $this->unusable($mapping, $path, 'invalid_json');
+        }
 
         return [
-            'checklist_type' => $checklistType,
+            ...$mapping,
             'path' => $path,
             'fallback_used' => false,
-            'item_count' => $itemCount,
+            'item_count' => $this->itemCount($checklist),
+            'checklist_version' => $checklistVersion,
             'checklist' => $checklist,
             'usable' => true,
             'error' => null,
@@ -95,64 +113,212 @@ final class DailyCheckoutChecklistResolver
     }
 
     /**
-     * Maps only the explicitly supported units that have checked-in checklist assets.
-     * An engine, ladder, or rescue record with an unsupported or contradictory identity
-     * must be corrected by an authorized owner; it must not inherit another unit's list.
-     *
-     * @return array{checklist_type: string, error: string|null}
+     * @return array{
+     *     checklist_type: string,
+     *     configured_template: string,
+     *     resolution_source: 'configured_template'|'family'|'family_override'|'pending',
+     *     family: string|null,
+     *     identity: string|null,
+     *     ambiguity: string|null,
+     *     error: string|null
+     * }
      */
     private function mappingFor(Apparatus $apparatus): array
     {
+        $template = $this->configuredTemplateFor($apparatus);
+        if ($template['error'] !== null) {
+            return $this->unmapped(
+                error: $template['error'],
+                configuredTemplate: $template['value'],
+                ambiguity: 'daily_checkout_template_invalid',
+            );
+        }
+
+        if ($template['template'] !== null) {
+            return [
+                'checklist_type' => $template['template']->value,
+                'configured_template' => $template['template']->value,
+                'resolution_source' => 'configured_template',
+                'family' => null,
+                'identity' => null,
+                'ambiguity' => null,
+                'error' => null,
+            ];
+        }
+
+        $specialty = $this->specialtyFor($apparatus);
+        if ($specialty !== null) {
+            return $this->unmapped(
+                error: 'specialty_template_pending',
+                configuredTemplate: $template['value'],
+                ambiguity: "specialty:{$specialty}",
+            );
+        }
+
+        $family = $this->familyFor($apparatus);
+        if ($family['error'] !== null) {
+            return $this->unmapped(
+                error: $family['error'],
+                configuredTemplate: $template['value'],
+                ambiguity: $family['error'],
+            );
+        }
+
+        $identity = $this->identityFor($apparatus);
+        if ($identity['error'] !== null) {
+            return $this->unmapped(
+                error: $identity['error'],
+                configuredTemplate: $template['value'],
+                family: $family['family'],
+                ambiguity: $identity['error'],
+            );
+        }
+
+        $identityFamily = $identity['identity'] === null ? null : $this->familyForIdentity($identity['identity']);
+        if ($family['family'] !== null && $identityFamily !== null && $family['family'] !== $identityFamily) {
+            return $this->unmapped(
+                error: 'ambiguous_apparatus_family',
+                configuredTemplate: $template['value'],
+                family: $family['family'],
+                identity: $identity['identity'],
+                ambiguity: 'identity_family_conflict',
+            );
+        }
+
+        if ($identity['identity'] !== null && isset(self::CHECKLISTS_BY_IDENTITY_OVERRIDE[$identity['identity']])) {
+            return [
+                'checklist_type' => self::CHECKLISTS_BY_IDENTITY_OVERRIDE[$identity['identity']],
+                'configured_template' => $template['value'],
+                'resolution_source' => 'family_override',
+                'family' => $identityFamily,
+                'identity' => $identity['identity'],
+                'ambiguity' => null,
+                'error' => null,
+            ];
+        }
+
+        if ($family['family'] === null) {
+            return $this->unmapped(
+                error: 'unclassified_family_template_pending',
+                configuredTemplate: $template['value'],
+                identity: $identity['identity'],
+                ambiguity: 'family_unclassified',
+            );
+        }
+
+        return [
+            'checklist_type' => self::CHECKLISTS_BY_FAMILY[$family['family']],
+            'configured_template' => $template['value'],
+            'resolution_source' => 'family',
+            'family' => $family['family'],
+            'identity' => $identity['identity'],
+            'ambiguity' => null,
+            'error' => null,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     template: DailyCheckoutChecklistTemplate|null,
+     *     value: string,
+     *     error: 'invalid_checklist_template'|null
+     * }
+     */
+    private function configuredTemplateFor(Apparatus $apparatus): array
+    {
+        $attributes = $apparatus->getAttributes();
+        $raw = $attributes['daily_checkout_template'] ?? null;
+        $value = $raw instanceof DailyCheckoutChecklistTemplate
+            ? $raw->value
+            : $this->nonEmptyString($raw);
+
+        if ($value === null) {
+            return [
+                'template' => null,
+                'value' => DailyCheckoutChecklistTemplate::Pending->value,
+                'error' => null,
+            ];
+        }
+
+        $value = strtolower($value);
+        $template = DailyCheckoutChecklistTemplate::tryFrom($value);
+        if ($template === null) {
+            return [
+                'template' => null,
+                'value' => $value,
+                'error' => 'invalid_checklist_template',
+            ];
+        }
+
+        return [
+            'template' => $template->isConfigured() ? $template : null,
+            'value' => $template->value,
+            'error' => null,
+        ];
+    }
+
+    /** @return array{family: 'engine'|'rescue'|'ladder'|null, error: 'ambiguous_apparatus_family'|null} */
+    private function familyFor(Apparatus $apparatus): array
+    {
+        $families = [];
+        foreach ([$apparatus->type, $apparatus->class_description] as $value) {
+            $family = $this->familyFromValue($value);
+            if ($family !== null) {
+                $families[$family] = true;
+            }
+        }
+
+        if (count($families) > 1) {
+            return ['family' => null, 'error' => 'ambiguous_apparatus_family'];
+        }
+
+        /** @var 'engine'|'rescue'|'ladder'|null $family */
+        $family = array_key_first($families);
+
+        return ['family' => $family, 'error' => null];
+    }
+
+    /** @return 'engine'|'rescue'|'ladder'|null */
+    private function familyFromValue(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        $normalized = strtolower(preg_replace('/\s+/', ' ', $value) ?? '');
+
+        return match ($normalized) {
+            'engine', 'engines', 'engine company' => 'engine',
+            'rescue', 'rescues', 'rescue company' => 'rescue',
+            'ladder', 'ladders', 'ladder company' => 'ladder',
+            default => null,
+        };
+    }
+
+    /** @return array{identity: string|null, error: 'ambiguous_apparatus_identity'|null} */
+    private function identityFor(Apparatus $apparatus): array
+    {
         $identities = [];
         foreach ([$apparatus->unit_id, $apparatus->designation, $apparatus->name] as $value) {
-            $identity = $this->specializedIdentity($value);
+            $identity = $this->identityFromValue($value);
             if ($identity !== null) {
                 $identities[$identity] = true;
             }
         }
 
-        $categories = [];
-        foreach ([$apparatus->type, $apparatus->class_description] as $value) {
-            $category = $this->specializedCategory($value);
-            if ($category !== null) {
-                $categories[$category] = true;
-            }
+        if (count($identities) > 1) {
+            return ['identity' => null, 'error' => 'ambiguous_apparatus_identity'];
         }
 
-        if (count($identities) > 1 || count($categories) > 1) {
-            return $this->unmapped('ambiguous_specialized_apparatus');
-        }
-
-        $identity = array_key_first($identities);
-        $category = array_key_first($categories);
-
-        if ($identity !== null) {
-            $mapping = self::CHECKLISTS_BY_APPARATUS_IDENTITY[$identity] ?? null;
-            if ($mapping === null) {
-                return $this->unmapped('unmapped_specialized_apparatus');
-            }
-
-            if ($category !== null && $mapping['category'] !== $category) {
-                return $this->unmapped('ambiguous_specialized_apparatus');
-            }
-
-            return [
-                'checklist_type' => $mapping['checklist_type'],
-                'error' => null,
-            ];
-        }
-
-        if ($category !== null) {
-            return $this->unmapped('unmapped_specialized_apparatus');
-        }
-
-        return [
-            'checklist_type' => 'default',
-            'error' => null,
-        ];
+        return ['identity' => array_key_first($identities), 'error' => null];
     }
 
-    private function specializedIdentity(mixed $value): ?string
+    private function identityFromValue(mixed $value): ?string
     {
         if (! is_string($value)) {
             return null;
@@ -178,34 +344,65 @@ final class DailyCheckoutChecklistResolver
         return null;
     }
 
-    private function specializedCategory(mixed $value): ?string
+    /** @return 'engine'|'rescue'|'ladder' */
+    private function familyForIdentity(string $identity): string
     {
-        if (! is_string($value)) {
-            return null;
-        }
+        return match ($identity[0]) {
+            'E' => 'engine',
+            'R' => 'rescue',
+            'L' => 'ladder',
+        };
+    }
 
-        $value = strtolower(trim($value));
+    private function specialtyFor(Apparatus $apparatus): ?string
+    {
+        foreach ([$apparatus->unit_id, $apparatus->designation, $apparatus->name, $apparatus->type, $apparatus->class_description] as $value) {
+            if (! is_string($value)) {
+                continue;
+            }
 
-        if (preg_match('/\bengines?\b/', $value) === 1) {
-            return 'engine';
-        }
+            $normalized = preg_replace('/[^a-z0-9]+/', '', strtolower($value)) ?? '';
+            if (str_contains($normalized, 'airtruck')) {
+                return 'air_truck';
+            }
 
-        if (preg_match('/\bladders?\b/', $value) === 1) {
-            return 'ladder';
-        }
+            if (str_contains($normalized, 'fireboat') || $normalized === 'fb6') {
+                return 'fire_boat';
+            }
 
-        if (preg_match('/\brescues?\b/', $value) === 1) {
-            return 'rescue';
+            if (preg_match('/\b(?:command|administrative|administration|admin)\b/i', $value) === 1) {
+                return 'administrative';
+            }
         }
 
         return null;
     }
 
-    /** @return array{checklist_type: 'unmapped', error: string} */
-    private function unmapped(string $error): array
-    {
+    /**
+     * @return array{
+     *     checklist_type: 'unmapped',
+     *     configured_template: string,
+     *     resolution_source: 'pending',
+     *     family: string|null,
+     *     identity: string|null,
+     *     ambiguity: string|null,
+     *     error: string
+     * }
+     */
+    private function unmapped(
+        string $error,
+        string $configuredTemplate,
+        ?string $family = null,
+        ?string $identity = null,
+        ?string $ambiguity = null,
+    ): array {
         return [
             'checklist_type' => 'unmapped',
+            'configured_template' => $configuredTemplate,
+            'resolution_source' => 'pending',
+            'family' => $family,
+            'identity' => $identity,
+            'ambiguity' => $ambiguity,
             'error' => $error,
         ];
     }
@@ -228,6 +425,35 @@ final class DailyCheckoutChecklistResolver
     }
 
     /** @param array<string, mixed> $checklist */
+    private function checklistVersion(array $checklist): string
+    {
+        $canonical = json_encode(
+            $this->canonicalize($checklist),
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
+        );
+
+        return hash('sha256', $canonical);
+    }
+
+    private function canonicalize(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (array_is_list($value)) {
+            return array_map(fn (mixed $item): mixed => $this->canonicalize($item), $value);
+        }
+
+        ksort($value, SORT_STRING);
+        foreach ($value as $key => $item) {
+            $value[$key] = $this->canonicalize($item);
+        }
+
+        return $value;
+    }
+
+    /** @param array<string, mixed> $checklist */
     private function hasUnambiguousSubmissionSchema(array $checklist): bool
     {
         $compartments = $checklist['compartments'] ?? null;
@@ -236,6 +462,7 @@ final class DailyCheckoutChecklistResolver
         }
 
         $compartmentIds = [];
+        $compartmentNames = [];
         foreach ($compartments as $compartment) {
             if (! is_array($compartment)) {
                 return false;
@@ -248,10 +475,14 @@ final class DailyCheckoutChecklistResolver
                 return false;
             }
 
-            if (isset($compartmentIds[$compartmentId])) {
+            // Defects are keyed by the canonical compartment display name and
+            // item name, so duplicate display names would make them ambiguous
+            // even if the stable compartment IDs differ.
+            if (isset($compartmentIds[$compartmentId]) || isset($compartmentNames[$compartmentName])) {
                 return false;
             }
             $compartmentIds[$compartmentId] = true;
+            $compartmentNames[$compartmentName] = true;
 
             $itemNames = [];
             foreach ($items as $item) {
@@ -260,10 +491,9 @@ final class DailyCheckoutChecklistResolver
                 }
 
                 $itemName = $this->nonEmptyString($item['name'] ?? null);
-                // The public submission contract currently identifies an item by its
-                // compartment and display name. A duplicate name in one compartment
-                // would make a defect/result unverifiable, so never publish it as a
-                // valid Daily Checkout checklist.
+                // The public submission contract identifies an item by its
+                // compartment and display name. Duplicate names therefore make a
+                // result unverifiable and must fail closed.
                 if ($itemName === null || isset($itemNames[$itemName])) {
                     return false;
                 }
@@ -287,23 +517,39 @@ final class DailyCheckoutChecklistResolver
     }
 
     /**
+     * @param array{
+     *     checklist_type: string,
+     *     configured_template: string,
+     *     resolution_source: 'configured_template'|'family'|'family_override'|'pending',
+     *     family: string|null,
+     *     identity: string|null,
+     *     ambiguity: string|null,
+     *     error: string|null
+     * } $mapping
      * @return array{
      *     checklist_type: string,
+     *     configured_template: string,
+     *     resolution_source: 'configured_template'|'family'|'family_override'|'pending',
+     *     family: string|null,
+     *     identity: string|null,
+     *     ambiguity: string|null,
      *     path: string,
-     *     fallback_used: bool,
-     *     item_count: int,
+     *     fallback_used: false,
+     *     item_count: 0,
+     *     checklist_version: null,
      *     checklist: null,
      *     usable: false,
      *     error: string
      * }
      */
-    private function unusable(string $checklistType, string $path, string $error): array
+    private function unusable(array $mapping, string $path, string $error): array
     {
         return [
-            'checklist_type' => $checklistType,
+            ...$mapping,
             'path' => $path,
             'fallback_used' => false,
             'item_count' => 0,
+            'checklist_version' => null,
             'checklist' => null,
             'usable' => false,
             'error' => $error,

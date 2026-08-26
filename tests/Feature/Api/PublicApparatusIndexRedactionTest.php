@@ -113,6 +113,7 @@ class PublicApparatusIndexRedactionTest extends TestCase
 
         // The checklist payload itself is still returned.
         $this->assertArrayHasKey('checklist', $response->json());
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', (string) $response->json('checklist_version'));
     }
 
     public function test_public_apparatus_checklist_only_exposes_an_open_defect_count(): void

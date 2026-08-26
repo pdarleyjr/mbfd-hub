@@ -1,7 +1,7 @@
 import { db, type DailyCheckoutQueuedSubmission } from '../lib/db';
 import type { InspectionSubmission } from '../types';
 import { createClientSubmissionId } from './storage';
-import { ApiClient, ApiRequestError } from './api';
+import { ApiClient, ApiRequestError, isChecklistVersion } from './api';
 
 const LEGACY_QUEUE_KEY = 'mbfd_submission_queue';
 const LEGACY_MIGRATION_KEY = 'daily-checkout-queue-migration-v1';
@@ -20,6 +20,16 @@ export interface DailyCheckoutQueueSummary {
   pending: number;
   requiresAttention: number;
   firstAttentionError?: string;
+  firstAttentionErrorCode?: string;
+}
+
+export class DailyCheckoutQueueConflictError extends Error {
+  constructor(existing: DailyCheckoutQueuedSubmission) {
+    super(existing.status === 'requires_attention'
+      ? 'A saved Daily Checkout using this checklist version needs officer review. This inspection remains saved locally and was not submitted.'
+      : 'A saved Daily Checkout using this checklist version is still awaiting synchronization. This inspection remains saved locally and was not submitted.');
+    this.name = 'DailyCheckoutQueueConflictError';
+  }
 }
 
 interface LegacyQueuedSubmission {
@@ -91,15 +101,26 @@ const normalizeLegacySubmission = (
   const id = typeof submission.id === 'string' && submission.id.trim() !== ''
     ? submission.id
     : `legacy_${clientSubmissionId}`;
+  const checklistVersion = data.checklist_version;
+  const requiresAttention = !isChecklistVersion(checklistVersion);
 
   return {
     id,
     apparatusId: submission.apparatusId as number,
+    checklistVersion: requiresAttention ? `legacy-${id}` : checklistVersion,
     data: { ...data, client_submission_id: clientSubmissionId } as InspectionSubmission,
     createdAt,
     updatedAt: createdAt,
-    status: 'pending',
+    status: requiresAttention ? 'requires_attention' : 'pending',
     retryCount: 0,
+    ...(requiresAttention
+      ? {
+          lastError: 'This saved inspection predates immutable checklist versions and needs officer review before it can be sent.',
+          lastErrorCode: 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED',
+          lastErrorAt: createdAt,
+          retentionExpiresAt: new Date(createdAt.getTime() + CLIENT_ERROR_RETENTION_DAYS * 24 * 60 * 60 * 1000),
+        }
+      : {}),
   };
 };
 
@@ -108,6 +129,7 @@ const hasSamePersistedPayload = (
   incoming: DailyCheckoutQueuedSubmission,
 ): boolean => (
   existing.apparatusId === incoming.apparatusId
+  && existing.checklistVersion === incoming.checklistVersion
   && existing.data.client_submission_id === incoming.data.client_submission_id
   && JSON.stringify(existing.data) === JSON.stringify(incoming.data)
 );
@@ -161,20 +183,20 @@ const migrateLegacyQueue = async (): Promise<void> => {
   try {
     await db.transaction('rw', db.dailyCheckoutSubmissions, db.cachedData, async () => {
       for (const submission of submissions) {
-        const existingByApparatus = await db.dailyCheckoutSubmissions
-          .where('apparatusId')
-          .equals(submission.apparatusId)
+        const existingByChecklistVersion = await db.dailyCheckoutSubmissions
+          .where('[apparatusId+checklistVersion]')
+          .equals([submission.apparatusId, submission.checklistVersion])
           .first();
         const existingById = await db.dailyCheckoutSubmissions.get(submission.id);
 
         if (
-          (existingByApparatus && !hasSamePersistedPayload(existingByApparatus, submission))
+          (existingByChecklistVersion && !hasSamePersistedPayload(existingByChecklistVersion, submission))
           || (existingById && !hasSamePersistedPayload(existingById, submission))
         ) {
-          throw new Error('A different Daily Checkout submission is already persisted for this apparatus.');
+          throw new Error('A different Daily Checkout submission is already persisted for this apparatus and checklist version.');
         }
 
-        if (!existingByApparatus && !existingById) {
+        if (!existingByChecklistVersion && !existingById) {
           await db.dailyCheckoutSubmissions.add(submission);
         }
       }
@@ -210,9 +232,10 @@ export const ensureDailyCheckoutQueueReady = (): Promise<void> => {
 };
 
 /**
- * The browser owns one unresolved inspection per apparatus. Once a payload
- * exists, every retry uses that exact payload and UUID until the server accepts
- * it or an operator explicitly resolves the saved validation error.
+ * The browser owns one unresolved inspection per apparatus and checklist
+ * version. A newer source version may queue separately while an older immutable
+ * payload remains retained for officer review. Every retry uses its exact
+ * payload and UUID until the server accepts it or an operator resolves it.
  */
 export const queueSubmission = async (
   apparatusId: number,
@@ -220,18 +243,15 @@ export const queueSubmission = async (
 ): Promise<string> => {
   await ensureDailyCheckoutQueueReady();
 
-  const existing = await db.dailyCheckoutSubmissions
-    .where('apparatusId')
-    .equals(apparatusId)
-    .first();
-  if (existing) {
-    return existing.id;
+  if (!isChecklistVersion(data.checklist_version)) {
+    throw new Error('The Daily Checkout checklist version is unavailable. The inspection was not queued.');
   }
 
   const now = new Date();
   const queuedSubmission: DailyCheckoutQueuedSubmission = {
     id: `daily_${data.client_submission_id}`,
     apparatusId,
+    checklistVersion: data.checklist_version,
     data,
     createdAt: now,
     updatedAt: now,
@@ -239,17 +259,51 @@ export const queueSubmission = async (
     retryCount: 0,
   };
 
+  const existingById = await db.dailyCheckoutSubmissions.get(queuedSubmission.id);
+  if (existingById) {
+    if (hasSamePersistedPayload(existingById, queuedSubmission)) {
+      return existingById.id;
+    }
+
+    throw new Error('A Daily Checkout submission ID is already saved with different data. This inspection was not submitted.');
+  }
+
+  const existingByChecklistVersion = await db.dailyCheckoutSubmissions
+    .where('[apparatusId+checklistVersion]')
+    .equals([apparatusId, queuedSubmission.checklistVersion])
+    .first();
+  if (existingByChecklistVersion) {
+    if (hasSamePersistedPayload(existingByChecklistVersion, queuedSubmission)) {
+      return existingByChecklistVersion.id;
+    }
+
+    throw new DailyCheckoutQueueConflictError(existingByChecklistVersion);
+  }
+
   try {
     await db.dailyCheckoutSubmissions.add(queuedSubmission);
   } catch (error) {
-    // Two windows can enqueue the same apparatus at once. Re-read the unique
-    // apparatus record rather than creating a second logical inspection.
-    const concurrentlyQueued = await db.dailyCheckoutSubmissions
-      .where('apparatusId')
-      .equals(apparatusId)
+    // Two windows can enqueue one checklist revision at once. Re-read both
+    // final unique boundaries; only an exact logical retry may reuse a record.
+    const concurrentlyQueuedById = await db.dailyCheckoutSubmissions.get(queuedSubmission.id);
+    if (concurrentlyQueuedById) {
+      if (hasSamePersistedPayload(concurrentlyQueuedById, queuedSubmission)) {
+        return concurrentlyQueuedById.id;
+      }
+
+      throw new Error('A Daily Checkout submission ID is already saved with different data. This inspection was not submitted.');
+    }
+
+    const concurrentlyQueuedByChecklistVersion = await db.dailyCheckoutSubmissions
+      .where('[apparatusId+checklistVersion]')
+      .equals([apparatusId, queuedSubmission.checklistVersion])
       .first();
-    if (concurrentlyQueued) {
-      return concurrentlyQueued.id;
+    if (concurrentlyQueuedByChecklistVersion) {
+      if (hasSamePersistedPayload(concurrentlyQueuedByChecklistVersion, queuedSubmission)) {
+        return concurrentlyQueuedByChecklistVersion.id;
+      }
+
+      throw new DailyCheckoutQueueConflictError(concurrentlyQueuedByChecklistVersion);
     }
 
     throw error;
@@ -266,12 +320,16 @@ export const getQueuedSubmission = async (id: string): Promise<DailyCheckoutQueu
   return (await db.dailyCheckoutSubmissions.get(id)) ?? null;
 };
 
-export const getQueuedSubmissionForApparatus = async (
+export const getQueuedSubmissionForApparatusAndChecklistVersion = async (
   apparatusId: number,
+  checklistVersion: string,
 ): Promise<DailyCheckoutQueuedSubmission | null> => {
   await ensureDailyCheckoutQueueReady();
 
-  return (await db.dailyCheckoutSubmissions.where('apparatusId').equals(apparatusId).first()) ?? null;
+  return (await db.dailyCheckoutSubmissions
+    .where('[apparatusId+checklistVersion]')
+    .equals([apparatusId, checklistVersion])
+    .first()) ?? null;
 };
 
 export const getSubmissionQueue = async (): Promise<DailyCheckoutQueuedSubmission[]> => {
@@ -289,6 +347,7 @@ export const getDailyCheckoutQueueSummary = async (): Promise<DailyCheckoutQueue
     pending: submissions.length - requiringAttention.length,
     requiresAttention: requiringAttention.length,
     firstAttentionError: requiringAttention[0]?.lastError,
+    firstAttentionErrorCode: requiringAttention[0]?.lastErrorCode,
   };
 };
 
@@ -311,6 +370,7 @@ const recordSubmissionFailure = async (id: string, error: unknown): Promise<void
     lastAttemptAt: now,
     lastError: error instanceof Error ? error.message : String(error),
     lastErrorStatus: error instanceof ApiRequestError ? error.status : undefined,
+    lastErrorCode: error instanceof ApiRequestError ? error.code : undefined,
     lastErrorAt: now,
     // A 4xx response is retained locally for operator review; it is never
     // treated as a successful or disposable submission.

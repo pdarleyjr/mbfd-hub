@@ -28,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-interaction --no-progress --no-scripts
       - name: Syntax check
-        run: find app config routes -name "*.php" -exec php -l {} \; | grep -v "No syntax errors" || true
+        run: find app config routes -type f -name "*.php" -print0 | xargs -0 -r -n 1 php -l
 
   deploy:
     needs: ci

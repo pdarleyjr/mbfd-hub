@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\ApparatusPmServiceType;
 use App\Enums\ApparatusServiceTicketCategory;
 use App\Enums\ApparatusServiceTicketPriority;
+use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Enums\DailyCheckoutRequirement;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\ApparatusResource\Pages;
@@ -80,6 +81,12 @@ class ApparatusResource extends Resource
                             ->default(DailyCheckoutRequirement::Unknown->value)
                             ->required()
                             ->helperText('Classify explicitly. This does not change the operational status of the apparatus.'),
+                        Forms\Components\Select::make('daily_checkout_template')
+                            ->label('Approved Daily Checkout Template')
+                            ->options(DailyCheckoutChecklistTemplate::options())
+                            ->default(DailyCheckoutChecklistTemplate::Pending->value)
+                            ->required()
+                            ->helperText('Pending permits only approved Engine, Rescue, and Ladder family mapping. Specialty and administrative apparatus remain blocked until an authorized template is selected.'),
                         Forms\Components\TextInput::make('assignment')
                             ->label('Assignment')
                             ->placeholder('Station 1, Reserve, etc.')
@@ -219,6 +226,13 @@ class ApparatusResource extends Resource
                         DailyCheckoutRequirement::Unknown->value => 'warning',
                         default => 'gray',
                     })
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('daily_checkout_template')
+                    ->label('Checkout Template')
+                    ->badge()
+                    ->getStateUsing(fn (Apparatus $record): string => $record->daily_checkout_template?->value ?? DailyCheckoutChecklistTemplate::Pending->value)
+                    ->formatStateUsing(fn (string $state): string => DailyCheckoutChecklistTemplate::options()[$state] ?? 'Invalid template configuration')
+                    ->color(fn (string $state): string => $state === DailyCheckoutChecklistTemplate::Pending->value ? 'warning' : 'gray')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('pm_health_status')
                     ->label('PM')

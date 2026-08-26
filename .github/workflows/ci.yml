@@ -90,4 +90,12 @@ jobs:
       run: php artisan migrate --force
 
     - name: Run Tests
+      env:
+        DB_CONNECTION: pgsql
+        EXPECTED_TEST_DB_CONNECTION: pgsql
+        DB_HOST: 127.0.0.1
+        DB_PORT: "5432"
+        DB_DATABASE: testing
+        DB_USERNAME: testing
+        DB_PASSWORD: testing
       run: php artisan test

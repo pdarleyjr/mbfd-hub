@@ -228,8 +228,10 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
     // PIN verification endpoint (public)
     Route::post('/station-inventory/verify-pin', [StationInventoryV2Controller::class, 'verifyPin']);
 
-    // Protected endpoints (require valid signed URL from PIN verification)
-    Route::middleware('signed')->name('api.v2.station-inventory.')->group(function () {
+    // Protected endpoints validate the PIN-issued base URL in the controller.
+    // Nested operations reuse that signature, so Laravel's exact-URL signed
+    // middleware cannot run before the controller reconstructs the base URL.
+    Route::name('api.v2.station-inventory.')->group(function () {
         // Inventory list
         Route::get('/station-inventory/{stationId}', [StationInventoryV2Controller::class, 'getInventory'])
             ->name('access');
