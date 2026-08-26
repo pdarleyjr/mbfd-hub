@@ -26,15 +26,28 @@ final class DailyCheckoutComplianceService
      * @param  Collection<int, Apparatus>  $apparatuses
      * @return array<string, mixed>
      */
-    public function summaryForApparatuses(Collection $apparatuses, ?CarbonImmutable $now = null): array
-    {
+    public function summaryForApparatuses(
+        Collection $apparatuses,
+        ?CarbonImmutable $now = null,
+        ?string $connection = null,
+        ?CarbonImmutable $evidenceAsOf = null,
+        bool $requireSubmissionPayloadHash = false,
+    ): array {
         [$startOfDay, $startOfNextDay] = $this->localDayWindow($now);
+        $evidenceAsOf = $evidenceAsOf?->utc();
 
         return $this->summary(
             $apparatuses,
-            $this->inspectionSignals($apparatuses, $startOfDay, $startOfNextDay),
-            $this->unresolvedCriticalDefectApparatusIds($apparatuses),
-            $this->statusTransitionSignals($apparatuses, $startOfDay, $startOfNextDay),
+            $this->inspectionSignals(
+                $apparatuses,
+                $startOfDay,
+                $startOfNextDay,
+                $connection,
+                $evidenceAsOf,
+                $requireSubmissionPayloadHash,
+            ),
+            $this->unresolvedCriticalDefectApparatusIds($apparatuses, $connection),
+            $this->statusTransitionSignals($apparatuses, $startOfDay, $startOfNextDay, $connection, $evidenceAsOf),
         );
     }
 
@@ -340,6 +353,9 @@ final class DailyCheckoutComplianceService
         Collection $apparatuses,
         CarbonImmutable $startOfDay,
         CarbonImmutable $startOfNextDay,
+        ?string $connection = null,
+        ?CarbonImmutable $evidenceAsOf = null,
+        bool $requireSubmissionPayloadHash = false,
     ): array {
         $apparatusIds = $this->apparatusIds($apparatuses);
         if ($apparatusIds === []) {
@@ -347,16 +363,23 @@ final class DailyCheckoutComplianceService
         }
 
         $signals = [];
-        $inspections = ApparatusInspection::query()
+        $inspectionQuery = ($connection === null ? ApparatusInspection::query() : ApparatusInspection::on($connection))
             ->whereIn('apparatus_id', $apparatusIds)
             // This is an intentional data-integrity cutover. Historical rows
             // predate server-side checklist reconciliation and therefore cannot
             // silently satisfy the canonical Daily Checkout signal.
             ->whereNotNull('client_submission_id')
             ->whereNotNull('completed_at')
-            ->where('completed_at', '>=', $startOfDay)
-            ->where('completed_at', '<', $startOfNextDay)
-            ->get(['apparatus_id', 'review_status', 'completed_at']);
+            ->where('completed_at', '>=', $startOfDay);
+        if ($evidenceAsOf === null) {
+            $inspectionQuery->where('completed_at', '<', $startOfNextDay);
+        } else {
+            $inspectionQuery->where('completed_at', '<=', $evidenceAsOf);
+        }
+        if ($requireSubmissionPayloadHash) {
+            $inspectionQuery->whereNotNull('submission_payload_hash');
+        }
+        $inspections = $inspectionQuery->get(['apparatus_id', 'review_status', 'completed_at']);
 
         foreach ($inspections as $inspection) {
             $apparatusId = (int) $inspection->apparatus_id;
@@ -398,18 +421,25 @@ final class DailyCheckoutComplianceService
         Collection $apparatuses,
         CarbonImmutable $startOfDay,
         CarbonImmutable $startOfNextDay,
+        ?string $connection = null,
+        ?CarbonImmutable $evidenceAsOf = null,
     ): array {
         $apparatusIds = $this->apparatusIds($apparatuses);
         if ($apparatusIds === []) {
             return [];
         }
 
-        $eventsByApparatus = ApparatusOperationalStatusEvent::query()
+        $eventQuery = ($connection === null ? ApparatusOperationalStatusEvent::query() : ApparatusOperationalStatusEvent::on($connection))
             ->whereIn('apparatus_id', $apparatusIds)
-            ->where('changed_at', '<', $startOfNextDay)
             ->orderBy('apparatus_id')
             ->orderBy('changed_at')
-            ->orderBy('id')
+            ->orderBy('id');
+        if ($evidenceAsOf === null) {
+            $eventQuery->where('changed_at', '<', $startOfNextDay);
+        } else {
+            $eventQuery->where('changed_at', '<=', $evidenceAsOf);
+        }
+        $eventsByApparatus = $eventQuery
             ->get(['id', 'apparatus_id', 'previous_status', 'status', 'changed_at'])
             ->groupBy('apparatus_id');
 
@@ -469,14 +499,14 @@ final class DailyCheckoutComplianceService
      * @param  Collection<int, Apparatus>  $apparatuses
      * @return list<int>
      */
-    private function unresolvedCriticalDefectApparatusIds(Collection $apparatuses): array
+    private function unresolvedCriticalDefectApparatusIds(Collection $apparatuses, ?string $connection = null): array
     {
         $apparatusIds = $this->apparatusIds($apparatuses);
         if ($apparatusIds === []) {
             return [];
         }
 
-        return ApparatusDefect::query()
+        return ($connection === null ? ApparatusDefect::query() : ApparatusDefect::on($connection))
             ->whereIn('apparatus_id', $apparatusIds)
             ->where('resolved', false)
             ->whereIn('status', ['Missing', 'Damaged'])
