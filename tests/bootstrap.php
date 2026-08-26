@@ -107,6 +107,7 @@ $testEnvironment = [
     'VITE_SENTRY_RELEASE' => '',
     'VIDEO_CONFERENCING_ENABLED' => 'false',
     'WEBPUSH_DB_CONNECTION' => 'sqlite',
+    'WORKGROUP_AI_ENABLED' => 'false',
     'WORKGROUP_AI_WORKER_SECRET' => '',
     'WORKGROUP_AI_WORKER_URL' => '',
 ];

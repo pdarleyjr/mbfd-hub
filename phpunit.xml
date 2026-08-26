@@ -50,6 +50,7 @@
         <env name="GOOGLE_SHEETS_APPARATUS_SYNC_ENABLED" value="false" force="true"/>
         <env name="HEALTH_SLACK_WEBHOOK_URL" value="" force="true"/>
         <env name="WEBPUSH_DB_CONNECTION" value="sqlite" force="true"/>
+        <env name="WORKGROUP_AI_ENABLED" value="false" force="true"/>
         <env name="LIVEKIT_API_KEY" value="" force="true"/>
         <env name="LIVEKIT_API_SECRET" value="" force="true"/>
         <env name="LIVEKIT_CLOUD_API_KEY" value="" force="true"/>

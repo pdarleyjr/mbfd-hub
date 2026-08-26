@@ -92,6 +92,7 @@ class TestEnvironmentIsolationTest extends TestCase
             'SESSION_DRIVER',
             'TELESCOPE_ENABLED',
             'WEBPUSH_DB_CONNECTION',
+            'WORKGROUP_AI_ENABLED',
         ] as $variable) {
             $this->assertMatchesRegularExpression(
                 '/<env name="'.preg_quote($variable, '/').'" value="[^"]*" force="true"\/>/',
