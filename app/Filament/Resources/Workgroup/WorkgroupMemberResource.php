@@ -209,11 +209,14 @@ class WorkgroupMemberResource extends Resource
     public static function canEdit($record): bool
     {
         $user = self::currentWorkgroupUser();
+        $workgroup = $record instanceof WorkgroupMember
+            ? $record->getAttribute('workgroup')
+            : null;
 
         return $user !== null
             && $record instanceof WorkgroupMember
-            && $record->workgroup !== null
-            && self::workgroupAccess()->canManageWorkgroup($user, $record->workgroup);
+            && $workgroup instanceof Workgroup
+            && self::workgroupAccess()->canManageWorkgroup($user, $workgroup);
     }
 
     public static function canDelete($record): bool
@@ -224,11 +227,14 @@ class WorkgroupMemberResource extends Resource
     public static function canView($record): bool
     {
         $user = self::currentWorkgroupUser();
+        $workgroup = $record instanceof WorkgroupMember
+            ? $record->getAttribute('workgroup')
+            : null;
 
         return $user !== null
             && $record instanceof WorkgroupMember
-            && $record->workgroup !== null
-            && self::workgroupAccess()->canViewWorkgroup($user, $record->workgroup);
+            && $workgroup instanceof Workgroup
+            && self::workgroupAccess()->canViewWorkgroup($user, $workgroup);
     }
 
     public static function getEloquentQuery(): Builder

@@ -30,7 +30,7 @@ class ViewInspection extends ViewRecord
                     'inspection' => $inspection->getKey(),
                 ]))
                 ->visible(function () use ($inspection): bool {
-                    $apparatus = $inspection->apparatus;
+                    $apparatus = $inspection->getAttribute('apparatus');
 
                     return $inspection->review_status === 'pending_review'
                         && $apparatus instanceof Apparatus

@@ -159,11 +159,14 @@ class WorkgroupFileResource extends Resource
     public static function canEdit($record): bool
     {
         $user = self::currentWorkgroupUser();
+        $workgroup = $record instanceof WorkgroupFile
+            ? $record->getAttribute('workgroup')
+            : null;
 
         return $user !== null
             && $record instanceof WorkgroupFile
-            && $record->workgroup !== null
-            && self::workgroupAccess()->canManageWorkgroup($user, $record->workgroup);
+            && $workgroup instanceof Workgroup
+            && self::workgroupAccess()->canManageWorkgroup($user, $workgroup);
     }
 
     public static function canDelete($record): bool

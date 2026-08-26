@@ -23,9 +23,9 @@ class PublicApparatusResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $dailyCheckoutRequirement = $this->resource instanceof Apparatus
-            ? $this->resource->getAttribute('daily_checkout_requirement')
-            : null;
+        $apparatus = $this->resource instanceof Apparatus ? $this->resource : null;
+        $dailyCheckoutRequirement = $apparatus?->getAttribute('daily_checkout_requirement');
+        $status = $apparatus?->getAttribute('status');
 
         return [
             'id' => $this->id,
@@ -35,7 +35,7 @@ class PublicApparatusResource extends JsonResource
             'vehicle_number' => $this->vehicle_number,
             'designation' => $this->designation,
             'slug' => $this->slug,
-            'status' => $this->status,
+            'status' => $status,
             'daily_checkout_requirement' => $dailyCheckoutRequirement instanceof DailyCheckoutRequirement
                 ? $dailyCheckoutRequirement->value
                 : DailyCheckoutRequirement::Unknown->value,

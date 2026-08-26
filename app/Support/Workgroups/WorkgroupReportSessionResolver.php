@@ -22,7 +22,7 @@ final class WorkgroupReportSessionResolver
         $workgroup = $this->workgroupContext->requireCurrent($user);
 
         $rawSessionId = $request->query('session_id');
-        abort_unless(is_string($rawSessionId) || is_int($rawSessionId), 404);
+        abort_unless(is_string($rawSessionId), 404);
 
         $sessionId = filter_var($rawSessionId, FILTER_VALIDATE_INT, [
             'options' => ['min_range' => 1],

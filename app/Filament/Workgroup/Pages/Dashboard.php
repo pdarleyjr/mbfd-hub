@@ -57,7 +57,10 @@ class Dashboard extends BaseDashboard
         $sessions = $this->getAccessibleSessions($member);
         $activeSession = $sessions->firstWhere('status', 'active');
 
-        $this->selectedSessionId = $activeSession?->id ?? $sessions->first()?->id;
+        $this->selectedSessionId = $activeSession?->id;
+        if ($this->selectedSessionId === null) {
+            $this->selectedSessionId = $sessions->first()?->id;
+        }
     }
 
     public function getAvailableWorkgroups(): \Illuminate\Support\Collection
