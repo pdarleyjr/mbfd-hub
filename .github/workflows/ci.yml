@@ -24,9 +24,9 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_DB: testing
-          POSTGRES_USER: testing
-          POSTGRES_PASSWORD: testing
+          POSTGRES_DB: mbfd_hub_test_ci
+          POSTGRES_USER: mbfd_test_ci
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
@@ -61,6 +61,12 @@ jobs:
       run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
 
     - name: Build Vite assets for HTTP tests
+      env:
+        SENTRY_AUTH_TOKEN: ""
+        SENTRY_ORG: ""
+        SENTRY_PROJECT_FRONTEND: ""
+        VITE_SENTRY_DSN: ""
+        VITE_SENTRY_RELEASE: ""
       run: npm run build
 
     - name: Copy .env
@@ -72,9 +78,9 @@ jobs:
           echo "DB_CONNECTION=pgsql"
           echo "DB_HOST=127.0.0.1"
           echo "DB_PORT=5432"
-          echo "DB_DATABASE=testing"
-          echo "DB_USERNAME=testing"
-          echo "DB_PASSWORD=testing"
+          echo "DB_DATABASE=mbfd_hub_test_ci"
+          echo "DB_USERNAME=mbfd_test_ci"
+          echo "DB_PASSWORD="
           echo "CACHE_DRIVER=array"
           echo "SESSION_DRIVER=array"
           echo "QUEUE_CONNECTION=sync"
@@ -92,13 +98,17 @@ jobs:
     - name: Run Migrations
       run: php artisan migrate --force
 
-    - name: Run Tests
+    - name: Run non-PostgreSQL tests
+      run: php artisan test --exclude-group=postgres
+
+    - name: Run required disposable PostgreSQL integration tests
       env:
-        DB_CONNECTION: pgsql
+        MBFD_ALLOW_DISPOSABLE_POSTGRES: "1"
+        REQUIRE_POSTGRES_INTEGRATION: "true"
         EXPECTED_TEST_DB_CONNECTION: pgsql
-        DB_HOST: 127.0.0.1
-        DB_PORT: "5432"
-        DB_DATABASE: testing
-        DB_USERNAME: testing
-        DB_PASSWORD: testing
-      run: php artisan test
+        DISPOSABLE_POSTGRES_HOST: 127.0.0.1
+        DISPOSABLE_POSTGRES_PORT: "5432"
+        DISPOSABLE_POSTGRES_DATABASE: mbfd_hub_test_ci
+        DISPOSABLE_POSTGRES_USERNAME: mbfd_test_ci
+        DISPOSABLE_POSTGRES_PASSWORD: ""
+      run: php artisan test --group=postgres

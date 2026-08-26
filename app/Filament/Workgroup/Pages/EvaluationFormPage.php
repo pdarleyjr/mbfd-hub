@@ -4,16 +4,19 @@ namespace App\Filament\Workgroup\Pages;
 
 use App\Models\CandidateProduct;
 use App\Models\EvaluationSubmission;
+use App\Models\User;
 use App\Models\WorkgroupMember;
-use App\Support\Workgroups\UniversalEvaluationRubric;
 use App\Services\Workgroup\EvaluationService;
+use App\Support\Workgroups\UniversalEvaluationRubric;
+use App\Support\Workgroups\WorkgroupAccess;
+use App\Support\Workgroups\WorkgroupContext;
+use Filament\Forms\Components\Group;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Group;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -26,32 +29,57 @@ class EvaluationFormPage extends Page
     use InteractsWithForms;
 
     protected static string $view = 'filament-workgroup.pages.evaluation-form';
+
     protected static ?string $title = 'Evaluate Product';
+
     protected static ?string $navigationLabel = 'Evaluate';
+
     protected static bool $shouldRegisterNavigation = false;
 
     public ?int $productId = null;
+
     public ?int $submissionId = null;
+
     public array $ratings = [];
+
     public array $notes = [];
+
     public ?string $advance_recommendation = null;
+
     public ?string $confidence_level = null;
+
     public bool $has_deal_breaker = false;
+
     public ?string $deal_breaker_note = null;
+
     public ?string $strongest_advantages = null;
+
     public ?string $biggest_weaknesses = null;
+
     public ?string $best_use_case = null;
+
     public ?string $compatibility_notes = null;
+
     public ?string $training_notes = null;
+
     public ?string $safety_concerns = null;
+
     public ?string $additional_comments = null;
+
     public ?CandidateProduct $product = null;
+
     public ?EvaluationSubmission $submission = null;
+
     public ?WorkgroupMember $member = null;
+
     public array $criteria = [];
+
     public array $criteriaByBucket = [];
+
     public bool $isReadOnly = false;
+
     public bool $canSubmit = false;
+
     public string $assessmentProfile = 'generic_apparatus';
 
     protected EvaluationService $evaluationService;
@@ -60,26 +88,31 @@ class EvaluationFormPage extends Page
     {
         $this->productId = (int) request()->get('productId', 0);
 
-        if (!$this->productId) {
+        if (! $this->productId) {
             $this->redirect(Evaluations::getUrl());
+
             return;
         }
 
-        $this->evaluationService = new EvaluationService();
-        $this->member = $this->getCurrentMember();
-
-        if (!$this->member) {
-            Notification::make()->title('Access Denied')->body('You must be a workgroup member.')->danger()->send();
-            $this->redirect(Evaluations::getUrl());
-            return;
-        }
+        $this->evaluationService = app(EvaluationService::class);
 
         $this->loadProduct();
     }
 
     protected function loadProduct(): void
     {
-        $this->product = CandidateProduct::with(['category', 'session'])->findOrFail($this->productId);
+        $user = $this->currentUser();
+        $access = app(WorkgroupAccess::class);
+        $this->product = $access
+            ->scopeCandidateProducts(CandidateProduct::with(['category', 'session.workgroup']), $user)
+            ->find($this->productId);
+
+        abort_unless($this->product !== null && $this->product->session !== null, 404);
+
+        $this->member = $this->currentWorkgroupMemberForProduct($user, $this->product);
+
+        abort_unless($this->member !== null, 404);
+
         $this->assessmentProfile = $this->product->category->getRawOriginal('assessment_profile') ?? 'generic_apparatus';
         $this->criteriaByBucket = UniversalEvaluationRubric::getCriteriaByBucket($this->assessmentProfile);
 
@@ -89,17 +122,7 @@ class EvaluationFormPage extends Page
         // Admins and facilitators are never blocked.
         // ---------------------------------------------------------------
         $sessionId = $this->product->workgroup_session_id;
-        if ($sessionId && $this->member->role === 'member') {
-            if (!$this->evaluationService->canMemberAccessSession($this->member, $sessionId)) {
-                Notification::make()
-                    ->title('Access Denied')
-                    ->body('You do not have attendance for this session and therefore cannot evaluate its products.')
-                    ->danger()
-                    ->send();
-                $this->redirect(Evaluations::getUrl());
-                return;
-            }
-        }
+        abort_unless($sessionId && $this->evaluationService->canMemberAccessSession($this->member, $sessionId), 404);
 
         foreach ($this->criteriaByBucket as $bucket => $bucketCriteria) {
             foreach ($bucketCriteria as $id => $criterion) {
@@ -116,7 +139,11 @@ class EvaluationFormPage extends Page
 
     protected function loadExistingData(): void
     {
-        if (!$this->submission) return;
+        if (! $this->submission) {
+            return;
+        }
+
+        $this->isReadOnly = $this->submission->isSubmitted();
 
         if ($this->submission->criterion_payload) {
             $this->ratings = $this->submission->criterion_payload['ratings'] ?? [];
@@ -143,27 +170,49 @@ class EvaluationFormPage extends Page
     protected function checkCanSubmit(): void
     {
         foreach ($this->criteria as $id => $criterion) {
-            if (!isset($this->ratings[$id]) || $this->ratings[$id] === '') {
+            if (! isset($this->ratings[$id]) || $this->ratings[$id] === '') {
                 $this->canSubmit = false;
+
                 return;
             }
         }
         if (empty($this->advance_recommendation) || empty($this->confidence_level)) {
             $this->canSubmit = false;
+
             return;
         }
         if ($this->has_deal_breaker && empty($this->deal_breaker_note)) {
             $this->canSubmit = false;
+
             return;
         }
         $this->canSubmit = true;
     }
 
-    public function updatedRatings(): void { $this->checkCanSubmit(); }
-    public function updatedAdvanceRecommendation(): void { $this->checkCanSubmit(); }
-    public function updatedConfidenceLevel(): void { $this->checkCanSubmit(); }
-    public function updatedHasDealBreaker(): void { $this->checkCanSubmit(); }
-    public function updatedDealBreakerNote(): void { $this->checkCanSubmit(); }
+    public function updatedRatings(): void
+    {
+        $this->checkCanSubmit();
+    }
+
+    public function updatedAdvanceRecommendation(): void
+    {
+        $this->checkCanSubmit();
+    }
+
+    public function updatedConfidenceLevel(): void
+    {
+        $this->checkCanSubmit();
+    }
+
+    public function updatedHasDealBreaker(): void
+    {
+        $this->checkCanSubmit();
+    }
+
+    public function updatedDealBreakerNote(): void
+    {
+        $this->checkCanSubmit();
+    }
 
     /**
      * Set all ratings to highest score (5).
@@ -202,11 +251,11 @@ class EvaluationFormPage extends Page
             ->schema([
                 Placeholder::make('legend')->label('')->content(new HtmlString(
                     '<span class="font-bold text-green-600">5=Outstanding</span> · '
-                    . '<span class="font-bold text-blue-600">4=Strong</span> · '
-                    . '<span class="font-bold text-yellow-600">3=Acceptable</span> · '
-                    . '<span class="font-bold text-red-600">2=Below</span> · '
-                    . '<span class="font-bold text-red-800">1=Unacceptable</span> · '
-                    . '<span class="text-gray-500">N/A</span>'
+                    .'<span class="font-bold text-blue-600">4=Strong</span> · '
+                    .'<span class="font-bold text-yellow-600">3=Acceptable</span> · '
+                    .'<span class="font-bold text-red-600">2=Below</span> · '
+                    .'<span class="font-bold text-red-800">1=Unacceptable</span> · '
+                    .'<span class="text-gray-500">N/A</span>'
                 )),
             ])->collapsed();
 
@@ -220,23 +269,25 @@ class EvaluationFormPage extends Page
         ];
 
         foreach ($this->criteriaByBucket as $bucket => $bucketCriteria) {
-            if (empty($bucketCriteria)) continue;
+            if (empty($bucketCriteria)) {
+                continue;
+            }
             $config = $bucketConfig[$bucket] ?? ['title' => ucfirst($bucket), 'desc' => ''];
             $fields = [];
 
             foreach ($bucketCriteria as $id => $criterion) {
                 $srcLabel = UniversalEvaluationRubric::getSourceLabel($criterion['source']);
                 $fields[] = Group::make([
-                    Placeholder::make('desc_' . $id)
+                    Placeholder::make('desc_'.$id)
                         ->label($criterion['name'])
-                        ->content($criterion['description'] . " ({$srcLabel} · Wt: {$criterion['weight']})")
+                        ->content($criterion['description']." ({$srcLabel} · Wt: {$criterion['weight']})")
                         ->columnSpanFull(),
-                    Select::make('ratings.' . $id)
+                    Select::make('ratings.'.$id)
                         ->label('Score')
                         ->options(UniversalEvaluationRubric::getRatingOptions())
                         ->disabled($this->isReadOnly)
                         ->columnSpan(1),
-                    TextInput::make('notes.' . $id)
+                    TextInput::make('notes.'.$id)
                         ->label('Notes')
                         ->disabled($this->isReadOnly)
                         ->columnSpan(1),
@@ -289,27 +340,29 @@ class EvaluationFormPage extends Page
 
     public function submitEvaluation(): void
     {
-        if (!$this->canSubmit) {
+        if (! $this->canSubmit) {
             Notification::make()->title('Incomplete')->body('Complete all fields first.')->danger()->send();
+
             return;
         }
-        $this->saveRubricData();
+        $submission = $this->saveRubricData();
         try {
-            $this->submission->update(['status' => 'submitted', 'submitted_at' => now()]);
-            $this->submission->refresh();
+            $submission->update(['status' => 'submitted', 'submitted_at' => now()]);
+            $this->submission = $submission->fresh();
+            $this->isReadOnly = true;
             Notification::make()->title('Evaluation Submitted')->success()->send();
         } catch (\Exception $e) {
             Notification::make()->title('Failed')->body($e->getMessage())->danger()->send();
         }
     }
 
-    protected function saveRubricData(): void
+    protected function saveRubricData(): EvaluationSubmission
     {
-        if (!$this->submission) return;
-        $ratings = array_filter($this->ratings, fn($v) => $v !== '' && $v !== null);
+        $submission = $this->resolveOwnedDraft();
+        $ratings = array_filter($this->ratings, fn ($v) => $v !== '' && $v !== null);
         $scores = UniversalEvaluationRubric::calculateAllScores($ratings);
 
-        $this->submission->update([
+        $submission->update([
             'rubric_version' => UniversalEvaluationRubric::getVersion(),
             'assessment_profile' => $this->assessmentProfile,
             'overall_score' => $scores['overall_score'],
@@ -331,21 +384,67 @@ class EvaluationFormPage extends Page
                 'additional_comments' => $this->additional_comments,
             ],
         ]);
-        $this->submission->refresh();
+        $this->submission = $submission->fresh();
+
+        return $this->submission;
     }
 
-    protected function getCurrentMember(): ?WorkgroupMember
+    private function resolveOwnedDraft(): EvaluationSubmission
     {
-        return WorkgroupMember::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->with(['workgroup.sessions'])
+        $user = $this->currentUser();
+        $product = app(WorkgroupAccess::class)
+            ->scopeCandidateProducts(CandidateProduct::with('session'), $user)
+            ->find($this->productId);
+
+        abort_unless($product !== null && $product->session !== null, 404);
+
+        $member = $this->currentWorkgroupMemberForProduct($user, $product);
+
+        abort_unless($member !== null, 404);
+
+        $submission = EvaluationSubmission::query()
+            ->whereKey($this->submissionId)
+            ->where('workgroup_member_id', $member->id)
+            ->where('candidate_product_id', $product->id)
+            ->where('status', 'draft')
             ->first();
+
+        abort_unless($submission !== null, 404);
+
+        $this->product = $product;
+        $this->member = $member;
+
+        return $submission;
     }
 
     public static function canAccess(): bool
     {
         $user = Auth::user();
-        if (!$user) return false;
-        return WorkgroupMember::where('user_id', $user->id)->where('is_active', true)->exists();
+
+        return $user instanceof User && app(WorkgroupAccess::class)->canEnterPanel($user);
+    }
+
+    private function currentUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless($user instanceof User, 404);
+
+        return $user;
+    }
+
+    private function currentWorkgroupMemberForProduct(User $user, CandidateProduct $product): WorkgroupMember
+    {
+        $session = $product->session;
+        abort_unless($session !== null, 404);
+
+        $context = app(WorkgroupContext::class);
+        $workgroup = $context->requireCurrent($user);
+        abort_unless($workgroup->id === $session->workgroup_id, 404);
+
+        $member = $context->requireMember($user);
+        abort_unless($member->workgroup_id === $workgroup->id, 404);
+
+        return $member;
     }
 }

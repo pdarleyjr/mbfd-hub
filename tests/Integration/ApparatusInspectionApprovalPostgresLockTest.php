@@ -11,18 +11,17 @@ use App\Models\ApparatusInspection;
 use App\Models\Station;
 use App\Models\User;
 use App\Services\ApparatusInspectionApprovalService;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Group;
+use Symfony\Component\Process\Process as SymfonyProcess;
 use Tests\TestCase;
 
 /**
- * Uses two real PostgreSQL connections. The first connection holds the same
- * inspection row that the service locks; the second invokes the production
- * approval or rejection method with a short lock timeout. This exercises the
- * lock boundary rather than assuming SQLite's lockForUpdate support.
+ * Uses a separate local PHP process to hold the same inspection row that the
+ * production approval service locks. The service must retry PostgreSQL lock
+ * timeouts, then retain one append-only terminal decision.
  *
  * It is deliberately guarded to an explicitly configured disposable test DB.
  */
@@ -37,45 +36,46 @@ final class ApparatusInspectionApprovalPostgresLockTest extends TestCase
         Http::preventStrayRequests();
     }
 
-    public function test_postgresql_serializes_a_second_approval_and_a_conflicting_rejection(): void
+    public function test_postgresql_retries_a_same_record_lock_and_records_one_terminal_decision(): void
     {
-        if (! app()->environment('testing')
-            || getenv('EXPECTED_TEST_DB_CONNECTION') !== 'pgsql'
-            || DB::connection()->getDriverName() !== 'pgsql') {
-            $this->markTestSkipped('This regression requires the explicitly configured disposable PostgreSQL test database.');
-        }
+        $this->requireDisposablePostgres();
 
         [$station, $apparatus, $approvalInspection, $rejectionInspection, $reviewer] = $this->pendingInspections();
         Queue::fake();
+        $connection = DB::connection();
+        $lockHolder = null;
 
         try {
             $service = app(ApparatusInspectionApprovalService::class);
 
-            $this->assertDecisionWaitsForInspectionLock(
-                $approvalInspection,
-                fn (): ApparatusInspection => $service->approve($approvalInspection->id, $reviewer),
-                'approval',
-            );
-            $this->assertDecisionWaitsForInspectionLock(
-                $rejectionInspection,
-                fn (): ApparatusInspection => $service->reject(
-                    $rejectionInspection->id,
-                    $reviewer,
-                    'The concurrently submitted evidence was rejected.',
-                ),
-                'rejection',
-            );
+            $lockKey = random_int(1_000_000, 2_000_000_000);
+            $lockHolder = $this->holdInspectionLockInSeparateProcess($approvalInspection->id, $lockKey);
+            $this->waitUntilAdvisoryLockIsHeld($lockKey, $lockHolder);
 
-            Queue::assertNothingPushed();
+            $connection->statement("SET lock_timeout = '75ms'");
+            $startedAt = hrtime(true);
+            $approved = $service->approve($approvalInspection->id, $reviewer);
+            $elapsedSeconds = (hrtime(true) - $startedAt) / 1_000_000_000;
+            $connection->statement('SET lock_timeout = DEFAULT');
 
-            $service->approve($approvalInspection->id, $reviewer);
-            $service->reject($rejectionInspection->id, $reviewer, 'The reviewer rejected the submitted evidence.');
+            $lockHolder->wait();
+            $this->assertTrue($lockHolder->isSuccessful(), $lockHolder->getErrorOutput());
+            $this->assertGreaterThanOrEqual(0.25, $elapsedSeconds);
+            $this->assertSame('approved', $approved->review_status);
+
+            $repeatApproval = $service->approve($approvalInspection->id, $reviewer);
+            $conflictingRejection = $service->reject(
+                $approvalInspection->id,
+                $reviewer,
+                'A later conflicting decision must not replace the terminal approval.',
+            );
 
             $this->assertSame('approved', $approvalInspection->fresh()->review_status);
-            $this->assertSame('rejected', $rejectionInspection->fresh()->review_status);
+            $this->assertSame('approved', $repeatApproval->review_status);
+            $this->assertSame('approved', $conflictingRejection->review_status);
             $this->assertSame('Out of Service', $apparatus->fresh()->status);
-            $this->assertSame(2, DB::table('apparatus_inspection_review_events')
-                ->whereIn('apparatus_inspection_id', [$approvalInspection->id, $rejectionInspection->id])
+            $this->assertSame(1, DB::table('apparatus_inspection_review_events')
+                ->where('apparatus_inspection_id', $approvalInspection->id)
                 ->count());
             $this->assertSame(1, DB::table('apparatus_defects')
                 ->where('apparatus_inspection_id', $approvalInspection->id)
@@ -83,53 +83,100 @@ final class ApparatusInspectionApprovalPostgresLockTest extends TestCase
             Queue::assertPushed(PmAlertNotificationJob::class, 1);
             Queue::assertPushed(AuditEquipmentAfterInspection::class, 1);
         } finally {
+            $connection->statement('SET lock_timeout = DEFAULT');
+
+            if ($lockHolder instanceof SymfonyProcess && $lockHolder->isRunning()) {
+                $lockHolder->wait();
+            }
+
             $this->deleteFixture($station, $apparatus, $approvalInspection, $rejectionInspection, $reviewer);
         }
     }
 
-    /** @param callable(): ApparatusInspection $decision */
-    private function assertDecisionWaitsForInspectionLock(
-        ApparatusInspection $inspection,
-        callable $decision,
-        string $label,
-    ): void {
-        $primaryConnectionName = DB::getDefaultConnection();
-        $secondaryConnectionName = 'apparatus_inspection_decision_lock_'.str_replace('.', '_', uniqid('', true));
-        config([
-            "database.connections.{$secondaryConnectionName}" => config("database.connections.{$primaryConnectionName}"),
-        ]);
-        DB::purge($secondaryConnectionName);
-
-        $primaryConnection = DB::connection($primaryConnectionName);
-        $secondaryConnection = DB::connection($secondaryConnectionName);
-        $primaryConnection->beginTransaction();
-
-        try {
-            $this->assertNotNull(
-                $primaryConnection->table('apparatus_inspections')
-                    ->where('id', $inspection->id)
-                    ->lockForUpdate()
-                    ->first(),
-            );
-            $secondaryConnection->statement("SET lock_timeout = '250ms'");
-            DB::setDefaultConnection($secondaryConnectionName);
-
-            try {
-                $decision();
-                $this->fail("The concurrent {$label} should have waited for the inspection row lock.");
-            } catch (QueryException $exception) {
-                $this->assertStringContainsString('lock timeout', strtolower($exception->getMessage()));
-            } finally {
-                DB::setDefaultConnection($primaryConnectionName);
-            }
-        } finally {
-            if ($primaryConnection->transactionLevel() > 0) {
-                $primaryConnection->rollBack();
-            }
-
-            DB::disconnect($secondaryConnectionName);
-            DB::purge($secondaryConnectionName);
+    private function requireDisposablePostgres(): void
+    {
+        if (app()->environment('testing')
+            && getenv('MBFD_ALLOW_DISPOSABLE_POSTGRES') === '1'
+            && getenv('EXPECTED_TEST_DB_CONNECTION') === 'pgsql'
+            && DB::connection()->getDriverName() === 'pgsql') {
+            return;
         }
+
+        if (getenv('REQUIRE_POSTGRES_INTEGRATION') === 'true') {
+            $this->fail('PostgreSQL integration tests require the explicit loopback disposable database configuration.');
+        }
+
+        $this->markTestSkipped('This regression requires the explicitly configured disposable PostgreSQL test database.');
+    }
+
+    private function holdInspectionLockInSeparateProcess(int $inspectionId, int $lockKey): SymfonyProcess
+    {
+        $connection = config('database.connections.'.config('database.default'));
+        $command = [
+            PHP_BINARY,
+            '-d',
+            'extension=pdo_pgsql',
+            '-r',
+            <<<'PHP'
+$pdo = new PDO(
+    getenv('AUDIT_PG_DSN'),
+    getenv('AUDIT_PG_USERNAME'),
+    getenv('AUDIT_PG_PASSWORD'),
+    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+);
+$pdo->beginTransaction();
+$inspection = $pdo->prepare('SELECT id FROM apparatus_inspections WHERE id = :id FOR UPDATE');
+$inspection->execute(['id' => (int) getenv('AUDIT_PG_INSPECTION_ID')]);
+if ($inspection->fetchColumn() === false) {
+    throw new RuntimeException('The disposable PostgreSQL lock fixture was not found.');
+}
+$pdo->query('SELECT pg_advisory_xact_lock('.(int) getenv('AUDIT_PG_LOCK_KEY').')');
+$pdo->query('SELECT pg_sleep(0.6)');
+$pdo->commit();
+PHP,
+        ];
+
+        $process = new SymfonyProcess($command, base_path(), [
+            'AUDIT_PG_DSN' => sprintf(
+                'pgsql:host=%s;port=%s;dbname=%s',
+                $connection['host'],
+                $connection['port'],
+                $connection['database'],
+            ),
+            'AUDIT_PG_INSPECTION_ID' => (string) $inspectionId,
+            'AUDIT_PG_LOCK_KEY' => (string) $lockKey,
+            'AUDIT_PG_PASSWORD' => (string) $connection['password'],
+            'AUDIT_PG_USERNAME' => (string) $connection['username'],
+            'SystemRoot' => (string) getenv('SystemRoot'),
+            'WINDIR' => (string) getenv('WINDIR'),
+        ]);
+        $process->start();
+
+        return $process;
+    }
+
+    private function waitUntilAdvisoryLockIsHeld(int $lockKey, SymfonyProcess $lockHolder): void
+    {
+        $deadline = microtime(true) + 5;
+
+        do {
+            $result = DB::selectOne('SELECT pg_try_advisory_lock(?) AS acquired', [$lockKey]);
+            $acquired = filter_var($result?->acquired, FILTER_VALIDATE_BOOL);
+
+            if ($acquired) {
+                DB::selectOne('SELECT pg_advisory_unlock(?)', [$lockKey]);
+            } else {
+                return;
+            }
+
+            if (! $lockHolder->isRunning()) {
+                $this->fail('The disposable PostgreSQL lock holder exited before it acquired the fixture lock: '.$lockHolder->getErrorOutput());
+            }
+
+            usleep(20_000);
+        } while (microtime(true) < $deadline);
+
+        $this->fail('Timed out waiting for the disposable PostgreSQL lock holder.');
     }
 
     /** @return array{Station, Apparatus, ApparatusInspection, ApparatusInspection, User} */

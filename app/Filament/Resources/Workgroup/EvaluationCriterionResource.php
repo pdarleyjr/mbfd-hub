@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\Workgroup;
 
-use App\Filament\Resources\Workgroup\Pages;
+use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
 use App\Models\EvaluationCriterion;
 use App\Models\EvaluationTemplate;
 use Filament\Forms;
@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class EvaluationCriterionResource extends Resource
 {
+    use ResolvesWorkgroupAccess;
+
     protected static ?string $model = EvaluationCriterion::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
@@ -119,21 +121,35 @@ class EvaluationCriterionResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null && self::workgroupAccess()->isGlobalViewer($user);
     }
 
     public static function canCreate(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        return self::currentWorkgroupUser()?->hasRole('super_admin') ?? false;
     }
 
     public static function canEdit($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        return self::canCreate();
     }
 
     public static function canDelete($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        return self::canCreate();
+    }
+
+    public static function canView($record): bool
+    {
+        return self::canViewAny();
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return self::canViewAny()
+            ? parent::getEloquentQuery()
+            : parent::getEloquentQuery()->whereRaw('1 = 0');
     }
 }

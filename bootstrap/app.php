@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin.role' => \App\Http\Middleware\EnsureAdminApiRole::class,
             'workgroup.access' => \App\Http\Middleware\EnsureWorkgroupPanelAccess::class,
+            'workgroup.global' => \App\Http\Middleware\EnsureGlobalWorkgroupAccess::class,
             'verify.bid.token' => \App\Http\Middleware\VerifyBidReaderToken::class,
             'display.readonly' => \App\Http\Middleware\EnsureDisplayReadOnly::class,
             'display.token' => \App\Http\Middleware\EnsureDisplayToken::class,

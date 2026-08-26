@@ -8,6 +8,7 @@ return new class extends Migration
     public function up(): void
     {
         $hasHistoricalDuplicates = DB::table('trt_inventory_sessions')
+            ->selectRaw('1')
             ->whereNull('trailer_id')
             ->groupBy('session_date')
             ->havingRaw('COUNT(*) > 1')

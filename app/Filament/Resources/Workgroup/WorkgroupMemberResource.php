@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\Workgroup;
 
-use App\Filament\Resources\Workgroup\Pages;
+use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
 use App\Models\User;
 use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Hash;
 
 class WorkgroupMemberResource extends Resource
 {
+    use ResolvesWorkgroupAccess;
+
     protected static ?string $model = WorkgroupMember::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
@@ -41,8 +43,8 @@ class WorkgroupMemberResource extends Resource
                             ->label('Select Existing User')
                             ->options(fn () => User::orderBy('name')->pluck('name', 'id'))
                             ->searchable()
-                            ->required(fn (callable $get) => !$get('create_new_user'))
-                            ->visible(fn (callable $get) => !$get('create_new_user')),
+                            ->required(fn (callable $get) => ! $get('create_new_user'))
+                            ->visible(fn (callable $get) => ! $get('create_new_user')),
                         Forms\Components\TextInput::make('new_user_name')
                             ->label('Full Name')
                             ->required(fn (callable $get) => $get('create_new_user'))
@@ -64,7 +66,7 @@ class WorkgroupMemberResource extends Resource
                             ->dehydrated(false),
                         Forms\Components\Select::make('workgroup_id')
                             ->label('Workgroup')
-                            ->options(fn () => Workgroup::orderBy('name')->pluck('name', 'id'))
+                            ->options(fn () => self::workgroupAccess()->scopeManageWorkgroups(Workgroup::query(), self::currentWorkgroupUser())->orderBy('name')->pluck('name', 'id'))
                             ->searchable()
                             ->required(),
                         Forms\Components\Select::make('role')
@@ -116,6 +118,10 @@ class WorkgroupMemberResource extends Resource
                 Tables\Columns\ToggleColumn::make('count_evaluations')
                     ->label('Count Evals')
                     ->sortable()
+                    ->disabled(fn (WorkgroupMember $record): bool => ! self::canEdit($record))
+                    ->beforeStateUpdated(function (WorkgroupMember $record): void {
+                        abort_unless(self::canEdit($record), 404);
+                    })
                     ->afterStateUpdated(function ($record) {
                         // Clear AI caches when toggling so reports refresh
                         \Illuminate\Support\Facades\Cache::forget("workgroup_ai_exec_report_{$record->workgroup_id}");
@@ -128,7 +134,7 @@ class WorkgroupMemberResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('workgroup_id')
                     ->label('Workgroup')
-                    ->options(fn () => Workgroup::pluck('name', 'id')),
+                    ->options(fn () => self::workgroupAccess()->scopeWorkgroups(Workgroup::query(), self::currentWorkgroupUser())->pluck('name', 'id')),
                 Tables\Filters\SelectFilter::make('role')
                     ->label('Role')
                     ->options([
@@ -146,6 +152,8 @@ class WorkgroupMemberResource extends Resource
                     ->label('Set Password')
                     ->icon('heroicon-o-key')
                     ->color('warning')
+                    ->visible(fn (WorkgroupMember $record): bool => self::canEdit($record))
+                    ->authorize(fn (WorkgroupMember $record): bool => self::canEdit($record))
                     ->form([
                         Forms\Components\TextInput::make('new_password')
                             ->label('New Password')
@@ -153,6 +161,8 @@ class WorkgroupMemberResource extends Resource
                             ->minLength(4),
                     ])
                     ->action(function (WorkgroupMember $record, array $data): void {
+                        abort_unless(self::canEdit($record), 404);
+
                         $user = $record->user;
                         if ($user) {
                             $user->update([
@@ -184,21 +194,45 @@ class WorkgroupMemberResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null && self::workgroupAccess()->canEnterPanel($user);
     }
 
     public static function canCreate(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null && self::workgroupAccess()->canManageAnyWorkgroup($user);
     }
 
     public static function canEdit($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null
+            && $record instanceof WorkgroupMember
+            && $record->workgroup !== null
+            && self::workgroupAccess()->canManageWorkgroup($user, $record->workgroup);
     }
 
     public static function canDelete($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        return self::canEdit($record);
+    }
+
+    public static function canView($record): bool
+    {
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null
+            && $record instanceof WorkgroupMember
+            && $record->workgroup !== null
+            && self::workgroupAccess()->canViewWorkgroup($user, $record->workgroup);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return self::workgroupAccess()->scopeWorkgroupRecords(parent::getEloquentQuery(), self::currentWorkgroupUser());
     }
 }

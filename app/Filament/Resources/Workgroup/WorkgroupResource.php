@@ -2,8 +2,7 @@
 
 namespace App\Filament\Resources\Workgroup;
 
-use App\Filament\Resources\Workgroup\Pages;
-use App\Filament\Resources\Workgroup\RelationManagers;
+use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
 use App\Models\Workgroup;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -16,6 +15,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class WorkgroupResource extends Resource
 {
+    use ResolvesWorkgroupAccess;
+
     protected static ?string $model = Workgroup::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
@@ -148,21 +149,41 @@ class WorkgroupResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null && self::workgroupAccess()->canEnterPanel($user);
     }
 
     public static function canCreate(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        return self::currentWorkgroupUser()?->hasRole('super_admin') ?? false;
     }
 
     public static function canEdit($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null
+            && $record instanceof Workgroup
+            && self::workgroupAccess()->canManageWorkgroup($user, $record);
     }
 
     public static function canDelete($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        return self::canEdit($record);
+    }
+
+    public static function canView($record): bool
+    {
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null
+            && $record instanceof Workgroup
+            && self::workgroupAccess()->canViewWorkgroup($user, $record);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return self::workgroupAccess()->scopeWorkgroups(parent::getEloquentQuery(), self::currentWorkgroupUser());
     }
 }

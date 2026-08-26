@@ -2,9 +2,8 @@
 
 namespace App\Filament\Resources\Workgroup;
 
-use App\Filament\Resources\Workgroup\Pages;
+use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
 use App\Models\Workgroup;
-use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -17,6 +16,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class WorkgroupSessionResource extends Resource
 {
+    use ResolvesWorkgroupAccess;
+
     protected static ?string $model = WorkgroupSession::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar';
@@ -37,7 +38,7 @@ class WorkgroupSessionResource extends Resource
                             ->label('Session Name'),
                         Forms\Components\Select::make('workgroup_id')
                             ->label('Workgroup')
-                            ->options(fn () => Workgroup::orderBy('name')->pluck('name', 'id'))
+                            ->options(fn () => self::workgroupAccess()->scopeManageWorkgroups(Workgroup::query(), self::currentWorkgroupUser())->orderBy('name')->pluck('name', 'id'))
                             ->searchable()
                             ->required()
                             ->live(),
@@ -48,35 +49,14 @@ class WorkgroupSessionResource extends Resource
                         Forms\Components\Select::make('status')
                             ->label('Status')
                             ->options([
-                                'draft'     => 'Draft',
-                                'active'    => 'Active',
+                                'draft' => 'Draft',
+                                'active' => 'Active',
                                 'completed' => 'Completed',
                             ])
                             ->default('draft')
                             ->required(),
                     ])
                     ->columns(2),
-
-                Forms\Components\Section::make('Session Attendance')
-                    ->description('Select the workgroup members who attended this session. Only these members will be able to evaluate session products.')
-                    ->schema([
-                        Forms\Components\CheckboxList::make('attendees')
-                            ->label('Attending Members')
-                            ->relationship(
-                                name: 'attendees',
-                                titleAttribute: 'id',
-                                modifyQueryUsing: fn (\Illuminate\Database\Eloquent\Builder $query) =>
-                                    $query->where('is_active', true)
-                                          ->whereNotNull('user_id')
-                                          ->with('user')
-                            )
-                            ->getOptionLabelFromRecordUsing(fn (WorkgroupMember $record) =>
-                                $record->user?->name ?? "Member #{$record->id}"
-                            )
-                            ->columns(2)
-                            ->searchable()
-                            ->helperText('Check all members who physically attended this session day.'),
-                    ]),
             ]);
     }
 
@@ -161,7 +141,7 @@ class WorkgroupSessionResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('workgroup_id')
                     ->label('Workgroup')
-                    ->options(fn () => Workgroup::pluck('name', 'id')),
+                    ->options(fn () => self::workgroupAccess()->scopeWorkgroups(Workgroup::query(), self::currentWorkgroupUser())->pluck('name', 'id')),
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Status')
                     ->options([
@@ -201,21 +181,43 @@ class WorkgroupSessionResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null && self::workgroupAccess()->canEnterPanel($user);
     }
 
     public static function canCreate(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null && self::workgroupAccess()->canManageAnyWorkgroup($user);
     }
 
     public static function canEdit($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null
+            && $record instanceof WorkgroupSession
+            && self::workgroupAccess()->canManageSession($user, $record);
     }
 
     public static function canDelete($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        return self::canEdit($record);
+    }
+
+    public static function canView($record): bool
+    {
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null
+            && $record instanceof WorkgroupSession
+            && self::workgroupAccess()->canViewSession($user, $record);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return self::workgroupAccess()->scopeSessions(parent::getEloquentQuery(), self::currentWorkgroupUser());
     }
 }

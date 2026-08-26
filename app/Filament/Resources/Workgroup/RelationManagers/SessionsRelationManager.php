@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Workgroup\RelationManagers;
 
+use App\Filament\Resources\Workgroup\RelationManagers\Concerns\AuthorizesWorkgroupOwner;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -10,6 +11,8 @@ use Filament\Tables\Table;
 
 class SessionsRelationManager extends RelationManager
 {
+    use AuthorizesWorkgroupOwner;
+
     protected static string $relationship = 'sessions';
 
     protected static ?string $title = 'Sessions';

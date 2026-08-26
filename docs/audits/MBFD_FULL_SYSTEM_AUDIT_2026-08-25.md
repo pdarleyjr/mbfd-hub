@@ -3,10 +3,10 @@
 - **Audit dates:** 2026-08-25–2026-08-26
 - **Static source inventory:** [MBFD_FULL_SYSTEM_AUDIT_2026-08-25.json](MBFD_FULL_SYSTEM_AUDIT_2026-08-25.json)
 - **Isolated worktree:** `D:\CodexWorktrees\mbfd-hub-full-system-20260825`
-- **Branch / audit checkpoint:** `audit/mbfd-hub-full-system-20260825` / `db284c7b9dfe3dee1a996222a0778f71a1b55df0`
+- **Audited branch HEAD:** `audit/mbfd-hub-full-system-20260825` / `74b3020c4`
 - **Hub repair commit:** `2ac7645a47db0b0225f5dab6fbe3eb8f47101560` (local only; not pushed or deployed)
 - **Verified source baseline:** cached `origin/main` at `ac6965f88f7d8ed441e08996b93d7cdb9f9b99c0`
-- **Current resumed repair set:** local audit changes in this branch; not pushed or deployed.
+- **Current resumed repair set:** isolated local Workgroup/PG/test-isolation changes in this branch; not pushed or deployed.
 
 ## Release verdict
 
@@ -71,6 +71,13 @@ The generated inventory is static-source evidence only. At generation it found 2
 - The readiness service treats an approved current-day inspection as authoritative even when another inspection is pending review.
 - The audit branch contains an explicit Daily requirement/template framework, but no production policy classification or backfill was inferred or applied.
 
+### Daily Checkout P0 reconfirmation — publication hold
+
+- **P0 / source finding:** an approved out-of-service apparatus can currently be represented as `checked` and increment the compliant count. This violates the required rule that out-of-service status must never inflate Daily compliance. The required/exempt denominator policy is an owner decision; do not silently choose it in a production release.
+- **P0 / source finding:** Station Detail renders approved inspection history and assigned apparatus links, not the canonical required-apparatus matrix (`checked`, `attention`, `review`, `not checked`, and out-of-service/exempt). It therefore cannot answer whether every required apparatus was completed for the operational day.
+- **P0 / source finding:** Station Operations independently counts all inspection rows by `created_at`, including pending/rejected or duplicate submissions, rather than using the canonical Daily compliance service and local-day semantics. It can disagree with the display/readiness result.
+- The tracked checklist resolver and public endpoint fail closed on missing, invalid, or ambiguous mappings. That is safer than silent success, but L1/L3 have duplicate radio labels and the dated read-only apparatus matrix shows that live required/template classification was still pending at observation time. Treat this as a release hold until a fresh, authorized data-policy preflight proves the intended classification and corrected checklist content.
+
 ### Access and operational safeguards
 
 - Workgroup provisioning requires an explicit temporary password; existing account resets set `must_change_password`, and protected matching accounts are skipped without account, password, enrollment, or workgroup mutation.
@@ -82,6 +89,16 @@ The generated inventory is static-source evidence only. At generation it found 2
 - The Employee Filament panel now persists the forced-password middleware. Actual Employee Livewire tests prove a flagged user cannot update the dashboard, can update only the password page, and can still log out; role-loss coverage now also exercises Training and Workgroup updates.
 - The direct video-conferencing health route now requires `super_admin` or `admin`; local regression coverage proves no-role and training users receive 403 while an admin receives the health response. No LiveKit, conference, player, or Media Control runtime action was performed.
 - The legacy direct Station Inventory PDF route now requires the same `super_admin`, `admin`, or `logistics_admin` role set as its existing API counterpart. A regular authenticated user receives 403; an inventory admin can still download the private PDF.
+
+### Workgroup tenant containment and report access
+
+- Active Workgroup resources, pages, relation managers, downloads, report exports, and AI endpoints now use default-deny membership/workgroup/session scoping. The selected workgroup is explicit for a multi-workgroup member; no active-session or first-membership fallback is accepted for the hardened active paths.
+- Active member-scoped report/download routes remain behind `workgroup.access` and a selected, authorized session. Cached reports can be read without making an external AI call; GET cache misses return not found rather than generating content.
+- Seven legacy ownerless report views now require explicit `workgroup.global_access` (or `super_admin`) rather than ordinary workgroup membership. The active Workgroup Links page is likewise hidden from ordinary members, so it no longer advertises links that would return an authorization failure.
+- The four registered custom widgets resolve the selected workgroup instead of `active()->first()`. The custom dashboard source does not currently render those widgets, so this is registration/future-use hardening, not browser-render acceptance.
+- Attendance, file, member, and session relation managers are manager-only and revalidate their owner workgroup. Direct-ID regressions cover cross-workgroup sessions, uploads, recipients, reports, evaluation form state, and report export requests.
+- The original Notes migration omitted `is_shared` and `shared_with_user_id` even though the page/model wrote them. A new additive, data-preserving migration adds both fields; a private-note regression first reproduced the missing-column failure and then passed locally. A code rollback intentionally leaves the additive data columns intact rather than risking deletion of pre-existing sharing data.
+- `AdminDashboard`, five legacy exporters, two legacy widgets, and the old AdminDashboard template remain unregistered. They must not be reactivated without explicit session scoping: several use global `active()->first()` fallbacks, three static exporter column definitions capture `$this`, and the AI exporter can invoke external analysis on a cache miss.
 
 ### Station inventory and TRT data integrity
 
@@ -110,19 +127,22 @@ The separate `mbfd-command-display` worktree was inspected without source edits,
 
 | Area | Result | Boundary / qualification |
 |---|---|---|
-| Laravel full suite | **PASS** — 516 tests / 2,822 assertions; 3 skipped | Re-run during the resumed audit with forced-empty ScreenTinker/Workgroup AI configuration and global stray-Laravel-HTTP prevention. This is local source/test evidence only, not hosted CI or production acceptance. |
+| Laravel full suite | **PASS** — 555 tests / 3,017 assertions; 6 skipped | Re-run after the current local repair set with forced-empty ScreenTinker/Workgroup AI configuration and global stray-Laravel-HTTP/process prevention. The six skips are disposable-PostgreSQL-only tests under the normal SQLite run. This is local source/test evidence only, not hosted CI or production acceptance. |
 | Daily integrity / review tests on local PostgreSQL | **PASS** — 16 tests / 115 assertions; 14 tests / 110 assertions | Fresh disposable PostgreSQL cluster only; all migrations including the three new migrations applied. |
-| Daily frontend typecheck and production build | **PASS** | Local build only. |
+| Daily Checkout typecheck and production build | **PASS** | Re-run locally in the isolated worktree; generated `/daily` assets and application-owned service worker were produced locally only. |
 | Daily Checkout Playwright | **PASS** — 12 / 12 | Dedicated local Daily configuration; includes queued reconnect/pending-review coverage. |
-| Root frontend typecheck and production build | **PASS** | Local build only; Browserslist/caniuse data is eight months stale. |
+| Root frontend typecheck and production build | **PASS** | Re-run locally with Sentry upload/release variables explicitly blank. The Vite build is source/build evidence only; it bundled but did not run LiveKit/Media Control. Browserslist/caniuse data is eight months stale. |
+| Operational Forms typecheck | **PASS** | Local static evidence only. |
+| Generated asset guard | **PASS** | Fresh root Vite, Filament, and Daily assets exist locally and no generated output is tracked by Git. |
 | Forced-password HTTP acceptance | **PASS** — 24 tests / 111 assertions | Real local `/livewire/update` requests across Admin, Employee, Training, and Workgroup, including role loss and allowed password/logout paths. No hosted session/browser evidence. |
 | Video-conferencing health authorization | **PASS** — 12 tests / 57 assertions | Local route/controller coverage; proves only Hub authorization behavior, not LiveKit/Media Control runtime health. |
 | Test integration isolation | **PASS** — 1 test / 4 assertions | Inherited sentinel values cannot enable ScreenTinker or Workgroup AI under PHPUnit, and stray Laravel HTTP is blocked globally. |
 | Station Inventory private-PDF access and generation | **PASS** — 6 tests / 19 assertions | Local private-disk and HTTP coverage, including regular-user denial, valid public PDF rendering, and distinct ULID paths. No production storage/path migration evidence. |
-| TRT default-session integrity | **PASS** — 3 tests / 8 assertions | Local SQLite schema proves the partial NULL uniqueness constraint and same-day public-submit convergence. A two-connection PostgreSQL race remains unrun. |
+| Workgroup tenant/report/Notes focused suite | **PASS** — 30 tests / 121 assertions | Local SQLite/Livewire/route evidence for active hardened surfaces. It does not prove hosted browser behavior, legacy dormant exporters, or a global-admin policy decision. |
+| Workgroup route-scope regression | **PASS** — 4 tests / 76 assertions | Local route metadata confirms member-scoped vs explicit-global report middleware. |
+| Disposable PostgreSQL approval/TRT integrity | **PASS** — 5 tests / 29 assertions | Dedicated loopback-only PostgreSQL 15 cluster; its test database/user naming and bootstrap guard reject any non-disposable target. The cluster was stopped after the test. This does not prove a production duplicate preflight or deployment migration. |
 | Inspection approval transaction acceptance | **PASS** — 5 tests / 52 assertions | Local fresh SQLite schema. Covers repeated/interleaved terminal decisions, outer-commit timing, rollback, cache state, and one job dispatch per terminal approval; SQLite does not prove PostgreSQL locking. |
-| PostgreSQL inspection decision locking | **NOT RUN** — 1 skipped | Syntax checked locally. The regression uses two connections and only runs with the explicit disposable-PostgreSQL test marker; it was correctly skipped under local SQLite. |
-| CI configuration guards | **PASS** — 10 / 10 | Source-only assertions, including isolation of PulsePoint from Support AI deploy paths, refusal of deployment capability in the PulsePoint verification workflow, and execution of this regression suite by CI. |
+| CI configuration guards | **PASS** — 12 / 12 | Re-run source-only assertions, including local browser/server harness isolation, no inherited Sentry upload capability, PostgreSQL test configuration, PulsePoint deployment containment, and execution of this suite by CI. |
 | PulsePoint worker | **PASS** — typecheck, 1 / 1 test, high-severity audit | Local only; the test confirms fail-closed behavior when the worker secret is absent. |
 | Root production dependency audit | **PASS** — no high-severity vulnerabilities | `npm audit --omit=dev --audit-level=high`. |
 | Composer locked dependency audit | **PASS** — no advisories | Local lockfile evidence only. |
@@ -133,10 +153,14 @@ The separate `mbfd-command-display` worktree was inspected without source edits,
 | Priority | Status | Required next evidence or decision |
 |---|---|---|
 | P0 | Local source safety repaired; not deployed | A separately authorized staged release must prove migration, rollback, real authorization, and public behavior before any production claim. |
+| P0 | Open / publication hold | The present `deploy.yml` can run automatically on a `main` push after only its lightweight syntax CI, then migrates before its Daily Checkout audit. It is not coupled to the full CI/static-analysis/security/build gates. Do not publish this branch during the class; choose an explicit Hub-only release window and a coherent pre-activation gate before changing deployment workflow behavior. |
+| P0 | Open / owner decision | An approved out-of-service Daily apparatus is counted as `checked`. Replace that representation with an explicit out-of-service state that cannot inflate compliance, after the owner decides whether it remains in the required denominator or is formally exempt. Update API, station/admin/display surfaces, and tests as one contract. |
+| P0 | Open / repair required | Station Detail lacks the canonical Daily required-apparatus matrix, and Station Operations displays a separate created-at inspection count that can include pending/rejected/duplicate rows. Make both consume one local-day, review-aware compliance contract before release. |
 | P0 | Open / owner decision | Public station video-conferencing routes can create a guest launch context and issue a station token without device identity. If publicly reachable, a caller can claim a station role. Select a kiosk-bound credential, mTLS, or verified edge identity contract before changing Hub routes; do not touch classroom players, Cloudflare, network, or Media Control runtime under this freeze. |
-| P1 | Open / safe containment available | Workgroup pages, API AI endpoints, reports, attendance, and direct IDs do not consistently prove that member, session, product, upload, and workgroup belong to the same tenant. Scope every record through `session.workgroup_id`, preserve existing global-admin behavior pending an owner decision, add Group-A/Group-B negative tests, and choose an explicit active-workgroup selector for multi-membership users. |
+| P1 | Local repair / owner decision | Active Workgroup pages, routes, relation managers, uploads, report exports, and registered widgets now have Group-A/Group-B coverage and explicit multi-workgroup context. Decide the intended global-admin workflow before adding any global selection UI: a global viewer can access global resources/static reports, while member-centric pages intentionally require an active membership. Keep dormant legacy dashboard/exporter/widget/template code unregistered until it has selected-session scoping and cache-only AI behavior. |
 | P1 | Open | The accountable owner must classify/backfill each apparatus' Daily Checkout requirement/template through a reviewed production plan; no production data was inferred or changed here. The observed registry also needs a deliberate decision for the absent Fire Boat 6 and duplicated L1/L3 `scba_radio` checklist labels. |
 | P1 | Open | Replace the post-migration Daily audit with a genuine pre-activation, staged/snapshot, read-only release gate. |
+| P1 | Open | Daily Playwright currently mocks every API request and is absent from root Playwright/CI execution; CI also omits Daily typecheck/build/E2E. Add a contained local/candidate API contract test and make the right build/typecheck gates required before a Daily release claim. Do not run browser/device acceptance during the live class. |
 | P1 | Open | Public Daily intake remains anonymously reachable subject to IP throttling. Although harmful operational effects are deferred, a kiosk/device credential, rate-limit, WAF, and storage-retention policy is still needed. |
 | P1 | Open / owner decision | Public station-request and legacy fire-equipment paths accept an arbitrary employee identity and persist/map it as requester. A genuine repair changes public/offline kiosk behavior: require the existing employee guard and derive identity server-side, then update UI/relogin/offline acceptance. Do not silently erase provenance or claim a caller-selected ID is authenticated. |
 | P1 | Frozen / no repair | Hub's ScreenTinker observer synchronously mirrors a captured plaintext password to the Media Control-adjacent endpoint and logs non-2xx body content. A future approved redesign needs no plaintext mirror/logging plus post-commit durable delivery. Do not modify it or exercise it against a live endpoint under this freeze. |
@@ -146,29 +170,36 @@ The separate `mbfd-command-display` worktree was inspected without source edits,
 | P1 | Open / data-classification decision | Workgroup uploads automatically extract and send document text to a public Worker default, permitting unauthenticated calls when no secret is configured. The two earlier local-test outbound attempts have unknown delivery/state; future source design needs explicit default-off/consent, required secret, and an after-commit durable job. |
 | P1 | Open / integration-gated | Google Sheets apparatus sync clears then writes in separate steps, terminal-fails rather than using its declared retries, and enqueues full syncs for every apparatus change. Define staged/atomic publication and coalescing/idempotency with a fake Sheets client before any external-sheet change. |
 | P1 | Open / operations-gated | Backup capture can fall back to a newest historical snapshot and restore smoke can validate a persistent older ID. Current exact-snapshot tests conflict with the source selection behavior. Capture the actual backup-run ID into a fresh atomic manifest, fail closed, prove freshness, then conduct a controlled restore; backup scope includes Media Control data, so defer live work under the freeze. |
-| P1 | Local repair only | The new default-TRT-session migration must first prove production has no historical same-day `NULL trailer_id` duplicates, and its two-connection PostgreSQL race regression is not yet run. Do not infer production migration readiness from SQLite. |
+| P1 | Local repair only | The new default-TRT-session migration passed a disposable two-connection PostgreSQL test, but production must first prove it has no historical same-day `NULL trailer_id` duplicates. Do not infer production migration readiness from local data. |
 | P1 | Local repair only | Station Inventory now prevents future filename collisions, but a database failure after the private PDF write can still leave an orphan file. Add failure cleanup/outbox sequencing and collision/failure test coverage before calling storage lifecycle complete. |
-| P1 | Open | The PostgreSQL two-connection locking regression is checked in but has not run in a disposable PostgreSQL environment. Do not infer real production lock-contention acceptance from the local SQLite suite. |
+| P1 | Local proof only | The PostgreSQL same-record inspection approval-lock regression passed in the dedicated loopback database with bounded retry behavior. It is not production lock-contention, worker, or external-Snipe acceptance. |
 | P1 | Open | Command Display has no committed, gated, semantically correct Daily contract. Correct the `review_pending` completion fixture, remove/prohibit the divergent client policy fallback, document/version the Hub schema, cover grid and detail payloads, and enforce the contract test before release. |
 | P1 | Open | GitHub governance is absent: authenticated read-only API calls returned HTTP 404 for `main` branch protection and required-status-check resources; repository ruleset listing returned zero rulesets. Require pull requests, required CI checks, at least one accountable review/code-owner rule, dismissal of stale approvals, and block force-push/deletion before any production-ready claim. No repository setting was changed. |
+| P1 | Open | Static analysis is not lockfile-reproducible: its workflow runs `composer require larastan/larastan` after installing the committed lockfile, but Larastan is not declared/locked. Deliberately add and lock it, or use a pinned external tool; do not call its runtime resolution a committed-CI result. |
+| P1 | Open | Observability runs `npm install` and creates a Sentry release on every `main` push without waiting for deployment success. Treat Sentry release metadata as non-provenance until the workflow is lockfile-reproducible and linked to a successful immutable deployment. |
+| P1 | Open | The production Compose/deploy path bind-mounts the checkout and builds from a Sail runtime before later `composer install --no-dev`; source declares PHP 8.2+, CI uses 8.4, and Compose targets Sail 8.5. Rehearse the exact immutable production image/interpreter and candidate SHA before release. |
+| P1 | Frozen / operations-gated | Current backup/rollback source selects the first `pgsql` container and writes a `/tmp` dump without identity/restore proof; the documented container name differs from Compose. The ecosystem backup script includes Media Control storage, so no live backup/restore smoke may be used during the classroom freeze. |
+| P1 | Open / unverified dependency | The Workgroup AI Worker lacks a lockfile and local test/typecheck script and is not covered by the listed Worker Dependabot directories. Do not deploy or exercise it as part of this Hub release. |
 | P1 | Open | Hosted CI, staging/candidate deployment, production endpoint/browser evidence, notification/queue evidence, backup/rollback evidence, and Command Display release evidence remain unobserved. |
 | P1 | Open | PulsePoint deployment state, account binding, secret presence, Workers.dev trigger, and lack of zone/cron routes are now read-only verified. Actual `/incidents` delivery, Hub consumption, current cache contents, and deployed-source-to-Git identity remain pending because a feed GET can mutate the Worker cache. The unapproved version above is not a substitute for a controlled release. |
 | P2 | Open | Station Inventory's actor remains the outcome of PIN verification rather than strong per-user identity. Decide whether that is sufficient for inventory-accountability requirements. |
 | P2 | Open | Review history is append-only through Eloquent and protected by model/FK rules, but has not been proven tamper-proof against privileged direct database access. |
 | P2 | Open | The direct queue-status route relies on `canAccessPanel('admin')`, which source indicates can admit training roles. Define intended queue-metadata visibility, apply role-specific authorization, and add a negative regression. |
 | P2 | REVIEW_REQUIRED | User role editing exposes unfiltered target-role assignment while its policy is generic. The deployed Shield permission map was not inspected, so exploitability is not asserted; add an actor/target-role matrix test before any production claim. |
+| P2 | Dormant legacy code | `WorkgroupNote::workgroup()` declares a direct relationship although the table has no `workgroup_id`, and the legacy AdminDashboard exporters/templates have no active render path. No current call site to the Note relation was found. Correct/remove it only with a relation API compatibility decision; do not re-register dormant code as a workaround. |
 | P2 | Open | Resolve Composer's strict version-constraint warnings and refresh stale Browserslist data in a scoped maintenance change. |
 | Separate system | Frozen / unobserved | Media Control browser, player, display-wall, soundbar, lip-sync, and physical acceptance require their own authorized window and cannot be inferred from Hub tests. |
 
 ## Safe next sequence
 
 1. Maintain the Media Control freeze. Obtain an owner-selected station device-identity contract before any conference/station-token change; do not use a Hub release to alter players, Cloudflare, network, or AV behavior.
-2. Apply and test the Hub-only Workgroup tenancy containment against Group-A/Group-B fixtures, then obtain decisions on global roles, member report visibility, and multi-workgroup selection.
-3. Obtain an explicit Hub-only deployment/change window and data-owner classification for Daily Checkout, public station-request identity, Workgroup AI document egress, push-provider endpoint hosts, and external Snipe/Sheets semantics.
-4. Build a disposable candidate from the exact committed source; prove the TRT duplicate preflight, migration, rollback, and two-connection PostgreSQL races against a production-shaped database backup without touching Media Control.
-5. Run hosted CI and staging browser/API/authorization tests, then obtain accountable human review acceptance. Include queue/Redis, backup-freshness, external-integration, and private-file lifecycle evidence as separate gates.
-6. Authorize PulsePoint separately if its incident version requires a controlled cache-safe behavioral probe, rollback, or release. Do not use `wrangler deploy --dry-run` as a validation mechanism.
-7. Treat every Media Control validation as a separate maintenance request with its own freeze release and physical acceptance criteria.
+2. Resolve the Daily Checkout P0 contract: choose the out-of-service denominator/exemption policy, then make Station Detail, Station Operations, public display/readiness, and the source-backed checklist matrix use the same review-aware local-day result. Obtain fresh authorized classification/checklist evidence before any production migration or kiosk test.
+3. Preserve the current Workgroup containment. Obtain the global-viewer and selected-workgroup/session policy before reactivating legacy dashboards, exporters, or widgets.
+4. Obtain an explicit Hub-only deployment/change window and data-owner classification for Daily Checkout, public station-request identity, Workgroup AI document egress, push-provider endpoint hosts, and external Snipe/Sheets semantics. Repair/replace the automatic post-migration deployment gate only under that approved window.
+5. Build a disposable candidate from the exact committed source; prove the TRT production duplicate preflight, migration/rollback plan, and production-shaped restore path without touching Media Control.
+6. Run hosted CI and staging browser/API/authorization tests, then obtain accountable human review acceptance. Include queue/Redis, backup-freshness, external-integration, and private-file lifecycle evidence as separate gates.
+7. Authorize PulsePoint separately if its incident version requires a controlled cache-safe behavioral probe, rollback, or release. Do not use `wrangler deploy --dry-run` as a validation mechanism.
+8. Treat every Media Control validation as a separate maintenance request with its own freeze release and physical acceptance criteria.
 
 ## Audit boundary
 

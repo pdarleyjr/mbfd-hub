@@ -3,13 +3,6 @@
     @php $allSessions = $this->getAllSessions(); @endphp
     @if($allSessions->count() > 0)
     <div class="wg-session-pills">
-        <button
-            wire:click="switchSession(null)"
-            class="wg-session-pill {{ $selectedSessionId === null ? 'wg-session-pill--overall' : '' }}"
-        >
-            <x-heroicon-o-squares-2x2 class="w-3.5 h-3.5" />
-            Overall Results
-        </button>
         @foreach($allSessions as $daySess)
         <button
             wire:click="switchSession({{ $daySess->id }})"
@@ -23,13 +16,6 @@
             {{ $daySess->name }}
         </button>
         @endforeach
-    </div>
-    @endif
-
-    {{-- Overall Project Banner --}}
-    @if($selectedSessionId === null)
-    <div class="wg-overall-banner" style="margin-bottom: 1.25rem;">
-        <span style="opacity: 0.7;">📊</span> Viewing aggregate results across all sessions
     </div>
     @endif
 
@@ -55,7 +41,8 @@
     </div>
     @endif
 
-    {{-- AI Executive Report Panel --}}
+    {{-- AI generation is an explicit manager-only action. --}}
+    @if($this->canManageSelectedSession())
     <div class="wg-ai-panel" wire:init="loadAiReport">
         <div class="wg-ai-panel-header">
             <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -121,9 +108,10 @@
         </div>
         @endif
     </div>
+    @endif
 
     {{-- SAVER Executive Report Generator --}}
-    @if($selectedSessionId === null)
+    @if($this->canManageSelectedSession())
     <div class="wg-section" style="margin-bottom: 1.25rem;">
         <div class="wg-section-header" style="background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%); color: #fff;">
             <div class="wg-section-header-icon" style="background: rgba(255,255,255,0.2);">
@@ -834,7 +822,7 @@
                     const resp = await fetch('/api/workgroup/ai/executive-report', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': this.getCsrf() },
-                        body: JSON.stringify({ force })
+                        body: JSON.stringify({ force, session_id: @js($selectedSessionId) })
                     });
                     if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).error || 'Server error');
                     const data = await resp.json();

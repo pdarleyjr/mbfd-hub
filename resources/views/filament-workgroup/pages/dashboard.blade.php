@@ -1,9 +1,24 @@
 <x-filament-panels::page>
     @php
         $member = method_exists($this, 'getCurrentMember') ? $this->getCurrentMember() : null;
+        $workgroups = method_exists($this, 'getAvailableWorkgroups') ? $this->getAvailableWorkgroups() : collect();
         $sessions = $member ? $this->getAccessibleSessions($member) : collect();
         $stats = $this->getWorkgroupStats();
     @endphp
+
+    @if($workgroups->count() > 1)
+    <div class="mb-5 flex flex-wrap gap-2 items-center">
+        <span class="text-sm font-medium text-gray-500 dark:text-gray-400 mr-1">Workgroup:</span>
+        @foreach($workgroups as $workgroup)
+            <button
+                wire:click="selectWorkgroup({{ $workgroup->id }})"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            >
+                {{ $workgroup->name }}
+            </button>
+        @endforeach
+    </div>
+    @endif
 
     {{-- Session Switcher (shown when member has access to multiple sessions) --}}
     @if($sessions->count() > 1)

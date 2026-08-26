@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Casts\HashedAndCaptured;
+use App\Support\Workgroups\WorkgroupAccess;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -188,15 +189,9 @@ class User extends Authenticatable implements FilamentUser
                 || $this->can('training.access');
         }
 
-        // Workgroup panel: allow users with workgroup roles or permission
+        // Workgroup access is based on an active membership, never a broad panel role.
         if ($panel->getId() === 'workgroups') {
-            return $this->hasRole('super_admin')
-                || $this->hasRole('admin')
-                || $this->hasRole('logistics_admin')
-                || $this->hasRole('workgroup_admin')
-                || $this->hasRole('workgroup_facilitator')
-                || $this->hasRole('workgroup_member')
-                || $this->can('workgroup.access');
+            return app(WorkgroupAccess::class)->canEnterPanel($this);
         }
 
         // Admin panel: allow any user with a valid role

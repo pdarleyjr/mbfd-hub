@@ -2,8 +2,12 @@
 
 namespace App\Filament\Workgroup\Pages;
 
+use App\Models\User;
 use App\Models\WorkgroupMember;
+use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
+use App\Support\Workgroups\WorkgroupAccess;
+use App\Support\Workgroups\WorkgroupContext;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Tables\Actions\DeleteAction;
@@ -13,7 +17,6 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class SharedUploads extends Page implements HasTable
@@ -25,21 +28,31 @@ class SharedUploads extends Page implements HasTable
     protected static string $view = 'filament-workgroup.pages.simple-page';
 
     protected static ?string $title = 'Shared Uploads';
-    
+
     protected static ?string $navigationLabel = 'Shared Uploads';
 
     public ?string $selectedSession = null;
 
     public function mount(): void
     {
-        // Set default session to active session
-        $member = $this->getCurrentMember();
-        if ($member && $member->workgroup) {
-            $activeSession = $member->workgroup->sessions()->active()->first();
-            if ($activeSession) {
-                $this->selectedSession = (string) $activeSession->id;
-            }
+        $member = $this->currentMember();
+        $activeSession = WorkgroupSession::query()
+            ->where('workgroup_id', $member->workgroup_id)
+            ->active()
+            ->first();
+
+        if ($activeSession) {
+            $this->selectedSession = (string) $activeSession->id;
         }
+    }
+
+    public static function canAccess(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User
+            && app(WorkgroupAccess::class)->canEnterPanel($user)
+            && app(WorkgroupContext::class)->member($user) !== null;
     }
 
     protected function getHeaderActions(): array
@@ -105,7 +118,10 @@ class SharedUploads extends Page implements HasTable
                     ->url(fn (WorkgroupSharedUpload $record) => route('workgroup.shared-upload.download', $record)),
                 DeleteAction::make()
                     ->label('Delete')
-                    ->visible(fn (WorkgroupSharedUpload $record) => $record->user_id === Auth::id()),
+                    ->action(function (WorkgroupSharedUpload $record): void {
+                        $this->ownedUpload($record, $this->currentMember())->delete();
+                    })
+                    ->visible(fn (WorkgroupSharedUpload $record) => $this->isCurrentUploader($record)),
             ])
             ->emptyStateHeading('No files uploaded yet')
             ->emptyStateDescription('Upload a file to share with your workgroup.');
@@ -113,41 +129,25 @@ class SharedUploads extends Page implements HasTable
 
     protected function getUploadsQuery(): Builder
     {
-        $member = $this->getCurrentMember();
-        
-        if (!$member || !$member->workgroup) {
-            return WorkgroupSharedUpload::whereNull('id');
-        }
+        $member = $this->currentMember();
+        $selectedSession = $this->selectedSession($member);
 
-        $workgroupId = $member->workgroup->id;
-        $sessionId = $this->selectedSession ? (int) $this->selectedSession : null;
-
-        return WorkgroupSharedUpload::where('workgroup_id', $workgroupId)
-            ->when($sessionId, fn($q) => $q->where('workgroup_session_id', $sessionId))
+        return app(WorkgroupAccess::class)
+            ->scopeWorkgroupRecords(WorkgroupSharedUpload::query(), $this->currentUser())
+            ->where('workgroup_id', $member->workgroup_id)
+            ->whereHas('session', fn (Builder $sessions): Builder => $sessions->where('workgroup_id', $member->workgroup_id))
+            ->when($selectedSession, fn (Builder $uploads): Builder => $uploads->where('workgroup_session_id', $selectedSession->id))
             ->orderBy('created_at', 'desc');
-    }
-
-    protected function getCurrentMember(): ?WorkgroupMember
-    {
-        $user = Auth::user();
-        
-        return WorkgroupMember::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->with(['workgroup.sessions'])
-            ->first();
     }
 
     protected function uploadFile(array $data): void
     {
-        $member = $this->getCurrentMember();
-        
-        if (!$member || !$member->workgroup) {
-            return;
-        }
+        $member = $this->currentMember();
+        $session = $this->requireSelectedSession($member);
 
         $file = $data['file'] ?? null;
-        
-        if (!$file) {
+
+        if (! $file) {
             return;
         }
 
@@ -166,8 +166,8 @@ class SharedUploads extends Page implements HasTable
             $tempPath = $file; // e.g. "livewire-tmp/abc123.pdf"
             $filename = pathinfo($tempPath, PATHINFO_BASENAME);
             $extension = pathinfo($tempPath, PATHINFO_EXTENSION);
-            $permanentDir = 'workgroup-shared-uploads/' . $member->workgroup->id;
-            $permanentPath = $permanentDir . '/' . $filename;
+            $permanentDir = 'workgroup-shared-uploads/'.$member->workgroup_id;
+            $permanentPath = $permanentDir.'/'.$filename;
 
             // Move from the Livewire temp (local) disk to the private disk
             $contents = Storage::disk('local')->get($tempPath);
@@ -179,23 +179,23 @@ class SharedUploads extends Page implements HasTable
             Storage::disk('local')->delete($tempPath);
 
             WorkgroupSharedUpload::create([
-                'workgroup_id' => $member->workgroup->id,
-                'workgroup_session_id' => $this->selectedSession ? (int) $this->selectedSession : null,
-                'user_id' => Auth::id(),
+                'workgroup_id' => $member->workgroup_id,
+                'workgroup_session_id' => $session->id,
+                'user_id' => $this->currentUser()->id,
                 'workgroup_member_id' => $member->id,
                 'filename' => $filename,
                 'filepath' => $permanentPath,
-                'file_type' => $mimeType ?: ('application/' . $extension),
+                'file_type' => $mimeType ?: ('application/'.$extension),
                 'file_size' => $fileSize,
             ]);
         } else {
             // UploadedFile object (fallback for direct uploads)
-            $path = $file->store('workgroup-shared-uploads/' . $member->workgroup->id, $privateDisk);
+            $path = $file->store('workgroup-shared-uploads/'.$member->workgroup_id, $privateDisk);
 
             WorkgroupSharedUpload::create([
-                'workgroup_id' => $member->workgroup->id,
-                'workgroup_session_id' => $this->selectedSession ? (int) $this->selectedSession : null,
-                'user_id' => Auth::id(),
+                'workgroup_id' => $member->workgroup_id,
+                'workgroup_session_id' => $session->id,
+                'user_id' => $this->currentUser()->id,
                 'workgroup_member_id' => $member->id,
                 'filename' => $file->getClientOriginalName(),
                 'filepath' => $path,
@@ -207,6 +207,77 @@ class SharedUploads extends Page implements HasTable
 
     public function updatedSelectedSession(): void
     {
+        $this->selectedSession($this->currentMember());
+
         $this->dispatch('$refresh');
+    }
+
+    private function currentUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless($user instanceof User, 404);
+
+        return $user;
+    }
+
+    private function currentMember(): WorkgroupMember
+    {
+        $user = $this->currentUser();
+
+        abort_unless(app(WorkgroupAccess::class)->canEnterPanel($user), 404);
+
+        return app(WorkgroupContext::class)->requireMember($user);
+    }
+
+    private function selectedSession(WorkgroupMember $member): ?WorkgroupSession
+    {
+        if ($this->selectedSession === null || $this->selectedSession === '') {
+            return null;
+        }
+
+        abort_unless(ctype_digit($this->selectedSession) && (int) $this->selectedSession > 0, 404);
+
+        $session = app(WorkgroupAccess::class)
+            ->scopeSessions(WorkgroupSession::query(), $this->currentUser())
+            ->where('workgroup_id', $member->workgroup_id)
+            ->find((int) $this->selectedSession);
+
+        abort_unless($session !== null, 404);
+
+        return $session;
+    }
+
+    private function requireSelectedSession(WorkgroupMember $member): WorkgroupSession
+    {
+        $session = $this->selectedSession($member);
+
+        abort_unless($session !== null, 404);
+
+        return $session;
+    }
+
+    private function isCurrentUploader(WorkgroupSharedUpload $record): bool
+    {
+        $member = $this->currentMember();
+
+        return $record->workgroup_id === $member->workgroup_id
+            && $record->workgroup_member_id === $member->id
+            && $record->user_id === $this->currentUser()->id;
+    }
+
+    private function ownedUpload(WorkgroupSharedUpload $record, WorkgroupMember $member): WorkgroupSharedUpload
+    {
+        $upload = app(WorkgroupAccess::class)
+            ->scopeWorkgroupRecords(WorkgroupSharedUpload::query(), $this->currentUser())
+            ->where('workgroup_id', $member->workgroup_id)
+            ->where('workgroup_member_id', $member->id)
+            ->where('user_id', $this->currentUser()->id)
+            ->whereHas('session', fn (Builder $sessions): Builder => $sessions->where('workgroup_id', $member->workgroup_id))
+            ->find($record->getKey());
+
+        abort_unless($upload !== null, 404);
+
+        return $upload;
     }
 }

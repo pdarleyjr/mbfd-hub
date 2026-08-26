@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\Workgroup;
 
-use App\Filament\Resources\Workgroup\Pages;
+use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
 use App\Models\Workgroup;
 use App\Models\WorkgroupFile;
 use App\Models\WorkgroupSession;
@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class WorkgroupFileResource extends Resource
 {
+    use ResolvesWorkgroupAccess;
+
     protected static ?string $model = WorkgroupFile::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-arrow-down';
@@ -42,7 +44,7 @@ class WorkgroupFileResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('workgroup_id')
                             ->label('Workgroup')
-                            ->options(fn () => Workgroup::orderBy('name')->pluck('name', 'id'))
+                            ->options(fn () => self::workgroupAccess()->scopeManageWorkgroups(Workgroup::query(), self::currentWorkgroupUser())->orderBy('name')->pluck('name', 'id'))
                             ->searchable()
                             ->required()
                             ->reactive()
@@ -51,10 +53,14 @@ class WorkgroupFileResource extends Resource
                             ->label('Session (Optional)')
                             ->options(function (callable $get) {
                                 $workgroupId = $get('workgroup_id');
-                                if (!$workgroupId) {
-                                    return WorkgroupSession::pluck('name', 'id');
+                                if (! $workgroupId) {
+                                    return [];
                                 }
-                                return WorkgroupSession::where('workgroup_id', $workgroupId)->pluck('name', 'id');
+
+                                return self::workgroupAccess()
+                                    ->scopeManageSessions(WorkgroupSession::query(), self::currentWorkgroupUser())
+                                    ->where('workgroup_id', $workgroupId)
+                                    ->pluck('name', 'id');
                             })
                             ->searchable(),
                     ])
@@ -84,7 +90,7 @@ class WorkgroupFileResource extends Resource
                     ->searchable()
                     ->label('Uploaded By'),
                 Tables\Columns\TextColumn::make('file_size')
-                    ->formatStateUsing(fn ($state) => $state ? number_format($state / 1024, 2) . ' KB' : '-')
+                    ->formatStateUsing(fn ($state) => $state ? number_format($state / 1024, 2).' KB' : '-')
                     ->label('Size'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
@@ -94,10 +100,10 @@ class WorkgroupFileResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('workgroup_id')
                     ->label('Workgroup')
-                    ->options(fn () => Workgroup::pluck('name', 'id')),
+                    ->options(fn () => self::workgroupAccess()->scopeWorkgroups(Workgroup::query(), self::currentWorkgroupUser())->pluck('name', 'id')),
                 Tables\Filters\SelectFilter::make('workgroup_session_id')
                     ->label('Session')
-                    ->options(fn () => WorkgroupSession::pluck('name', 'id')),
+                    ->options(fn () => self::workgroupAccess()->scopeSessions(WorkgroupSession::query(), self::currentWorkgroupUser())->pluck('name', 'id')),
                 Tables\Filters\SelectFilter::make('file_type')
                     ->label('File Type')
                     ->options([
@@ -138,21 +144,44 @@ class WorkgroupFileResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null && self::workgroupAccess()->canEnterPanel($user);
     }
 
     public static function canCreate(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null && self::workgroupAccess()->canManageAnyWorkgroup($user);
     }
 
     public static function canEdit($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null
+            && $record instanceof WorkgroupFile
+            && $record->workgroup !== null
+            && self::workgroupAccess()->canManageWorkgroup($user, $record->workgroup);
     }
 
     public static function canDelete($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        return self::canEdit($record);
+    }
+
+    public static function canView($record): bool
+    {
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null
+            && $record instanceof WorkgroupFile
+            && self::workgroupAccess()->canViewFile($user, $record);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return self::workgroupAccess()->scopeWorkgroupRecords(parent::getEloquentQuery(), self::currentWorkgroupUser());
     }
 }

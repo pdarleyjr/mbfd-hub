@@ -7,6 +7,8 @@ namespace Tests\Feature\Filament;
 use App\Filament\Pages\SetPasswordPage;
 use App\Http\Middleware\ForcePasswordChange;
 use App\Models\User;
+use App\Models\Workgroup;
+use App\Models\WorkgroupMember;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -42,7 +44,7 @@ final class ForcedPasswordChangeTest extends TestCase
         string $panelId,
     ): void {
         $user = User::factory()->create(['must_change_password' => true]);
-        $user->assignRole(Role::findOrCreate($role, 'web'));
+        $this->grantPanelAccess($user, $role);
 
         $this->actingAs($user)
             ->get($homeUrl)
@@ -64,7 +66,7 @@ final class ForcedPasswordChangeTest extends TestCase
         string $panelId,
     ): void {
         $user = User::factory()->create(['must_change_password' => false]);
-        $user->assignRole(Role::findOrCreate($role, 'web'));
+        $this->grantPanelAccess($user, $role);
 
         $this->actingAs($user)
             ->get($homeUrl)
@@ -159,7 +161,7 @@ final class ForcedPasswordChangeTest extends TestCase
         string $panelId,
     ): void {
         $user = User::factory()->create(['must_change_password' => false]);
-        $user->assignRole(Role::findOrCreate($role, 'web'));
+        $this->grantPanelAccess($user, $role);
 
         $snapshot = $this->livewireSnapshotFrom(
             $this->actingAs($user)->get($homeUrl)->assertOk(),
@@ -197,7 +199,7 @@ final class ForcedPasswordChangeTest extends TestCase
             'must_change_password' => true,
             'password' => Hash::make('current-password'),
         ]);
-        $user->assignRole(Role::findOrCreate($role, 'web'));
+        $this->grantPanelAccess($user, $role);
 
         $snapshot = $this->livewireSnapshotFrom(
             $this->actingAs($user)->get($setPasswordUrl)->assertOk(),
@@ -237,7 +239,7 @@ final class ForcedPasswordChangeTest extends TestCase
         string $panelId,
     ): void {
         $user = User::factory()->create(['must_change_password' => true]);
-        $user->assignRole(Role::findOrCreate($role, 'web'));
+        $this->grantPanelAccess($user, $role);
 
         $this->actingAs($user)
             ->post(Filament::getPanel($panelId)->getLogoutUrl())
@@ -286,13 +288,19 @@ final class ForcedPasswordChangeTest extends TestCase
         string $homeUrl,
     ): void {
         $user = User::factory()->create(['must_change_password' => false]);
-        $user->assignRole(Role::findOrCreate($role, 'web'));
+        $this->grantPanelAccess($user, $role);
 
         $snapshot = $this->livewireSnapshotFrom(
             $this->actingAs($user)->get($homeUrl)->assertOk(),
         );
 
-        $user->syncRoles([]);
+        if ($role === 'workgroup_member') {
+            WorkgroupMember::query()
+                ->where('user_id', $user->id)
+                ->update(['is_active' => false]);
+        } else {
+            $user->syncRoles([]);
+        }
 
         $this->actingAs($user->fresh())
             ->withHeader('X-Livewire', 'true')
@@ -329,5 +337,26 @@ final class ForcedPasswordChangeTest extends TestCase
             $componentNameSuffix,
             implode(', ', array_unique($componentNames)),
         ));
+    }
+
+    private function grantPanelAccess(User $user, string $role): void
+    {
+        $user->assignRole(Role::findOrCreate($role, 'web'));
+
+        if ($role !== 'workgroup_member') {
+            return;
+        }
+
+        $workgroup = Workgroup::create([
+            'name' => 'Forced password test workgroup '.$user->id,
+            'created_by' => $user->id,
+        ]);
+
+        WorkgroupMember::create([
+            'workgroup_id' => $workgroup->id,
+            'user_id' => $user->id,
+            'role' => 'member',
+            'is_active' => true,
+        ]);
     }
 }

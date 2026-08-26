@@ -40,9 +40,12 @@ use App\Http\Controllers\VideoConferencing\StationReadyController;
 use App\Http\Controllers\VideoConferencing\StationStandDownController;
 use App\Http\Controllers\Webhooks\LiveKitWebhookController;
 use App\Http\Controllers\Workgroup\FileDownloadController;
+use App\Http\Controllers\Workgroup\WorkgroupReportController;
 use App\Http\Middleware\EnsureEmployeeAuthenticated;
 use App\Http\Middleware\EnsureVideoConferenceHealthAccess;
 use App\Http\Middleware\ForcePasswordChangeMiddleware;
+use App\Support\Workgroups\WorkgroupReportSessionResolver;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -301,63 +304,74 @@ Route::get('/workgroup/shared-upload/{upload}/download', [FileDownloadController
     ->name('workgroup.shared-upload.download')
     ->middleware(['auth', 'workgroup.access']);
 
-// SAVER Report — Print-ready view
-Route::get('/workgroup/saver-report', function () {
-    $workgroup = \App\Models\Workgroup::first();
-    $aiService = app(\App\Services\Workgroup\WorkgroupAIService::class);
-
-    $reportHtml = $aiService->getCachedSaverReport($workgroup?->id ?? 0);
-
-    return view('filament.workgroup.pages.saver-report', [
-        'reportHtml' => $reportHtml,
-        'workgroupName' => $workgroup?->name ?? 'MBFD Workgroup',
-        'sessionName' => 'All Sessions',
-        'generatedAt' => now()->format('F j, Y'),
-    ]);
-})->name('workgroup.saver-report')->middleware(['auth', 'workgroup.access']);
+// SAVER Report — cached, session-specific print-ready view.
+Route::get('/workgroup/saver-report', [WorkgroupReportController::class, 'saverReport'])
+    ->name('workgroup.saver-report')
+    ->middleware(['auth', 'workgroup.access']);
 
 // Workgroup Analysis Report — Gemini-generated standalone page
 Route::view('/workgroups/analysis-report', 'workgroup.analysis-report')
     ->name('workgroup.analysis-report')
-    ->middleware(['auth', 'workgroup.access']);
+    ->middleware(['auth', 'workgroup.global']);
 
 // Workgroup Data Dashboard — React-based Gemini dashboard
 Route::view('/workgroups/data-dashboard', 'workgroup.data-dashboard')
     ->name('workgroup.data-dashboard')
-    ->middleware(['auth', 'workgroup.access']);
+    ->middleware(['auth', 'workgroup.global']);
 
 // Mid-Mount L1 Proposed Inventory — Self-contained React/SheetJS dashboard
 Route::view('/workgroups/l1-inventory', 'workgroup.l1-inventory')
     ->name('workgroup.l1-inventory')
-    ->middleware(['auth', 'workgroup.access']);
+    ->middleware(['auth', 'workgroup.global']);
 
 // Workgroup Final Session Presentation — Reveal.js slide deck
 Route::view('/workgroups/final-presentation', 'workgroup.final-presentation')
     ->name('workgroup.final-presentation')
-    ->middleware(['auth', 'workgroup.access']);
+    ->middleware(['auth', 'workgroup.global']);
 
 // MBFD Workgroup Evaluation Results — Professional Impeccable report with PDF export
 Route::view('/workgroups/evaluation-report', 'workgroup.evaluation-report')
     ->name('workgroup.evaluation-report')
-    ->middleware(['auth', 'workgroup.access']);
+    ->middleware(['auth', 'workgroup.global']);
 
 // MBFD Workgroup Final Recommendations — Final Selection & Implementation Report
 Route::view('/workgroups/final-recommendations', 'workgroup.final-recommendations')
     ->name('workgroup.final-recommendations')
-    ->middleware(['auth', 'workgroup.access']);
+    ->middleware(['auth', 'workgroup.global']);
 
 // MBFD Workgroup Summary — Full evaluation report with PDF export
 Route::view('/workgroups/workgroup-summary', 'workgroup.workgroup-summary')
     ->name('workgroup.workgroup-summary')
-    ->middleware(['auth', 'workgroup.access']);
+    ->middleware(['auth', 'workgroup.global']);
 
-// Workgroup Results CSV Export (authenticated)
-Route::get('/workgroup-export/{tableKey}', function (string $tableKey, \Illuminate\Http\Request $request) {
-    $sessionId = $request->query('session_id') ?: null;
+// Workgroup Results CSV Export (authenticated, session-scoped)
+Route::get('/workgroup-export/{tableKey}', function (
+    string $tableKey,
+    Request $request,
+    WorkgroupReportSessionResolver $sessions,
+) {
+    $session = $sessions->resolve($request);
+    $sessionId = $session->id;
     $evalService = app(\App\Services\Workgroup\EvaluationService::class);
 
-    if (str_starts_with($tableKey, 'category_')) {
-        $categoryName = urldecode(str_replace('category_', '', $tableKey));
+    $isCategoryExport = str_starts_with($tableKey, 'category_');
+    abort_unless(
+        $isCategoryExport || in_array($tableKey, [
+            'competitor_groups',
+            'finalists',
+            't1_standalone',
+            'brand_overall',
+            'cutoff_saws',
+            'spreaders',
+            'cutters',
+            'rams',
+        ], true),
+        404,
+    );
+
+    if ($isCategoryExport) {
+        $categoryName = trim(urldecode(str_replace('category_', '', $tableKey)));
+        abort_unless($categoryName !== '' && mb_strlen($categoryName) <= 120, 404);
         $results = $evalService->getSessionResults($sessionId);
         $targetCat = collect($results['rankable_categories'])->first(fn ($c) => $c['category_name'] === $categoryName);
 
@@ -370,13 +384,11 @@ Route::get('/workgroup-export/{tableKey}', function (string $tableKey, \Illumina
                 }
             }
             fclose($h);
-        }, strtolower(str_replace(' ', '_', $categoryName)).'_rankings_'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv']);
+        }, 'category_rankings_'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv']);
     }
 
     if ($tableKey === 'competitor_groups') {
-        $wg = \App\Models\Workgroup::first();
-        $sess = $sessionId ? \App\Models\WorkgroupSession::find($sessionId) : null;
-        $rankings = $wg ? $evalService->getCompetitorGroupRankings($wg, $sess) : [];
+        $rankings = $evalService->getCompetitorGroupRankings($session->workgroup, $session);
 
         return response()->streamDownload(function () use ($rankings) {
             $h = fopen('php://output', 'w');

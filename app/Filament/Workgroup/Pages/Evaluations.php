@@ -2,14 +2,16 @@
 
 namespace App\Filament\Workgroup\Pages;
 
-use App\Filament\Workgroup\Pages\EvaluationFormPage;
 use App\Models\CandidateProduct;
 use App\Models\EvaluationSubmission;
+use App\Models\User;
 use App\Models\WorkgroupMember;
+use App\Models\WorkgroupSession;
 use App\Services\Workgroup\EvaluationService;
+use App\Support\Workgroups\WorkgroupAccess;
+use App\Support\Workgroups\WorkgroupContext;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
-use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Tables\Actions\Action as TableAction;
 use Filament\Tables\Columns\TextColumn;
@@ -25,8 +27,11 @@ class Evaluations extends Page implements HasTable
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
+
     protected static string $view = 'filament-workgroup.pages.evaluations';
+
     protected static ?string $title = 'Evaluations';
+
     protected static ?string $navigationLabel = 'Evaluations';
 
     public ?string $selectedSession = null;
@@ -34,7 +39,7 @@ class Evaluations extends Page implements HasTable
     public function mount(): void
     {
         $member = $this->getCurrentMember();
-        if (!$member) {
+        if (! $member) {
             return;
         }
 
@@ -42,9 +47,6 @@ class Evaluations extends Page implements HasTable
         $attendedSessions = $this->getAttendedSessions($member);
 
         if ($attendedSessions->isNotEmpty()) {
-            // Default to the first session in name order (Day 1 → Day 2 → Day 3)
-            // Prefer active sessions only if attending multiple; otherwise just pick first by name
-            $activeAttended = $attendedSessions->firstWhere('status', 'active');
             // Use first session by name (already sorted alphabetically by getAttendedSessions)
             $this->selectedSession = (string) $attendedSessions->first()->id;
         } elseif ($member->workgroup) {
@@ -62,8 +64,16 @@ class Evaluations extends Page implements HasTable
      */
     public function switchSession(int $sessionId): void
     {
+        $this->assertSessionIsAccessible($sessionId);
         $this->selectedSession = (string) $sessionId;
         $this->resetTable();
+    }
+
+    public function updatingSelectedSession(?string $sessionId): void
+    {
+        abort_unless($sessionId !== null && ctype_digit($sessionId), 404);
+
+        $this->assertSessionIsAccessible((int) $sessionId);
     }
 
     /**
@@ -73,7 +83,7 @@ class Evaluations extends Page implements HasTable
      */
     public function getAttendedSessions(WorkgroupMember $member): \Illuminate\Support\Collection
     {
-        if (!$member->workgroup) {
+        if (! $member->workgroup) {
             return collect();
         }
 
@@ -81,7 +91,7 @@ class Evaluations extends Page implements HasTable
 
         // Admin and facilitator roles see ALL sessions in their workgroup
         if (in_array($member->role, ['admin', 'facilitator'])) {
-            return \App\Models\WorkgroupSession::where('workgroup_id', $workgroupId)
+            return WorkgroupSession::where('workgroup_id', $workgroupId)
                 ->orderBy('name')
                 ->get();
         }
@@ -105,7 +115,7 @@ class Evaluations extends Page implements HasTable
             return collect();
         }
 
-        return \App\Models\WorkgroupSession::where('workgroup_id', $workgroupId)
+        return WorkgroupSession::where('workgroup_id', $workgroupId)
             ->whereIn('id', $allSessionIds)
             ->orderBy('name')
             ->get();
@@ -114,7 +124,7 @@ class Evaluations extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         $member = $this->getCurrentMember();
-        if (!$member) {
+        if (! $member) {
             return [];
         }
 
@@ -132,8 +142,10 @@ class Evaluations extends Page implements HasTable
                 ->label(function () use ($attendedSessions): string {
                     if ($this->selectedSession) {
                         $current = $attendedSessions->firstWhere('id', (int) $this->selectedSession);
-                        return 'Session: ' . ($current?->name ?? 'Select Session');
+
+                        return 'Session: '.($current?->name ?? 'Select Session');
                     }
+
                     return 'Select Session';
                 })
                 ->icon('heroicon-o-calendar')
@@ -147,9 +159,7 @@ class Evaluations extends Page implements HasTable
                         ->helperText('Only sessions you attended are shown.'),
                 ])
                 ->action(function (array $data): void {
-                    $this->selectedSession = (string) $data['session_id'];
-                    // Reset table to page 1 after switching
-                    $this->resetTable();
+                    $this->switchSession((int) $data['session_id']);
                 }),
         ];
     }
@@ -179,9 +189,14 @@ class Evaluations extends Page implements HasTable
                     ->label('Status')
                     ->badge()
                     ->getStateUsing(function ($record) use ($member) {
-                        if (!$member) return 'Not Started';
+                        if (! $member) {
+                            return 'Not Started';
+                        }
                         $sub = $record->submissions->firstWhere('workgroup_member_id', $member->id);
-                        if (!$sub) return 'Not Started';
+                        if (! $sub) {
+                            return 'Not Started';
+                        }
+
                         return $sub->status === 'submitted' ? 'Completed' : 'In Progress';
                     })
                     ->color(fn (string $state) => match ($state) {
@@ -193,22 +208,39 @@ class Evaluations extends Page implements HasTable
             ->actions([
                 TableAction::make('evaluate')
                     ->label(function ($record) use ($member) {
-                        if (!$member) return 'Evaluate';
+                        if (! $member) {
+                            return 'Evaluate';
+                        }
                         $sub = $record->submissions->firstWhere('workgroup_member_id', $member->id);
-                        if (!$sub) return 'Evaluate';
+                        if (! $sub) {
+                            return 'Evaluate';
+                        }
+
                         return $sub->status === 'submitted' ? 'View' : 'Continue';
                     })
                     ->icon(function ($record) use ($member) {
-                        if (!$member) return 'heroicon-o-pencil-square';
+                        if (! $member) {
+                            return 'heroicon-o-pencil-square';
+                        }
                         $sub = $record->submissions->firstWhere('workgroup_member_id', $member->id);
-                        if ($sub && $sub->status === 'submitted') return 'heroicon-o-eye';
+                        if ($sub && $sub->status === 'submitted') {
+                            return 'heroicon-o-eye';
+                        }
+
                         return 'heroicon-o-pencil-square';
                     })
                     ->color(function ($record) use ($member) {
-                        if (!$member) return 'primary';
+                        if (! $member) {
+                            return 'primary';
+                        }
                         $sub = $record->submissions->firstWhere('workgroup_member_id', $member->id);
-                        if ($sub && $sub->status === 'submitted') return 'gray';
-                        if ($sub) return 'warning';
+                        if ($sub && $sub->status === 'submitted') {
+                            return 'gray';
+                        }
+                        if ($sub) {
+                            return 'warning';
+                        }
+
                         return 'primary';
                     })
                     ->url(fn ($record) => EvaluationFormPage::getUrl(['productId' => $record->id])),
@@ -220,20 +252,20 @@ class Evaluations extends Page implements HasTable
     protected function getEvaluationsQuery(): Builder
     {
         $member = $this->getCurrentMember();
-        if (!$member) {
+        if (! $member) {
             return CandidateProduct::whereNull('id');
         }
 
         $sessionId = $this->selectedSession ? (int) $this->selectedSession : null;
 
-        if (!$sessionId) {
+        if (! $sessionId) {
             return CandidateProduct::whereNull('id');
         }
 
         // Enforce attendance gate: member must be attending this session to see products
         // (or already have existing submissions — backfill safety)
         $evalService = app(EvaluationService::class);
-        if ($member->role === 'member' && !$evalService->canMemberAccessSession($member, $sessionId)) {
+        if (! $evalService->canMemberAccessSession($member, $sessionId)) {
             return CandidateProduct::whereNull('id');
         }
 
@@ -242,7 +274,7 @@ class Evaluations extends Page implements HasTable
             ->with(['submissions' => function ($q) use ($member, $sessionId) {
                 $q->where('workgroup_member_id', $member?->id);
                 if ($sessionId) {
-                    $q->whereHas('candidateProduct', fn($sq) => $sq->where('workgroup_session_id', $sessionId));
+                    $q->whereHas('candidateProduct', fn ($sq) => $sq->where('workgroup_session_id', $sessionId));
                 }
             }])
             ->orderBy('category_id')
@@ -251,9 +283,29 @@ class Evaluations extends Page implements HasTable
 
     protected function getCurrentMember(): ?WorkgroupMember
     {
-        return WorkgroupMember::where('user_id', Auth::id())
-            ->where('is_active', true)
-            ->with(['workgroup.sessions'])
-            ->first();
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        return app(WorkgroupContext::class)->member($user)?->load('workgroup.sessions');
+    }
+
+    public static function canAccess(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User && app(WorkgroupAccess::class)->canEnterPanel($user);
+    }
+
+    private function assertSessionIsAccessible(int $sessionId): void
+    {
+        $member = $this->getCurrentMember();
+
+        abort_unless(
+            $member !== null && $this->getAttendedSessions($member)->contains('id', $sessionId),
+            404,
+        );
     }
 }

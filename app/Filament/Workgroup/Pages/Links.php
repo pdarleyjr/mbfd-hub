@@ -2,7 +2,10 @@
 
 namespace App\Filament\Workgroup\Pages;
 
+use App\Models\User;
+use App\Support\Workgroups\WorkgroupAccess;
 use Filament\Pages\Page;
+use Illuminate\Support\Facades\Auth;
 
 class Links extends Page
 {
@@ -17,6 +20,13 @@ class Links extends Page
     protected static ?string $navigationGroup = 'Dashboard';
 
     protected static ?int $navigationSort = 5;
+
+    public static function canAccess(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User && app(WorkgroupAccess::class)->isGlobalViewer($user);
+    }
 
     public function getAnalysisReportUrl(): string
     {

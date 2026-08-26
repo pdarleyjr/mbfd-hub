@@ -93,19 +93,29 @@ test("deployment treats the post-migration Daily Checkout audit as a hard failur
   assert.doesNotMatch(workflow, /daily-checkout:audit[^\r\n]*\|\|\s*true\b/);
 });
 
-test("CI runs PHPUnit against its provisioned PostgreSQL service", () => {
+test("CI runs a required PostgreSQL group against its dedicated disposable service", () => {
   const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
   const phpunit = readFileSync(resolve(root, "phpunit.xml"), "utf8");
-  const testStep = workflow.match(
-    /- name: Run Tests\r?\n(?<body>[\s\S]*?)(?=\r?\n\s+- name:|\r?\n\s{2}[A-Za-z][\w-]*:|$)/,
+  const defaultTestStep = workflow.match(
+    /- name: Run non-PostgreSQL tests\r?\n(?<body>[\s\S]*?)(?=\r?\n\s+- name:|\r?\n\s{2}[A-Za-z][\w-]*:|$)/,
+  )?.groups?.body;
+  const postgresTestStep = workflow.match(
+    /- name: Run required disposable PostgreSQL integration tests\r?\n(?<body>[\s\S]*?)(?=\r?\n\s+- name:|\r?\n\s{2}[A-Za-z][\w-]*:|$)/,
   )?.groups?.body;
 
-  assert.ok(testStep, "CI must define its PHPUnit step");
-  assert.match(testStep, /DB_CONNECTION:\s*pgsql/);
-  assert.match(testStep, /EXPECTED_TEST_DB_CONNECTION:\s*pgsql/);
-  assert.match(testStep, /DB_HOST:\s*127\.0\.0\.1/);
-  assert.match(testStep, /DB_DATABASE:\s*testing/);
-  assert.match(testStep, /php artisan test/);
+  assert.match(workflow, /POSTGRES_DB:\s*mbfd_hub_test_ci/);
+  assert.match(workflow, /POSTGRES_USER:\s*mbfd_test_ci/);
+  assert.match(workflow, /POSTGRES_HOST_AUTH_METHOD:\s*trust/);
+  assert.ok(defaultTestStep, "CI must define its non-PostgreSQL PHPUnit step");
+  assert.match(defaultTestStep, /php artisan test --exclude-group=postgres/);
+  assert.ok(postgresTestStep, "CI must define its required disposable PostgreSQL PHPUnit step");
+  assert.match(postgresTestStep, /MBFD_ALLOW_DISPOSABLE_POSTGRES:\s*["']1["']/);
+  assert.match(postgresTestStep, /REQUIRE_POSTGRES_INTEGRATION:\s*["']true["']/);
+  assert.match(postgresTestStep, /DISPOSABLE_POSTGRES_HOST:\s*127\.0\.0\.1/);
+  assert.match(postgresTestStep, /DISPOSABLE_POSTGRES_DATABASE:\s*mbfd_hub_test_ci/);
+  assert.match(postgresTestStep, /DISPOSABLE_POSTGRES_USERNAME:\s*mbfd_test_ci/);
+  assert.match(postgresTestStep, /DISPOSABLE_POSTGRES_PASSWORD:\s*["']{2}/);
+  assert.match(postgresTestStep, /php artisan test --group=postgres/);
   assert.match(phpunit, /<directory>tests\/Integration<\/directory>/);
 });
 
@@ -152,4 +162,57 @@ test("CI executes the deploy-free configuration regression suite", () => {
     "node --test tests/Node/ci-configuration.test.mjs",
   );
   assert.match(workflow, /- name: Verify CI configuration\r?\n\s+run: npm run test:ci-configuration/);
+});
+
+test("browser and local-server test harnesses reject production endpoints and inherited integrations", () => {
+  const testingExample = readFileSync(resolve(root, ".env.testing.example"), "utf8");
+  const loopbackOnlyFiles = [
+    "playwright.config.ts",
+    "playwright.operational-forms.config.ts",
+    "playwright.personnel-requests.config.ts",
+    "playwright.video-conferencing.config.ts",
+    "tests/e2e/auth.setup.ts",
+    "tests/e2e/debug-admin.spec.ts",
+    "tests/e2e/mbfd-full-verification.spec.ts",
+    "tests/e2e/workgroup-evaluations.spec.ts",
+  ];
+  const childProcessFiles = [
+    "playwright.operational-forms.config.ts",
+    "playwright.personnel-requests.config.ts",
+    "tests/e2e/operational-forms.setup.ts",
+    "tests/e2e/personnel-requests.setup.ts",
+  ];
+
+  assert.match(testingExample, /^E2E_BASE_URL=http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/m);
+
+  for (const file of loopbackOnlyFiles) {
+    const source = readFileSync(resolve(root, file), "utf8");
+    assert.match(source, /loopbackBaseUrl\(/, `${file} must validate its base URL`);
+    assert.doesNotMatch(source, /https:\/\/(?:www\.)?mbfdhub\.com|https:\/\/support\.darleyplex\.com/i);
+  }
+
+  for (const file of childProcessFiles) {
+    const source = readFileSync(resolve(root, file), "utf8");
+    assert.match(source, /sanitizedTestEnvironment\(/, `${file} must scrub inherited integration configuration`);
+    assert.doesNotMatch(source, /\.\.\.process\.env/);
+  }
+});
+
+test("ordinary CI builds cannot inherit Sentry upload capability or production integration secrets", () => {
+  const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const buildStep = workflow.match(
+    /- name: Build Vite assets for HTTP tests\r?\n(?<body>[\s\S]*?)(?=\r?\n\s+- name:|\r?\n\s{2}[A-Za-z][\w-]*:|$)/,
+  )?.groups?.body;
+
+  assert.ok(buildStep, "CI must define its Vite build step");
+  for (const variable of [
+    "SENTRY_AUTH_TOKEN",
+    "SENTRY_ORG",
+    "SENTRY_PROJECT_FRONTEND",
+    "VITE_SENTRY_DSN",
+    "VITE_SENTRY_RELEASE",
+  ]) {
+    assert.match(buildStep, new RegExp(`${variable}:\\s*[\"']{2}`));
+  }
+  assert.doesNotMatch(workflow, /\$\{\{\s*secrets\./i);
 });

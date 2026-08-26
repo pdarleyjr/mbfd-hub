@@ -2,9 +2,12 @@
 
 namespace App\Filament\Workgroup\Pages;
 
+use App\Models\User;
 use App\Models\WorkgroupFile;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSharedUpload;
+use App\Support\Workgroups\WorkgroupAccess;
+use App\Support\Workgroups\WorkgroupContext;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Tables\Columns\TextColumn;
@@ -23,23 +26,14 @@ class Files extends Page implements HasTable
     protected static string $view = 'filament-workgroup.pages.simple-page';
 
     protected static ?string $title = 'Files';
-    
+
     protected static ?string $navigationLabel = 'Files';
 
     public ?string $activeTab = 'assigned';
-    
-    public ?string $selectedSession = null;
 
     public function mount(): void
     {
-        // Set default session to active session
-        $member = $this->getCurrentMember();
-        if ($member && $member->workgroup) {
-            $activeSession = $member->workgroup->sessions()->active()->first();
-            if ($activeSession) {
-                $this->selectedSession = (string) $activeSession->id;
-            }
-        }
+        abort_unless(static::canAccess(), 404);
     }
 
     protected function getHeaderActions(): array
@@ -107,8 +101,8 @@ class Files extends Page implements HasTable
     protected function getFilesQuery(): Builder
     {
         $member = $this->getCurrentMember();
-        
-        if (!$member || !$member->workgroup) {
+
+        if (! $member || ! $member->workgroup) {
             return WorkgroupFile::whereNull('id');
         }
 
@@ -128,11 +122,12 @@ class Files extends Page implements HasTable
     protected function getCurrentMember(): ?WorkgroupMember
     {
         $user = Auth::user();
-        
-        return WorkgroupMember::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->with(['workgroup.sessions'])
-            ->first();
+
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        return app(WorkgroupContext::class)->member($user)?->load('workgroup.sessions');
     }
 
     protected function getDownloadUrl($record): string
@@ -142,7 +137,7 @@ class Files extends Page implements HasTable
         } elseif ($record instanceof WorkgroupSharedUpload) {
             return route('workgroup.shared-upload.download', $record);
         }
-        
+
         return '#';
     }
 
@@ -151,8 +146,10 @@ class Files extends Page implements HasTable
         $this->dispatch('$refresh');
     }
 
-    public function updatedSelectedSession(): void
+    public static function canAccess(): bool
     {
-        $this->dispatch('$refresh');
+        $user = Auth::user();
+
+        return $user instanceof User && app(WorkgroupAccess::class)->canEnterPanel($user);
     }
 }
