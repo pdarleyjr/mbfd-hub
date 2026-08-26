@@ -46,6 +46,8 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
           coverage: none
       - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
       - name: Install Node dependencies
         run: npm ci --ignore-scripts --legacy-peer-deps
@@ -85,6 +87,8 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
           coverage: none
       - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
       - name: Run PHPStan
         run: vendor/bin/phpstan analyse --memory-limit=512M --no-progress -c phpstan.neon
@@ -117,6 +121,8 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
           coverage: none
       - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
       - name: Prepare disposable PostgreSQL test application
         run: |
@@ -187,6 +193,8 @@ jobs:
           DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176
         run: npm run test:daily-checkout-e2e
       - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
       - name: Run Daily Checkout contract and integrity tests
         run: >-
@@ -212,6 +220,8 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
           coverage: none
       - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --no-dev --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts --optimize-autoloader
       - name: Install root Node dependencies
         run: npm ci --ignore-scripts --legacy-peer-deps
@@ -253,6 +263,8 @@ jobs:
         with:
           php-version: '8.4'
       - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
       - name: Run Composer security audit
         run: composer audit --locked --format=table
@@ -336,6 +348,8 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
           coverage: none
       - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
       - name: Prepare PHP 8.5 disposable PostgreSQL test application
         run: |

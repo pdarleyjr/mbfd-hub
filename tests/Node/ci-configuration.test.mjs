@@ -96,6 +96,24 @@ test("Actionlint failures fail the static-analysis job", () => {
   assert.doesNotMatch(workflow, /fail-on-error:\s*(?:false|["']false["'])\b/);
 });
 
+test("Composer CI installs use an ephemeral GitHub token instead of a persisted Composer secret", () => {
+  const composerInstallSteps = [
+    [".github/workflows/06-static-analysis.yml", "phpstan", "Install dependencies"],
+    [".github/workflows/observability.yml", "sentry_release", "Install Composer deps"],
+    [".github/workflows/security.yml", "dependency-audit", "Install Composer dependencies"],
+  ];
+
+  for (const [path, jobName, stepName] of composerInstallSteps) {
+    const workflow = readFileSync(resolve(root, path), "utf8");
+    const install = workflowStep(workflowJob(workflow, jobName), stepName);
+
+    assert.match(install, /COMPOSER_AUTH:/, `${path} must set Composer authentication`);
+    assert.match(install, /github-oauth/, `${path} must scope Composer authentication to GitHub`);
+    assert.match(install, /github\.token/, `${path} must use the ephemeral GitHub token`);
+    assert.doesNotMatch(install, /secrets\./i, `${path} must not use a persisted Composer secret`);
+  }
+});
+
 test("production activation is manual, main-only, and blocked by every Hub release gate", () => {
   const deploy = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
   const gates = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
@@ -201,6 +219,22 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
   assert.match(staticAnalysis, /composer install/);
   assert.match(workflowStep(staticAnalysis, "Run PHPStan"), /vendor\/bin\/phpstan analyse/);
   assert.doesNotMatch(staticAnalysis, /composer require[^\r\n]*larastan/i);
+
+  for (const jobName of [
+    "php-quality",
+    "static-analysis",
+    "phpunit-postgres",
+    "daily-contract-integrity",
+    "generated-assets",
+    "security-dependencies",
+    "php-85-compatibility",
+  ]) {
+    const install = workflowStep(workflowJob(gates, jobName), "Install PHP dependencies");
+    assert.match(install, /COMPOSER_AUTH:/, `${jobName} must authenticate Composer with its ephemeral job token`);
+    assert.match(install, /github-oauth/, `${jobName} must scope Composer authentication to GitHub`);
+    assert.match(install, /github\.token/, `${jobName} must use the ephemeral GitHub token`);
+    assert.doesNotMatch(install, /secrets\./i, `${jobName} must not require a persisted Composer secret`);
+  }
 
   const postgres = workflowJob(gates, "phpunit-postgres");
   assert.match(postgres, /POSTGRES_DB:\s*mbfd_hub_test_ci/);
