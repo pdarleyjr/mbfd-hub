@@ -95,6 +95,8 @@ class StationController extends Controller
             ->findOrFail($id);
 
         $staffing = app(StationStaffingService::class)->summaryFor($station);
+        $dailyCheckout = app(DailyCheckoutComplianceService::class)
+            ->summaryForApparatuses($station->apparatuses);
         $dormBedsCount = $staffing['dorm_beds_count'];
         $personnelCount = $staffing['assigned_personnel_count'];
 
@@ -206,6 +208,7 @@ class StationController extends Controller
                     'current_defects_count' => $apparatus->relationLoaded('currentDefects') ? $apparatus->currentDefects->count() : 0,
                 ];
             })->values()->all(),
+            'daily_checkout' => $dailyCheckout,
             'rooms' => $station->rooms->map(function ($room) use ($roomsHaveIsActive) {
                 return [
                     'id' => $room->id,

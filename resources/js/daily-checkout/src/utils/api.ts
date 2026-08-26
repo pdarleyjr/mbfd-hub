@@ -3,7 +3,7 @@ import {
   Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData,
   StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse,
   InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
-  StationInspectionSummary, ApparatusInspectionSummary, FireEquipmentRequestSummary,
+  StationInspectionSummary, FireEquipmentRequestSummary,
   SingleGasMeterSummary, StationRequestSummary, ApparatusServiceTicketSummary, StationActivityEntry, RoomProfile,
 } from '../types';
 
@@ -430,17 +430,6 @@ export class ApiClient {
     });
     if (!response.ok) {
       throw new Error('Failed to fetch station inspections');
-    }
-    const data = await response.json();
-    return data.inspections || [];
-  }
-
-  static async getTodayApparatusInspections(stationId: number): Promise<ApparatusInspectionSummary[]> {
-    const response = await fetch(`${API_BASE}/public/stations/${stationId}/apparatus-inspections`, {
-      headers: { ...DEFAULT_HEADERS },
-    });
-    if (!response.ok) {
-      throw new Error('Failed to fetch apparatus inspections');
     }
     const data = await response.json();
     return data.inspections || [];

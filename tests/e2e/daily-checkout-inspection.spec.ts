@@ -13,6 +13,100 @@ const apparatus = {
   current_miles: 1_000,
 };
 
+const stationDetail = {
+  id: 1,
+  name: 'Station 1',
+  station_number: 1,
+  address: '1 Test Street',
+  city: 'Miami Beach',
+  state: 'FL',
+  zip_code: '33139',
+  phone: '',
+  is_active: true,
+  apparatuses: [
+    apparatus,
+    { ...apparatus, id: 102, name: 'Engine 2', designation: 'E2', vehicle_number: 'E2', slug: 'engine-2' },
+    { ...apparatus, id: 103, name: 'Rescue 1', designation: 'R1', vehicle_number: 'R1', slug: 'rescue-1' },
+    { ...apparatus, id: 104, name: 'Ladder 1', designation: 'L1', vehicle_number: 'L1', slug: 'ladder-1' },
+    { ...apparatus, id: 105, name: 'Engine 5', designation: 'E5', vehicle_number: 'E5', slug: 'engine-5', status: 'Out of Service' },
+  ],
+  daily_checkout: {
+    required_total: 4,
+    checked: 1,
+    attention: 1,
+    review_pending: 1,
+    not_checked: 1,
+    completed: 2,
+    out_of_service: 1,
+    exempt: 0,
+    classification_required: 0,
+    completion_percent: 50,
+    completion_available: true,
+    matrix: [
+      {
+        apparatus_id: 101,
+        state: 'checked',
+        daily_checkout_requirement: 'required',
+        out_of_service: false,
+        classification_required: false,
+        included_in_required_total: true,
+        included_in_completed: true,
+        has_pending_submission: false,
+        return_checkout_required: false,
+        return_checkout_verified: false,
+      },
+      {
+        apparatus_id: 102,
+        state: 'attention',
+        daily_checkout_requirement: 'required',
+        out_of_service: false,
+        classification_required: false,
+        included_in_required_total: true,
+        included_in_completed: true,
+        has_pending_submission: false,
+        return_checkout_required: false,
+        return_checkout_verified: false,
+      },
+      {
+        apparatus_id: 103,
+        state: 'review_pending',
+        daily_checkout_requirement: 'required',
+        out_of_service: false,
+        classification_required: false,
+        included_in_required_total: true,
+        included_in_completed: false,
+        has_pending_submission: true,
+        return_checkout_required: false,
+        return_checkout_verified: false,
+      },
+      {
+        apparatus_id: 104,
+        state: 'not_checked',
+        daily_checkout_requirement: 'required',
+        out_of_service: false,
+        classification_required: false,
+        included_in_required_total: true,
+        included_in_completed: false,
+        has_pending_submission: false,
+        return_checkout_required: false,
+        return_checkout_verified: false,
+      },
+      {
+        apparatus_id: 105,
+        state: 'out_of_service',
+        daily_checkout_requirement: 'required',
+        out_of_service: true,
+        classification_required: false,
+        included_in_required_total: false,
+        included_in_completed: false,
+        has_pending_submission: false,
+        return_checkout_required: false,
+        return_checkout_verified: false,
+      },
+    ],
+  },
+};
+
 const checklist = {
   checklist_version: 'a'.repeat(64),
   checklist: {
@@ -66,6 +160,7 @@ async function mockInspectionApi(
     readonly omitChecklistVersion?: boolean;
     readonly checklistVersion?: string;
     readonly reviewPendingOnSubmit?: boolean;
+    readonly stationDailyCheckout?: 'canonical' | 'unavailable';
   } = {},
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
@@ -79,6 +174,24 @@ async function mockInspectionApi(
 
     if (path === '/api/public/apparatuses') {
       return route.fulfill({ json: [apparatus] });
+    }
+
+    if (path === '/api/public/stations/1') {
+      if (options.stationDailyCheckout === 'unavailable') {
+        const { daily_checkout: _dailyCheckout, ...stationWithoutDailyCheckout } = stationDetail;
+
+        return route.fulfill({ json: stationWithoutDailyCheckout });
+      }
+
+      return route.fulfill({ json: stationDetail });
+    }
+
+    if (path === '/api/public/stations/1/requests') {
+      return route.fulfill({ json: { data: [] } });
+    }
+
+    if (path === '/api/public/stations/1/service-tickets') {
+      return route.fulfill({ json: { data: [], meta: { total: 0 } } });
     }
 
     if (path === '/api/public/employees/list') {
@@ -266,6 +379,29 @@ async function createVersionThreeQueue(page: Page, record: Omit<SeededQueuedInsp
     database.close();
   }, record);
 }
+
+test('station Daily Checkout renders the canonical server result without estimating readiness from inspection rows', async ({ page }) => {
+  await mockInspectionApi(page);
+
+  await page.goto('/daily/stations/1');
+
+  await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toBeVisible();
+  await expect(page.getByText('2 / 4 required inspections completed', { exact: true })).toBeVisible();
+  await expect(page.getByText('50%', { exact: true })).toBeVisible();
+  await expect(page.getByText('Review pending', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Out of service', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('A submission is pending review.', { exact: true })).toBeVisible();
+});
+
+test('station Daily Checkout is explicitly unavailable when the canonical server result is absent', async ({ page }) => {
+  await mockInspectionApi(page, { stationDailyCheckout: 'unavailable' });
+
+  await page.goto('/daily/stations/1');
+
+  await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toBeVisible();
+  await expect(page.getByText('Unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByText('The authoritative Daily Checkout result is unavailable. Readiness is not estimated from inspection records.', { exact: true })).toBeVisible();
+});
 
 test('non-empty checklist permits a complete inspection and sends its submission', async ({ page }) => {
   const api = await mockInspectionApi(page);
