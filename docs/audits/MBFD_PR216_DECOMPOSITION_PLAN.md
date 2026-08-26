@@ -268,7 +268,7 @@ the follow-on source checkpoint. Candidate-scoped Pint currently passes all
 177 changed PHP files, while the broad repository audit has 293 historic
 nonconforming files. The original audit head has runnerless, zero-step
 static/Trivy cancellations and queued CI/assets/CodeQL work; the follow-on
-checkpoint has no exact-SHA hosted matrix yet. Do not attribute this external
+checkpoint requires its own successful exact-SHA hosted matrix. Do not attribute this external
 Actions state to a source/security finding without runner/account evidence.
 
 Even after CI is repaired and rerun, the following remain release blockers for
