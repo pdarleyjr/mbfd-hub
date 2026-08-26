@@ -613,12 +613,11 @@ final class AuditDailyCheckoutPreactivation extends Command
         CarbonImmutable $startOfDay,
         ?string $expectedChecklistVersion,
     ): array {
-        $latest = null;
+        $latest = $this->latestEvent($events);
         $openOutOfService = null;
         $returnEvent = null;
 
         foreach ($events as $event) {
-            $latest = $event;
             $changedAt = $this->asUtc($event->changed_at);
             if ($changedAt === null) {
                 continue;
@@ -725,6 +724,19 @@ final class AuditDailyCheckoutPreactivation extends Command
             'qualifying_post_return_inspection' => $qualifying,
             'issues' => $issues,
         ];
+    }
+
+    /**
+     * @param  list<stdClass>  $events
+     */
+    private function latestEvent(array $events): ?stdClass
+    {
+        $latest = null;
+        foreach ($events as $event) {
+            $latest = $event;
+        }
+
+        return $latest;
     }
 
     /** @return array{id: int, previous_status: string|null, status: string, changed_at_utc: string|null} */
