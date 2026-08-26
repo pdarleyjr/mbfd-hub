@@ -631,12 +631,6 @@ parameters:
 			path: app/Filament/Widgets/StationOperationsHubWidget.php
 
 		-
-			message: '#^Using nullsafe property access "\?\-\>designation" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 2
-			path: app/Filament/Widgets/StationOperationsHubWidget.php
-
-		-
 			message: '#^Left side of && is always true\.$#'
 			identifier: booleanAnd.leftAlwaysTrue
 			count: 6
