@@ -7,12 +7,32 @@ use App\Models\InventoryItem;
 use App\Models\Station;
 use App\Models\StationInventoryItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Routing\Route;
+use Illuminate\Support\Facades\Route as RouteFacade;
 use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class StationInventoryV2SignedUrlTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_every_station_inventory_v2_route_except_pin_verification_uses_the_shared_signature_guard(): void
+    {
+        $protectedRoutes = collect(RouteFacade::getRoutes()->getRoutes())
+            ->filter(static fn (Route $route): bool => ($route->uri() === 'api/v2/station-inventory'
+                || str_starts_with($route->uri(), 'api/v2/station-inventory/'))
+                && $route->uri() !== 'api/v2/station-inventory/verify-pin');
+
+        $this->assertNotEmpty($protectedRoutes);
+
+        foreach ($protectedRoutes as $route) {
+            $this->assertContains(
+                'station-inventory.signed',
+                $route->gatherMiddleware(),
+                sprintf('%s must use the shared Station Inventory signature guard.', $route->uri()),
+            );
+        }
+    }
 
     public function test_an_unsigned_item_count_update_is_rejected_before_any_inventory_change(): void
     {
@@ -158,6 +178,83 @@ class StationInventoryV2SignedUrlTest extends TestCase
             'actor_name' => 'Signed Officer',
             'actor_shift' => 'B-Day',
             'action' => 'note_added',
+        ]);
+    }
+
+    public function test_a_base_inventory_signature_authorizes_a_nested_supply_request_read(): void
+    {
+        $station = Station::create([
+            'station_number' => 'Test-401',
+            'address' => '401 Test Avenue',
+            'zip_code' => '33139',
+        ]);
+        $baseUrl = URL::temporarySignedRoute(
+            'api.v2.station-inventory.access',
+            now()->addMinutes(5),
+            [
+                'stationId' => $station->id,
+                'actor_name' => 'Signed Officer',
+                'actor_shift' => 'A-Day',
+            ],
+        );
+        $parts = parse_url($baseUrl);
+        $supplyRequestsUrl = $parts['path'].'/supply-requests?'.$parts['query'];
+
+        $this->getJson($supplyRequestsUrl)
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('requests', []);
+    }
+
+    public function test_a_base_inventory_signature_cannot_be_retargeted_to_another_station_nested_operation(): void
+    {
+        $signedStation = Station::create([
+            'station_number' => 'Test-501',
+            'address' => '501 Test Avenue',
+            'zip_code' => '33139',
+        ]);
+        $targetStation = Station::create([
+            'station_number' => 'Test-502',
+            'address' => '502 Test Avenue',
+            'zip_code' => '33139',
+        ]);
+        $category = InventoryCategory::create(['name' => 'Test Supplies']);
+        $catalogItem = InventoryItem::create([
+            'category_id' => $category->id,
+            'name' => 'Test Gloves',
+            'par_quantity' => 10,
+        ]);
+        $targetItem = StationInventoryItem::create([
+            'station_id' => $targetStation->id,
+            'inventory_item_id' => $catalogItem->id,
+            'on_hand' => 7,
+        ]);
+        $baseUrl = URL::temporarySignedRoute(
+            'api.v2.station-inventory.access',
+            now()->addMinutes(5),
+            [
+                'stationId' => $signedStation->id,
+                'actor_name' => 'Signed Officer',
+                'actor_shift' => 'A-Day',
+            ],
+        );
+        $parts = parse_url($baseUrl);
+        $targetUrl = $parts['path'];
+        $targetUrl = preg_replace(
+            '#/station-inventory/\d+#',
+            '/station-inventory/'.$targetStation->id,
+            $targetUrl,
+        );
+        $targetUrl .= '/item/'.$targetItem->id.'?'.$parts['query'];
+
+        $this->putJson($targetUrl, ['on_hand' => 3])
+            ->assertUnauthorized()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Invalid or expired token');
+
+        $this->assertDatabaseHas('station_inventory_items', [
+            'id' => $targetItem->id,
+            'on_hand' => 7,
         ]);
     }
 }

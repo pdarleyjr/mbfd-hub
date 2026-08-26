@@ -10,7 +10,6 @@ use App\Models\StationSupplyRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -21,36 +20,6 @@ use Illuminate\Support\Facades\Validator;
  */
 class StationInventoryV2Controller extends Controller
 {
-    /**
-     * Validate signed URL - works for both base inventory and nested routes
-     * by checking signature against the base station-inventory URL
-     */
-    private function validateSignedRequest(Request $request, int $stationId): bool
-    {
-        // First try direct validation (works for base inventory route)
-        if ($request->hasValidSignature()) {
-            return true;
-        }
-
-        // For nested routes (supply-requests, item updates), reconstruct the base URL
-        // and validate signature against that
-        $url = $request->fullUrl();
-        // Strip /supply-requests or /item/X from the URL path
-        $baseUrl = preg_replace(
-            '#/station-inventory/(\d+)/(supply-requests|item/\d+)#',
-            '/station-inventory/$1',
-            $url
-        );
-
-        if ($baseUrl !== $url) {
-            return URL::hasValidSignature(
-                \Illuminate\Http\Request::create($baseUrl)
-            );
-        }
-
-        return false;
-    }
-
     /** @return array{name: string, shift: string}|null */
     private function signedActor(Request $request): ?array
     {
@@ -159,14 +128,6 @@ class StationInventoryV2Controller extends Controller
      */
     public function getInventory(Request $request, int $stationId): JsonResponse
     {
-        // Validate signed URL
-        if (! $this->validateSignedRequest($request, $stationId)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired token',
-            ], 401);
-        }
-
         $station = Station::findOrFail($stationId);
 
         // Load station inventory items with relationships
@@ -215,14 +176,6 @@ class StationInventoryV2Controller extends Controller
      */
     public function updateItem(Request $request, int $stationId, int $itemId): JsonResponse
     {
-        // Validate signed URL
-        if (! $this->validateSignedRequest($request, $stationId)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired token',
-            ], 401);
-        }
-
         $actor = $this->signedActor($request);
         if ($actor === null) {
             return response()->json([
@@ -309,14 +262,6 @@ class StationInventoryV2Controller extends Controller
      */
     public function getSupplyRequests(Request $request, int $stationId): JsonResponse
     {
-        // Validate signed URL
-        if (! $this->validateSignedRequest($request, $stationId)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired token',
-            ], 401);
-        }
-
         $requests = StationSupplyRequest::where('station_id', $stationId)
             ->whereIn('status', ['open', 'ordered', 'denied'])
             ->orderBy('created_at', 'desc')
@@ -345,14 +290,6 @@ class StationInventoryV2Controller extends Controller
      */
     public function createSupplyRequest(Request $request, int $stationId): JsonResponse
     {
-        // Validate signed URL
-        if (! $this->validateSignedRequest($request, $stationId)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired token',
-            ], 401);
-        }
-
         $actor = $this->signedActor($request);
         if ($actor === null) {
             return response()->json([
