@@ -59,6 +59,21 @@ The local deploy safeguards are source-only: cached `origin/main` still contains
 
 The generated inventory is static-source evidence only. At generation it found 2,182 source files, 178 static route declarations, 80 models, 158 migrations, 73 feature tests, and 15 E2E specs. Dynamic Laravel route expansion, hosted configuration, runtime authorization, and external integration availability remain separate checks.
 
+## Scoped UI code audit — provisional
+
+Scope is limited to the active Daily Station Detail source and the Workgroup Links view. This is a source-only review against the documented MBFD operational design context; it is not a browser, contrast, screen-reader, touch-device, or physical acceptance result.
+
+| Dimension | Score | Evidence / key finding |
+|---|---:|---|
+| Accessibility | 2/4 | Daily source uses visible focus styles, 48px minimum controls, reduced-motion handling, and safe-area rules; rendered contrast, semantic reading order, and keyboard flow remain untested. |
+| Performance | 2/4 | The local Vite build code-splits, but produces a 1.0 MB PDF worker and a 489 KB LiveKit chunk; no performance budget or real-device measurement is established. |
+| Responsive | 3/4 | Daily source includes mobile touch/safe-area patterns and the Station Detail cards use 48px minimum controls; no phone/iPad browser acceptance has been run. |
+| Theming | 1/4 | The active Workgroup Links view repeats large inline style blocks and hard-coded cool grays/blue/purple colors, bypassing the documented warm-neutral/token system. |
+| Anti-patterns | 1/4 | Links is a repeated generic card grid with imperative mouse/focus handlers and decorative shadows rather than reusable, tokenized components. |
+| **Total** | **9/20** | **Poor — source-only remediation required before claiming a polished operational UI.** |
+
+The P0 Station Detail compliance-matrix gap above is functional as well as UX-critical. Keep the global-only Links restriction, but defer any visual refactor until after Daily compliance semantics and the active Workgroup/report policy are settled.
+
 ## Repairs completed locally
 
 ### Daily Checkout integrity and review safety
