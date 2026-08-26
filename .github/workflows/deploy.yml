@@ -38,6 +38,11 @@ jobs:
   release-gates:
     needs: assert-main
     uses: ./.github/workflows/hub-release-gates.yml
+    with:
+      # CI has already checked the PR/base range before merge. Rechecking the
+      # exact dispatched main candidate against its first parent catches a
+      # post-merge source change without inventing an unavailable PR context.
+      pint_base_sha: ${{ format('{0}^', github.sha) }}
 
   deploy:
     needs: release-gates

@@ -19,3 +19,5 @@ permissions:
 jobs:
   release-gates:
     uses: ./.github/workflows/hub-release-gates.yml
+    with:
+      pint_base_sha: ${{ github.event.pull_request.base.sha || github.event.before }}

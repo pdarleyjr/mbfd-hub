@@ -5,6 +5,11 @@ name: Hub release gates
 # manual-activation candidate before an environment-protected deployment job.
 on:
   workflow_call:
+    inputs:
+      pint_base_sha:
+        description: 'Commit or revision immediately preceding the candidate PHP diff.'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -26,7 +31,9 @@ jobs:
       - name: Install Node dependencies
         run: npm ci --ignore-scripts --legacy-peer-deps
       - name: Verify CI configuration
-        run: npm run test:ci-configuration
+        run: |
+          npm run test:ci-configuration
+          npm run test:changed-php-files
 
   php-quality:
     name: PHP and root frontend quality
@@ -36,6 +43,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
@@ -56,8 +64,11 @@ jobs:
           set -euo pipefail
           find app bootstrap config database routes tests -type f -name '*.php' -print0 |
             xargs -0 -r -n 1 php -l
-      - name: Run Pint
-        run: vendor/bin/pint --test
+      - name: Run changed-PHP Pint
+        env:
+          PINT_BASE_SHA: ${{ inputs.pint_base_sha }}
+          PINT_HEAD_SHA: ${{ github.sha }}
+        run: node scripts/ci/changed-php-files.mjs
       - name: Validate Composer lockfile
         run: composer validate --strict --no-check-publish
       - name: Run Composer security audit
@@ -72,6 +83,29 @@ jobs:
           VITE_SENTRY_DSN: ""
           VITE_SENTRY_RELEASE: ""
         run: npm run build
+
+  # This retains the historical formatting baseline in every run without
+  # allowing unrelated existing debt to mask the candidate-scoped hard gate.
+  repository-pint-debt:
+    name: Repository-wide Pint debt (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+          coverage: none
+      - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+        run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Report repository-wide Pint debt
+        run: vendor/bin/pint --test
 
   static-analysis:
     name: PHPStan static analysis

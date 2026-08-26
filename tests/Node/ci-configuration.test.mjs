@@ -142,6 +142,7 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   const releaseGateCaller = workflowJob(deploy, "release-gates");
   assert.match(releaseGateCaller, /needs:\s*assert-main/);
   assert.match(releaseGateCaller, /uses:\s*\.\/\.github\/workflows\/hub-release-gates\.yml/);
+  assert.match(releaseGateCaller, /pint_base_sha:\s*\$\{\{\s*format\('\{0\}\^',\s*github\.sha\)\s*\}\}/);
 
   const deployment = workflowJob(deploy, "deploy");
   assert.match(deployment, /needs:\s*release-gates/);
@@ -201,6 +202,8 @@ test("independent Hub operations activation cannot run from an audit ref or with
 test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset, security, and runtime-compatibility checks", () => {
   const gates = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
 
+  assert.match(gates, /workflow_call:\s*\r?\n\s+inputs:\s*\r?\n\s+pint_base_sha:\s*\r?\n(?:\s+.*\r?\n)*?\s+required:\s*true\s*\r?\n\s+type:\s*string/);
+
   const ciConfiguration = workflowJob(gates, "ci-configuration");
   assert.match(workflowStep(ciConfiguration, "Verify CI configuration"), /npm run test:ci-configuration/);
 
@@ -209,11 +212,19 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
   assert.match(lint, /set -euo pipefail/);
   assert.match(lint, /php -l/);
   assert.doesNotMatch(lint, /\|\|\s*true\b/);
-  assert.match(workflowStep(phpQuality, "Run Pint"), /vendor\/bin\/pint --test/);
+  assert.match(phpQuality, /fetch-depth:\s*0/);
+  const changedPhpPint = workflowStep(phpQuality, "Run changed-PHP Pint");
+  assert.match(changedPhpPint, /PINT_BASE_SHA:\s*\$\{\{\s*inputs\.pint_base_sha\s*\}\}/);
+  assert.match(changedPhpPint, /PINT_HEAD_SHA:\s*\$\{\{\s*github\.sha\s*\}\}/);
+  assert.match(changedPhpPint, /node scripts\/ci\/changed-php-files\.mjs/);
   assert.match(workflowStep(phpQuality, "Validate Composer lockfile"), /composer validate --strict --no-check-publish/);
   assert.match(workflowStep(phpQuality, "Run Composer security audit"), /composer audit --locked/);
   assert.match(workflowStep(phpQuality, "Root TypeScript typecheck"), /npm run typecheck/);
   assert.match(workflowStep(phpQuality, "Root production build"), /npm run build/);
+
+  const repositoryPintDebt = workflowJob(gates, "repository-pint-debt");
+  assert.match(repositoryPintDebt, /continue-on-error:\s*true/);
+  assert.match(workflowStep(repositoryPintDebt, "Report repository-wide Pint debt"), /vendor\/bin\/pint --test/);
 
   const staticAnalysis = workflowJob(gates, "static-analysis");
   assert.match(staticAnalysis, /composer install/);
@@ -292,6 +303,7 @@ test("CI invokes the deploy-free shared release gate for main and pull requests"
   assert.match(ci, /^  push:\r?\n    branches: \[main\]/m);
   assert.match(ci, /^  pull_request:\r?\n    branches: \[main\]/m);
   assert.match(ci, /uses:\s*\.\/\.github\/workflows\/hub-release-gates\.yml/);
+  assert.match(ci, /pint_base_sha:\s*\$\{\{\s*github\.event\.pull_request\.base\.sha\s*\|\|\s*github\.event\.before\s*\}\}/);
   assert.doesNotMatch(ci, /^\s*runs-on:\s*self-hosted\s*$/m);
   assert.doesNotMatch(ci, /^\s*environment:\s*$/m);
   assert.doesNotMatch(ci, /^\s*DEPLOY_SSH_KEY:/m);
@@ -382,7 +394,13 @@ test("CI executes the deploy-free configuration regression suite", () => {
     packageJson.scripts["test:ci-configuration"],
     "node --test tests/Node/ci-configuration.test.mjs",
   );
-  assert.match(workflowStep(workflowJob(gates, "ci-configuration"), "Verify CI configuration"), /npm run test:ci-configuration/);
+  assert.equal(
+    packageJson.scripts["test:changed-php-files"],
+    "node --test tests/Node/changed-php-files.test.mjs",
+  );
+  const configuration = workflowStep(workflowJob(gates, "ci-configuration"), "Verify CI configuration");
+  assert.match(configuration, /npm run test:ci-configuration/);
+  assert.match(configuration, /npm run test:changed-php-files/);
 });
 
 test("browser and local-server test harnesses reject production endpoints and inherited integrations", () => {
