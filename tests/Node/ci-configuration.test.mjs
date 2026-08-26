@@ -239,6 +239,11 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
   const postgres = workflowJob(gates, "phpunit-postgres");
   assert.match(postgres, /POSTGRES_DB:\s*mbfd_hub_test_ci/);
   assert.match(postgres, /MBFD_ALLOW_DISPOSABLE_POSTGRES:\s*["']1["']/);
+  assert.match(postgres, /actions\/setup-node@/);
+  assert.match(workflowStep(postgres, "Install Node dependencies"), /npm ci --ignore-scripts --legacy-peer-deps/);
+  const postgresTestAssets = workflowStep(postgres, "Build root test assets");
+  assert.match(postgresTestAssets, /npm run build/);
+  assert.match(postgresTestAssets, /SENTRY_AUTH_TOKEN:\s*""/);
   assert.match(workflowStep(postgres, "Run PHPUnit suite"), /php artisan test --exclude-group=postgres/);
   assert.match(
     workflowStep(postgres, "Run PostgreSQL concurrency and integrity tests"),
@@ -272,6 +277,11 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
 
   const php85 = workflowJob(gates, "php-85-compatibility");
   assert.match(php85, /php-version:\s*["']8\.5["']/);
+  assert.match(php85, /actions\/setup-node@/);
+  assert.match(workflowStep(php85, "Install Node dependencies"), /npm ci --ignore-scripts --legacy-peer-deps/);
+  const php85TestAssets = workflowStep(php85, "Build root test assets");
+  assert.match(php85TestAssets, /npm run build/);
+  assert.match(php85TestAssets, /SENTRY_AUTH_TOKEN:\s*""/);
   assert.match(workflowStep(php85, "Run PHP 8.5 PHPUnit compatibility suite"), /php artisan test --exclude-group=postgres/);
   assert.match(workflowStep(php85, "Run PHP 8.5 PostgreSQL compatibility tests"), /php artisan test --group=postgres/);
 });

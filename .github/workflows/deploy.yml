@@ -74,6 +74,8 @@ jobs:
           set -euo pipefail
           RELEASE_SHA="$GITHUB_SHA"
           test -n "$RELEASE_SHA"
+          # This quoted heredoc is intentionally evaluated on the remote host.
+          # shellcheck disable=SC2029
           ssh deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
           set -euo pipefail
 
@@ -120,6 +122,8 @@ jobs:
           set -euo pipefail
           RELEASE_SHA="$GITHUB_SHA"
           test -n "$RELEASE_SHA"
+          # This quoted heredoc is intentionally evaluated on the remote host.
+          # shellcheck disable=SC2029
           ssh deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
           set -euo pipefail
           cd /opt/mbfd/mbfd-hub
@@ -189,6 +193,8 @@ jobs:
           set -euo pipefail
           RELEASE_SHA="$GITHUB_SHA"
           test -n "$RELEASE_SHA"
+          # This quoted heredoc is intentionally evaluated on the remote host.
+          # shellcheck disable=SC2029
           ssh deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
           set -euo pipefail
           cd /opt/mbfd/mbfd-hub

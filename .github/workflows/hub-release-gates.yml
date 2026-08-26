@@ -120,10 +120,16 @@ jobs:
           php-version: '8.4'
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
           coverage: none
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
       - name: Install PHP dependencies
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Install Node dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
       - name: Prepare disposable PostgreSQL test application
         run: |
           cp .env.example .env
@@ -142,6 +148,14 @@ jobs:
           php artisan package:discover --ansi
           chmod -R 775 storage bootstrap/cache
           php artisan migrate --force
+      - name: Build root test assets
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_ORG: ""
+          SENTRY_PROJECT_FRONTEND: ""
+          VITE_SENTRY_DSN: ""
+          VITE_SENTRY_RELEASE: ""
+        run: npm run build
       - name: Run PHPUnit suite
         run: php artisan test --exclude-group=postgres
       - name: Run PostgreSQL concurrency and integrity tests
@@ -347,10 +361,16 @@ jobs:
           php-version: '8.5'
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
           coverage: none
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
       - name: Install PHP dependencies
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Install Node dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
       - name: Prepare PHP 8.5 disposable PostgreSQL test application
         run: |
           cp .env.example .env
@@ -369,6 +389,14 @@ jobs:
           php artisan package:discover --ansi
           chmod -R 775 storage bootstrap/cache
           php artisan migrate --force
+      - name: Build root test assets
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_ORG: ""
+          SENTRY_PROJECT_FRONTEND: ""
+          VITE_SENTRY_DSN: ""
+          VITE_SENTRY_RELEASE: ""
+        run: npm run build
       - name: Run PHP 8.5 PHPUnit compatibility suite
         run: php artisan test --exclude-group=postgres
       - name: Run PHP 8.5 PostgreSQL compatibility tests
