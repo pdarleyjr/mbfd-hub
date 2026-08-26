@@ -33,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.role' => \App\Http\Middleware\EnsureAdminApiRole::class,
             'workgroup.access' => \App\Http\Middleware\EnsureWorkgroupPanelAccess::class,
             'verify.bid.token' => \App\Http\Middleware\VerifyBidReaderToken::class,
+            'station-inventory.signed' => \App\Http\Middleware\ValidateStationInventorySignature::class,
             'display.readonly' => \App\Http\Middleware\EnsureDisplayReadOnly::class,
             'display.token' => \App\Http\Middleware\EnsureDisplayToken::class,
             'conference.enabled' => \App\Http\Middleware\EnsureVideoConferencingEnabled::class,
