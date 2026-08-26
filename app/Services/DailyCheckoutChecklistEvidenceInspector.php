@@ -108,7 +108,7 @@ final class DailyCheckoutChecklistEvidenceInspector
                         'compartment_id' => $compartmentId,
                         'compartment_label' => $compartmentLabel,
                         'label' => $itemName,
-                        'occurrences' => array_values($occurrences),
+                        'occurrences' => $occurrences,
                     ];
                 }
             }
@@ -121,7 +121,7 @@ final class DailyCheckoutChecklistEvidenceInspector
                     'compartment_id' => $identifier,
                     'compartment_label' => null,
                     'label' => $identifier,
-                    'occurrences' => array_values($occurrences),
+                    'occurrences' => $occurrences,
                 ];
             }
         }
@@ -132,7 +132,7 @@ final class DailyCheckoutChecklistEvidenceInspector
                     'compartment_id' => null,
                     'compartment_label' => $label,
                     'label' => $label,
-                    'occurrences' => array_values($occurrences),
+                    'occurrences' => $occurrences,
                 ];
             }
         }

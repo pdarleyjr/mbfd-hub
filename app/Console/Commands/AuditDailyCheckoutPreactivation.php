@@ -613,7 +613,7 @@ final class AuditDailyCheckoutPreactivation extends Command
         CarbonImmutable $startOfDay,
         ?string $expectedChecklistVersion,
     ): array {
-        $latest = $events === [] ? null : $events[array_key_last($events)];
+        $latest = null;
         $latestMatchesCurrent = $latest === null
             ? null
             : $this->normalizedStatus($latest->status) === $this->normalizedStatus($apparatus->status);
@@ -621,6 +621,7 @@ final class AuditDailyCheckoutPreactivation extends Command
         $returnEvent = null;
 
         foreach ($events as $event) {
+            $latest = $event;
             $changedAt = $this->asUtc($event->changed_at);
             if ($changedAt === null) {
                 continue;
