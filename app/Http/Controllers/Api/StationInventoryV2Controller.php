@@ -2,61 +2,41 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\Station;
-use App\Models\InventoryItem;
-use App\Models\StationInventoryItem;
-use App\Models\StationInventoryAudit;
-use App\Models\StationSupplyRequest;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
+use App\Models\Station;
+use App\Models\StationInventoryAudit;
+use App\Models\StationInventoryItem;
+use App\Models\StationSupplyRequest;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Validator;
 
 /**
  * Station Inventory V2 API Controller
- * 
+ *
  * Provides PIN-protected access to station inventory management.
  * Uses signed URLs for session-based authentication after PIN verification.
  */
 class StationInventoryV2Controller extends Controller
 {
-
-    /**
-     * Validate signed URL - works for both base inventory and nested routes
-     * by checking signature against the base station-inventory URL
-     */
-    private function validateSignedRequest(Request $request, int $stationId): bool
+    /** @return array{name: string, shift: string}|null */
+    private function signedActor(Request $request): ?array
     {
-        // First try direct validation (works for base inventory route)
-        if ($request->hasValidSignature()) {
-            return true;
+        $actorName = $request->query('actor_name');
+        $actorShift = $request->query('actor_shift');
+
+        if (! is_string($actorName) || ! is_string($actorShift) || $actorName === '' || $actorShift === '') {
+            return null;
         }
-        
-        // For nested routes (supply-requests, item updates), reconstruct the base URL
-        // and validate signature against that
-        $url = $request->fullUrl();
-        // Strip /supply-requests or /item/X from the URL path
-        $baseUrl = preg_replace(
-            '#/station-inventory/(\d+)/(supply-requests|item/\d+)#',
-            '/station-inventory/$1',
-            $url
-        );
-        
-        if ($baseUrl !== $url) {
-            return URL::hasValidSignature(
-                \Illuminate\Http\Request::create($baseUrl)
-            );
-        }
-        
-        return false;
+
+        return ['name' => $actorName, 'shift' => $actorShift];
     }
 
     /**
      * Verify station PIN and generate access token
-     * 
+     *
      * POST /api/v2/station-inventory/verify-pin
      */
     public function verifyPin(Request $request): JsonResponse
@@ -77,11 +57,11 @@ class StationInventoryV2Controller extends Controller
 
         // Try to find station by ID first, then by station_number
         $station = Station::find($request->station_id);
-        if (!$station) {
+        if (! $station) {
             $station = Station::where('station_number', $request->station_id)->first();
         }
 
-        if (!$station) {
+        if (! $station) {
             return response()->json([
                 'success' => false,
                 'message' => 'Station not found',
@@ -89,7 +69,7 @@ class StationInventoryV2Controller extends Controller
         }
 
         // Verify PIN using Hash::check
-        if (!Hash::check($request->pin, $station->inventory_pin_hash)) {
+        if (! Hash::check($request->pin, $station->inventory_pin_hash)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid PIN',
@@ -144,19 +124,11 @@ class StationInventoryV2Controller extends Controller
 
     /**
      * Get full inventory list for a station
-     * 
+     *
      * GET /api/v2/station-inventory/{stationId}
      */
     public function getInventory(Request $request, int $stationId): JsonResponse
     {
-        // Validate signed URL
-        if (!$this->validateSignedRequest($request, $stationId)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired token',
-            ], 401);
-        }
-
         $station = Station::findOrFail($stationId);
 
         // Load station inventory items with relationships
@@ -200,13 +172,13 @@ class StationInventoryV2Controller extends Controller
 
     /**
      * Update on_hand count for a station inventory item
-     * 
+     *
      * PUT /api/v2/station-inventory/{stationId}/item/{itemId}
      */
     public function updateItem(Request $request, int $stationId, int $itemId): JsonResponse
     {
-        // Validate signed URL
-        if (!$this->validateSignedRequest($request, $stationId)) {
+        $actor = $this->signedActor($request);
+        if ($actor === null) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid or expired token',
@@ -215,8 +187,6 @@ class StationInventoryV2Controller extends Controller
 
         $validator = Validator::make($request->all(), [
             'on_hand' => 'required|integer|min:0',
-            'actor_name' => 'required|string|max:255',
-            'actor_shift' => 'required|string|max:50',
         ]);
 
         if ($validator->fails()) {
@@ -226,9 +196,10 @@ class StationInventoryV2Controller extends Controller
             ], 422);
         }
 
-        // Find the station inventory item
+        // The client receives the StationInventoryItem primary key as `item.id`.
+        // Scope it to the station before updating so IDs cannot cross stations.
         $stationItem = StationInventoryItem::where('station_id', $stationId)
-            ->where('inventory_item_id', $itemId)
+            ->whereKey($itemId)
             ->with('inventoryItem')
             ->firstOrFail();
 
@@ -257,9 +228,9 @@ class StationInventoryV2Controller extends Controller
         // Create audit log
         StationInventoryAudit::create([
             'station_id' => $stationId,
-            'inventory_item_id' => $itemId,
-            'actor_name' => $request->actor_name,
-            'actor_shift' => $request->actor_shift,
+            'inventory_item_id' => $stationItem->inventory_item_id,
+            'actor_name' => $actor['name'],
+            'actor_shift' => $actor['shift'],
             'action' => 'count_updated',
             'from_value' => $oldValues,
             'to_value' => [
@@ -287,19 +258,11 @@ class StationInventoryV2Controller extends Controller
 
     /**
      * Get all open/ordered/denied supply requests for a station
-     * 
+     *
      * GET /api/v2/station-inventory/{stationId}/supply-requests
      */
     public function getSupplyRequests(Request $request, int $stationId): JsonResponse
     {
-        // Validate signed URL
-        if (!$this->validateSignedRequest($request, $stationId)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired token',
-            ], 401);
-        }
-
         $requests = StationSupplyRequest::where('station_id', $stationId)
             ->whereIn('status', ['open', 'ordered', 'denied'])
             ->orderBy('created_at', 'desc')
@@ -323,13 +286,13 @@ class StationInventoryV2Controller extends Controller
 
     /**
      * Create a new supply request
-     * 
+     *
      * POST /api/v2/station-inventory/{stationId}/supply-requests
      */
     public function createSupplyRequest(Request $request, int $stationId): JsonResponse
     {
-        // Validate signed URL
-        if (!$this->validateSignedRequest($request, $stationId)) {
+        $actor = $this->signedActor($request);
+        if ($actor === null) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid or expired token',
@@ -338,8 +301,6 @@ class StationInventoryV2Controller extends Controller
 
         $validator = Validator::make($request->all(), [
             'request_text' => 'required|string|max:1000',
-            'actor_name' => 'required|string|max:255',
-            'actor_shift' => 'required|string|max:50',
         ]);
 
         if ($validator->fails()) {
@@ -354,16 +315,16 @@ class StationInventoryV2Controller extends Controller
             'station_id' => $stationId,
             'request_text' => $request->request_text,
             'status' => 'open',
-            'created_by_name' => $request->actor_name,
-            'created_by_shift' => $request->actor_shift,
+            'created_by_name' => $actor['name'],
+            'created_by_shift' => $actor['shift'],
         ]);
 
         // Create audit log
         StationInventoryAudit::create([
             'station_id' => $stationId,
             'inventory_item_id' => null,
-            'actor_name' => $request->actor_name,
-            'actor_shift' => $request->actor_shift,
+            'actor_name' => $actor['name'],
+            'actor_shift' => $actor['shift'],
             'action' => 'note_added',
             'from_value' => null,
             'to_value' => [
