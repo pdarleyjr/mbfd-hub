@@ -2,7 +2,7 @@ name: Lighthouse CI
 
 on:
   workflow_run:
-    workflows: ["Deploy to Production"]
+    workflows: ["Deploy approved Hub candidate"]
     branches: [main]
     types: [completed]
   workflow_dispatch:

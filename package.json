@@ -6,6 +6,7 @@
         "dev": "vite",
         "typecheck": "tsc --noEmit",
         "test:ci-configuration": "node --test tests/Node/ci-configuration.test.mjs",
+        "test:daily-checkout-e2e": "playwright test --config=playwright.daily-checkout.config.ts",
         "typecheck:operational-forms": "tsc -p tsconfig.operational-forms.json",
         "test:operational-forms-node": "node --test tests/Node/operational-forms/*.test.mjs",
         "test:operational-forms-e2e": "playwright test --config=playwright.operational-forms.config.ts",

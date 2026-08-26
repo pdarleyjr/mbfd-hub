@@ -345,6 +345,7 @@ test("browser and local-server test harnesses reject production endpoints and in
   const testingExample = readFileSync(resolve(root, ".env.testing.example"), "utf8");
   const loopbackOnlyFiles = [
     "playwright.config.ts",
+    "playwright.daily-checkout.config.ts",
     "playwright.operational-forms.config.ts",
     "playwright.personnel-requests.config.ts",
     "playwright.video-conferencing.config.ts",
@@ -354,6 +355,7 @@ test("browser and local-server test harnesses reject production endpoints and in
     "tests/e2e/workgroup-evaluations.spec.ts",
   ];
   const childProcessFiles = [
+    "playwright.daily-checkout.config.ts",
     "playwright.operational-forms.config.ts",
     "playwright.personnel-requests.config.ts",
     "tests/e2e/operational-forms.setup.ts",
@@ -373,6 +375,36 @@ test("browser and local-server test harnesses reject production endpoints and in
     assert.match(source, /sanitizedTestEnvironment\(/, `${file} must scrub inherited integration configuration`);
     assert.doesNotMatch(source, /\.\.\.process\.env/);
   }
+});
+
+test("Daily Checkout browser acceptance uses a mocked isolated loopback build", () => {
+  const config = readFileSync(resolve(root, "playwright.daily-checkout.config.ts"), "utf8");
+  const dailySpec = readFileSync(resolve(root, "tests/e2e/daily-checkout-inspection.spec.ts"), "utf8");
+  const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
+  const gates = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
+  const daily = workflowJob(gates, "daily-contract-integrity");
+
+  assert.equal(
+    packageJson.scripts["test:daily-checkout-e2e"],
+    "playwright test --config=playwright.daily-checkout.config.ts",
+  );
+  assert.match(config, /loopbackBaseUrl\('DAILY_CHECKOUT_E2E_BASE_URL'/);
+  assert.match(config, /sanitizedTestEnvironment\(/);
+  assert.match(config, /DAILY_CHECKOUT_OUT_DIR/);
+  assert.match(config, /serviceWorkers:\s*'block'/);
+  assert.match(config, /reuseExistingServer:\s*false/);
+  assert.match(config, /testMatch:\s*\/daily-checkout-inspection\\\.spec\\\.ts\//);
+  assert.match(dailySpec, /page\.route\('\*\*\/api\/\*\*'/);
+  assert.match(workflowStep(daily, "Install root browser test dependencies"), /npm ci --ignore-scripts --legacy-peer-deps/);
+  assert.match(workflowStep(daily, "Install Chromium for mocked Daily Checkout Playwright"), /npx playwright install --with-deps chromium/);
+  assert.match(workflowStep(daily, "Run mocked Daily Checkout Playwright"), /npm run test:daily-checkout-e2e/);
+});
+
+test("Lighthouse follows the approved Hub candidate activation workflow", () => {
+  const lighthouse = readFileSync(resolve(root, ".github/workflows/lighthouse.yml"), "utf8");
+
+  assert.match(lighthouse, /workflows:\s*\["Deploy approved Hub candidate"\]/);
+  assert.doesNotMatch(lighthouse, /Deploy to Production/);
 });
 
 test("ordinary CI builds cannot inherit Sentry upload capability or production integration secrets", () => {
