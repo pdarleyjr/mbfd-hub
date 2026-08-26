@@ -5,13 +5,15 @@
 - **Isolated worktree:** `D:\CodexWorktrees\mbfd-hub-full-system-20260825`
 - **Pre-resume local baseline:** `audit/mbfd-hub-full-system-20260825` / `74b3020c4`
 - **Published audit branch:** `origin/audit/mbfd-hub-full-system-20260825` (non-main publication only; no merge, deployment, or production action follows from it).
+- **Draft pull request:** [#216](https://github.com/pdarleyjr/mbfd-hub/pull/216) into `main`; it is review/hosted-validation only and does not authorize merge or deployment.
+- **Hosted-validation source checkpoint:** `5e7addd057c6f0efa341dee1f493778c37a776aa`; later commits update this evidence record only.
 - **Initial published checkpoint:** `2612745572cb891b6fe03b74da72a608cbeb528e`; later local commits add the canonical Daily Checkout and Hub release-gate repairs recorded here.
 - **Verified source baseline:** cached `origin/main` at `ac6965f88f7d8ed441e08996b93d7cdb9f9b99c0`
-- **Current resumed repair set:** isolated Hub-only Daily, PostgreSQL-fixture, release-gate, and test-isolation changes in this branch. The report is source/local evidence, not deployment evidence.
+- **Current repair/evidence boundary:** isolated Hub-only source and local evidence, plus the named GitHub-hosted validation below. None is deployment, production, public-endpoint, or physical-AV evidence.
 
 ## Release verdict
 
-**FAIL — not ready to merge or deploy.** It is safe to publish this non-main audit branch and run GitHub-hosted validation; it is not safe to claim hosted CI, a candidate deployment, a production database migration, a public endpoint, a human operational workflow, or physical AV behavior until those gates are independently observed.
+**FAIL — not ready to merge or deploy.** GitHub-hosted validation is now observed: PHPStan passes at the named source checkpoint and named release-gate jobs pass as recorded below. There is still no all-green exact-SHA release-gate matrix because full-repository Pint fails; the sequential quality job therefore skipped its later Composer/root-frontend commands. It is not safe to claim a candidate deployment, a production database migration, a public endpoint, a human operational workflow, or physical AV behavior.
 
 The original workspace was preserved. Except for the separately recorded PulsePoint Cloudflare incident below, no Hub deployment, production migration, restart, container action, GMKtec command, or production database/storage operation was performed.
 
@@ -157,7 +159,7 @@ The separate `mbfd-command-display` worktree was kept isolated from the dirty re
 | Root and Daily high-severity dependency audits | **PASS** | Both `npm audit --audit-level=high` invocations report zero vulnerabilities. |
 | Changed Daily/Display PHP formatting | **PASS** — 10 files | Scoped Pint pass for the changed Daily/Display source and ledger fixture. |
 | Full repository Pint | **FAIL** — 298 nonconforming files | Broad inherited repository formatting debt remains. No unrelated mass formatting was performed; this blocks the hard full-Pint release gate. |
-| PHPStan | **UNVERIFIED locally** | The locked PHPStan archive is unavailable locally. The workflow now supplies only the ephemeral GitHub job token for Composer, but hosted execution has not yet been observed. |
+| PHPStan (local) | **UNVERIFIED locally** | The locked PHPStan archive is unavailable locally. Hosted execution is separately recorded below. |
 | Forced-password HTTP acceptance | **PASS** — 24 tests / 111 assertions | Real local `/livewire/update` requests across Admin, Employee, Training, and Workgroup, including role loss and allowed password/logout paths. No hosted session/browser evidence. |
 | Video-conferencing health authorization | **PASS** — 12 tests / 57 assertions | Local route/controller coverage; proves only Hub authorization behavior, not LiveKit/Media Control runtime health. |
 | Test integration isolation | **PASS** — 1 test / 4 assertions | Inherited sentinel values cannot enable ScreenTinker or Workgroup AI under PHPUnit, and stray Laravel HTTP is blocked globally. |
@@ -168,14 +170,24 @@ The separate `mbfd-command-display` worktree was kept isolated from the dirty re
 | Inspection approval transaction acceptance | **PASS** — 5 tests / 52 assertions | Local fresh SQLite schema. Covers repeated/interleaved terminal decisions, outer-commit timing, rollback, cache state, and one job dispatch per terminal approval; SQLite does not prove PostgreSQL locking. |
 | PulsePoint worker | **PASS** — typecheck, 1 / 1 test, high-severity audit | Local only; the test confirms fail-closed behavior when the worker secret is absent. |
 
+## GitHub-hosted validation evidence — draft PR #216
+
+The following is hosted CI evidence for source checkpoint `5e7addd057c6f0efa341dee1f493778c37a776aa`; it is not candidate, production, public-browser, device, human, or physical-AV acceptance.
+
+| Area | Result | Boundary / qualification |
+|---|---|---|
+| [Static Analysis / PHPStan](https://github.com/pdarleyjr/mbfd-hub/actions/runs/32983487495) | **PASS** — 0 reported errors | Hosted Composer authentication uses an ephemeral job token. The local PHPStan archive remains unavailable, so this is the authoritative static-analysis proof for the checkpoint. |
+| Named release-gate jobs | **PASS as observed** | CI configuration, generated assets, PHPStan, PHPUnit/PostgreSQL concurrency-integrity, Daily Checkout contract/integrity, dependency security, filesystem/config security, and PHP 8.5 compatibility passed in the [release-gates run](https://github.com/pdarleyjr/mbfd-hub/actions/runs/32983487924). These are CI-source gates only. |
+| PHP and root frontend quality | **FAIL** — full Pint | PHP lint passed, then `vendor/bin/pint --test` reported 298 unique nonconforming inherited PHP paths (311 rendered rows). Composer lock/audit and root TypeScript typecheck/build were skipped by that sequential job, so their hosted status is unobserved here rather than failed. No mass formatting was performed. |
+
 ## Remaining release gates and findings
 
 | Priority | Status | Required next evidence or decision |
 |---|---|---|
 | P0 | Local source safety repaired; not deployed | A separately authorized staged release must prove migration, rollback, real authorization, and public behavior before any production claim. |
-| P0 | Open / release hold | Candidate activation source is now manual, main-only, confirmation-gated, exact-SHA-gated, and production-environment-gated. It still lacks a Daily data/cutover preactivation gate; hosted CI/protection/approval/runtime evidence is unobserved. Keep all Hub activation after class because direct Media separation does not prove harmless shared-host resource contention. |
+| P0 | Open / release hold | Candidate activation source is now manual, main-only, confirmation-gated, exact-SHA-gated, and production-environment-gated. It still lacks a Daily data/cutover preactivation gate; named hosted CI evidence is now observed, but the matrix is not all green because Pint fails. Protection, approval, candidate, and runtime evidence remain unobserved. Keep all Hub activation after class because direct Media separation does not prove harmless shared-host resource contention. |
 | P0 | Local repair / data-cutover required | Out-of-service can no longer inflate completed Daily compliance in source. The exact seven-state matrix and denominator arithmetic are covered locally, but pre-ledger OOS-return history and raw-SQL changes require a staged, read-only manual classification/cutover review before activation. |
-| P0 | Local repair / proof required | Station Detail, Station Operations, public station data, Display Snapshot/Readiness, and the audit command now consume the canonical Daily result. The repair remains undeployed and needs hosted/candidate/public acceptance independently. |
+| P0 | Local repair / proof required | Station Detail, Station Operations, public station data, Display Snapshot/Readiness, and the audit command now consume the canonical Daily result. The repair remains undeployed; mocked hosted/browser contract evidence does not replace candidate or public acceptance. |
 | P0 | Open / owner decision | Public station video-conferencing routes can create a guest launch context and issue a station token without device identity. If publicly reachable, a caller can claim a station role. Select a kiosk-bound credential, mTLS, or verified edge identity contract before changing Hub routes; do not touch classroom players, Cloudflare, network, or Media Control runtime under this freeze. |
 | P1 | Local repair / owner decision | Active Workgroup pages, routes, relation managers, uploads, report exports, and registered widgets now have Group-A/Group-B coverage and explicit multi-workgroup context. Decide the intended global-admin workflow before adding any global selection UI: a global viewer can access global resources/static reports, while member-centric pages intentionally require an active membership. Keep dormant legacy dashboard/exporter/widget/template code unregistered until it has selected-session scoping and cache-only AI behavior. |
 | P1 | Open | The accountable owner must classify/backfill each apparatus' Daily Checkout requirement/template through a reviewed production plan; no production data was inferred or changed here. The observed registry also needs a deliberate decision for the absent Fire Boat 6 and duplicated L1/L3 `scba_radio` checklist labels. |
@@ -195,12 +207,12 @@ The separate `mbfd-command-display` worktree was kept isolated from the dirty re
 | P1 | Local proof only | The PostgreSQL same-record inspection approval-lock regression passed in the dedicated loopback database with bounded retry behavior. It is not production lock-contention, worker, or external-Snipe acceptance. |
 | P1 | Local isolated repair / unpublished | Command Display's isolated branch now uses the canonical 2-of-4 fixture and history-only activity adapter; focused local mock tests pass. It remains unpushed, ungated, and undeployed, with two unrelated AI-prose mock failures in its full suite. |
 | P1 | Open | GitHub governance is absent: authenticated read-only API calls returned HTTP 404 for `main` branch protection and required-status-check resources; repository ruleset listing returned zero rulesets. Require pull requests, required CI checks, at least one accountable review/code-owner rule, dismissal of stale approvals, and block force-push/deletion before any production-ready claim. No repository setting was changed. |
-| P1 | Release gate blocked / unverified | Larastan/PHPStan is now declared and locked, and Composer CI uses an ephemeral job token rather than a persisted Composer secret. The locked PHPStan archive is absent locally and no hosted PHPStan execution has been observed; do not call static analysis passed. Full repository Pint also currently fails on 298 inherited nonconforming files. |
+| P1 | Hosted static-analysis pass / release gate blocked | Larastan/PHPStan is declared and locked, Composer CI uses an ephemeral job token rather than a persisted Composer secret, and hosted PHPStan passes with zero errors at source checkpoint `5e7addd057c6f0efa341dee1f493778c37a776aa`. The locked archive remains absent locally. Full repository Pint still fails on 298 inherited nonconforming files, so the release gate remains blocked. |
 | P1 | Open | Observability runs `npm install` and creates a Sentry release on every `main` push without waiting for deployment success. Treat Sentry release metadata as non-provenance until the workflow is lockfile-reproducible and linked to a successful immutable deployment. |
 | P1 | Open | The production Compose/deploy path still builds from a Sail runtime. Local PHP 8.4/8.5 suites pass, but the exact immutable production image/interpreter and candidate SHA remain un-rehearsed. |
 | P1 | Frozen / source repair only | Hub deploy source now verifies the exact named Hub container/database/user, nonempty `pg_dump`, and `pg_restore --list` before activation. No production backup, restore, container, or Media-associated storage action was run; backup/rollback proof remains pending. |
 | P1 | Open / unverified dependency | The Workgroup AI Worker lacks a lockfile and local test/typecheck script and is not covered by the listed Worker Dependabot directories. Do not deploy or exercise it as part of this Hub release. |
-| P1 | Open | Hosted CI, staging/candidate deployment, production endpoint/browser evidence, notification/queue evidence, backup/rollback evidence, and Command Display release evidence remain unobserved. |
+| P1 | Hosted CI partially observed / release gate blocked | Named draft-PR hosted jobs now provide CI evidence, but no all-green current-SHA gate exists because Pint fails. Staging/candidate deployment, production endpoint/browser, notification/queue, backup/rollback, and Command Display release evidence remain unobserved. |
 | P1 | Open | PulsePoint deployment state, account binding, secret presence, Workers.dev trigger, and lack of zone/cron routes are now read-only verified. Actual `/incidents` delivery, Hub consumption, current cache contents, and deployed-source-to-Git identity remain pending because a feed GET can mutate the Worker cache. The unapproved version above is not a substitute for a controlled release. |
 | P2 | Open | Station Inventory's actor remains the outcome of PIN verification rather than strong per-user identity. Decide whether that is sufficient for inventory-accountability requirements. |
 | P2 | Open | Review history is append-only through Eloquent and protected by model/FK rules, but has not been proven tamper-proof against privileged direct database access. |
@@ -217,7 +229,7 @@ The separate `mbfd-command-display` worktree was kept isolated from the dirty re
 3. Preserve the current Workgroup containment. Obtain the global-viewer and selected-workgroup/session policy before reactivating legacy dashboards, exporters, or widgets.
 4. After class, obtain an explicit Hub-only deployment/change window and data-owner classification for Daily Checkout, public station-request identity, Workgroup AI document egress, push-provider endpoint hosts, and external Snipe/Sheets semantics. Keep the independent `production-activate.yml` path out of the window unless it is brought behind equivalent gates.
 5. Build a disposable candidate from the exact committed source; prove the Daily data/cutover preflight, TRT duplicate preflight, migration/rollback plan, and production-shaped restore path without touching Media Control.
-6. Run hosted CI, then staging browser/API/authorization tests and accountable human review. Include queue/Redis, backup-freshness, external-integration, private-file lifecycle, and Command Display publication evidence as separate gates.
+6. Complete an all-green hosted CI matrix for the exact immutable candidate SHA, then run staging browser/API/authorization tests and accountable human review. Include queue/Redis, backup-freshness, external-integration, private-file lifecycle, and Command Display publication evidence as separate gates.
 7. Authorize PulsePoint separately if its incident version requires a controlled cache-safe behavioral probe, rollback, or release. Do not use `wrangler deploy --dry-run` as a validation mechanism.
 8. Treat every Media Control validation as a separate maintenance request with its own freeze release and physical acceptance criteria.
 
