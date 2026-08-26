@@ -695,7 +695,8 @@ class StationController extends Controller
     }
 
     /**
-     * Get today's apparatus inspections for apparatus assigned to this station
+     * Get today's apparatus inspection history for apparatus assigned to this station.
+     * This endpoint is not a Daily Checkout readiness or completion source.
      */
     public function apparatusInspections(int $id): JsonResponse
     {
@@ -721,6 +722,7 @@ class StationController extends Controller
         // SECURITY (H-02): public endpoint — redact operator name and rank.
         return response()->json([
             'station_id' => $id,
+            'apparatus_inspection_history_only' => true,
             'inspections' => PublicApparatusInspectionResource::collection($inspections)->resolve(request()),
             'total' => $inspections->count(),
         ]);

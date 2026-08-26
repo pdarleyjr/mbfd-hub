@@ -88,6 +88,7 @@ final class PublicStationApparatusInspectionDayWindowTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('station_id', $this->station->id)
+            ->assertJsonPath('apparatus_inspection_history_only', true)
             ->assertJsonPath('total', 1);
         $this->assertSame([$included->id], collect($response->json('inspections'))->pluck('id')->all());
     }
