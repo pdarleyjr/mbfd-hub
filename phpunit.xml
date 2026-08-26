@@ -87,6 +87,7 @@
         <server name="SCREENTINKER_SYNC_TOKEN" value=""/>
         <env name="SESSION_DRIVER" value="array" force="true"/>
         <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <env name="WEBPUSH_ALLOWED_ENDPOINT_HOSTS" value="" force="true"/>
         <env name="VAPID_PEM_FILE" value="" force="true"/>
         <env name="VAPID_PRIVATE_KEY" value="" force="true"/>
         <env name="VAPID_PUBLIC_KEY" value="" force="true"/>

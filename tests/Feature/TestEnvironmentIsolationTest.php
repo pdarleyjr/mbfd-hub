@@ -50,6 +50,7 @@ class TestEnvironmentIsolationTest extends TestCase
             'webpush.vapid.private_key',
             'webpush.vapid.public_key',
             'webpush.vapid.subject',
+            'webpush.allowed_endpoint_hosts',
         ] as $configuration) {
             $this->assertEmpty(config($configuration), $configuration.' must be blank in PHPUnit');
         }
@@ -91,6 +92,7 @@ class TestEnvironmentIsolationTest extends TestCase
             'QUEUE_CONNECTION',
             'SESSION_DRIVER',
             'TELESCOPE_ENABLED',
+            'WEBPUSH_ALLOWED_ENDPOINT_HOSTS',
             'WEBPUSH_DB_CONNECTION',
             'WORKGROUP_AI_ENABLED',
         ] as $variable) {

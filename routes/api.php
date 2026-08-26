@@ -133,7 +133,7 @@ Route::prefix('admin/trt-inventory')->middleware(['web', 'auth', 'admin.role:sup
 // Push notification routes (public VAPID key, authenticated subscription management)
 Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey']);
 
-Route::middleware(['web', 'auth'])->group(function () {
+Route::middleware(['web', 'auth', 'throttle:10,1'])->group(function () {
     Route::post('push-subscriptions', [PushSubscriptionController::class, 'store']);
     Route::delete('push-subscriptions', [PushSubscriptionController::class, 'destroy']);
     Route::post('push/test', [TestNotificationController::class, 'sendTestNotification']);

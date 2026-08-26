@@ -17,6 +17,7 @@ const integrationEnvironmentPrefixes = [
   'SENTRY_',
   'SNIPEIT_',
   'VAPID_',
+  'WEBPUSH_',
   'WORKGROUP_AI_',
 ];
 
