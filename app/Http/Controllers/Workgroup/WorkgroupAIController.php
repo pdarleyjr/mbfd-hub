@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Workgroup;
 use App\Http\Controllers\Controller;
 use App\Models\CandidateProduct;
 use App\Models\User;
+use App\Models\Workgroup;
 use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
 use App\Services\Workgroup\WorkgroupAIService;
@@ -39,7 +40,7 @@ class WorkgroupAIController extends Controller
             ->scopeCandidateProducts(CandidateProduct::with(['category', 'session']), $user)
             ->find($productId);
 
-        if (! $product) {
+        if (! ($product instanceof CandidateProduct)) {
             return response()->json(['error' => 'Product not found'], 404);
         }
 
@@ -65,15 +66,19 @@ class WorkgroupAIController extends Controller
         $sessions = $this->workgroupAccess->scopeSessions(WorkgroupSession::query(), $user);
         $session = $validated['session_id']
             ? $sessions->find($validated['session_id'])
-            : $sessions->active()->orderBy('id')->first();
+            : $sessions->where('status', 'active')->orderBy('id')->first();
 
-        if (! $session) {
+        if (! ($session instanceof WorkgroupSession)) {
             return response()->json(['error' => 'No active session'], 404);
         }
 
         $this->workgroupAccess->requireManageSession($user, $session);
         $session->loadMissing('workgroup');
-        abort_unless($session->workgroup !== null, 404);
+        $workgroup = $session->workgroup;
+
+        if (! ($workgroup instanceof Workgroup)) {
+            abort(404);
+        }
 
         // Build products array for the category
         $products = CandidateProduct::where('workgroup_session_id', $session->id)
@@ -122,15 +127,19 @@ class WorkgroupAIController extends Controller
         $sessions = $this->workgroupAccess->scopeSessions(WorkgroupSession::query(), $user);
         $session = $validated['session_id']
             ? $sessions->find($validated['session_id'])
-            : $sessions->active()->orderBy('id')->first();
+            : $sessions->where('status', 'active')->orderBy('id')->first();
 
-        if (! $session) {
+        if (! ($session instanceof WorkgroupSession)) {
             return response()->json(['error' => 'No active session'], 404);
         }
 
         $this->workgroupAccess->requireManageSession($user, $session);
         $session->loadMissing('workgroup');
-        abort_unless($session->workgroup !== null, 404);
+        $workgroup = $session->workgroup;
+
+        if (! ($workgroup instanceof Workgroup)) {
+            abort(404);
+        }
 
         // Check cached version first
         $cached = $this->aiService->getCachedExecutiveReport($session->id);
@@ -138,7 +147,7 @@ class WorkgroupAIController extends Controller
             return response()->json(array_merge($cached, ['fromCache' => true]));
         }
 
-        $result = $this->aiService->generateExecutiveReport($session->workgroup, $session);
+        $result = $this->aiService->generateExecutiveReport($workgroup, $session);
 
         return response()->json($result);
     }
@@ -155,7 +164,7 @@ class WorkgroupAIController extends Controller
             ->scopeWorkgroupRecords(WorkgroupSharedUpload::query(), $user)
             ->find($uploadId);
 
-        if (! $upload) {
+        if (! ($upload instanceof WorkgroupSharedUpload)) {
             return response()->json(['error' => 'Upload not found'], 404);
         }
 

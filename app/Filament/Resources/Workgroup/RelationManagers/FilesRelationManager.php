@@ -3,11 +3,13 @@
 namespace App\Filament\Resources\Workgroup\RelationManagers;
 
 use App\Filament\Resources\Workgroup\RelationManagers\Concerns\AuthorizesWorkgroupOwner;
+use App\Models\Workgroup;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use LogicException;
 
 class FilesRelationManager extends RelationManager
 {
@@ -28,7 +30,7 @@ class FilesRelationManager extends RelationManager
                     ->required(),
                 Forms\Components\Select::make('workgroup_session_id')
                     ->label('Session')
-                    ->options(fn () => $this->getOwnerRecord()->sessions()->orderBy('name')->pluck('name', 'id'))
+                    ->options(fn () => $this->getWorkgroupOwner()->sessions()->orderBy('name')->pluck('name', 'id'))
                     ->searchable(),
                 Forms\Components\TextInput::make('file_type')
                     ->label('File Type')
@@ -60,7 +62,7 @@ class FilesRelationManager extends RelationManager
             ->filters([
                 Tables\Filters\SelectFilter::make('workgroup_session_id')
                     ->label('Session')
-                    ->options(fn () => $this->getOwnerRecord()->sessions()->orderBy('name')->pluck('name', 'id')),
+                    ->options(fn () => $this->getWorkgroupOwner()->sessions()->orderBy('name')->pluck('name', 'id')),
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
@@ -93,10 +95,21 @@ class FilesRelationManager extends RelationManager
         }
 
         abort_unless(
-            $this->getOwnerRecord()->sessions()->whereKey($sessionId)->exists(),
+            $this->getWorkgroupOwner()->sessions()->whereKey($sessionId)->exists(),
             404,
         );
 
         return $data;
+    }
+
+    private function getWorkgroupOwner(): Workgroup
+    {
+        $ownerRecord = $this->getOwnerRecord();
+
+        if (! $ownerRecord instanceof Workgroup) {
+            throw new LogicException('Files relation manager requires a workgroup owner.');
+        }
+
+        return $ownerRecord;
     }
 }

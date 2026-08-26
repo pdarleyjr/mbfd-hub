@@ -4,6 +4,8 @@ namespace App\Filament\Resources\InspectionResource\Pages;
 
 use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\InspectionResource;
+use App\Models\Apparatus;
+use App\Models\ApparatusInspection;
 use Filament\Actions;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
@@ -15,17 +17,25 @@ class ViewInspection extends ViewRecord
 
     protected function getHeaderActions(): array
     {
+        $inspection = $this->getRecord();
+        abort_unless($inspection instanceof ApparatusInspection, 404);
+
         return [
             Actions\Action::make('reviewFullInspection')
                 ->label('Review full inspection')
                 ->icon('heroicon-o-arrow-top-right-on-square')
                 ->color('primary')
                 ->url(fn (): string => ApparatusResource::getUrl('view-inspection', [
-                    'record' => $this->record->apparatus_id,
-                    'inspection' => $this->record->getKey(),
+                    'record' => $inspection->apparatus_id,
+                    'inspection' => $inspection->getKey(),
                 ]))
-                ->visible(fn (): bool => $this->record->review_status === 'pending_review'
-                    && ApparatusResource::canView($this->record->apparatus)),
+                ->visible(function () use ($inspection): bool {
+                    $apparatus = $inspection->apparatus;
+
+                    return $inspection->review_status === 'pending_review'
+                        && $apparatus instanceof Apparatus
+                        && ApparatusResource::canView($apparatus);
+                }),
             Actions\DeleteAction::make(),
         ];
     }

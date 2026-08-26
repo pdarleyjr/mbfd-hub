@@ -6,6 +6,7 @@ use App\Models\CandidateProduct;
 use App\Models\EvaluationSubmission;
 use App\Models\User;
 use App\Models\WorkgroupMember;
+use App\Models\WorkgroupSession;
 use App\Services\Workgroup\EvaluationService;
 use App\Support\Workgroups\UniversalEvaluationRubric;
 use App\Support\Workgroups\WorkgroupAccess;
@@ -103,15 +104,17 @@ class EvaluationFormPage extends Page
     {
         $user = $this->currentUser();
         $access = app(WorkgroupAccess::class);
-        $this->product = $access
+        $product = $access
             ->scopeCandidateProducts(CandidateProduct::with(['category', 'session.workgroup']), $user)
             ->find($this->productId);
 
-        abort_unless($this->product !== null && $this->product->session !== null, 404);
+        if (! $product instanceof CandidateProduct || ! ($product->session instanceof WorkgroupSession)) {
+            abort(404);
+        }
 
-        $this->member = $this->currentWorkgroupMemberForProduct($user, $this->product);
+        $this->product = $product;
 
-        abort_unless($this->member !== null, 404);
+        $this->member = $this->currentWorkgroupMemberForProduct($user, $product);
 
         $this->assessmentProfile = $this->product->category->getRawOriginal('assessment_profile') ?? 'generic_apparatus';
         $this->criteriaByBucket = UniversalEvaluationRubric::getCriteriaByBucket($this->assessmentProfile);
@@ -396,11 +399,11 @@ class EvaluationFormPage extends Page
             ->scopeCandidateProducts(CandidateProduct::with('session'), $user)
             ->find($this->productId);
 
-        abort_unless($product !== null && $product->session !== null, 404);
+        if (! $product instanceof CandidateProduct || ! ($product->session instanceof WorkgroupSession)) {
+            abort(404);
+        }
 
         $member = $this->currentWorkgroupMemberForProduct($user, $product);
-
-        abort_unless($member !== null, 404);
 
         $submission = EvaluationSubmission::query()
             ->whereKey($this->submissionId)
@@ -436,7 +439,10 @@ class EvaluationFormPage extends Page
     private function currentWorkgroupMemberForProduct(User $user, CandidateProduct $product): WorkgroupMember
     {
         $session = $product->session;
-        abort_unless($session !== null, 404);
+
+        if (! $session instanceof WorkgroupSession) {
+            abort(404);
+        }
 
         $context = app(WorkgroupContext::class);
         $workgroup = $context->requireCurrent($user);

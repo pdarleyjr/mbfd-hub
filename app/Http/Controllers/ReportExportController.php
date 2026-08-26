@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Workgroup;
 use App\Support\Security\SafeHtml;
 use App\Support\Workgroups\WorkgroupReportSessionResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -20,6 +21,8 @@ class ReportExportController extends Controller
     public function exportExecutiveReport(Request $request)
     {
         $session = $this->sessions->resolve($request);
+        $workgroup = $session->workgroup;
+        abort_unless($workgroup instanceof Workgroup, 404);
         $cached = Cache::get("workgroup_ai_exec_report_{$session->id}");
         $reportHtml = is_array($cached) ? ($cached['report'] ?? null) : $cached;
 
@@ -34,7 +37,7 @@ class ReportExportController extends Controller
             'title' => $title,
             'reportHtml' => $reportHtml,
             'generatedAt' => now()->format('F j, Y g:i A'),
-            'workgroupName' => $session->workgroup->name,
+            'workgroupName' => $workgroup->name,
         ]);
 
         $pdf->setPaper('letter', 'portrait');
@@ -50,6 +53,8 @@ class ReportExportController extends Controller
     public function exportSaverReport(Request $request)
     {
         $session = $this->sessions->resolve($request);
+        $workgroup = $session->workgroup;
+        abort_unless($workgroup instanceof Workgroup, 404);
         $reportHtml = Cache::get("workgroup_saver_report_{$session->workgroup_id}_{$session->id}");
 
         abort_unless(
@@ -68,7 +73,7 @@ class ReportExportController extends Controller
             'title' => $title,
             'reportHtml' => $reportHtml,
             'generatedAt' => now()->format('F j, Y g:i A'),
-            'workgroupName' => $session->workgroup->name,
+            'workgroupName' => $workgroup->name,
         ]);
 
         $pdf->setPaper('letter', 'portrait');

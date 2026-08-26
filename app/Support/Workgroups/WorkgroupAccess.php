@@ -13,6 +13,7 @@ use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 final class WorkgroupAccess
 {
@@ -58,58 +59,66 @@ final class WorkgroupAccess
     public function canViewSession(User $user, WorkgroupSession $session): bool
     {
         $session->loadMissing('workgroup');
+        $workgroup = $session->workgroup;
 
-        return $session->workgroup !== null && $this->canViewWorkgroup($user, $session->workgroup);
+        return $workgroup instanceof Workgroup && $this->canViewWorkgroup($user, $workgroup);
     }
 
     public function canManageSession(User $user, WorkgroupSession $session): bool
     {
         $session->loadMissing('workgroup');
+        $workgroup = $session->workgroup;
 
-        return $session->workgroup !== null && $this->canManageWorkgroup($user, $session->workgroup);
+        return $workgroup instanceof Workgroup && $this->canManageWorkgroup($user, $workgroup);
     }
 
     public function canViewCandidateProduct(User $user, CandidateProduct $product): bool
     {
         $product->loadMissing('session.workgroup');
+        $session = $product->session;
 
-        return $product->session !== null && $this->canViewSession($user, $product->session);
+        return $session instanceof WorkgroupSession && $this->canViewSession($user, $session);
     }
 
     public function canManageCandidateProduct(User $user, CandidateProduct $product): bool
     {
         $product->loadMissing('session.workgroup');
+        $session = $product->session;
 
-        return $product->session !== null && $this->canManageSession($user, $product->session);
+        return $session instanceof WorkgroupSession && $this->canManageSession($user, $session);
     }
 
     public function canViewFile(User $user, WorkgroupFile $file): bool
     {
         $file->loadMissing('workgroup');
+        $workgroup = $file->workgroup;
 
-        return $file->workgroup !== null && $this->canViewWorkgroup($user, $file->workgroup);
+        return $workgroup instanceof Workgroup && $this->canViewWorkgroup($user, $workgroup);
     }
 
     public function canViewUpload(User $user, WorkgroupSharedUpload $upload): bool
     {
         $upload->loadMissing('workgroup');
+        $workgroup = $upload->workgroup;
 
-        return $upload->workgroup !== null && $this->canViewWorkgroup($user, $upload->workgroup);
+        return $workgroup instanceof Workgroup && $this->canViewWorkgroup($user, $workgroup);
     }
 
     public function canViewEvaluationSubmission(User $user, EvaluationSubmission $submission): bool
     {
         $submission->loadMissing('candidateProduct.session.workgroup');
+        $product = $submission->candidateProduct;
 
-        return $submission->candidateProduct !== null
-            && $this->canViewCandidateProduct($user, $submission->candidateProduct);
+        return $product instanceof CandidateProduct
+            && $this->canViewCandidateProduct($user, $product);
     }
 
     public function canManageUpload(User $user, WorkgroupSharedUpload $upload): bool
     {
         $upload->loadMissing('workgroup');
+        $workgroup = $upload->workgroup;
 
-        return $upload->workgroup !== null && $this->canManageWorkgroup($user, $upload->workgroup);
+        return $workgroup instanceof Workgroup && $this->canManageWorkgroup($user, $workgroup);
     }
 
     public function requireWorkgroup(User $user, Workgroup $workgroup): void
@@ -152,37 +161,57 @@ final class WorkgroupAccess
         abort_unless($this->canManageUpload($user, $upload), 404);
     }
 
-    /** @param Builder<Workgroup> $query */
+    /**
+     * @param  Builder<Workgroup>  $query
+     * @return Builder<Workgroup>
+     */
     public function scopeWorkgroups(Builder $query, ?User $user): Builder
     {
         return $this->scopeByWorkgroupColumn($query, $user, 'workgroups.id');
     }
 
-    /** @param Builder<Workgroup> $query */
+    /**
+     * @param  Builder<Workgroup>  $query
+     * @return Builder<Workgroup>
+     */
     public function scopeManageWorkgroups(Builder $query, ?User $user): Builder
     {
         return $this->scopeByManagedWorkgroupColumn($query, $user, 'workgroups.id');
     }
 
-    /** @param Builder<WorkgroupSession> $query */
+    /**
+     * @param  Builder<WorkgroupSession>  $query
+     * @return Builder<WorkgroupSession>
+     */
     public function scopeSessions(Builder $query, ?User $user): Builder
     {
         return $this->scopeByWorkgroupColumn($query, $user, 'workgroup_id');
     }
 
-    /** @param Builder<WorkgroupSession> $query */
+    /**
+     * @param  Builder<WorkgroupSession>  $query
+     * @return Builder<WorkgroupSession>
+     */
     public function scopeManageSessions(Builder $query, ?User $user): Builder
     {
         return $this->scopeByManagedWorkgroupColumn($query, $user, 'workgroup_id');
     }
 
-    /** @param Builder<WorkgroupFile|WorkgroupMember|WorkgroupSharedUpload> $query */
+    /**
+     * @template TWorkgroupRecord of WorkgroupFile|WorkgroupMember|WorkgroupSharedUpload
+     *
+     * @param  Builder<TWorkgroupRecord>  $query
+     * @return Builder<TWorkgroupRecord>
+     */
     public function scopeWorkgroupRecords(Builder $query, ?User $user): Builder
     {
         return $this->scopeByWorkgroupColumn($query, $user, 'workgroup_id');
     }
 
-    /** @param Builder<CandidateProduct> $query */
+    /**
+     * @param  Builder<CandidateProduct>  $query
+     * @return Builder<CandidateProduct>
+     */
     public function scopeCandidateProducts(Builder $query, ?User $user): Builder
     {
         if ($user === null) {
@@ -193,10 +222,16 @@ final class WorkgroupAccess
             return $query;
         }
 
-        return $query->whereHas('session', fn (Builder $sessions): Builder => $this->scopeSessions($sessions, $user));
+        return $query->whereHas('session', function (Builder $sessions) use ($user): Builder {
+            /** @var Builder<WorkgroupSession> $sessions */
+            return $this->scopeSessions($sessions, $user);
+        });
     }
 
-    /** @param Builder<EvaluationSubmission> $query */
+    /**
+     * @param  Builder<EvaluationSubmission>  $query
+     * @return Builder<EvaluationSubmission>
+     */
     public function scopeEvaluationSubmissions(Builder $query, ?User $user): Builder
     {
         if ($user === null) {
@@ -207,12 +242,18 @@ final class WorkgroupAccess
             return $query;
         }
 
-        return $query->whereHas(
-            'candidateProduct.session',
-            fn (Builder $sessions): Builder => $this->scopeSessions($sessions, $user),
-        );
+        return $query->whereHas('candidateProduct.session', function (Builder $sessions) use ($user): Builder {
+            /** @var Builder<WorkgroupSession> $sessions */
+            return $this->scopeSessions($sessions, $user);
+        });
     }
 
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
     private function scopeByWorkgroupColumn(Builder $query, ?User $user, string $column): Builder
     {
         if ($user === null) {
@@ -226,6 +267,12 @@ final class WorkgroupAccess
         return $query->whereIn($column, $this->activeMembershipsFor($user)->select('workgroup_id'));
     }
 
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
     private function scopeByManagedWorkgroupColumn(Builder $query, ?User $user, string $column): Builder
     {
         if ($user === null) {

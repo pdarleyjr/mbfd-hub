@@ -3,6 +3,7 @@
 namespace App\Filament\Workgroup\Pages;
 
 use App\Models\User;
+use App\Models\Workgroup;
 use App\Models\WorkgroupSession;
 use App\Services\Workgroup\EvaluationService;
 use App\Services\Workgroup\WorkgroupAIService;
@@ -180,7 +181,9 @@ class SessionResultsPage extends Page
 
         $filename = 'competitor_group_rankings_'.now()->format('Y-m-d').'.csv';
 
-        $rankings = $workgroup ? $evalService->getCompetitorGroupRankings($workgroup, $session) : [];
+        $rankings = $workgroup instanceof Workgroup
+            ? $evalService->getCompetitorGroupRankings($workgroup, $session)
+            : [];
 
         return response()->streamDownload(function () use ($rankings) {
             $handle = fopen('php://output', 'w');
@@ -317,7 +320,7 @@ class SessionResultsPage extends Page
             $aiService = app(WorkgroupAIService::class);
             $workgroup = $session->workgroup;
 
-            if (! $workgroup) {
+            if (! ($workgroup instanceof Workgroup)) {
                 $this->aiReportError = 'No workgroup found for AI report generation.';
                 $this->aiReportLoaded = true;
 
@@ -359,7 +362,7 @@ class SessionResultsPage extends Page
 
         try {
             $workgroup = $session->workgroup;
-            if (! $workgroup) {
+            if (! ($workgroup instanceof Workgroup)) {
                 $this->saverReportError = 'No workgroup found.';
                 $this->saverReportLoading = false;
 
@@ -431,7 +434,7 @@ class SessionResultsPage extends Page
         $isolatedProducts = [];
         $nonRankableFeedback = collect();
 
-        if ($workgroup) {
+        if ($workgroup instanceof Workgroup) {
             $comprehensiveResults = $evalService->getComprehensiveResults($workgroup, $session);
             $competitorGroupRankings = $comprehensiveResults['competitor_group_rankings'] ?? [];
             $isolatedProducts = $comprehensiveResults['isolated_products'] ?? [];

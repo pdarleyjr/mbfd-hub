@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 
+/** @property Form $form */
 class SetPasswordPage extends Page
 {
     protected static ?string $slug = 'set-password';

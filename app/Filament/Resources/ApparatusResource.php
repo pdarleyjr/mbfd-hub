@@ -219,7 +219,13 @@ class ApparatusResource extends Resource
                 Tables\Columns\TextColumn::make('daily_checkout_requirement')
                     ->label('Daily Checkout')
                     ->badge()
-                    ->getStateUsing(fn (Apparatus $record): string => $record->daily_checkout_requirement?->value ?? DailyCheckoutRequirement::Unknown->value)
+                    ->getStateUsing(function (Apparatus $record): string {
+                        $requirement = $record->getAttribute('daily_checkout_requirement');
+
+                        return $requirement instanceof DailyCheckoutRequirement
+                            ? $requirement->value
+                            : DailyCheckoutRequirement::Unknown->value;
+                    })
                     ->formatStateUsing(fn (string $state): string => DailyCheckoutRequirement::options()[$state] ?? 'Unknown - needs policy confirmation')
                     ->color(fn (string $state): string => match ($state) {
                         DailyCheckoutRequirement::Required->value => 'success',
@@ -230,7 +236,13 @@ class ApparatusResource extends Resource
                 Tables\Columns\TextColumn::make('daily_checkout_template')
                     ->label('Checkout Template')
                     ->badge()
-                    ->getStateUsing(fn (Apparatus $record): string => $record->daily_checkout_template?->value ?? DailyCheckoutChecklistTemplate::Pending->value)
+                    ->getStateUsing(function (Apparatus $record): string {
+                        $template = $record->getAttribute('daily_checkout_template');
+
+                        return $template instanceof DailyCheckoutChecklistTemplate
+                            ? $template->value
+                            : DailyCheckoutChecklistTemplate::Pending->value;
+                    })
                     ->formatStateUsing(fn (string $state): string => DailyCheckoutChecklistTemplate::options()[$state] ?? 'Invalid template configuration')
                     ->color(fn (string $state): string => $state === DailyCheckoutChecklistTemplate::Pending->value ? 'warning' : 'gray')
                     ->toggleable(isToggledHiddenByDefault: true),

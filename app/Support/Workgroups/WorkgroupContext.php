@@ -22,7 +22,7 @@ final class WorkgroupContext
         if ($selectedId !== null) {
             $selected = $this->access()->scopeWorkgroups(Workgroup::query(), $user)->find($selectedId);
 
-            if ($selected !== null) {
+            if ($selected instanceof Workgroup) {
                 return $selected;
             }
 
@@ -38,7 +38,9 @@ final class WorkgroupContext
     {
         $workgroup = $this->access()->scopeWorkgroups(Workgroup::query(), $user)->find($workgroupId);
 
-        abort_unless($workgroup !== null, 404);
+        if (! ($workgroup instanceof Workgroup)) {
+            abort(404);
+        }
 
         session()->put(self::SESSION_KEY, $workgroup->id);
 

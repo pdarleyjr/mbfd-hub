@@ -243,7 +243,9 @@ class SharedUploads extends Page implements HasTable
             ->where('workgroup_id', $member->workgroup_id)
             ->find((int) $this->selectedSession);
 
-        abort_unless($session !== null, 404);
+        if (! ($session instanceof WorkgroupSession)) {
+            abort(404);
+        }
 
         return $session;
     }
@@ -276,7 +278,9 @@ class SharedUploads extends Page implements HasTable
             ->whereHas('session', fn (Builder $sessions): Builder => $sessions->where('workgroup_id', $member->workgroup_id))
             ->find($record->getKey());
 
-        abort_unless($upload !== null, 404);
+        if (! ($upload instanceof WorkgroupSharedUpload)) {
+            abort(404);
+        }
 
         return $upload;
     }

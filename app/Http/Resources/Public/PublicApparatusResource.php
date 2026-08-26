@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Public;
 
+use App\Enums\DailyCheckoutRequirement;
+use App\Models\Apparatus;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -14,11 +16,17 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * Never exposes VIN, internal notes, Snipe-IT asset ids, financials, or PM
  * history. Current meters are intentionally included because the checkout
  * meter form needs the immediately preceding reading to reject regressions.
+ *
+ * @mixin Apparatus
  */
 class PublicApparatusResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $dailyCheckoutRequirement = $this->resource instanceof Apparatus
+            ? $this->resource->getAttribute('daily_checkout_requirement')
+            : null;
+
         return [
             'id' => $this->id,
             'name' => $this->designation ?: $this->name ?: $this->unit_id,
@@ -28,7 +36,9 @@ class PublicApparatusResource extends JsonResource
             'designation' => $this->designation,
             'slug' => $this->slug,
             'status' => $this->status,
-            'daily_checkout_requirement' => $this->daily_checkout_requirement?->value ?? 'unknown',
+            'daily_checkout_requirement' => $dailyCheckoutRequirement instanceof DailyCheckoutRequirement
+                ? $dailyCheckoutRequirement->value
+                : DailyCheckoutRequirement::Unknown->value,
             'current_engine_hours' => $this->current_engine_hours,
             'current_miles' => $this->current_miles,
             'current_defects_count' => $this->when(

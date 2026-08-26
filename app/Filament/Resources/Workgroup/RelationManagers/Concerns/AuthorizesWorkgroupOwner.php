@@ -16,7 +16,7 @@ trait AuthorizesWorkgroupOwner
     {
         $user = auth()->user();
 
-        return $user instanceof User && static::canManageOwnerRecord($user, $ownerRecord);
+        return $user instanceof User && self::canManageOwnerRecord($user, $ownerRecord);
     }
 
     protected function can(string $action, ?Model $record = null): bool
@@ -28,7 +28,7 @@ trait AuthorizesWorkgroupOwner
     {
         $user = auth()->user();
 
-        return $user instanceof User && static::canManageOwnerRecord($user, $this->getOwnerRecord());
+        return $user instanceof User && self::canManageOwnerRecord($user, $this->getOwnerRecord());
     }
 
     private static function canManageOwnerRecord(User $user, Model $ownerRecord): bool
