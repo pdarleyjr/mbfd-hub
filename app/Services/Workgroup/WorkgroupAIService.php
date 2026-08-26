@@ -29,23 +29,26 @@ use Illuminate\Support\Facades\Storage;
  */
 class WorkgroupAIService
 {
+    private const CONFIGURATION_ERROR = 'AI service not configured. Set WORKGROUP_AI_ENABLED, WORKGROUP_AI_WORKER_URL, and WORKGROUP_AI_WORKER_SECRET in configuration.';
+
+    protected bool $workerEnabled;
     protected string $workerUrl;
     protected ?string $workerSecret;
     protected int $timeout;
 
     public function __construct()
     {
-        $this->workerUrl = rtrim(
-            config('workgroup.ai_worker_url', env('WORKGROUP_AI_WORKER_URL', 'https://mbfd-workgroup-ai.pdarleyjr.workers.dev')),
-            '/'
-        );
-        $this->workerSecret = config('workgroup.ai_worker_secret', env('WORKGROUP_AI_WORKER_SECRET'));
+        $this->workerEnabled = filter_var(config('workgroup.ai_worker_enabled', false), FILTER_VALIDATE_BOOL);
+        $this->workerUrl = rtrim(trim((string) config('workgroup.ai_worker_url', '')), '/');
+
+        $workerSecret = trim((string) config('workgroup.ai_worker_secret', ''));
+        $this->workerSecret = $workerSecret === '' ? null : $workerSecret;
         $this->timeout = 60; // AI requests can take up to 60s
     }
 
     public function isEnabled(): bool
     {
-        return !empty($this->workerUrl);
+        return $this->workerEnabled && $this->workerUrl !== '' && $this->workerSecret !== null;
     }
 
     // =========================================================================
@@ -345,7 +348,7 @@ class WorkgroupAIService
     public function generateSaverReport(Workgroup $workgroup, ?WorkgroupSession $session = null): string
     {
         if (!$this->isEnabled()) {
-            return '<p class="text-red-600">AI service not configured. Set WORKGROUP_AI_WORKER_URL in .env</p>';
+            return '<p class="text-red-600">'.self::CONFIGURATION_ERROR.'</p>';
         }
 
         $evalService = app(EvaluationService::class);
@@ -981,29 +984,29 @@ class WorkgroupAIService
     /**
      * Build an authenticated HTTP client for the Workgroup AI worker.
      *
-     * Adds the shared x-api-secret header when WORKGROUP_AI_WORKER_SECRET is
-     * set, so the worker can reject anonymous traffic at the edge. Falls back
-     * to an unauthenticated request when no secret is configured (e.g. local
-     * development against a public worker).
+     * The worker is reachable only when all three configured values are
+     * present. Every request carries the shared x-api-secret header.
      */
     protected function workerRequest(int $timeout): \Illuminate\Http\Client\PendingRequest
     {
-        $request = Http::timeout($timeout)->acceptJson();
+        $secret = $this->workerSecret;
 
-        if (! empty($this->workerSecret)) {
-            $request = $request->withHeaders([
-                'x-api-secret' => $this->workerSecret,
-            ]);
+        if (!$this->isEnabled() || $secret === null) {
+            throw new \LogicException('Workgroup AI service is not fully configured.');
         }
 
-        return $request;
+        return Http::timeout($timeout)
+            ->acceptJson()
+            ->withHeaders([
+                'x-api-secret' => $secret,
+            ]);
     }
 
     protected function fallbackAnalysis(CandidateProduct $product): array
     {
         return [
             'analysis'       => null,
-            'error'          => 'AI service not configured. Set WORKGROUP_AI_WORKER_URL in .env',
+            'error'          => self::CONFIGURATION_ERROR,
             'productName'    => $product->name,
             'generatedAt'    => now()->toISOString(),
         ];

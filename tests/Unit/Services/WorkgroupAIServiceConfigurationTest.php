@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
+use App\Models\Workgroup;
 use App\Services\Workgroup\WorkgroupAIService;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -55,8 +57,174 @@ class WorkgroupAIServiceConfigurationTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_disabled_worker_configuration_never_sends_document_text(): void
+    {
+        $this->configureWorkgroupService(
+            enabled: false,
+            url: 'https://workgroup-ai.example.test',
+            secret: 'test-secret',
+        );
+        Http::fake();
+
+        $service = new WorkgroupAIService;
+
+        $this->assertFalse($service->isEnabled());
+        $this->assertSame(
+            ['success' => false, 'error' => 'Service not enabled or empty text'],
+            $service->vectorizeTextChunk('Sensitive test text', 'specification.txt'),
+        );
+        Http::assertNothingSent();
+    }
+
+    public function test_enabled_worker_configuration_without_a_secret_never_sends_document_text(): void
+    {
+        $this->configureWorkgroupService(
+            enabled: true,
+            url: 'https://workgroup-ai.example.test',
+            secret: null,
+        );
+        Http::fake();
+
+        $service = new WorkgroupAIService;
+
+        $this->assertFalse($service->isEnabled());
+        $this->assertSame(
+            ['success' => false, 'error' => 'Service not enabled or empty text'],
+            $service->vectorizeTextChunk('Sensitive test text', 'specification.txt'),
+        );
+        Http::assertNothingSent();
+    }
+
+    public function test_enabled_worker_configuration_without_a_url_never_sends_document_text(): void
+    {
+        $this->configureWorkgroupService(
+            enabled: true,
+            url: '',
+            secret: 'test-secret',
+        );
+        Http::fake();
+
+        $service = new WorkgroupAIService;
+
+        $this->assertFalse($service->isEnabled());
+        $this->assertSame(
+            ['success' => false, 'error' => 'Service not enabled or empty text'],
+            $service->vectorizeTextChunk('Sensitive test text', 'specification.txt'),
+        );
+        Http::assertNothingSent();
+    }
+
+    public function test_enabled_worker_configuration_sends_the_required_authentication_header(): void
+    {
+        $this->configureWorkgroupService(
+            enabled: true,
+            url: 'https://workgroup-ai.example.test',
+            secret: 'test-secret',
+        );
+        Http::fake([
+            'https://workgroup-ai.example.test/vectorize' => Http::response(['success' => true]),
+        ]);
+
+        $service = new WorkgroupAIService;
+
+        $this->assertTrue($service->isEnabled());
+        $this->assertSame(
+            ['success' => true],
+            $service->vectorizeTextChunk('Sensitive test text', 'specification.txt'),
+        );
+        Http::assertSent(
+            fn (Request $request): bool => $request->url() === 'https://workgroup-ai.example.test/vectorize'
+                && $request->hasHeader('x-api-secret', 'test-secret'),
+        );
+    }
+
+    public function test_cached_configuration_never_falls_back_to_runtime_environment_values(): void
+    {
+        config(['workgroup' => []]);
+
+        $this->withWorkgroupEnvironment([
+            'WORKGROUP_AI_ENABLED' => 'true',
+            'WORKGROUP_AI_WORKER_URL' => 'https://runtime-environment.example.test',
+            'WORKGROUP_AI_WORKER_SECRET' => 'runtime-environment-secret',
+        ], function (): void {
+            Http::fake();
+
+            $service = new WorkgroupAIService;
+
+            $this->assertFalse($service->isEnabled());
+            $this->assertSame(
+                ['success' => false, 'error' => 'Service not enabled or empty text'],
+                $service->vectorizeTextChunk('Sensitive test text', 'specification.txt'),
+            );
+            Http::assertNothingSent();
+        });
+    }
+
+    public function test_phpunit_blocks_an_unfaked_workgroup_worker_request(): void
+    {
+        $this->configureWorkgroupService(
+            enabled: true,
+            url: 'https://workgroup-ai.example.test',
+            secret: 'test-secret',
+        );
+
+        $this->assertTrue(Http::getFacadeRoot()->preventingStrayRequests());
+
+        $result = (new WorkgroupAIService)->vectorizeTextChunk('Sensitive test text', 'specification.txt');
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(
+            'Attempted request to [https://workgroup-ai.example.test/vectorize] without a matching fake.',
+            $result['error'],
+        );
+    }
+
+    public function test_disabled_service_explains_the_complete_worker_configuration_contract(): void
+    {
+        $this->configureWorkgroupService(
+            enabled: false,
+            url: '',
+            secret: null,
+        );
+        Http::fake();
+
+        $report = (new WorkgroupAIService)->generateSaverReport(new Workgroup);
+
+        $this->assertSame(
+            '<p class="text-red-600">AI service not configured. Set WORKGROUP_AI_ENABLED, WORKGROUP_AI_WORKER_URL, and WORKGROUP_AI_WORKER_SECRET in configuration.</p>',
+            $report,
+        );
+        Http::assertNothingSent();
+    }
+
+    private function configureWorkgroupService(bool $enabled, string $url, ?string $secret): void
+    {
+        config([
+            'workgroup.ai_worker_enabled' => $enabled,
+            'workgroup.ai_worker_url' => $url,
+            'workgroup.ai_worker_secret' => $secret,
+        ]);
+    }
+
     /** @param array<string, string> $environment */
     private function workgroupConfiguration(array $environment): array
+    {
+        return $this->withWorkgroupEnvironment($environment, function (): array {
+            /** @var array{ai_worker_enabled: bool, ai_worker_url: string, ai_worker_secret: ?string} $configuration */
+            $configuration = require base_path('config/workgroup.php');
+
+            return $configuration;
+        });
+    }
+
+    /**
+     * @template TResult
+     *
+     * @param  array<string, string>  $environment
+     * @param  callable(): TResult  $callback
+     * @return TResult
+     */
+    private function withWorkgroupEnvironment(array $environment, callable $callback): mixed
     {
         $keys = [
             'WORKGROUP_AI_ENABLED',
@@ -86,10 +254,7 @@ class WorkgroupAIServiceConfigurationTest extends TestCase
         Env::enablePutenv();
 
         try {
-            /** @var array{ai_worker_enabled: bool, ai_worker_url: string, ai_worker_secret: ?string} $configuration */
-            $configuration = require base_path('config/workgroup.php');
-
-            return $configuration;
+            return $callback();
         } finally {
             foreach ($previous as $key => $value) {
                 if ($value['environment'] === false) {
