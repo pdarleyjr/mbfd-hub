@@ -83,5 +83,10 @@
         <env name="SESSION_DRIVER" value="array" force="true"/>
         <env name="TELESCOPE_ENABLED" value="false" force="true"/>
         <env name="VIDEO_CONFERENCING_ENABLED" value="false" force="true"/>
+        <env name="WORKGROUP_AI_ENABLED" value="false" force="true"/>
+        <env name="WORKGROUP_AI_WORKER_SECRET" value="" force="true"/>
+        <env name="WORKGROUP_AI_WORKER_URL" value="" force="true"/>
+        <server name="WORKGROUP_AI_WORKER_SECRET" value=""/>
+        <server name="WORKGROUP_AI_WORKER_URL" value=""/>
     </php>
 </phpunit>
