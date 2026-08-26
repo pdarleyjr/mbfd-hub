@@ -260,17 +260,23 @@ class StationOperationsHubWidget extends Widget
 
     private function formatDefects(Collection $defects): array
     {
-        return $defects->map(fn (ApparatusDefect $d) => [
-            'id' => $d->id,
-            'unit' => $d->apparatus?->designation ?? $d->apparatus?->unit_id ?? 'Unknown',
-            'item' => $d->item ?? 'Unknown',
-            'issue_type' => $d->issue_type ?? '',
-            'status' => $d->status ?? 'Unknown',
-            'reported_date' => $d->reported_date
-                ? Carbon::parse($d->reported_date)->format('M j, Y')
-                : ($d->created_at?->format('M j, Y') ?? ''),
-            'url' => DefectResource::getUrl('edit', ['record' => $d->id]),
-        ])->toArray();
+        return $defects->map(function (ApparatusDefect $defect): array {
+            $apparatus = $defect->getAttribute('apparatus');
+
+            return [
+                'id' => $defect->id,
+                'unit' => $apparatus instanceof Apparatus
+                    ? ($apparatus->designation ?? $apparatus->getAttribute('unit_id') ?? 'Unknown')
+                    : 'Unknown',
+                'item' => $defect->item ?? 'Unknown',
+                'issue_type' => $defect->issue_type ?? '',
+                'status' => $defect->status ?? 'Unknown',
+                'reported_date' => $defect->reported_date
+                    ? Carbon::parse($defect->reported_date)->format('M j, Y')
+                    : ($defect->created_at?->format('M j, Y') ?? ''),
+                'url' => DefectResource::getUrl('edit', ['record' => $defect->id]),
+            ];
+        })->toArray();
     }
 
     private function formatSupplyRequests(Collection $requests, int $stationId): array
