@@ -256,6 +256,12 @@ PHP,
             ->whereIn('apparatus_inspection_id', $inspectionIds)
             ->delete();
         DB::table('apparatus_inspections')->whereIn('id', $inspectionIds)->delete();
+        // A critical approval can move this fixture apparatus to OOS, which
+        // intentionally emits a restrictive status-ledger event. Remove only
+        // that disposable fixture evidence before deleting the fixture rig.
+        DB::table('apparatus_operational_status_events')
+            ->where('apparatus_id', $apparatus->id)
+            ->delete();
         DB::table('apparatuses')->where('id', $apparatus->id)->delete();
         DB::table('stations')->where('id', $station->id)->delete();
         DB::table('users')->where('id', $reviewer->id)->delete();
