@@ -192,7 +192,9 @@ class StationOperationsHubWidget extends Widget
 
                 return [
                     'id' => $apparatusId,
-                    'unit' => $apparatus?->designation ?? $apparatus?->getAttribute('unit_id') ?? "Apparatus {$apparatusId}",
+                    'unit' => $apparatus instanceof Apparatus
+                        ? ($apparatus->designation ?? $apparatus->getAttribute('unit_id') ?? "Apparatus {$apparatusId}")
+                        : "Apparatus {$apparatusId}",
                     'state' => $state,
                     'completion' => $row['included_in_completed']
                         ? 'completed'
