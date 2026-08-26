@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
-         bootstrap="vendor/autoload.php"
+         bootstrap="tests/bootstrap.php"
          colors="true"
 >
     <testsuites>
@@ -19,18 +19,69 @@
     </source>
     <php>
         <ini name="memory_limit" value="256M"/>
-        <env name="APP_ENV" value="testing"/>
-        <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/>
-        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
-        <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" force="true"/>
+        <env name="APP_URL" value="http://localhost" force="true"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <env name="AI_ANALYSIS_ENABLED" value="false" force="true"/>
+        <env name="AI_DRIVER" value="local" force="true"/>
+        <env name="AWS_ACCESS_KEY_ID" value="" force="true"/>
+        <env name="AWS_ENDPOINT" value="" force="true"/>
+        <env name="AWS_SECRET_ACCESS_KEY" value="" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="BID_CONSOLE_URL" value="" force="true"/>
+        <env name="BID_READER_TOKEN" value="" force="true"/>
+        <env name="BROADCAST_DRIVER" value="log" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="CLOUDFLARE_ACCOUNT_ID" value="" force="true"/>
+        <env name="CLOUDFLARE_AI_ENABLED" value="false" force="true"/>
+        <env name="CLOUDFLARE_API_SECRET" value="" force="true"/>
+        <env name="CLOUDFLARE_API_TOKEN" value="" force="true"/>
+        <env name="CLOUDFLARE_WORKER_API_SECRET" value="" force="true"/>
+        <env name="CLOUDFLARE_WORKER_URL" value="" force="true"/>
+        <env name="DB_CONNECTION" value="sqlite" force="true"/>
+        <env name="DB_DATABASE" value=":memory:" force="true"/>
         <env name="WEBPUSH_DB_CONNECTION" value="sqlite"/>
-        <env name="MAIL_MAILER" value="array"/>
-        <env name="PULSE_ENABLED" value="false"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
-        <env name="SESSION_DRIVER" value="array"/>
-        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="FILESYSTEM_DISK" value="local" force="true"/>
+        <env name="GOOGLE_SERVICE_ACCOUNT_JSON_PATH" value="" force="true"/>
+        <env name="GOOGLE_SHEETS_APPARATUS_SYNC_ENABLED" value="false" force="true"/>
+        <env name="HEALTH_SLACK_WEBHOOK_URL" value="" force="true"/>
+        <env name="LIVEKIT_API_KEY" value="" force="true"/>
+        <env name="LIVEKIT_API_SECRET" value="" force="true"/>
+        <env name="LIVEKIT_CLOUD_API_KEY" value="" force="true"/>
+        <env name="LIVEKIT_CLOUD_API_SECRET" value="" force="true"/>
+        <env name="LIVEKIT_CLOUD_API_URL" value="" force="true"/>
+        <env name="LIVEKIT_CLOUD_URL" value="" force="true"/>
+        <env name="LIVEKIT_SELF_HOSTED_API_KEY" value="" force="true"/>
+        <env name="LIVEKIT_SELF_HOSTED_API_SECRET" value="" force="true"/>
+        <env name="LIVEKIT_SELF_HOSTED_API_URL" value="" force="true"/>
+        <env name="LIVEKIT_SELF_HOSTED_URL" value="" force="true"/>
+        <env name="LIVEKIT_URL" value="" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="MAIL_PASSWORD" value="" force="true"/>
+        <env name="MAIL_URL" value="" force="true"/>
+        <env name="OH_DEAR_HEALTH_CHECK_SECRET" value="" force="true"/>
+        <env name="OH_DEAR_HEALTH_CHECK_URL" value="" force="true"/>
+        <env name="OLLAMA_URL" value="" force="true"/>
+        <env name="PULSE_ENABLED" value="false" force="true"/>
+        <env name="PULSEPOINT_WORKER_URL" value="" force="true"/>
+        <env name="PRIVATE_FILESYSTEM_DISK" value="local" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="R2_ACCESS_KEY_ID" value="" force="true"/>
+        <env name="R2_ENDPOINT" value="" force="true"/>
+        <env name="R2_SECRET_ACCESS_KEY" value="" force="true"/>
+        <env name="RESEND_KEY" value="" force="true"/>
+        <env name="SCREENTINKER_SYNC_URL" value="" force="true"/>
+        <env name="SCREENTINKER_SYNC_TOKEN" value="" force="true"/>
+        <env name="SENTRY_DSN" value="" force="true"/>
+        <env name="SENTRY_LARAVEL_DSN" value="" force="true"/>
+        <env name="SNIPEIT_API_TOKEN" value="" force="true"/>
+        <env name="SNIPEIT_API_URL" value="" force="true"/>
+        <env name="SLACK_BOT_USER_OAUTH_TOKEN" value="" force="true"/>
+        <server name="SCREENTINKER_SYNC_URL" value=""/>
+        <server name="SCREENTINKER_SYNC_TOKEN" value=""/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <env name="VIDEO_CONFERENCING_ENABLED" value="false" force="true"/>
     </php>
 </phpunit>
