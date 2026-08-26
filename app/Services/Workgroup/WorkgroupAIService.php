@@ -32,8 +32,11 @@ class WorkgroupAIService
     private const CONFIGURATION_ERROR = 'AI service not configured. Set WORKGROUP_AI_ENABLED, WORKGROUP_AI_WORKER_URL, and WORKGROUP_AI_WORKER_SECRET in configuration.';
 
     protected bool $workerEnabled;
+
     protected string $workerUrl;
+
     protected ?string $workerSecret;
+
     protected int $timeout;
 
     public function __construct()
@@ -72,19 +75,19 @@ class WorkgroupAIService
         int $chunkIndex = 0,
         ?int $fileId = null
     ): array {
-        if (!$this->isEnabled() || empty(trim($text))) {
+        if (! $this->isEnabled() || empty(trim($text))) {
             return ['success' => false, 'error' => 'Service not enabled or empty text'];
         }
 
         try {
             $response = $this->workerRequest($this->timeout)->post("{$this->workerUrl}/vectorize", [
-                'text'         => $text,
-                'filename'     => $filename,
-                'productName'  => $productName,
+                'text' => $text,
+                'filename' => $filename,
+                'productName' => $productName,
                 'manufacturer' => $manufacturer,
-                'category'     => $category,
-                'chunkIndex'   => $chunkIndex,
-                'fileId'       => $fileId ? "file-{$fileId}" : "file-unknown",
+                'category' => $category,
+                'chunkIndex' => $chunkIndex,
+                'fileId' => $fileId ? "file-{$fileId}" : 'file-unknown',
             ]);
 
             if ($response->successful()) {
@@ -92,14 +95,15 @@ class WorkgroupAIService
             }
 
             Log::warning('[WorkgroupAI] Vectorize failed', [
-                'status'   => $response->status(),
+                'status' => $response->status(),
                 'filename' => $filename,
-                'body'     => $response->body(),
+                'body' => $response->body(),
             ]);
 
             return ['success' => false, 'error' => "Worker returned {$response->status()}"];
         } catch (\Exception $e) {
             Log::error('[WorkgroupAI] Vectorize exception', ['error' => $e->getMessage()]);
+
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
@@ -111,7 +115,7 @@ class WorkgroupAIService
      */
     public function vectorizeUpload(WorkgroupSharedUpload $upload): array
     {
-        if (!$this->isEnabled()) {
+        if (! $this->isEnabled()) {
             return ['success' => false, 'error' => 'AI service not configured'];
         }
 
@@ -125,7 +129,7 @@ class WorkgroupAIService
             $content = Storage::disk($privateDisk)->exists($filepath)
                 ? Storage::disk($privateDisk)->get($filepath)
                 : Storage::disk('public')->get($filepath);
-            if (!$content) {
+            if (! $content) {
                 return ['success' => false, 'error' => 'File not found in storage'];
             }
 
@@ -143,13 +147,13 @@ class WorkgroupAIService
 
             foreach ($chunks as $index => $chunk) {
                 $result = $this->vectorizeTextChunk(
-                    text:         $chunk,
-                    filename:     $filename,
-                    productName:  null, // Could be enriched by admin later
+                    text: $chunk,
+                    filename: $filename,
+                    productName: null, // Could be enriched by admin later
                     manufacturer: null,
-                    category:     null,
-                    chunkIndex:   $index,
-                    fileId:       $upload->id
+                    category: null,
+                    chunkIndex: $index,
+                    fileId: $upload->id
                 );
                 $results[] = $result;
 
@@ -159,20 +163,21 @@ class WorkgroupAIService
                 }
             }
 
-            $successful = count(array_filter($results, fn($r) => $r['success'] ?? false));
+            $successful = count(array_filter($results, fn ($r) => $r['success'] ?? false));
 
             return [
-                'success'     => $successful > 0,
-                'chunks'      => count($chunks),
-                'vectorized'  => $successful,
-                'filename'    => $filename,
+                'success' => $successful > 0,
+                'chunks' => count($chunks),
+                'vectorized' => $successful,
+                'filename' => $filename,
             ];
 
         } catch (\Exception $e) {
             Log::error('[WorkgroupAI] Vectorize upload failed', [
                 'upload_id' => $upload->id,
-                'error'     => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
+
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
@@ -188,7 +193,7 @@ class WorkgroupAIService
      */
     public function analyzeProduct(CandidateProduct $product): array
     {
-        if (!$this->isEnabled()) {
+        if (! $this->isEnabled()) {
             return $this->fallbackAnalysis($product);
         }
 
@@ -197,7 +202,7 @@ class WorkgroupAIService
         return Cache::remember($cacheKey, 7200, function () use ($product) {
             $submissions = EvaluationSubmission::where('candidate_product_id', $product->id)
                 ->where('status', 'submitted')
-                ->whereHas('member', fn($q) => $q->where('count_evaluations', true))
+                ->whereHas('member', fn ($q) => $q->where('count_evaluations', true))
                 ->with(['member.user'])
                 ->get();
 
@@ -206,17 +211,17 @@ class WorkgroupAIService
             }
 
             $aggregateScores = $this->calculateAggregateScores($submissions);
-            $submissionsFormatted = $submissions->map(fn($s) => $this->formatSubmission($s))->values()->toArray();
+            $submissionsFormatted = $submissions->map(fn ($s) => $this->formatSubmission($s))->values()->toArray();
 
             try {
                 $response = $this->workerRequest($this->timeout)->post("{$this->workerUrl}/analyze", [
-                    'productName'     => $product->name,
-                    'manufacturer'    => $product->manufacturer,
-                    'model'           => $product->model,
-                    'category'        => $product->category?->name,
-                    'submissions'     => $submissionsFormatted,
+                    'productName' => $product->name,
+                    'manufacturer' => $product->manufacturer,
+                    'model' => $product->model,
+                    'category' => $product->category?->name,
+                    'submissions' => $submissionsFormatted,
                     'aggregateScores' => $aggregateScores,
-                    'sessionName'     => $product->session?->name,
+                    'sessionName' => $product->session?->name,
                 ]);
 
                 if ($response->successful()) {
@@ -225,12 +230,14 @@ class WorkgroupAIService
 
                 Log::warning('[WorkgroupAI] Analyze failed', [
                     'product_id' => $product->id,
-                    'status'     => $response->status(),
+                    'status' => $response->status(),
                 ]);
+
                 return ['analysis' => null, 'error' => "Worker error: {$response->status()}"];
 
             } catch (\Exception $e) {
                 Log::error('[WorkgroupAI] Analyze exception', ['error' => $e->getMessage()]);
+
                 return ['analysis' => null, 'error' => $e->getMessage()];
             }
         });
@@ -242,11 +249,11 @@ class WorkgroupAIService
      */
     public function generateCategorySummary(string $category, array $products, ?string $sessionName = null): array
     {
-        if (!$this->isEnabled()) {
+        if (! $this->isEnabled()) {
             return ['summary' => null, 'error' => 'AI service not configured'];
         }
 
-        $cacheKey = 'workgroup_ai_category_' . md5($category . serialize($products));
+        $cacheKey = 'workgroup_ai_category_'.md5($category.serialize($products));
 
         return Cache::remember($cacheKey, 7200, function () use ($category, $products, $sessionName) {
             // Determine if battery hydraulics (rank by brand)
@@ -254,8 +261,8 @@ class WorkgroupAIService
 
             try {
                 $response = $this->workerRequest($this->timeout)->post("{$this->workerUrl}/summary", [
-                    'category'    => $category,
-                    'products'    => $products,
+                    'category' => $category,
+                    'products' => $products,
                     'sessionName' => $sessionName,
                     'rankingType' => $rankingType,
                 ]);
@@ -267,6 +274,7 @@ class WorkgroupAIService
                 return ['summary' => null, 'error' => "Worker error: {$response->status()}"];
             } catch (\Exception $e) {
                 Log::error('[WorkgroupAI] Category summary exception', ['error' => $e->getMessage()]);
+
                 return ['summary' => null, 'error' => $e->getMessage()];
             }
         });
@@ -282,7 +290,7 @@ class WorkgroupAIService
      */
     public function generateExecutiveReport(Workgroup $workgroup, ?WorkgroupSession $session = null): array
     {
-        if (!$this->isEnabled()) {
+        if (! $this->isEnabled()) {
             return ['report' => null, 'error' => 'AI service not configured'];
         }
 
@@ -300,9 +308,9 @@ class WorkgroupAIService
 
         try {
             $response = $this->workerRequest(120)->post("{$this->workerUrl}/executive-report", [
-                'sessionName'  => $sessionLabel,
-                'sessionDate'  => now()->format('F j, Y'),
-                'categories'   => $categories,
+                'sessionName' => $sessionLabel,
+                'sessionDate' => now()->format('F j, Y'),
+                'categories' => $categories,
                 'overallStats' => $overallStats,
                 'anonymousComments' => $anonymousComments,
                 'systemDirective' => 'You must analyze the provided anonymous evaluator comments and cross-reference them against the vendor product specifications and tool details found in your RAG index for these specific brands. Include qualitative insights from evaluator feedback alongside the quantitative scores.',
@@ -314,12 +322,14 @@ class WorkgroupAIService
                     ? "workgroup_ai_exec_report_{$session->id}"
                     : "workgroup_ai_exec_report_overall_{$workgroup->id}";
                 Cache::put($cacheKey, $result, 1800);
+
                 return $result;
             }
 
             return ['report' => null, 'error' => "Worker error: {$response->status()}"];
         } catch (\Exception $e) {
             Log::error('[WorkgroupAI] Executive report exception', ['error' => $e->getMessage()]);
+
             return ['report' => null, 'error' => $e->getMessage()];
         }
     }
@@ -347,7 +357,7 @@ class WorkgroupAIService
      */
     public function generateSaverReport(Workgroup $workgroup, ?WorkgroupSession $session = null): string
     {
-        if (!$this->isEnabled()) {
+        if (! $this->isEnabled()) {
             return '<p class="text-red-600">'.self::CONFIGURATION_ERROR.'</p>';
         }
 
@@ -368,8 +378,9 @@ class WorkgroupAIService
                 $data = $response->json();
                 $html = SafeHtml::report($data['report'] ?? $data['result']['response'] ?? '');
 
-                if (!empty($html)) {
+                if (! empty($html)) {
                     Cache::put("workgroup_saver_report_{$workgroup->id}_{$session?->id}", $html, 3600);
+
                     return $html;
                 }
 
@@ -386,6 +397,7 @@ class WorkgroupAIService
 
         } catch (\Exception $e) {
             Log::error('[WorkgroupAI] SAVER report exception', ['error' => $e->getMessage()]);
+
             return $this->generateSaverReportFallback($prompt, $workgroup, $session);
         }
     }
@@ -405,7 +417,7 @@ class WorkgroupAIService
     {
         try {
             $response = $this->workerRequest(120)->post("{$this->workerUrl}/executive-report", [
-                'sessionName' => $session?->name ?? 'All Sessions — ' . $workgroup->name,
+                'sessionName' => $session?->name ?? 'All Sessions — '.$workgroup->name,
                 'sessionDate' => now()->format('F j, Y'),
                 'categories' => [],
                 'overallStats' => [],
@@ -415,8 +427,9 @@ class WorkgroupAIService
             if ($response->successful()) {
                 $data = $response->json();
                 $html = SafeHtml::report($data['report'] ?? $data['result']['response'] ?? '');
-                if (!empty($html)) {
+                if (! empty($html)) {
                     Cache::put("workgroup_saver_report_{$workgroup->id}_{$session?->id}", $html, 3600);
+
                     return $html;
                 }
             }
@@ -433,46 +446,46 @@ class WorkgroupAIService
     protected function buildSaverPrompt(array $results, Workgroup $workgroup, ?WorkgroupSession $session): string
     {
         $lines = [];
-        $lines[] = "You are an expert evaluator writing a DHS SAVER (System Assessment and Validation for Emergency Responders) style report.";
-        $lines[] = "You must analyze the provided anonymous evaluator comments and cross-reference them against the vendor product specifications and tool details found in your RAG index for these specific brands.";
-        $lines[] = "";
+        $lines[] = 'You are an expert evaluator writing a DHS SAVER (System Assessment and Validation for Emergency Responders) style report.';
+        $lines[] = 'You must analyze the provided anonymous evaluator comments and cross-reference them against the vendor product specifications and tool details found in your RAG index for these specific brands.';
+        $lines[] = '';
         $lines[] = "WORKGROUP: {$workgroup->name}";
-        $lines[] = "SESSION: " . ($session ? $session->name : 'Overall Project Evaluation');
-        $lines[] = "DATE: " . now()->format('F j, Y');
-        $lines[] = "";
+        $lines[] = 'SESSION: '.($session ? $session->name : 'Overall Project Evaluation');
+        $lines[] = 'DATE: '.now()->format('F j, Y');
+        $lines[] = '';
 
         // Brand aggregated rankings
-        if (!empty($results['brand_aggregated_rankings'])) {
-            $lines[] = "=== BRAND AGGREGATED RANKINGS ===";
+        if (! empty($results['brand_aggregated_rankings'])) {
+            $lines[] = '=== BRAND AGGREGATED RANKINGS ===';
             foreach ($results['brand_aggregated_rankings'] as $cat) {
                 $lines[] = "Category: {$cat['category_name']}";
                 foreach ($cat['brand_rankings'] as $idx => $brand) {
                     $score = $brand['composite_score'] !== null ? number_format($brand['composite_score'], 1) : 'N/A';
                     $lines[] = "  #{$idx}: {$brand['brand']} — Composite: {$score} ({$brand['product_count']} products)";
 
-                    if (!empty($brand['saver_breakdown'])) {
+                    if (! empty($brand['saver_breakdown'])) {
                         $s = $brand['saver_breakdown'];
-                        $lines[] = "    Capability: " . ($s['capability'] ?? 'N/A') .
-                            " | Usability: " . ($s['usability'] ?? 'N/A') .
-                            " | Affordability: " . ($s['affordability'] ?? 'N/A') .
-                            " | Maintainability: " . ($s['maintainability'] ?? 'N/A') .
-                            " | Deployability: " . ($s['deployability'] ?? 'N/A');
+                        $lines[] = '    Capability: '.($s['capability'] ?? 'N/A').
+                            ' | Usability: '.($s['usability'] ?? 'N/A').
+                            ' | Affordability: '.($s['affordability'] ?? 'N/A').
+                            ' | Maintainability: '.($s['maintainability'] ?? 'N/A').
+                            ' | Deployability: '.($s['deployability'] ?? 'N/A');
                     }
 
-                    if (!empty($brand['products'])) {
+                    if (! empty($brand['products'])) {
                         foreach ($brand['products'] as $p) {
                             $pScore = $p['avg_score'] !== null ? number_format($p['avg_score'], 1) : 'N/A';
                             $lines[] = "    - {$p['name']}: {$pScore} ({$p['response_count']} responses)";
                         }
                     }
                 }
-                $lines[] = "";
+                $lines[] = '';
             }
         }
 
         // Competitor group rankings
-        if (!empty($results['competitor_group_rankings'])) {
-            $lines[] = "=== COMPETITOR GROUP RANKINGS ===";
+        if (! empty($results['competitor_group_rankings'])) {
+            $lines[] = '=== COMPETITOR GROUP RANKINGS ===';
             foreach ($results['competitor_group_rankings'] as $cat) {
                 $lines[] = "Category: {$cat['category_name']}";
                 foreach ($cat['groups'] as $group) {
@@ -483,23 +496,23 @@ class WorkgroupAIService
                         $lines[] = "    #{$idx}: {$r['name']} ({$r['brand']}) — {$rScore} ({$r['response_count']} resp.)";
                     }
                 }
-                $lines[] = "";
+                $lines[] = '';
             }
         }
 
         // Isolated products
-        if (!empty($results['isolated_products'])) {
-            $lines[] = "=== STANDALONE PRODUCTS ===";
+        if (! empty($results['isolated_products'])) {
+            $lines[] = '=== STANDALONE PRODUCTS ===';
             foreach ($results['isolated_products'] as $iso) {
                 $iScore = $iso['avg_score'] !== null ? number_format($iso['avg_score'], 1) : 'N/A';
                 $lines[] = "- {$iso['name']} ({$iso['brand']}) in {$iso['category_name']}: {$iScore} ({$iso['response_count']} resp.) {$iso['note']}";
             }
-            $lines[] = "";
+            $lines[] = '';
         }
 
         // Standard category rankings
-        if (!empty($results['standard_category_rankings'])) {
-            $lines[] = "=== STANDARD CATEGORY RANKINGS ===";
+        if (! empty($results['standard_category_rankings'])) {
+            $lines[] = '=== STANDARD CATEGORY RANKINGS ===';
             foreach ($results['standard_category_rankings'] as $cat) {
                 $lines[] = "Category: {$cat['category_name']} ({$cat['total_products']} products, {$cat['eligible_products']} eligible)";
 
@@ -507,11 +520,11 @@ class WorkgroupAIService
                     $sScore = $item['weighted_average'] !== null ? number_format($item['weighted_average'], 1) : 'N/A';
 
                     $name = $item['product']->name ?? 'Unknown';
-                    $lines[] = "  #{$idx}: {$name} — {$sScore} ({$item['response_count']} resp.) " .
+                    $lines[] = "  #{$idx}: {$name} — {$sScore} ({$item['response_count']} resp.) ".
                         ($item['meets_threshold'] ? '✓ threshold' : '✗ below threshold');
                 }
 
-                $lines[] = "";
+                $lines[] = '';
             }
         }
 
@@ -519,23 +532,23 @@ class WorkgroupAIService
         $nrFeedback = $results['non_rankable_feedback'] ?? collect();
 
         if ($nrFeedback->isNotEmpty()) {
-            $lines[] = "=== NON-RANKABLE CATEGORY FEEDBACK ===";
+            $lines[] = '=== NON-RANKABLE CATEGORY FEEDBACK ===';
             foreach ($nrFeedback as $nrCat) {
                 $lines[] = "Category: {$nrCat['category_name']} ({$nrCat['submissions_count']} submissions)";
 
                 foreach ($nrCat['feedback'] as $fb) {
-                    $lines[] = "  {$fb['evaluator']}: {$fb['product']} — Score: " . ($fb['score'] ?? 'N/A');
+                    $lines[] = "  {$fb['evaluator']}: {$fb['product']} — Score: ".($fb['score'] ?? 'N/A');
                 }
 
-                $lines[] = "";
+                $lines[] = '';
             }
         }
 
         // Collect and inject anonymous comments
         $anonymousComments = $this->collectAnonymousComments($workgroup, $session);
 
-        if (!empty($anonymousComments)) {
-            $lines[] = "=== ANONYMOUS EVALUATOR COMMENTS ===";
+        if (! empty($anonymousComments)) {
+            $lines[] = '=== ANONYMOUS EVALUATOR COMMENTS ===';
             $groupedByProduct = collect($anonymousComments)->groupBy('product');
 
             foreach ($groupedByProduct as $productName => $productComments) {
@@ -545,61 +558,61 @@ class WorkgroupAIService
                     $lines[] = "  [{$c['type']}]: {$c['comment']}";
                 }
 
-                $lines[] = "";
+                $lines[] = '';
             }
         }
 
-        $lines[] = "";
-        $lines[] = "=== INSTRUCTIONS ===";
-        $lines[] = "You are generating a highly detailed, professional DHS SAVER (System Assessment and Validation for Emergency Responders) purchasing recommendation document for the Miami Beach Fire Department Health & Safety Committee.";
+        $lines[] = '';
+        $lines[] = '=== INSTRUCTIONS ===';
+        $lines[] = 'You are generating a highly detailed, professional DHS SAVER (System Assessment and Validation for Emergency Responders) purchasing recommendation document for the Miami Beach Fire Department Health & Safety Committee.';
 
         $lines[] = "\nTarget length: 3000-5000 words of substantive analysis";
 
-        $lines[] = "This document will be used to justify a multi-hundred-thousand-dollar capital purchase. It must be thorough, data-driven, and technically rigorous.";
+        $lines[] = 'This document will be used to justify a multi-hundred-thousand-dollar capital purchase. It must be thorough, data-driven, and technically rigorous.';
 
         $lines[] = "\nGenerate the report in clean HTML format with these sections:";
-        $lines[] = "1. <h2>Executive Summary</h2> — Overall findings, key recommendation, evaluation scope";
+        $lines[] = '1. <h2>Executive Summary</h2> — Overall findings, key recommendation, evaluation scope';
 
         $lines[] = "\n2. <h2>Vendor Profiles</h2> — For each competing vendor/manufacturer (e.g., Holmatro, TNT Rescue, Hurst, Amkus), provide:";
-        $lines[] = "   * Company background and market position in the rescue tool industry";
-        $lines[] = "   * Product line overview based on the evaluated tools";
-        $lines[] = "   * Cross-reference any vendor spec sheets available in your RAG index (workgroup-specs Vectorize)";
-        $lines[] = "   * Key technical differentiators (battery platform, power output, weight, cutting/spreading force)";
+        $lines[] = '   * Company background and market position in the rescue tool industry';
+        $lines[] = '   * Product line overview based on the evaluated tools';
+        $lines[] = '   * Cross-reference any vendor spec sheets available in your RAG index (workgroup-specs Vectorize)';
+        $lines[] = '   * Key technical differentiators (battery platform, power output, weight, cutting/spreading force)';
 
         $lines[] = "\n3. <h2>Capability Assessment</h2> (SAVER Dimension 1) — Analyze how well each brand/product performs its intended rescue function";
-        $lines[] = "   Include specific capability scores from the data above";
-        $lines[] = "   Compare power output, cutting force, spreading distance across brands";
-        $lines[] = "   Reference evaluator comments about real-world performance";
+        $lines[] = '   Include specific capability scores from the data above';
+        $lines[] = '   Compare power output, cutting force, spreading distance across brands';
+        $lines[] = '   Reference evaluator comments about real-world performance';
 
         $lines[] = "\n4. <h2>Usability Assessment</h2> (SAVER Dimension 2) — Ergonomic analysis: weight, grip comfort, balance, trigger design";
-        $lines[] = "   Training requirements and learning curve for each brand";
-        $lines[] = "   Evaluator feedback on ease of operation under stress";
+        $lines[] = '   Training requirements and learning curve for each brand';
+        $lines[] = '   Evaluator feedback on ease of operation under stress';
 
         $lines[] = "\n5. <h2>Affordability Assessment</h2> (SAVER Dimension 3) — Total cost of ownership analysis (tools + batteries + chargers + cases)";
-        $lines[] = "   Value proposition: cost per unit of capability";
-        $lines[] = "   Battery ecosystem costs (proprietary vs. shared platform)";
+        $lines[] = '   Value proposition: cost per unit of capability';
+        $lines[] = '   Battery ecosystem costs (proprietary vs. shared platform)';
 
         $lines[] = "\n6. <h2>Maintainability Assessment</h2> (SAVER Dimension 4) — Durability indicators and expected service life";
-        $lines[] = "   Repair complexity and parts availability";
-        $lines[] = "   Warranty terms and manufacturer support";
+        $lines[] = '   Repair complexity and parts availability';
+        $lines[] = '   Warranty terms and manufacturer support';
 
         $lines[] = "\n7. <h2>Deployability Assessment</h2> (SAVER Dimension 5) — Portability and apparatus compartment compatibility";
-        $lines[] = "   Battery interchangeability across tool types";
-        $lines[] = "   Setup time from compartment to operational";
-        $lines[] = "   Integration with existing MBFD apparatus layout";
+        $lines[] = '   Battery interchangeability across tool types';
+        $lines[] = '   Setup time from compartment to operational';
+        $lines[] = '   Integration with existing MBFD apparatus layout';
 
         $lines[] = "\n8. <h2>Evaluator Feedback Analysis</h2> — Synthesize the anonymous evaluator comments provided above";
-        $lines[] = "   Identify recurring themes (positive and negative) per brand";
-        $lines[] = "   Highlight any safety concerns or deal-breakers mentioned";
-        $lines[] = "   Note consensus points and areas of disagreement among evaluators";
+        $lines[] = '   Identify recurring themes (positive and negative) per brand';
+        $lines[] = '   Highlight any safety concerns or deal-breakers mentioned';
+        $lines[] = '   Note consensus points and areas of disagreement among evaluators';
 
         $lines[] = "\n9. <h2>Comparative Analysis Table</h2> — Create an HTML <table> comparing all brands across ALL five SAVER dimensions";
-        $lines[] = "   Include overall composite score, rank, and recommendation status";
-        $lines[] = "   Use color-coded indicators (green for highest, red for lowest in each dimension)";
+        $lines[] = '   Include overall composite score, rank, and recommendation status';
+        $lines[] = '   Use color-coded indicators (green for highest, red for lowest in each dimension)';
         $lines[] = "\n10. <h2>Final Purchasing Recommendation</h2> — Ranked recommendations (#1, #2, #3) with detailed justification";
-        $lines[] = "    Recommended purchase configuration (which tools, how many, which accessories)";
-        $lines[] = "    Risk assessment for each option";
-        $lines[] = "    Dissenting considerations (why someone might choose #2 over #1)";
+        $lines[] = '    Recommended purchase configuration (which tools, how many, which accessories)';
+        $lines[] = '    Risk assessment for each option';
+        $lines[] = '    Dissenting considerations (why someone might choose #2 over #1)';
 
         return implode("\n", $lines);
     }
@@ -611,24 +624,26 @@ class WorkgroupAIService
     protected function calculateAggregateScores(Collection $submissions): array
     {
         $count = $submissions->count();
-        if ($count === 0) return [];
+        if ($count === 0) {
+            return [];
+        }
 
         $advanceCount = $submissions->where('advance_recommendation', 'yes')->count();
-        $maybeCount   = $submissions->where('advance_recommendation', 'maybe')->count();
-        $noCount      = $submissions->where('advance_recommendation', 'no')->count();
+        $maybeCount = $submissions->where('advance_recommendation', 'maybe')->count();
+        $noCount = $submissions->where('advance_recommendation', 'no')->count();
         $dealBreakers = $submissions->where('has_deal_breaker', true)->count();
 
         return [
-            'evaluatorCount'   => $count,
-            'averageOverall'   => $submissions->avg('overall_score'),
-            'avgCapability'    => $submissions->avg('capability_score'),
-            'avgUsability'     => $submissions->avg('usability_score'),
+            'evaluatorCount' => $count,
+            'averageOverall' => $submissions->avg('overall_score'),
+            'avgCapability' => $submissions->avg('capability_score'),
+            'avgUsability' => $submissions->avg('usability_score'),
             'avgAffordability' => $submissions->avg('affordability_score'),
             'avgMaintainability' => $submissions->avg('maintainability_score'),
             'avgDeployability' => $submissions->avg('deployability_score'),
-            'advanceCount'     => $advanceCount,
-            'maybeCount'       => $maybeCount,
-            'noCount'          => $noCount,
+            'advanceCount' => $advanceCount,
+            'maybeCount' => $maybeCount,
+            'noCount' => $noCount,
             'dealBreakerCount' => $dealBreakers,
         ];
     }
@@ -640,19 +655,19 @@ class WorkgroupAIService
 
         $anonymousNotes = [];
 
-        if (!empty($narrative['strengths'])) {
+        if (! empty($narrative['strengths'])) {
             $anonymousNotes[] = "Strengths: {$narrative['strengths']}";
         }
 
-        if (!empty($narrative['weaknesses'])) {
+        if (! empty($narrative['weaknesses'])) {
             $anonymousNotes[] = "Weaknesses: {$narrative['weaknesses']}";
         }
 
-        if (!empty($narrative['overall_impression'])) {
+        if (! empty($narrative['overall_impression'])) {
             $anonymousNotes[] = "Overall Impression: {$narrative['overall_impression']}";
         }
 
-        if (!empty($narrative['additional_comments'])) {
+        if (! empty($narrative['additional_comments'])) {
             $anonymousNotes[] = "Additional: {$narrative['additional_comments']}";
         }
 
@@ -660,19 +675,19 @@ class WorkgroupAIService
         $legacyComments = $submission->comments->pluck('comment')->filter()->values()->toArray();
 
         return [
-            'evaluatorRole'        => $submission->member?->role ?? 'member',
-            'overallScore'         => $submission->overall_score,
-            'capabilityScore'      => $submission->capability_score,
-            'usabilityScore'       => $submission->usability_score,
-            'affordabilityScore'   => $submission->affordability_score,
+            'evaluatorRole' => $submission->member?->role ?? 'member',
+            'overallScore' => $submission->overall_score,
+            'capabilityScore' => $submission->capability_score,
+            'usabilityScore' => $submission->usability_score,
+            'affordabilityScore' => $submission->affordability_score,
             'maintainabilityScore' => $submission->maintainability_score,
-            'deployabilityScore'   => $submission->deployability_score,
-            'recommendationLabel'  => $submission->recommendation_label,
-            'confidenceLabel'      => $submission->confidence_label,
-            'hasDealBreaker'       => $submission->has_deal_breaker,
-            'dealBreakerNote'      => $submission->deal_breaker_note,
-            'narrative'            => $submission->narrative_payload,
-            'anonymousNotes'       => array_merge($anonymousNotes, $legacyComments),
+            'deployabilityScore' => $submission->deployability_score,
+            'recommendationLabel' => $submission->recommendation_label,
+            'confidenceLabel' => $submission->confidence_label,
+            'hasDealBreaker' => $submission->has_deal_breaker,
+            'dealBreakerNote' => $submission->deal_breaker_note,
+            'narrative' => $submission->narrative_payload,
+            'anonymousNotes' => array_merge($anonymousNotes, $legacyComments),
         ];
     }
 
@@ -680,8 +695,8 @@ class WorkgroupAIService
     {
         // Get all products grouped by category — only include countable submissions
         $products = CandidateProduct::where('workgroup_session_id', $session->id)
-            ->with(['category', 'submissions' => fn($q) => $q->where('status', 'submitted')
-                ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))])
+            ->with(['category', 'submissions' => fn ($q) => $q->where('status', 'submitted')
+                ->whereHas('member', fn ($mq) => $mq->where('count_evaluations', true))])
             ->get();
 
         $grouped = $products->groupBy('category.name');
@@ -691,32 +706,33 @@ class WorkgroupAIService
 
             $productsFormatted = $categoryProducts->map(function (CandidateProduct $product) {
                 $submissions = $product->submissions;
+
                 return [
-                    'name'            => $product->name,
-                    'manufacturer'    => $product->manufacturer,
-                    'model'           => $product->model,
-                    'averageScore'    => $submissions->avg('overall_score'),
+                    'name' => $product->name,
+                    'manufacturer' => $product->manufacturer,
+                    'model' => $product->model,
+                    'averageScore' => $submissions->avg('overall_score'),
                     'submissionCount' => $submissions->count(),
-                    'isFinalist'      => $submissions->filter(fn($s) => $s->advance_recommendation === 'yes')->count() >= ceil($submissions->count() / 2),
-                    'hasDealBreaker'  => $submissions->where('has_deal_breaker', true)->count() > 0,
-                    'finalistVotes'   => $submissions->where('advance_recommendation', 'yes')->count(),
-                    'capabilityScore'      => $submissions->avg('capability_score'),
-                    'usabilityScore'       => $submissions->avg('usability_score'),
-                    'affordabilityScore'   => $submissions->avg('affordability_score'),
+                    'isFinalist' => $submissions->filter(fn ($s) => $s->advance_recommendation === 'yes')->count() >= ceil($submissions->count() / 2),
+                    'hasDealBreaker' => $submissions->where('has_deal_breaker', true)->count() > 0,
+                    'finalistVotes' => $submissions->where('advance_recommendation', 'yes')->count(),
+                    'capabilityScore' => $submissions->avg('capability_score'),
+                    'usabilityScore' => $submissions->avg('usability_score'),
+                    'affordabilityScore' => $submissions->avg('affordability_score'),
                     'maintainabilityScore' => $submissions->avg('maintainability_score'),
-                    'deployabilityScore'   => $submissions->avg('deployability_score'),
+                    'deployabilityScore' => $submissions->avg('deployability_score'),
                 ];
             })
-            ->sortByDesc('averageScore')
-            ->values()
-            ->toArray();
+                ->sortByDesc('averageScore')
+                ->values()
+                ->toArray();
 
-            $evaluatorIds = $categoryProducts->flatMap(fn($p) => $p->submissions->pluck('workgroup_member_id'))->unique()->count();
+            $evaluatorIds = $categoryProducts->flatMap(fn ($p) => $p->submissions->pluck('workgroup_member_id'))->unique()->count();
 
             return [
-                'name'           => $categoryName,
-                'rankingType'    => $rankingType,
-                'products'       => $productsFormatted,
+                'name' => $categoryName,
+                'rankingType' => $rankingType,
+                'products' => $productsFormatted,
                 'evaluatorCount' => $evaluatorIds,
             ];
         })->values()->toArray();
@@ -724,20 +740,20 @@ class WorkgroupAIService
 
     protected function buildOverallStats(WorkgroupSession $session): array
     {
-        $products     = CandidateProduct::where('workgroup_session_id', $session->id)->count();
-        $submissions  = EvaluationSubmission::whereHas('candidateProduct', fn($q) => $q->where('workgroup_session_id', $session->id))
+        $products = CandidateProduct::where('workgroup_session_id', $session->id)->count();
+        $submissions = EvaluationSubmission::whereHas('candidateProduct', fn ($q) => $q->where('workgroup_session_id', $session->id))
             ->where('status', 'submitted')
-            ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))
+            ->whereHas('member', fn ($mq) => $mq->where('count_evaluations', true))
             ->count();
-        $evaluatorIds = EvaluationSubmission::whereHas('candidateProduct', fn($q) => $q->where('workgroup_session_id', $session->id))
+        $evaluatorIds = EvaluationSubmission::whereHas('candidateProduct', fn ($q) => $q->where('workgroup_session_id', $session->id))
             ->where('status', 'submitted')
-            ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))
+            ->whereHas('member', fn ($mq) => $mq->where('count_evaluations', true))
             ->distinct('workgroup_member_id')
             ->count('workgroup_member_id');
 
         return [
-            'totalProducts'    => $products,
-            'totalEvaluators'  => $evaluatorIds,
+            'totalProducts' => $products,
+            'totalEvaluators' => $evaluatorIds,
             'totalSubmissions' => $submissions,
         ];
     }
@@ -755,8 +771,8 @@ class WorkgroupAIService
         }
 
         $products = CandidateProduct::whereIn('workgroup_session_id', $sessionIds)
-            ->with(['category', 'submissions' => fn($q) => $q->where('status', 'submitted')
-                ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))])
+            ->with(['category', 'submissions' => fn ($q) => $q->where('status', 'submitted')
+                ->whereHas('member', fn ($mq) => $mq->where('count_evaluations', true))])
             ->get();
 
         $grouped = $products->groupBy('category.name');
@@ -766,32 +782,33 @@ class WorkgroupAIService
 
             $productsFormatted = $categoryProducts->map(function (CandidateProduct $product) {
                 $submissions = $product->submissions;
+
                 return [
-                    'name'            => $product->name,
-                    'manufacturer'    => $product->manufacturer,
-                    'model'           => $product->model,
-                    'averageScore'    => $submissions->avg('overall_score'),
+                    'name' => $product->name,
+                    'manufacturer' => $product->manufacturer,
+                    'model' => $product->model,
+                    'averageScore' => $submissions->avg('overall_score'),
                     'submissionCount' => $submissions->count(),
-                    'isFinalist'      => $submissions->filter(fn($s) => $s->advance_recommendation === 'yes')->count() >= ceil(max($submissions->count(), 1) / 2),
-                    'hasDealBreaker'  => $submissions->where('has_deal_breaker', true)->count() > 0,
-                    'finalistVotes'   => $submissions->where('advance_recommendation', 'yes')->count(),
-                    'capabilityScore'      => $submissions->avg('capability_score'),
-                    'usabilityScore'       => $submissions->avg('usability_score'),
-                    'affordabilityScore'   => $submissions->avg('affordability_score'),
+                    'isFinalist' => $submissions->filter(fn ($s) => $s->advance_recommendation === 'yes')->count() >= ceil(max($submissions->count(), 1) / 2),
+                    'hasDealBreaker' => $submissions->where('has_deal_breaker', true)->count() > 0,
+                    'finalistVotes' => $submissions->where('advance_recommendation', 'yes')->count(),
+                    'capabilityScore' => $submissions->avg('capability_score'),
+                    'usabilityScore' => $submissions->avg('usability_score'),
+                    'affordabilityScore' => $submissions->avg('affordability_score'),
                     'maintainabilityScore' => $submissions->avg('maintainability_score'),
-                    'deployabilityScore'   => $submissions->avg('deployability_score'),
+                    'deployabilityScore' => $submissions->avg('deployability_score'),
                 ];
             })
-            ->sortByDesc('averageScore')
-            ->values()
-            ->toArray();
+                ->sortByDesc('averageScore')
+                ->values()
+                ->toArray();
 
-            $evaluatorIds = $categoryProducts->flatMap(fn($p) => $p->submissions->pluck('workgroup_member_id'))->unique()->count();
+            $evaluatorIds = $categoryProducts->flatMap(fn ($p) => $p->submissions->pluck('workgroup_member_id'))->unique()->count();
 
             return [
-                'name'           => $categoryName,
-                'rankingType'    => $rankingType,
-                'products'       => $productsFormatted,
+                'name' => $categoryName,
+                'rankingType' => $rankingType,
+                'products' => $productsFormatted,
                 'evaluatorCount' => $evaluatorIds,
             ];
         })->values()->toArray();
@@ -809,19 +826,19 @@ class WorkgroupAIService
         }
 
         $products = CandidateProduct::whereIn('workgroup_session_id', $sessionIds)->count();
-        $submissions = EvaluationSubmission::whereHas('candidateProduct', fn($q) => $q->whereIn('workgroup_session_id', $sessionIds))
+        $submissions = EvaluationSubmission::whereHas('candidateProduct', fn ($q) => $q->whereIn('workgroup_session_id', $sessionIds))
             ->where('status', 'submitted')
-            ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))
+            ->whereHas('member', fn ($mq) => $mq->where('count_evaluations', true))
             ->count();
-        $evaluatorIds = EvaluationSubmission::whereHas('candidateProduct', fn($q) => $q->whereIn('workgroup_session_id', $sessionIds))
+        $evaluatorIds = EvaluationSubmission::whereHas('candidateProduct', fn ($q) => $q->whereIn('workgroup_session_id', $sessionIds))
             ->where('status', 'submitted')
-            ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))
+            ->whereHas('member', fn ($mq) => $mq->where('count_evaluations', true))
             ->distinct('workgroup_member_id')
             ->count('workgroup_member_id');
 
         return [
-            'totalProducts'    => $products,
-            'totalEvaluators'  => $evaluatorIds,
+            'totalProducts' => $products,
+            'totalEvaluators' => $evaluatorIds,
             'totalSubmissions' => $submissions,
         ];
     }
@@ -844,9 +861,9 @@ class WorkgroupAIService
             return [];
         }
 
-        $submissions = EvaluationSubmission::whereHas('candidateProduct', fn($q) => $q->whereIn('workgroup_session_id', $sessionIds))
+        $submissions = EvaluationSubmission::whereHas('candidateProduct', fn ($q) => $q->whereIn('workgroup_session_id', $sessionIds))
             ->where('status', 'submitted')
-            ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true))
+            ->whereHas('member', fn ($mq) => $mq->where('count_evaluations', true))
             ->with(['candidateProduct', 'comments'])
             ->get();
 
@@ -859,7 +876,7 @@ class WorkgroupAIService
             $narrative = $submission->narrative_payload ?? [];
 
             foreach (['strengths', 'weaknesses', 'overall_impression', 'additional_comments'] as $field) {
-                if (!empty($narrative[$field])) {
+                if (! empty($narrative[$field])) {
                     $comments[] = [
                         'product' => $productName,
                         'type' => str_replace('_', ' ', $field),
@@ -869,7 +886,7 @@ class WorkgroupAIService
             }
 
             // Deal breaker notes
-            if ($submission->has_deal_breaker && !empty($submission->deal_breaker_note)) {
+            if ($submission->has_deal_breaker && ! empty($submission->deal_breaker_note)) {
                 $comments[] = [
                     'product' => $productName,
                     'type' => 'deal breaker',
@@ -879,7 +896,7 @@ class WorkgroupAIService
 
             // Legacy comments
             foreach ($submission->comments as $comment) {
-                if (!empty($comment->comment)) {
+                if (! empty($comment->comment)) {
                     $comments[] = [
                         'product' => $productName,
                         'type' => 'evaluator comment',
@@ -904,6 +921,7 @@ class WorkgroupAIService
         ) {
             return 'brand';
         }
+
         return 'individual';
     }
 
@@ -923,12 +941,14 @@ class WorkgroupAIService
             $text = implode(' ', $matches[0] ?? []);
             // Clean up whitespace
             $text = preg_replace('/\s+/', ' ', $text);
+
             return trim($text);
         }
 
         // For unknown types, try to extract readable text
         $text = '';
         preg_match_all('/[a-zA-Z0-9\s\.,\-:;!?\/\\\\()\[\]\'\"@#$%&*+=<>]{10,}/u', $content, $matches);
+
         return implode(' ', $matches[0] ?? []);
     }
 
@@ -943,7 +963,7 @@ class WorkgroupAIService
         }
 
         $chunks = [];
-        $start  = 0;
+        $start = 0;
         $length = strlen($text);
 
         while ($start < $length) {
@@ -958,7 +978,7 @@ class WorkgroupAIService
             }
 
             $chunks[] = substr($text, $start, $end - $start);
-            $start    = max($start + 1, $end - $overlap);
+            $start = max($start + 1, $end - $overlap);
         }
 
         return $chunks;
@@ -991,7 +1011,7 @@ class WorkgroupAIService
     {
         $secret = $this->workerSecret;
 
-        if (!$this->isEnabled() || $secret === null) {
+        if (! $this->isEnabled() || $secret === null) {
             throw new \LogicException('Workgroup AI service is not fully configured.');
         }
 
@@ -1005,10 +1025,10 @@ class WorkgroupAIService
     protected function fallbackAnalysis(CandidateProduct $product): array
     {
         return [
-            'analysis'       => null,
-            'error'          => self::CONFIGURATION_ERROR,
-            'productName'    => $product->name,
-            'generatedAt'    => now()->toISOString(),
+            'analysis' => null,
+            'error' => self::CONFIGURATION_ERROR,
+            'productName' => $product->name,
+            'generatedAt' => now()->toISOString(),
         ];
     }
 }
