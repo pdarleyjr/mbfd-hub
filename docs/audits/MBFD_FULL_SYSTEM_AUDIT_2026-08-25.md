@@ -4,6 +4,7 @@
 - **Static source inventory:** [MBFD_FULL_SYSTEM_AUDIT_2026-08-25.json](MBFD_FULL_SYSTEM_AUDIT_2026-08-25.json)
 - **Isolated worktree:** `D:\CodexWorktrees\mbfd-hub-full-system-20260825`
 - **Branch / audit checkpoint:** `audit/mbfd-hub-full-system-20260825` / `db284c7b9dfe3dee1a996222a0778f71a1b55df0`
+- **Hub repair commit:** `2ac7645a47db0b0225f5dab6fbe3eb8f47101560` (local only; not pushed or deployed)
 - **Verified source baseline:** cached `origin/main` at `ac6965f88f7d8ed441e08996b93d7cdb9f9b99c0`
 
 ## Release verdict
