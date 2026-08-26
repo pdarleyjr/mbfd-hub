@@ -13,7 +13,7 @@ namespace App\Services\Display;
  * and this class stays trivially testable.
  *
  * Weighting (sums to 100):
- *   - 40  explicit Daily Checkout completeness (healthy checked rigs / required rigs)
+ *   - 40  explicit Daily Checkout completion (checked + attention / required rigs)
  *   - 25  station inspection currency (passed within 30d)
  *   - 15  inverse of unresolved equipment-request load
  *   - 10  apparatus status / open-defect health (in-service ratio + penalty)
@@ -74,15 +74,19 @@ final class DisplayReadiness
             ];
         }
 
-        // 1. Explicit Daily Checkout completeness (40). A repeated submission
+        // 1. Explicit Daily Checkout completion (40). A repeated submission
         // is already collapsed to its apparatus identity by the compliance
-        // service before reaching this pure calculator.
+        // service before reaching this pure calculator. An approved checkout
+        // with an unresolved critical defect is `attention`: it is completed
+        // for the owner-approved Daily denominator, while the final readiness
+        // state below remains ATTENTION.
         if ($requiredApparatusCount > 0) {
-            $ratio = min(1.0, $checkedApparatusCount / $requiredApparatusCount);
+            $completedApparatusCount = $checkedApparatusCount + $attentionApparatusCount;
+            $ratio = min(1.0, $completedApparatusCount / $requiredApparatusCount);
             $checkoutScore = self::W_CHECKOUT * $ratio;
             $reasons[] = sprintf(
-                '%d of %d apparatus checked out today',
-                min($checkedApparatusCount, $requiredApparatusCount),
+                '%d of %d apparatus completed Daily Checkout',
+                min($completedApparatusCount, $requiredApparatusCount),
                 $requiredApparatusCount
             );
         } elseif ($unknownApparatusCount > 0) {

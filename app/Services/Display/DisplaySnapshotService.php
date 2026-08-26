@@ -62,7 +62,12 @@ final class DisplaySnapshotService
             $apparatusCounts = $this->apparatusStatusCounts();
             $pmHealth = $this->pmHealthCounts();
             $defects = $this->defectSummary();
-            $submissions = $this->submissionSummary();
+            $dailyCheckout = app(DailyCheckoutComplianceService::class)
+                ->summaryForApparatuses(
+                    Apparatus::query()
+                        ->get(['id', 'status', 'daily_checkout_requirement'])
+                );
+            $submissions = $this->submissionSummary($dailyCheckout);
             $requests = $this->requestSummary($stations['stationIds']);
             $inventory = $this->inventoryExceptions();
 
@@ -141,7 +146,7 @@ final class DisplaySnapshotService
         $apparatusIds = $station->apparatuses->pluck('id')->all();
         $dailyCheckout = app(DailyCheckoutComplianceService::class)
             ->summaryForApparatuses($station->apparatuses);
-        $inspectionsToday = $dailyCheckout['completed_required_count'];
+        $inspectionsToday = $dailyCheckout['completed'];
         $stationInspections30d = StationInspection::query()
             ->where('station_id', $id)
             ->where('inspection_date', '>=', Carbon::now()->subDays(30))
@@ -164,14 +169,14 @@ final class DisplaySnapshotService
         $staffing = app(StationStaffingService::class)->summaryFor($station);
 
         $readiness = DisplayReadiness::compute(
-            requiredApparatusCount: $dailyCheckout['required_count'],
-            checkedApparatusCount: $dailyCheckout['checked_count'],
-            attentionApparatusCount: $dailyCheckout['attention_count'],
-            reviewPendingApparatusCount: $dailyCheckout['review_pending_count'],
-            notCheckedApparatusCount: $dailyCheckout['not_checked_count'],
-            unknownApparatusCount: $dailyCheckout['unknown_count'],
+            requiredApparatusCount: $dailyCheckout['required_total'],
+            checkedApparatusCount: $dailyCheckout['checked'],
+            attentionApparatusCount: $dailyCheckout['attention'],
+            reviewPendingApparatusCount: $dailyCheckout['review_pending'],
+            notCheckedApparatusCount: $dailyCheckout['not_checked'],
+            unknownApparatusCount: $dailyCheckout['classification_required'],
             inServiceCount: $statusCounts['in_service'],
-            outOfServiceCount: $dailyCheckout['out_of_service_count'],
+            outOfServiceCount: $dailyCheckout['out_of_service'],
             maintenanceCount: $statusCounts['maintenance'],
             openDefects: $openDefects,
             criticalDefects: $criticalDefectCount,
@@ -234,6 +239,8 @@ final class DisplaySnapshotService
             'generated_at' => Carbon::now()->toISOString(),
             'station_id' => $station->id,
             'apparatus' => $this->redactedApparatus($station->apparatuses),
+            'daily_checkout' => app(DailyCheckoutComplianceService::class)
+                ->summaryForApparatuses($station->apparatuses),
         ];
     }
 
@@ -250,6 +257,8 @@ final class DisplaySnapshotService
         }
 
         $apparatusIds = $station->apparatuses->pluck('id')->all();
+        $dailyCheckout = app(DailyCheckoutComplianceService::class)
+            ->summaryForApparatuses($station->apparatuses);
 
         $apparatusInspections = empty($apparatusIds)
             ? collect()
@@ -258,7 +267,7 @@ final class DisplaySnapshotService
                 ->whereIn('apparatus_id', $apparatusIds)
                 ->orderByDesc('created_at')
                 ->limit(25)
-                ->get(['id', 'apparatus_id', 'shift', 'completed_at', 'created_at']);
+                ->get(['id', 'apparatus_id', 'shift', 'review_status', 'completed_at', 'created_at']);
 
         $stationInspections = StationInspection::query()
             ->where('station_id', $id)
@@ -277,6 +286,11 @@ final class DisplaySnapshotService
             'found' => true,
             'generated_at' => Carbon::now()->toISOString(),
             'station_id' => $station->id,
+            // This endpoint also exposes recent inspection history, but that
+            // history is never a readiness source. Consumers must use this
+            // canonical matrix/summary for Daily Checkout state.
+            'daily_checkout' => $dailyCheckout,
+            'apparatus_inspection_history_only' => true,
             'apparatus_inspections' => $apparatusInspections->map(fn (ApparatusInspection $i): array => [
                 'id' => $i->id,
                 'apparatus_name' => $i->apparatus?->designation
@@ -284,8 +298,9 @@ final class DisplaySnapshotService
                     ?: $i->apparatus?->unit_id
                     ?: 'Unknown',
                 'shift' => $i->shift,
-                'completed_at' => optional($i->completed_at)->toISOString()
-                    ?? optional($i->created_at)->toISOString(),
+                'submitted_at' => optional($i->created_at)->toISOString(),
+                'completed_at' => optional($i->completed_at)->toISOString(),
+                'review_status' => $i->review_status,
             ])->values()->all(),
             'station_inspections' => $stationInspections->map(fn (StationInspection $i): array => [
                 'id' => $i->id,
@@ -426,14 +441,14 @@ final class DisplaySnapshotService
             $staffing = $staffingService->summaryFor($station);
 
             $readiness = DisplayReadiness::compute(
-                requiredApparatusCount: $dailyCheckout['required_count'],
-                checkedApparatusCount: $dailyCheckout['checked_count'],
-                attentionApparatusCount: $dailyCheckout['attention_count'],
-                reviewPendingApparatusCount: $dailyCheckout['review_pending_count'],
-                notCheckedApparatusCount: $dailyCheckout['not_checked_count'],
-                unknownApparatusCount: $dailyCheckout['unknown_count'],
+                requiredApparatusCount: $dailyCheckout['required_total'],
+                checkedApparatusCount: $dailyCheckout['checked'],
+                attentionApparatusCount: $dailyCheckout['attention'],
+                reviewPendingApparatusCount: $dailyCheckout['review_pending'],
+                notCheckedApparatusCount: $dailyCheckout['not_checked'],
+                unknownApparatusCount: $dailyCheckout['classification_required'],
                 inServiceCount: $statusCounts['in_service'],
-                outOfServiceCount: $dailyCheckout['out_of_service_count'],
+                outOfServiceCount: $dailyCheckout['out_of_service'],
                 maintenanceCount: $statusCounts['maintenance'],
                 openDefects: $openDefects,
                 criticalDefects: $criticalDefects,
@@ -563,7 +578,8 @@ final class DisplaySnapshotService
     /**
      * @return array<string, mixed>
      */
-    private function submissionSummary(): array
+    /** @param array<string, mixed> $dailyCheckout */
+    private function submissionSummary(array $dailyCheckout): array
     {
         $stationInspections30d = StationInspection::query()
             ->where('inspection_date', '>=', Carbon::now()->subDays(30));
@@ -581,11 +597,17 @@ final class DisplaySnapshotService
             ->count();
 
         return [
+            // The top-level Daily Checkout object is the only canonical
+            // completion source. The legacy `inspections` week/month values
+            // remain record-history diagnostics and must never be used to
+            // derive per-apparatus readiness.
+            'daily_checkout' => $dailyCheckout,
             'inspections' => [
-                'today' => ApparatusInspection::query()->whereDate('completed_at', Carbon::today())->count(),
+                'today' => $dailyCheckout['completed'],
                 'this_week' => ApparatusInspection::query()->where('completed_at', '>=', Carbon::now()->startOfWeek())->count(),
                 'this_month' => ApparatusInspection::query()->where('completed_at', '>=', Carbon::now()->startOfMonth())->count(),
-                'pending_review' => $apparatusPendingReview,
+                'pending_review' => $dailyCheckout['review_pending'],
+                'history_records_pending_review' => $apparatusPendingReview,
             ],
             'station_inspections' => [
                 'pending_review' => $stationPendingReview,

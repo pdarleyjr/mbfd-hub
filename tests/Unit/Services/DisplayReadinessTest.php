@@ -34,16 +34,16 @@ class DisplayReadinessTest extends TestCase
         $this->assertContains('1 apparatus needs daily checkout policy classification', $readiness['reasons']);
     }
 
-    public function test_review_pending_or_attention_apparatus_prevents_ready_status(): void
+    public function test_attention_counts_as_completed_checkout_but_keeps_readiness_at_attention(): void
     {
         $readiness = DisplayReadiness::compute(
-            requiredApparatusCount: 2,
-            checkedApparatusCount: 2,
+            requiredApparatusCount: 4,
+            checkedApparatusCount: 1,
             attentionApparatusCount: 1,
             reviewPendingApparatusCount: 1,
-            notCheckedApparatusCount: 0,
+            notCheckedApparatusCount: 1,
             unknownApparatusCount: 0,
-            inServiceCount: 2,
+            inServiceCount: 4,
             outOfServiceCount: 0,
             maintenanceCount: 0,
             openDefects: 0,
@@ -55,7 +55,9 @@ class DisplayReadinessTest extends TestCase
             snapshotAgeSeconds: 0,
         );
 
+        $this->assertSame(80, $readiness['percent']);
         $this->assertSame(DisplayReadiness::STATUS_ATTENTION, $readiness['status']);
+        $this->assertContains('2 of 4 apparatus completed Daily Checkout', $readiness['reasons']);
         $this->assertContains('1 apparatus checkout requires review', $readiness['reasons']);
         $this->assertContains('1 checked apparatus has an unresolved critical defect', $readiness['reasons']);
     }

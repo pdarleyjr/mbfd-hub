@@ -36,6 +36,10 @@ final class AuditDailyCheckoutReadinessTest extends TestCase
         $this->assertSame('family', $report['apparatus'][0]['resolution_source']);
         $this->assertSame('/daily/vehicle-inspections/engine-3', $report['apparatus'][0]['checkout_url']);
         $this->assertNull($report['apparatus'][0]['ambiguity']);
+        $this->assertSame(1, $report['daily_checkout']['required_total']);
+        $this->assertSame(0, $report['daily_checkout']['completed']);
+        $this->assertSame('not_checked', $report['apparatus'][0]['daily_checkout']['state']);
+        $this->assertTrue($report['apparatus'][0]['daily_checkout']['included_in_required_total']);
     }
 
     public function test_it_blocks_deployment_when_an_apparatus_has_not_been_classified_by_an_authorized_owner(): void
@@ -66,6 +70,19 @@ final class AuditDailyCheckoutReadinessTest extends TestCase
         $this->assertNull($report['apparatus'][0]['checkout_url']);
         $this->assertContains('daily_checkout_requirement_schema_absent', $report['apparatus'][0]['issues']);
         $this->assertContains('daily_checkout_template_schema_absent', $report['apparatus'][0]['issues']);
+    }
+
+    public function test_it_fails_closed_when_the_operational_status_ledger_schema_is_absent(): void
+    {
+        $this->makeApparatus('required');
+        Schema::dropIfExists('apparatus_operational_status_events');
+
+        [$status, $report] = $this->audit();
+
+        $this->assertSame(Command::FAILURE, $status);
+        $this->assertFalse($report['schema']['apparatus_operational_status_ledger_present']);
+        $this->assertNull($report['daily_checkout']);
+        $this->assertContains('apparatus_operational_status_ledger_schema_absent', $report['apparatus'][0]['issues']);
     }
 
     public function test_it_blocks_deployment_when_a_required_apparatus_has_no_routable_daily_checkout_slug(): void

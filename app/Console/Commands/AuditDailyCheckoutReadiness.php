@@ -8,6 +8,7 @@ use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Enums\DailyCheckoutRequirement;
 use App\Models\Apparatus;
 use App\Services\DailyCheckoutChecklistResolver;
+use App\Services\DailyCheckoutComplianceService;
 use Illuminate\Console\Command;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
@@ -29,10 +30,13 @@ final class AuditDailyCheckoutReadiness extends Command
 
     protected $description = 'Read-only gate for Daily Checkout policy classification, templates, routing, and checklist coverage.';
 
-    public function handle(DailyCheckoutChecklistResolver $checklists): int
-    {
+    public function handle(
+        DailyCheckoutChecklistResolver $checklists,
+        DailyCheckoutComplianceService $compliance,
+    ): int {
         $hasDailyCheckoutRequirement = Schema::hasColumn('apparatuses', 'daily_checkout_requirement');
         $hasDailyCheckoutTemplate = Schema::hasColumn('apparatuses', 'daily_checkout_template');
+        $hasOperationalStatusLedger = Schema::hasTable('apparatus_operational_status_events');
         /** @var list<string|Expression> $columns */
         $columns = [
             'apparatuses.id',
@@ -62,6 +66,25 @@ final class AuditDailyCheckoutReadiness extends Command
             ->get()
             ->all();
 
+        // The audit owns policy/checklist validation, but it must not recreate
+        // Daily state from timestamps or row counts. When the append-only
+        // operational ledger is present, append the same canonical matrix used
+        // by every runtime consumer. Before that schema exists, fail closed:
+        // an OOS return cannot safely be inferred from apparatus updated_at.
+        $dailyCheckout = $hasOperationalStatusLedger
+            ? $compliance->summaryForApparatuses(
+                collect($apparatuses)->map(static function (stdClass $apparatus): Apparatus {
+                    $model = new Apparatus;
+                    $model->setRawAttributes((array) $apparatus, true);
+
+                    return $model;
+                })
+            )
+            : null;
+        $dailyCheckoutByApparatus = $dailyCheckout === null
+            ? []
+            : collect($dailyCheckout['matrix'])->keyBy('apparatus_id')->all();
+
         $requiredSlugCounts = [];
         foreach ($apparatuses as $apparatus) {
             if ($this->policyFor($apparatus) !== DailyCheckoutRequirement::Required) {
@@ -84,6 +107,7 @@ final class AuditDailyCheckoutReadiness extends Command
             'configured_template' => 0,
             'invalid_template' => 0,
             'ambiguous_classification' => 0,
+            'operational_status_ledger_schema_absent' => $hasOperationalStatusLedger ? 0 : 1,
             'issues' => 0,
         ];
         $matrix = [];
@@ -121,6 +145,10 @@ final class AuditDailyCheckoutReadiness extends Command
 
             if (! $hasDailyCheckoutTemplate) {
                 $issues[] = 'daily_checkout_template_schema_absent';
+            }
+
+            if (! $hasOperationalStatusLedger) {
+                $issues[] = 'apparatus_operational_status_ledger_schema_absent';
             }
 
             $model = new Apparatus;
@@ -189,20 +217,26 @@ final class AuditDailyCheckoutReadiness extends Command
                     'usable' => $resolution['usable'],
                     'error' => $resolution['error'],
                 ],
+                // Null is deliberate when the status ledger schema is absent:
+                // this command never substitutes apparatus timestamps or raw
+                // inspection rows for the canonical OOS-return contract.
+                'daily_checkout' => $dailyCheckoutByApparatus[(int) $apparatus->id] ?? null,
                 'issues' => $issues,
             ];
         }
 
         $report = [
-            'schema_version' => 3,
+            'schema_version' => 4,
             'generated_at_utc' => now('UTC')->toIso8601String(),
             'read_only' => true,
             'schema' => [
                 'daily_checkout_requirement_column_present' => $hasDailyCheckoutRequirement,
                 'daily_checkout_template_column_present' => $hasDailyCheckoutTemplate,
+                'apparatus_operational_status_ledger_present' => $hasOperationalStatusLedger,
             ],
-            'gate_passed' => $summary['issues'] === 0,
+            'gate_passed' => $hasOperationalStatusLedger && $summary['issues'] === 0,
             'summary' => $summary,
+            'daily_checkout' => $dailyCheckout,
             'apparatus' => $matrix,
         ];
 
