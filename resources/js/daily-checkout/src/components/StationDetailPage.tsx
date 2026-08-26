@@ -583,7 +583,7 @@ export default function StationDetailPage() {
                       <h4 className="font-semibold text-neutral-800">{apparatus.name || apparatus.unit_id}</h4>
                       <p className="text-sm text-neutral-600">Unit: {apparatus.vehicle_number}</p>
                       <p className="text-sm text-neutral-500 capitalize">Type: {apparatus.type}</p>
-                      {apparatus.slug && (
+                      {apparatus.daily_checkout_requirement === 'required' && apparatus.slug && (
                         <Link
                           to={`/vehicle-inspections/${apparatus.slug}`}
                           className="mt-2 inline-flex items-center text-xs text-red-600 font-medium hover:text-red-700"
@@ -591,6 +591,12 @@ export default function StationDetailPage() {
                           Start Inspection
                           <svg className="ml-1 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                         </Link>
+                      )}
+                      {apparatus.daily_checkout_requirement === 'unknown' && (
+                        <p className="mt-2 text-xs font-medium text-amber-700">Daily Checkout policy needs confirmation</p>
+                      )}
+                      {apparatus.daily_checkout_requirement && !['required', 'unknown'].includes(apparatus.daily_checkout_requirement) && (
+                        <p className="mt-2 text-xs font-medium text-neutral-500">Daily Checkout: {apparatus.daily_checkout_requirement.replaceAll('_', ' ')}</p>
                       )}
                       <a
                         href={`/employee/apparatus-service-request?station_id=${station.id}&apparatus_id=${apparatus.id}&return_to=${encodeURIComponent(`/daily/stations/${station.id}`)}`}

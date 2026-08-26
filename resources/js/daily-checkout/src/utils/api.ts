@@ -23,6 +23,19 @@ const normalizeItemStatus = (status?: string): 'Present' | 'Missing' | 'Damaged'
   return 'Present';
 };
 
+export class ApiRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
+}
+
+const responseMessage = async (response: Response, fallback: string): Promise<string> => {
+  const payload = await response.json().catch(() => null);
+
+  return typeof payload?.message === 'string' ? payload.message : fallback;
+};
+
 export class ApiClient {
   static async getApparatuses(): Promise<Apparatus[]> {
     const response = await fetch(`${API_BASE}/public/apparatuses`, {
@@ -49,14 +62,17 @@ export class ApiClient {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
-      throw new Error('Failed to fetch checklist');
+      throw new ApiRequestError(
+        await responseMessage(response, 'The Daily Checkout checklist is unavailable.'),
+        response.status,
+      );
     }
 
     const payload = await response.json();
     const rawChecklist = payload?.checklist ?? payload;
     const rawCompartments = Array.isArray(rawChecklist?.compartments) ? rawChecklist.compartments : [];
 
-    return {
+    const checklist: ChecklistData = {
       compartments: rawCompartments.map((compartment: any, compartmentIndex: number) => {
         const compartmentId = compartment?.id ?? `compartment-${compartmentIndex + 1}`;
 
@@ -74,6 +90,15 @@ export class ApiClient {
         };
       }),
     };
+
+    if (!checklist.compartments.some((compartment) => compartment.items.length > 0)) {
+      throw new ApiRequestError(
+        'The Daily Checkout checklist is unavailable. Contact an officer before continuing.',
+        503,
+      );
+    }
+
+    return checklist;
   }
 
   static async submitInspection(apparatusId: number, data: InspectionSubmission): Promise<{ success: boolean; message: string }> {
@@ -84,8 +109,10 @@ export class ApiClient {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to submit inspection');
+      throw new ApiRequestError(
+        await responseMessage(response, 'Failed to submit inspection'),
+        response.status,
+      );
     }
 
     return response.json();

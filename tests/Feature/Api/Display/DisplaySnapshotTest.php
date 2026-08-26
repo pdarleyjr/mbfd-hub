@@ -9,6 +9,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -18,6 +19,15 @@ use Tests\TestCase;
 class DisplaySnapshotTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $token = Str::random(48);
+        config(['services.display_api.token' => $token]);
+        $this->withHeader('X-Display-Token', $token);
+    }
 
     private function seedStationWithData(): Station
     {
@@ -36,9 +46,11 @@ class DisplaySnapshotTest extends TestCase
             'model' => 'Enforcer',
             'year' => 2020,
             'status' => 'In Service',
+            'daily_checkout_requirement' => 'required',
         ]);
 
         ApparatusInspection::create([
+            'client_submission_id' => (string) Str::uuid(),
             'apparatus_id' => $apparatus->id,
             'operator_name' => 'Jane Roe',
             'rank' => 'Lieutenant',
@@ -124,6 +136,8 @@ class DisplaySnapshotTest extends TestCase
         $this->assertArrayHasKey('readiness_percent', $row);
         $this->assertArrayHasKey('readiness_status', $row);
         $this->assertArrayHasKey('readiness_reasons', $row);
+        $this->assertSame(4, $row['assigned_apparatus_count']);
+        $this->assertSame(1, $row['daily_checkout']['required_count']);
         $this->assertIsInt($row['readiness_percent']);
         $this->assertContains($row['readiness_status'], ['READY', 'ATTENTION', 'INCOMPLETE', 'CRITICAL', 'UNKNOWN']);
         $this->assertIsArray($row['readiness_reasons']);
@@ -154,8 +168,11 @@ class DisplaySnapshotTest extends TestCase
 
         $this->assertSame($station->id, $data['station']['id']);
         $this->assertSame(1, $data['counts']['inspections_today']);
+        $this->assertSame(0, $data['counts']['daily_checkout']['checked_count']);
+        $this->assertSame(1, $data['counts']['daily_checkout']['attention_count']);
         $this->assertSame(1, $data['counts']['open_defects']);
         $this->assertArrayHasKey('readiness', $data);
+        $this->assertNotSame('READY', $data['readiness']['status']);
         $this->assertNotEmpty($data['readiness']['reasons']);
     }
 }

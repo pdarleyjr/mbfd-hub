@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use App\Enums\DailyCheckoutRequirement;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,6 +30,7 @@ class Apparatus extends Model
         'model',
         'year',
         'status',
+        'daily_checkout_requirement',
         'mileage',
         'last_service_date',
         'notes',
@@ -47,6 +51,7 @@ class Apparatus extends Model
     ];
 
     protected $casts = [
+        'daily_checkout_requirement' => DailyCheckoutRequirement::class,
         'mileage' => 'decimal:2',
         'last_service_date' => 'date',
         'reported_at' => 'datetime',
@@ -213,5 +218,10 @@ class Apparatus extends Model
     public function isPmCritical(): bool
     {
         return $this->getHoursSinceLastPm() >= (($this->pm_interval_hours ?? 300) + 5);
+    }
+
+    public function isDailyCheckoutRequired(): bool
+    {
+        return $this->daily_checkout_requirement === DailyCheckoutRequirement::Required;
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,6 +14,7 @@ class ApparatusInspection extends Model
     use HasFactory;
 
     protected $fillable = [
+        'client_submission_id',
         'apparatus_id',
         'operator_name',
         'rank',

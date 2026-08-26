@@ -1,4 +1,5 @@
 export type ApparatusType = 'engine' | 'ladder1' | 'ladder3' | 'rescue' | 'rope';
+export type DailyCheckoutRequirement = 'required' | 'exempt' | 'reserve' | 'administrative' | 'inactive' | 'unknown';
 
 export interface PmHealthStatus {
   status: 'green' | 'yellow' | 'red';
@@ -18,6 +19,7 @@ export interface Apparatus {
   designation?: string;
   slug: string;
   status?: string;
+  daily_checkout_requirement?: DailyCheckoutRequirement;
   // PM Maintenance fields
   current_engine_hours?: number | null;
   current_miles?: number | null;
@@ -76,6 +78,7 @@ export interface Defect {
 }
 
 export interface InspectionSubmission {
+  client_submission_id: string;
   operator_name: string;
   rank: string;
   shift: string;

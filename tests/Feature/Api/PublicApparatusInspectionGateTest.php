@@ -9,6 +9,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
 use App\Models\User;
+use App\Services\DailyCheckoutChecklistResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
@@ -46,20 +47,26 @@ class PublicApparatusInspectionGateTest extends TestCase
             'model' => 'Enforcer',
             'year' => 2020,
             'status' => $status,
+            'daily_checkout_requirement' => 'required',
         ]);
     }
 
-    private function criticalDefectPayload(): array
+    private function criticalDefectPayload(Apparatus $apparatus): array
     {
+        $compartments = $this->canonicalCompartments($apparatus);
+        $compartments[0]['items'][0]['status'] = 'Missing';
+
         return [
+            'client_submission_id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             'operator_name' => 'John Doe',
             'rank' => 'Lieutenant',
             'shift' => 'A',
             'unit_number' => 'E1',
+            'compartments' => $compartments,
             'defects' => [
                 [
-                    'compartment' => 'Cab',
-                    'item' => 'SCBA',
+                    'compartment' => $compartments[0]['name'],
+                    'item' => $compartments[0]['items'][0]['name'],
                     'status' => 'Missing',
                     'notes' => 'Not on board',
                 ],
@@ -73,7 +80,7 @@ class PublicApparatusInspectionGateTest extends TestCase
 
         $response = $this->postJson(
             "/api/public/apparatuses/{$apparatus->id}/inspections",
-            $this->criticalDefectPayload()
+            $this->criticalDefectPayload($apparatus)
         );
 
         $response->assertStatus(201);
@@ -93,16 +100,12 @@ class PublicApparatusInspectionGateTest extends TestCase
         $apparatus = $this->makeApparatus('In Service');
 
         $response = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", [
+            'client_submission_id' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
             'operator_name' => 'Jane Roe',
             'rank' => 'Firefighter',
             'shift' => 'B',
-            'defects' => [
-                [
-                    'compartment' => 'Cab',
-                    'item' => 'Flashlight',
-                    'status' => 'Present',
-                ],
-            ],
+            'compartments' => $this->canonicalCompartments($apparatus),
+            'defects' => [],
         ]);
 
         $response->assertStatus(201);
@@ -121,12 +124,14 @@ class PublicApparatusInspectionGateTest extends TestCase
         ]);
 
         $response = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", [
+            'client_submission_id' => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
             'operator_name' => 'Jane Roe',
             'rank' => 'Firefighter',
             'shift' => 'B',
             'unit_number' => 'ATTACKER-CONTROLLED-VALUE',
             'engine_hours' => 101.5,
             'miles' => 10_025,
+            'compartments' => $this->canonicalCompartments($apparatus),
             'defects' => [],
         ]);
 
@@ -146,7 +151,7 @@ class PublicApparatusInspectionGateTest extends TestCase
 
         $this->postJson(
             "/api/public/apparatuses/{$apparatus->id}/inspections",
-            $this->criticalDefectPayload()
+            $this->criticalDefectPayload($apparatus)
         )->assertStatus(201);
 
         $inspection = ApparatusInspection::latest('id')->first();
@@ -164,7 +169,7 @@ class PublicApparatusInspectionGateTest extends TestCase
 
         $this->postJson(
             "/api/public/apparatuses/{$apparatus->id}/inspections",
-            $this->criticalDefectPayload()
+            $this->criticalDefectPayload($apparatus)
         )->assertStatus(201);
 
         $inspection = ApparatusInspection::latest('id')->first();
@@ -189,5 +194,27 @@ class PublicApparatusInspectionGateTest extends TestCase
         Sanctum::actingAs($user);
 
         return $user;
+    }
+
+    /** @return list<array{id: string, name: string, items: list<array{id: string, name: string, status: string, notes: null}>}> */
+    private function canonicalCompartments(Apparatus $apparatus): array
+    {
+        $checklist = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus)['checklist'];
+        $this->assertIsArray($checklist);
+
+        return array_map(static function (array $compartment): array {
+            $compartmentId = (string) $compartment['id'];
+
+            return [
+                'id' => $compartmentId,
+                'name' => (string) ($compartment['name'] ?? $compartment['title']),
+                'items' => array_map(static fn (array $item, int $index): array => [
+                    'id' => (string) ($item['id'] ?? "{$compartmentId}-item-".($index + 1)),
+                    'name' => (string) $item['name'],
+                    'status' => 'Present',
+                    'notes' => null,
+                ], $compartment['items'], array_keys($compartment['items'])),
+            ];
+        }, $checklist['compartments']);
     }
 }

@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, Compartment, Defect, MeterData, InspectionSubmission } from '../types';
 import { ApiClient } from '../utils/api';
-import { saveInspectionProgress, loadInspectionProgress, clearInspectionProgress, queueSubmission, getSubmissionQueue, removeFromQueue } from '../utils/storage';
+import { getQueuedSubmission, getQueuedSubmissionForApparatus, queueSubmission, submitQueuedInspection } from '../utils/dailyCheckoutSubmissionQueue';
+import { createClientSubmissionId, saveInspectionProgress, loadInspectionProgress, clearInspectionProgress } from '../utils/storage';
 import { useOffline } from '../hooks/useOffline';
 import OfficerStep from './OfficerStep';
 import MeterStep from './MeterStep';
@@ -37,6 +38,7 @@ export default function InspectionWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [serviceNotices, setServiceNotices] = useState<ApparatusServiceTicketSummary[]>([]);
   const [serviceNoticesUnavailable, setServiceNoticesUnavailable] = useState(false);
+  const clientSubmissionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,6 +54,10 @@ export default function InspectionWizard() {
         }
 
         setApparatus(foundApparatus);
+        const queuedSubmission = await getQueuedSubmissionForApparatus(foundApparatus.id);
+        if (queuedSubmission) {
+          clientSubmissionIdRef.current = queuedSubmission.data.client_submission_id;
+        }
         setOfficerInfo(prev => ({ ...prev, unitNumber: foundApparatus.vehicle_number }));
 
         // Service status is intentionally secondary. A network or API failure
@@ -95,33 +101,6 @@ export default function InspectionWizard() {
 
     fetchData();
   }, [slug, hasLoadedAutosave]);
-
-  // Auto-sync queued submissions when back online
-  useEffect(() => {
-    if (!isOffline) {
-      const syncQueue = async () => {
-        const queue = getSubmissionQueue();
-        if (queue.length === 0) return;
-
-        for (const item of queue) {
-          try {
-            await ApiClient.submitInspection(item.apparatusId, item.data);
-            removeFromQueue(item.id);
-            
-            // Vibrate on successful sync
-            if ('vibrate' in navigator) {
-              navigator.vibrate(200);
-            }
-          } catch (error) {
-            console.error('Failed to sync queued submission:', error);
-            // Leave in queue to try again later
-          }
-        }
-      };
-
-      syncQueue();
-    }
-  }, [isOffline]);
 
   // Autosave progress
   useEffect(() => {
@@ -172,6 +151,7 @@ export default function InspectionWizard() {
       });
 
       const submission: InspectionSubmission = {
+        client_submission_id: clientSubmissionIdRef.current ?? createClientSubmissionId(),
         operator_name: officerInfo.name,
         rank: officerInfo.rank,
         shift: officerInfo.shift,
@@ -192,11 +172,15 @@ export default function InspectionWizard() {
         defects,
         officer_signature: signature,
       };
+      clientSubmissionIdRef.current = submission.client_submission_id;
+      const queueId = await queueSubmission(apparatus.id, submission);
+      const queuedSubmission = await getQueuedSubmission(queueId);
+      if (!queuedSubmission) {
+        throw new Error('Unable to retain this inspection for submission. Please try again.');
+      }
+      clientSubmissionIdRef.current = queuedSubmission.data.client_submission_id;
 
       if (isOffline) {
-        // Queue for later submission
-        queueSubmission(apparatus.id, submission);
-        
         // Vibrate to indicate queued
         if ('vibrate' in navigator) {
           navigator.vibrate([50, 100, 50]);
@@ -207,8 +191,10 @@ export default function InspectionWizard() {
         
         navigate('/success?queued=true');
       } else {
-        // Submit immediately
-        await ApiClient.submitInspection(apparatus.id, submission);
+        const submissionResult = await submitQueuedInspection(queueId);
+        if (submissionResult !== 'submitted') {
+          throw new Error('The queued inspection could not be located for submission. Please try again.');
+        }
         
         // Vibrate on success
         if ('vibrate' in navigator) {

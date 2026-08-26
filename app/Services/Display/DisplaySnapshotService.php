@@ -15,6 +15,7 @@ use App\Models\StationInspection;
 use App\Models\StationRequest;
 use App\Models\StationRequestUpdate;
 use App\Models\StationSupplyRequest;
+use App\Services\DailyCheckoutComplianceService;
 use App\Services\StationStaffingService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -138,8 +139,9 @@ final class DisplaySnapshotService
         }
 
         $apparatusIds = $station->apparatuses->pluck('id')->all();
-
-        $inspectionsToday = $this->countTodayInspections($apparatusIds);
+        $dailyCheckout = app(DailyCheckoutComplianceService::class)
+            ->summaryForApparatuses($station->apparatuses);
+        $inspectionsToday = $dailyCheckout['completed_required_count'];
         $stationInspections30d = StationInspection::query()
             ->where('station_id', $id)
             ->where('inspection_date', '>=', Carbon::now()->subDays(30))
@@ -162,11 +164,15 @@ final class DisplaySnapshotService
         $staffing = app(StationStaffingService::class)->summaryFor($station);
 
         $readiness = DisplayReadiness::compute(
-            apparatusCount: $staffing['assigned_apparatus_count'] ?? $station->apparatuses->count(),
-            inspectionsToday: $inspectionsToday,
-            inServiceCount: $staffing['in_service_assigned_count'] ?? $statusCounts['in_service'],
-            outOfServiceCount: $staffing['out_of_service_assigned_count'] ?? $statusCounts['out_of_service'],
-            maintenanceCount: $staffing['maintenance_assigned_count'] ?? $statusCounts['maintenance'],
+            requiredApparatusCount: $dailyCheckout['required_count'],
+            checkedApparatusCount: $dailyCheckout['checked_count'],
+            attentionApparatusCount: $dailyCheckout['attention_count'],
+            reviewPendingApparatusCount: $dailyCheckout['review_pending_count'],
+            notCheckedApparatusCount: $dailyCheckout['not_checked_count'],
+            unknownApparatusCount: $dailyCheckout['unknown_count'],
+            inServiceCount: $statusCounts['in_service'],
+            outOfServiceCount: $dailyCheckout['out_of_service_count'],
+            maintenanceCount: $statusCounts['maintenance'],
             openDefects: $openDefects,
             criticalDefects: $criticalDefectCount,
             lastStationInspectionStatus: $lastInspection['status'],
@@ -201,6 +207,7 @@ final class DisplaySnapshotService
                 'equipment_requests' => $equipmentRequests,
                 'open_defects' => $openDefects,
                 'supply_requests' => $supplyRequests,
+                'daily_checkout' => $dailyCheckout,
             ],
             'readiness' => [
                 'percent' => $readiness['percent'],
@@ -376,7 +383,7 @@ final class DisplaySnapshotService
         // we read those as nullable attributes instead of enumerating them.
         /** @var Collection<int, Station> $stations */
         $stations = Station::query()
-            ->with('apparatuses:id,station_id,unit_id,designation,status')
+            ->with('apparatuses:id,station_id,unit_id,designation,status,daily_checkout_requirement')
             ->where('is_active', true)
             ->orderBy('station_number')
             ->get();
@@ -385,32 +392,32 @@ final class DisplaySnapshotService
         $allApparatusIds = $stations->flatMap(fn (Station $s) => $s->apparatuses->pluck('id'))->all();
 
         // Batch-load all per-station signal sources, then group in PHP.
-        $todayInspectionsByApparatus = $this->todayInspectionCountsByApparatus($allApparatusIds);
         $openDefectsByApparatus = $this->openDefectCountsByApparatus($allApparatusIds);
         $criticalDefectsByApparatus = $this->criticalDefectCountsByApparatus($allApparatusIds);
         $lastInspectionByStation = $this->lastStationInspectionByStation($stationIds);
         $pendingEquipByStation = $this->pendingStationEquipmentCounts($stationIds);
         $staffingService = app(StationStaffingService::class);
+        $dailyCheckoutByStation = app(DailyCheckoutComplianceService::class)
+            ->summariesForStations($stations);
 
         $rows = $stations->map(function (Station $station) use (
-            $todayInspectionsByApparatus,
             $openDefectsByApparatus,
             $criticalDefectsByApparatus,
             $lastInspectionByStation,
             $pendingEquipByStation,
             $staffingService,
+            $dailyCheckoutByStation,
         ): array {
             $apparatusIds = $station->apparatuses->pluck('id')->all();
 
-            $inspectionsToday = 0;
             $openDefects = 0;
             $criticalDefects = 0;
             foreach ($apparatusIds as $aid) {
-                $inspectionsToday += $todayInspectionsByApparatus[$aid] ?? 0;
                 $openDefects += $openDefectsByApparatus[$aid] ?? 0;
                 $criticalDefects += $criticalDefectsByApparatus[$aid] ?? 0;
             }
 
+            $dailyCheckout = $dailyCheckoutByStation[$station->id];
             $statusCounts = $this->classifyApparatusCollection($station->apparatuses);
             $lastInspection = $lastInspectionByStation[$station->id]
                 ?? ['status' => null, 'age_days' => null];
@@ -419,11 +426,15 @@ final class DisplaySnapshotService
             $staffing = $staffingService->summaryFor($station);
 
             $readiness = DisplayReadiness::compute(
-                apparatusCount: $staffing['assigned_apparatus_count'] ?? $station->apparatuses->count(),
-                inspectionsToday: $inspectionsToday,
-                inServiceCount: $staffing['in_service_assigned_count'] ?? $statusCounts['in_service'],
-                outOfServiceCount: $staffing['out_of_service_assigned_count'] ?? $statusCounts['out_of_service'],
-                maintenanceCount: $staffing['maintenance_assigned_count'] ?? $statusCounts['maintenance'],
+                requiredApparatusCount: $dailyCheckout['required_count'],
+                checkedApparatusCount: $dailyCheckout['checked_count'],
+                attentionApparatusCount: $dailyCheckout['attention_count'],
+                reviewPendingApparatusCount: $dailyCheckout['review_pending_count'],
+                notCheckedApparatusCount: $dailyCheckout['not_checked_count'],
+                unknownApparatusCount: $dailyCheckout['unknown_count'],
+                inServiceCount: $statusCounts['in_service'],
+                outOfServiceCount: $dailyCheckout['out_of_service_count'],
+                maintenanceCount: $statusCounts['maintenance'],
                 openDefects: $openDefects,
                 criticalDefects: $criticalDefects,
                 lastStationInspectionStatus: $lastInspection['status'],
@@ -446,6 +457,7 @@ final class DisplaySnapshotService
                 'in_service' => $staffing['in_service_assigned_count'],
                 'out_of_service' => $staffing['out_of_service_assigned_count'],
                 'maintenance' => $staffing['maintenance_assigned_count'],
+                'daily_checkout' => $dailyCheckout,
                 'open_defects' => $openDefects,
                 'readiness_percent' => $readiness['percent'],
                 'readiness_status' => $readiness['status'],
@@ -764,41 +776,6 @@ final class DisplaySnapshotService
             ->with('apparatuses')
             ->where('is_active', true)
             ->find($id);
-    }
-
-    /**
-     * @param  list<int>  $apparatusIds
-     */
-    private function countTodayInspections(array $apparatusIds): int
-    {
-        if (empty($apparatusIds)) {
-            return 0;
-        }
-
-        return ApparatusInspection::query()
-            ->whereIn('apparatus_id', $apparatusIds)
-            ->whereDate('created_at', Carbon::today())
-            ->count();
-    }
-
-    /**
-     * @param  list<int>  $apparatusIds
-     * @return array<int, int> apparatus_id => count
-     */
-    private function todayInspectionCountsByApparatus(array $apparatusIds): array
-    {
-        if (empty($apparatusIds)) {
-            return [];
-        }
-
-        return ApparatusInspection::query()
-            ->whereIn('apparatus_id', $apparatusIds)
-            ->whereDate('created_at', Carbon::today())
-            ->selectRaw('apparatus_id, COUNT(*) as aggregate')
-            ->groupBy('apparatus_id')
-            ->pluck('aggregate', 'apparatus_id')
-            ->map(fn ($v): int => (int) $v)
-            ->all();
     }
 
     /**

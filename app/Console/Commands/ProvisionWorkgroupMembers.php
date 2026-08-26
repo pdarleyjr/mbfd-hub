@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\Hash;
 
 class ProvisionWorkgroupMembers extends Command
 {
-    protected $signature = 'mbfd:provision-workgroup-members';
+    protected $signature = 'mbfd:provision-workgroup-members
+                            {--password= : Unique temporary password for affected accounts (minimum 15 characters)}
+                            {--password-env= : Environment variable containing the unique temporary password}';
 
-    protected $description = 'Create 6 new workgroup member accounts and reset existing base member passwords. SAFE: never touches admin or elevated-role accounts.';
+    protected $description = 'Create 6 new workgroup member accounts and reset existing base member passwords using an explicitly supplied temporary password. SAFE: never touches admin or elevated-role accounts.';
 
     /**
      * Roles that are PROTECTED — accounts holding any of these roles
@@ -41,7 +43,12 @@ class ProvisionWorkgroupMembers extends Command
 
     public function handle(): int
     {
-        $password = 'Miamibeach!';
+        $password = $this->resolvePassword();
+
+        if ($password === null) {
+            return self::FAILURE;
+        }
+
         $hashedPassword = Hash::make($password);
 
         // ----------------------------------------------------------------
@@ -141,8 +148,47 @@ class ProvisionWorkgroupMembers extends Command
         $this->line("New accounts provisioned : " . count($this->newMembers));
         $this->line("Passwords reset          : {$resetCount}");
         $this->line("Protected accounts skipped: {$skippedCount}");
-        $this->info("All workgroup member passwords are now: {$password}");
+        $this->info('All workgroup member passwords were reset using the supplied credential material.');
 
         return self::SUCCESS;
+    }
+
+    private function resolvePassword(): ?string
+    {
+        $optionPassword = (string) $this->option('password');
+        $environmentVariable = trim((string) $this->option('password-env'));
+
+        if ($optionPassword !== '' && $environmentVariable !== '') {
+            $this->error('Use either --password=<value> or --password-env=<VARIABLE>, not both.');
+
+            return null;
+        }
+
+        if ($environmentVariable !== '') {
+            if (! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $environmentVariable)) {
+                $this->error('The --password-env value must be a valid environment variable name.');
+
+                return null;
+            }
+
+            $environmentPassword = getenv($environmentVariable);
+            $password = is_string($environmentPassword) ? $environmentPassword : '';
+        } else {
+            $password = $optionPassword;
+        }
+
+        if ($password === '') {
+            $this->error('Pass a unique temporary password with --password=<value> or --password-env=<VARIABLE>. No default password is available.');
+
+            return null;
+        }
+
+        if (mb_strlen($password) < 15) {
+            $this->error('Temporary passwords must contain at least 15 characters.');
+
+            return null;
+        }
+
+        return $password;
     }
 }

@@ -8,6 +8,7 @@ use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\Station;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -18,6 +19,15 @@ use Tests\TestCase;
 class DisplayRedactionTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $token = Str::random(48);
+        config(['services.display_api.token' => $token]);
+        $this->withHeader('X-Display-Token', $token);
+    }
 
     private const SECRET_VIN = '***REMOVED_SECRET***';
 

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\ApparatusPmServiceType;
 use App\Enums\ApparatusServiceTicketCategory;
 use App\Enums\ApparatusServiceTicketPriority;
+use App\Enums\DailyCheckoutRequirement;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\ApparatusResource\Pages;
 use App\Filament\Resources\ApparatusResource\RelationManagers;
@@ -73,6 +74,12 @@ class ApparatusResource extends Resource
                                 'Reserve' => 'Reserve',
                             ])
                             ->default('In Service'),
+                        Forms\Components\Select::make('daily_checkout_requirement')
+                            ->label('Daily Checkout Policy')
+                            ->options(DailyCheckoutRequirement::options())
+                            ->default(DailyCheckoutRequirement::Unknown->value)
+                            ->required()
+                            ->helperText('Classify explicitly. This does not change the operational status of the apparatus.'),
                         Forms\Components\TextInput::make('assignment')
                             ->label('Assignment')
                             ->placeholder('Station 1, Reserve, etc.')
@@ -202,6 +209,17 @@ class ApparatusResource extends Resource
                         default => 'gray',
                     })
                     ->placeholder('—'),
+                Tables\Columns\TextColumn::make('daily_checkout_requirement')
+                    ->label('Daily Checkout')
+                    ->badge()
+                    ->getStateUsing(fn (Apparatus $record): string => $record->daily_checkout_requirement?->value ?? DailyCheckoutRequirement::Unknown->value)
+                    ->formatStateUsing(fn (string $state): string => DailyCheckoutRequirement::options()[$state] ?? 'Unknown - needs policy confirmation')
+                    ->color(fn (string $state): string => match ($state) {
+                        DailyCheckoutRequirement::Required->value => 'success',
+                        DailyCheckoutRequirement::Unknown->value => 'warning',
+                        default => 'gray',
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('pm_health_status')
                     ->label('PM')
                     ->badge()
@@ -465,6 +483,17 @@ class ApparatusResource extends Resource
                     }),
             ])
             ->actions([
+                Tables\Actions\Action::make('daily_checkout')
+                    ->label('Daily Checkout')
+                    ->icon('heroicon-o-clipboard-document-check')
+                    ->color('success')
+                    ->visible(fn (Apparatus $record): bool => $record->daily_checkout_requirement === DailyCheckoutRequirement::Required || $record->daily_checkout_requirement === DailyCheckoutRequirement::Unknown)
+                    ->disabled(fn (Apparatus $record): bool => ! $record->isDailyCheckoutRequired() || ! filled($record->slug))
+                    ->tooltip(fn (Apparatus $record): string => $record->isDailyCheckoutRequired()
+                        ? 'Open the exact Daily Checkout for this apparatus'
+                        : 'Classify the Daily Checkout policy before starting a checkout')
+                    ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
+                    ->openUrlInNewTab(),
                 Tables\Actions\Action::make('view_inspections')
                     ->label('Inspections')
                     ->icon('heroicon-o-clipboard-document-list')

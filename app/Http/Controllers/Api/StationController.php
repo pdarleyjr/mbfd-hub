@@ -18,8 +18,9 @@ use App\Models\RoomAsset;
 use App\Models\RoomAudit;
 use App\Models\RoomAuditItem;
 use App\Models\Station;
+use App\Services\DailyCheckoutComplianceService;
 use App\Services\StationStaffingService;
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -698,11 +699,17 @@ class StationController extends Controller
         $station = Station::findOrFail($id);
 
         $apparatusIds = $station->apparatuses()->pluck('id');
+        $localNow = CarbonImmutable::now(DailyCheckoutComplianceService::TIMEZONE)
+            ->setTimezone(DailyCheckoutComplianceService::TIMEZONE);
+        $startOfDay = $localNow->startOfDay();
+        $startOfNextDay = $startOfDay->addDay();
 
         $inspections = ApparatusInspection::whereIn('apparatus_id', $apparatusIds)
-            ->whereDate('created_at', Carbon::today())
+            ->whereNotNull('completed_at')
+            ->where('completed_at', '>=', $startOfDay->utc())
+            ->where('completed_at', '<', $startOfNextDay->utc())
             ->with('apparatus')
-            ->orderBy('created_at', 'desc')
+            ->orderBy('completed_at', 'desc')
             ->get();
 
         // SECURITY (H-02): public endpoint — redact operator name and rank.
