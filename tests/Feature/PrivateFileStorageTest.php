@@ -93,9 +93,12 @@ class PrivateFileStorageTest extends TestCase
     // 2. The authorized controller route streams the file; anon is rejected.
     // ---------------------------------------------------------------------
 
-    public function test_authenticated_user_downloads_inventory_pdf_from_private_disk(): void
+    public function test_inventory_admin_downloads_inventory_pdf_from_private_disk(): void
     {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $role = Role::findOrCreate('logistics_admin', 'web');
         $user = User::factory()->create();
+        $user->assignRole($role);
         $station = $this->makeStation();
         $submission = $this->seedInventorySubmission($user, $station);
 
@@ -104,6 +107,17 @@ class PrivateFileStorageTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_authenticated_user_without_an_inventory_admin_role_cannot_download_inventory_pdf(): void
+    {
+        $user = User::factory()->create();
+        $station = $this->makeStation();
+        $submission = $this->seedInventorySubmission($user, $station);
+
+        Sanctum::actingAs($user);
+
+        $this->get(route('download-inventory-pdf', $submission))->assertForbidden();
     }
 
     public function test_anonymous_user_cannot_download_inventory_pdf(): void

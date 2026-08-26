@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Role;
@@ -148,5 +149,185 @@ final class ForcedPasswordChangeTest extends TestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame('Livewire update allowed', $response->getContent());
+    }
+
+    #[DataProvider('panelRoutes')]
+    public function test_flagged_users_cannot_invoke_a_protected_panel_livewire_update(
+        string $role,
+        string $homeUrl,
+        string $setPasswordUrl,
+        string $panelId,
+    ): void {
+        $user = User::factory()->create(['must_change_password' => false]);
+        $user->assignRole(Role::findOrCreate($role, 'web'));
+
+        $snapshot = $this->livewireSnapshotFrom(
+            $this->actingAs($user)->get($homeUrl)->assertOk(),
+        );
+
+        $user->forceFill(['must_change_password' => true])->save();
+
+        $response = $this->actingAs($user->fresh())
+            ->withHeader('X-Livewire', 'true')
+            ->postJson('/livewire/update', [
+                'components' => [[
+                    'snapshot' => $snapshot,
+                    'updates' => [],
+                    'calls' => [[
+                        'path' => '',
+                        'method' => '$refresh',
+                        'params' => [],
+                    ]],
+                ]],
+            ]);
+
+        $response->assertRedirect($setPasswordUrl);
+        self::assertTrue($user->fresh()->must_change_password);
+        self::assertSame($panelId, Filament::getPanel($panelId)->getId());
+    }
+
+    #[DataProvider('panelRoutes')]
+    public function test_flagged_users_can_complete_password_change_through_livewire_and_regain_panel_access(
+        string $role,
+        string $homeUrl,
+        string $setPasswordUrl,
+        string $panelId,
+    ): void {
+        $user = User::factory()->create([
+            'must_change_password' => true,
+            'password' => Hash::make('current-password'),
+        ]);
+        $user->assignRole(Role::findOrCreate($role, 'web'));
+
+        $snapshot = $this->livewireSnapshotFrom(
+            $this->actingAs($user)->get($setPasswordUrl)->assertOk(),
+            'set-password-page',
+        );
+
+        $response = $this->actingAs($user)
+            ->withHeader('X-Livewire', 'true')
+            ->postJson('/livewire/update', [
+                'components' => [[
+                    'snapshot' => $snapshot,
+                    'updates' => [
+                        'data.current_password' => 'current-password',
+                        'data.password' => 'A-longer-replacement-password-2026',
+                        'data.password_confirmation' => 'A-longer-replacement-password-2026',
+                    ],
+                    'calls' => [[
+                        'path' => '',
+                        'method' => 'save',
+                        'params' => [],
+                    ]],
+                ]],
+            ]);
+
+        $response->assertOk();
+        self::assertFalse($user->fresh()->must_change_password);
+        self::assertTrue(Hash::check('A-longer-replacement-password-2026', $user->fresh()->password));
+        $this->actingAs($user->fresh())->get($homeUrl)->assertOk();
+        self::assertSame($panelId, Filament::getPanel($panelId)->getId());
+    }
+
+    #[DataProvider('panelRoutes')]
+    public function test_flagged_users_can_log_out_without_completing_password_change(
+        string $role,
+        string $homeUrl,
+        string $setPasswordUrl,
+        string $panelId,
+    ): void {
+        $user = User::factory()->create(['must_change_password' => true]);
+        $user->assignRole(Role::findOrCreate($role, 'web'));
+
+        $this->actingAs($user)
+            ->post(Filament::getPanel($panelId)->getLogoutUrl())
+            ->assertRedirect();
+
+        $this->assertGuest('web');
+    }
+
+    public function test_livewire_reapplies_the_admin_training_redirect_after_a_role_change(): void
+    {
+        $user = User::factory()->create(['must_change_password' => false]);
+        $user->assignRole(Role::findOrCreate('admin', 'web'));
+
+        $snapshot = $this->livewireSnapshotFrom(
+            $this->actingAs($user)->get('/admin')->assertOk(),
+        );
+
+        $user->syncRoles([Role::findOrCreate('training_admin', 'web')]);
+
+        $this->actingAs($user->fresh())
+            ->withHeader('X-Livewire', 'true')
+            ->postJson('/livewire/update', [
+                'components' => [[
+                    'snapshot' => $snapshot,
+                    'updates' => [],
+                    'calls' => [],
+                ]],
+            ])
+            ->assertRedirect('/training');
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function restrictedPanelRoles(): array
+    {
+        return [
+            'training' => ['training_admin', '/training'],
+            'workgroups' => ['workgroup_member', '/workgroups'],
+        ];
+    }
+
+    #[DataProvider('restrictedPanelRoles')]
+    public function test_livewire_rechecks_training_and_workgroup_panel_access_after_a_role_is_removed(
+        string $role,
+        string $homeUrl,
+    ): void {
+        $user = User::factory()->create(['must_change_password' => false]);
+        $user->assignRole(Role::findOrCreate($role, 'web'));
+
+        $snapshot = $this->livewireSnapshotFrom(
+            $this->actingAs($user)->get($homeUrl)->assertOk(),
+        );
+
+        $user->syncRoles([]);
+
+        $this->actingAs($user->fresh())
+            ->withHeader('X-Livewire', 'true')
+            ->postJson('/livewire/update', [
+                'components' => [[
+                    'snapshot' => $snapshot,
+                    'updates' => [],
+                    'calls' => [],
+                ]],
+            ])
+            ->assertForbidden();
+    }
+
+    private function livewireSnapshotFrom(TestResponse $response, ?string $componentNameSuffix = null): string
+    {
+        $matched = preg_match_all('/wire:snapshot="([^"]+)"/', $response->getContent(), $matches);
+
+        self::assertGreaterThan(0, $matched, 'Expected a real Livewire snapshot in the panel response.');
+
+        $componentNames = [];
+
+        foreach ($matches[1] as $encodedSnapshot) {
+            $snapshot = html_entity_decode($encodedSnapshot, ENT_QUOTES);
+            $componentName = data_get(json_decode($snapshot, true), 'memo.name');
+            $componentNames[] = (string) $componentName;
+
+            if ($componentNameSuffix === null || str_ends_with((string) $componentName, $componentNameSuffix)) {
+                return $snapshot;
+            }
+        }
+
+        self::fail(sprintf(
+            'Expected a Livewire component ending in [%s]; found [%s].',
+            $componentNameSuffix,
+            implode(', ', array_unique($componentNames)),
+        ));
     }
 }

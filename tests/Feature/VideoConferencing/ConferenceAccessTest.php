@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Mockery;
+use Spatie\Permission\Models\Role;
 use Tests\Fakes\FakeConferenceProvider;
 use Tests\TestCase;
 
@@ -171,6 +172,16 @@ class ConferenceAccessTest extends TestCase
         $this->getJson('/admin/video-conferencing/health')->assertUnauthorized();
         $this->actingAs(User::factory()->create(), 'web')
             ->getJson('/admin/video-conferencing/health')
+            ->assertForbidden();
+        $trainingUser = User::factory()->create();
+        $trainingUser->assignRole(Role::findOrCreate('training_admin', 'web'));
+        $this->actingAs($trainingUser, 'web')
+            ->getJson('/admin/video-conferencing/health')
+            ->assertForbidden();
+        $admin = User::factory()->create();
+        $admin->assignRole(Role::findOrCreate('admin', 'web'));
+        $this->actingAs($admin, 'web')
+            ->getJson('/admin/video-conferencing/health')
             ->assertOk()
             ->assertJsonPath('status', 'disabled');
         $this->assertSame([], $provider->createdRooms);
@@ -199,7 +210,9 @@ class ConferenceAccessTest extends TestCase
             )->assertNoContent();
         }
 
-        $this->actingAs(User::factory()->create(), 'web')
+        $admin = User::factory()->create();
+        $admin->assignRole(Role::findOrCreate('admin', 'web'));
+        $this->actingAs($admin, 'web')
             ->getJson('/admin/video-conferencing/health')
             ->assertOk()
             ->assertJsonPath('status', 'degraded')

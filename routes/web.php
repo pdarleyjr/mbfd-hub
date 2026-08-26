@@ -41,6 +41,7 @@ use App\Http\Controllers\VideoConferencing\StationStandDownController;
 use App\Http\Controllers\Webhooks\LiveKitWebhookController;
 use App\Http\Controllers\Workgroup\FileDownloadController;
 use App\Http\Middleware\EnsureEmployeeAuthenticated;
+use App\Http\Middleware\EnsureVideoConferenceHealthAccess;
 use App\Http\Middleware\ForcePasswordChangeMiddleware;
 use Illuminate\Support\Facades\Route;
 
@@ -147,7 +148,7 @@ Route::prefix('employee')
     });
 
 Route::get('/admin/video-conferencing/health', VideoConferenceHealthController::class)
-    ->middleware(['auth:web', 'throttle:30,1'])
+    ->middleware(['auth:web', EnsureVideoConferenceHealthAccess::class, 'throttle:30,1'])
     ->name('admin.video-conferencing.health');
 
 Route::get('/admin/personnel-request-attachments/{attachment}', AdminPersonnelRequestAttachmentController::class)
@@ -285,7 +286,7 @@ Route::get('/__version', function () {
 // Station Inventory PDF Download
 Route::get('/inventory-pdf/{submission}', [StationInventoryController::class, 'downloadPdf'])
     ->name('download-inventory-pdf')
-    ->middleware('auth');
+    ->middleware(['auth', 'admin.role:super_admin,admin,logistics_admin']);
 
 // Workgroup File Downloads & Preview
 Route::get('/workgroup/file/{file}/download', [FileDownloadController::class, 'downloadFile'])

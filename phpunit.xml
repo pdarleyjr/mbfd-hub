@@ -33,7 +33,15 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SCREENTINKER_SYNC_URL" value="" force="true"/>
+        <env name="SCREENTINKER_SYNC_TOKEN" value="" force="true"/>
+        <server name="SCREENTINKER_SYNC_URL" value=""/>
+        <server name="SCREENTINKER_SYNC_TOKEN" value=""/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="WORKGROUP_AI_WORKER_SECRET" value="" force="true"/>
+        <env name="WORKGROUP_AI_WORKER_URL" value="" force="true"/>
+        <server name="WORKGROUP_AI_WORKER_SECRET" value=""/>
+        <server name="WORKGROUP_AI_WORKER_URL" value=""/>
     </php>
 </phpunit>

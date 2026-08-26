@@ -127,3 +127,29 @@ test("the Support AI deployment cannot be triggered by a PulsePoint-only change"
   assert.match(verification, /npm test/);
   assert.doesNotMatch(verification, /wrangler deploy/);
 });
+
+test("the PulsePoint verification workflow cannot acquire deployment capability", () => {
+  const verification = readFileSync(resolve(root, ".github/workflows/verify-pulsepoint-proxy.yml"), "utf8");
+  const forbiddenDeploymentPatterns = [
+    /\bwrangler\s+(?:deploy|publish)\b/i,
+    /\bnpm\s+(?:run|exec)\s+(?:--\s+)?(?:wrangler\s+)?(?:deploy|publish)\b/i,
+    /\b(?:pnpm|yarn)\s+(?:run\s+)?(?:deploy|publish)\b/i,
+    /cloudflare\/wrangler-action/i,
+    /\b(?:CLOUDFLARE|CF)_API_TOKEN\b/i,
+  ];
+
+  for (const pattern of forbiddenDeploymentPatterns) {
+    assert.doesNotMatch(verification, pattern, `verify-only workflow must not match ${pattern}`);
+  }
+});
+
+test("CI executes the deploy-free configuration regression suite", () => {
+  const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
+  const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
+
+  assert.equal(
+    packageJson.scripts["test:ci-configuration"],
+    "node --test tests/Node/ci-configuration.test.mjs",
+  );
+  assert.match(workflow, /- name: Verify CI configuration\r?\n\s+run: npm run test:ci-configuration/);
+});

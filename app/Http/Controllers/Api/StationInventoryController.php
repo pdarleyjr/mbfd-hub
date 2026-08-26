@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class StationInventoryController extends Controller
 {
@@ -140,7 +141,7 @@ class StationInventoryController extends Controller
 
         // Save PDF to the PRIVATE disk (not web-reachable). Served only via the
         // authenticated downloadPdf route below — never a public /storage URL.
-        $filename = 'inventory-'.$station->id.'-'.time().'.pdf';
+        $filename = 'inventory-'.$station->id.'-'.Str::ulid().'.pdf';
         $pdfPath = 'inventory-submissions/'.$filename;
         Storage::disk($this->privateDisk())->put($pdfPath, $pdf->output());
 

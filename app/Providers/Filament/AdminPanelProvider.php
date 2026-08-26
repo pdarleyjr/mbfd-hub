@@ -182,6 +182,7 @@ class AdminPanelProvider extends PanelProvider
                 ForceFilamentPasswordChange::class,
             ])
             ->persistentMiddleware([
+                RedirectTrainingUsers::class,
                 ForceFilamentPasswordChange::class,
             ])
             ->databaseNotifications()

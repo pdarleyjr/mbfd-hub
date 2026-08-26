@@ -88,7 +88,7 @@ final class ApparatusInspectionApprovalService
             });
 
             return $inspection;
-        });
+        }, 3);
     }
 
     public function reject(int $inspectionId, User $reviewer, string $reviewNotes): ApparatusInspection
@@ -114,7 +114,7 @@ final class ApparatusInspectionApprovalService
             });
 
             return $inspection;
-        });
+        }, 3);
     }
 
     private function recordReviewEvent(
