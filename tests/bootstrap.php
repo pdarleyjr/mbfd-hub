@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+if (! defined('MBFD_PHPUNIT_BOOTSTRAP')) {
+    define('MBFD_PHPUNIT_BOOTSTRAP', true);
+}
+
 $allowDisposablePostgres = getenv('MBFD_ALLOW_DISPOSABLE_POSTGRES') === '1';
 $disposablePostgres = [
     'host' => (string) getenv('DISPOSABLE_POSTGRES_HOST'),

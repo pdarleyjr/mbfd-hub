@@ -103,4 +103,13 @@ class TestEnvironmentIsolationTest extends TestCase
             );
         }
     }
+
+    public function test_phpunit_uses_a_comment_only_environment_sentinel_without_overriding_isolation(): void
+    {
+        $this->assertTrue(defined('MBFD_PHPUNIT_BOOTSTRAP'));
+        $this->assertSame('tests/Fixtures/phpunit.environment', app()->environmentFile());
+        $this->assertFileExists(base_path(app()->environmentFile()));
+        $this->assertFalse((bool) config('app.debug'));
+        $this->assertNull(env('E2E_BASE_URL'));
+    }
 }

@@ -6,7 +6,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Sentry\Laravel\Integration;
 
-return Application::configure(basePath: dirname(__DIR__))
+$app = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -71,3 +71,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         Integration::handles($exceptions);
     })->create();
+
+if (defined('MBFD_PHPUNIT_BOOTSTRAP')) {
+    $app->loadEnvironmentFrom('tests/Fixtures/phpunit.environment');
+}
+
+return $app;
