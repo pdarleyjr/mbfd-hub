@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources\Workgroup\RelationManagers;
 
+use App\Filament\Resources\Workgroup\RelationManagers\Concerns\AuthorizesWorkgroupOwner;
 use App\Models\User;
-use App\Models\Workgroup;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class MembersRelationManager extends RelationManager
 {
+    use AuthorizesWorkgroupOwner;
+
     protected static string $relationship = 'members';
 
     protected static ?string $title = 'Members';

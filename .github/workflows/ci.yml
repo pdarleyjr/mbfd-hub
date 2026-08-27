@@ -1,5 +1,7 @@
 name: CI
 
+# This is validation only. It is deliberately unable to reach a self-hosted
+# runner, deployment secret, production environment, or SSH target.
 on:
   push:
     branches: [main]
@@ -12,82 +14,10 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_DB: testing
-          POSTGRES_USER: testing
-          POSTGRES_PASSWORD: testing
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-    - name: Setup Node
-      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-      with:
-        node-version: '22'
-        cache: npm
-
-    - name: Install Node dependencies
-      run: npm ci --ignore-scripts --legacy-peer-deps
-
-    - name: Setup PHP
-      uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
-      with:
-        php-version: '8.4'
-        extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
-        coverage: none
-
-    - name: Install dependencies
-      run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
-
-    - name: Build Vite assets for HTTP tests
-      run: npm run build
-
-    - name: Copy .env
-      run: cp .env.example .env || true
-
-    - name: Configure test environment
-      run: |
-        {
-          echo "DB_CONNECTION=pgsql"
-          echo "DB_HOST=127.0.0.1"
-          echo "DB_PORT=5432"
-          echo "DB_DATABASE=testing"
-          echo "DB_USERNAME=testing"
-          echo "DB_PASSWORD=testing"
-          echo "CACHE_DRIVER=array"
-          echo "SESSION_DRIVER=array"
-          echo "QUEUE_CONNECTION=sync"
-        } >> .env
-
-    - name: Generate key
-      run: php artisan key:generate
-
-    - name: Discover packages
-      run: php artisan package:discover --ansi
-
-    - name: Directory Permissions
-      run: chmod -R 775 storage bootstrap/cache
-
-    - name: Run Migrations
-      run: php artisan migrate --force
-
-    - name: Run Tests
-      run: php artisan test
+  release-gates:
+    uses: ./.github/workflows/hub-release-gates.yml
+    with:
+      pint_base_sha: ${{ github.event.pull_request.base.sha || github.event.before }}

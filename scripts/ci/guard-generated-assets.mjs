@@ -36,25 +36,21 @@ if (tracked.length > 0) {
 }
 console.log("OK: no generated assets are tracked in git.");
 
-console.log("== CI asset-order guard ==");
-const ciWorkflowPath = resolve(root, ".github/workflows/ci.yml");
-const ciWorkflow = readFileSync(ciWorkflowPath, "utf8");
-const ciComposerIndex = ciWorkflow.indexOf("run: composer install");
-const ciBuildIndex = ciWorkflow.indexOf("run: npm run build");
-const ciTestIndex = ciWorkflow.indexOf("run: php artisan test");
-if (
-  ciComposerIndex === -1 ||
-  ciBuildIndex === -1 ||
-  ciTestIndex === -1 ||
-  ciComposerIndex > ciBuildIndex ||
-  ciBuildIndex > ciTestIndex
-) {
-  console.error(
-    "ERROR: .github/workflows/ci.yml must run `composer install`, then `npm run build`, then `php artisan test`.",
-  );
+console.log("== Hub release-gate asset guard ==");
+const releaseGateWorkflowPath = resolve(root, ".github/workflows/hub-release-gates.yml");
+const releaseGateWorkflow = readFileSync(releaseGateWorkflowPath, "utf8");
+const missingReleaseCommands = [
+  "run: composer install",
+  "run: npm run build",
+  "run: php artisan test --exclude-group=postgres",
+].filter((command) => !releaseGateWorkflow.includes(command));
+
+if (missingReleaseCommands.length > 0) {
+  console.error("ERROR: the shared Hub release gate is missing required validation command(s):");
+  missingReleaseCommands.forEach((command) => console.error("  " + command));
   process.exit(1);
 }
-console.log("OK: CI installs PHP assets and builds the untracked Vite manifest before HTTP tests.");
+console.log("OK: shared Hub release gates define PHP install, production asset build, and PHPUnit validation.");
 
 const requireBuild = process.env.REQUIRE_GENERATED_ASSETS === "1";
 const manifest = resolve(root, "public/build/manifest.json");

@@ -2,31 +2,21 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
+use App\Support\Workgroups\WorkgroupAccess;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureWorkgroupPanelAccess
 {
+    public function __construct(private readonly WorkgroupAccess $workgroupAccess) {}
+
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
-        if (! $user) {
-            return $next($request);
-        }
-
-        $hasAccess = $user->hasRole('super_admin')
-            || $user->hasRole('admin')
-            || $user->hasRole('logistics_admin')
-            || $user->hasRole('workgroup_admin')
-            || $user->hasRole('workgroup_facilitator')
-            || $user->hasRole('workgroup_member')
-            || $user->can('workgroup.access');
-
-        if (! $hasAccess) {
-            abort(404);
-        }
+        abort_unless($user instanceof User && $this->workgroupAccess->canEnterPanel($user), 404);
 
         return $next($request);
     }

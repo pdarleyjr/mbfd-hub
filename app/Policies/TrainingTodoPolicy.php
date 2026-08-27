@@ -19,19 +19,21 @@ class TrainingTodoPolicy
 
     public function create(User $user): bool
     {
-        return true;
+        return $this->canManageTrainingTodos($user);
     }
 
     public function update(User $user, TrainingTodo $trainingTodo): bool
     {
-        $assignedTo = $trainingTodo->assigned_to ?? [];
-        return $user->is_admin 
-            || $trainingTodo->created_by === $user->id 
-            || in_array($user->id, $assignedTo);
+        return $this->canManageTrainingTodos($user);
     }
 
     public function delete(User $user, TrainingTodo $trainingTodo): bool
     {
-        return $user->is_admin || $trainingTodo->created_by === $user->id;
+        return $this->canManageTrainingTodos($user);
+    }
+
+    private function canManageTrainingTodos(User $user): bool
+    {
+        return $user->hasAnyRole(['super_admin', 'training_admin']);
     }
 }

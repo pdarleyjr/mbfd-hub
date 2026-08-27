@@ -1,7 +1,8 @@
 // No changes needed - the test file doesn't have loginAsAdmin, it uses storageState from config
 import { test, expect } from '@playwright/test';
+import { loopbackBaseUrl } from './support/test-environment';
 
-const BASE_URL = 'https://mbfdhub.com';
+const BASE_URL = loopbackBaseUrl('E2E_BASE_URL', 'http://127.0.0.1:8098', 'PLAYWRIGHT_BASE_URL');
 
 // ============================================================
 // DESKTOP TESTS

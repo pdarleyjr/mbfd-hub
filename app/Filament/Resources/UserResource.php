@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
 use Filament\Forms;
@@ -10,10 +11,8 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Hash;
 
-use App\Filament\Concerns\EnterpriseTable;
 class UserResource extends Resource
 {
     use EnterpriseTable;
@@ -52,7 +51,7 @@ class UserResource extends Resource
                             ->maxLength(255),
                     ])
                     ->columns(2),
-                
+
                 Forms\Components\Section::make('Profile')
                     ->schema([
                         Forms\Components\TextInput::make('display_name')
@@ -72,6 +71,7 @@ class UserResource extends Resource
                         Forms\Components\Select::make('roles')
                             ->multiple()
                             ->relationship('roles', 'name')
+                            ->disabled(fn (): bool => ! static::canManageRoles())
                             ->preload(),
                     ]),
             ]);
@@ -90,7 +90,7 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('display_name')
                     ->searchable()
                     ->sortable(),
-               Tables\Columns\TextColumn::make('rank')
+                Tables\Columns\TextColumn::make('rank')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('station')
                     ->searchable(),
@@ -162,5 +162,10 @@ class UserResource extends Resource
     public static function canViewAny(): bool
     {
         return auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false;
+    }
+
+    public static function canManageRoles(): bool
+    {
+        return auth()->user()?->hasRole('super_admin') ?? false;
     }
 }

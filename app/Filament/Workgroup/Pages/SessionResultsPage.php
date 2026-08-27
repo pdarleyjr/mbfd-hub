@@ -2,20 +2,16 @@
 
 namespace App\Filament\Workgroup\Pages;
 
-use App\Filament\Workgroup\Widgets\CategoryRankingsWidget;
-use App\Filament\Workgroup\Widgets\FinalistsWidget;
-use App\Filament\Workgroup\Widgets\SessionProgressWidget;
-use App\Models\EvaluationSubmission;
+use App\Models\User;
 use App\Models\Workgroup;
-use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use App\Services\Workgroup\EvaluationService;
 use App\Services\Workgroup\WorkgroupAIService;
-use Filament\Actions\Action;
-use Filament\Forms\Components\Select;
+use App\Support\Workgroups\WorkgroupAccess;
+use App\Support\Workgroups\WorkgroupContext;
 use Filament\Pages\Page;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -43,12 +39,16 @@ class SessionResultsPage extends Page
 
     /** Async AI report state */
     public bool $aiReportLoaded = false;
+
     public ?string $aiReport = null;
+
     public ?string $aiReportError = null;
 
     /** SAVER Report state */
     public bool $saverReportLoading = false;
+
     public ?string $saverReportHtml = null;
+
     public ?string $saverReportError = null;
 
     /**
@@ -57,14 +57,15 @@ class SessionResultsPage extends Page
      */
     public function exportTableCsv(string $tableKey)
     {
-        $sessionId = $this->getSelectedSession()?->id;
+        $sessionId = $this->requireSelectedSession()->id;
         $evalService = app(EvaluationService::class);
         $granular = $evalService->getGranularToolGroupings($sessionId);
 
-        $filename = $tableKey . '_results_' . now()->format('Y-m-d') . '.csv';
+        $filename = $tableKey.'_results_'.now()->format('Y-m-d').'.csv';
 
         if ($tableKey === 't1_standalone') {
             $t1 = $granular['t1_standalone'] ?? null;
+
             return response()->streamDownload(function () use ($t1) {
                 $handle = fopen('php://output', 'w');
                 fputcsv($handle, ['Product', 'Brand', 'Overall Score', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability', 'Responses']);
@@ -87,6 +88,7 @@ class SessionResultsPage extends Page
 
         if ($tableKey === 'brand_overall') {
             $brands = $granular['brand_overall'] ?? [];
+
             return response()->streamDownload(function () use ($brands) {
                 $handle = fopen('php://output', 'w');
                 fputcsv($handle, ['Rank', 'Brand', 'Overall Avg', 'Tool Count', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability']);
@@ -109,6 +111,7 @@ class SessionResultsPage extends Page
 
         // Standard product tables: cutoff_saws, spreaders, cutters, rams
         $items = $granular[$tableKey] ?? [];
+
         return response()->streamDownload(function () use ($items) {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, ['Rank', 'Product', 'Brand', 'Overall Score', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability', 'Advance Yes', 'Advance No', 'Deal Breakers', 'Responses']);
@@ -138,14 +141,14 @@ class SessionResultsPage extends Page
      */
     public function exportCategoryRankingsCsv(string $categoryName)
     {
-        $session = $this->getSelectedSession();
+        $session = $this->requireSelectedSession();
         $evalService = app(EvaluationService::class);
-        $sessionId = $session?->id;
+        $sessionId = $session->id;
         $results = $evalService->getSessionResults($sessionId);
 
-        $filename = str_replace(' ', '_', strtolower($categoryName)) . '_rankings_' . now()->format('Y-m-d') . '.csv';
+        $filename = str_replace(' ', '_', strtolower($categoryName)).'_rankings_'.now()->format('Y-m-d').'.csv';
 
-        $targetCat = collect($results['rankable_categories'])->first(fn($c) => $c['category_name'] === $categoryName);
+        $targetCat = collect($results['rankable_categories'])->first(fn ($c) => $c['category_name'] === $categoryName);
 
         return response()->streamDownload(function () use ($targetCat) {
             $handle = fopen('php://output', 'w');
@@ -172,13 +175,15 @@ class SessionResultsPage extends Page
      */
     public function exportCompetitorGroupsCsv()
     {
-        $session = $this->getSelectedSession();
+        $session = $this->requireSelectedSession();
         $evalService = app(EvaluationService::class);
-        $workgroup = Workgroup::first();
+        $workgroup = $session->workgroup;
 
-        $filename = 'competitor_group_rankings_' . now()->format('Y-m-d') . '.csv';
+        $filename = 'competitor_group_rankings_'.now()->format('Y-m-d').'.csv';
 
-        $rankings = $workgroup ? $evalService->getCompetitorGroupRankings($workgroup, $session) : [];
+        $rankings = $workgroup instanceof Workgroup
+            ? $evalService->getCompetitorGroupRankings($workgroup, $session)
+            : [];
 
         return response()->streamDownload(function () use ($rankings) {
             $handle = fopen('php://output', 'w');
@@ -207,18 +212,18 @@ class SessionResultsPage extends Page
      */
     public function exportFinalistsCsv()
     {
-        $session = $this->getSelectedSession();
+        $session = $this->requireSelectedSession();
         $evalService = app(EvaluationService::class);
-        $sessionId = $session?->id;
+        $sessionId = $session->id;
         $results = $evalService->getSessionResults($sessionId);
 
-        $filename = 'finalists_' . now()->format('Y-m-d') . '.csv';
+        $filename = 'finalists_'.now()->format('Y-m-d').'.csv';
 
         return response()->streamDownload(function () use ($results) {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, ['Category', 'Rank', 'Product', 'Manufacturer', 'Avg Score', 'Responses']);
             foreach ($results['rankable_categories'] as $cat) {
-                $rankings = collect($cat['rankings'])->filter(fn($r) => $r['meets_threshold'])->take(2);
+                $rankings = collect($cat['rankings'])->filter(fn ($r) => $r['meets_threshold'])->take(2);
                 foreach ($rankings as $idx => $item) {
                     fputcsv($handle, [
                         $cat['category_name'],
@@ -237,38 +242,40 @@ class SessionResultsPage extends Page
     public function getHeading(): string
     {
         $session = $this->getSelectedSession();
-        if (!$session && $this->selectedSessionId === null) {
-            return 'Overall Results — All Sessions';
-        }
+
         return $session ? "Results: {$session->name}" : 'Session Results';
     }
 
     public function getSubheading(): ?string
     {
-        $session = $this->getSelectedSession();
-        if (!$session) {
-            $allSessions = WorkgroupSession::all();
-            return "Showing combined results across all {$allSessions->count()} session(s).";
-        }
+        $session = $this->requireSelectedSession();
 
         $progress = app(EvaluationService::class)->getSessionProgress($session->id);
+
         return "Completion: {$progress['completion_percentage']}% — {$progress['submitted_submissions']} of {$progress['max_possible_submissions']} evaluations submitted";
     }
 
     public function mount(): void
     {
-        abort_unless(static::canAccess(), 403);
+        abort_unless(static::canAccess(), 404);
 
-        // Default to null (Overall Results — all sessions combined)
-        $this->selectedSessionId = null;
+        $session = $this->scopedSessions()->active()->orderBy('id')->first()
+            ?? $this->scopedSessions()->orderBy('id')->first();
+
+        abort_unless($session !== null, 404);
+
+        $this->selectedSessionId = $session->id;
     }
 
     public function getSelectedSession(): ?WorkgroupSession
     {
-        if ($this->selectedSessionId) {
-            return WorkgroupSession::find($this->selectedSessionId);
+        if ($this->selectedSessionId === null) {
+            return null;
         }
-        return null; // null = Overall / All Sessions
+
+        return $this->scopedSessions()
+            ->with('workgroup')
+            ->find($this->selectedSessionId);
     }
 
     /**
@@ -276,7 +283,12 @@ class SessionResultsPage extends Page
      */
     public function getAllSessions(): \Illuminate\Support\Collection
     {
-        return WorkgroupSession::orderBy('name')->get();
+        return $this->scopedSessions()->orderBy('name')->get();
+    }
+
+    public function updatingSelectedSessionId(?int $sessionId): void
+    {
+        $this->assertSessionIsAccessible($sessionId);
     }
 
     /**
@@ -284,6 +296,8 @@ class SessionResultsPage extends Page
      */
     public function switchSession(?int $sessionId): void
     {
+        $this->assertSessionIsAccessible($sessionId);
+
         $this->selectedSessionId = $sessionId;
         // Clear AI and SAVER report when switching sessions
         $this->aiReportLoaded = false;
@@ -299,26 +313,29 @@ class SessionResultsPage extends Page
      */
     public function loadAiReport(): void
     {
+        $session = $this->requireSelectedSession();
+        app(WorkgroupAccess::class)->requireManageSession($this->currentUser(), $session);
+
         try {
-            $session = $this->getSelectedSession();
-
             $aiService = app(WorkgroupAIService::class);
-            $workgroup = Workgroup::first();
+            $workgroup = $session->workgroup;
 
-            if (!$workgroup) {
+            if (! ($workgroup instanceof Workgroup)) {
                 $this->aiReportError = 'No workgroup found for AI report generation.';
                 $this->aiReportLoaded = true;
+
                 return;
             }
 
-            // When session is null, this is the "Overall" scope — generate
-            // an aggregate report across ALL sessions, not just Day 1.
             $result = $aiService->generateExecutiveReport($workgroup, $session);
             $this->aiReport = is_array($result) ? ($result['report'] ?? json_encode($result)) : (string) $result;
             $this->aiReportLoaded = true;
-        } catch (\Exception $e) {
-            Log::error('[SessionResultsPage] AI report failed', ['error' => $e->getMessage()]);
-            $this->aiReportError = 'Failed to generate AI report: ' . $e->getMessage();
+        } catch (\Throwable $exception) {
+            Log::error('[WorkgroupAI] Worker request failed', [
+                'operation' => 'session_results_executive_report',
+                'exception_type' => $exception::class,
+            ]);
+            $this->aiReportError = 'AI service request failed. Please try again later.';
             $this->aiReportLoaded = true;
         }
     }
@@ -335,31 +352,36 @@ class SessionResultsPage extends Page
     }
 
     /**
-     * Generate SAVER Executive Report via AI.
-     * Only available on the "Overall" view (selectedSessionId === null).
+     * Generate a session-scoped SAVER Executive Report via AI.
      */
     public function generateSaverReport(): void
     {
+        $session = $this->requireSelectedSession();
+        app(WorkgroupAccess::class)->requireManageSession($this->currentUser(), $session);
+
         $this->saverReportLoading = true;
         $this->saverReportError = null;
         $this->saverReportHtml = null;
 
         try {
-            $workgroup = Workgroup::first();
-            if (!$workgroup) {
+            $workgroup = $session->workgroup;
+            if (! ($workgroup instanceof Workgroup)) {
                 $this->saverReportError = 'No workgroup found.';
                 $this->saverReportLoading = false;
+
                 return;
             }
 
-            $session = $this->getSelectedSession();
             $aiService = app(WorkgroupAIService::class);
             $html = $aiService->generateSaverReport($workgroup, $session);
 
             $this->saverReportHtml = $html;
-        } catch (\Exception $e) {
-            Log::error('[SessionResultsPage] SAVER report failed', ['error' => $e->getMessage()]);
-            $this->saverReportError = 'Failed to generate report: ' . $e->getMessage();
+        } catch (\Throwable $exception) {
+            Log::error('[WorkgroupAI] Worker request failed', [
+                'operation' => 'session_results_saver_report',
+                'exception_type' => $exception::class,
+            ]);
+            $this->saverReportError = 'AI service request failed. Please try again later.';
         } finally {
             $this->saverReportLoading = false;
         }
@@ -403,29 +425,11 @@ class SessionResultsPage extends Page
     // ─── View Data (passed to blade) ────────────────────────────────
     protected function getViewData(): array
     {
-        $session = $this->getSelectedSession();
+        $session = $this->requireSelectedSession();
         $evalService = app(EvaluationService::class);
-        $allSessions = WorkgroupSession::orderBy('name')->get();
-        $workgroup = Workgroup::first();
-
-        if (!$session && $this->selectedSessionId !== null) {
-            // Selected a specific session ID that doesn't exist
-            return [
-                'session' => null,
-                'categoryResults' => collect(),
-                'progress' => null,
-                'sessions' => $allSessions,
-                'brandGroupedAnalysis' => [],
-                'workgroup' => $workgroup,
-                'comprehensiveResults' => [],
-                'competitorGroupRankings' => [],
-                'isolatedProducts' => [],
-                'nonRankableFeedback' => collect(),
-            ];
-        }
-
-        // session === null means "Overall Results" — pass null to get all data combined
-        $sessionId = $session?->id; // null = all sessions
+        $allSessions = $this->getAllSessions();
+        $workgroup = $session->workgroup;
+        $sessionId = $session->id;
 
         $results = $evalService->getSessionResults($sessionId);
         $progress = $evalService->getSessionProgress($sessionId);
@@ -436,7 +440,7 @@ class SessionResultsPage extends Page
         $isolatedProducts = [];
         $nonRankableFeedback = collect();
 
-        if ($workgroup) {
+        if ($workgroup instanceof Workgroup) {
             $comprehensiveResults = $evalService->getComprehensiveResults($workgroup, $session);
             $competitorGroupRankings = $comprehensiveResults['competitor_group_rankings'] ?? [];
             $isolatedProducts = $comprehensiveResults['isolated_products'] ?? [];
@@ -444,23 +448,23 @@ class SessionResultsPage extends Page
         }
 
         // Enhance category results with SAVER score breakdown
-        $categoryResults = collect($results['rankable_categories'])->map(function ($cat) use ($sessionId) {
+        $categoryResults = collect($results['rankable_categories'])->map(function ($cat) {
             $rankings = collect($cat['rankings'])->map(function ($item) {
                 $product = $item['product'];
                 $submissions = \App\Models\EvaluationSubmission::where('candidate_product_id', $product->id)
                     ->where('status', 'submitted')
-                    ->whereHas('member', fn($q) => $q->where('count_evaluations', true))
+                    ->whereHas('member', fn ($q) => $q->where('count_evaluations', true))
                     ->get();
 
                 return array_merge($item, [
-                    'capability_avg'     => $submissions->avg('capability_score'),
-                    'usability_avg'      => $submissions->avg('usability_score'),
-                    'affordability_avg'  => $submissions->avg('affordability_score'),
-                    'maintainability_avg'=> $submissions->avg('maintainability_score'),
-                    'deployability_avg'  => $submissions->avg('deployability_score'),
-                    'advance_yes'        => $submissions->where('advance_recommendation', 'yes')->count(),
-                    'advance_no'         => $submissions->where('advance_recommendation', 'no')->count(),
-                    'deal_breakers'      => $submissions->where('has_deal_breaker', true)->count(),
+                    'capability_avg' => $submissions->avg('capability_score'),
+                    'usability_avg' => $submissions->avg('usability_score'),
+                    'affordability_avg' => $submissions->avg('affordability_score'),
+                    'maintainability_avg' => $submissions->avg('maintainability_score'),
+                    'deployability_avg' => $submissions->avg('deployability_score'),
+                    'advance_yes' => $submissions->where('advance_recommendation', 'yes')->count(),
+                    'advance_no' => $submissions->where('advance_recommendation', 'no')->count(),
+                    'deal_breakers' => $submissions->where('has_deal_breaker', true)->count(),
                 ]);
             });
 
@@ -468,16 +472,16 @@ class SessionResultsPage extends Page
         });
 
         return [
-            'session'               => $session,
-            'categoryResults'       => $categoryResults,
-            'progress'              => $progress,
-            'sessions'              => $allSessions,
-            'brandGroupedAnalysis'  => $evalService->getBrandGroupedAnalysis($sessionId),
-            'workgroup'             => $workgroup,
-            'comprehensiveResults'  => $comprehensiveResults,
+            'session' => $session,
+            'categoryResults' => $categoryResults,
+            'progress' => $progress,
+            'sessions' => $allSessions,
+            'brandGroupedAnalysis' => $evalService->getBrandGroupedAnalysis($sessionId),
+            'workgroup' => $workgroup,
+            'comprehensiveResults' => $comprehensiveResults,
             'competitorGroupRankings' => $competitorGroupRankings,
-            'isolatedProducts'      => $isolatedProducts,
-            'nonRankableFeedback'   => $nonRankableFeedback instanceof \Illuminate\Support\Collection ? $nonRankableFeedback : collect($nonRankableFeedback),
+            'isolatedProducts' => $isolatedProducts,
+            'nonRankableFeedback' => $nonRankableFeedback instanceof \Illuminate\Support\Collection ? $nonRankableFeedback : collect($nonRankableFeedback),
             'granularToolGroupings' => $evalService->getGranularToolGroupings($sessionId),
         ];
     }
@@ -487,16 +491,51 @@ class SessionResultsPage extends Page
     {
         $user = Auth::user();
 
-        if (!$user) {
-            return false;
-        }
+        return $user instanceof User && app(WorkgroupAccess::class)->canEnterPanel($user);
+    }
 
-        if ($user->hasRole(['super_admin', 'admin', 'logistics_admin'])) {
-            return true;
-        }
+    public function canManageSelectedSession(): bool
+    {
+        $session = $this->getSelectedSession();
 
-        return WorkgroupMember::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->exists();
+        return $session !== null
+            && app(WorkgroupAccess::class)->canManageSession($this->currentUser(), $session);
+    }
+
+    private function assertSessionIsAccessible(?int $sessionId): void
+    {
+        abort_unless(
+            $sessionId !== null && $this->scopedSessions()->whereKey($sessionId)->exists(),
+            404,
+        );
+    }
+
+    private function requireSelectedSession(): WorkgroupSession
+    {
+        $session = $this->getSelectedSession();
+
+        abort_unless($session !== null, 404);
+
+        return $session;
+    }
+
+    /** @return Builder<WorkgroupSession> */
+    private function scopedSessions(): Builder
+    {
+        $user = $this->currentUser();
+        $workgroup = app(WorkgroupContext::class)->requireCurrent($user);
+
+        return app(WorkgroupAccess::class)
+            ->scopeSessions(WorkgroupSession::query(), $user)
+            ->where('workgroup_id', $workgroup->id);
+    }
+
+    private function currentUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless($user instanceof User, 404);
+
+        return $user;
     }
 }

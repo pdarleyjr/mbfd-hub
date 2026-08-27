@@ -7,13 +7,18 @@ use Tests\TestCase;
 
 class SecurityHardeningRoutesTest extends TestCase
 {
-    public function test_workgroup_export_and_report_routes_require_workgroup_access(): void
+    public function test_workgroup_export_and_report_routes_require_their_intended_workgroup_scope(): void
     {
-        $routeNames = [
+        $memberScopedRoutes = [
             'workgroup.file.download',
             'workgroup.file.preview',
             'workgroup.shared-upload.download',
             'workgroup.saver-report',
+            'workgroup.export.csv',
+            'reports.executive.pdf',
+            'reports.saver.pdf',
+        ];
+        $globalScopedRoutes = [
             'workgroup.analysis-report',
             'workgroup.data-dashboard',
             'workgroup.l1-inventory',
@@ -21,17 +26,22 @@ class SecurityHardeningRoutesTest extends TestCase
             'workgroup.evaluation-report',
             'workgroup.final-recommendations',
             'workgroup.workgroup-summary',
-            'workgroup.export.csv',
-            'reports.executive.pdf',
-            'reports.saver.pdf',
         ];
 
-        foreach ($routeNames as $routeName) {
+        foreach ($memberScopedRoutes as $routeName) {
             $route = Route::getRoutes()->getByName($routeName);
 
             $this->assertNotNull($route, "Route [{$routeName}] should exist.");
             $this->assertContains('auth', $route->gatherMiddleware(), "Route [{$routeName}] should require auth.");
             $this->assertContains('workgroup.access', $route->gatherMiddleware(), "Route [{$routeName}] should require workgroup access.");
+        }
+
+        foreach ($globalScopedRoutes as $routeName) {
+            $route = Route::getRoutes()->getByName($routeName);
+
+            $this->assertNotNull($route, "Route [{$routeName}] should exist.");
+            $this->assertContains('auth', $route->gatherMiddleware(), "Route [{$routeName}] should require auth.");
+            $this->assertContains('workgroup.global', $route->gatherMiddleware(), "Route [{$routeName}] should require explicit global workgroup access.");
         }
     }
 

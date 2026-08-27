@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Api;
 
 use App\Models\Apparatus;
+use App\Models\ApparatusDefect;
 use App\Models\Station;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -50,7 +51,13 @@ class PublicApparatusIndexRedactionTest extends TestCase
             'snipeit_asset_id' => 4242,
             'snipeit_asset_tag' => 'MBFD-SECRET-TAG',
             'current_location' => 'Secret Bay 3',
+            'last_pm_date' => '2026-08-01',
+            'last_pm_engine_hours' => 12.5,
+            'last_pm_mileage' => 4_000,
+            'current_engine_hours' => 18.5,
+            'current_miles' => 5_000,
             'status' => 'In Service',
+            'daily_checkout_requirement' => 'required',
             'notes' => 'SECRET apparatus maintenance note',
         ]);
     }
@@ -65,6 +72,7 @@ class PublicApparatusIndexRedactionTest extends TestCase
         $this->assertStringNotContainsString('MBFD-SECRET-TAG', $body);
         $this->assertStringNotContainsString('SECRET apparatus maintenance note', $body);
         $this->assertStringNotContainsString('Secret Bay 3', $body);
+        $this->assertStringNotContainsString('2026-08-01', $body);
 
         $row = $response->json('0');
         $this->assertArrayNotHasKey('vin', $row);
@@ -72,12 +80,18 @@ class PublicApparatusIndexRedactionTest extends TestCase
         $this->assertArrayNotHasKey('snipeit_asset_tag', $row);
         $this->assertArrayNotHasKey('notes', $row);
         $this->assertArrayNotHasKey('current_location', $row);
+        $this->assertArrayNotHasKey('station_id', $row);
+        $this->assertArrayNotHasKey('last_pm_date', $row);
+        $this->assertArrayNotHasKey('last_pm_engine_hours', $row);
+        $this->assertArrayNotHasKey('last_pm_mileage', $row);
 
         // Operational fields the daily-checkout UI relies on remain present.
         $this->assertArrayHasKey('id', $row);
         $this->assertArrayHasKey('status', $row);
-        $this->assertArrayHasKey('pm_health', $row);
+        $this->assertArrayHasKey('current_engine_hours', $row);
+        $this->assertArrayHasKey('current_miles', $row);
         $this->assertArrayHasKey('designation', $row);
+        $this->assertSame('required', $row['daily_checkout_requirement']);
     }
 
     public function test_public_apparatus_checklist_redacts_internal_fields(): void
@@ -94,8 +108,40 @@ class PublicApparatusIndexRedactionTest extends TestCase
         $this->assertArrayNotHasKey('vin', $apparatus);
         $this->assertArrayNotHasKey('snipeit_asset_id', $apparatus);
         $this->assertArrayNotHasKey('current_location', $apparatus);
+        $this->assertArrayNotHasKey('station_id', $apparatus);
+        $this->assertArrayNotHasKey('last_pm_date', $apparatus);
 
         // The checklist payload itself is still returned.
         $this->assertArrayHasKey('checklist', $response->json());
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', (string) $response->json('checklist_version'));
+    }
+
+    public function test_public_apparatus_checklist_only_exposes_an_open_defect_count(): void
+    {
+        ApparatusDefect::create([
+            'apparatus_id' => $this->apparatus->id,
+            'compartment' => 'Cab',
+            'item' => 'Flashlight',
+            'status' => 'Missing',
+            'issue_type' => 'missing',
+            'reported_date' => now()->toDateString(),
+            'notes' => 'SECRET defect note',
+            'photo_path' => 'defects/private-photo.png',
+            'resolution_notes' => 'SECRET resolution note',
+            'defect_history' => [['notes' => 'SECRET defect history']],
+            'resolved' => false,
+        ]);
+
+        $response = $this->getJson("/api/public/apparatuses/{$this->apparatus->id}/checklist");
+
+        $response->assertOk()
+            ->assertJsonPath('open_defects_count', 1);
+
+        $body = $response->getContent();
+        $this->assertStringNotContainsString('SECRET defect note', $body);
+        $this->assertStringNotContainsString('private-photo.png', $body);
+        $this->assertStringNotContainsString('SECRET resolution note', $body);
+        $this->assertStringNotContainsString('SECRET defect history', $body);
+        $this->assertArrayNotHasKey('open_defects', $response->json());
     }
 }

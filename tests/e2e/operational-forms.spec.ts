@@ -10,7 +10,7 @@ test('updated home exposes the exact operational destinations', async ({ page },
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Station / Vehicles / Equipment' })).toHaveAttribute('href', /\/daily\/stations$/);
   await expect(page.getByRole('link', { name: /Open operational forms/i })).toHaveAttribute('href', /\/employee\/forms$/);
-  await page.screenshot({ path: 'tests/e2e/screenshots/operational-forms-home-desktop.png', fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('operational-forms-home-desktop.png'), fullPage: true });
 });
 
 test('employee can enter the controlled forms workspace and start an ICS 214', async ({ page }, testInfo) => {
@@ -29,7 +29,7 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
   await expect(page.getByRole('link', { name: 'MBFD Hub home' })).toHaveAttribute('href', '/');
   await expect(page.getByText('ICS 214 — Activity Log')).toBeVisible();
   await expect(page.getByText(/FROC-LOG-001-FF/)).toBeVisible();
-  await page.screenshot({ path: `tests/e2e/screenshots/operational-forms-library-${testInfo.project.name}.png`, fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath(`operational-forms-library-${testInfo.project.name}.png`), fullPage: true });
 
   await page.locator('.of-form-card').filter({ hasText: 'ICS 214' }).getByRole('button', { name: 'Create form' }).click();
   await expect(page.getByText('Incident and operational period')).toBeVisible();
@@ -54,7 +54,7 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
     expect(viewportFit).toBe(true);
   }
   await expect(page.getByRole('button', { name: 'Generate PDF' })).toBeVisible();
-  await page.screenshot({ path: `tests/e2e/screenshots/operational-forms-ics-editor-${testInfo.project.name}.png`, fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath(`operational-forms-ics-editor-${testInfo.project.name}.png`), fullPage: true });
 });
 
 test('employee dashboard header returns members to the main MBFD Hub', async ({ page }, testInfo) => {
@@ -78,7 +78,7 @@ test('employee dashboard header returns members to the main MBFD Hub', async ({ 
   const target = await home.boundingBox();
   expect(target?.width).toBeGreaterThanOrEqual(44);
   expect(target?.height).toBeGreaterThanOrEqual(44);
-  await page.screenshot({ path: 'tests/e2e/screenshots/employee-dashboard-home-phone.png', fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('employee-dashboard-home-phone.png'), fullPage: true });
 });
 
 test('employee can submit an arbitrary completed file from the Forms library', async ({ page }, testInfo) => {
@@ -195,11 +195,11 @@ test('desktop employee previews a generated flattened ICS PDF', async ({ page },
   const seededRecord = page.locator('.of-record-table tbody tr').filter({ hasText: 'E2E Controlled ICS 214' });
   await seededRecord.getByRole('button', { name: /Open E2E Controlled ICS 214/ }).click();
   await expect(page.getByText('Latest controlled PDF')).toBeVisible();
-  await page.screenshot({ path: 'tests/e2e/screenshots/operational-forms-pdf-ready-desktop.png', fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('operational-forms-pdf-ready-desktop.png'), fullPage: true });
   await page.locator('.of-document-ready').getByRole('button', { name: 'View latest PDF', exact: true }).click();
   await expect(page.getByText('Page 1 of 1')).toBeVisible({ timeout: 15_000 });
   await expect.poll(() => page.locator('.of-preview-content canvas').evaluate((canvas: HTMLCanvasElement) => canvas.width)).toBeGreaterThan(500);
-  await page.screenshot({ path: 'tests/e2e/screenshots/operational-forms-pdf-preview-desktop.png', fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('operational-forms-pdf-preview-desktop.png'), fullPage: true });
 });
 
 test('admin Forms resource exposes separate controlled-form tabs', async ({ page }, testInfo) => {
@@ -216,5 +216,5 @@ test('admin Forms resource exposes separate controlled-form tabs', async ({ page
   await expect(page.getByText('Submitted files', { exact: true })).toBeVisible();
   await expect(page.getByText('E2E Controlled ICS 214')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: 'Delete' }).first()).toBeVisible();
-  await page.screenshot({ path: 'tests/e2e/screenshots/operational-forms-admin-tabs-desktop.png', fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('operational-forms-admin-tabs-desktop.png'), fullPage: true });
 });

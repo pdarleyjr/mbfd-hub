@@ -9,6 +9,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -18,6 +19,15 @@ use Tests\TestCase;
 class DisplaySnapshotTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $token = Str::random(48);
+        config(['services.display_api.token' => $token]);
+        $this->withHeader('X-Display-Token', $token);
+    }
 
     private function seedStationWithData(): Station
     {
@@ -36,9 +46,11 @@ class DisplaySnapshotTest extends TestCase
             'model' => 'Enforcer',
             'year' => 2020,
             'status' => 'In Service',
+            'daily_checkout_requirement' => 'required',
         ]);
 
         ApparatusInspection::create([
+            'client_submission_id' => (string) Str::uuid(),
             'apparatus_id' => $apparatus->id,
             'operator_name' => 'Jane Roe',
             'rank' => 'Lieutenant',
@@ -80,6 +92,20 @@ class DisplaySnapshotTest extends TestCase
                 'defects' => ['total_open', 'critical_missing', 'items'],
                 'submissions' => [
                     'inspections' => ['today', 'this_week', 'this_month', 'pending_review'],
+                    'daily_checkout' => [
+                        'required_total',
+                        'checked',
+                        'attention',
+                        'review_pending',
+                        'not_checked',
+                        'completed',
+                        'out_of_service',
+                        'exempt',
+                        'classification_required',
+                        'completion_percent',
+                        'completion_available',
+                        'matrix',
+                    ],
                     'station_inspections' => ['pending_review', 'pass_rate_30d'],
                     'inventory',
                 ],
@@ -124,6 +150,9 @@ class DisplaySnapshotTest extends TestCase
         $this->assertArrayHasKey('readiness_percent', $row);
         $this->assertArrayHasKey('readiness_status', $row);
         $this->assertArrayHasKey('readiness_reasons', $row);
+        $this->assertSame(4, $row['assigned_apparatus_count']);
+        $this->assertSame(1, $row['daily_checkout']['required_total']);
+        $this->assertSame(1, $row['daily_checkout']['completed']);
         $this->assertIsInt($row['readiness_percent']);
         $this->assertContains($row['readiness_status'], ['READY', 'ATTENTION', 'INCOMPLETE', 'CRITICAL', 'UNKNOWN']);
         $this->assertIsArray($row['readiness_reasons']);
@@ -149,13 +178,51 @@ class DisplaySnapshotTest extends TestCase
     public function test_station_detail_returns_counts_and_readiness(): void
     {
         $station = $this->seedStationWithData();
+        $apparatus = $station->apparatuses()->sole();
+
+        // This historical row has no durable client submission identifier.
+        // It must never inflate the canonical current-day checkout result.
+        ApparatusInspection::create([
+            'apparatus_id' => $apparatus->id,
+            'operator_name' => 'Historical Fixture',
+            'rank' => 'Firefighter',
+            'shift' => 'A-Day',
+            'review_status' => 'approved',
+            'completed_at' => now(),
+        ]);
 
         $data = $this->getJson("/api/display/stations/{$station->id}")->json();
 
         $this->assertSame($station->id, $data['station']['id']);
         $this->assertSame(1, $data['counts']['inspections_today']);
+        $this->assertSame(0, $data['counts']['daily_checkout']['checked']);
+        $this->assertSame(1, $data['counts']['daily_checkout']['attention']);
+        $this->assertSame(1, $data['counts']['daily_checkout']['completed']);
         $this->assertSame(1, $data['counts']['open_defects']);
         $this->assertArrayHasKey('readiness', $data);
+        $this->assertNotSame('READY', $data['readiness']['status']);
         $this->assertNotEmpty($data['readiness']['reasons']);
+    }
+
+    public function test_overview_checkout_ticker_uses_the_canonical_completed_count_not_raw_inspection_records(): void
+    {
+        $station = $this->seedStationWithData();
+        $apparatus = $station->apparatuses()->sole();
+
+        ApparatusInspection::create([
+            'apparatus_id' => $apparatus->id,
+            'operator_name' => 'Duplicate History',
+            'rank' => 'Firefighter',
+            'shift' => 'A-Day',
+            'review_status' => 'approved',
+            'completed_at' => now(),
+        ]);
+
+        $submissions = $this->getJson('/api/display/snapshot')->json('submissions');
+
+        $this->assertSame(1, $submissions['inspections']['today']);
+        $this->assertSame(1, $submissions['daily_checkout']['completed']);
+        $this->assertSame(1, $submissions['daily_checkout']['attention']);
+        $this->assertSame(1, $submissions['daily_checkout']['required_total']);
     }
 }

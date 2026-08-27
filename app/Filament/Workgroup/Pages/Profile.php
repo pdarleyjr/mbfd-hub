@@ -2,10 +2,12 @@
 
 namespace App\Filament\Workgroup\Pages;
 
+use App\Models\User;
 use App\Models\WorkgroupMember;
+use App\Support\Workgroups\WorkgroupAccess;
+use App\Support\Workgroups\WorkgroupContext;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
-use Filament\Support\Enums\Alignment;
 use Illuminate\Support\Facades\Auth;
 
 class Profile extends Page
@@ -15,10 +17,11 @@ class Profile extends Page
     protected static string $view = 'filament-workgroup.pages.profile';
 
     protected static ?string $title = 'Profile';
-    
+
     protected static ?string $navigationLabel = 'Profile';
 
     public ?string $name = '';
+
     public ?string $email = '';
 
     public function mount(): void
@@ -56,18 +59,19 @@ class Profile extends Page
     protected function getCurrentMember(): ?WorkgroupMember
     {
         $user = Auth::user();
-        
-        return WorkgroupMember::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->with(['workgroup'])
-            ->first();
+
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        return app(WorkgroupContext::class)->member($user)?->load('workgroup');
     }
 
     protected function updateProfile(array $data): void
     {
         $user = Auth::user();
-        
-        if (!$user) {
+
+        if (! $user) {
             return;
         }
 
@@ -75,5 +79,12 @@ class Profile extends Page
             'name' => $data['name'],
             'email' => $data['email'],
         ]);
+    }
+
+    public static function canAccess(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User && app(WorkgroupAccess::class)->canEnterPanel($user);
     }
 }

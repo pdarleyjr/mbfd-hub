@@ -13,7 +13,7 @@ namespace App\Services\Display;
  * and this class stays trivially testable.
  *
  * Weighting (sums to 100):
- *   - 40  apparatus checkout completeness (today's inspections / apparatus)
+ *   - 40  explicit Daily Checkout completion (checked + attention / required rigs)
  *   - 25  station inspection currency (passed within 30d)
  *   - 15  inverse of unresolved equipment-request load
  *   - 10  apparatus status / open-defect health (in-service ratio + penalty)
@@ -45,8 +45,12 @@ final class DisplayReadiness
      * @return array{percent: int, status: string, reasons: list<string>}
      */
     public static function compute(
-        int $apparatusCount,
-        int $inspectionsToday,
+        int $requiredApparatusCount,
+        int $checkedApparatusCount,
+        int $attentionApparatusCount,
+        int $reviewPendingApparatusCount,
+        int $notCheckedApparatusCount,
+        int $unknownApparatusCount,
         int $inServiceCount,
         int $outOfServiceCount,
         int $maintenanceCount,
@@ -60,8 +64,9 @@ final class DisplayReadiness
     ): array {
         $reasons = [];
 
-        // No apparatus and no station inspection signal => nothing to grade on.
-        if ($apparatusCount === 0 && $lastStationInspectionStatus === null) {
+        // No Daily Checkout policy signal and no station inspection signal =>
+        // nothing to grade on.
+        if ($requiredApparatusCount === 0 && $unknownApparatusCount === 0 && $lastStationInspectionStatus === null) {
             return [
                 'percent' => 0,
                 'status' => self::STATUS_UNKNOWN,
@@ -69,20 +74,63 @@ final class DisplayReadiness
             ];
         }
 
-        // 1. Apparatus checkout completeness (40).
-        if ($apparatusCount > 0) {
-            $ratio = min(1.0, $inspectionsToday / $apparatusCount);
+        // 1. Explicit Daily Checkout completion (40). A repeated submission
+        // is already collapsed to its apparatus identity by the compliance
+        // service before reaching this pure calculator. An approved checkout
+        // with an unresolved critical defect is `attention`: it is completed
+        // for the owner-approved Daily denominator, while the final readiness
+        // state below remains ATTENTION.
+        if ($requiredApparatusCount > 0) {
+            $completedApparatusCount = $checkedApparatusCount + $attentionApparatusCount;
+            $ratio = min(1.0, $completedApparatusCount / $requiredApparatusCount);
             $checkoutScore = self::W_CHECKOUT * $ratio;
             $reasons[] = sprintf(
-                '%d of %d apparatus checked out today',
-                min($inspectionsToday, $apparatusCount),
-                $apparatusCount
+                '%d of %d apparatus completed Daily Checkout',
+                min($completedApparatusCount, $requiredApparatusCount),
+                $requiredApparatusCount
             );
+        } elseif ($unknownApparatusCount > 0) {
+            // Missing policy classification must not silently receive the
+            // full checkout score.
+            $checkoutScore = 0.0;
         } else {
-            // No apparatus at this station: this dimension does not apply, award
-            // it fully so the station is not penalised for having no rigs.
+            // No apparatus explicitly requires Daily Checkout: this dimension
+            // does not apply, so do not penalise the station for that alone.
             $checkoutScore = self::W_CHECKOUT;
-            $reasons[] = 'No apparatus assigned to this station';
+            $reasons[] = 'No apparatus explicitly requires Daily Checkout';
+        }
+
+        if ($unknownApparatusCount > 0) {
+            $reasons[] = sprintf(
+                '%d apparatus %s daily checkout policy classification',
+                $unknownApparatusCount,
+                $unknownApparatusCount === 1 ? 'needs' : 'need'
+            );
+        }
+
+        if ($reviewPendingApparatusCount > 0) {
+            $reasons[] = sprintf(
+                '%d apparatus checkout%s require%s review',
+                $reviewPendingApparatusCount,
+                $reviewPendingApparatusCount === 1 ? '' : 's',
+                $reviewPendingApparatusCount === 1 ? 's' : ''
+            );
+        }
+
+        if ($attentionApparatusCount > 0) {
+            $reasons[] = sprintf(
+                '%d checked apparatus %s an unresolved critical defect',
+                $attentionApparatusCount,
+                $attentionApparatusCount === 1 ? 'has' : 'have'
+            );
+        }
+
+        if ($notCheckedApparatusCount > 0) {
+            $reasons[] = sprintf(
+                '%d required apparatus %s not checked today',
+                $notCheckedApparatusCount,
+                $notCheckedApparatusCount === 1 ? 'is' : 'are'
+            );
         }
 
         // 2. Station inspection currency (25).
@@ -124,8 +172,9 @@ final class DisplayReadiness
         }
 
         // 4. Apparatus status / open-defect health (10).
-        if ($apparatusCount > 0) {
-            $inServiceRatio = min(1.0, $inServiceCount / $apparatusCount);
+        $actualApparatusCount = $inServiceCount + $outOfServiceCount + $maintenanceCount;
+        if ($actualApparatusCount > 0) {
+            $inServiceRatio = min(1.0, $inServiceCount / $actualApparatusCount);
             $defectPenalty = min(0.5, ($openDefects * 0.05) + ($criticalDefects * 0.15));
             $statusScore = max(0.0, self::W_STATUS_DEFECTS * ($inServiceRatio - $defectPenalty));
         } else {
@@ -169,10 +218,23 @@ final class DisplayReadiness
         );
         $percent = max(0, min(100, $percent));
 
+        $status = self::statusForPercent($percent);
+        if (
+            $status === self::STATUS_READY
+            && (
+                $unknownApparatusCount > 0
+                || $attentionApparatusCount > 0
+                || $reviewPendingApparatusCount > 0
+                || $notCheckedApparatusCount > 0
+            )
+        ) {
+            $status = self::STATUS_ATTENTION;
+        }
+
         return [
             'percent' => $percent,
-            'status' => self::statusForPercent($percent),
-            'reasons' => array_values($reasons),
+            'status' => $status,
+            'reasons' => $reasons,
         ];
     }
 

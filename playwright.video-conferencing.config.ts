@@ -1,4 +1,7 @@
 import { defineConfig } from '@playwright/test';
+import { loopbackBaseUrl } from './tests/e2e/support/test-environment';
+
+const baseURL = loopbackBaseUrl('VIDEO_CONFERENCING_E2E_BASE_URL', 'http://127.0.0.1:8000');
 
 export default defineConfig({
     testDir: './tests/e2e/video-conferencing',
@@ -9,7 +12,7 @@ export default defineConfig({
     outputDir: 'test-results/video-conferencing',
     reporter: [['list'], ['html', { outputFolder: 'playwright-report/video-conferencing', open: 'never' }]],
     use: {
-        baseURL: process.env.VIDEO_CONFERENCING_E2E_BASE_URL ?? 'http://127.0.0.1:8000',
+        baseURL,
         viewport: { width: 1280, height: 900 },
         permissions: ['camera', 'microphone', 'local-network-access'],
         trace: 'retain-on-failure',

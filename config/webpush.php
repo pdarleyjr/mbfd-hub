@@ -14,6 +14,20 @@ return [
     ],
 
     /**
+     * Exact HTTPS delivery hosts accepted from browser PushSubscription data.
+     *
+     * Keep this empty until the service owner has approved the supported
+     * browser providers. The registration endpoint fails closed when there
+     * are no configured hosts; wildcard entries and URLs are never accepted.
+     *
+     * @var list<string>
+     */
+    'allowed_endpoint_hosts' => array_values(array_filter(array_map(
+        static fn (string $host): string => strtolower(trim($host)),
+        explode(',', (string) env('WEBPUSH_ALLOWED_ENDPOINT_HOSTS', '')),
+    ))),
+
+    /**
      * This is model that will be used to for push subscriptions.
      */
     'model' => \NotificationChannels\WebPush\PushSubscription::class,

@@ -1,11 +1,12 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router';
+import DailyCheckoutQueueProcessor from './components/DailyCheckoutQueueProcessor';
 import OfflineIndicator from './components/OfflineIndicator';
 import { IOSInstallPrompt } from './components/IOSInstallPrompt';
+import SuccessPage from './components/SuccessPage';
 
 const ApparatusList = lazy(() => import('./components/ApparatusList'));
 const InspectionWizard = lazy(() => import('./components/InspectionWizard'));
-const SuccessPage = lazy(() => import('./components/SuccessPage'));
 const StationListPage = lazy(() => import('./components/StationListPage'));
 const StationDetailPage = lazy(() => import('./components/StationDetailPage'));
 const RoomAssetTracker = lazy(() => import('./components/RoomAssetTracker'));
@@ -57,6 +58,7 @@ function App() {
         </a>
         <HomeNav />
         <OfflineIndicator />
+        <DailyCheckoutQueueProcessor />
         <IOSInstallPrompt />
         <main id="main-content" className="max-w-5xl mx-auto py-8 px-4">
           <Suspense fallback={<PageLoading />}>

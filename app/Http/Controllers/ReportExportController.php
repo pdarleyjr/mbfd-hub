@@ -1,55 +1,37 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\Workgroup;
-use App\Models\WorkgroupSession;
-use App\Services\Workgroup\WorkgroupAIService;
+use App\Support\Security\SafeHtml;
+use App\Support\Workgroups\WorkgroupReportSessionResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
 class ReportExportController extends Controller
 {
+    public function __construct(private readonly WorkgroupReportSessionResolver $sessions) {}
+
     /**
      * Export the AI Executive Report as PDF.
      */
     public function exportExecutiveReport(Request $request)
     {
-        $sessionId = $request->query('session_id');
-        $workgroup = Workgroup::first();
+        $session = $this->sessions->resolve($request);
+        $workgroup = $session->workgroup;
+        abort_unless($workgroup instanceof Workgroup, 404);
+        $cached = Cache::get("workgroup_ai_exec_report_{$session->id}");
+        $reportHtml = is_array($cached) ? ($cached['report'] ?? null) : $cached;
 
-        if (!$workgroup) {
-            abort(404, 'No workgroup found.');
-        }
+        abort_unless(is_string($reportHtml) && trim($reportHtml) !== '', 404);
 
-        $session = $sessionId ? WorkgroupSession::find($sessionId) : null;
+        $reportHtml = SafeHtml::report($reportHtml);
+        abort_unless($reportHtml !== '', 404);
 
-        // Try to get cached report first
-        $cacheKey = $session
-            ? "workgroup_ai_exec_report_{$session->id}"
-            : "workgroup_ai_exec_report_overall_{$workgroup->id}";
-        $cached = Cache::get($cacheKey);
-
-        $reportHtml = '';
-        if ($cached) {
-            $reportHtml = is_array($cached) ? ($cached['report'] ?? json_encode($cached)) : (string) $cached;
-        }
-
-        if (empty($reportHtml)) {
-            // Generate fresh if not cached
-            $aiService = app(WorkgroupAIService::class);
-            $result = $aiService->generateExecutiveReport($workgroup, $session);
-            $reportHtml = is_array($result) ? ($result['report'] ?? '') : (string) $result;
-        }
-
-        if (empty($reportHtml)) {
-            abort(404, 'No report content available. Generate the report first.');
-        }
-
-        $title = $session
-            ? "Executive Report — {$session->name}"
-            : "Executive Report — Overall Project Evaluation";
+        $title = "Executive Report — {$session->name}";
 
         $pdf = Pdf::loadView('filament.workgroup.pages.saver-report-pdf', [
             'title' => $title,
@@ -60,7 +42,8 @@ class ReportExportController extends Controller
 
         $pdf->setPaper('letter', 'portrait');
 
-        $filename = 'MBFD_Executive_Report_' . ($session ? $session->name : 'Overall') . '_' . now()->format('Y-m-d') . '.pdf';
+        $filename = 'MBFD_Executive_Report_'.$session->name.'_'.now()->format('Y-m-d').'.pdf';
+
         return $pdf->download($filename);
     }
 
@@ -69,33 +52,22 @@ class ReportExportController extends Controller
      */
     public function exportSaverReport(Request $request)
     {
-        $sessionId = $request->query('session_id');
-        $workgroup = Workgroup::first();
+        $session = $this->sessions->resolve($request);
+        $workgroup = $session->workgroup;
+        abort_unless($workgroup instanceof Workgroup, 404);
+        $reportHtml = Cache::get("workgroup_saver_report_{$session->workgroup_id}_{$session->id}");
 
-        if (!$workgroup) {
-            abort(404, 'No workgroup found.');
-        }
+        abort_unless(
+            is_string($reportHtml)
+            && trim($reportHtml) !== ''
+            && ! str_contains($reportHtml, 'text-red-600'),
+            404,
+        );
 
-        $session = $sessionId ? WorkgroupSession::find($sessionId) : null;
+        $reportHtml = SafeHtml::report($reportHtml);
+        abort_unless($reportHtml !== '', 404);
 
-        // Try cache first
-        $cached = Cache::get("workgroup_saver_report_{$workgroup->id}_{$session?->id}");
-
-        $reportHtml = $cached ?? '';
-
-        if (empty($reportHtml)) {
-            // Generate fresh
-            $aiService = app(WorkgroupAIService::class);
-            $reportHtml = $aiService->generateSaverReport($workgroup, $session);
-        }
-
-        if (empty($reportHtml) || str_contains($reportHtml, 'text-red-600')) {
-            abort(404, 'No SAVER report content available. Generate the report first.');
-        }
-
-        $title = $session
-            ? "SAVER Purchasing Report — {$session->name}"
-            : "SAVER Purchasing Report — All Sessions";
+        $title = "SAVER Purchasing Report — {$session->name}";
 
         $pdf = Pdf::loadView('filament.workgroup.pages.saver-report-pdf', [
             'title' => $title,
@@ -106,7 +78,8 @@ class ReportExportController extends Controller
 
         $pdf->setPaper('letter', 'portrait');
 
-        $filename = 'MBFD_SAVER_Report_' . ($session ? $session->name : 'Overall') . '_' . now()->format('Y-m-d') . '.pdf';
+        $filename = 'MBFD_SAVER_Report_'.$session->name.'_'.now()->format('Y-m-d').'.pdf';
+
         return $pdf->download($filename);
     }
 }

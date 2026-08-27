@@ -1,7 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use App\Enums\DailyCheckoutChecklistTemplate;
+use App\Enums\DailyCheckoutRequirement;
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,6 +33,8 @@ class Apparatus extends Model
         'model',
         'year',
         'status',
+        'daily_checkout_requirement',
+        'daily_checkout_template',
         'mileage',
         'last_service_date',
         'notes',
@@ -47,6 +55,8 @@ class Apparatus extends Model
     ];
 
     protected $casts = [
+        'daily_checkout_requirement' => DailyCheckoutRequirement::class,
+        'daily_checkout_template' => DailyCheckoutChecklistTemplate::class,
         'mileage' => 'decimal:2',
         'last_service_date' => 'date',
         'reported_at' => 'datetime',
@@ -75,6 +85,35 @@ class Apparatus extends Model
             if (empty($apparatus->slug) && ! empty($apparatus->designation)) {
                 $apparatus->slug = Str::slug($apparatus->designation);
             }
+        });
+
+        static::updated(function (Apparatus $apparatus): void {
+            if (! $apparatus->wasChanged('status')) {
+                return;
+            }
+
+            $previousStatus = $apparatus->getPrevious()['status'] ?? null;
+            $currentStatus = $apparatus->getAttribute('status');
+            if ($previousStatus === $currentStatus) {
+                return;
+            }
+
+            // The model's persisted updated_at is the authoritative event time.
+            // The event is inserted on the same connection/transaction, so an
+            // enclosing status-write rollback also rolls this ledger row back.
+            $updatedAt = $apparatus->getAttribute('updated_at');
+            $changedAt = $updatedAt instanceof DateTimeInterface
+                ? CarbonImmutable::instance($updatedAt)->utc()
+                : ($updatedAt !== null
+                    ? CarbonImmutable::parse((string) $updatedAt, config('app.timezone'))->utc()
+                    : now()->utc());
+
+            ApparatusOperationalStatusEvent::query()->create([
+                'apparatus_id' => $apparatus->getKey(),
+                'previous_status' => $previousStatus,
+                'status' => $currentStatus,
+                'changed_at' => $changedAt,
+            ]);
         });
     }
 
@@ -110,6 +149,14 @@ class Apparatus extends Model
     public function currentDefects()
     {
         return $this->openDefects();
+    }
+
+    /** @return HasMany<ApparatusOperationalStatusEvent, $this> */
+    public function operationalStatusEvents(): HasMany
+    {
+        return $this->hasMany(ApparatusOperationalStatusEvent::class)
+            ->orderBy('changed_at')
+            ->orderBy('id');
     }
 
     /**
@@ -213,5 +260,10 @@ class Apparatus extends Model
     public function isPmCritical(): bool
     {
         return $this->getHoursSinceLastPm() >= (($this->pm_interval_hours ?? 300) + 5);
+    }
+
+    public function isDailyCheckoutRequired(): bool
+    {
+        return $this->daily_checkout_requirement === DailyCheckoutRequirement::Required;
     }
 }

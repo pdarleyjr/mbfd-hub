@@ -122,6 +122,9 @@ class EmployeePanelProvider extends PanelProvider
                 Authenticate::class,
                 ForcePasswordChangeMiddleware::class,
             ])
+            ->persistentMiddleware([
+                ForcePasswordChangeMiddleware::class,
+            ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('60s')
             ->renderHook(

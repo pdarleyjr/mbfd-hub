@@ -30,9 +30,24 @@ class TrtInventorySession extends Model
      */
     public static function findOrCreateForToday(?int $trailerId = null): self
     {
-        return self::firstOrCreate([
-            'session_date' => now()->toDateString(),
+        $now = now();
+        $sessionDate = $now->toDateString();
+
+        self::query()->insertOrIgnore([
             'trailer_id' => $trailerId,
+            'session_date' => $sessionDate,
+            'created_at' => $now,
+            'updated_at' => $now,
         ]);
+
+        $query = self::query()->where('session_date', $sessionDate);
+
+        if ($trailerId === null) {
+            $query->whereNull('trailer_id');
+        } else {
+            $query->where('trailer_id', $trailerId);
+        }
+
+        return $query->sole();
     }
 }

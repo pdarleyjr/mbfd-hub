@@ -3,14 +3,15 @@
 namespace App\Filament\Workgroup\Pages;
 
 use App\Models\EvaluationSubmission;
+use App\Models\User;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupNote;
 use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
+use App\Support\Workgroups\WorkgroupAccess;
+use App\Support\Workgroups\WorkgroupContext;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Select;
 use Filament\Pages\Dashboard as BaseDashboard;
-use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -29,8 +30,15 @@ class Dashboard extends BaseDashboard
 
     public function mount(): void
     {
+        $user = $this->currentUser();
+        $requestedWorkgroupId = request()->integer('workgroup_id');
+
+        if ($requestedWorkgroupId > 0) {
+            app(WorkgroupContext::class)->select($user, $requestedWorkgroupId);
+        }
+
         $member = $this->getCurrentMember();
-        if (!$member) {
+        if (! $member) {
             return;
         }
 
@@ -40,13 +48,33 @@ class Dashboard extends BaseDashboard
         $this->selectedSessionId = $activeAttended?->id ?? $attended->first()?->id;
     }
 
+    public function selectWorkgroup(int $workgroupId): void
+    {
+        $context = app(WorkgroupContext::class);
+        $user = $this->currentUser();
+        $context->select($user, $workgroupId);
+        $member = $context->requireMember($user);
+        $sessions = $this->getAccessibleSessions($member);
+        $activeSession = $sessions->firstWhere('status', 'active');
+
+        $this->selectedSessionId = $activeSession?->id;
+        if ($this->selectedSessionId === null) {
+            $this->selectedSessionId = $sessions->first()?->id;
+        }
+    }
+
+    public function getAvailableWorkgroups(): \Illuminate\Support\Collection
+    {
+        return app(WorkgroupContext::class)->available($this->currentUser());
+    }
+
     /**
      * Get sessions accessible to this member
      * (admin/facilitator: all sessions; member: attended or submitted)
      */
     public function getAccessibleSessions(WorkgroupMember $member): \Illuminate\Support\Collection
     {
-        if (!$member->workgroup) {
+        if (! $member->workgroup) {
             return collect();
         }
 
@@ -80,10 +108,11 @@ class Dashboard extends BaseDashboard
 
     public function getSubheading(): ?string
     {
-        $session = $this->selectedSessionId ? WorkgroupSession::find($this->selectedSessionId) : null;
+        $session = $this->getSelectedAccessibleSession();
         if ($session) {
             return "Viewing: {$session->name} — Switch sessions using the buttons below.";
         }
+
         return 'Overview of your current workgroup, evaluations, and shared resources.';
     }
 
@@ -118,7 +147,7 @@ class Dashboard extends BaseDashboard
         $user = auth()->user();
         $workgroupMember = $this->getCurrentMember($user);
 
-        if (!$workgroupMember) {
+        if (! $workgroupMember) {
             return [
                 Stat::make('No Workgroup', 'Not assigned')
                     ->description('Contact administrator')
@@ -128,9 +157,9 @@ class Dashboard extends BaseDashboard
         }
 
         $workgroup = $workgroupMember->workgroup;
-        $session = $this->selectedSessionId ? WorkgroupSession::find($this->selectedSessionId) : null;
-        if (!$session) {
-            $session = $workgroup?->sessions()->active()->first();
+        $session = $this->getSelectedAccessibleSession();
+        if (! $session) {
+            $session = $this->getAccessibleSessions($workgroupMember)->first();
         }
 
         $assignedFilesCount = $workgroup?->files()->count() ?? 0;
@@ -181,19 +210,64 @@ class Dashboard extends BaseDashboard
     protected function getCurrentMember($user = null): ?WorkgroupMember
     {
         $user = $user ?? auth()->user();
+
+        if (! $user instanceof User) {
+            return null;
+        }
+
         return WorkgroupMember::where('user_id', $user->id)
             ->where('is_active', true)
             ->with('workgroup.sessions')
+            ->where('workgroup_id', app(WorkgroupContext::class)->current($user)?->id)
             ->first();
+    }
+
+    public function updatingSelectedSessionId(?int $sessionId): void
+    {
+        abort_unless(
+            $sessionId !== null && $this->getSelectedAccessibleSession($sessionId) !== null,
+            404,
+        );
+    }
+
+    private function getSelectedAccessibleSession(?int $sessionId = null): ?WorkgroupSession
+    {
+        $sessionId ??= $this->selectedSessionId;
+        $member = $this->getCurrentMember();
+
+        if ($sessionId === null || $member === null) {
+            return null;
+        }
+
+        return $this->getAccessibleSessions($member)->firstWhere('id', $sessionId);
     }
 
     protected function getPendingEvaluationsCount(WorkgroupMember $member, ?WorkgroupSession $session): int
     {
-        if (!$session) return 0;
+        if (! $session) {
+            return 0;
+        }
         $totalProducts = $session->candidateProducts()->count();
         $evaluatedProducts = EvaluationSubmission::where('workgroup_member_id', $member->id)
-            ->whereHas('candidateProduct', fn($q) => $q->where('workgroup_session_id', $session->id))
+            ->whereHas('candidateProduct', fn ($q) => $q->where('workgroup_session_id', $session->id))
             ->count();
+
         return max(0, $totalProducts - $evaluatedProducts);
+    }
+
+    public static function canAccess(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User && app(WorkgroupAccess::class)->canEnterPanel($user);
+    }
+
+    private function currentUser(): User
+    {
+        $user = Auth::user();
+
+        abort_unless($user instanceof User, 404);
+
+        return $user;
     }
 }

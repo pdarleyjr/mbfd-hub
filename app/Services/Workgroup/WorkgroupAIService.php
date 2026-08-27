@@ -8,11 +8,13 @@ use App\Models\Workgroup;
 use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
 use App\Support\Security\SafeHtml;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 /**
  * WorkgroupAIService
@@ -30,6 +32,8 @@ use Illuminate\Support\Facades\Storage;
 class WorkgroupAIService
 {
     private const CONFIGURATION_ERROR = 'AI service not configured. Set WORKGROUP_AI_ENABLED, WORKGROUP_AI_WORKER_URL, and WORKGROUP_AI_WORKER_SECRET in configuration.';
+
+    private const SERVICE_REQUEST_ERROR = 'AI service request failed. Please try again later.';
 
     protected bool $workerEnabled;
 
@@ -94,17 +98,13 @@ class WorkgroupAIService
                 return $response->json();
             }
 
-            Log::warning('[WorkgroupAI] Vectorize failed', [
-                'status' => $response->status(),
-                'filename' => $filename,
-                'body' => $response->body(),
-            ]);
+            $this->logWorkerFailure('vectorize', response: $response);
 
-            return ['success' => false, 'error' => "Worker returned {$response->status()}"];
-        } catch (\Exception $e) {
-            Log::error('[WorkgroupAI] Vectorize exception', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => self::SERVICE_REQUEST_ERROR];
+        } catch (Throwable $exception) {
+            $this->logWorkerFailure('vectorize', exception: $exception);
 
-            return ['success' => false, 'error' => $e->getMessage()];
+            return ['success' => false, 'error' => self::SERVICE_REQUEST_ERROR];
         }
     }
 
@@ -172,13 +172,10 @@ class WorkgroupAIService
                 'filename' => $filename,
             ];
 
-        } catch (\Exception $e) {
-            Log::error('[WorkgroupAI] Vectorize upload failed', [
-                'upload_id' => $upload->id,
-                'error' => $e->getMessage(),
-            ]);
+        } catch (Throwable $exception) {
+            $this->logWorkerFailure('vectorize_upload', exception: $exception);
 
-            return ['success' => false, 'error' => $e->getMessage()];
+            return ['success' => false, 'error' => self::SERVICE_REQUEST_ERROR];
         }
     }
 
@@ -228,17 +225,14 @@ class WorkgroupAIService
                     return $response->json();
                 }
 
-                Log::warning('[WorkgroupAI] Analyze failed', [
-                    'product_id' => $product->id,
-                    'status' => $response->status(),
-                ]);
+                $this->logWorkerFailure('analyze', response: $response);
 
-                return ['analysis' => null, 'error' => "Worker error: {$response->status()}"];
+                return ['analysis' => null, 'error' => self::SERVICE_REQUEST_ERROR];
 
-            } catch (\Exception $e) {
-                Log::error('[WorkgroupAI] Analyze exception', ['error' => $e->getMessage()]);
+            } catch (Throwable $exception) {
+                $this->logWorkerFailure('analyze', exception: $exception);
 
-                return ['analysis' => null, 'error' => $e->getMessage()];
+                return ['analysis' => null, 'error' => self::SERVICE_REQUEST_ERROR];
             }
         });
     }
@@ -271,11 +265,13 @@ class WorkgroupAIService
                     return $response->json();
                 }
 
-                return ['summary' => null, 'error' => "Worker error: {$response->status()}"];
-            } catch (\Exception $e) {
-                Log::error('[WorkgroupAI] Category summary exception', ['error' => $e->getMessage()]);
+                $this->logWorkerFailure('category_summary', response: $response);
 
-                return ['summary' => null, 'error' => $e->getMessage()];
+                return ['summary' => null, 'error' => self::SERVICE_REQUEST_ERROR];
+            } catch (Throwable $exception) {
+                $this->logWorkerFailure('category_summary', exception: $exception);
+
+                return ['summary' => null, 'error' => self::SERVICE_REQUEST_ERROR];
             }
         });
     }
@@ -326,11 +322,13 @@ class WorkgroupAIService
                 return $result;
             }
 
-            return ['report' => null, 'error' => "Worker error: {$response->status()}"];
-        } catch (\Exception $e) {
-            Log::error('[WorkgroupAI] Executive report exception', ['error' => $e->getMessage()]);
+            $this->logWorkerFailure('executive_report', response: $response);
 
-            return ['report' => null, 'error' => $e->getMessage()];
+            return ['report' => null, 'error' => self::SERVICE_REQUEST_ERROR];
+        } catch (Throwable $exception) {
+            $this->logWorkerFailure('executive_report', exception: $exception);
+
+            return ['report' => null, 'error' => self::SERVICE_REQUEST_ERROR];
         }
     }
 
@@ -387,16 +385,13 @@ class WorkgroupAIService
                 return '<p class="text-yellow-600">AI returned empty report. Try regenerating.</p>';
             }
 
-            Log::warning('[WorkgroupAI] SAVER report failed', [
-                'status' => $response->status(),
-                'body' => substr($response->body(), 0, 500),
-            ]);
+            $this->logWorkerFailure('saver_report', response: $response);
 
             // Fallback: try the general /analyze endpoint with the SAVER prompt
             return $this->generateSaverReportFallback($prompt, $workgroup, $session);
 
-        } catch (\Exception $e) {
-            Log::error('[WorkgroupAI] SAVER report exception', ['error' => $e->getMessage()]);
+        } catch (Throwable $exception) {
+            $this->logWorkerFailure('saver_report', exception: $exception);
 
             return $this->generateSaverReportFallback($prompt, $workgroup, $session);
         }
@@ -433,8 +428,10 @@ class WorkgroupAIService
                     return $html;
                 }
             }
-        } catch (\Exception $e) {
-            Log::error('[WorkgroupAI] SAVER fallback failed', ['error' => $e->getMessage()]);
+
+            $this->logWorkerFailure('saver_report_fallback', response: $response);
+        } catch (Throwable $exception) {
+            $this->logWorkerFailure('saver_report_fallback', exception: $exception);
         }
 
         return '<p class="text-red-600">Unable to generate SAVER report. The AI service may be temporarily unavailable. Please try again later.</p>';
@@ -999,6 +996,32 @@ class WorkgroupAIService
         }
 
         return $data;
+    }
+
+    private function logWorkerFailure(string $operation, ?Response $response = null, ?Throwable $exception = null): void
+    {
+        $context = ['operation' => $operation];
+
+        if ($response !== null) {
+            $context['status'] = $response->status();
+            $requestId = $response->header('X-Request-Id');
+            if ($requestId === '') {
+                $requestId = $response->header('X-Correlation-Id');
+            }
+
+            if ($requestId !== '') {
+                $context['request_id'] = $requestId;
+            }
+        }
+
+        if ($exception !== null) {
+            $context['exception_type'] = $exception::class;
+            Log::error('[WorkgroupAI] Worker request failed', $context);
+
+            return;
+        }
+
+        Log::warning('[WorkgroupAI] Worker request failed', $context);
     }
 
     /**

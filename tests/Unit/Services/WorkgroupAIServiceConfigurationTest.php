@@ -9,6 +9,7 @@ use App\Services\Workgroup\WorkgroupAIService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class WorkgroupAIServiceConfigurationTest extends TestCase
@@ -170,13 +171,72 @@ class WorkgroupAIServiceConfigurationTest extends TestCase
 
         $this->assertTrue(Http::getFacadeRoot()->preventingStrayRequests());
 
+        Log::spy();
+
         $result = (new WorkgroupAIService)->vectorizeTextChunk('Sensitive test text', 'specification.txt');
 
         $this->assertFalse($result['success']);
-        $this->assertSame(
-            'Attempted request to [https://workgroup-ai.example.test/vectorize] without a matching fake.',
-            $result['error'],
+        $this->assertSame('AI service request failed. Please try again later.', $result['error']);
+        Log::shouldHaveReceived('error')
+            ->once()
+            ->withArgs(
+                fn (string $message, array $context): bool => $message === '[WorkgroupAI] Worker request failed'
+                    && $context['operation'] === 'vectorize'
+                    && isset($context['exception_type'])
+                    && ! str_contains((string) json_encode($context), 'workgroup-ai.example.test'),
+            );
+    }
+
+    public function test_worker_failure_logs_only_structured_metadata_and_returns_a_safe_error(): void
+    {
+        $this->configureWorkgroupService(
+            enabled: true,
+            url: 'https://workgroup-ai.example.test',
+            secret: 'test-secret',
         );
+        $sensitiveResponse = 'private worker response: procurement document text';
+        Http::fake([
+            'https://workgroup-ai.example.test/vectorize' => Http::response($sensitiveResponse, 502, [
+                'X-Request-Id' => 'worker-request-123',
+            ]),
+        ]);
+        Log::spy();
+
+        $result = (new WorkgroupAIService)->vectorizeTextChunk('Sensitive test text', 'specification.txt');
+
+        $this->assertSame(['success' => false, 'error' => 'AI service request failed. Please try again later.'], $result);
+        Log::shouldHaveReceived('warning')
+            ->once()
+            ->with('[WorkgroupAI] Worker request failed', [
+                'operation' => 'vectorize',
+                'status' => 502,
+                'request_id' => 'worker-request-123',
+            ]);
+    }
+
+    public function test_worker_failure_uses_the_correlation_id_when_the_request_id_is_absent(): void
+    {
+        $this->configureWorkgroupService(
+            enabled: true,
+            url: 'https://workgroup-ai.example.test',
+            secret: 'test-secret',
+        );
+        Http::fake([
+            'https://workgroup-ai.example.test/vectorize' => Http::response('worker failure', 502, [
+                'X-Correlation-Id' => 'worker-correlation-456',
+            ]),
+        ]);
+        Log::spy();
+
+        (new WorkgroupAIService)->vectorizeTextChunk('Sensitive test text', 'specification.txt');
+
+        Log::shouldHaveReceived('warning')
+            ->once()
+            ->with('[WorkgroupAI] Worker request failed', [
+                'operation' => 'vectorize',
+                'status' => 502,
+                'request_id' => 'worker-correlation-456',
+            ]);
     }
 
     public function test_disabled_service_explains_the_complete_worker_configuration_contract(): void

@@ -3,13 +3,13 @@
 namespace App\Filament\Workgroup\Exports;
 
 use App\Models\CandidateProduct;
-use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupSession;
 use App\Services\Workgroup\WorkgroupAIService;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 /**
  * AI-Enhanced Evaluation Report Exporter
@@ -68,8 +68,7 @@ class WorkgroupAIReportExporter extends Exporter
             // Evaluation Stats
             ExportColumn::make('evaluator_count')
                 ->label('# Evaluators')
-                ->state(fn (CandidateProduct $record): int =>
-                    $record->submissions()->where('status', 'submitted')->count()
+                ->state(fn (CandidateProduct $record): int => $record->submissions()->where('status', 'submitted')->count()
                 ),
 
             ExportColumn::make('category_rank')
@@ -82,8 +81,7 @@ class WorkgroupAIReportExporter extends Exporter
 
             ExportColumn::make('deal_breaker_count')
                 ->label('Deal-Breaker Reports')
-                ->state(fn (CandidateProduct $record): int =>
-                    $record->submissions()->where('status', 'submitted')->where('has_deal_breaker', true)->count()
+                ->state(fn (CandidateProduct $record): int => $record->submissions()->where('status', 'submitted')->where('has_deal_breaker', true)->count()
                 ),
 
             // AI Analysis
@@ -116,50 +114,58 @@ class WorkgroupAIReportExporter extends Exporter
         $avg = $record->submissions()
             ->where('status', 'submitted')
             ->avg($field);
+
         return $avg !== null ? number_format((float) $avg, 2) : 'N/A';
     }
 
     protected static function getCategoryRank(CandidateProduct $record): string
     {
-        if (!$record->category_id) return 'N/A';
+        if (! $record->category_id) {
+            return 'N/A';
+        }
 
         // Get all products in same category, ordered by avg overall score
         $products = CandidateProduct::where('category_id', $record->category_id)
             ->where('workgroup_session_id', $record->workgroup_session_id)
-            ->with(['submissions' => fn($q) => $q->where('status', 'submitted')])
+            ->with(['submissions' => fn ($q) => $q->where('status', 'submitted')])
             ->get()
-            ->map(fn($p) => [
-                'id'  => $p->id,
+            ->map(fn ($p) => [
+                'id' => $p->id,
                 'avg' => $p->submissions->avg('overall_score') ?? 0,
             ])
             ->sortByDesc('avg')
             ->values();
 
-        $rank = $products->search(fn($item) => $item['id'] === $record->id);
-        return $rank !== false ? '#' . ($rank + 1) . ' of ' . $products->count() : 'N/A';
+        $rank = $products->search(fn ($item) => $item['id'] === $record->id);
+
+        return $rank !== false ? '#'.($rank + 1).' of '.$products->count() : 'N/A';
     }
 
     protected static function getFinalistVotes(CandidateProduct $record): string
     {
-        $total   = $record->submissions()->where('status', 'submitted')->count();
+        $total = $record->submissions()->where('status', 'submitted')->count();
         $advance = $record->submissions()->where('status', 'submitted')->where('advance_recommendation', 'yes')->count();
-        $maybe   = $record->submissions()->where('status', 'submitted')->where('advance_recommendation', 'maybe')->count();
+        $maybe = $record->submissions()->where('status', 'submitted')->where('advance_recommendation', 'maybe')->count();
 
-        if ($total === 0) return 'N/A';
-        return "Yes: {$advance}, Maybe: {$maybe}, No: " . ($total - $advance - $maybe) . " (of {$total} evaluators)";
+        if ($total === 0) {
+            return 'N/A';
+        }
+
+        return "Yes: {$advance}, Maybe: {$maybe}, No: ".($total - $advance - $maybe)." (of {$total} evaluators)";
     }
 
     protected static function getAISummary(CandidateProduct $record): string
     {
         // Check cache first (set by WorkgroupAIService::analyzeProduct)
         $cacheKey = "workgroup_ai_product_{$record->id}";
-        $cached   = Cache::get($cacheKey);
+        $cached = Cache::get($cacheKey);
 
-        if ($cached && !empty($cached['analysis'])) {
+        if ($cached && ! empty($cached['analysis'])) {
             // Strip markdown headers for cleaner CSV output
             $text = $cached['analysis'];
             $text = preg_replace('/^#{1,3}\s+/m', '', $text);
             $text = preg_replace('/\*\*(.*?)\*\*/', '$1', $text);
+
             return substr(trim($text), 0, 2000);
         }
 
@@ -171,20 +177,26 @@ class WorkgroupAIReportExporter extends Exporter
         }
 
         try {
-            $service  = app(WorkgroupAIService::class);
-            $result   = $service->analyzeProduct($record);
+            $service = app(WorkgroupAIService::class);
+            $result = $service->analyzeProduct($record);
             $analysis = $result['analysis'] ?? null;
 
-            if (!$analysis) {
-                return '[AI analysis unavailable: ' . ($result['error'] ?? 'unknown error') . ']';
+            if (! $analysis) {
+                return '[AI analysis unavailable: '.($result['error'] ?? 'unknown error').']';
             }
 
             // Strip markdown for cleaner spreadsheet output
             $analysis = preg_replace('/^#{1,3}\s+/m', '', $analysis);
             $analysis = preg_replace('/\*\*(.*?)\*\*/', '$1', $analysis);
+
             return substr(trim($analysis), 0, 2000);
-        } catch (\Exception $e) {
-            return '[AI analysis failed: ' . $e->getMessage() . ']';
+        } catch (\Throwable $exception) {
+            Log::warning('[WorkgroupAI] Worker request failed', [
+                'operation' => 'export_analysis',
+                'exception_type' => $exception::class,
+            ]);
+
+            return '[AI analysis unavailable]';
         }
     }
 
@@ -198,12 +210,14 @@ class WorkgroupAIReportExporter extends Exporter
         $texts = [];
         foreach ($submissions as $sub) {
             $narrative = $sub->narrative_payload ?? [];
-            if (!empty($narrative[$field])) {
+            if (! empty($narrative[$field])) {
                 $texts[] = trim($narrative[$field]);
             }
         }
 
-        if (empty($texts)) return '';
+        if (empty($texts)) {
+            return '';
+        }
 
         // Combine and deduplicate
         return implode(' | ', array_unique($texts));
@@ -211,10 +225,10 @@ class WorkgroupAIReportExporter extends Exporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'AI Evaluation Report export completed. ' . number_format($export->successful_rows) . ' products exported with AI analysis.';
+        $body = 'AI Evaluation Report export completed. '.number_format($export->successful_rows).' products exported with AI analysis.';
 
         if ($failedRowsCount = $export->getFailedRowsCount()) {
-            $body .= ' ' . number_format($failedRowsCount) . ' rows failed to export.';
+            $body .= ' '.number_format($failedRowsCount).' rows failed to export.';
         }
 
         return $body;
@@ -227,7 +241,7 @@ class WorkgroupAIReportExporter extends Exporter
     {
         $session = WorkgroupSession::active()->first();
 
-        if (!$session) {
+        if (! $session) {
             return CandidateProduct::query()->whereRaw('1 = 0');
         }
 
@@ -236,7 +250,7 @@ class WorkgroupAIReportExporter extends Exporter
             ->with([
                 'category',
                 'session',
-                'submissions' => fn($q) => $q->where('status', 'submitted'),
+                'submissions' => fn ($q) => $q->where('status', 'submitted'),
             ])
             ->orderBy('category_id')
             ->orderByRaw('(

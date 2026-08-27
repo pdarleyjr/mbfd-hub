@@ -30,6 +30,7 @@ class EvaluationService
     public function setMinimumResponseThreshold(int $threshold): self
     {
         $this->minimumResponseThreshold = $threshold;
+
         return $this;
     }
 
@@ -41,7 +42,7 @@ class EvaluationService
     public function calculateWeightedAverage(EvaluationSubmission $submission): ?float
     {
         $scores = $submission->scores()->with('criterion')->get();
-        
+
         if ($scores->isEmpty()) {
             return null;
         }
@@ -62,6 +63,7 @@ class EvaluationService
     public function calculateWeightedAverageById(int $submissionId): ?float
     {
         $submission = EvaluationSubmission::with('scores.criterion')->find($submissionId);
+
         return $submission ? $this->calculateWeightedAverage($submission) : null;
     }
 
@@ -70,9 +72,9 @@ class EvaluationService
         $query = CandidateProduct::where('category_id', $categoryId)
             ->with(['category', 'submissions' => function ($q) use ($sessionId) {
                 $q->where('status', 'submitted')
-                  ->whereHas('member', fn($mq) => $mq->where('count_evaluations', true));
+                    ->whereHas('member', fn ($mq) => $mq->where('count_evaluations', true));
                 if ($sessionId) {
-                    $q->whereHas('candidateProduct', fn($sq) => $sq->where('workgroup_session_id', $sessionId));
+                    $q->whereHas('candidateProduct', fn ($sq) => $sq->where('workgroup_session_id', $sessionId));
                 }
             }]);
 
@@ -83,12 +85,12 @@ class EvaluationService
         $products = $query->get();
 
         $rankings = $products->map(function ($product) {
-            $submittedSubmissions = $product->submissions->filter(fn($s) => $s->status === 'submitted');
+            $submittedSubmissions = $product->submissions->filter(fn ($s) => $s->status === 'submitted');
             $responseCount = $submittedSubmissions->count();
-            
+
             // Use pre-calculated rubric overall_score instead of legacy EvaluationScore relationship
-            $scores = $submittedSubmissions->map(fn($s) => $s->overall_score)->filter(fn($s) => $s !== null);
-            
+            $scores = $submittedSubmissions->map(fn ($s) => $s->overall_score)->filter(fn ($s) => $s !== null);
+
             if ($scores->isEmpty()) {
                 return [
                     'product' => $product,
@@ -116,7 +118,8 @@ class EvaluationService
     public function getTopProducts(int $categoryId, ?int $sessionId = null, int $limit = 2): Collection
     {
         $rankings = $this->getCategoryRankings($categoryId, $sessionId);
-        $eligibleProducts = $rankings->filter(fn($item) => $item['meets_threshold']);
+        $eligibleProducts = $rankings->filter(fn ($item) => $item['meets_threshold']);
+
         return $eligibleProducts->take($limit);
     }
 
@@ -127,7 +130,7 @@ class EvaluationService
 
         foreach ($rankableCategories as $category) {
             $topProducts = $this->getTopProducts($category->id, $sessionId, 2);
-            
+
             foreach ($topProducts as $index => $item) {
                 $finalists->push([
                     'category' => $category,
@@ -158,7 +161,7 @@ class EvaluationService
                 })->where('status', 'submitted')->with(['member.user', 'candidateProduct', 'comments'])->get();
 
             if ($submissions->isNotEmpty()) {
-                $categoryFeedback = $submissions->map(function ($submission) use ($category) {
+                $categoryFeedback = $submissions->map(function ($submission) {
                     return [
                         'submission_id' => $submission->id,
                         'evaluator' => $submission->member?->user?->name,
@@ -190,7 +193,7 @@ class EvaluationService
 
         foreach ($rankableCategories as $category) {
             $rankings = $this->getCategoryRankings($category->id, $sessionId);
-            $topProducts = $rankings->filter(fn($item) => $item['meets_threshold'])->take(2);
+            $topProducts = $rankings->filter(fn ($item) => $item['meets_threshold'])->take(2);
 
             $categoryRankings[] = [
                 'category' => $category,
@@ -199,7 +202,7 @@ class EvaluationService
                 'rankings' => $rankings,
                 'top_products' => $topProducts->values(),
                 'total_products' => $rankings->count(),
-                'eligible_products' => $rankings->filter(fn($item) => $item['meets_threshold'])->count(),
+                'eligible_products' => $rankings->filter(fn ($item) => $item['meets_threshold'])->count(),
             ];
         }
 
@@ -220,7 +223,7 @@ class EvaluationService
         if ($sessionId) {
             $query->where('workgroup_session_id', $sessionId);
         }
-        
+
         $totalProducts = $query->count();
 
         // When a specific session is requested, count only the members who
@@ -229,10 +232,14 @@ class EvaluationService
         // If no sessionId is provided (global view), fall back to all active
         // countable members.
         if ($sessionId) {
+            $workgroupId = WorkgroupSession::query()
+                ->whereKey($sessionId)
+                ->value('workgroup_id');
+
             $totalMembers = WorkgroupMember::where('is_active', true)
                 ->where('count_evaluations', true)
-                ->whereHas('sessionsAttended', fn($q) =>
-                    $q->where('workgroup_sessions.id', $sessionId)
+                ->where('workgroup_id', $workgroupId)
+                ->whereHas('sessionsAttended', fn ($q) => $q->where('workgroup_sessions.id', $sessionId)
                 )
                 ->count();
 
@@ -242,6 +249,7 @@ class EvaluationService
             if ($totalMembers === 0) {
                 $totalMembers = WorkgroupMember::where('is_active', true)
                     ->where('count_evaluations', true)
+                    ->where('workgroup_id', $workgroupId)
                     ->count();
             }
         } else {
@@ -286,7 +294,7 @@ class EvaluationService
 
             // Enforce attendance: only show products from sessions the member attended.
             // Members who already have submissions for this session retain access regardless.
-            if (!$this->canMemberAccessSession($member, $sessionId)) {
+            if (! $this->canMemberAccessSession($member, $sessionId)) {
                 return collect(); // No access — return empty list
             }
         }
@@ -307,6 +315,12 @@ class EvaluationService
      */
     public function canMemberAccessSession(WorkgroupMember $member, int $sessionId): bool
     {
+        $session = WorkgroupSession::find($sessionId);
+
+        if (! $member->is_active || $session === null || $session->workgroup_id !== $member->workgroup_id) {
+            return false;
+        }
+
         // Admins and facilitators always have access
         if (in_array($member->role, ['admin', 'facilitator'])) {
             return true;
@@ -325,7 +339,7 @@ class EvaluationService
         // Backfill safety: if the member already has any submission for this session
         // (e.g., historical data), grant read/edit access even if not in attendance table.
         $hasExistingSubmission = EvaluationSubmission::where('workgroup_member_id', $member->id)
-            ->whereHas('candidateProduct', fn($q) => $q->where('workgroup_session_id', $sessionId))
+            ->whereHas('candidateProduct', fn ($q) => $q->where('workgroup_session_id', $sessionId))
             ->exists();
 
         return $hasExistingSubmission;
@@ -333,14 +347,21 @@ class EvaluationService
 
     public function getOrCreateDraft(WorkgroupMember $member, int $productId): EvaluationSubmission
     {
+        $product = CandidateProduct::find($productId);
+
+        abort_unless(
+            $product !== null && $this->canMemberAccessSession($member, $product->workgroup_session_id),
+            404,
+        );
+
         $submission = EvaluationSubmission::where('workgroup_member_id', $member->id)
-            ->where('candidate_product_id', $productId)
+            ->where('candidate_product_id', $product->id)
             ->first(); // No status filter — find ANY existing submission (ERROR-010 fix)
 
-        if (!$submission) {
+        if (! $submission) {
             $submission = EvaluationSubmission::create([
                 'workgroup_member_id' => $member->id,
-                'candidate_product_id' => $productId,
+                'candidate_product_id' => $product->id,
                 'status' => 'draft',
             ]);
         }
@@ -363,15 +384,15 @@ class EvaluationService
     public function submitEvaluation(EvaluationSubmission $submission): EvaluationSubmission
     {
         $template = $submission->candidateProduct->category->templates()->active()->first();
-        
+
         if ($template) {
             $criteria = $template->criteria;
             $scores = $submission->scores;
             $scoredCriteriaIds = $scores->pluck('criterion_id')->toArray();
             $requiredCriteriaIds = $criteria->pluck('id')->toArray();
             $missingCriteria = array_diff($requiredCriteriaIds, $scoredCriteriaIds);
-            
-            if (!empty($missingCriteria)) {
+
+            if (! empty($missingCriteria)) {
                 throw new \Exception('Please complete all criteria before submitting.');
             }
         }
@@ -387,14 +408,14 @@ class EvaluationService
     public function getProductStats(int $productId): array
     {
         $product = CandidateProduct::with('category')->findOrFail($productId);
-        
+
         $submissions = $this->countableSubmissions()
             ->where('candidate_product_id', $productId)
             ->where('status', 'submitted')
             ->get();
 
         $responseCount = $submissions->count();
-        
+
         if ($responseCount === 0) {
             return [
                 'product' => $product,
@@ -407,8 +428,8 @@ class EvaluationService
         }
 
         // Use pre-calculated rubric overall_score instead of legacy EvaluationScore relationship
-        $scores = $submissions->map(fn($s) => $s->overall_score)->filter(fn($s) => $s !== null);
-        
+        $scores = $submissions->map(fn ($s) => $s->overall_score)->filter(fn ($s) => $s !== null);
+
         if ($scores->isEmpty()) {
             return [
                 'product' => $product,
@@ -427,8 +448,8 @@ class EvaluationService
             'product' => $product,
             'response_count' => $responseCount,
             'weighted_average' => $weightedAverage,
-            'min_score' => !empty($scoreValues) ? min($scoreValues) : null,
-            'max_score' => !empty($scoreValues) ? max($scoreValues) : null,
+            'min_score' => ! empty($scoreValues) ? min($scoreValues) : null,
+            'max_score' => ! empty($scoreValues) ? max($scoreValues) : null,
             'meets_threshold' => $responseCount >= $this->minimumResponseThreshold,
         ];
     }
@@ -450,7 +471,7 @@ class EvaluationService
      */
     public function getBrandGroupedAnalysis(?int $sessionId = null): array
     {
-        if (!$sessionId) {
+        if (! $sessionId) {
             return [];
         }
 
@@ -470,7 +491,7 @@ class EvaluationService
 
             // Group products by manufacturer
             $byManufacturer = $products->groupBy('manufacturer')
-                ->filter(fn($p) => $p->first()?->manufacturer); // skip null manufacturer
+                ->filter(fn ($p) => $p->first()?->manufacturer); // skip null manufacturer
 
             if ($byManufacturer->count() < 2) {
                 // Only one brand — no comparison needed
@@ -495,7 +516,7 @@ class EvaluationService
                         ->where('status', 'submitted')
                         ->get();
 
-                    $scores = $submissions->map(fn($s) => $s->overall_score)->filter(fn($s) => $s !== null);
+                    $scores = $submissions->map(fn ($s) => $s->overall_score)->filter(fn ($s) => $s !== null);
                     $avgScore = $scores->isNotEmpty() ? round($scores->avg(), 2) : null;
                     $responseCount = $submissions->count();
 
@@ -510,7 +531,7 @@ class EvaluationService
                 }
 
                 // Composite score = average of per-product averages (only include scored products)
-                $scoredProducts = array_filter($productScores, fn($p) => $p['avg_score'] !== null);
+                $scoredProducts = array_filter($productScores, fn ($p) => $p['avg_score'] !== null);
                 $compositeScore = count($scoredProducts) > 0
                     ? round(collect($scoredProducts)->avg('avg_score'), 2)
                     : null;
@@ -526,9 +547,16 @@ class EvaluationService
 
             // Sort by composite score descending, nulls last
             usort($brandRankings, function ($a, $b) {
-                if ($a['composite_score'] === null && $b['composite_score'] === null) return 0;
-                if ($a['composite_score'] === null) return 1;
-                if ($b['composite_score'] === null) return -1;
+                if ($a['composite_score'] === null && $b['composite_score'] === null) {
+                    return 0;
+                }
+                if ($a['composite_score'] === null) {
+                    return 1;
+                }
+                if ($b['composite_score'] === null) {
+                    return -1;
+                }
+
                 return $b['composite_score'] <=> $a['composite_score'];
             });
 
@@ -585,7 +613,7 @@ class EvaluationService
             }
 
             // Group by effective brand (brand ?? manufacturer)
-            $byBrand = $products->groupBy(fn($p) => $p->effective_brand ?? 'Unknown');
+            $byBrand = $products->groupBy(fn ($p) => $p->effective_brand ?? 'Unknown');
 
             if ($byBrand->count() < 2) {
                 continue; // No cross-brand comparison possible
@@ -603,7 +631,7 @@ class EvaluationService
                         ->where('status', 'submitted')
                         ->get();
 
-                    $scores = $submissions->pluck('overall_score')->filter(fn($s) => $s !== null);
+                    $scores = $submissions->pluck('overall_score')->filter(fn ($s) => $s !== null);
                     $avgScore = $scores->isNotEmpty() ? round($scores->avg(), 2) : null;
 
                     $productDetails[] = [
@@ -616,7 +644,7 @@ class EvaluationService
                     $allSubmissions = $allSubmissions->merge($submissions);
                 }
 
-                $scoredProducts = array_filter($productDetails, fn($p) => $p['avg_score'] !== null);
+                $scoredProducts = array_filter($productDetails, fn ($p) => $p['avg_score'] !== null);
                 $compositeScore = count($scoredProducts) > 0
                     ? round(collect($scoredProducts)->avg('avg_score'), 2)
                     : null;
@@ -634,7 +662,7 @@ class EvaluationService
             }
 
             // Sort by composite score descending, nulls last
-            usort($brandRankings, fn($a, $b) => $this->sortNullsLast($a['composite_score'], $b['composite_score']));
+            usort($brandRankings, fn ($a, $b) => $this->sortNullsLast($a['composite_score'], $b['composite_score']));
 
             $results[] = [
                 'category_name' => $category->name,
@@ -683,7 +711,7 @@ class EvaluationService
             }
 
             // Group by competitor_group — null groups become per-product isolates
-            $grouped = $products->groupBy(fn($p) => $p->competitor_group ?? 'ungrouped_' . $p->id);
+            $grouped = $products->groupBy(fn ($p) => $p->competitor_group ?? 'ungrouped_'.$p->id);
 
             $groups = [];
 
@@ -704,7 +732,7 @@ class EvaluationService
                         ->where('status', 'submitted')
                         ->get();
 
-                    $scores = $submissions->pluck('overall_score')->filter(fn($s) => $s !== null);
+                    $scores = $submissions->pluck('overall_score')->filter(fn ($s) => $s !== null);
                     $avgScore = $scores->isNotEmpty() ? round($scores->avg(), 2) : null;
 
                     $rankings[] = [
@@ -720,7 +748,7 @@ class EvaluationService
                 }
 
                 // Sort within group
-                usort($rankings, fn($a, $b) => $this->sortNullsLast($a['avg_score'], $b['avg_score']));
+                usort($rankings, fn ($a, $b) => $this->sortNullsLast($a['avg_score'], $b['avg_score']));
 
                 $groups[$groupKey] = [
                     'group_name' => $groupProducts->first()->competitor_group ?? $groupKey,
@@ -729,7 +757,7 @@ class EvaluationService
                 ];
             }
 
-            if (!empty($groups)) {
+            if (! empty($groups)) {
                 $results[] = [
                     'category_name' => $category->name,
                     'category_id' => $category->id,
@@ -782,7 +810,7 @@ class EvaluationService
                 $isOnlyUngrouped = $product->competitor_group === null
                     && $products->where('competitor_group', null)->count() === 1;
 
-                if (!$isStandalone && !$isOnlyUngrouped) {
+                if (! $isStandalone && ! $isOnlyUngrouped) {
                     continue;
                 }
 
@@ -791,7 +819,7 @@ class EvaluationService
                     ->where('status', 'submitted')
                     ->get();
 
-                $scores = $submissions->pluck('overall_score')->filter(fn($s) => $s !== null);
+                $scores = $submissions->pluck('overall_score')->filter(fn ($s) => $s !== null);
                 $avgScore = $scores->isNotEmpty() ? round($scores->avg(), 2) : null;
 
                 $isolated[] = [
@@ -902,7 +930,7 @@ class EvaluationService
                 ->where('status', 'submitted')
                 ->get();
 
-            $scores = $submissions->pluck('overall_score')->filter(fn($s) => $s !== null);
+            $scores = $submissions->pluck('overall_score')->filter(fn ($s) => $s !== null);
             $avgScore = $scores->isNotEmpty() ? round($scores->avg(), 2) : null;
 
             return [
@@ -926,7 +954,7 @@ class EvaluationService
 
         // Helper: filter products by keyword in name (case-insensitive)
         $filterByKeyword = function (Collection $products, string $keyword) {
-            return $products->filter(fn($p) => str_contains(strtolower($p->name), strtolower($keyword)));
+            return $products->filter(fn ($p) => str_contains(strtolower($p->name), strtolower($keyword)));
         };
 
         // Helper: rank a collection of scored products by avg_score desc
@@ -943,16 +971,14 @@ class EvaluationService
             ->merge($filterByKeyword($allProducts, 'saw'))
             ->unique('id');
         // Exclude anything that looks like a "cutter" (extrication cutter, not saw)
-        $cutoffSawProducts = $cutoffSawProducts->reject(fn($p) =>
-            str_contains(strtolower($p->name), 'cutter') ||
+        $cutoffSawProducts = $cutoffSawProducts->reject(fn ($p) => str_contains(strtolower($p->name), 'cutter') ||
             str_contains(strtolower($p->name), 'spreader') ||
             str_contains(strtolower($p->name), 'ram')
         );
         $cutoffSaws = $rankProducts($cutoffSawProducts);
 
         // 2. T1 Standalone
-        $t1Products = $allProducts->filter(fn($p) =>
-            preg_match('/\bT[\s-]?1\b/i', $p->name) ||
+        $t1Products = $allProducts->filter(fn ($p) => preg_match('/\bT[\s-]?1\b/i', $p->name) ||
             strtolower(trim($p->name)) === 't1'
         );
         $t1Standalone = $t1Products->isNotEmpty()
@@ -964,8 +990,11 @@ class EvaluationService
         $extricationProducts = $allProducts->filter(function ($p) use ($extricationKeywords) {
             $name = strtolower($p->name);
             foreach ($extricationKeywords as $kw) {
-                if (str_contains($name, $kw)) return true;
+                if (str_contains($name, $kw)) {
+                    return true;
+                }
             }
+
             return false;
         });
 
@@ -980,7 +1009,7 @@ class EvaluationService
 
         // 7. Brand Overall Summary (extrication brands)
         $brandOverall = [];
-        $extricationByBrand = $extricationProducts->groupBy(fn($p) => $p->effective_brand ?? 'Unknown');
+        $extricationByBrand = $extricationProducts->groupBy(fn ($p) => $p->effective_brand ?? 'Unknown');
         foreach ($extricationByBrand as $brand => $brandProducts) {
             $allSubmissions = collect();
             $toolCount = $brandProducts->count();
@@ -992,12 +1021,12 @@ class EvaluationService
                     ->where('status', 'submitted')
                     ->get();
 
-                $scores = $submissions->pluck('overall_score')->filter(fn($s) => $s !== null);
+                $scores = $submissions->pluck('overall_score')->filter(fn ($s) => $s !== null);
                 $productScores[] = $scores->isNotEmpty() ? $scores->avg() : null;
                 $allSubmissions = $allSubmissions->merge($submissions);
             }
 
-            $scoredProducts = array_filter($productScores, fn($s) => $s !== null);
+            $scoredProducts = array_filter($productScores, fn ($s) => $s !== null);
             $overallAvg = count($scoredProducts) > 0 ? round(array_sum($scoredProducts) / count($scoredProducts), 2) : null;
 
             $brandOverall[] = [
@@ -1008,7 +1037,7 @@ class EvaluationService
             ];
         }
         // Sort by overall_avg desc, nulls last
-        usort($brandOverall, fn($a, $b) => $this->sortNullsLast($a['overall_avg'], $b['overall_avg']));
+        usort($brandOverall, fn ($a, $b) => $this->sortNullsLast($a['overall_avg'], $b['overall_avg']));
         // Assign rank
         foreach ($brandOverall as $i => &$b) {
             $b['rank'] = $i + 1;
@@ -1072,7 +1101,8 @@ class EvaluationService
      */
     private function safeAvg(Collection $items, string $field): ?float
     {
-        $values = $items->pluck($field)->filter(fn($v) => $v !== null);
+        $values = $items->pluck($field)->filter(fn ($v) => $v !== null);
+
         return $values->isNotEmpty() ? round($values->avg(), 2) : null;
     }
 
@@ -1081,9 +1111,16 @@ class EvaluationService
      */
     private function sortNullsLast(?float $a, ?float $b): int
     {
-        if ($a === null && $b === null) return 0;
-        if ($a === null) return 1;
-        if ($b === null) return -1;
+        if ($a === null && $b === null) {
+            return 0;
+        }
+        if ($a === null) {
+            return 1;
+        }
+        if ($b === null) {
+            return -1;
+        }
+
         return $b <=> $a;
     }
 }
