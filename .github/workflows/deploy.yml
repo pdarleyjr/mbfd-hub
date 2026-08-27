@@ -170,7 +170,7 @@ jobs:
           umask 077
           docker exec "$HUB_PG_CONTAINER" pg_dump -U "$HUB_PG_USER" -Fc "$HUB_PG_DATABASE" > "$BACKUP_FILE"
           test -s "$BACKUP_FILE"
-          docker exec -i "$HUB_PG_CONTAINER" pg_restore --list - < "$BACKUP_FILE" > /dev/null
+          docker exec -i "$HUB_PG_CONTAINER" pg_restore --list < "$BACKUP_FILE" > /dev/null
            BACKUP_SHA256="$(sha256sum "$BACKUP_FILE" | awk '{print $1}')"
            printf 'release_sha=%s\nprevious_sha=%s\ncreated_at=%s\nbackup_file=%s\nsha256=%s\n' \
              "$RELEASE_SHA" "$PREVIOUS_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BACKUP_FILE" "$BACKUP_SHA256" > "$HUB_BACKUP_DIR/$BACKUP_ID.metadata"

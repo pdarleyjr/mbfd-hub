@@ -199,6 +199,7 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(databaseBackup, /pg_dump/);
   assert.match(databaseBackup, /test -s/);
   assert.match(databaseBackup, /pg_restore --list/);
+  assert.doesNotMatch(databaseBackup, /pg_restore --list\s+-\s*</);
   assert.match(databaseBackup, /sha256sum/);
   assert.match(databaseBackup, /BACKUP_FILE="\$HUB_BACKUP_DIR\//);
   assert.doesNotMatch(databaseBackup, /BACKUP_DIR=\/var\/lib\/postgresql\/data/);
