@@ -183,16 +183,24 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(databaseBackup, /HUB_PG_USER=mbfd_user/);
   assert.match(databaseBackup, /HUB_BACKUP_DIR/);
   assert.match(databaseBackup, /PG_DATA_SOURCE/);
-  assert.match(databaseBackup, /PG_DATA_SOURCE_REAL="\$\(realpath -e -- "\$PG_DATA_SOURCE"\)"/);
-  assert.match(databaseBackup, /HUB_BACKUP_DIR_REAL="\$\(realpath -e -- "\$HUB_BACKUP_DIR"\)"/);
+  assert.match(databaseBackup, /BACKUP_PATH_HELPER_IMAGE=sail-8\.5\/app/);
+  assert.match(databaseBackup, /docker run --rm --network none --pull=never/);
+  assert.match(databaseBackup, /--read-only --cap-drop=ALL/);
+  assert.match(databaseBackup, /--mount type=bind,src=\/mnt,dst=\/host-mnt,readonly/);
+  assert.match(databaseBackup, /PG_DATA_SOURCE_IN_HELPER/);
+  assert.match(databaseBackup, /HUB_BACKUP_DIR_IN_HELPER/);
+  assert.match(databaseBackup, /realpath -e -- "\$1"/);
+  assert.match(databaseBackup, /realpath -e -- "\$2"/);
   assert.match(databaseBackup, /case "\$HUB_BACKUP_DIR_REAL" in/);
   assert.match(databaseBackup, /"\$PG_DATA_SOURCE_REAL"\|"\$PG_DATA_SOURCE_REAL"\/\*\)/);
+  assert.doesNotMatch(databaseBackup, /PG_DATA_SOURCE_REAL="\$\(realpath -e -- "\$PG_DATA_SOURCE"\)"/);
+  assert.doesNotMatch(databaseBackup, /HUB_BACKUP_DIR_REAL="\$\(realpath -e -- "\$HUB_BACKUP_DIR"\)"/);
   assert.match(databaseBackup, /docker inspect/);
   assert.match(databaseBackup, /pg_dump/);
   assert.match(databaseBackup, /test -s/);
   assert.match(databaseBackup, /pg_restore --list/);
   assert.match(databaseBackup, /sha256sum/);
-  assert.match(databaseBackup, /BACKUP_FILE="\$HUB_BACKUP_DIR_REAL\//);
+  assert.match(databaseBackup, /BACKUP_FILE="\$HUB_BACKUP_DIR\//);
   assert.doesNotMatch(databaseBackup, /BACKUP_DIR=\/var\/lib\/postgresql\/data/);
 
   const maintenance = workflowStep(deployment, "Enter maintenance mode and verify queue safety");
