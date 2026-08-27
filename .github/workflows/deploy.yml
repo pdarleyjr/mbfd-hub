@@ -133,28 +133,47 @@ jobs:
            esac
            PG_DATA_SOURCE="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Source}}{{end}}{{end}}' "$HUB_PG_CONTAINER")"
            test -n "$PG_DATA_SOURCE"
-           PG_DATA_SOURCE_REAL="$(realpath -e -- "$PG_DATA_SOURCE")"
-           HUB_BACKUP_DIR_REAL="$(realpath -e -- "$HUB_BACKUP_DIR")"
-           case "$HUB_BACKUP_DIR_REAL" in
-             "$PG_DATA_SOURCE_REAL"|"$PG_DATA_SOURCE_REAL"/*)
-               echo 'Hub backup storage resolves inside the PostgreSQL data source.' >&2
+           BACKUP_PATH_HELPER_IMAGE=sail-8.5/app
+           case "$PG_DATA_SOURCE" in
+             /mnt/*) PG_DATA_SOURCE_IN_HELPER="/host-mnt/${PG_DATA_SOURCE#/mnt/}" ;;
+             *)
+               echo 'Hub PostgreSQL data source must be mounted below /mnt for isolated path validation.' >&2
                exit 1
                ;;
            esac
-           test -d "$HUB_BACKUP_DIR_REAL"
-           test -w "$HUB_BACKUP_DIR_REAL"
+           case "$HUB_BACKUP_DIR" in
+             /mnt/*) HUB_BACKUP_DIR_IN_HELPER="/host-mnt/${HUB_BACKUP_DIR#/mnt/}" ;;
+             *)
+               echo 'Hub backup storage must be mounted below /mnt for isolated path validation.' >&2
+               exit 1
+               ;;
+           esac
+           docker run --rm --network none --pull=never --read-only --cap-drop=ALL --entrypoint sh \
+             --mount type=bind,src=/mnt,dst=/host-mnt,readonly \
+             "$BACKUP_PATH_HELPER_IMAGE" -euc '
+               PG_DATA_SOURCE_REAL="$(realpath -e -- "$1")"
+               HUB_BACKUP_DIR_REAL="$(realpath -e -- "$2")"
+               case "$HUB_BACKUP_DIR_REAL" in
+                 "$PG_DATA_SOURCE_REAL"|"$PG_DATA_SOURCE_REAL"/*)
+                   echo "Hub backup storage resolves inside the PostgreSQL data source." >&2
+                   exit 1
+                   ;;
+               esac
+             ' sh "$PG_DATA_SOURCE_IN_HELPER" "$HUB_BACKUP_DIR_IN_HELPER"
+           test -d "$HUB_BACKUP_DIR"
+           test -w "$HUB_BACKUP_DIR"
 
            cd "$HUB_CHECKOUT"
            PREVIOUS_SHA="$(git rev-parse HEAD)"
            BACKUP_ID="mbfd-hub-pre-activation-$(date -u +%Y%m%dT%H%M%SZ)-$RELEASE_SHA"
-           BACKUP_FILE="$HUB_BACKUP_DIR_REAL/$BACKUP_ID.dump"
+           BACKUP_FILE="$HUB_BACKUP_DIR/$BACKUP_ID.dump"
           umask 077
           docker exec "$HUB_PG_CONTAINER" pg_dump -U "$HUB_PG_USER" -Fc "$HUB_PG_DATABASE" > "$BACKUP_FILE"
           test -s "$BACKUP_FILE"
           docker exec -i "$HUB_PG_CONTAINER" pg_restore --list - < "$BACKUP_FILE" > /dev/null
            BACKUP_SHA256="$(sha256sum "$BACKUP_FILE" | awk '{print $1}')"
            printf 'release_sha=%s\nprevious_sha=%s\ncreated_at=%s\nbackup_file=%s\nsha256=%s\n' \
-             "$RELEASE_SHA" "$PREVIOUS_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BACKUP_FILE" "$BACKUP_SHA256" > "$HUB_BACKUP_DIR_REAL/$BACKUP_ID.metadata"
+             "$RELEASE_SHA" "$PREVIOUS_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BACKUP_FILE" "$BACKUP_SHA256" > "$HUB_BACKUP_DIR/$BACKUP_ID.metadata"
           echo "Verified Hub backup: $BACKUP_FILE sha256=$BACKUP_SHA256"
           REMOTE
 
