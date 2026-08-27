@@ -2,10 +2,11 @@
 
 namespace App\Filament\Resources\Workgroup;
 
-use App\Filament\Resources\Workgroup\Pages;
 use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
+use App\Models\User;
 use App\Models\WorkgroupSession;
+use App\Support\Workgroups\WorkgroupAccess;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -50,7 +51,7 @@ class CandidateProductResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('workgroup_session_id')
                             ->label('Session')
-                            ->options(fn () => WorkgroupSession::orderBy('name')->pluck('name', 'id'))
+                            ->options(fn () => self::access()->scopeManageSessions(WorkgroupSession::query(), self::currentUser())->orderBy('name')->pluck('name', 'id'))
                             ->searchable()
                             ->required(),
                         Forms\Components\Select::make('category_id')
@@ -128,7 +129,7 @@ class CandidateProductResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('workgroup_session_id')
                     ->label('Session')
-                    ->options(fn () => WorkgroupSession::pluck('name', 'id')),
+                    ->options(fn () => self::access()->scopeSessions(WorkgroupSession::query(), self::currentUser())->pluck('name', 'id')),
                 Tables\Filters\SelectFilter::make('category_id')
                     ->label('Category')
                     ->options(fn () => EvaluationCategory::pluck('name', 'id')),
@@ -157,21 +158,55 @@ class CandidateProductResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentUser();
+
+        return $user !== null && self::access()->canEnterPanel($user);
     }
 
     public static function canCreate(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentUser();
+
+        return $user !== null && self::access()->canManageAnyWorkgroup($user);
     }
 
     public static function canEdit($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentUser();
+
+        return $user !== null
+            && $record instanceof CandidateProduct
+            && self::access()->canManageCandidateProduct($user, $record);
     }
 
     public static function canDelete($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        return self::canEdit($record);
+    }
+
+    public static function canView($record): bool
+    {
+        $user = self::currentUser();
+
+        return $user !== null
+            && $record instanceof CandidateProduct
+            && self::access()->canViewCandidateProduct($user, $record);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return self::access()->scopeCandidateProducts(parent::getEloquentQuery(), self::currentUser());
+    }
+
+    private static function access(): WorkgroupAccess
+    {
+        return app(WorkgroupAccess::class);
+    }
+
+    private static function currentUser(): ?User
+    {
+        $user = auth()->user();
+
+        return $user instanceof User ? $user : null;
     }
 }

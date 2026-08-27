@@ -1,245 +1,263 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
+use App\Enums\DailyCheckoutRequirement;
 use App\Http\Controllers\Controller;
-use App\Jobs\AuditEquipmentAfterInspection;
-use App\Jobs\PmAlertNotificationJob;
+use App\Http\Resources\Public\PublicApparatusResource;
 use App\Models\Apparatus;
-use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\Employee;
+use App\Models\User;
+use App\Services\ApparatusInspectionApprovalService;
+use App\Services\DailyCheckoutChecklistResolver;
+use App\Services\Display\DisplaySnapshotService;
 use App\Support\Security\Base64Image;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ApparatusController extends Controller
 {
-    public function index()
+    public function index(): JsonResponse
     {
-        // Internal/identifying fields are redacted from this public (unauthenticated)
-        // endpoint. The daily-checkout SPA only needs operational/status fields; VIN,
-        // Snipe-IT asset identifiers, internal notes, and physical location are not
-        // exposed to anonymous callers.
-        $hidden = ['vin', 'snipeit_asset_id', 'snipeit_asset_tag', 'notes', 'current_location'];
+        $apparatuses = Apparatus::query()
+            ->where('daily_checkout_requirement', DailyCheckoutRequirement::Required->value)
+            ->get();
 
-        $apparatuses = Apparatus::all()->map(function ($apparatus) use ($hidden) {
-            $data = $apparatus->toArray();
-            $data['pm_health'] = $apparatus->getPmHealthStatus();
-
-            foreach ($hidden as $key) {
-                unset($data[$key]);
-            }
-
-            return $data;
-        });
-
-        return response()->json($apparatuses);
+        return response()->json(PublicApparatusResource::collection($apparatuses)->resolve(request()));
     }
 
-    public function checklist($id)
+    public function checklist(int $id, DailyCheckoutChecklistResolver $checklistResolver): JsonResponse
     {
         $apparatus = Apparatus::findOrFail($id);
 
-        // Determine checklist file based on apparatus type and designation
-        $checklistType = 'default';
-        if ($apparatus->type) {
-            $type = strtolower($apparatus->type);
-            if (str_contains($type, 'engine')) {
-                // E2 has specialized equipment (Paratech, TNT tools, etc.)
-                $designation = strtolower($apparatus->designation ?? '');
-                $name = strtolower($apparatus->name ?? '');
-                if (preg_match('/e\s*2\b/', $designation) || preg_match('/e\s*2\b/', $name)) {
-                    $checklistType = 'engine2';
-                } else {
-                    $checklistType = 'engine';
-                }
-            } elseif (str_contains($type, 'ladder')) {
-                // Use designation to differentiate ladder types
-                // L 3 -> ladder3, all others (L 1, L 11) -> ladder1
-                $designation = strtolower($apparatus->designation ?? '');
-                $name = strtolower($apparatus->name ?? '');
-                if (preg_match('/l\s*3\b/', $designation) || preg_match('/l\s*3\b/', $name)) {
-                    $checklistType = 'ladder3';
-                } else {
-                    $checklistType = 'ladder1';
-                }
-            } elseif (str_contains($type, 'rescue')) {
-                $checklistType = 'rescue';
-            }
+        if (! $apparatus->isDailyCheckoutRequired()) {
+            return response()->json([
+                'message' => 'This apparatus is not configured for Daily Checkout.',
+            ], 409);
         }
 
-        // Load checklist JSON from storage
-        $checklistPath = storage_path("app/checklists/{$checklistType}_checklist.json");
+        $resolution = $checklistResolver->resolve($apparatus);
+        if (! $resolution['usable']) {
+            Log::warning('Daily Checkout checklist resolution failed.', [
+                'apparatus_id' => $apparatus->id,
+                'checklist_type' => $resolution['checklist_type'],
+                'reason' => $resolution['error'],
+            ]);
 
-        // Fallback to default if specific checklist does not exist
-        if (! file_exists($checklistPath)) {
-            $checklistPath = storage_path('app/checklists/default_checklist.json');
+            return response()->json([
+                'message' => 'The Daily Checkout checklist is unavailable. Contact an officer before continuing.',
+                'code' => 'DAILY_CHECKOUT_CHECKLIST_UNAVAILABLE',
+            ], 503);
         }
 
-        $checklist = [];
-        if (file_exists($checklistPath)) {
-            $checklist = json_decode(file_get_contents($checklistPath), true);
-        }
-
-        // Redact internal/identifying apparatus fields from this public endpoint.
-        $apparatusData = $apparatus->toArray();
-        foreach (['vin', 'snipeit_asset_id', 'snipeit_asset_tag', 'notes', 'current_location'] as $key) {
-            unset($apparatusData[$key]);
-        }
+        $checklist = $resolution['checklist'];
 
         return response()->json([
-            'apparatus' => $apparatusData,
+            'apparatus' => (new PublicApparatusResource($apparatus))->resolve(request()),
             'checklist' => $checklist,
-            'open_defects' => $apparatus->openDefects,
+            'checklist_version' => $resolution['checklist_version'],
+            'checklist_type' => $resolution['checklist_type'],
+            'checklist_item_count' => $resolution['item_count'],
+            // This unauthenticated route only needs a warning count. Never
+            // serialize defect notes, photos, resolution history, or paths.
+            'open_defects_count' => $apparatus->openDefects()->count(),
         ]);
     }
 
-    public function storeInspection(Request $request, $id)
-    {
+    public function storeInspection(
+        Request $request,
+        int $id,
+        DailyCheckoutChecklistResolver $checklistResolver,
+    ): JsonResponse {
         $validated = $request->validate([
-            'operator_name' => 'required|string|max:255',
-            'rank' => 'required|string|max:100',
-            'shift' => 'nullable|string|max:20',
-            'unit_number' => 'nullable|string|max:100',
-            'engine_hours' => 'nullable|numeric|min:0',
-            'miles' => 'nullable|integer|min:0',
-            'compartments' => 'nullable|array',
-            'defects' => 'nullable|array',
-            'defects.*.compartment' => 'required|string',
-            'defects.*.item' => 'required|string',
-            'defects.*.status' => 'required|string|in:Present,Missing,Damaged',
-            'defects.*.notes' => 'nullable|string',
-            'defects.*.photo' => 'nullable|string|max:7000000',
-            'officer_signature' => 'nullable|string|max:7000000',
-            'employee_id' => 'nullable|integer|exists:employees,id',
+            'client_submission_id' => ['required', 'uuid'],
+            'checklist_version' => ['required', 'string', 'regex:/\\A[a-f0-9]{64}\\z/i'],
+            'operator_name' => ['required', 'string', 'max:255'],
+            'rank' => ['required', 'string', 'max:100'],
+            'shift' => ['nullable', 'string', 'max:20'],
+            'unit_number' => ['nullable', 'string', 'max:100'],
+            'engine_hours' => ['nullable', 'numeric', 'min:0'],
+            'miles' => ['nullable', 'integer', 'min:0'],
+            'compartments' => ['required', 'array', 'min:1'],
+            'compartments.*' => ['required', 'array'],
+            'compartments.*.id' => ['required', 'string', 'max:255'],
+            'compartments.*.name' => ['required', 'string', 'max:255'],
+            'compartments.*.items' => ['required', 'array', 'min:1'],
+            'compartments.*.items.*' => ['required', 'array'],
+            'compartments.*.items.*.name' => ['required', 'string', 'max:255'],
+            'compartments.*.items.*.status' => ['required', 'string', 'in:Present,Missing,Damaged'],
+            'compartments.*.items.*.notes' => ['nullable', 'string', 'max:2000'],
+            'defects' => ['nullable', 'array', 'max:100'],
+            'defects.*.compartment' => ['required', 'string', 'max:255'],
+            'defects.*.item' => ['required', 'string', 'max:255'],
+            'defects.*.status' => ['required', 'string', 'in:Missing,Damaged'],
+            'defects.*.notes' => ['nullable', 'string', 'max:2000'],
+            'defects.*.photo' => ['nullable', 'string', 'max:7000000'],
+            'officer_signature' => ['nullable', 'string', 'max:7000000'],
+            'employee_id' => ['nullable', 'integer', 'exists:employees,id'],
         ]);
+
+        $clientSubmissionId = (string) $validated['client_submission_id'];
+        $validated['checklist_version'] = strtolower((string) $validated['checklist_version']);
+        $submissionPayloadHash = $this->submissionPayloadHash($validated);
+        $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId);
+        if ($existing !== null) {
+            return $this->idempotentInspectionResponse($existing, $id, $submissionPayloadHash);
+        }
 
         $apparatus = Apparatus::findOrFail($id);
-
-        // Save officer signature if provided
-        $signaturePath = null;
-        if ($request->officer_signature) {
-            $signaturePath = $this->storeImageOrFail(
-                $request->officer_signature,
-                'signatures',
-                'signature',
-                'officer_signature'
-            );
+        if (! $apparatus->isDailyCheckoutRequired()) {
+            return response()->json([
+                'message' => 'This apparatus is not configured for Daily Checkout.',
+            ], 409);
         }
 
-        // Resolve employee_id if provided
-        $employeeId = $request->employee_id;
+        $resolution = $checklistResolver->resolve($apparatus);
+        if (! $resolution['usable']) {
+            Log::warning('Daily Checkout checklist resolution failed during submission.', [
+                'apparatus_id' => $apparatus->id,
+                'checklist_type' => $resolution['checklist_type'],
+                'reason' => $resolution['error'],
+            ]);
 
-        // The client may display a unit number, but the persisted identity must
-        // always come from the apparatus selected by its unique route ID.
-        $today = now()->format('Y-m-d');
-        $designation = $apparatus->designation ?? $apparatus->name ?? 'UNK';
-        $designationTag = preg_replace('/[^A-Z0-9]/i', '', $designation);
+            return response()->json([
+                'message' => 'The Daily Checkout checklist is unavailable. Contact an officer before continuing.',
+                'code' => 'DAILY_CHECKOUT_CHECKLIST_UNAVAILABLE',
+            ], 503);
+        }
 
-        $inspection = ApparatusInspection::create([
-            'apparatus_id' => $apparatus->id,
-            'operator_name' => $validated['operator_name'],
-            'rank' => $validated['rank'],
-            'shift' => $validated['shift'] ?? null,
-            'unit_number' => $apparatus->vehicle_number,
-            'engine_hours' => $validated['engine_hours'] ?? null,
-            'miles' => $validated['miles'] ?? null,
-            'vehicle_number' => $apparatus->vehicle_number,
-            'designation_at_time' => $apparatus->designation,
-            'results' => $validated['compartments'] ?? null,
-            'officer_signature' => $signaturePath,
-            'employee_id' => $employeeId,
-            'review_status' => 'approved',
-            'completed_at' => now(),
-        ]);
+        if (! hash_equals((string) $resolution['checklist_version'], $validated['checklist_version'])) {
+            return $this->checklistVersionMismatchResponse((string) $resolution['checklist_version']);
+        }
 
-        // The database ID is concurrency-safe, unlike a daily count. The unique
-        // index makes the invariant explicit for imports and future writers too.
-        $inspectionRef = "INS-{$designationTag}-{$today}-".str_pad((string) $inspection->id, 6, '0', STR_PAD_LEFT);
-        $inspection->update(['inspection_reference' => $inspectionRef]);
+        $this->validateCompleteChecklist($validated, $resolution['checklist']);
 
-        // Track if any critical defects found
-        $hasCriticalDefects = false;
+        $storedPaths = [];
+        try {
+            $prepared = $this->prepareImages($validated, $storedPaths);
+            $result = DB::transaction(function () use ($id, $clientSubmissionId, $prepared, $checklistResolver, $submissionPayloadHash): array {
+                $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId, true);
+                if ($existing !== null) {
+                    return ['inspection' => $existing, 'created' => false];
+                }
 
-        foreach ($request->defects ?? [] as $defectData) {
-            $photoPath = null;
+                $lockedApparatus = $this->lockApparatusForInspection($id);
+                if (! $lockedApparatus->isDailyCheckoutRequired()) {
+                    abort(409, 'This apparatus is not configured for Daily Checkout.');
+                }
 
-            if (! empty($defectData['photo'])) {
-                $photoPath = $this->storeImageOrFail(
-                    $defectData['photo'],
-                    'defects',
-                    'defect',
-                    'defects.photo'
-                );
+                $lockedResolution = $checklistResolver->resolve($lockedApparatus);
+                if (! $lockedResolution['usable']) {
+                    Log::warning('Daily Checkout checklist resolution failed after apparatus lock.', [
+                        'apparatus_id' => $lockedApparatus->id,
+                        'checklist_type' => $lockedResolution['checklist_type'],
+                        'reason' => $lockedResolution['error'],
+                    ]);
+
+                    abort(503, 'The Daily Checkout checklist is unavailable. Contact an officer before continuing.');
+                }
+
+                if (! hash_equals((string) $lockedResolution['checklist_version'], (string) $prepared['checklist_version'])) {
+                    return [
+                        'inspection' => null,
+                        'created' => false,
+                        'checklist_version_mismatch' => true,
+                        'checklist_version' => $lockedResolution['checklist_version'],
+                    ];
+                }
+                $this->validateCompleteChecklist($prepared, $lockedResolution['checklist']);
+
+                // The client may display a unit number, but the persisted identity must
+                // always come from the apparatus selected by its unique route ID.
+                $today = now()->format('Y-m-d');
+                $designation = $lockedApparatus->designation ?? $lockedApparatus->name ?? 'UNK';
+                $designationTag = preg_replace('/[^A-Z0-9]/i', '', $designation) ?: 'UNK';
+                $hasCriticalDefects = false;
+                foreach ($prepared['defects'] ?? [] as $defectData) {
+                    if (in_array($defectData['status'], ['Missing', 'Damaged'], true)) {
+                        $hasCriticalDefects = true;
+                    }
+                }
+
+                $inspection = $this->createInspection([
+                    'client_submission_id' => $clientSubmissionId,
+                    'submission_payload_hash' => $submissionPayloadHash,
+                    'checklist_version' => $lockedResolution['checklist_version'],
+                    'apparatus_id' => $lockedApparatus->id,
+                    'operator_name' => $prepared['operator_name'],
+                    'rank' => $prepared['rank'],
+                    'shift' => $prepared['shift'] ?? null,
+                    'unit_number' => $lockedApparatus->vehicle_number,
+                    'engine_hours' => $prepared['engine_hours'] ?? null,
+                    'miles' => $prepared['miles'] ?? null,
+                    'vehicle_number' => $lockedApparatus->vehicle_number,
+                    'designation_at_time' => $lockedApparatus->designation,
+                    'results' => $prepared['compartments'] ?? null,
+                    'officer_signature' => $prepared['officer_signature_path'] ?? null,
+                    'employee_id' => $prepared['employee_id'] ?? null,
+                    // The public route has no authenticated device or user context.
+                    // Retain its validated evidence, but never apply operational
+                    // effects until an authorized reviewer approves it.
+                    'pending_effects' => [
+                        'defects' => $prepared['defects'] ?? [],
+                        'has_critical_defects' => $hasCriticalDefects,
+                    ],
+                    'review_status' => 'pending_review',
+                    'completed_at' => now(),
+                ]);
+
+                $inspectionRef = "INS-{$designationTag}-{$today}-".str_pad((string) $inspection->id, 6, '0', STR_PAD_LEFT);
+                $inspection->update(['inspection_reference' => $inspectionRef]);
+
+                DB::afterCommit(function (): void {
+                    $this->forgetDisplayReadModels();
+                });
+
+                return ['inspection' => $inspection, 'created' => true];
+            }, 3);
+
+            if (($result['checklist_version_mismatch'] ?? false) === true) {
+                $this->deleteStoredPaths($storedPaths);
+
+                return $this->checklistVersionMismatchResponse((string) $result['checklist_version']);
             }
 
-            // Check for critical defects (Missing or Damaged)
-            if (in_array($defectData['status'], ['Missing', 'Damaged'])) {
-                $hasCriticalDefects = true;
+            /** @var ApparatusInspection $inspection */
+            $inspection = $result['inspection'];
+            if (! $result['created']) {
+                $this->deleteStoredPaths($storedPaths);
+
+                return $this->idempotentInspectionResponse($inspection, $id, $submissionPayloadHash);
             }
 
-            ApparatusDefect::recordDefect(
-                $apparatus->id,
-                $defectData['compartment'],
-                $defectData['item'],
-                $defectData['status'],
-                $defectData['notes'] ?? null,
-                $photoPath,
-                $inspection->id,
-            );
-        }
-
-        // SECURITY (H-01): a public, unauthenticated submission must NOT directly
-        // drive an apparatus Out of Service. When critical defects are reported,
-        // hold the inspection for review instead of mutating operational status.
-        // An authorized user applies the out-of-service hold via approve().
-        if ($hasCriticalDefects) {
-            $inspection->update(['review_status' => 'pending_review']);
-        }
-
-        // Update meter readings with positive increment validation
-        if ($request->has('engine_hours') && $request->engine_hours !== null) {
-            $newHours = floatval($request->engine_hours);
-            $currentHours = floatval($apparatus->current_engine_hours ?? 0);
-
-            // Only update if new value is greater (positive increment)
-            if ($newHours > $currentHours) {
-                $apparatus->current_engine_hours = $newHours;
+            return response()->json($this->inspectionReceipt($inspection), 201);
+        } catch (QueryException $exception) {
+            $this->deleteStoredPaths($storedPaths);
+            if (! $this->isClientSubmissionIdUniqueConstraintViolation($exception)) {
+                throw $exception;
             }
-        }
 
-        if ($request->has('miles') && $request->miles !== null) {
-            $newMiles = intval($request->miles);
-            $currentMiles = intval($apparatus->current_miles ?? 0);
-
-            // Only update if new value is greater (positive increment)
-            if ($newMiles > $currentMiles) {
-                $apparatus->current_miles = $newMiles;
+            $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId);
+            if ($existing !== null) {
+                return $this->idempotentInspectionResponse($existing, $id, $submissionPayloadHash);
             }
+
+            throw $exception;
+        } catch (Throwable $exception) {
+            $this->deleteStoredPaths($storedPaths);
+
+            throw $exception;
         }
-
-        // Save apparatus if meter data was updated
-        if ($apparatus->isDirty('current_engine_hours') || $apparatus->isDirty('current_miles')) {
-            // Capture PM status BEFORE saving to detect threshold crossings
-            $previousHealth = $apparatus->getOriginal('current_engine_hours')
-                ? (new Apparatus(array_merge($apparatus->getOriginal(), ['current_engine_hours' => $apparatus->getOriginal('current_engine_hours')])))->getPmHealthStatus()['status']
-                : 'green';
-
-            $apparatus->reported_at = now();
-            $apparatus->save();
-
-            // Dispatch PM alert check (async) after saving new meter readings
-            PmAlertNotificationJob::dispatch($apparatus->id, $previousHealth);
-        }
-
-        // Dispatch Snipe-IT equipment audit job (async — does not slow the form)
-        if ($apparatus->snipeit_asset_id) {
-            AuditEquipmentAfterInspection::dispatch($inspection->id, $apparatus->id)
-                ->delay(now()->addSeconds(5));
-        }
-
-        return response()->json($inspection->load('apparatus'), 201);
     }
 
     /**
@@ -250,19 +268,41 @@ class ApparatusController extends Controller
      * submission endpoint records the inspection as 'pending_review'; an
      * authorized reviewer confirms it here, which applies the operational hold.
      */
-    public function approveInspection(Request $request, $id)
-    {
-        $inspection = ApparatusInspection::with('apparatus')->findOrFail($id);
+    public function approveInspection(
+        Request $request,
+        ApparatusInspection $inspection,
+        ApparatusInspectionApprovalService $approvalService,
+    ): JsonResponse {
+        $reviewer = $request->user();
+        abort_unless($reviewer instanceof User && $reviewer->can('approve', $inspection), 403);
 
-        if ($inspection->review_status === 'pending_review') {
-            $apparatus = $inspection->apparatus;
+        $inspection = $approvalService->approve((int) $inspection->getKey(), $reviewer);
 
-            if ($apparatus !== null && $apparatus->status !== 'Out of Service') {
-                $apparatus->update(['status' => 'Out of Service']);
-            }
-        }
+        return response()->json($inspection->fresh()->load('apparatus'));
+    }
 
-        $inspection->update(['review_status' => 'approved']);
+    /**
+     * Reject a pending-review inspection without applying any reported
+     * apparatus effects. A reviewer note is retained in the append-only
+     * decision history with the authenticated actor.
+     */
+    public function rejectInspection(
+        Request $request,
+        ApparatusInspection $inspection,
+        ApparatusInspectionApprovalService $approvalService,
+    ): JsonResponse {
+        $reviewer = $request->user();
+        abort_unless($reviewer instanceof User && $reviewer->can('reject', $inspection), 403);
+
+        $validated = $request->validate([
+            'review_notes' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $inspection = $approvalService->reject(
+            (int) $inspection->getKey(),
+            $reviewer,
+            trim($validated['review_notes']),
+        );
 
         return response()->json($inspection->fresh()->load('apparatus'));
     }
@@ -281,6 +321,141 @@ class ApparatusController extends Controller
         return response()->json($employees);
     }
 
+    private function findInspectionByClientSubmissionId(string $clientSubmissionId, bool $lock = false): ?ApparatusInspection
+    {
+        $query = ApparatusInspection::query()->where('client_submission_id', $clientSubmissionId);
+
+        return ($lock ? $query->lockForUpdate() : $query)->first();
+    }
+
+    /** @param array<string, mixed> $attributes */
+    protected function createInspection(array $attributes): ApparatusInspection
+    {
+        return ApparatusInspection::query()->create($attributes);
+    }
+
+    protected function lockApparatusForInspection(int $id): Apparatus
+    {
+        return Apparatus::query()->lockForUpdate()->findOrFail($id);
+    }
+
+    private function checklistVersionMismatchResponse(string $currentChecklistVersion): JsonResponse
+    {
+        return response()->json([
+            'message' => 'The Daily Checkout checklist changed after this inspection was saved. Officer review is required before a new submission.',
+            'code' => 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED',
+            'current_checklist_version' => $currentChecklistVersion,
+        ], 409);
+    }
+
+    private function isClientSubmissionIdUniqueConstraintViolation(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+        if (! in_array($sqlState, ['23000', '23505'], true)) {
+            return false;
+        }
+
+        return str_contains(strtolower($exception->getMessage()), 'client_submission_id');
+    }
+
+    private function idempotentInspectionResponse(
+        ApparatusInspection $inspection,
+        int $apparatusId,
+        string $submissionPayloadHash,
+    ): JsonResponse {
+        if ((int) $inspection->apparatus_id !== $apparatusId) {
+            return response()->json([
+                'message' => 'This submission identifier was already used for a different apparatus.',
+            ], 409);
+        }
+
+        if (! is_string($inspection->submission_payload_hash)
+            || ! hash_equals($inspection->submission_payload_hash, $submissionPayloadHash)) {
+            return response()->json([
+                'message' => 'This submission identifier was already used with different inspection data.',
+                'code' => 'DAILY_CHECKOUT_SUBMISSION_REPLAY_CONFLICT',
+            ], 409);
+        }
+
+        return response()->json($this->inspectionReceipt($inspection));
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function submissionPayloadHash(array $payload): string
+    {
+        return hash('sha256', json_encode(
+            $this->canonicalizeSubmissionPayload($payload),
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+        ));
+    }
+
+    private function canonicalizeSubmissionPayload(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (array_is_list($value)) {
+            return array_map($this->canonicalizeSubmissionPayload(...), $value);
+        }
+
+        ksort($value, SORT_STRING);
+
+        foreach ($value as $key => $item) {
+            $value[$key] = $this->canonicalizeSubmissionPayload($item);
+        }
+
+        return $value;
+    }
+
+    private function inspectionReceipt(ApparatusInspection $inspection): array
+    {
+        $inspection = $inspection->fresh() ?? $inspection;
+
+        return [
+            'id' => $inspection->id,
+            'apparatus_id' => $inspection->apparatus_id,
+            'inspection_reference' => $inspection->inspection_reference,
+            'review_status' => $inspection->review_status,
+            'completed_at' => $inspection->completed_at,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  list<string>  $storedPaths
+     * @return array<string, mixed>
+     */
+    private function prepareImages(array $data, array &$storedPaths): array
+    {
+        if (filled($data['officer_signature'] ?? null)) {
+            $data['officer_signature_path'] = $this->storeImageOrFail(
+                (string) $data['officer_signature'],
+                'signatures',
+                'signature',
+                'officer_signature',
+            );
+            $storedPaths[] = $data['officer_signature_path'];
+        }
+        unset($data['officer_signature']);
+
+        foreach ($data['defects'] ?? [] as $index => &$defect) {
+            if (filled($defect['photo'] ?? null)) {
+                $defect['photo_path'] = $this->storeImageOrFail(
+                    (string) $defect['photo'],
+                    'defects',
+                    'defect',
+                    "defects.{$index}.photo",
+                );
+                $storedPaths[] = $defect['photo_path'];
+            }
+            unset($defect['photo']);
+        }
+        unset($defect);
+
+        return $data;
+    }
+
     private function storeImageOrFail(string $payload, string $directory, string $prefix, string $field): string
     {
         $path = Base64Image::store($payload, $directory, $prefix);
@@ -292,5 +467,186 @@ class ApparatusController extends Controller
         }
 
         return $path;
+    }
+
+    /** @param list<string> $paths */
+    private function deleteStoredPaths(array $paths): void
+    {
+        foreach (array_unique($paths) as $path) {
+            Storage::disk('public')->delete($path);
+        }
+    }
+
+    private function forgetDisplayReadModels(): void
+    {
+        Cache::forget(DisplaySnapshotService::SNAPSHOT_CACHE_KEY);
+        Cache::forget(DisplaySnapshotService::STATIONS_CACHE_KEY);
+    }
+
+    /**
+     * A browser may never decide which rows count as a completed Daily Checkout.
+     * The submitted matrix must be an exact representation of the current,
+     * server-resolved checklist, and every non-present row must have a matching
+     * defect record for the review workflow.
+     *
+     * @param  array<string, mixed>  $submission
+     * @param  array<string, mixed>|null  $checklist
+     */
+    private function validateCompleteChecklist(array $submission, ?array $checklist): void
+    {
+        if ($checklist === null || ! is_array($checklist['compartments'] ?? null)) {
+            throw ValidationException::withMessages([
+                'compartments' => 'The Daily Checkout checklist could not be validated.',
+            ]);
+        }
+
+        $expected = [];
+        foreach ($checklist['compartments'] as $compartment) {
+            if (! is_array($compartment)) {
+                throw ValidationException::withMessages([
+                    'compartments' => 'The Daily Checkout checklist could not be validated.',
+                ]);
+            }
+
+            $compartmentId = $this->canonicalChecklistString($compartment['id'] ?? null);
+            $compartmentName = $this->canonicalChecklistString($compartment['name'] ?? $compartment['title'] ?? null);
+            if ($compartmentId === null || $compartmentName === null || ! is_array($compartment['items'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'compartments' => 'The Daily Checkout checklist could not be validated.',
+                ]);
+            }
+
+            $itemNames = [];
+            foreach ($compartment['items'] as $item) {
+                $itemName = is_array($item) ? $this->canonicalChecklistString($item['name'] ?? null) : null;
+                if ($itemName === null) {
+                    throw ValidationException::withMessages([
+                        'compartments' => 'The Daily Checkout checklist could not be validated.',
+                    ]);
+                }
+                $itemNames[] = $itemName;
+            }
+
+            $expected[$compartmentId] = [
+                'name' => $compartmentName,
+                'item_names' => $itemNames,
+            ];
+        }
+
+        $submittedById = [];
+        foreach ($submission['compartments'] as $compartment) {
+            $compartmentId = $this->canonicalChecklistString($compartment['id'] ?? null);
+            if ($compartmentId === null || isset($submittedById[$compartmentId])) {
+                throw ValidationException::withMessages([
+                    'compartments' => 'Each current Daily Checkout compartment must be submitted exactly once.',
+                ]);
+            }
+            $submittedById[$compartmentId] = $compartment;
+        }
+
+        if (array_diff_key($expected, $submittedById) !== [] || array_diff_key($submittedById, $expected) !== []) {
+            throw ValidationException::withMessages([
+                'compartments' => 'The submitted inspection must include every current Daily Checkout compartment exactly once.',
+            ]);
+        }
+
+        $requiredDefects = [];
+        foreach ($expected as $compartmentId => $expectedCompartment) {
+            /** @var array<string, mixed> $submittedCompartment */
+            $submittedCompartment = $submittedById[$compartmentId];
+            $submittedName = $this->canonicalChecklistString($submittedCompartment['name'] ?? null);
+            if ($submittedName !== $expectedCompartment['name']) {
+                throw ValidationException::withMessages([
+                    'compartments' => 'The submitted inspection does not match the current Daily Checkout checklist.',
+                ]);
+            }
+
+            $submittedItems = $submittedCompartment['items'] ?? null;
+            if (! is_array($submittedItems)) {
+                throw ValidationException::withMessages([
+                    'compartments' => 'The submitted inspection does not match the current Daily Checkout checklist.',
+                ]);
+            }
+
+            $expectedItemNames = $expectedCompartment['item_names'];
+            $submittedItemNames = [];
+            foreach ($submittedItems as $item) {
+                $itemName = is_array($item) ? $this->canonicalChecklistString($item['name'] ?? null) : null;
+                if ($itemName === null) {
+                    throw ValidationException::withMessages([
+                        'compartments' => 'The submitted inspection must contain every current Daily Checkout item exactly once.',
+                    ]);
+                }
+
+                $submittedItemNames[] = $itemName;
+            }
+            sort($expectedItemNames);
+            sort($submittedItemNames);
+            if ($submittedItemNames !== $expectedItemNames) {
+                throw ValidationException::withMessages([
+                    'compartments' => 'The submitted inspection must contain every current Daily Checkout item exactly once.',
+                ]);
+            }
+
+            foreach ($submittedItems as $item) {
+                if (! is_array($item)) {
+                    throw ValidationException::withMessages([
+                        'compartments' => 'The submitted inspection does not match the current Daily Checkout checklist.',
+                    ]);
+                }
+
+                $status = (string) ($item['status'] ?? '');
+                if ($status === 'Present') {
+                    continue;
+                }
+
+                $key = $this->defectKey(
+                    $expectedCompartment['name'],
+                    $this->canonicalChecklistString($item['name'] ?? null) ?? '',
+                    $status,
+                );
+                $requiredDefects[$key] = ($requiredDefects[$key] ?? 0) + 1;
+            }
+        }
+
+        $submittedDefects = [];
+        foreach ($submission['defects'] ?? [] as $defect) {
+            $compartment = $this->canonicalChecklistString($defect['compartment'] ?? null);
+            $item = $this->canonicalChecklistString($defect['item'] ?? null);
+            if ($compartment === null || $item === null) {
+                throw ValidationException::withMessages([
+                    'defects' => 'Every Missing or Damaged checklist item must have one matching defect record.',
+                ]);
+            }
+
+            $key = $this->defectKey(
+                $compartment,
+                $item,
+                (string) ($defect['status'] ?? ''),
+            );
+            $submittedDefects[$key] = ($submittedDefects[$key] ?? 0) + 1;
+        }
+
+        ksort($requiredDefects);
+        ksort($submittedDefects);
+        if ($submittedDefects !== $requiredDefects) {
+            throw ValidationException::withMessages([
+                'defects' => 'Every Missing or Damaged checklist item must have one matching defect record.',
+            ]);
+        }
+    }
+
+    private function defectKey(string $compartment, string $item, string $status): string
+    {
+        return implode("\0", [$compartment, $item, $status]);
+    }
+
+    private function canonicalChecklistString(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return $value;
     }
 }

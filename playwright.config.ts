@@ -1,4 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import { loopbackBaseUrl } from './tests/e2e/support/test-environment';
+
+const baseURL = loopbackBaseUrl('PLAYWRIGHT_BASE_URL', 'http://127.0.0.1:8098', 'E2E_BASE_URL');
 
 /**
  * Three-viewport regression matrix.
@@ -24,7 +27,8 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost',
+    baseURL,
+    serviceWorkers: 'block',
   },
   projects: [
     // -------------------------------------------------------------------- //

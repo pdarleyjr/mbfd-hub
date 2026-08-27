@@ -119,6 +119,74 @@
             </div>
         @endif
 
+        {{-- Pending-review evidence has not changed apparatus readiness, defects, or meters. --}}
+        @if($inspection->review_status === 'pending_review')
+            <div class="fi-section rounded-xl bg-amber-50 shadow-sm ring-1 ring-amber-200 p-6 dark:bg-amber-900/10 dark:ring-amber-800">
+                <h3 class="text-base font-semibold text-amber-900 dark:text-amber-200 mb-2">Pending officer review</h3>
+                <p class="text-sm text-amber-800 dark:text-amber-300 mb-4">
+                    This submission is evidence only until an authorized reviewer approves it. Approval applies the reported meter readings and defects to the apparatus.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
+                    <div>
+                        <span class="text-amber-800 dark:text-amber-300">Reported engine hours</span>
+                        <p class="font-medium text-gray-900 dark:text-white">{{ $inspection->engine_hours ?? 'Not reported' }}</p>
+                    </div>
+                    <div>
+                        <span class="text-amber-800 dark:text-amber-300">Reported miles</span>
+                        <p class="font-medium text-gray-900 dark:text-white">{{ $inspection->miles ?? 'Not reported' }}</p>
+                    </div>
+                </div>
+
+                @if(count($pendingDefects) > 0)
+                    <h4 class="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-3">Reported pending defects ({{ count($pendingDefects) }})</h4>
+                    <div class="space-y-3">
+                        @foreach($pendingDefects as $defect)
+                            <div class="rounded-lg bg-white dark:bg-gray-900 p-4 border border-amber-200 dark:border-amber-800">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div>
+                                        <p class="font-medium text-gray-900 dark:text-white">{{ $defect['item'] ?? 'Unknown item' }}</p>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ $defect['compartment'] ?? 'Unknown compartment' }}</p>
+                                    </div>
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                        {{ $defect['status'] ?? 'Reported' }}
+                                    </span>
+                                </div>
+                                @if(filled($defect['notes'] ?? null))
+                                    <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ $defect['notes'] }}</p>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <p class="text-sm text-amber-800 dark:text-amber-300">No defects were reported with this pending submission.</p>
+                @endif
+            </div>
+        @endif
+
+        @if($reviewEvents->isNotEmpty())
+            <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6 dark:bg-gray-900 dark:ring-white/10">
+                <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">Review History</h3>
+                <div class="space-y-4">
+                    @foreach($reviewEvents as $reviewEvent)
+                        <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <p class="font-medium text-gray-900 dark:text-white">
+                                    {{ ucfirst(str_replace('_', ' ', $reviewEvent->previous_status)) }} → {{ ucfirst(str_replace('_', ' ', $reviewEvent->status)) }}
+                                </p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">{{ $reviewEvent->created_at?->format('M j, Y g:i A') }}</p>
+                            </div>
+                            <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                                Reviewer: {{ $reviewEvent->changedByUser?->name ?? data_get($reviewEvent->metadata, 'reviewer_name', 'User no longer active') }}
+                            </p>
+                            @if(filled($reviewEvent->internal_note))
+                                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ $reviewEvent->internal_note }}</p>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         {{-- Defects Section --}}
         @if($defects->count() > 0)
             <div class="fi-section rounded-xl bg-red-50 shadow-sm ring-1 ring-red-200 p-6 dark:bg-red-900/10 dark:ring-red-800">

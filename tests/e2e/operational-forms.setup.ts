@@ -1,22 +1,34 @@
 import { execFileSync } from 'node:child_process';
 import { openSync, closeSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  disposableTestAppKey,
+  isolatedSqliteDatabasePath,
+  localPhpBinary,
+  sanitizedTestEnvironment,
+} from './support/test-environment';
 
 export default function globalSetup() {
-  const php = process.env.OPERATIONAL_FORMS_E2E_PHP ?? 'php';
-  const database = process.env.OPERATIONAL_FORMS_E2E_DATABASE ?? resolve(process.cwd(), 'database/operational_forms_e2e.sqlite');
+  const php = localPhpBinary('OPERATIONAL_FORMS_E2E_PHP');
+  const database = isolatedSqliteDatabasePath('OPERATIONAL_FORMS_E2E_DATABASE', 'operational_forms_e2e.sqlite');
   closeSync(openSync(database, 'a'));
   const options = {
     cwd: process.cwd(),
     stdio: 'inherit' as const,
-    env: {
-      ...process.env,
+    env: sanitizedTestEnvironment({
       APP_ENV: 'testing',
-      APP_KEY: process.env.APP_KEY ?? 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      APP_KEY: disposableTestAppKey,
+      APP_URL: 'http://127.0.0.1:8017',
+      BROADCAST_DRIVER: 'log',
+      CACHE_STORE: 'array',
       DB_CONNECTION: 'sqlite',
       DB_DATABASE: database,
+      FILESYSTEM_DISK: 'local',
+      FROC_IMPORT_FORCE_FALLBACK: 'true',
+      MAIL_MAILER: 'array',
+      PRIVATE_FILESYSTEM_DISK: 'local',
       QUEUE_CONNECTION: 'sync',
-    },
+      SESSION_DRIVER: 'file',
+    }),
   };
 
   execFileSync(php, ['artisan', 'migrate:fresh', '--force'], options);

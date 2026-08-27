@@ -31,14 +31,17 @@
                     @endphp
                     <div x-show="activeTab === {{ $index }}" x-cloak class="mt-4 space-y-4">
 
-                        {{-- Today's Vehicle Inspections --}}
+                        {{-- Canonical Daily Checkout — never count raw inspection rows here. --}}
                         @include('filament.widgets.partials.station-hub-section', [
-                            'title' => "Today's Vehicle Inspections",
+                            'title' => 'Daily Checkout Compliance',
+                            'subtitle' => $data['dailyCheckoutSubtitle'] ?? null,
                             'icon' => 'heroicon-o-clipboard-document-check',
-                            'count' => $counts['vehicleInspections'] ?? 0,
-                            'items' => $data['vehicleInspections'] ?? [],
-                            'emptyMessage' => 'No vehicle inspections today',
-                            'columns' => ['unit' => 'Unit', 'operator' => 'Operator', 'shift' => 'Shift', 'time' => 'Time'],
+                            'count' => $counts['dailyCheckoutCompleted'] ?? 0,
+                            'items' => $data['dailyCheckoutRows'] ?? [],
+                            'emptyMessage' => 'No Daily Checkout policy rows',
+                            'columns' => ['unit' => 'Unit', 'state' => 'Daily state', 'completion' => 'Completion'],
+                            'statusField' => 'state',
+                            'dangerStatuses' => ['not_checked', 'classification_required'],
                         ])
 
                         {{-- Station Inspections (30 days) --}}

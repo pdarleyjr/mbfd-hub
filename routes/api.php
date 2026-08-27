@@ -133,7 +133,7 @@ Route::prefix('admin/trt-inventory')->middleware(['web', 'auth', 'admin.role:sup
 // Push notification routes (public VAPID key, authenticated subscription management)
 Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey']);
 
-Route::middleware(['web', 'auth'])->group(function () {
+Route::middleware(['web', 'auth', 'throttle:10,1'])->group(function () {
     Route::post('push-subscriptions', [PushSubscriptionController::class, 'store']);
     Route::delete('push-subscriptions', [PushSubscriptionController::class, 'destroy']);
     Route::post('push/test', [TestNotificationController::class, 'sendTestNotification']);
@@ -209,6 +209,8 @@ Route::delete('/big-ticket-requests/{bigTicketRequest}', [BigTicketRequestContro
 // path that may flip an apparatus Out of Service. Authenticated + authorized only.
 Route::post('/apparatus-inspections/{inspection}/approve', [ApparatusController::class, 'approveInspection'])
     ->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:30,1']);
+Route::post('/apparatus-inspections/{inspection}/reject', [ApparatusController::class, 'rejectInspection'])
+    ->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:30,1']);
 
 // Station Inventory V2 (PIN-protected, real-time inventory management)
 // =========================================================================
@@ -228,8 +230,10 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
     // PIN verification endpoint (public)
     Route::post('/station-inventory/verify-pin', [StationInventoryV2Controller::class, 'verifyPin']);
 
-    // Protected endpoints (require valid signed URL from PIN verification)
-    Route::middleware('signed')->name('api.v2.station-inventory.')->group(function () {
+    // Every protected endpoint validates the PIN-issued base URL in the shared
+    // guard. Nested operations reuse that signature, so Laravel's exact-URL
+    // signed middleware cannot run before the base URL is reconstructed.
+    Route::middleware('station-inventory.signed')->name('api.v2.station-inventory.')->group(function () {
         // Inventory list
         Route::get('/station-inventory/{stationId}', [StationInventoryV2Controller::class, 'getInventory'])
             ->name('access');

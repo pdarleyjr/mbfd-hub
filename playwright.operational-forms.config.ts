@@ -1,10 +1,31 @@
 import { defineConfig, devices } from '@playwright/test';
 import { closeSync, openSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  disposableTestAppKey,
+  isolatedSqliteDatabasePath,
+  loopbackBaseUrl,
+  sanitizedTestEnvironment,
+} from './tests/e2e/support/test-environment';
 
-const e2eDatabase = process.env.OPERATIONAL_FORMS_E2E_DATABASE ?? resolve(process.cwd(), 'database/operational_forms_e2e.sqlite');
-const e2eAppKey = process.env.APP_KEY ?? 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+const e2eDatabase = isolatedSqliteDatabasePath('OPERATIONAL_FORMS_E2E_DATABASE', 'operational_forms_e2e.sqlite');
+const baseURL = loopbackBaseUrl('PLAYWRIGHT_BASE_URL', 'http://127.0.0.1:8017');
 closeSync(openSync(e2eDatabase, 'a'));
+
+const webServerEnvironment = sanitizedTestEnvironment({
+  APP_ENV: 'testing',
+  APP_KEY: disposableTestAppKey,
+  APP_URL: baseURL,
+  BROADCAST_DRIVER: 'log',
+  CACHE_STORE: 'array',
+  DB_CONNECTION: 'sqlite',
+  DB_DATABASE: e2eDatabase,
+  FILESYSTEM_DISK: 'local',
+  FROC_IMPORT_FORCE_FALLBACK: 'true',
+  MAIL_MAILER: 'array',
+  PRIVATE_FILESYSTEM_DISK: 'local',
+  QUEUE_CONNECTION: 'sync',
+  SESSION_DRIVER: 'file',
+});
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -15,26 +36,17 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:8017',
+    baseURL,
     viewport: { width: 1440, height: 1000 },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: process.env.OPERATIONAL_FORMS_E2E_SERVER_COMMAND ?? 'php artisan serve --host=127.0.0.1 --port=8017',
-    url: process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:8017',
+    command: 'php artisan serve --host=127.0.0.1 --port=8017',
+    url: baseURL,
     timeout: 60_000,
     reuseExistingServer: false,
-    env: {
-      ...process.env,
-      APP_ENV: 'testing',
-      APP_KEY: e2eAppKey,
-      DB_CONNECTION: 'sqlite',
-      DB_DATABASE: e2eDatabase,
-      QUEUE_CONNECTION: 'sync',
-      SESSION_DRIVER: 'file',
-      FROC_IMPORT_FORCE_FALLBACK: 'true',
-    },
+    env: webServerEnvironment,
   },
   projects: [
     { name: 'phone-small', use: { browserName: 'chromium', viewport: { width: 320, height: 568 }, hasTouch: true, isMobile: true } },

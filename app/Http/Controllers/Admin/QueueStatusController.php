@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use Filament\Facades\Filament;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +16,7 @@ class QueueStatusController extends Controller
     {
         $user = $request->user();
         abort_unless(
-            $user instanceof User && $user->canAccessPanel(Filament::getPanel('admin')),
+            $user instanceof User && $user->hasRole('super_admin'),
             403,
         );
 

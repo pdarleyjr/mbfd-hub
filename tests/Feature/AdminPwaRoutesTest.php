@@ -27,11 +27,12 @@ class AdminPwaRoutesTest extends TestCase
         );
     }
 
-    public function test_queue_status_is_available_only_to_admin_users(): void
+    public function test_queue_status_is_available_only_to_super_admin_users(): void
     {
-        Role::create(['name' => 'super_admin', 'guard_name' => 'web']);
-        $admin = User::factory()->create();
-        $admin->assignRole('super_admin');
+        $roles = collect(['super_admin', 'admin', 'logistics_admin', 'training_admin', 'training_viewer'])
+            ->mapWithKeys(fn (string $name) => [$name => Role::create(['name' => $name, 'guard_name' => 'web'])]);
+        $superAdmin = User::factory()->create();
+        $superAdmin->assignRole($roles['super_admin']);
 
         $this->getJson('/admin/pulse/queues.json')->assertUnauthorized();
 
@@ -39,7 +40,16 @@ class AdminPwaRoutesTest extends TestCase
             ->getJson('/admin/pulse/queues.json')
             ->assertForbidden();
 
-        $this->actingAs($admin)
+        foreach (['admin', 'logistics_admin', 'training_admin', 'training_viewer'] as $roleName) {
+            $user = User::factory()->create();
+            $user->assignRole($roles[$roleName]);
+
+            $this->actingAs($user)
+                ->getJson('/admin/pulse/queues.json')
+                ->assertForbidden();
+        }
+
+        $this->actingAs($superAdmin)
             ->getJson('/admin/pulse/queues.json')
             ->assertOk()
             ->assertExactJson(['pending' => 0]);

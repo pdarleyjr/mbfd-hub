@@ -32,9 +32,9 @@ return [
         'worker_url' => env('PULSEPOINT_WORKER_URL', 'https://pulsepoint-proxy.pdarleyjr.workers.dev/incidents'),
     ],
 
-    // Shared secret guarding the read-only /api/display/* surface. When set, the
+    // Shared secret guarding the read-only /api/display/* surface. The
     // command-display Cloudflare Functions gateway must present it as X-Display-Token.
-    // Empty/unset = open (no-op) for local/dev and staged rollout.
+    // Empty/unset fails closed for non-OPTIONS requests.
     'display_api' => [
         'token' => env('DISPLAY_API_TOKEN'),
     ],

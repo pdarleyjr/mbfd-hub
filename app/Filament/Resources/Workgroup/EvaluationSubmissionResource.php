@@ -3,20 +3,21 @@
 namespace App\Filament\Resources\Workgroup;
 
 use App\Filament\Exports\EvaluationSubmissionExporter;
-use App\Filament\Resources\Workgroup\Pages;
+use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupSession;
+use Filament\Forms\Form;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Filament\Forms;
-use Filament\Forms\Form;
 
 class EvaluationSubmissionResource extends Resource
 {
+    use ResolvesWorkgroupAccess;
+
     protected static ?string $model = EvaluationSubmission::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-check';
@@ -62,7 +63,7 @@ class EvaluationSubmissionResource extends Resource
                             ->dateTime(),
                         Infolists\Components\TextEntry::make('total_score')
                             ->label('Score')
-                            ->state(fn ($record) => $record->total_score !== null ? number_format($record->total_score, 2) . '%' : '-'),
+                            ->state(fn ($record) => $record->total_score !== null ? number_format($record->total_score, 2).'%' : '-'),
                     ])
                     ->columns(3),
             ]);
@@ -96,7 +97,7 @@ class EvaluationSubmissionResource extends Resource
                     }),
                 Tables\Columns\TextColumn::make('total_score')
                     ->label('Score')
-                    ->formatStateUsing(fn ($state, $record) => $record->total_score !== null ? number_format($record->total_score, 2) . '%' : '-')
+                    ->formatStateUsing(fn ($state, $record) => $record->total_score !== null ? number_format($record->total_score, 2).'%' : '-')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('submitted_at')
                     ->dateTime()
@@ -106,7 +107,7 @@ class EvaluationSubmissionResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('workgroup_session_id')
                     ->label('Session')
-                    ->options(fn () => WorkgroupSession::pluck('name', 'id'))
+                    ->options(fn () => self::workgroupAccess()->scopeSessions(WorkgroupSession::query(), self::currentWorkgroupUser())->pluck('name', 'id'))
                     ->query(function (Builder $query, array $data) {
                         if ($data['value']) {
                             $query->whereHas('candidateProduct', function ($q) use ($data) {
@@ -141,11 +142,22 @@ class EvaluationSubmissionResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null && self::workgroupAccess()->canEnterPanel($user);
     }
 
     public static function canView($record): bool
     {
-        return (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false);
+        $user = self::currentWorkgroupUser();
+
+        return $user !== null
+            && $record instanceof EvaluationSubmission
+            && self::workgroupAccess()->canViewEvaluationSubmission($user, $record);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return self::workgroupAccess()->scopeEvaluationSubmissions(parent::getEloquentQuery(), self::currentWorkgroupUser());
     }
 }

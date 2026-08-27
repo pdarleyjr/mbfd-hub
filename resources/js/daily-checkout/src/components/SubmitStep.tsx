@@ -31,7 +31,11 @@ export default function SubmitStep({
       return;
     }
     setSigError(false);
-    const sigData = sigRef.current.getTrimmedCanvas().toDataURL('image/png');
+    // react-signature-canvas delegates getTrimmedCanvas() to trim-canvas,
+    // whose CommonJS default export is incompatible with the current Vite
+    // runtime. The native SignaturePad data URL is sufficient for the signed
+    // inspection record and preserves the real, drawn canvas content.
+    const sigData = sigRef.current.toDataURL('image/png');
     onSubmit(sigData);
   };
 
@@ -79,7 +83,7 @@ export default function SubmitStep({
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <p className="text-red-800 font-medium text-sm">
             ⚠️ This vehicle has {issuesCount} defect{issuesCount !== 1 ? 's' : ''}. 
-            It will be automatically placed on <strong>HOLD (Out of Service)</strong> upon submission.
+            The report will be held for authorized review. An authorized reviewer applies any operational hold.
           </p>
         </div>
       )}

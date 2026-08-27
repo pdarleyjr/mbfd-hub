@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { loopbackBaseUrl } from './support/test-environment';
 
-const BASE_URL = process.env.E2E_BASE_URL ?? 'https://mbfdhub.com';
+const BASE_URL = loopbackBaseUrl('E2E_BASE_URL', 'http://127.0.0.1:8098', 'PLAYWRIGHT_BASE_URL');
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? '';
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? '';
 

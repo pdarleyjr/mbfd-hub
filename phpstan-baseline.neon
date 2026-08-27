@@ -469,24 +469,6 @@ parameters:
 			path: app/Filament/Resources/Workgroup/WorkgroupMemberResource.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Filament/Resources/Workgroup/WorkgroupSessionResource.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Filament/Resources/Workgroup/WorkgroupSessionResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$role\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Filament/Training/Resources/TrainingTodoResource/Pages/ViewTrainingTodo.php
-
-		-
 			message: '#^Cannot access property \$id on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
 			identifier: property.nonObject
 			count: 1
@@ -649,24 +631,6 @@ parameters:
 			path: app/Filament/Widgets/StationOperationsHubWidget.php
 
 		-
-			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusInspection model\.$#'
-			identifier: larastan.relationExistence
-			count: 1
-			path: app/Filament/Widgets/StationOperationsHubWidget.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>designation" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 2
-			path: app/Filament/Widgets/StationOperationsHubWidget.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>unit_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 2
-			path: app/Filament/Widgets/StationOperationsHubWidget.php
-
-		-
 			message: '#^Left side of && is always true\.$#'
 			identifier: booleanAnd.leftAlwaysTrue
 			count: 6
@@ -745,12 +709,6 @@ parameters:
 			path: app/Filament/Workgroup/Pages/Dashboard.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:sessions\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Filament/Workgroup/Pages/Dashboard.php
-
-		-
 			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
@@ -817,33 +775,9 @@ parameters:
 			path: app/Filament/Workgroup/Pages/Files.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:sessions\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Filament/Workgroup/Pages/Files.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\WorkgroupNote\:\:\$is_shared\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Filament/Workgroup/Pages/Notes.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\WorkgroupNote\:\:\$shared_with_user_id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Filament/Workgroup/Pages/Notes.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 2
-			path: app/Filament/Workgroup/Pages/Notes.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:sessions\(\)\.$#'
-			identifier: method.notFound
-			count: 1
 			path: app/Filament/Workgroup/Pages/Notes.php
 
 		-
@@ -853,22 +787,10 @@ parameters:
 			path: app/Filament/Workgroup/Pages/Notes.php
 
 		-
-			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\WorkgroupMember\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Filament/Workgroup/Pages/Notes.php
-
-		-
 			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$email\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Filament/Workgroup/Pages/Profile.php
-
-		-
-			message: '#^Anonymous function has an unused use \$sessionId\.$#'
-			identifier: closure.unusedUse
-			count: 1
-			path: app/Filament/Workgroup/Pages/SessionResultsPage.php
 
 		-
 			message: '#^Anonymous function should return non\-empty\-array but returns non\-empty\-array\.$#'
@@ -923,18 +845,6 @@ parameters:
 			identifier: argument.unresolvableType
 			count: 1
 			path: app/Filament/Workgroup/Pages/SessionResultsPage.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 5
-			path: app/Filament/Workgroup/Pages/SharedUploads.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:sessions\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Filament/Workgroup/Pages/SharedUploads.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$comment\.$#'
@@ -1063,24 +973,6 @@ parameters:
 			path: app/Http/Controllers/Api/AdminMetricsController.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\ApparatusInspection\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\ApparatusInspection\>\:\:\$apparatus\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/ApparatusController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Apparatus\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Apparatus\>\:\:\$openDefects\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/ApparatusController.php
-
-		-
-			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusInspection model\.$#'
-			identifier: larastan.relationExistence
-			count: 1
-			path: app/Http/Controllers/Api/ApparatusController.php
-
-		-
 			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
@@ -1157,18 +1049,6 @@ parameters:
 			identifier: argument.unresolvableType
 			count: 2
 			path: app/Http/Controllers/Api/InventoryChatController.php
-
-		-
-			message: '#^Anonymous function should return Illuminate\\Support\\Collection\<int, array\{id\: mixed, label\: mixed, side\: mixed, dimensions\: mixed, shelfType\: mixed, shelfCount\: mixed, hasPegboard\: mixed, pegboardFaces\: mixed, \.\.\.\}\> but returns Illuminate\\Support\\Collection\<int, array\{id\: mixed, label\: mixed, side\: mixed, dimensions\: mixed, shelfType\: mixed, shelfCount\: mixed, hasPegboard\: mixed, pegboardFaces\: mixed, \.\.\.\}\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/Api/Public/ApparatusLayout/ApparatusLayoutController.php
-
-		-
-			message: '#^Anonymous function should return Illuminate\\Support\\Collection\<int, array\{id\: mixed, name\: mixed, category\: mixed, dimensions\: mixed, weight\: mixed, canRotate\: mixed, requiresClearance\: mixed, clearanceDepth\: mixed, \.\.\.\}\> but returns Illuminate\\Support\\Collection\<int, array\{id\: mixed, name\: mixed, category\: mixed, dimensions\: mixed, weight\: mixed, canRotate\: mixed, requiresClearance\: mixed, clearanceDepth\: mixed, \.\.\.\}\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/Api/Public/ApparatusLayout/ApparatusLayoutController.php
 
 		-
 			message: '#^Access to an undefined property App\\Models\\Station\:\:\$latitude\.$#'
@@ -1387,12 +1267,6 @@ parameters:
 			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
 
 		-
-			message: '#^Anonymous function should return array\{category\: \(int\|string\), items\: Illuminate\\Support\\Collection\<int, array\{id\: mixed, inventory_item_id\: mixed, name\: mixed, sku\: mixed, unit_label\: mixed, par_quantity\: mixed, par_units\: mixed, on_hand\: mixed, \.\.\.\}\>\} but returns array\{category\: \(int\|string\), items\: Illuminate\\Support\\Collection\<int, array\{id\: mixed, inventory_item_id\: mixed, name\: mixed, sku\: mixed, unit_label\: mixed, par_quantity\: mixed, par_units\: mixed, on_hand\: mixed, \.\.\.\}\>\}\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
-
-		-
 			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\StationInventoryItem\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: argument.unresolvableType
 			count: 1
@@ -1407,12 +1281,6 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/TrtInventoryController.php
-
-		-
-			message: '#^Anonymous function should return array\{category\: \(int\|string\), items\: Illuminate\\Support\\Collection\<int, array\{id\: mixed, name\: mixed, category\: mixed, expected_quantity\: mixed, sort_order\: mixed\}\>\} but returns array\{category\: \(int\|string\), items\: Illuminate\\Support\\Collection\<int, array\{id\: mixed, name\: mixed, category\: mixed, expected_quantity\: mixed, sort_order\: mixed\}\>\}\.$#'
-			identifier: return.type
 			count: 1
 			path: app/Http/Controllers/Api/TrtInventoryController.php
 
@@ -1481,18 +1349,6 @@ parameters:
 			identifier: deadCode.unreachable
 			count: 1
 			path: app/Http/Controllers/IncidentsController.php
-
-		-
-			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: app/Http/Controllers/ReportExportController.php
-
-		-
-			message: '#^Parameter \#1 \$workgroup of method App\\Services\\Workgroup\\WorkgroupAIService\:\:generateExecutiveReport\(\) expects App\\Models\\Workgroup, App\\Models\\WorkgroupSession given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Workgroup/WorkgroupAIController.php
 
 		-
 			message: '#^Access to an undefined property App\\Http\\Resources\\ApparatusResource\:\:\$assignment\.$#'
@@ -1837,51 +1693,9 @@ parameters:
 			path: app/Http/Resources/Public/PublicApparatusResource.php
 
 		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$designation\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicApparatusResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicApparatusResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicApparatusResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$slug\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicApparatusResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$type\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicApparatusResource.php
-
-		-
 			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$unit_id\.$#'
 			identifier: property.notFound
 			count: 2
-			path: app/Http/Resources/Public/PublicApparatusResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$vehicle_number\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicApparatusResource.php
-
-		-
-			message: '#^Call to an undefined method App\\Http\\Resources\\Public\\PublicApparatusResource\:\:relationLoaded\(\)\.$#'
-			identifier: method.notFound
-			count: 1
 			path: app/Http/Resources/Public/PublicApparatusResource.php
 
 		-
@@ -2965,12 +2779,6 @@ parameters:
 			path: app/Services/Display/DisplayAiService.php
 
 		-
-			message: '#^Parameter \#1 \$array \(list\{0\: ''No apparatus…''\|non\-falsy\-string, 1\: non\-falsy\-string, 2\: ''No pending…''\|non\-falsy\-string, 3\?\: non\-falsy\-string, 4\?\: non\-falsy\-string, 5\?\: non\-falsy\-string, 6\?\: non\-falsy\-string\}\) of array_values is already a list, call has no effect\.$#'
-			identifier: arrayValues.list
-			count: 1
-			path: app/Services/Display/DisplayReadiness.php
-
-		-
 			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$openDefects\.$#'
 			identifier: property.notFound
 			count: 1
@@ -3063,18 +2871,6 @@ parameters:
 		-
 			message: '#^Offset ''status'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
-			count: 2
-			path: app/Services/Display/DisplaySnapshotService.php
-
-		-
-			message: '#^Parameter \#1 \$apparatus of method App\\Services\\Display\\DisplaySnapshotService\:\:classifyApparatusCollection\(\) expects Illuminate\\Support\\Collection\<int, App\\Models\\Apparatus\>, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\> given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Services/Display/DisplaySnapshotService.php
-
-		-
-			message: '#^Parameter \#1 \$apparatus of method App\\Services\\Display\\DisplaySnapshotService\:\:redactedApparatus\(\) expects Illuminate\\Support\\Collection\<int, App\\Models\\Apparatus\>, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\> given\.$#'
-			identifier: argument.type
 			count: 2
 			path: app/Services/Display/DisplaySnapshotService.php
 
@@ -3339,12 +3135,6 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$submitted_at\.$#'
 			identifier: property.notFound
-			count: 1
-			path: app/Services/Workgroup/EvaluationService.php
-
-		-
-			message: '#^Anonymous function has an unused use \$category\.$#'
-			identifier: closure.unusedUse
 			count: 1
 			path: app/Services/Workgroup/EvaluationService.php
 

@@ -6,8 +6,10 @@ namespace Tests\Feature\Api\Display;
 
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
+use App\Models\ApparatusInspection;
 use App\Models\Station;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -18,6 +20,15 @@ use Tests\TestCase;
 class DisplayRedactionTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $token = Str::random(48);
+        config(['services.display_api.token' => $token]);
+        $this->withHeader('X-Display-Token', $token);
+    }
 
     private const SECRET_VIN = '***REMOVED_SECRET***';
 
@@ -119,5 +130,31 @@ class DisplayRedactionTest extends TestCase
         // Operator name / rank are personnel identity and must not appear on
         // inspection submissions.
         $this->assertStringNotContainsString('operator_name', $body);
+    }
+
+    public function test_station_submission_history_does_not_substitute_created_at_for_canonical_checkout_completion(): void
+    {
+        $station = $this->seedFleet();
+        $apparatus = $station->apparatuses()->sole();
+        $apparatus->update(['daily_checkout_requirement' => 'required']);
+
+        ApparatusInspection::query()->create([
+            'apparatus_id' => $apparatus->id,
+            'operator_name' => 'History Only',
+            'rank' => 'Firefighter',
+            'shift' => 'A-Day',
+            'review_status' => 'pending_review',
+            'completed_at' => null,
+        ]);
+
+        $response = $this->getJson("/api/display/stations/{$station->id}/submissions");
+
+        $response->assertOk()
+            ->assertJsonPath('apparatus_inspection_history_only', true)
+            ->assertJsonPath('daily_checkout.required_total', 1)
+            ->assertJsonPath('daily_checkout.completed', 0)
+            ->assertJsonPath('daily_checkout.not_checked', 1)
+            ->assertJsonPath('apparatus_inspections.0.completed_at', null);
+        $this->assertNotEmpty($response->json('apparatus_inspections.0.submitted_at'));
     }
 }

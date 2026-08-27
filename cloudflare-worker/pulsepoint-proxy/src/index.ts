@@ -17,7 +17,7 @@ interface Env {
   PULSEPOINT_AGENCY: string;
   CACHE_TTL: string;
   /** CF Worker secret: set via `wrangler secret put PULSEPOINT_HASH_PASSWORD` */
-  PULSEPOINT_HASH_PASSWORD: string;
+  PULSEPOINT_HASH_PASSWORD?: string;
   /** Optional: set to "development" to allow localhost CORS origins */
   ENVIRONMENT?: string;
 }
@@ -178,17 +178,13 @@ function concatBytes(...arrays: Uint8Array[]): Uint8Array {
 
 // ─── Decryption ───────────────────────────────────────────────────────────────
 
-// Resolved from env at request time (see fetchIncidents). Declared here for
-// module scope; the actual value is injected from the CF Worker secret.
-let _hashPassword: Uint8Array | null = null;
-
 /**
  * EVP_BytesToKey: derives a 32-byte AES key using iterated MD5 hashes with
  * password + salt, matching PulsePoint's encryption scheme.
  */
 async function deriveAesKey(salt: Uint8Array, hashPassword: Uint8Array): Promise<CryptoKey> {
-  let key = new Uint8Array(0);
-  let prev = new Uint8Array(0);
+  let key: Uint8Array = new Uint8Array(0);
+  let prev: Uint8Array = new Uint8Array(0);
 
   while (key.length < 32) {
     prev = md5(concatBytes(prev, hashPassword, salt));
@@ -389,9 +385,13 @@ export default {
       return jsonResponse({ error: "Not found" }, 404, cors, 0);
     }
 
-    // Resolve password from secret; fall back to the public default so the
-    // worker degrades gracefully if the secret was not yet configured.
-    const rawPassword = env.PULSEPOINT_HASH_PASSWORD ?? "tombrady5rings";
+    // The decryption password is a Worker secret. Do not provide a source fallback:
+    // a missing secret must fail closed without contacting the upstream provider.
+    const rawPassword = env.PULSEPOINT_HASH_PASSWORD;
+    if (!rawPassword) {
+      console.error('[pulsepoint-proxy] PULSEPOINT_HASH_PASSWORD is not configured');
+      return jsonResponse({ error: 'Service unavailable' }, 503, cors, 0);
+    }
     const hashPassword = new TextEncoder().encode(rawPassword);
 
     try {

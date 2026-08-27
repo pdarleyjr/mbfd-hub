@@ -2,38 +2,38 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\NotificationSettings;
+use App\Filament\Pages\SetPasswordPage;
+use App\Filament\Resources\Workgroup\CandidateProductResource;
+use App\Filament\Resources\Workgroup\EvaluationCategoryResource;
+use App\Filament\Workgroup\Pages\Dashboard;
+use App\Filament\Workgroup\Pages\EvaluationFormPage;
+use App\Filament\Workgroup\Pages\Evaluations;
+use App\Filament\Workgroup\Pages\Files;
+use App\Filament\Workgroup\Pages\Links;
+use App\Filament\Workgroup\Pages\Notes;
+use App\Filament\Workgroup\Pages\Profile;
+use App\Filament\Workgroup\Pages\SessionResultsPage;
+use App\Filament\Workgroup\Pages\SharedUploads;
+use App\Http\Middleware\EnsureWorkgroupPanelAccess;
+use App\Http\Middleware\ForceFilamentPasswordChange;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
-use Filament\Navigation\NavigationItem;
-use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use App\Http\Middleware\EnsureWorkgroupPanelAccess;
-use Filament\View\PanelsRenderHook;
-use App\Filament\Pages\Auth\Login;
-use App\Filament\Pages\NotificationSettings;
-use App\Filament\Workgroup\Pages\Dashboard;
-use App\Filament\Workgroup\Pages\Files;
-use App\Filament\Workgroup\Pages\Notes;
-use App\Filament\Workgroup\Pages\Evaluations;
-use App\Filament\Workgroup\Pages\SharedUploads;
-use App\Filament\Workgroup\Pages\Profile;
-use App\Filament\Workgroup\Pages\EvaluationFormPage;
-use App\Filament\Workgroup\Pages\SessionResultsPage;
-use App\Filament\Workgroup\Pages\Links;
-use App\Filament\Resources\Workgroup\CandidateProductResource;
-use App\Filament\Resources\Workgroup\EvaluationCategoryResource;
 
 class WorkgroupPanelProvider extends PanelProvider
 {
@@ -76,6 +76,7 @@ class WorkgroupPanelProvider extends PanelProvider
                 SessionResultsPage::class,
                 NotificationSettings::class,
                 Links::class,
+                SetPasswordPage::class,
             ])
             ->widgets([
                 \App\Filament\Workgroup\Widgets\WorkgroupStatsWidget::class,
@@ -132,6 +133,11 @@ class WorkgroupPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 EnsureWorkgroupPanelAccess::class,
+                ForceFilamentPasswordChange::class,
+            ])
+            ->persistentMiddleware([
+                EnsureWorkgroupPanelAccess::class,
+                ForceFilamentPasswordChange::class,
             ])
             ->sidebarCollapsibleOnDesktop()
             ->renderHook(
@@ -144,9 +150,9 @@ class WorkgroupPanelProvider extends PanelProvider
             <meta name="apple-mobile-web-app-capable" content="yes">
             <meta name="apple-mobile-web-app-status-bar-style" content="default">
             <meta name="apple-mobile-web-app-title" content="Eval Feedback Hub">
-            <link rel="apple-touch-icon" href="' . secure_asset('images/mbfd_logo-256.png') . '" sizes="180x180">
-            <link rel="apple-touch-startup-image" href="' . secure_asset('images/mbfd_logo.png') . '" sizes="160x290 640x1136" media="screen and (max-device-width: 414px)">
-            <link rel="manifest" href="' . secure_asset('/manifest.json') . '">
+            <link rel="apple-touch-icon" href="'.secure_asset('images/mbfd_logo-256.png').'" sizes="180x180">
+            <link rel="apple-touch-startup-image" href="'.secure_asset('images/mbfd_logo.png').'" sizes="160x290 640x1136" media="screen and (max-device-width: 414px)">
+            <link rel="manifest" href="'.secure_asset('/manifest.json').'">
             <meta name="theme-color" content="#ff0000">',
             );
     }

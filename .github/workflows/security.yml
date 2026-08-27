@@ -28,6 +28,8 @@ jobs:
           php-version: '8.4'
 
       - name: Install Composer dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --no-interaction --prefer-dist
 
       - name: Composer security audit

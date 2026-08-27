@@ -14,7 +14,7 @@ class TrainingTodoWidget extends BaseWidget
 {
     protected static ?int $sort = 2;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
@@ -43,7 +43,7 @@ class TrainingTodoWidget extends BaseWidget
                                 $record->createdBy?->name ? "By: {$record->createdBy->name}" : null,
                             ])->filter()->join(' • ');
 
-                            return trim($desc . ($meta ? "\n{$meta}" : ''));
+                            return trim($desc.($meta ? "\n{$meta}" : ''));
                         }),
                     TextColumn::make('assignee_names')
                         ->label('Assigned To')
@@ -73,7 +73,8 @@ class TrainingTodoWidget extends BaseWidget
                     ->label('New Training Todo')
                     ->icon('heroicon-o-plus')
                     ->color('primary')
-                    ->url(route('filament.training.resources.training-todos.create')),
+                    ->url(route('filament.training.resources.training-todos.create'))
+                    ->visible(fn (): bool => auth()->user()?->can('create', TrainingTodo::class) ?? false),
             ])
             ->emptyStateHeading('No pending training todos')
             ->emptyStateDescription('All training todos are completed or no todos exist.')

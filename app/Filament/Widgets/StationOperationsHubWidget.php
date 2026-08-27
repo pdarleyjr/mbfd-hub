@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\DefectResource;
-use App\Filament\Resources\InspectionResource;
 use App\Filament\Resources\StationInspectionResource;
 use App\Filament\Resources\StationRequestResource;
 use App\Filament\Resources\StationResource;
+use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
-use App\Models\ApparatusInspection;
 use App\Models\Station;
 use App\Models\StationInspection;
 use App\Models\StationRequest;
 use App\Models\StationSupplyRequest;
 use App\Models\User;
+use App\Services\DailyCheckoutComplianceService;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -40,7 +41,7 @@ class StationOperationsHubWidget extends Widget
      */
     public function getViewData(): array
     {
-        $stationModels = Station::with('apparatuses:id,station_id,unit_id,designation')
+        $stationModels = Station::with('apparatuses:id,station_id,unit_id,designation,status,daily_checkout_requirement')
             ->where('is_active', true)
             ->orderBy('station_number')
             ->get(['id', 'station_number']);
@@ -54,7 +55,18 @@ class StationOperationsHubWidget extends Widget
             fn (Station $s) => [$s->id => $s->apparatuses->pluck('id')->toArray()]
         )->toArray();
 
-        $stationData = $this->loadAllStationData($stations);
+        $dailyCheckoutByStation = app(DailyCheckoutComplianceService::class)
+            ->summariesForStations($stationModels);
+        /** @var Collection<int, Apparatus> $apparatusById */
+        $apparatusById = $stationModels
+            ->flatMap(function (Station $station): Collection {
+                /** @var Collection<int, Apparatus> $apparatuses */
+                $apparatuses = $station->apparatuses;
+
+                return $apparatuses;
+            })
+            ->keyBy(static fn (Apparatus $apparatus): int => (int) $apparatus->getKey());
+        $stationData = $this->loadAllStationData($stations, $dailyCheckoutByStation, $apparatusById);
 
         return [
             'stations' => $stations,
@@ -62,13 +74,17 @@ class StationOperationsHubWidget extends Widget
         ];
     }
 
-    protected function loadAllStationData(array $stations): array
+    /**
+     * @param  array<int, array<string, int>>  $stations
+     * @param  array<int, array<string, mixed>>  $dailyCheckoutByStation
+     * @param  Collection<int, Apparatus>  $apparatusById
+     */
+    protected function loadAllStationData(array $stations, array $dailyCheckoutByStation, Collection $apparatusById): array
     {
         $stationIds = collect($stations)->pluck('id')->toArray();
         $allApparatusIds = collect($this->stationApparatusMap)->flatten()->toArray();
 
         // Batch queries with eager loading
-        $todayInspections = $this->getTodayVehicleInspections($allApparatusIds);
         $stationInspections = $this->getStationInspections($stationIds);
         $stationRequests = $this->getStationRequests($stationIds);
         $defects = $this->getUnresolvedDefects($allApparatusIds);
@@ -79,10 +95,6 @@ class StationOperationsHubWidget extends Widget
             $sid = $station['id'];
             $apparatusIds = $this->stationApparatusMap[$sid] ?? [];
 
-            $stationVehicleInspections = $todayInspections->filter(
-                fn ($i) => in_array($i->apparatus_id, $apparatusIds)
-            )->values();
-
             $stationDefects = $defects->filter(
                 fn ($d) => in_array($d->apparatus_id, $apparatusIds)
             )->values();
@@ -90,15 +102,20 @@ class StationOperationsHubWidget extends Widget
             $stationRequestRows = $stationRequests->where('station_id', $sid)->values();
             $stationStationInsp = $stationInspections->where('station_id', $sid)->values();
             $stationSupplyReqs = $supplyRequests->where('station_id', $sid)->values();
+            $dailyCheckout = $dailyCheckoutByStation[$sid] ?? null;
 
             $data[$sid] = [
-                'vehicleInspections' => $this->formatVehicleInspections($stationVehicleInspections),
+                'dailyCheckout' => $dailyCheckout,
+                'dailyCheckoutRows' => $dailyCheckout === null
+                    ? []
+                    : $this->formatDailyCheckoutMatrix($dailyCheckout, $apparatusById),
+                'dailyCheckoutSubtitle' => $this->dailyCheckoutSubtitle($dailyCheckout),
                 'stationInspections' => $this->formatStationInspections($stationStationInsp),
                 'stationRequests' => $this->formatStationRequests($stationRequestRows),
                 'defects' => $this->formatDefects($stationDefects),
                 'supplyRequests' => $this->formatSupplyRequests($stationSupplyReqs, $sid),
                 'counts' => [
-                    'vehicleInspections' => $stationVehicleInspections->count(),
+                    'dailyCheckoutCompleted' => $dailyCheckout['completed'] ?? 0,
                     'stationInspections' => $stationStationInsp->count(),
                     'stationRequests' => $stationRequestRows->count(),
                     'defects' => $stationDefects->count(),
@@ -111,20 +128,6 @@ class StationOperationsHubWidget extends Widget
     }
 
     // ── Query methods ────────────────────────────────────────────
-
-    private function getTodayVehicleInspections(array $apparatusIds): Collection
-    {
-        if (empty($apparatusIds)) {
-            return collect();
-        }
-
-        return ApparatusInspection::with('apparatus:id,station_id,unit_id,designation')
-            ->whereIn('apparatus_id', $apparatusIds)
-            ->whereDate('created_at', Carbon::today())
-            ->orderByDesc('created_at')
-            ->limit(50)
-            ->get(['id', 'apparatus_id', 'operator_name', 'shift', 'completed_at', 'created_at']);
-    }
 
     private function getStationInspections(array $stationIds): Collection
     {
@@ -171,18 +174,58 @@ class StationOperationsHubWidget extends Widget
 
     // ── Formatting methods (convert to arrays with URLs) ─────────
 
-    private function formatVehicleInspections(Collection $inspections): array
+    /**
+     * @param  array<string, mixed>  $dailyCheckout
+     * @param  Collection<int, Apparatus>  $apparatusById
+     * @return list<array<string, string|int>>
+     */
+    private function formatDailyCheckoutMatrix(array $dailyCheckout, Collection $apparatusById): array
     {
-        return $inspections->map(fn (ApparatusInspection $i) => [
-            'id' => $i->id,
-            'unit' => $i->apparatus?->designation ?? $i->apparatus?->unit_id ?? 'Unknown',
-            'operator' => $i->operator_name ?? 'Unknown',
-            'shift' => $i->shift ?? '',
-            'time' => $i->completed_at
-                ? Carbon::parse($i->completed_at)->format('g:i A')
-                : ($i->created_at?->format('g:i A') ?? ''),
-            'url' => InspectionResource::getUrl('view', ['record' => $i->id]),
-        ])->toArray();
+        /** @var list<array{apparatus_id: int, state: string, included_in_completed: bool}> $matrix */
+        $matrix = $dailyCheckout['matrix'];
+
+        return collect($matrix)
+            ->map(function (array $row) use ($apparatusById): array {
+                $apparatusId = (int) $row['apparatus_id'];
+                $apparatus = $apparatusById->get($apparatusId);
+                $state = (string) $row['state'];
+
+                return [
+                    'id' => $apparatusId,
+                    'unit' => $apparatus instanceof Apparatus
+                        ? ($apparatus->designation ?? $apparatus->getAttribute('unit_id') ?? "Apparatus {$apparatusId}")
+                        : "Apparatus {$apparatusId}",
+                    'state' => $state,
+                    'completion' => $row['included_in_completed']
+                        ? 'completed'
+                        : (in_array($state, ['out_of_service', 'exempt'], true) ? 'excluded' : 'not complete'),
+                    'url' => ApparatusResource::getUrl('edit', ['record' => $apparatusId]),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /** @param array<string, mixed>|null $dailyCheckout */
+    private function dailyCheckoutSubtitle(?array $dailyCheckout): string
+    {
+        if ($dailyCheckout === null) {
+            return 'Daily Checkout unavailable';
+        }
+
+        if (($dailyCheckout['completion_available'] ?? false) !== true) {
+            return 'No required apparatus — completion unavailable';
+        }
+
+        return sprintf(
+            '%d / %d complete · %d review pending · %d OOS · %d exempt · %d classification required',
+            $dailyCheckout['completed'],
+            $dailyCheckout['required_total'],
+            $dailyCheckout['review_pending'],
+            $dailyCheckout['out_of_service'],
+            $dailyCheckout['exempt'],
+            $dailyCheckout['classification_required'],
+        );
     }
 
     /** @param Collection<int, StationInspection> $inspections */
@@ -219,17 +262,23 @@ class StationOperationsHubWidget extends Widget
 
     private function formatDefects(Collection $defects): array
     {
-        return $defects->map(fn (ApparatusDefect $d) => [
-            'id' => $d->id,
-            'unit' => $d->apparatus?->designation ?? $d->apparatus?->unit_id ?? 'Unknown',
-            'item' => $d->item ?? 'Unknown',
-            'issue_type' => $d->issue_type ?? '',
-            'status' => $d->status ?? 'Unknown',
-            'reported_date' => $d->reported_date
-                ? Carbon::parse($d->reported_date)->format('M j, Y')
-                : ($d->created_at?->format('M j, Y') ?? ''),
-            'url' => DefectResource::getUrl('edit', ['record' => $d->id]),
-        ])->toArray();
+        return $defects->map(function (ApparatusDefect $defect): array {
+            $apparatus = $defect->getAttribute('apparatus');
+
+            return [
+                'id' => $defect->id,
+                'unit' => $apparatus instanceof Apparatus
+                    ? ($apparatus->designation ?? $apparatus->getAttribute('unit_id') ?? 'Unknown')
+                    : 'Unknown',
+                'item' => $defect->item ?? 'Unknown',
+                'issue_type' => $defect->issue_type ?? '',
+                'status' => $defect->status ?? 'Unknown',
+                'reported_date' => $defect->reported_date
+                    ? Carbon::parse($defect->reported_date)->format('M j, Y')
+                    : ($defect->created_at?->format('M j, Y') ?? ''),
+                'url' => DefectResource::getUrl('edit', ['record' => $defect->id]),
+            ];
+        })->toArray();
     }
 
     private function formatSupplyRequests(Collection $requests, int $stationId): array

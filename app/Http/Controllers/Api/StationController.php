@@ -12,16 +12,19 @@ use App\Http\Resources\Public\PublicRoomResource;
 use App\Http\Resources\Public\PublicStationInspectionResource;
 use App\Http\Resources\Public\PublicStationRequestResource;
 use App\Http\Resources\Public\PublicStationResource;
+use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\Room;
 use App\Models\RoomAsset;
 use App\Models\RoomAudit;
 use App\Models\RoomAuditItem;
 use App\Models\Station;
+use App\Services\DailyCheckoutComplianceService;
 use App\Services\StationStaffingService;
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 class StationController extends Controller
@@ -94,6 +97,10 @@ class StationController extends Controller
             ->findOrFail($id);
 
         $staffing = app(StationStaffingService::class)->summaryFor($station);
+        /** @var Collection<int, Apparatus> $stationApparatuses */
+        $stationApparatuses = $station->apparatuses;
+        $dailyCheckout = app(DailyCheckoutComplianceService::class)
+            ->summaryForApparatuses($stationApparatuses);
         $dormBedsCount = $staffing['dorm_beds_count'];
         $personnelCount = $staffing['assigned_personnel_count'];
 
@@ -205,6 +212,7 @@ class StationController extends Controller
                     'current_defects_count' => $apparatus->relationLoaded('currentDefects') ? $apparatus->currentDefects->count() : 0,
                 ];
             })->values()->all(),
+            'daily_checkout' => $dailyCheckout,
             'rooms' => $station->rooms->map(function ($room) use ($roomsHaveIsActive) {
                 return [
                     'id' => $room->id,
@@ -691,23 +699,34 @@ class StationController extends Controller
     }
 
     /**
-     * Get today's apparatus inspections for apparatus assigned to this station
+     * Get today's apparatus inspection history for apparatus assigned to this station.
+     * This endpoint is not a Daily Checkout readiness or completion source.
      */
     public function apparatusInspections(int $id): JsonResponse
     {
         $station = Station::findOrFail($id);
 
         $apparatusIds = $station->apparatuses()->pluck('id');
+        $localNow = CarbonImmutable::now(DailyCheckoutComplianceService::TIMEZONE)
+            ->setTimezone(DailyCheckoutComplianceService::TIMEZONE);
+        $startOfDay = $localNow->startOfDay();
+        $startOfNextDay = $startOfDay->addDay();
 
         $inspections = ApparatusInspection::whereIn('apparatus_id', $apparatusIds)
-            ->whereDate('created_at', Carbon::today())
+            ->whereNotNull('completed_at')
+            // Pending public submissions are evidence for officer review, not
+            // an operationally completed checkout for the public station view.
+            ->where('review_status', 'approved')
+            ->where('completed_at', '>=', $startOfDay->utc())
+            ->where('completed_at', '<', $startOfNextDay->utc())
             ->with('apparatus')
-            ->orderBy('created_at', 'desc')
+            ->orderBy('completed_at', 'desc')
             ->get();
 
         // SECURITY (H-02): public endpoint — redact operator name and rank.
         return response()->json([
             'station_id' => $id,
+            'apparatus_inspection_history_only' => true,
             'inspections' => PublicApparatusInspectionResource::collection($inspections)->resolve(request()),
             'total' => $inspections->count(),
         ]);

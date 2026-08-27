@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class WorkgroupNote extends Model
 {
@@ -61,6 +62,6 @@ class WorkgroupNote extends Model
      */
     public function getPreviewAttribute($length = null): string
     {
-        return \Str::limit(strip_tags($this->content ?? ''), (int) ($length ?? 100));
+        return Str::limit(strip_tags($this->content ?? ''), (int) ($length ?? 100));
     }
 }

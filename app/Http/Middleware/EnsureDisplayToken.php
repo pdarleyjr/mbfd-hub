@@ -17,10 +17,8 @@ use Symfony\Component\HttpFoundation\Response;
  * endpoints — including the staff-only personnel roster — are only reachable by a
  * caller that presents the shared secret in the X-Display-Token header.
  *
- * Backward-compatible by design: when no token is configured
- * (config('services.display_api.token') is empty) the guard is a no-op, so the
- * routes keep working in local/dev and during a staged rollout. Enforcement turns
- * on the moment DISPLAY_API_TOKEN is set in the environment.
+ * DISPLAY_API_TOKEN is required wherever these routes are exposed. If it is
+ * absent, non-preflight requests fail closed before reaching a display endpoint.
  */
 final class EnsureDisplayToken
 {
@@ -28,9 +26,16 @@ final class EnsureDisplayToken
     {
         $expected = config('services.display_api.token');
 
-        // Not configured -> open (no-op). CORS preflight is never gated.
-        if (! is_string($expected) || $expected === '' || $request->getMethod() === 'OPTIONS') {
+        // CORS preflight is never gated.
+        if ($request->getMethod() === 'OPTIONS') {
             return $next($request);
+        }
+
+        if (! is_string($expected) || $expected === '') {
+            return response()->json(
+                ['message' => 'Display API is unavailable.'],
+                Response::HTTP_SERVICE_UNAVAILABLE
+            );
         }
 
         $provided = (string) $request->header('X-Display-Token', '');

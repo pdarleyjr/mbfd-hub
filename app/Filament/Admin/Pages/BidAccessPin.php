@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Support\BidApiUrl;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -165,7 +166,7 @@ class BidAccessPin extends Page implements HasForms
             return null;
         }
 
-        return rtrim(str_replace('staging.', 'api.staging.', $base), '/');
+        return BidApiUrl::fromConsoleUrl($base);
     }
 
     /**

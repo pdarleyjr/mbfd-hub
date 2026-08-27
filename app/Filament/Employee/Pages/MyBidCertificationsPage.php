@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Employee\Pages;
 
 use App\Models\Employee;
+use App\Support\BidApiUrl;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -66,7 +67,7 @@ class MyBidCertificationsPage extends Page
         // The bid Worker exposes a read endpoint scoped by employee_id with
         // the same bearer token used by /verify-credentials. Worker side
         // returns `{ credentials: string[], lastUpdated: ISO8601 }`.
-        $url = rtrim(str_replace('staging.', 'api.staging.', $base), '/')
+        $url = BidApiUrl::fromConsoleUrl($base)
             .'/api/portal/members/'
             .rawurlencode($employeeId)
             .'/credentials';

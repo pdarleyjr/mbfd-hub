@@ -1,7 +1,8 @@
 name: Production activation
 
-# Manual cutover workflow. Triggered via `gh workflow run production-activate.yml`
-# or the GitHub Actions UI. Each toggle is independent — you can flip Redis
+# Independent Hub operations workflow. It is not a source-release path and
+# cannot substitute for the verified candidate activation in deploy.yml. It is
+# restricted to an explicitly confirmed main-ref production operation. Each toggle is independent — you can flip Redis
 # without R2 and vice versa. Both operations:
 #   - take a timestamped .env backup BEFORE writing anything
 #   - rebuild config cache so the new env values take effect
@@ -14,6 +15,11 @@ name: Production activation
 on:
   workflow_dispatch:
     inputs:
+      confirm_production_activation:
+        description: 'I confirm this approved main-ref Hub production operation may run.'
+        required: true
+        type: boolean
+        default: false
       activate_redis:
         description: 'Flip CACHE_STORE / QUEUE_CONNECTION / SESSION_DRIVER / BROADCAST_DRIVER to redis (+reverb)'
         required: false
@@ -59,12 +65,18 @@ concurrency:
 
 jobs:
   activate:
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: self-hosted
     timeout-minutes: 15
     environment:
       name: production
       url: https://www.mbfdhub.com
     steps:
+      - name: Require main and explicit activation confirmation
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "${{ inputs.confirm_production_activation }}" = "true"
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh

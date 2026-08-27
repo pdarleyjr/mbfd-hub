@@ -6,7 +6,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Sentry\Laravel\Integration;
 
-return Application::configure(basePath: dirname(__DIR__))
+$app = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -32,7 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin.role' => \App\Http\Middleware\EnsureAdminApiRole::class,
             'workgroup.access' => \App\Http\Middleware\EnsureWorkgroupPanelAccess::class,
+            'workgroup.global' => \App\Http\Middleware\EnsureGlobalWorkgroupAccess::class,
             'verify.bid.token' => \App\Http\Middleware\VerifyBidReaderToken::class,
+            'station-inventory.signed' => \App\Http\Middleware\ValidateStationInventorySignature::class,
             'display.readonly' => \App\Http\Middleware\EnsureDisplayReadOnly::class,
             'display.token' => \App\Http\Middleware\EnsureDisplayToken::class,
             'conference.enabled' => \App\Http\Middleware\EnsureVideoConferencingEnabled::class,
@@ -69,3 +71,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         Integration::handles($exceptions);
     })->create();
+
+if (defined('MBFD_PHPUNIT_BOOTSTRAP')) {
+    $app->loadEnvironmentFrom('tests/Fixtures/phpunit.environment');
+}
+
+return $app;
