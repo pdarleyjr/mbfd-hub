@@ -323,6 +323,62 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
         $this->assertFalse($row['canonical_daily']['included_in_completed']);
     }
 
+    public function test_it_blocks_an_unresolved_operational_classification_by_default_and_allows_it_only_for_owner_beta(): void
+    {
+        $apparatus = $this->makeApparatus([
+            'daily_checkout_requirement' => 'required',
+            'daily_checkout_template' => 'engine',
+        ]);
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $this->makeInspection($apparatus, CarbonImmutable::parse('2026-08-26T14:00:00Z'), (string) $resolution['checklist_version']);
+        $manifest = $this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+            operationalClassification: 'unknown',
+        );
+
+        [$defaultStatus, $defaultReport] = $this->preactivate($this->writeManifest($manifest));
+
+        $this->assertSame(Command::FAILURE, $defaultStatus);
+        $this->assertFalse($defaultReport['gate_passed']);
+        $this->assertSame([], $defaultReport['technical_issues']);
+        $this->assertSame(['operational_classification_required'], $defaultReport['policy_issues']);
+        $this->assertSame(['operational_classification_required'], $defaultReport['blocking_policy_issues']);
+        $this->assertFalse($defaultReport['apparatus'][0]['classification_required']);
+        $this->assertSame('unknown', $defaultReport['apparatus'][0]['operational_classification']);
+
+        [$betaStatus, $betaReport] = $this->preactivate(
+            $this->writeManifest($manifest),
+            allowClassificationRequired: true,
+        );
+
+        $this->assertSame(Command::SUCCESS, $betaStatus);
+        $this->assertTrue($betaReport['gate_passed']);
+        $this->assertSame([], $betaReport['technical_issues']);
+        $this->assertSame(['operational_classification_required'], $betaReport['policy_issues']);
+        $this->assertSame([], $betaReport['blocking_policy_issues']);
+        $this->assertFalse($betaReport['apparatus'][0]['classification_required']);
+        $this->assertSame('unknown', $betaReport['apparatus'][0]['operational_classification']);
+    }
+
+    public function test_it_rejects_an_unrecognized_operational_classification(): void
+    {
+        $apparatus = $this->makeApparatus();
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $manifest = $this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+            operationalClassification: 'guessed',
+        );
+
+        [$status, $report] = $this->preactivate($this->writeManifest($manifest));
+
+        $this->assertSame(Command::FAILURE, $status);
+        $this->assertContains('policy_manifest_operational_classification_invalid', $report['issues']);
+    }
+
     public function test_the_beta_classification_flag_does_not_waive_a_policy_integrity_mismatch(): void
     {
         $apparatus = $this->makeApparatus([
@@ -334,6 +390,7 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
             $apparatus,
             expectedChecklistType: 'engine',
             expectedChecklistVersion: (string) $resolution['checklist_version'],
+            operationalClassification: 'unknown',
         );
         $manifest['apparatus'][0]['designation'] = 'MISMATCHED-UNIT';
 
@@ -346,7 +403,7 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
         $this->assertFalse($report['gate_passed']);
         $this->assertTrue($report['input']['allow_classification_required']);
         $this->assertContains('policy_data_mismatch:designation', $report['technical_issues']);
-        $this->assertSame(['classification_required'], $report['policy_issues']);
+        $this->assertSame(['operational_classification_required', 'classification_required'], $report['policy_issues']);
         $this->assertSame([], $report['blocking_policy_issues']);
         $this->assertContains('policy_data_mismatch:designation', $report['issues']);
     }
@@ -604,6 +661,7 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
         string $expectedChecklistType,
         string $expectedChecklistVersion,
         ?array $preLedgerReview = null,
+        string $operationalClassification = 'active',
     ): array {
         $station = Station::on(self::CONNECTION)->findOrFail($apparatus->station_id);
 
@@ -623,7 +681,7 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
                 'vehicle_number' => $apparatus->vehicle_number,
                 'type' => $apparatus->type,
                 'station_number' => (string) $station->station_number,
-                'operational_classification' => 'active',
+                'operational_classification' => $operationalClassification,
                 'daily_checkout_requirement' => $apparatus->getRawOriginal('daily_checkout_requirement'),
                 'daily_checkout_template' => $apparatus->getRawOriginal('daily_checkout_template'),
                 'expected_checklist_type' => $expectedChecklistType,

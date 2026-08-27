@@ -247,6 +247,9 @@ final class AuditDailyCheckoutPreactivation extends Command
                 $rowIssues[] = 'apparatus_present_but_not_in_approved_policy';
             } else {
                 $rowIssues = array_merge($rowIssues, $this->policyMismatches($apparatus, $policy));
+                if ($policy['operational_classification'] === 'unknown') {
+                    $rowPolicyIssues[] = 'operational_classification_required';
+                }
             }
 
             $model = $models->first(static fn (Apparatus $model): bool => (int) $model->id === $apparatusId);
@@ -444,7 +447,10 @@ final class AuditDailyCheckoutPreactivation extends Command
 
     private static function isWaivedBetaPolicyIssue(bool $allowClassificationRequired, string $issue): bool
     {
-        return $allowClassificationRequired && $issue === 'classification_required';
+        return $allowClassificationRequired && in_array($issue, [
+            'classification_required',
+            'operational_classification_required',
+        ], true);
     }
 
     /** @return array<string, bool> */
