@@ -3,20 +3,19 @@
 ## Purpose and fixed boundary
 
 This is a source-decomposition plan for the committed audit branch
-`audit/mbfd-hub-full-system-20260825`. The original published umbrella head
-was `23d9a19e5b1070edd47fcacab90baf8d4894cc5b`; this continuation also covers
-the follow-on source checkpoint `ef82652a3e80b2acdf2261c2b27461f952692eb6`.
-It is not merge, deployment, production-migration, Cloudflare, or physical-AV
+`audit/mbfd-hub-full-system-20260825`. The current source checkpoint before
+this documentation-only update is `62e4749e89246eb62fce24012bbda2d87f135317`.
+The original published umbrella and follow-on checkpoints remain historical
+context; this continuation does not reset, squash, or discard them. It is not
+merge, deployment, production-migration, Cloudflare, or physical-AV
 authorization.
 
 The inspected local merge base is cached `origin/main` at
-`ac6965f88f7d8ed441e08996b93d7cdb9f9b99c0`. At the follow-on source
-checkpoint, the committed range contains 36 linear commits and 238 files
-(`+29,302/-2,341`); `git diff --check` reported no whitespace errors. The
-original remote umbrella measured 29 commits / 223 files (`+26,160/-2,265`)
-at `23d9a19e5`; the difference is the constrained continuation work allocated
-below. `.audit-postgres/` remains untracked local evidence and must neither be
-staged nor copied into any child PR.
+`ac6965f88f7d8ed441e08996b93d7cdb9f9b99c0`. At the current source checkpoint,
+the committed range contains 47 linear commits and 242 files
+(`+30,190/-2,594`); `git diff --check` reported no whitespace errors.
+`.audit-postgres/` remains untracked local evidence and must neither be staged
+nor copied into any child PR.
 
 Strict exclusions:
 
@@ -36,6 +35,27 @@ The changed-path review found no committed Media Control, MediaMTX,
 ScreenTinker, eARC, or P3 path change. Audit inventory text and PHPUnit
 isolation references are documentation/test containment, not Media Control
 work.
+
+## Executed clean candidate branches
+
+The following candidates were rebuilt manually in clean worktrees rather than
+cherry-picked from the mixed umbrella range. All remain draft and unmerged;
+none authorizes a deployment.
+
+| Pull request | Candidate and base | Commit | Scope / observed local evidence |
+|---|---|---|---|
+| [#217](https://github.com/pdarleyjr/mbfd-hub/pull/217) | Station Inventory V2 signature guard → `main` | `ca0414b0` | Eight paths: central middleware/route guard, actor resolver, controller, and focused tests. Syntax, candidate Pint, and whitespace checks passed; full Laravel suite was not locally runnable in that clean worktree. |
+| [#218](https://github.com/pdarleyjr/mbfd-hub/pull/218) | Generic test-runtime isolation → `main` | `b36a3edd` | Eight harness-only paths: comment-only PHPUnit sentinel, HTTP/process blocking, and disposable PostgreSQL guard. Syntax, candidate Pint, XML, sentinel, and guard checks passed; no feature configuration was included. |
+| [#219](https://github.com/pdarleyjr/mbfd-hub/pull/219) | Workgroup AI hardening → #218 | `ce2fb3ec` | Seven Workgroup-only paths: explicit config-backed enable/URL/secret, fail-closed service, authenticated requests, and regression coverage. Focused PHP 8.5 harness passed 12 tests / 97 assertions plus syntax, Pint, XML, diff, fallback, and secret checks. |
+
+GitHub Actions is temporarily unavailable because the user reported exhausted
+minutes. It remains enabled. The current local-equivalent evidence does not
+turn any candidate into a hosted-CI pass; PHPStan, PostgreSQL, Trivy, and
+Actionlint remain explicitly unverified where their locked tool/service is not
+available locally. At the umbrella source checkpoint, the materialized local
+non-PostgreSQL suite passed 604 tests / 3,361 assertions on each PHP 8.4.6 and
+PHP 8.5.4 interpreter; that proves neither a child PR's hosted matrix nor a
+deployment.
 
 ## Exhaustive subsystem allocation
 
@@ -112,7 +132,7 @@ Cross-dependencies that prohibit arbitrary extraction:
 - Command Display token enforcement is independent of the canonical Daily
   projection, but requires out-of-repository caller continuity before release.
 
-## Candidate child-PR sequence
+## Planned child-PR sequence — historical plan
 
 | Sequence | Candidate PR | Status | Preconditions and verification focus |
 |---:|---|---|---|
@@ -131,22 +151,27 @@ Cross-dependencies that prohibit arbitrary extraction:
 | 12 | PulsePoint Worker hardening | Strictly separate | Worker-only locked install, typecheck, and unit test; no deployment. |
 | 13 | Audit evidence | Independent, last | Regenerate/review only when the final candidate and observed evidence are known. |
 
-### Follow-on child-PR order
+The executed branch sequence above refines this plan without changing its
+release boundary: #218 supplies the generic harness root, #217 is an
+independent Station Inventory candidate, and #219 is the Workgroup AI slice
+stacked on #218. Web Push was deliberately not bundled into #219.
+
+### Follow-on child-PR order — remaining work
 
 1. Candidate-scoped Pint and reusable-gate wiring. Run the Node helper tests and
    PHP candidate-path Pint. Do not make the historic full-repository Pint debt
    a functional PR change.
 2. Station Inventory failure cleanup plus queue-status authorization, then user
    role assignment. These are independent, small authorization/storage units.
-3. Workgroup AI default-off egress and Web Push registration hardening. Both
-   require their owner configuration decisions before activation, but neither
-   requires a Media Control action.
+3. #219 executes Workgroup AI default-off egress only. Keep Web Push
+   registration hardening in its own owner-configuration candidate; neither
+   candidate requires a Media Control action.
 4. Daily preactivation gate stacked after the Daily foundation/review/canonical
    PRs. Run it only on an owner-approved, read-only candidate snapshot—not on
    production—and retain its explicit Reserve/unresolved-state failure.
-5. Fold the final evidence update into the audit/documentation PR only after
-   exact-SHA hosted CI is available. Do not state that a source-only check is a
-   deployment result.
+5. Fold the final evidence update into the audit/documentation PR after the
+   temporary GitHub Actions capacity limit clears and exact-SHA hosted CI is
+   available. Do not state that a source-only check is a deployment result.
 
 ## Commit extraction limits
 
@@ -263,20 +288,20 @@ approval. None of those gates is Media Control acceptance.
 ## Current blockers to a Hub release
 
 The audit records that PR #216 is **FAIL / not ready to merge or deploy**.
-Observed hosted PHPStan evidence applies to source checkpoint `5e7addd05`, not
-the follow-on source checkpoint. Candidate-scoped Pint currently passes all
-177 changed PHP files, while the broad repository audit has 293 historic
-nonconforming files. The original audit head has runnerless, zero-step
-static/Trivy cancellations and queued CI/assets/CodeQL work; the follow-on
-checkpoint requires its own successful exact-SHA hosted matrix. Do not attribute this external
-Actions state to a source/security finding without runner/account evidence.
+Hosted PHPStan evidence applies only to earlier source checkpoints. GitHub
+Actions is temporarily unavailable because the user reported exhausted minutes,
+so current exact-SHA hosted validation is **not observed**, not green or
+waived. Candidate-scoped Pint currently passes all 179 changed PHP files, while
+the broad repository audit has 292 inherited nonconforming paths. Do not
+attribute the external Actions-capacity condition to a source or security
+finding.
 
-Even after CI is repaired and rerun, the following remain release blockers for
-the affected child PRs: Daily data classification/template ownership, historical
+Even after hosted CI resumes, the following remain release blockers for the
+affected child PRs: Daily data classification/template ownership, historical
 OOS-return cutover review, TRT duplicate preflight, Command Display token
-continuity, restore rehearsal/rollback proof, and staged public/API/browser
-authorization evidence. An active classroom presentation additionally blocks
-any Hub deployment because direct service separation does not prove harmless
-shared-host resource contention. Build a fresh, exact-SHA, Hub-only candidate
-from the selected child PRs; do not deploy the mixed audit branch as a
-substitute.
+continuity, restore rehearsal/rollback proof, staged public/API/browser
+authorization evidence, and owner-configured GitHub governance. The classroom
+has ended, but that does not authorize a Hub deployment: direct service
+separation does not prove harmless shared-host resource contention, and Media
+Control remains frozen. Build a fresh, exact-SHA, Hub-only candidate from the
+selected child PRs; do not deploy the mixed audit branch as a substitute.
