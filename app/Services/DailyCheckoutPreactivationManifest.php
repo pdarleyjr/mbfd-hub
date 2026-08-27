@@ -181,7 +181,7 @@ final class DailyCheckoutPreactivationManifest
         }
 
         $operationalClassification = $this->requiredString($row, 'operational_classification');
-        if (! in_array($operationalClassification, ['active', 'reserve', 'inactive'], true)) {
+        if (! in_array($operationalClassification, ['active', 'reserve', 'inactive', 'unknown'], true)) {
             throw new RuntimeException('policy_manifest_operational_classification_invalid');
         }
 
