@@ -1,6 +1,7 @@
 import { test as setup, expect } from '@playwright/test';
+import { loopbackBaseUrl } from './support/test-environment';
 
-const BASE_URL = process.env.E2E_BASE_URL ?? 'https://mbfdhub.com';
+const BASE_URL = loopbackBaseUrl('E2E_BASE_URL', 'http://127.0.0.1:8098', 'PLAYWRIGHT_BASE_URL');
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? '';
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? '';
 const AUTH_FILE = 'tests/e2e/.auth/admin.json';
@@ -22,10 +23,7 @@ setup('authenticate as admin', async ({ page }) => {
         if (body.includes('redirect')) {
           console.log('Livewire redirect found in response');
         }
-        // Check for error messages
-        if (body.includes('credentials') || body.includes('error')) {
-          console.log('Livewire error snippet:', body.substring(body.indexOf('credentials') - 50, body.indexOf('credentials') + 100));
-        }
+        // Do not log response bodies: authentication failures may contain sensitive details.
         console.log('Livewire response length:', body.length);
       } catch {}
     }

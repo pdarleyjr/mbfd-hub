@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Api\Display;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -14,6 +15,15 @@ use Tests\TestCase;
 class DisplayReadOnlyTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $token = Str::random(48);
+        config(['services.display_api.token' => $token]);
+        $this->withHeader('X-Display-Token', $token);
+    }
 
     public function test_get_snapshot_returns_200(): void
     {

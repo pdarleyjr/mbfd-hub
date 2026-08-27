@@ -3,10 +3,12 @@
 namespace App\Filament\Workgroup\Widgets;
 
 use App\Models\EvaluationSubmission;
+use App\Models\User;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupNote;
 use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
+use App\Support\Workgroups\WorkgroupContext;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Auth;
@@ -17,8 +19,8 @@ class WorkgroupStatsWidget extends BaseWidget
     {
         $user = Auth::user();
         $workgroupMember = $this->getWorkgroupMember($user);
-        
-        if (!$workgroupMember) {
+
+        if (! $workgroupMember) {
             return [
                 Stat::make('No Workgroup', 'Not assigned')
                     ->description('Contact administrator')
@@ -29,10 +31,9 @@ class WorkgroupStatsWidget extends BaseWidget
 
         $workgroup = $workgroupMember->workgroup;
         $activeSession = $workgroup?->sessions()->active()->first();
-        
+
         // Count assigned files
-        $assignedFilesCount = $workgroup?->files()->when($activeSession, fn($q) => 
-            $q->where('workgroup_session_id', $activeSession->id)
+        $assignedFilesCount = $workgroup?->files()->when($activeSession, fn ($q) => $q->where('workgroup_session_id', $activeSession->id)
         )->count() ?? 0;
 
         // Count pending evaluations — only those that count
@@ -43,8 +44,7 @@ class WorkgroupStatsWidget extends BaseWidget
 
         // Count shared uploads
         $sharedUploadsCount = WorkgroupSharedUpload::where('workgroup_id', $workgroup?->id)
-            ->when($activeSession, fn($q) => 
-                $q->where('workgroup_session_id', $activeSession->id)
+            ->when($activeSession, fn ($q) => $q->where('workgroup_session_id', $activeSession->id)
             )
             ->count();
 
@@ -94,24 +94,25 @@ class WorkgroupStatsWidget extends BaseWidget
         ];
     }
 
-    protected function getWorkgroupMember($user): ?WorkgroupMember
+    protected function getWorkgroupMember(mixed $user): ?WorkgroupMember
     {
-        return WorkgroupMember::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->with('workgroup.sessions')
-            ->first();
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        return app(WorkgroupContext::class)->member($user)?->load('workgroup.sessions');
     }
 
     protected function getPendingEvaluationsCount(WorkgroupMember $member, ?WorkgroupSession $session): int
     {
-        if (!$session) {
+        if (! $session) {
             return 0;
         }
 
         // Get candidate products for this session that haven't been evaluated
         $totalProducts = $session->candidateProducts()->count();
         $evaluatedProducts = EvaluationSubmission::where('workgroup_member_id', $member->id)
-            ->whereHas('candidateProduct', fn($q) => $q->where('workgroup_session_id', $session->id))
+            ->whereHas('candidateProduct', fn ($q) => $q->where('workgroup_session_id', $session->id))
             ->count();
 
         return max(0, $totalProducts - $evaluatedProducts);

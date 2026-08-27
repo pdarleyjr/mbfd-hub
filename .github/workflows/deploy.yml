@@ -1,284 +1,328 @@
-name: Deploy to Production
+name: Deploy approved Hub candidate
 
+# A merge to main runs CI only. Production activation requires a deliberate
+# dispatch from main, an explicit confirmation, exact-SHA release gates, and
+# protected production-environment approval.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      confirm_production_activation:
+        description: 'I confirm this approved main candidate may activate the MBFD Hub production runtime.'
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
   group: production-deployment
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  ci:
+  assert-main:
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Setup PHP
-        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
-        with:
-          php-version: '8.4'
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress --no-scripts
-      - name: Syntax check
-        run: find app config routes -name "*.php" -exec php -l {} \; | grep -v "No syntax errors" || true
+      - name: Require main and explicit activation confirmation
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "${{ inputs.confirm_production_activation }}" = "true"
+          test -n "$GITHUB_SHA"
+
+  release-gates:
+    needs: assert-main
+    uses: ./.github/workflows/hub-release-gates.yml
+    with:
+      pint_base_sha: ${{ format('{0}^', github.sha) }}
 
   deploy:
-    needs: ci
+    needs: release-gates
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: self-hosted
-    timeout-minutes: 20
-    permissions:
-      contents: read
+    timeout-minutes: 60
     environment:
       name: production
       url: https://www.mbfdhub.com
-
     steps:
-      - name: Setup SSH
+      - name: Configure ephemeral Hub deployment SSH target
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ vars.MBFD_HUB_SSH_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.MBFD_HUB_SSH_KNOWN_HOSTS }}
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts 2>/dev/null || true
-          touch ~/.ssh/config
-          cp ~/.ssh/config ~/.ssh/config.before-deploy-${{ github.run_id }}
-          python3 - <<'PY'
-          from pathlib import Path
+          set -euo pipefail
+          test -n "$DEPLOY_KEY"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          SSH_DIR="$RUNNER_TEMP/mbfd-hub-ssh"
+          install -d -m 700 "$SSH_DIR"
+          printf '%s\n' "$DEPLOY_KEY" > "$SSH_DIR/deploy_key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$SSH_DIR/known_hosts"
+          printf 'Host deploy-target\n  HostName %s\n  User %s\n  IdentityFile %s\n  UserKnownHostsFile %s\n  StrictHostKeyChecking yes\n  ConnectTimeout 10\n' \
+            "$DEPLOY_HOST" "$DEPLOY_USER" "$SSH_DIR/deploy_key" "$SSH_DIR/known_hosts" > "$SSH_DIR/config"
+          chmod 600 "$SSH_DIR/deploy_key" "$SSH_DIR/config"
+          printf 'HUB_SSH_CONFIG=%s\n' "$SSH_DIR/config" >> "$GITHUB_ENV"
 
-          path = Path.home() / '.ssh' / 'config'
-          lines = path.read_text().splitlines()
-          kept = []
-          skip = False
-
-          for line in lines:
-              stripped = line.strip()
-              lower = stripped.lower()
-              if lower.startswith('host ') or lower.startswith('match '):
-                  skip = lower.startswith('host ') and 'deploy-target' in stripped.split()[1:]
-              if not skip:
-                  kept.append(line)
-
-          path.write_text('\n'.join(kept).rstrip() + '\n')
-          PY
-          cat >> ~/.ssh/config << EOF
-          Host deploy-target
-            HostName 127.0.0.1
-            User ${{ secrets.DEPLOY_USER }}
-            IdentityFile ~/.ssh/deploy_key
-            StrictHostKeyChecking no
-            ConnectTimeout 10
-            ServerAliveInterval 10
-            ServerAliveCountMax 3
-          EOF
-          chmod 600 ~/.ssh/config
-
-      - name: Pre-deploy backup
+      - name: Inspect Hub production checkout and runtime
+        env:
+          RELEASE_SHA: ${{ github.sha }}
         run: |
-          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          # TIMESTAMP intentionally expands on the runner; remote values remain escaped.
-          # shellcheck disable=SC2029
-          ssh deploy-target "
-            umask 077
-            PG=\$(docker ps --format '{{.Names}}' | grep pgsql | head -1)
-            if [ -n \"\$PG\" ]; then
-              docker exec \"\$PG\" pg_dump -U mbfd_user -Fc mbfd_hub > /tmp/pre_deploy_${TIMESTAMP}.dump
-              echo '✓ Pre-deploy backup: /tmp/pre_deploy_${TIMESTAMP}.dump'
-            else
-              echo '::warning::No PostgreSQL container found'
-            fi
-          "
+          set -euo pipefail
+          test -n "$RELEASE_SHA"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HUB_CHECKOUT=/opt/mbfd/mbfd-hub
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_PG_CONTAINER=mbfd-hub-pgsql
+          HUB_PG_DATABASE=mbfd_hub
+          HUB_PG_USER=mbfd_user
 
-      # set -e ensures failures inside the SSH heredoc bubble up — previously a
-      # silent git-reset permission error left the host on a stale commit while
-      # the workflow still reported success. HEAD verification below catches
-      # that case explicitly. The chown step runs inside the Laravel container
-      # as root via Docker group membership (no host sudo needed); it covers
-      # public/ (where vite emits root-owned files) plus app/Filament/Resources
-      # (where prior agents have created root-owned untracked files that block
-      # git clean -fd).
-      - name: Pull latest code
-        run: |
-          ssh deploy-target "set -e
-            cd /opt/mbfd/mbfd-hub
-            docker exec -u 0 mbfd-hub-laravel chown -R sail:sail /var/www/html/public /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/app/Filament 2>/dev/null || true
-            git fetch origin --force --prune
-            git reset --hard origin/main
-            git clean -fd
-            EXPECTED=\$(git rev-parse origin/main)
-            ACTUAL=\$(git rev-parse HEAD)
-            if [ \"\$EXPECTED\" != \"\$ACTUAL\" ]; then
-              echo '::error::HEAD does not match origin/main after reset' >&2
-              exit 1
-            fi
-            echo '{\"sha\":\"'\$ACTUAL'\",\"deployed_at\":\"'\$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' > public/deploy-marker.json
-            echo '✓ Code updated to '\$(git rev-parse --short HEAD)
-          "
-
-      - name: Rebuild containers
-        run: |
-          ssh deploy-target "
-            cd /opt/mbfd/mbfd-hub
-            docker compose -f compose.prod.yaml up -d --build
-            echo '✓ Containers rebuilt'
-          "
-
-      - name: Restart Laravel container
-        run: |
-          ssh deploy-target "docker restart mbfd-hub-laravel && echo '✓ Container restarted'"
-
-      - name: Wait for container ready
-        run: |
-          sleep 10
-          for i in $(seq 1 30); do
-            if ssh deploy-target "docker exec mbfd-hub-laravel php -r 'echo 1;'" 2>/dev/null; then
-              echo "✓ Container accepting commands after ${i}s"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::Container not ready after 30s"
-          exit 1
-
-      - name: Fix permissions
-        run: |
-          ssh deploy-target "cd /opt/mbfd/mbfd-hub && chmod -R 775 storage bootstrap/cache"
-
-      # Composer install runs INSIDE the container as the sail user so vendor/
-      # ownership matches the host runner — same pattern as Build frontend
-      # assets step below. The --no-dev flag keeps phpunit/mockery out of
-      # production. Lockfile drift would fail the whole deploy here rather
-      # than at runtime when an autoloaded class can't be found.
-      - name: Install PHP dependencies
-        run: |
-          ssh deploy-target "set -e
-            docker exec -u sail mbfd-hub-laravel composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
-            echo '✓ Composer dependencies installed'
-          "
-
-      - name: Run migrations and optimize
-        run: |
-          ssh deploy-target "
-            docker exec -u sail mbfd-hub-laravel php artisan storage:link --force 2>/dev/null || true
-            docker exec -u sail mbfd-hub-laravel php artisan migrate --force
-            docker exec -u sail mbfd-hub-laravel php artisan optimize:clear
-            docker exec -u sail mbfd-hub-laravel php artisan config:cache
-            docker exec -u sail mbfd-hub-laravel php artisan route:cache
-            docker exec -u sail mbfd-hub-laravel php artisan view:cache || docker exec -u sail mbfd-hub-laravel php artisan view:clear
-            docker exec -u sail mbfd-hub-laravel php artisan filament:clear-cached-components
-            echo '✓ Laravel optimized'
-          "
-
-      # docker exec runs as 'sail' (UID 1000) so build output is owned by the
-      # same user as the host runner — without this, files end up root-owned
-      # and the next deploy's git reset fails to replace them.
-      # Build into temporary directories first, then atomically swap public
-      # assets only after manifests exist. A failed Vite build must never remove
-      # the currently-live public/build/manifest.json again.
-      - name: Build frontend assets
-        run: |
-          ssh deploy-target "set -e
-            cd /opt/mbfd/mbfd-hub
-            docker exec -u sail mbfd-hub-laravel bash -lc 'set -e
-              rm -rf /var/www/html/public/build-next
-              npm ci --legacy-peer-deps
-              npx vite build --outDir public/build-next --emptyOutDir
-              test -s /var/www/html/public/build-next/manifest.json
-            '
-            docker exec -u sail mbfd-hub-laravel php artisan filament:assets
-            docker exec -u sail mbfd-hub-laravel bash -lc 'set -e
-              rm -rf /var/www/html/public/daily-next
-              cd /var/www/html/resources/js/daily-checkout
-              npm ci --legacy-peer-deps
-              DAILY_CHECKOUT_OUT_DIR=../../../public/daily-next npm run build
-              test -f /var/www/html/public/daily-next/index.html
-            '
-            rm -rf public/build-previous public/daily-previous
-            if [ -d public/build ]; then mv public/build public/build-previous; fi
-            mv public/build-next public/build
-            if [ -d public/daily ]; then mv public/daily public/daily-previous; fi
-            mv public/daily-next public/daily
-            echo '✓ All frontend assets built'
-          "
-
-      # Reverb and the queue worker start with the config cache that exists
-      # when the container boots. Restart after config:cache so both supervised
-      # processes use the same app credentials and runtime drivers as Laravel.
-      - name: Restart services with current config cache
-        run: |
-          ssh deploy-target "set -e
-            docker restart mbfd-hub-laravel >/dev/null
-            for i in \$(seq 1 45); do
-              if docker inspect --format='{{.State.Health.Status}}' mbfd-hub-laravel | grep -q '^healthy$'; then
-                echo '✓ Services restarted with current config cache'
-                exit 0
-              fi
-              sleep 1
-            done
-            echo 'Laravel container did not become healthy after config-cache restart' >&2
-            exit 1
-          "
-
-      - name: Verify background services
-        run: |
-          ssh deploy-target "set -e
-            docker exec mbfd-hub-laravel pgrep -af '^/usr/bin/php /var/www/html/artisan reverb:start '
-            docker exec mbfd-hub-laravel pgrep -af '^/usr/bin/php /var/www/html/artisan queue:work '
-            echo '✓ Supervised Reverb and queue worker verified'
-          "
-
-      - name: Wait for health
-        run: |
-          for i in $(seq 1 60); do
-            if ssh deploy-target "docker exec mbfd-hub-laravel curl -sf http://localhost:80" > /dev/null 2>&1; then
-              echo "✓ Laravel healthy after ${i}s"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::Laravel did not become healthy in 60s"
-          exit 1
-
-  smoke-tests:
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - name: Run smoke tests
-        run: |
-          PASS=0; FAIL=0
-          test_url() {
-            local desc="$1" url="$2" expected="${3:-200}"
-            HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" "$url" --max-time 15)
-            if [ "$HTTP_CODE" = "$expected" ]; then
-              echo "✓ $desc → HTTP $HTTP_CODE"; PASS=$((PASS + 1))
-            else
-              echo "✗ $desc → HTTP $HTTP_CODE (expected $expected)"; FAIL=$((FAIL + 1))
-            fi
-          }
-          echo "=== Post-Deploy Smoke Tests ==="
-          sleep 5
-          test_url "Landing page"        "https://www.mbfdhub.com/"
-          test_url "Daily Forms"          "https://www.mbfdhub.com/daily/"
-          test_url "Admin login"          "https://www.mbfdhub.com/admin/login"
-          test_url "Service worker"       "https://www.mbfdhub.com/sw.js"
-          test_url "Daily SW"             "https://www.mbfdhub.com/daily/service-worker.js"
-          test_url "Manifest"             "https://www.mbfdhub.com/manifest.json"
-          test_url "Admin PWA manifest"   "https://www.mbfdhub.com/admin-pwa/manifest.webmanifest"
-          test_url "Admin PWA SW"         "https://www.mbfdhub.com/admin/service-worker.js"
-          test_url "Admin /up health"     "https://www.mbfdhub.com/up"
-          test_url "Deploy marker"        "https://www.mbfdhub.com/deploy-marker.json"
-          test_url "Snipe-IT"             "https://inventory.mbfdhub.com"  "200"
-          echo ""
-          echo "=== Results: $PASS passed, $FAIL failed ==="
-          if [ "$FAIL" -gt 0 ]; then
+          test -d "$HUB_CHECKOUT/.git"
+          cd "$HUB_CHECKOUT"
+          git status --short --branch
+          git diff --stat
+          if test -n "$(git status --porcelain)"; then
+            echo 'Refusing to overwrite a dirty production checkout.' >&2
             exit 1
           fi
+
+          test "$(docker inspect --format '{{.Name}}' "$HUB_APP_CONTAINER")" = "/$HUB_APP_CONTAINER"
+          test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_APP_CONTAINER")" = 'laravel.test'
+          test "$(docker inspect --format '{{.Name}}' "$HUB_PG_CONTAINER")" = "/$HUB_PG_CONTAINER"
+          test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_PG_CONTAINER")" = 'pgsql'
+          test "$(docker inspect --format '{{.State.Running}}' "$HUB_APP_CONTAINER")" = 'true'
+          test "$(docker inspect --format '{{.State.Running}}' "$HUB_PG_CONTAINER")" = 'true'
+          docker exec "$HUB_PG_CONTAINER" pg_isready -q -d "$HUB_PG_DATABASE" -U "$HUB_PG_USER"
+          TRT_DUPLICATE_DATES="$(docker exec "$HUB_PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$HUB_PG_USER" -d "$HUB_PG_DATABASE" -Atqc \
+            'SELECT session_date FROM trt_inventory_sessions WHERE trailer_id IS NULL GROUP BY session_date HAVING COUNT(*) > 1')"
+          if test -n "$TRT_DUPLICATE_DATES"; then
+            echo 'TRT default-session duplicates require deliberate data reconciliation before migration.' >&2
+            printf '%s\n' "$TRT_DUPLICATE_DATES" >&2
+            exit 1
+          fi
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan migrate:status --no-ansi
+          REMOTE
+
+      - name: Verify targeted Hub database backup
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_BACKUP_DIR"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HUB_CHECKOUT=/opt/mbfd/mbfd-hub
+          HUB_PG_CONTAINER=mbfd-hub-pgsql
+          HUB_PG_DATABASE=mbfd_hub
+          HUB_PG_USER=mbfd_user
+
+          test "$(docker inspect --format '{{.Name}}' "$HUB_PG_CONTAINER")" = "/$HUB_PG_CONTAINER"
+          test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_PG_CONTAINER")" = 'pgsql'
+          case "$HUB_BACKUP_DIR" in
+            /var/lib/postgresql/data|/var/lib/postgresql/data/*|'')
+              echo 'Hub backup storage must be outside the PostgreSQL data volume.' >&2
+              exit 1
+              ;;
+           esac
+           PG_DATA_SOURCE="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Source}}{{end}}{{end}}' "$HUB_PG_CONTAINER")"
+           test -n "$PG_DATA_SOURCE"
+           PG_DATA_SOURCE_REAL="$(realpath -e -- "$PG_DATA_SOURCE")"
+           HUB_BACKUP_DIR_REAL="$(realpath -e -- "$HUB_BACKUP_DIR")"
+           case "$HUB_BACKUP_DIR_REAL" in
+             "$PG_DATA_SOURCE_REAL"|"$PG_DATA_SOURCE_REAL"/*)
+               echo 'Hub backup storage resolves inside the PostgreSQL data source.' >&2
+               exit 1
+               ;;
+           esac
+           test -d "$HUB_BACKUP_DIR_REAL"
+           test -w "$HUB_BACKUP_DIR_REAL"
+
+           cd "$HUB_CHECKOUT"
+           PREVIOUS_SHA="$(git rev-parse HEAD)"
+           BACKUP_ID="mbfd-hub-pre-activation-$(date -u +%Y%m%dT%H%M%SZ)-$RELEASE_SHA"
+           BACKUP_FILE="$HUB_BACKUP_DIR_REAL/$BACKUP_ID.dump"
+          umask 077
+          docker exec "$HUB_PG_CONTAINER" pg_dump -U "$HUB_PG_USER" -Fc "$HUB_PG_DATABASE" > "$BACKUP_FILE"
+          test -s "$BACKUP_FILE"
+          docker exec -i "$HUB_PG_CONTAINER" pg_restore --list - < "$BACKUP_FILE" > /dev/null
+           BACKUP_SHA256="$(sha256sum "$BACKUP_FILE" | awk '{print $1}')"
+           printf 'release_sha=%s\nprevious_sha=%s\ncreated_at=%s\nbackup_file=%s\nsha256=%s\n' \
+             "$RELEASE_SHA" "$PREVIOUS_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BACKUP_FILE" "$BACKUP_SHA256" > "$HUB_BACKUP_DIR_REAL/$BACKUP_ID.metadata"
+          echo "Verified Hub backup: $BACKUP_FILE sha256=$BACKUP_SHA256"
+          REMOTE
+
+      - name: Enter maintenance mode and verify queue safety
+        run: |
+          set -euo pipefail
+          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan down --render=errors::503
+          test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/)" = '503'
+          QUEUE_PROCESSES="$(docker exec "$HUB_APP_CONTAINER" pgrep -af 'artisan queue:work' || true)"
+          test -n "$QUEUE_PROCESSES"
+          if printf '%s\n' "$QUEUE_PROCESSES" | grep -Eq -- '(^|[[:space:]])--force([[:space:]]|$)'; then
+            echo 'Refusing activation while a queue worker bypasses maintenance mode.' >&2
+            exit 1
+          fi
+          REMOTE
+
+      - name: Checkout exact approved candidate
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_SHA"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/mbfd/mbfd-hub
+          git fetch origin main --no-tags
+          test "$(git rev-parse origin/main)" = "$RELEASE_SHA"
+          git cat-file -e "$RELEASE_SHA^{commit}"
+          git checkout --detach "$RELEASE_SHA"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          REMOTE
+
+      - name: Migrate, build, and atomically swap Hub assets
+        run: |
+          set -euo pipefail
+          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          cd /opt/mbfd/mbfd-hub
+          test "$(docker inspect --format '{{.Name}}' "$HUB_APP_CONTAINER")" = "/$HUB_APP_CONTAINER"
+          test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_APP_CONTAINER")" = 'laravel.test'
+          docker exec -u sail "$HUB_APP_CONTAINER" composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan migrate:status --no-ansi
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan migrate --force
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan optimize:clear
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan config:cache
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan route:cache
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan view:cache
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan filament:clear-cached-components
+          docker exec -u sail "$HUB_APP_CONTAINER" bash -lc 'set -euo pipefail
+            cd /var/www/html
+            rm -rf -- public/build-next public/daily-next
+            npm ci --legacy-peer-deps
+            npx vite build --outDir public/build-next --emptyOutDir
+            test -s public/build-next/manifest.json
+            php artisan filament:assets
+            cd resources/js/daily-checkout
+            npm ci --legacy-peer-deps
+            DAILY_CHECKOUT_OUT_DIR=../../../public/daily-next npm run build
+            test -s ../../../public/daily-next/index.html
+          '
+          docker exec -u sail "$HUB_APP_CONTAINER" bash -lc 'set -euo pipefail
+            cd /var/www/html
+            test -s public/build-next/manifest.json
+            test -s public/daily-next/index.html
+            archive_suffix=$(date -u +%Y%m%dT%H%M%SZ)
+            if test -e public/build-previous; then mv -- public/build-previous "public/build-previous-$archive_suffix"; fi
+            if test -e public/daily-previous; then mv -- public/daily-previous "public/daily-previous-$archive_suffix"; fi
+            if test -d public/build; then mv -- public/build public/build-previous; fi
+            if test -d public/daily; then mv -- public/daily public/daily-previous; fi
+            mv -- public/build-next public/build
+            mv -- public/daily-next public/daily
+            test -s public/build/manifest.json
+            test -s public/daily/index.html
+          '
+          docker compose -f compose.prod.yaml up -d --build --no-deps --force-recreate laravel.test
+          REMOTE
+
+      - name: Verify Hub application health
+        run: |
+          set -euo pipefail
+          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          for _ in $(seq 1 60); do
+            if docker inspect --format='{{.State.Health.Status}}' "$HUB_APP_CONTAINER" | grep -qx healthy \
+              && docker exec "$HUB_APP_CONTAINER" curl -fsS http://localhost:80/up > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo 'MBFD Hub application did not become healthy after activation.' >&2
+          exit 1
+          REMOTE
+
+      - name: Restart Hub queues and verify background services
+        run: |
+          set -euo pipefail
+          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          CACHE_DRIVER="$(docker exec -u sail "$HUB_APP_CONTAINER" php -r '
+          require "/var/www/html/vendor/autoload.php";
+          $app = require "/var/www/html/bootstrap/app.php";
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          echo config("cache.default");
+          ')"
+          case "$CACHE_DRIVER" in
+            ''|array)
+              echo 'Queue restart requires a shared, healthy cache driver.' >&2
+              exit 1
+              ;;
+          esac
+          docker exec -u sail "$HUB_APP_CONTAINER" php -r '
+          require "/var/www/html/vendor/autoload.php";
+          $app = require "/var/www/html/bootstrap/app.php";
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          $cache = $app->make("cache");
+          $key = "mbfd_release_queue_restart_probe";
+          $cache->put($key, "ok", 60);
+          if ($cache->get($key) !== "ok") { exit(1); }
+          $cache->forget($key);
+          '
+          QUEUE_BEFORE="$(docker exec "$HUB_APP_CONTAINER" pgrep -f 'artisan queue:work' | sort | tr '\n' ' ')"
+          test -n "$QUEUE_BEFORE"
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan queue:restart
+          for _ in $(seq 1 60); do
+            QUEUE_AFTER="$(docker exec "$HUB_APP_CONTAINER" pgrep -f 'artisan queue:work' | sort | tr '\n' ' ')"
+            if test -n "$QUEUE_AFTER" && test "$QUEUE_AFTER" != "$QUEUE_BEFORE"; then
+              break
+            fi
+            sleep 1
+          done
+          test -n "${QUEUE_AFTER:-}"
+          test "$QUEUE_AFTER" != "$QUEUE_BEFORE"
+          docker exec "$HUB_APP_CONTAINER" supervisorctl status
+          docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/php /var/www/html/artisan reverb:start '
+          docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/php /var/www/html/artisan queue:work '
+          REMOTE
+
+      - name: Leave maintenance mode and verify internal health
+        run: |
+          set -euo pipefail
+          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan up
+          test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/up)" = '200'
+          REMOTE
+
+      - name: Record successful Hub candidate activation
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_SHA"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/mbfd/mbfd-hub
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          printf '{"sha":"%s","deployed_at":"%s"}\n' "$RELEASE_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > public/deploy-marker.json
+          REMOTE
+
+      - name: Verify public Hub smoke routes
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 15 https://www.mbfdhub.com/up > /dev/null
+          test "$(curl --silent --show-error --location --max-time 15 --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/)" = '200'

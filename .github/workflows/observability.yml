@@ -27,6 +27,8 @@ jobs:
           php-version: '8.4'
 
       - name: Install Composer deps
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-interaction --no-progress --no-scripts
 
       - name: Setup Node

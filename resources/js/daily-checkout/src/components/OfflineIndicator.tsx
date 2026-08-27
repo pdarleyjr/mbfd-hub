@@ -1,39 +1,65 @@
 import { useEffect, useState } from 'react';
 import { useOffline } from '../hooks/useOffline';
-import { getSubmissionQueue } from '../utils/storage';
+import { getDailyCheckoutQueueSummary, onDailyCheckoutQueueChanged } from '../utils/dailyCheckoutSubmissionQueue';
 
 export default function OfflineIndicator() {
   const isOffline = useOffline();
   const [queueCount, setQueueCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [attentionCount, setAttentionCount] = useState(0);
+  const [attentionError, setAttentionError] = useState<string | undefined>();
+  const [attentionErrorCode, setAttentionErrorCode] = useState<string | undefined>();
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
-    // Update queue count
-    const updateQueue = () => {
-      setQueueCount(getSubmissionQueue().length);
+    let mounted = true;
+    const updateQueue = async () => {
+      try {
+        const summary = await getDailyCheckoutQueueSummary();
+        if (!mounted) {
+          return;
+        }
+
+        setQueueCount(summary.total);
+        setPendingCount(summary.pending);
+        setAttentionCount(summary.requiresAttention);
+        setAttentionError(summary.firstAttentionError);
+        setAttentionErrorCode(summary.firstAttentionErrorCode);
+      } catch (error) {
+        console.error('Failed to read the Daily Checkout submission queue:', error);
+      }
     };
-    
-    updateQueue();
+
+    void updateQueue();
+    const unsubscribe = onDailyCheckoutQueueChanged(() => {
+      void updateQueue();
+    });
     const interval = setInterval(updateQueue, 1000);
-    
-    return () => clearInterval(interval);
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
-    if (isOffline) {
+    if (attentionCount > 0) {
+      setShowToast(false);
+    } else if (isOffline) {
       setToastMessage('You are offline. Changes will be saved locally.');
       setShowToast(true);
-    } else if (!isOffline && queueCount > 0) {
-      setToastMessage(`Back online! Syncing ${queueCount} pending submission${queueCount > 1 ? 's' : ''}...`);
+    } else if (!isOffline && pendingCount > 0) {
+      setToastMessage(`Back online! Syncing ${pendingCount} pending submission${pendingCount > 1 ? 's' : ''}...`);
       setShowToast(true);
       
       // Auto hide after 5 seconds
       setTimeout(() => setShowToast(false), 5000);
     }
-  }, [isOffline, queueCount]);
+  }, [attentionCount, isOffline, pendingCount]);
 
-  if (!showToast && !isOffline) return null;
+  if (!showToast && !isOffline && attentionCount === 0) return null;
 
   return (
     <>
@@ -47,6 +73,23 @@ export default function OfflineIndicator() {
               {queueCount} pending
             </span>
           )}
+        </div>
+      )}
+
+      {attentionCount > 0 && (
+        <div
+          className="fixed top-0 left-0 right-0 z-40 bg-red-700 text-white px-4 py-3 text-center text-sm font-medium shadow-lg"
+          role="alert"
+        >
+          <p>
+            {attentionCount} saved Daily Checkout submission{attentionCount > 1 ? 's need' : ' needs'} review before it can be sent. The payload remains saved on this device.
+          </p>
+          {attentionErrorCode === 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED' && (
+            <p className="mt-1 text-red-100">
+              The checklist changed after this inspection was saved. An officer must reconcile it with the current checklist before a new submission is created.
+            </p>
+          )}
+          {attentionError && <p className="mt-1 text-red-100">Latest server response: {attentionError}</p>}
         </div>
       )}
 

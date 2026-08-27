@@ -1,9 +1,16 @@
-import { Link, useSearchParams } from 'react-router';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import { useEffect } from 'react';
+import {
+  DAILY_CHECKOUT_QUEUE_SYNC_EVENT,
+  type DailyCheckoutQueueSyncResult,
+} from '../utils/dailyCheckoutSubmissionQueue';
 
 export default function SuccessPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const isQueued = searchParams.get('queued') === 'true';
+  const isPendingReview = searchParams.get('review') === 'pending';
+  const queuedSubmissionId = (location.state as { queuedSubmissionId?: unknown } | null)?.queuedSubmissionId;
 
   useEffect(() => {
     // Vibrate on success
@@ -11,6 +18,28 @@ export default function SuccessPage() {
       navigator.vibrate(200);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isQueued || typeof queuedSubmissionId !== 'string') {
+      return;
+    }
+
+    const handleQueueSync = (event: Event) => {
+      const result = (event as CustomEvent<DailyCheckoutQueueSyncResult>).detail;
+      if (!result.pendingReviewQueueIds.includes(queuedSubmissionId)) {
+        return;
+      }
+
+      // Only the mounted success page for this exact queue record changes
+      // state. A different operator route is never redirected by background
+      // synchronization.
+      setSearchParams({ review: 'pending' }, { replace: true });
+    };
+
+    window.addEventListener(DAILY_CHECKOUT_QUEUE_SYNC_EVENT, handleQueueSync);
+
+    return () => window.removeEventListener(DAILY_CHECKOUT_QUEUE_SYNC_EVENT, handleQueueSync);
+  }, [isQueued, queuedSubmissionId, setSearchParams]);
 
   return (
     <div className="max-w-md mx-auto text-center">
@@ -31,12 +60,18 @@ export default function SuccessPage() {
           </svg>
         </div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          {isQueued ? 'Inspection Queued!' : 'Inspection Submitted!'}
+          {isQueued
+            ? 'Inspection Queued!'
+            : isPendingReview
+              ? 'Inspection Submitted for Review!'
+              : 'Inspection Submitted!'}
         </h1>
         <p className="text-gray-600">
-          {isQueued 
+          {isQueued
             ? 'Your inspection will be submitted automatically when you\'re back online.'
-            : 'Your daily checkout inspection has been successfully recorded.'
+            : isPendingReview
+              ? 'Your daily checkout inspection is awaiting officer review before it changes readiness, defects, or meter records.'
+              : 'Your daily checkout inspection has been successfully recorded.'
           }
         </p>
       </div>
@@ -54,9 +89,9 @@ export default function SuccessPage() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <p className="text-sm text-blue-800">
             <strong>What happens next?</strong><br />
-            • Your inspection data has been saved to the system<br />
-            • Any issues found will be tracked for follow-up<br />
-            • Administrators will review the inspection results
+            {isPendingReview
+              ? <>• An authorized officer must review this submission<br />• Readiness, defects, and meter records remain unchanged until approval</>
+              : <>• Your inspection data has been saved to the system<br />• Any issues found will be tracked for follow-up<br />• Administrators will review the inspection results</>}
           </p>
         </div>
       )}

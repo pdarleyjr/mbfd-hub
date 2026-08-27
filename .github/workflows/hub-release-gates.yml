@@ -1,0 +1,478 @@
+name: Hub release gates
+
+# This workflow is intentionally reusable. CI calls it for pull requests and
+# main; the production workflow calls the same checks again for the immutable
+# manual-activation candidate before an environment-protected deployment job.
+on:
+  workflow_call:
+    inputs:
+      pint_base_sha:
+        description: 'Commit or revision immediately preceding the candidate PHP diff.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  ci-configuration:
+    name: CI configuration guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install Node dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Verify CI configuration
+        run: |
+          npm run test:ci-configuration
+          npm run test:changed-php-files
+
+  php-quality:
+    name: PHP and root frontend quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+          coverage: none
+      - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+        run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Install Node dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: PHP lint
+        run: |
+          set -euo pipefail
+          find app bootstrap config database routes tests -type f -name '*.php' -print0 |
+            xargs -0 -r -n 1 php -l
+      - name: Run changed-PHP Pint
+        env:
+          PINT_BASE_SHA: ${{ inputs.pint_base_sha }}
+          PINT_HEAD_SHA: ${{ github.sha }}
+        run: node scripts/ci/changed-php-files.mjs
+      - name: Validate Composer lockfile
+        run: composer validate --strict --no-check-publish
+      - name: Run Composer security audit
+        run: composer audit --locked --format=table
+      - name: Root TypeScript typecheck
+        run: npm run typecheck
+      - name: Root production build
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_ORG: ""
+          SENTRY_PROJECT_FRONTEND: ""
+          VITE_SENTRY_DSN: ""
+          VITE_SENTRY_RELEASE: ""
+        run: npm run build
+
+  # This retains the historical formatting baseline in every run without
+  # allowing unrelated existing debt to mask the candidate-scoped hard gate.
+  repository-pint-debt:
+    name: Repository-wide Pint debt (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+          coverage: none
+      - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+        run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Report repository-wide Pint debt
+        run: vendor/bin/pint --test
+
+  static-analysis:
+    name: PHPStan static analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+          coverage: none
+      - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+        run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Run PHPStan
+        run: vendor/bin/phpstan analyse --memory-limit=512M --no-progress -c phpstan.neon
+
+  actionlint:
+    name: GitHub Actions syntax and policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Run actionlint
+        uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2.1.2
+        with:
+          fail-on-error: true
+
+  phpunit-postgres:
+    name: PHPUnit and PostgreSQL concurrency/integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16.13-alpine
+        env:
+          POSTGRES_DB: mbfd_hub_test_ci
+          POSTGRES_USER: mbfd_test_ci
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+          coverage: none
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+        run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Install Node dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Prepare disposable PostgreSQL test application
+        run: |
+          cp .env.example .env
+          {
+            echo "DB_CONNECTION=pgsql"
+            echo "DB_HOST=127.0.0.1"
+            echo "DB_PORT=5432"
+            echo "DB_DATABASE=mbfd_hub_test_ci"
+            echo "DB_USERNAME=mbfd_test_ci"
+            echo "DB_PASSWORD="
+            echo "CACHE_DRIVER=array"
+            echo "SESSION_DRIVER=array"
+            echo "QUEUE_CONNECTION=sync"
+          } >> .env
+          php artisan key:generate --force
+          php artisan package:discover --ansi
+          chmod -R 775 storage bootstrap/cache
+          php artisan migrate --force
+      - name: Build root test assets
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_ORG: ""
+          SENTRY_PROJECT_FRONTEND: ""
+          VITE_SENTRY_DSN: ""
+          VITE_SENTRY_RELEASE: ""
+        run: npm run build
+      - name: Run PHPUnit suite
+        run: php artisan test --exclude-group=postgres
+      - name: Run PostgreSQL concurrency and integrity tests
+        env:
+          MBFD_ALLOW_DISPOSABLE_POSTGRES: "1"
+          REQUIRE_POSTGRES_INTEGRATION: "true"
+          EXPECTED_TEST_DB_CONNECTION: pgsql
+          DISPOSABLE_POSTGRES_HOST: 127.0.0.1
+          DISPOSABLE_POSTGRES_PORT: "5432"
+          DISPOSABLE_POSTGRES_DATABASE: mbfd_hub_test_ci
+          DISPOSABLE_POSTGRES_USERNAME: mbfd_test_ci
+          DISPOSABLE_POSTGRES_PASSWORD: ""
+        run: php artisan test --group=postgres
+
+  daily-contract-integrity:
+    name: Daily Checkout contract and integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+          coverage: none
+      - name: Install root browser test dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Install Daily Checkout dependencies
+        working-directory: resources/js/daily-checkout
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Daily TypeScript typecheck
+        working-directory: resources/js/daily-checkout
+        run: npm run typecheck
+      - name: Daily production build
+        working-directory: resources/js/daily-checkout
+        env:
+          DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
+        run: npm run build
+      - name: Install Chromium for mocked Daily Checkout Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Run mocked Daily Checkout Playwright
+        env:
+          DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176
+        run: npm run test:daily-checkout-e2e
+      - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+        run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Run Daily Checkout contract and integrity tests
+        run: >-
+          php artisan test
+          tests/Feature/Api/DailyCheckoutIntegrityTest.php
+          tests/Feature/Console/AuditDailyCheckoutReadinessTest.php
+
+  generated-assets:
+    name: Generated deployment assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+          coverage: none
+      - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+        run: composer install --no-dev --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts --optimize-autoloader
+      - name: Install root Node dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Build Vite and Filament assets
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_ORG: ""
+          SENTRY_PROJECT_FRONTEND: ""
+          VITE_SENTRY_DSN: ""
+          VITE_SENTRY_RELEASE: ""
+        run: |
+          npm run build
+          php artisan filament:assets
+      - name: Build Daily PWA assets
+        working-directory: resources/js/daily-checkout
+        env:
+          DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
+        run: |
+          npm ci --ignore-scripts --legacy-peer-deps
+          npm run build
+      - name: Verify generated assets after build
+        env:
+          REQUIRE_GENERATED_ASSETS: "1"
+        run: node scripts/ci/guard-generated-assets.mjs
+
+  security-dependencies:
+    name: Hub dependency security thresholds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        with:
+          php-version: '8.4'
+      - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+        run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Run Composer security audit
+        run: composer audit --locked --format=table
+      - name: Root NPM security audit
+        run: |
+          npm ci --ignore-scripts --legacy-peer-deps
+          npm audit --audit-level=high
+      - name: Daily NPM security audit
+        working-directory: resources/js/daily-checkout
+        run: |
+          npm ci --ignore-scripts --legacy-peer-deps
+          npm audit --audit-level=high
+
+  security-secrets:
+    name: Hub secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.8
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  security-filesystem:
+    name: Hub filesystem and configuration security thresholds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Trivy Hub filesystem scan
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          format: table
+      - name: Trivy Hub configuration scan
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          format: table
+
+  # compose.prod.yaml currently uses the Sail 8.5 runtime. This is a required
+  # compatibility lane, not a best-effort matrix, so CI 8.4 cannot be treated
+  # as sufficient release evidence for the production runtime.
+  php-85-compatibility:
+    name: PHP 8.5 production-runtime compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16.13-alpine
+        env:
+          POSTGRES_DB: mbfd_hub_test_ci
+          POSTGRES_USER: mbfd_test_ci
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        with:
+          php-version: '8.5'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+          coverage: none
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+        run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Install Node dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Prepare PHP 8.5 disposable PostgreSQL test application
+        run: |
+          cp .env.example .env
+          {
+            echo "DB_CONNECTION=pgsql"
+            echo "DB_HOST=127.0.0.1"
+            echo "DB_PORT=5432"
+            echo "DB_DATABASE=mbfd_hub_test_ci"
+            echo "DB_USERNAME=mbfd_test_ci"
+            echo "DB_PASSWORD="
+            echo "CACHE_DRIVER=array"
+            echo "SESSION_DRIVER=array"
+            echo "QUEUE_CONNECTION=sync"
+          } >> .env
+          php artisan key:generate --force
+          php artisan package:discover --ansi
+          chmod -R 775 storage bootstrap/cache
+          php artisan migrate --force
+      - name: Build root test assets
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_ORG: ""
+          SENTRY_PROJECT_FRONTEND: ""
+          VITE_SENTRY_DSN: ""
+          VITE_SENTRY_RELEASE: ""
+        run: npm run build
+      - name: Run PHP 8.5 PHPUnit compatibility suite
+        run: php artisan test --exclude-group=postgres
+      - name: Run PHP 8.5 PostgreSQL compatibility tests
+        env:
+          MBFD_ALLOW_DISPOSABLE_POSTGRES: "1"
+          REQUIRE_POSTGRES_INTEGRATION: "true"
+          EXPECTED_TEST_DB_CONNECTION: pgsql
+          DISPOSABLE_POSTGRES_HOST: 127.0.0.1
+          DISPOSABLE_POSTGRES_PORT: "5432"
+          DISPOSABLE_POSTGRES_DATABASE: mbfd_hub_test_ci
+          DISPOSABLE_POSTGRES_USERNAME: mbfd_test_ci
+          DISPOSABLE_POSTGRES_PASSWORD: ""
+        run: php artisan test --group=postgres
+
+  release-gates:
+    name: All required Hub release gates
+    needs:
+      - ci-configuration
+      - php-quality
+      - static-analysis
+      - actionlint
+      - phpunit-postgres
+      - daily-contract-integrity
+      - generated-assets
+      - security-dependencies
+      - security-secrets
+      - security-filesystem
+      - php-85-compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm all required Hub release gates passed
+        run: echo "All required Hub release gates passed."

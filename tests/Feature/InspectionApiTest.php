@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
+use App\Services\DailyCheckoutChecklistResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -38,15 +39,20 @@ class InspectionApiTest extends TestCase
             'vin' => 'TEST123VIN',
             'status' => 'in_service',
             'is_reserve' => false,
+            'daily_checkout_requirement' => 'required',
         ]);
 
         // Inspection data payload
         $inspectionData = [
+            'client_submission_id' => 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            'checklist_version' => $this->canonicalChecklistVersion($apparatus),
             'operator_name' => 'John Doe',
             'rank' => 'Lieutenant',
             'completed_at' => now()->toDateTimeString(),
             'shift' => 'A',
             'unit_number' => 'E1',
+            'compartments' => $this->canonicalCompartments($apparatus),
+            'defects' => [],
         ];
 
         // Make POST request
@@ -57,11 +63,9 @@ class InspectionApiTest extends TestCase
             ->assertJsonStructure([
                 'id',
                 'apparatus_id',
-                'operator_name',
-                'rank',
+                'inspection_reference',
+                'review_status',
                 'completed_at',
-                'created_at',
-                'updated_at',
             ]);
 
         // Verify record was created in database
@@ -120,6 +124,7 @@ class InspectionApiTest extends TestCase
             'vin' => 'TEST123VIN',
             'status' => 'in_service',
             'is_reserve' => false,
+            'daily_checkout_requirement' => 'required',
         ]);
 
         // Missing required fields
@@ -127,5 +132,36 @@ class InspectionApiTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['operator_name']);
+    }
+
+    /** @return list<array{id: string, name: string, items: list<array{id: string, name: string, status: string, notes: null}>}> */
+    private function canonicalChecklistVersion(Apparatus $apparatus): string
+    {
+        $version = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus)['checklist_version'];
+        $this->assertIsString($version);
+
+        return $version;
+    }
+
+    /** @return list<array{id: string, name: string, items: list<array{id: string, name: string, status: string, notes: null}>}> */
+    private function canonicalCompartments(Apparatus $apparatus): array
+    {
+        $checklist = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus)['checklist'];
+        $this->assertIsArray($checklist);
+
+        return array_map(static function (array $compartment): array {
+            $compartmentId = (string) $compartment['id'];
+
+            return [
+                'id' => $compartmentId,
+                'name' => (string) ($compartment['name'] ?? $compartment['title']),
+                'items' => array_map(static fn (array $item, int $index): array => [
+                    'id' => (string) ($item['id'] ?? "{$compartmentId}-item-".($index + 1)),
+                    'name' => (string) $item['name'],
+                    'status' => 'Present',
+                    'notes' => null,
+                ], $compartment['items'], array_keys($compartment['items'])),
+            ];
+        }, $checklist['compartments']);
     }
 }

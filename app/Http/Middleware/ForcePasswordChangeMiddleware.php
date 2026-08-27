@@ -2,8 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use App\Filament\Employee\Pages\ChangePasswordPage;
 use Closure;
 use Illuminate\Http\Request;
+use Livewire\Livewire;
 use Symfony\Component\HttpFoundation\Response;
 
 class ForcePasswordChangeMiddleware
@@ -17,18 +19,19 @@ class ForcePasswordChangeMiddleware
             return $next($request);
         }
 
-        // Skip the change-password page itself to avoid redirect loops
-        if ($request->routeIs('filament.employee.pages.change-password-page')) {
-            return $next($request);
-        }
+        $changePasswordUrl = ChangePasswordPage::getUrl(panel: 'employee');
+        $changePasswordPath = trim((string) parse_url($changePasswordUrl, PHP_URL_PATH), '/');
 
-        // Skip logout route
-        if ($request->routeIs('filament.employee.auth.logout')) {
+        // Allow the password page, its Livewire update transport, and logout.
+        if ($request->routeIs(
+            ChangePasswordPage::getRouteName('employee'),
+            'filament.employee.auth.logout',
+        ) || $request->path() === $changePasswordPath || trim(Livewire::originalPath(), '/') === $changePasswordPath) {
             return $next($request);
         }
 
         if ($employee->must_change_password) {
-            return redirect()->route('filament.employee.pages.change-password-page');
+            return redirect()->to($changePasswordUrl);
         }
 
         return $next($request);

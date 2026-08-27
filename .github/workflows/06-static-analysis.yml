@@ -24,10 +24,9 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
 
       - name: Install dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-interaction --no-progress --no-scripts
-
-      - name: Install Larastan
-        run: composer require --dev "larastan/larastan:^3.0" --no-interaction --no-progress
 
       - name: Run PHPStan
         run: vendor/bin/phpstan analyse --memory-limit=512M --no-progress -c phpstan.neon

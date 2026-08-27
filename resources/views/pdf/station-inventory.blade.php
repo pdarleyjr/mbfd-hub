@@ -127,13 +127,13 @@
 
     @foreach($categories as $category)
         @php
-            $categoryItems = array_filter($items, function($item) use ($category) {
+            $categoryItems = array_filter($items, function($item) use ($category, $categories) {
                 $categoryItem = collect($categories)
                     ->where('id', $category['id'])
                     ->first();
                 if (!$categoryItem) return false;
                 $categoryItemIds = collect($categoryItem['items'])->pluck('id')->toArray();
-                return in_array($item['itemId'], $categoryItemIds);
+                return in_array($item['item_id'], $categoryItemIds, true);
             });
         @endphp
         
@@ -152,7 +152,7 @@
                     <tbody>
                         @foreach($category['items'] as $index => $categoryItem)
                             @php
-                                $orderItem = collect($items)->firstWhere('itemId', $categoryItem['id']);
+                                $orderItem = collect($items)->firstWhere('item_id', $categoryItem['id']);
                                 $quantity = $orderItem['quantity'] ?? 0;
                             @endphp
                             @if($quantity > 0)

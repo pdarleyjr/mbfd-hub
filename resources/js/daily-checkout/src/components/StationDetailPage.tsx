@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router';
 import {
   StationDetail,
   Apparatus,
-  ApparatusInspectionSummary,
+  DailyCheckoutMatrixRow,
+  DailyCheckoutSummary,
   StationInspectionSummary,
   StationRequestSummary,
   ApparatusServiceTicketSummary,
@@ -23,10 +24,6 @@ export default function StationDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [stationLoadAttempt, setStationLoadAttempt] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>('requests');
-
-  // Today's apparatus inspections
-  const [todayInspections, setTodayInspections] = useState<ApparatusInspectionSummary[]>([]);
-  const [todayInspectionsLoading, setTodayInspectionsLoading] = useState(true);
 
   // Tab data (lazy loaded)
   const [stationInspections, setStationInspections] = useState<StationInspectionSummary[]>([]);
@@ -81,7 +78,6 @@ export default function StationDetailPage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    setTodayInspectionsLoading(true);
 
     const fetchStation = async () => {
       try {
@@ -96,17 +92,6 @@ export default function StationDetailPage() {
       }
     };
 
-    const fetchTodayInspections = async () => {
-      try {
-        const data = await ApiClient.getTodayApparatusInspections(stationId);
-        if (!cancelled) setTodayInspections(data);
-      } catch {
-        // Non-critical, silently fail
-      } finally {
-        if (!cancelled) setTodayInspectionsLoading(false);
-      }
-    };
-
     const fetchOpenServiceTicketCount = async () => {
       try {
         const count = await ApiClient.getOpenApparatusServiceTicketCount(stationId);
@@ -117,7 +102,6 @@ export default function StationDetailPage() {
     };
 
     fetchStation();
-    fetchTodayInspections();
     fetchOpenServiceTicketCount();
     return () => { cancelled = true; };
   }, [id, stationLoadAttempt]);
@@ -275,6 +259,9 @@ export default function StationDetailPage() {
     ?? configuredComplement?.dormBedsCount
     ?? null;
   const roomGroups = groupRoomsByArea(station.rooms ?? []);
+  const dailyCheckout = isCanonicalDailyCheckoutSummary(station.daily_checkout)
+    ? station.daily_checkout
+    : null;
 
   return (
     <div className="space-y-6">
@@ -296,7 +283,7 @@ export default function StationDetailPage() {
       </div>
 
       {/* ============================== */}
-      {/* FIRST CARD: Station Info + Quick Links + Today's Inspections */}
+      {/* FIRST CARD: Station Info + Quick Links + Canonical Daily Checkout */}
       {/* ============================== */}
       <div className="bg-white rounded-2xl ring-1 ring-neutral-200/80 p-6">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-6">
@@ -387,46 +374,10 @@ export default function StationDetailPage() {
           </Link>
         </div>
 
-        {/* Today's Vehicle Inspections */}
-        <div>
-          <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">
-            Today's Vehicle Inspections
-          </h3>
-          {todayInspectionsLoading ? (
-            <div className="space-y-2">
-              {[1, 2].map(i => (
-                <div key={i} className="skeleton h-12 w-full rounded-lg"></div>
-              ))}
-            </div>
-          ) : todayInspections.length > 0 ? (
-            <div className="space-y-2">
-              {todayInspections.map((inspection) => (
-                <div
-                  key={inspection.id}
-                  className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg ring-1 ring-neutral-200/60"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${inspection.defect_count > 0 ? 'bg-amber-500' : 'bg-green-500'}`} />
-                    <div>
-                      <p className="text-sm font-medium text-neutral-800">{inspection.apparatus_name}</p>
-                      <p className="text-xs text-neutral-500">
-                        {inspection.operator_name} &middot; {inspection.shift} Shift
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-neutral-500">{formatTime(inspection.completed_at)}</p>
-                    {inspection.defect_count > 0 && (
-                      <p className="text-xs text-amber-600 font-medium">{inspection.defect_count} defect{inspection.defect_count !== 1 ? 's' : ''}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-neutral-400 italic py-2">No inspections submitted today</p>
-          )}
-        </div>
+        <DailyCheckoutPanel
+          dailyCheckout={dailyCheckout}
+          apparatuses={station.apparatuses ?? []}
+        />
       </div>
 
       {/* ============================== */}
@@ -583,7 +534,7 @@ export default function StationDetailPage() {
                       <h4 className="font-semibold text-neutral-800">{apparatus.name || apparatus.unit_id}</h4>
                       <p className="text-sm text-neutral-600">Unit: {apparatus.vehicle_number}</p>
                       <p className="text-sm text-neutral-500 capitalize">Type: {apparatus.type}</p>
-                      {apparatus.slug && (
+                      {apparatus.daily_checkout_requirement === 'required' && apparatus.slug && (
                         <Link
                           to={`/vehicle-inspections/${apparatus.slug}`}
                           className="mt-2 inline-flex items-center text-xs text-red-600 font-medium hover:text-red-700"
@@ -591,6 +542,12 @@ export default function StationDetailPage() {
                           Start Inspection
                           <svg className="ml-1 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                         </Link>
+                      )}
+                      {apparatus.daily_checkout_requirement === 'unknown' && (
+                        <p className="mt-2 text-xs font-medium text-amber-700">Daily Checkout policy needs confirmation</p>
+                      )}
+                      {apparatus.daily_checkout_requirement && !['required', 'unknown'].includes(apparatus.daily_checkout_requirement) && (
+                        <p className="mt-2 text-xs font-medium text-neutral-500">Daily Checkout: {apparatus.daily_checkout_requirement.replaceAll('_', ' ')}</p>
                       )}
                       <a
                         href={`/employee/apparatus-service-request?station_id=${station.id}&apparatus_id=${apparatus.id}&return_to=${encodeURIComponent(`/daily/stations/${station.id}`)}`}
@@ -817,6 +774,166 @@ export default function StationDetailPage() {
 }
 
 // ===== Helper Components =====
+
+const DAILY_CHECKOUT_STATES = new Set([
+  'checked',
+  'attention',
+  'review_pending',
+  'not_checked',
+  'out_of_service',
+  'exempt',
+  'classification_required',
+]);
+
+function isCanonicalDailyCheckoutSummary(value: unknown): value is DailyCheckoutSummary {
+  if (!value || typeof value !== 'object') return false;
+
+  const summary = value as Record<string, unknown>;
+  const countKeys = [
+    'required_total',
+    'checked',
+    'attention',
+    'review_pending',
+    'not_checked',
+    'completed',
+    'out_of_service',
+    'exempt',
+    'classification_required',
+  ];
+
+  if (
+    !countKeys.every((key) => typeof summary[key] === 'number')
+    || typeof summary.completion_available !== 'boolean'
+    || !Array.isArray(summary.matrix)
+    || (summary.completion_percent !== null && typeof summary.completion_percent !== 'number')
+  ) {
+    return false;
+  }
+
+  const canonical = summary as unknown as DailyCheckoutSummary;
+
+  if (
+    canonical.required_total !== canonical.checked + canonical.attention + canonical.review_pending + canonical.not_checked
+    || canonical.completed !== canonical.checked + canonical.attention
+    || (canonical.required_total === 0 && (canonical.completion_available || canonical.completion_percent !== null))
+    || (canonical.required_total > 0 && (!canonical.completion_available || canonical.completion_percent === null))
+  ) {
+    return false;
+  }
+
+  return canonical.matrix.every(isDailyCheckoutMatrixRow);
+}
+
+function isDailyCheckoutMatrixRow(value: unknown): value is DailyCheckoutMatrixRow {
+  if (!value || typeof value !== 'object') return false;
+
+  const row = value as Record<string, unknown>;
+
+  return typeof row.apparatus_id === 'number'
+    && typeof row.state === 'string'
+    && DAILY_CHECKOUT_STATES.has(row.state)
+    && typeof row.daily_checkout_requirement === 'string'
+    && typeof row.out_of_service === 'boolean'
+    && typeof row.classification_required === 'boolean'
+    && typeof row.included_in_required_total === 'boolean'
+    && typeof row.included_in_completed === 'boolean'
+    && typeof row.has_pending_submission === 'boolean'
+    && typeof row.return_checkout_required === 'boolean'
+    && typeof row.return_checkout_verified === 'boolean';
+}
+
+function DailyCheckoutPanel({ dailyCheckout, apparatuses }: { dailyCheckout: DailyCheckoutSummary | null; apparatuses: Apparatus[] }) {
+  if (dailyCheckout === null) {
+    return (
+      <section aria-labelledby="daily-checkout-heading" className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="daily-checkout-heading" className="font-heading text-lg font-semibold text-neutral-900">Daily Checkout</h2>
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">Unavailable</span>
+        </div>
+        <p className="mt-2 text-sm text-amber-900">The authoritative Daily Checkout result is unavailable. Readiness is not estimated from inspection records.</p>
+      </section>
+    );
+  }
+
+  const apparatusNames = new Map(
+    apparatuses.map((apparatus) => [
+      apparatus.id,
+      apparatus.name || apparatus.designation || apparatus.unit_id || `Apparatus ${apparatus.id}`,
+    ]),
+  );
+  const completionLabel = dailyCheckout.completion_available && dailyCheckout.completion_percent !== null
+    ? `${dailyCheckout.completion_percent}%`
+    : 'Completion unavailable';
+  const summaryItems = [
+    { label: 'Checked', value: dailyCheckout.checked, className: 'bg-green-50 text-green-800' },
+    { label: 'Attention', value: dailyCheckout.attention, className: 'bg-amber-50 text-amber-900' },
+    { label: 'Review pending', value: dailyCheckout.review_pending, className: 'bg-amber-50 text-amber-900' },
+    { label: 'Not checked', value: dailyCheckout.not_checked, className: 'bg-red-50 text-red-800' },
+    { label: 'Out of service', value: dailyCheckout.out_of_service, className: 'bg-neutral-100 text-neutral-700' },
+    { label: 'Exempt', value: dailyCheckout.exempt, className: 'bg-neutral-100 text-neutral-700' },
+    { label: 'Classification required', value: dailyCheckout.classification_required, className: 'bg-amber-50 text-amber-900' },
+  ];
+
+  return (
+    <section aria-labelledby="daily-checkout-heading" className="rounded-xl border border-neutral-200 bg-neutral-50/50 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 id="daily-checkout-heading" className="font-heading text-lg font-semibold text-neutral-900">Daily Checkout</h2>
+          {dailyCheckout.completion_available ? (
+            <p className="mt-1 text-sm text-neutral-600">{dailyCheckout.completed} / {dailyCheckout.required_total} required inspections completed</p>
+          ) : (
+            <p className="mt-1 text-sm text-neutral-600">No required apparatus — completion unavailable</p>
+          )}
+        </div>
+        <span className="w-fit rounded-full bg-blue-50 px-3 py-1 text-sm font-bold tabular-nums text-blue-800">{completionLabel}</span>
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-7">
+        {summaryItems.map((item) => (
+          <div key={item.label} className={`rounded-lg px-3 py-2 ${item.className}`}>
+            <dt className="text-xs font-medium">{item.label}</dt>
+            <dd className="mt-0.5 text-lg font-bold tabular-nums">{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <ul className="mt-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
+        {dailyCheckout.matrix.map((row) => {
+          const presentation = dailyCheckoutStatePresentation(row);
+          const requirementStatus = row.included_in_required_total
+            ? (row.included_in_completed ? 'Counts as completed' : 'Required inspection not complete')
+            : 'Excluded from required total';
+
+          return (
+            <li key={row.apparatus_id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-semibold text-neutral-900">{apparatusNames.get(row.apparatus_id) ?? `Apparatus ${row.apparatus_id}`}</p>
+                <p className="text-xs text-neutral-500">{requirementStatus}</p>
+                {row.has_pending_submission && <p className="mt-1 text-xs font-medium text-amber-800">A submission is pending review.</p>}
+                {row.return_checkout_required && <p className="mt-1 text-xs font-medium text-amber-800">Post-return checkout {row.return_checkout_verified ? 'verified' : 'required'}.</p>}
+              </div>
+              <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${presentation.className}`}>{presentation.label}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function dailyCheckoutStatePresentation(row: DailyCheckoutMatrixRow): { label: string; className: string } {
+  const labels: Record<DailyCheckoutMatrixRow['state'], { label: string; className: string }> = {
+    checked: { label: 'Checked', className: 'bg-green-100 text-green-800' },
+    attention: { label: 'Attention', className: 'bg-amber-100 text-amber-900' },
+    review_pending: { label: 'Review pending', className: 'bg-amber-100 text-amber-900' },
+    not_checked: { label: 'Not checked', className: 'bg-red-100 text-red-800' },
+    out_of_service: { label: 'Out of service', className: 'bg-neutral-100 text-neutral-700' },
+    exempt: { label: 'Exempt', className: 'bg-neutral-100 text-neutral-700' },
+    classification_required: { label: 'Classification required', className: 'bg-amber-100 text-amber-900' },
+  };
+
+  return labels[row.state];
+}
 
 function TabSkeleton() {
   return (

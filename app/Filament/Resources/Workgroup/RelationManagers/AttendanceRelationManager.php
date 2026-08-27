@@ -2,16 +2,18 @@
 
 namespace App\Filament\Resources\Workgroup\RelationManagers;
 
+use App\Filament\Resources\Workgroup\RelationManagers\Concerns\AuthorizesWorkgroupOwner;
 use App\Models\WorkgroupMember;
-use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Notifications\Notification;
 
 class AttendanceRelationManager extends RelationManager
 {
+    use AuthorizesWorkgroupOwner;
+
     protected static string $relationship = 'attendees';
 
     protected static ?string $title = 'Session Attendance';
@@ -39,10 +41,10 @@ class AttendanceRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('role')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'admin'       => 'danger',
+                        'admin' => 'danger',
                         'facilitator' => 'warning',
-                        'member'      => 'info',
-                        default       => 'gray',
+                        'member' => 'info',
+                        default => 'gray',
                     }),
                 Tables\Columns\IconColumn::make('is_active')
                     ->boolean()
@@ -55,6 +57,7 @@ class AttendanceRelationManager extends RelationManager
                     ->preloadRecordSelect()
                     ->recordSelectOptionsQuery(function (\Illuminate\Database\Eloquent\Builder $query) {
                         $session = $this->getOwnerRecord();
+
                         // Only show active members from the same workgroup
                         return $query
                             ->where('is_active', true)
@@ -77,6 +80,7 @@ class AttendanceRelationManager extends RelationManager
                     ->requiresConfirmation()
                     ->modalHeading('Mark all active members as attending?')
                     ->modalDescription('This will add ALL active members from this workgroup to the session attendance list. Existing attendance records are preserved.')
+                    ->authorize(fn (self $livewire): bool => $livewire->canManageOwner())
                     ->action(function (): void {
                         $session = $this->getOwnerRecord();
                         $allMemberIds = WorkgroupMember::where('is_active', true)
@@ -89,7 +93,7 @@ class AttendanceRelationManager extends RelationManager
 
                         Notification::make()
                             ->title('Attendance updated')
-                            ->body(count($allMemberIds) . ' active member(s) marked as attending.')
+                            ->body(count($allMemberIds).' active member(s) marked as attending.')
                             ->success()
                             ->send();
                     }),

@@ -11,6 +11,7 @@ use App\Services\CloudflareAIService;
 use App\Services\Display\DisplayAiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -21,6 +22,15 @@ use Tests\TestCase;
 class DisplayAiSnapshotTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $token = Str::random(48);
+        config(['services.display_api.token' => $token]);
+        $this->withHeader('X-Display-Token', $token);
+    }
 
     private function seedFleet(): void
     {

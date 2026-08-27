@@ -46,7 +46,7 @@
                                 @php
                                     $statusVal = $item[$colKey] ?? '';
                                     $isDanger = in_array($statusVal, $dangerStatuses) || $statusVal === 'fail';
-                                    $isPending = $statusVal === 'pending';
+                                    $isPending = in_array($statusVal, ['pending', 'review_pending'], true);
                                     $isSuccess = in_array($statusVal, ['pass', 'approved', 'fulfilled']);
 
                                     if ($isDanger) {

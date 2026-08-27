@@ -5,11 +5,14 @@ namespace App\Filament\Workgroup\Widgets;
 use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
 use App\Models\EvaluationSubmission;
+use App\Models\User;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
+use App\Support\Workgroups\WorkgroupContext;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -21,12 +24,12 @@ class FinalistsWidget extends BaseWidget
 {
     public ?WorkgroupSession $session = null;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
-        $session = $this->session ?? WorkgroupSession::active()->first();
-        
+        $session = $this->resolveSession();
+
         return $table
             ->query($this->getQuery($session))
             ->columns([
@@ -54,8 +57,8 @@ class FinalistsWidget extends BaseWidget
                     ->formatStateUsing(fn ($state) => $state ? number_format((float) $state, 2) : '—')
                     ->sortable()
                     ->badge()
-                    ->color(fn ($state) => match(true) {
-                        !$state => 'gray',
+                    ->color(fn ($state) => match (true) {
+                        ! $state => 'gray',
                         (float) $state >= 80 => 'success',
                         (float) $state >= 60 => 'warning',
                         default => 'danger',
@@ -76,17 +79,18 @@ class FinalistsWidget extends BaseWidget
 
     protected function getQuery(?WorkgroupSession $session)
     {
-        if (!$session) {
+        if (! $session) {
             return CandidateProduct::query()->whereRaw('1 = 0');
         }
 
         // Get IDs of members whose evaluations count
-        $countableMemberIds = WorkgroupMember::where('count_evaluations', true)->pluck('id');
+        $countableMemberIds = WorkgroupMember::where('workgroup_id', $session->workgroup_id)
+            ->where('count_evaluations', true)
+            ->pluck('id');
 
         return CandidateProduct::query()
             ->where('workgroup_session_id', $session->id)
-            ->whereHas('category', fn($query) => 
-                $query->where('is_rankable', true)
+            ->whereHas('category', fn ($query) => $query->where('is_rankable', true)
             )
             ->with(['category'])
             ->select('candidate_products.*')
@@ -104,21 +108,43 @@ class FinalistsWidget extends BaseWidget
             ->orderByDesc('weighted_score');
     }
 
-    /**
-     * Get finalists (top 2) for a specific category.
-     */
-    public static function getFinalistsForCategory(EvaluationCategory $category): array
+    private function resolveSession(): ?WorkgroupSession
     {
-        $session = WorkgroupSession::active()->first();
-        
-        if (!$session) {
-            return [];
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return null;
         }
+
+        $workgroup = app(WorkgroupContext::class)->current($user);
+
+        if ($workgroup === null) {
+            return null;
+        }
+
+        if ($this->session !== null) {
+            return WorkgroupSession::query()
+                ->whereKey($this->session->id)
+                ->where('workgroup_id', $workgroup->id)
+                ->first();
+        }
+
+        return WorkgroupSession::query()
+            ->where('workgroup_id', $workgroup->id)
+            ->active()
+            ->orderBy('id')
+            ->first();
+    }
+
+    /**
+     * Get finalists (top 2) for a specific category and authorized session.
+     */
+    public static function getFinalistsForCategory(EvaluationCategory $category, WorkgroupSession $session): array
+    {
 
         return CandidateProduct::where('workgroup_session_id', $session->id)
             ->where('category_id', $category->id)
-            ->withCount(['submissions' => fn($q) => 
-                $q->where('status', 'submitted')
+            ->withCount(['submissions' => fn ($q) => $q->where('status', 'submitted'),
             ])
             ->get()
             ->map(function ($product, $index) {
@@ -126,7 +152,7 @@ class FinalistsWidget extends BaseWidget
                 $avgScore = EvaluationSubmission::where('candidate_product_id', $product->id)
                     ->where('status', 'submitted')
                     ->avg('overall_score');
-                
+
                 if ($avgScore === null) {
                     // Fallback to legacy calculation
                     $avgScore = DB::table('evaluation_submissions as es')
@@ -154,19 +180,13 @@ class FinalistsWidget extends BaseWidget
     /**
      * Get all finalists across all rankable categories.
      */
-    public static function getAllFinalists(): array
+    public static function getAllFinalists(WorkgroupSession $session): array
     {
-        $session = WorkgroupSession::active()->first();
-        
-        if (!$session) {
-            return [];
-        }
-
         $categories = EvaluationCategory::rankable()->active()->ordered()->get();
         $finalists = [];
 
         foreach ($categories as $category) {
-            $categoryFinalists = self::getFinalistsForCategory($category);
+            $categoryFinalists = self::getFinalistsForCategory($category, $session);
             $finalists[$category->name] = $categoryFinalists;
         }
 

@@ -33,7 +33,7 @@ class WorkgroupSharedUploadObserver
         $vectorizableExtensions = ['pdf', 'docx', 'doc', 'txt', 'ppt', 'pptx', 'csv', 'md'];
         $extension = strtolower(pathinfo($upload->filename, PATHINFO_EXTENSION));
 
-        if (!in_array($extension, $vectorizableExtensions)) {
+        if (! in_array($extension, $vectorizableExtensions)) {
             return;
         }
 
@@ -41,26 +41,26 @@ class WorkgroupSharedUploadObserver
         dispatch(function () use ($upload) {
             try {
                 $service = app(WorkgroupAIService::class);
-                $result  = $service->vectorizeUpload($upload);
+                $result = $service->vectorizeUpload($upload);
 
                 if ($result['success'] ?? false) {
                     Log::info('[WorkgroupAI] File vectorized successfully', [
-                        'upload_id'  => $upload->id,
-                        'filename'   => $upload->filename,
-                        'chunks'     => $result['chunks'] ?? 0,
+                        'operation' => 'vectorize_upload',
+                        'upload_id' => $upload->id,
+                        'chunks' => $result['chunks'] ?? 0,
                         'vectorized' => $result['vectorized'] ?? 0,
                     ]);
                 } else {
                     Log::warning('[WorkgroupAI] File vectorization failed', [
+                        'operation' => 'vectorize_upload',
                         'upload_id' => $upload->id,
-                        'filename'  => $upload->filename,
-                        'error'     => $result['error'] ?? 'unknown',
                     ]);
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $exception) {
                 Log::error('[WorkgroupAI] Vectorization observer exception', [
+                    'operation' => 'vectorize_upload',
                     'upload_id' => $upload->id,
-                    'error'     => $e->getMessage(),
+                    'exception_type' => $exception::class,
                 ]);
             }
         })->afterResponse();

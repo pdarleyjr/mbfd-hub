@@ -4,8 +4,10 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\NotificationSettings;
+use App\Filament\Pages\SetPasswordPage;
 use App\Filament\Training\Pages\Settings as TrainingSettings;
 use App\Http\Middleware\EnsureTrainingPanelAccess;
+use App\Http\Middleware\ForceFilamentPasswordChange;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -58,6 +60,7 @@ class TrainingPanelProvider extends PanelProvider
             ->pages([
                 \App\Filament\Training\Pages\Dashboard::class,
                 NotificationSettings::class,
+                SetPasswordPage::class,
             ])
             ->navigationGroups([
                 NavigationGroup::make()
@@ -100,6 +103,10 @@ class TrainingPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 EnsureTrainingPanelAccess::class,
+                ForceFilamentPasswordChange::class,
+            ])
+            ->persistentMiddleware([
+                ForceFilamentPasswordChange::class,
             ])
             ->sidebarCollapsibleOnDesktop()
             ->renderHook(

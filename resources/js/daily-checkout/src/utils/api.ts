@@ -3,7 +3,7 @@ import {
   Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData,
   StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse,
   InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
-  StationInspectionSummary, ApparatusInspectionSummary, FireEquipmentRequestSummary,
+  StationInspectionSummary, FireEquipmentRequestSummary,
   SingleGasMeterSummary, StationRequestSummary, ApparatusServiceTicketSummary, StationActivityEntry, RoomProfile,
 } from '../types';
 
@@ -21,6 +21,27 @@ const normalizeItemStatus = (status?: string): 'Present' | 'Missing' | 'Damaged'
   }
 
   return 'Present';
+};
+
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
+}
+
+export const isChecklistVersion = (value: unknown): value is string => (
+  typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)
+);
+
+const responseMessage = async (response: Response, fallback: string): Promise<string> => {
+  const payload = await response.json().catch(() => null);
+
+  return typeof payload?.message === 'string' ? payload.message : fallback;
 };
 
 export class ApiClient {
@@ -49,14 +70,26 @@ export class ApiClient {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
-      throw new Error('Failed to fetch checklist');
+      throw new ApiRequestError(
+        await responseMessage(response, 'The Daily Checkout checklist is unavailable.'),
+        response.status,
+      );
     }
 
     const payload = await response.json();
+    const checklistVersion = payload?.checklist_version;
+    if (!isChecklistVersion(checklistVersion)) {
+      throw new ApiRequestError(
+        'The Daily Checkout checklist version is unavailable. Contact an officer before continuing.',
+        503,
+      );
+    }
+
     const rawChecklist = payload?.checklist ?? payload;
     const rawCompartments = Array.isArray(rawChecklist?.compartments) ? rawChecklist.compartments : [];
 
-    return {
+    const checklist: ChecklistData = {
+      checklist_version: checklistVersion.toLowerCase(),
       compartments: rawCompartments.map((compartment: any, compartmentIndex: number) => {
         const compartmentId = compartment?.id ?? `compartment-${compartmentIndex + 1}`;
 
@@ -74,9 +107,21 @@ export class ApiClient {
         };
       }),
     };
+
+    if (!checklist.compartments.some((compartment) => compartment.items.length > 0)) {
+      throw new ApiRequestError(
+        'The Daily Checkout checklist is unavailable. Contact an officer before continuing.',
+        503,
+      );
+    }
+
+    return checklist;
   }
 
-  static async submitInspection(apparatusId: number, data: InspectionSubmission): Promise<{ success: boolean; message: string }> {
+  static async submitInspection(
+    apparatusId: number,
+    data: InspectionSubmission,
+  ): Promise<{ review_status?: 'approved' | 'pending_review' }> {
     const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/inspections`, {
       method: 'POST',
       headers: { ...DEFAULT_HEADERS },
@@ -84,8 +129,12 @@ export class ApiClient {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to submit inspection');
+      const payload = await response.json().catch(() => null);
+      throw new ApiRequestError(
+        typeof payload?.message === 'string' ? payload.message : 'Failed to submit inspection',
+        response.status,
+        typeof payload?.code === 'string' ? payload.code : undefined,
+      );
     }
 
     return response.json();
@@ -339,14 +388,14 @@ export class ApiClient {
 
   static async updateInventoryItem(
     inventoryUrl: string,
-    itemId: number,
+    stationInventoryItemId: number,
     data: UpdateItemRequest
   ): Promise<{ success: boolean; message: string }> {
-    // IMPORTANT: Do NOT modify the signed URL path - signature will fail
-    // Extract base URL and signature, then append the item path
+    // Reuse the PIN-issued base signature and append the station inventory item.
+    // The API validates that signature against the base URL server-side.
     const baseUrl = inventoryUrl.split('?')[0]; // Get everything before query string
     const queryString = inventoryUrl.split('?')[1]; // Get query string with signature
-    const url = `${baseUrl}/item/${itemId}?${queryString}`;
+    const url = `${baseUrl}/item/${stationInventoryItemId}?${queryString}`;
     
     const response = await fetch(url, {
       method: 'PUT',
@@ -381,17 +430,6 @@ export class ApiClient {
     });
     if (!response.ok) {
       throw new Error('Failed to fetch station inspections');
-    }
-    const data = await response.json();
-    return data.inspections || [];
-  }
-
-  static async getTodayApparatusInspections(stationId: number): Promise<ApparatusInspectionSummary[]> {
-    const response = await fetch(`${API_BASE}/public/stations/${stationId}/apparatus-inspections`, {
-      headers: { ...DEFAULT_HEADERS },
-    });
-    if (!response.ok) {
-      throw new Error('Failed to fetch apparatus inspections');
     }
     const data = await response.json();
     return data.inspections || [];

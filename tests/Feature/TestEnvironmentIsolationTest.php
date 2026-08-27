@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Services\Workgroup\WorkgroupAIService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Tests\TestCase;
@@ -31,6 +32,7 @@ final class TestEnvironmentIsolationTest extends TestCase
             'services.cloudflare.ai.api_token',
             'services.cloudflare.api_secret',
             'services.cloudflare.worker_url',
+            'services.display_api.token',
             'services.pulsepoint.worker_url',
             'services.screentinker.sync_token',
             'services.screentinker.sync_url',
@@ -44,6 +46,11 @@ final class TestEnvironmentIsolationTest extends TestCase
             'video-conferencing.livekit.profiles.self_hosted.api_secret',
             'video-conferencing.livekit.profiles.self_hosted.api_url',
             'video-conferencing.livekit.profiles.self_hosted.url',
+            'webpush.vapid.pem_file',
+            'webpush.vapid.private_key',
+            'webpush.vapid.public_key',
+            'webpush.vapid.subject',
+            'webpush.allowed_endpoint_hosts',
         ] as $configuration) {
             $this->assertEmpty(config($configuration), $configuration.' must be blank in PHPUnit');
         }
@@ -51,6 +58,7 @@ final class TestEnvironmentIsolationTest extends TestCase
         $this->assertFalse((bool) config('cloudflare.ai.enabled'));
         $this->assertFalse((bool) config('google_sheets.apparatus_sync_enabled'));
         $this->assertFalse((bool) config('services.cloudflare.ai.enabled'));
+        $this->assertFalse(app(WorkgroupAIService::class)->isEnabled());
         $this->assertFalse((bool) config('video-conferencing.enabled'));
         $this->assertSame('testing', config('app.env'));
         $this->assertSame('array', config('cache.default'));
@@ -84,6 +92,11 @@ final class TestEnvironmentIsolationTest extends TestCase
             'QUEUE_CONNECTION',
             'SESSION_DRIVER',
             'TELESCOPE_ENABLED',
+            'WEBPUSH_DB_CONNECTION',
+            'WEBPUSH_ALLOWED_ENDPOINT_HOSTS',
+            'WORKGROUP_AI_ENABLED',
+            'WORKGROUP_AI_WORKER_SECRET',
+            'WORKGROUP_AI_WORKER_URL',
         ] as $variable) {
             $this->assertMatchesRegularExpression(
                 '/<env name="'.preg_quote($variable, '/').'" value="[^"]*" force="true"\/>/',

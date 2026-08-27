@@ -2,8 +2,9 @@
 
 namespace App\Filament\Training\Pages;
 
-use Filament\Pages\Dashboard as BaseDashboard;
+use App\Models\Training\TrainingTodo;
 use Filament\Actions\Action;
+use Filament\Pages\Dashboard as BaseDashboard;
 
 class Dashboard extends BaseDashboard
 {
@@ -15,7 +16,7 @@ class Dashboard extends BaseDashboard
 
     public function getSubheading(): ?string
     {
-        return 'Current training work queue, external sources, and division tools.';
+        return 'Current training work queue and division tools.';
     }
 
     public function getColumns(): int|string|array
@@ -34,12 +35,8 @@ class Dashboard extends BaseDashboard
                 ->label('New Training Todo')
                 ->icon('heroicon-o-plus-circle')
                 ->color('primary')
-                ->url(fn () => route('filament.training.resources.training-todos.create')),
-            Action::make('externalSources')
-                ->label('External Sources')
-                ->icon('heroicon-o-globe-alt')
-                ->color('gray')
-                ->url(fn () => route('filament.training.resources.external-sources.index')),
+                ->url(fn () => route('filament.training.resources.training-todos.create'))
+                ->visible(fn (): bool => auth()->user()?->can('create', TrainingTodo::class) ?? false),
         ];
     }
 }

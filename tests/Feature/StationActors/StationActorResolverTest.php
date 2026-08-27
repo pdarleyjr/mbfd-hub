@@ -33,7 +33,9 @@ class StationActorResolverTest extends TestCase
         $actor = app(StationActorResolver::class)->resolveVerifiedHuman();
 
         $this->assertInstanceOf(VerifiedHumanStationActor::class, $actor);
-        $this->assertSame($employee->id, $actor->employeeId);
+        $this->assertSame((int) $employee->getKey(), $actor->employeeRecordId);
+        $this->assertSame('F042', $employee->employee_id);
+        $this->assertObjectNotHasProperty('employeeId', $actor);
         $this->assertTrue((new ReflectionClass($actor))->isReadOnly());
     }
 

@@ -1,4 +1,34 @@
 export type ApparatusType = 'engine' | 'ladder1' | 'ladder3' | 'rescue' | 'rope';
+export type DailyCheckoutRequirement = 'required' | 'exempt' | 'reserve' | 'administrative' | 'inactive' | 'unknown';
+export type DailyCheckoutState = 'checked' | 'attention' | 'review_pending' | 'not_checked' | 'out_of_service' | 'exempt' | 'classification_required';
+
+export interface DailyCheckoutMatrixRow {
+  apparatus_id: number;
+  state: DailyCheckoutState;
+  daily_checkout_requirement: DailyCheckoutRequirement;
+  out_of_service: boolean;
+  classification_required: boolean;
+  included_in_required_total: boolean;
+  included_in_completed: boolean;
+  has_pending_submission: boolean;
+  return_checkout_required: boolean;
+  return_checkout_verified: boolean;
+}
+
+export interface DailyCheckoutSummary {
+  required_total: number;
+  checked: number;
+  attention: number;
+  review_pending: number;
+  not_checked: number;
+  completed: number;
+  out_of_service: number;
+  exempt: number;
+  classification_required: number;
+  completion_percent: number | null;
+  completion_available: boolean;
+  matrix: DailyCheckoutMatrixRow[];
+}
 
 export interface PmHealthStatus {
   status: 'green' | 'yellow' | 'red';
@@ -18,6 +48,7 @@ export interface Apparatus {
   designation?: string;
   slug: string;
   status?: string;
+  daily_checkout_requirement?: DailyCheckoutRequirement;
   // PM Maintenance fields
   current_engine_hours?: number | null;
   current_miles?: number | null;
@@ -64,6 +95,7 @@ export interface Compartment {
 }
 
 export interface ChecklistData {
+  checklist_version: string;
   compartments: Compartment[];
 }
 
@@ -76,6 +108,8 @@ export interface Defect {
 }
 
 export interface InspectionSubmission {
+  client_submission_id: string;
+  checklist_version: string;
   operator_name: string;
   rank: string;
   shift: string;
@@ -94,6 +128,7 @@ export interface MeterData {
 }
 
 export interface InspectionData {
+  checklist_version: string;
   officer: OfficerInfo;
   meter: MeterData;
   compartments: Compartment[];
@@ -161,16 +196,6 @@ export interface StationInspectionSummary {
   inspector_name: string;
   notes?: string;
   created_at: string;
-}
-
-export interface ApparatusInspectionSummary {
-  id: number;
-  apparatus_name: string;
-  operator_name: string;
-  rank: string;
-  shift: string;
-  completed_at: string;
-  defect_count: number;
 }
 
 export interface FireEquipmentRequestSummary {
@@ -309,6 +334,7 @@ export interface StationDetail extends Station {
   shop_works?: ShopWork[];
   active_shop_works?: ShopWork[];
   summary?: StationSummary;
+  daily_checkout?: DailyCheckoutSummary;
 }
 
 export interface StationSummary {
