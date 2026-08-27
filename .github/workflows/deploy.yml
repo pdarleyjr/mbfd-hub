@@ -312,7 +312,7 @@ jobs:
           done
           test -n "${QUEUE_AFTER:-}"
           test "$QUEUE_AFTER" != "$QUEUE_BEFORE"
-          docker exec "$HUB_APP_CONTAINER" supervisorctl status
+          docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/python3 /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf$'
           docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/php /var/www/html/artisan reverb:start '
           docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/php /var/www/html/artisan queue:work '
           REMOTE

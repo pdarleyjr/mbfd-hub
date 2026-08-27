@@ -220,7 +220,8 @@ test("production activation is manual, main-only, and blocked by every Hub relea
 
   const backgroundServices = workflowStep(deployment, "Restart Hub queues and verify background services");
   assert.match(backgroundServices, /php artisan queue:restart/);
-  assert.match(backgroundServices, /supervisorctl status/);
+  assert.match(backgroundServices, /supervisord -c \/etc\/supervisor\/conf\.d\/supervisord\.conf/);
+  assert.doesNotMatch(backgroundServices, /supervisorctl status/);
   assert.match(backgroundServices, /reverb:start/);
 
   const leaveMaintenance = workflowStep(deployment, "Leave maintenance mode and verify internal health");
