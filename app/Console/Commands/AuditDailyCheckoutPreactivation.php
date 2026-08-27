@@ -272,7 +272,9 @@ final class AuditDailyCheckoutPreactivation extends Command
                 $rowPolicyIssues[] = 'classification_required';
             }
 
+            $requiredChecklistVersion = null;
             if ($policy !== null && $policy['daily_checkout_requirement'] === DailyCheckoutRequirement::Required->value) {
+                $requiredChecklistVersion = $policy['expected_checklist_version'];
                 if (! $checklist['usable']) {
                     $rowIssues[] = 'required_apparatus_checklist_unusable';
                 }
@@ -294,9 +296,7 @@ final class AuditDailyCheckoutPreactivation extends Command
                 $currentInspection['approved'],
                 $policy['pre_ledger_oos_review'] ?? null,
                 $startOfDay,
-                $policy !== null && $policy['daily_checkout_requirement'] === DailyCheckoutRequirement::Required->value
-                    ? $policy['expected_checklist_version']
-                    : null,
+                $requiredChecklistVersion,
             );
             $rowIssues = array_merge($rowIssues, $ledger['issues']);
             unset($ledger['issues']);
@@ -306,10 +306,9 @@ final class AuditDailyCheckoutPreactivation extends Command
                 $rowIssues[] = 'canonical_daily_state_unavailable';
             }
             if (
-                $policy !== null
-                && $policy['daily_checkout_requirement'] === DailyCheckoutRequirement::Required->value
+                $requiredChecklistVersion !== null
                 && in_array($canonicalDaily['state'] ?? null, ['checked', 'attention'], true)
-                && ($currentInspection['latest_approved']['checklist_version'] ?? null) !== $policy['expected_checklist_version']
+                && ($currentInspection['latest_approved']['checklist_version'] ?? null) !== $requiredChecklistVersion
             ) {
                 $rowIssues[] = 'current_approved_checkout_checklist_version_mismatch';
             }
