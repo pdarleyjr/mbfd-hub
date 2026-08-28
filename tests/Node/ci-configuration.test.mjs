@@ -190,7 +190,11 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(databaseBackup, /PG_DATA_SOURCE/);
   assert.match(databaseBackup, /BACKUP_PATH_HELPER_IMAGE=sail-8\.5\/app/);
   assert.match(databaseBackup, /docker run --rm --network none --pull=never/);
-  assert.match(databaseBackup, /--read-only --cap-drop=ALL/);
+  assert.match(databaseBackup, /--read-only --cap-drop=ALL --cap-add=DAC_READ_SEARCH --security-opt=no-new-privileges/);
+  assert.match(databaseBackup, /--user 0:0/);
+  assert.doesNotMatch(databaseBackup, /--privileged\b/);
+  assert.doesNotMatch(databaseBackup, /--cap-add(?:=|\s+)(?!DAC_READ_SEARCH\b)/);
+  assert.doesNotMatch(databaseBackup, /--cap-add=DAC_OVERRIDE/);
   assert.match(databaseBackup, /--mount type=bind,src=\/mnt,dst=\/host-mnt,readonly/);
   assert.match(databaseBackup, /PG_DATA_SOURCE_IN_HELPER/);
   assert.match(databaseBackup, /HUB_BACKUP_DIR_IN_HELPER/);

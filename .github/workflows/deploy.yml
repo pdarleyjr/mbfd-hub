@@ -149,7 +149,9 @@ jobs:
                exit 1
                ;;
            esac
-           docker run --rm --network none --pull=never --read-only --cap-drop=ALL --entrypoint sh \
+           # Path resolution must traverse the protected PostgreSQL data directory;
+           # retain only read/search bypass in the isolated read-only helper.
+           docker run --rm --network none --pull=never --read-only --cap-drop=ALL --cap-add=DAC_READ_SEARCH --security-opt=no-new-privileges --user 0:0 --entrypoint sh \
              --mount type=bind,src=/mnt,dst=/host-mnt,readonly \
              "$BACKUP_PATH_HELPER_IMAGE" -euc '
                PG_DATA_SOURCE_REAL="$(realpath -e -- "$1")"
