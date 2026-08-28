@@ -246,8 +246,16 @@ class ApparatusController extends Controller
         }
 
         $session = $issued['session'];
-        $sessionChecklist = $session->checklist_snapshot;
+        $sessionChecklist = $session->getAttribute('checklist_snapshot');
         if (! is_array($sessionChecklist) || ! $inspectionSessionService->checklistHasIntegrity($session)) {
+            return response()->json([
+                'message' => 'The Fire Boat inspection session contract could not be verified. Reconnect and start a new inspection session.',
+                'code' => 'DAILY_CHECKOUT_INSPECTION_SESSION_INVALID',
+            ], 409);
+        }
+
+        $sessionDutyDate = $session->getAttribute('duty_date');
+        if (! ($sessionDutyDate instanceof CarbonImmutable)) {
             return response()->json([
                 'message' => 'The Fire Boat inspection session contract could not be verified. Reconnect and start a new inspection session.',
                 'code' => 'DAILY_CHECKOUT_INSPECTION_SESSION_INVALID',
@@ -260,7 +268,7 @@ class ApparatusController extends Controller
             'checklist_version' => $session->checklist_hash,
             'checklist_type' => $resolution['checklist_type'],
             'checklist_item_count' => $resolution['item_count'],
-            'inspection_date' => $session->duty_date?->toDateString(),
+            'inspection_date' => $sessionDutyDate->toDateString(),
             'due_tasks' => $session->due_tasks,
             'open_defects_count' => $apparatus->openDefects()->count(),
             'inspection_session' => $inspectionSessionService->publicContract($session, $issued['token']),

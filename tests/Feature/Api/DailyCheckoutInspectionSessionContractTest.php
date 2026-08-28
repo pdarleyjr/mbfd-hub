@@ -432,7 +432,10 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         $today = $transition->json('inspection_session');
         $this->assertIsArray($today);
 
-        $transition->assertJsonPath('inspection_session.duty_date', '2026-08-31');
+        $transition
+            ->assertJsonPath('checklist.template_id', 'fire_boat_6_daily')
+            ->assertJsonPath('checklist.template_version', '2026-07')
+            ->assertJsonPath('inspection_session.duty_date', '2026-08-31');
         $priorRecord = DailyCheckoutInspectionSession::query()->where('public_id', $prior['id'])->sole();
         $todayRecord = DailyCheckoutInspectionSession::query()->where('public_id', $today['id'])->sole();
         $this->assertNotNull($priorRecord->abandoned_at);
@@ -445,6 +448,44 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         $this->assertSame($priorRecord->id, $todayRecord->prior_inspection_session_id);
         $this->assertSame($todayRecord->id, $priorRecord->replacement_session_id);
         $this->assertDatabaseCount('daily_checkout_inspection_sessions', 2);
+    }
+
+    public function test_malformed_prior_expiry_fails_closed_without_issuing_a_replacement(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-30 23:55:00');
+        $prior = $this->startInspectionSession($apparatus);
+        DB::table('daily_checkout_inspection_sessions')
+            ->where('public_id', $prior['id'])
+            ->update(['expires_at' => 'not-a-date']);
+
+        $this->setTestTime('2026-08-31 00:05:00');
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspection-sessions/{$prior['id']}/abandon",
+            $this->abandonmentPayload($prior, '18181818-1818-4818-8818-181818181818'),
+        )
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'DAILY_CHECKOUT_INSPECTION_SESSION_EXPIRED');
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 1);
+    }
+
+    public function test_malformed_prior_duty_date_fails_closed_without_issuing_a_replacement(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-30 23:55:00');
+        $prior = $this->startInspectionSession($apparatus);
+        DB::table('daily_checkout_inspection_sessions')
+            ->where('public_id', $prior['id'])
+            ->update(['duty_date' => 'not-a-date']);
+
+        $this->setTestTime('2026-08-31 00:05:00');
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspection-sessions/{$prior['id']}/abandon",
+            $this->abandonmentPayload($prior, '19191919-1919-4919-8919-191919191919'),
+        )
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'DAILY_CHECKOUT_INSPECTION_SESSION_ABANDONMENT_NOT_REQUIRED');
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 1);
     }
 
     public function test_replayed_abandonment_transition_is_idempotent_and_does_not_issue_a_second_contract(): void

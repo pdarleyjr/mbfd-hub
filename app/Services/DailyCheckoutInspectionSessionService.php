@@ -162,14 +162,16 @@ final class DailyCheckoutInspectionSessionService
                 );
             }
 
-            if ($prior->expires_at === null || $prior->expires_at->lessThanOrEqualTo($issuedAt)) {
+            $priorExpiresAt = $this->inspectionSessionDateAttribute($prior, 'expires_at');
+            if ($priorExpiresAt === null || $priorExpiresAt->lessThanOrEqualTo($issuedAt)) {
                 throw new DailyCheckoutInspectionSessionException(
                     'DAILY_CHECKOUT_INSPECTION_SESSION_EXPIRED',
                     'This Fire Boat inspection session has expired. Reconnect and start a new inspection session.',
                 );
             }
 
-            if ($prior->duty_date === null || $prior->duty_date->toDateString() === $issuedAt->toDateString()) {
+            $priorDutyDate = $this->inspectionSessionDateAttribute($prior, 'duty_date');
+            if ($priorDutyDate === null || $priorDutyDate->toDateString() === $issuedAt->toDateString()) {
                 throw new DailyCheckoutInspectionSessionException(
                     'DAILY_CHECKOUT_INSPECTION_SESSION_ABANDONMENT_NOT_REQUIRED',
                     'The active Fire Boat inspection already belongs to today and cannot be replaced by this transition.',
@@ -366,9 +368,11 @@ final class DailyCheckoutInspectionSessionService
 
     private function activeContractForApparatus(int $apparatusId, CarbonImmutable $issuedAt): ?DailyCheckoutInspectionSession
     {
-        return $this->activeContractsForApparatus($apparatusId, $issuedAt)
+        $session = $this->activeContractsForApparatus($apparatusId, $issuedAt)
             ->orderBy('id')
             ->first();
+
+        return $session instanceof DailyCheckoutInspectionSession ? $session : null;
     }
 
     private function activeContractsForApparatus(int $apparatusId, CarbonImmutable $issuedAt): \Illuminate\Database\Eloquent\Builder
@@ -378,6 +382,17 @@ final class DailyCheckoutInspectionSessionService
             ->whereNull('submitted_inspection_id')
             ->whereNull('abandoned_at')
             ->where('expires_at', '>', $issuedAt);
+    }
+
+    private function inspectionSessionDateAttribute(DailyCheckoutInspectionSession $session, string $attribute): ?CarbonImmutable
+    {
+        try {
+            $value = $session->getAttribute($attribute);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $value instanceof CarbonImmutable ? $value : null;
     }
 
     private function assertContractOwnership(
