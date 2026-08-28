@@ -430,6 +430,26 @@ test('a string Station 2 API value renders both authorized conference links', as
     .toHaveAttribute('href', '/employee/video-conferencing/command');
 });
 
+test('a string Station 3 API value renders its conference link', async ({ page }) => {
+  await mockInspectionApi(page, { stationNumber: '3' });
+
+  await page.goto('/daily/stations/1');
+
+  await expect(page.getByRole('link', { name: 'Morning Lineup Video Conference', exact: true }))
+    .toHaveAttribute('href', '/video-conferencing/stations/3');
+  await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true })).toHaveCount(0);
+});
+
+test('a string Station 4 API value renders its conference link', async ({ page }) => {
+  await mockInspectionApi(page, { stationNumber: '4' });
+
+  await page.goto('/daily/stations/1');
+
+  await expect(page.getByRole('link', { name: 'Morning Lineup Video Conference', exact: true }))
+    .toHaveAttribute('href', '/video-conferencing/stations/4');
+  await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true })).toHaveCount(0);
+});
+
 test('a string Station 6 API value renders its conference link', async ({ page }) => {
   await mockInspectionApi(page, { stationNumber: '6' });
 
