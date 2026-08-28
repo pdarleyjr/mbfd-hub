@@ -254,6 +254,7 @@ jobs:
       url: https://www.mbfdhub.com
     env:
       HUB_IMAGE_REF: ${{ needs.prepare-production-image.outputs.image_ref }}
+      HUB_ACTIVATION_ID: mbfd-hub-activation-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Configure ephemeral Hub deployment SSH target
         env:
@@ -275,6 +276,35 @@ jobs:
             "$DEPLOY_HOST" "$DEPLOY_USER" "$SSH_DIR/deploy_key" "$SSH_DIR/known_hosts" > "$SSH_DIR/config"
           chmod 600 "$SSH_DIR/deploy_key" "$SSH_DIR/config"
           printf 'HUB_SSH_CONFIG=%s\n' "$SSH_DIR/config" >> "$GITHUB_ENV"
+
+      - name: Validate Hub deployment variable syntax
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_IMAGE_REF: ${{ needs.prepare-production-image.outputs.image_ref }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_APP_ENV_FILE: ${{ vars.MBFD_HUB_APP_ENV_FILE }}
+          HUB_STORAGE_PATH: ${{ vars.MBFD_HUB_STORAGE_PATH }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_NETWORK_NAME: ${{ vars.MBFD_HUB_NETWORK_NAME }}
+          HUB_WWWUSER: ${{ vars.MBFD_HUB_WWWUSER }}
+          HUB_WWWGROUP: ${{ vars.MBFD_HUB_WWWGROUP }}
+          HUB_GOOGLE_SA_PATH: ${{ vars.MBFD_HUB_GOOGLE_SA_PATH }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$HUB_IMAGE_REF" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
+          for path in "$HUB_RELEASE_ROOT" "$HUB_APP_ENV_FILE" "$HUB_STORAGE_PATH" "$HUB_BACKUP_DIR"; do
+            [[ "$path" =~ ^/[A-Za-z0-9._/-]+$ ]]
+          done
+          if [[ -n "$HUB_GOOGLE_SA_PATH" ]]; then
+            [[ "$HUB_GOOGLE_SA_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]
+          fi
+          [[ "$HUB_NETWORK_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]
+          [[ "$HUB_WWWUSER" =~ ^[1-9][0-9]*$ ]]
+          [[ "$HUB_WWWGROUP" =~ ^[1-9][0-9]*$ ]]
+          [[ "$HUB_ACTIVATION_ID" =~ ^mbfd-hub-activation-[a-f0-9]{40}-[0-9]+-[0-9]+$ ]]
+          printf 'HUB_DEPLOYMENT_VARIABLES_VALIDATED=1\n' >> "$GITHUB_ENV"
 
       - name: Inspect Hub production checkout and runtime
         env:
@@ -455,18 +485,24 @@ jobs:
         env:
           RELEASE_SHA: ${{ github.sha }}
           HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
           test -n "$HUB_IMAGE_REF"
           test -n "$HUB_BACKUP_DIR"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' bash -s" <<'REMOTE'
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_CHECKOUT=/opt/mbfd/mbfd-hub
           HUB_APP_CONTAINER=mbfd-hub-laravel
           HUB_PG_CONTAINER=mbfd-hub-pgsql
           HUB_PG_DATABASE=mbfd_hub
           HUB_PG_USER=mbfd_user
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
 
           test "$(docker inspect --format '{{.Name}}' "$HUB_PG_CONTAINER")" = "/$HUB_PG_CONTAINER"
           test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_PG_CONTAINER")" = 'pgsql'
@@ -510,9 +546,11 @@ jobs:
            test -d "$HUB_BACKUP_DIR"
            test -w "$HUB_BACKUP_DIR"
 
-           cd "$HUB_CHECKOUT"
-           PREVIOUS_SHA="$(git rev-parse HEAD)"
            PREVIOUS_IMAGE_REF="$(docker inspect --format '{{.Config.Image}}' "$HUB_APP_CONTAINER")"
+           PREVIOUS_RUNTIME_REVISION="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$PREVIOUS_IMAGE_REF" 2>/dev/null || true)"
+           if ! [[ "$PREVIOUS_RUNTIME_REVISION" =~ ^[a-f0-9]{40}$ ]]; then
+             PREVIOUS_RUNTIME_REVISION=legacy_unlabeled
+           fi
            BACKUP_ID="mbfd-hub-pre-activation-$(date -u +%Y%m%dT%H%M%SZ)-$RELEASE_SHA"
            BACKUP_FILE="$HUB_BACKUP_DIR/$BACKUP_ID.dump"
           umask 077
@@ -520,19 +558,42 @@ jobs:
           test -s "$BACKUP_FILE"
           docker exec -i "$HUB_PG_CONTAINER" pg_restore --list < "$BACKUP_FILE" > /dev/null
            BACKUP_SHA256="$(sha256sum "$BACKUP_FILE" | awk '{print $1}')"
-           printf 'release_sha=%s\nimage_ref=%s\nprevious_sha=%s\nprevious_image=%s\ncreated_at=%s\nbackup_file=%s\nsha256=%s\n' \
-             "$RELEASE_SHA" "$HUB_IMAGE_REF" "$PREVIOUS_SHA" "$PREVIOUS_IMAGE_REF" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BACKUP_FILE" "$BACKUP_SHA256" > "$HUB_BACKUP_DIR/$BACKUP_ID.metadata"
+           printf 'release_sha=%s\nimage_ref=%s\nprevious_runtime_revision=%s\nprevious_image=%s\ncreated_at=%s\nbackup_file=%s\nsha256=%s\n' \
+             "$RELEASE_SHA" "$HUB_IMAGE_REF" "$PREVIOUS_RUNTIME_REVISION" "$PREVIOUS_IMAGE_REF" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BACKUP_FILE" "$BACKUP_SHA256" > "$HUB_BACKUP_DIR/$BACKUP_ID.metadata"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" backup_verified not_requested
           echo "Verified Hub backup: $BACKUP_FILE sha256=$BACKUP_SHA256"
           REMOTE
 
       - name: Enter maintenance mode and verify queue safety
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
-          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_IMAGE_REF"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+
+          test -r "$HUB_ACTIVATION_STATE"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/)" = '200'
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" pre_cutover_maintenance_requested requested
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan down --render=errors::503
           test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/)" = '503'
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" pre_cutover_maintenance_entered entered
           QUEUE_PROCESSES="$(docker exec "$HUB_APP_CONTAINER" pgrep -af 'artisan queue:work' || true)"
           test -n "$QUEUE_PROCESSES"
           if printf '%s\n' "$QUEUE_PROCESSES" | grep -Eq -- '(^|[[:space:]])--force([[:space:]]|$)'; then
@@ -551,6 +612,8 @@ jobs:
           HUB_WWWUSER: ${{ vars.MBFD_HUB_WWWUSER }}
           HUB_WWWGROUP: ${{ vars.MBFD_HUB_WWWGROUP }}
           HUB_GOOGLE_SA_PATH: ${{ vars.MBFD_HUB_GOOGLE_SA_PATH }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
@@ -561,14 +624,19 @@ jobs:
           test -n "$HUB_NETWORK_NAME"
           test -n "$HUB_WWWUSER"
           test -n "$HUB_WWWGROUP"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_APP_ENV_FILE='$HUB_APP_ENV_FILE' HUB_STORAGE_PATH='$HUB_STORAGE_PATH' HUB_NETWORK_NAME='$HUB_NETWORK_NAME' HUB_WWWUSER='$HUB_WWWUSER' HUB_WWWGROUP='$HUB_WWWGROUP' HUB_GOOGLE_SA_PATH='$HUB_GOOGLE_SA_PATH' bash -s" <<'REMOTE'
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_APP_ENV_FILE='$HUB_APP_ENV_FILE' HUB_STORAGE_PATH='$HUB_STORAGE_PATH' HUB_NETWORK_NAME='$HUB_NETWORK_NAME' HUB_WWWUSER='$HUB_WWWUSER' HUB_WWWGROUP='$HUB_WWWGROUP' HUB_GOOGLE_SA_PATH='$HUB_GOOGLE_SA_PATH' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
           HUB_GOOGLE_SA_PATH="${HUB_GOOGLE_SA_PATH:-/dev/null}"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
 
           test -e "$HUB_SOURCE_WORKTREE/.git"
           test "$(git -C "$HUB_SOURCE_WORKTREE" rev-parse HEAD)" = "$RELEASE_SHA"
           test -f "$HUB_SOURCE_WORKTREE/compose.prod.image.yaml"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
           test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$HUB_IMAGE_REF")" = "$RELEASE_SHA"
 
           run_image_artisan() {
@@ -591,9 +659,19 @@ jobs:
               "$HUB_IMAGE_REF" artisan "$@"
           }
 
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" pre_cutover_migration_status entered
           run_image_artisan migrate:status --no-ansi
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" migration_started entered
           run_image_artisan migrate --force
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" migration_complete entered
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" cutover_activation_started entered
           run_image_artisan daily-checkout:activate-ledger --release-sha="$RELEASE_SHA" --no-interaction
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" cutover_activated entered
           REMOTE
 
       - name: Switch only the Hub Laravel service to the immutable image
@@ -606,6 +684,8 @@ jobs:
           HUB_WWWUSER: ${{ vars.MBFD_HUB_WWWUSER }}
           HUB_WWWGROUP: ${{ vars.MBFD_HUB_WWWGROUP }}
           HUB_GOOGLE_SA_PATH: ${{ vars.MBFD_HUB_GOOGLE_SA_PATH }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
@@ -616,15 +696,20 @@ jobs:
           test -n "$HUB_NETWORK_NAME"
           test -n "$HUB_WWWUSER"
           test -n "$HUB_WWWGROUP"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_APP_ENV_FILE='$HUB_APP_ENV_FILE' HUB_STORAGE_PATH='$HUB_STORAGE_PATH' HUB_NETWORK_NAME='$HUB_NETWORK_NAME' HUB_WWWUSER='$HUB_WWWUSER' HUB_WWWGROUP='$HUB_WWWGROUP' HUB_GOOGLE_SA_PATH='$HUB_GOOGLE_SA_PATH' bash -s" <<'REMOTE'
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_APP_ENV_FILE='$HUB_APP_ENV_FILE' HUB_STORAGE_PATH='$HUB_STORAGE_PATH' HUB_NETWORK_NAME='$HUB_NETWORK_NAME' HUB_WWWUSER='$HUB_WWWUSER' HUB_WWWGROUP='$HUB_WWWGROUP' HUB_GOOGLE_SA_PATH='$HUB_GOOGLE_SA_PATH' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
           HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
           HUB_GOOGLE_SA_PATH="${HUB_GOOGLE_SA_PATH:-/dev/null}"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
 
           test -e "$HUB_SOURCE_WORKTREE/.git"
           test "$(git -C "$HUB_SOURCE_WORKTREE" rev-parse HEAD)" = "$RELEASE_SHA"
           test -f "$HUB_SOURCE_WORKTREE/compose.prod.image.yaml"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
           test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$HUB_IMAGE_REF")" = "$RELEASE_SHA"
           test "$(docker inspect --format '{{.Name}}' "$HUB_APP_CONTAINER")" = "/$HUB_APP_CONTAINER"
           test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_APP_CONTAINER")" = laravel.test
@@ -643,6 +728,8 @@ jobs:
             printf 'HUB_WWWGROUP=%s\n' "$HUB_WWWGROUP"
             printf 'HUB_GOOGLE_SA_PATH=%s\n' "$HUB_GOOGLE_SA_PATH"
           } > "$HUB_COMPOSE_ENV"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" service_switch_started entered
           docker compose --project-name "$HUB_COMPOSE_PROJECT" \
             --env-file "$HUB_COMPOSE_ENV" \
             -f "$HUB_SOURCE_WORKTREE/compose.prod.image.yaml" \
@@ -653,22 +740,45 @@ jobs:
           test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$HUB_APP_CONTAINER")" = "$HUB_COMPOSE_PROJECT"
           test "$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{printf "%s\n" $name}}{{end}}' "$HUB_APP_CONTAINER")" = "$HUB_NETWORK_NAME"
           test "$(docker inspect --format '{{.Config.Image}}' "$HUB_APP_CONTAINER")" = "$HUB_IMAGE_REF"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" service_switch_recreated entered
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" post_switch_cache_started entered
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan optimize:clear
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan config:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan route:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan view:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan filament:clear-cached-components
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" post_switch_cache_complete entered
           REMOTE
 
       - name: Verify Hub application health
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
-          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" health_verification_started entered
           for _ in $(seq 1 60); do
             if docker inspect --format='{{.State.Health.Status}}' "$HUB_APP_CONTAINER" | grep -qx healthy \
               && docker exec "$HUB_APP_CONTAINER" curl -fsS http://localhost:80/up > /dev/null; then
+              bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+                "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" health_verified entered
               exit 0
             fi
             sleep 1
@@ -678,11 +788,26 @@ jobs:
           REMOTE
 
       - name: Restart Hub queues and verify background services
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
-          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" queue_restart_started entered
           CACHE_DRIVER="$(docker exec -u sail "$HUB_APP_CONTAINER" php -r '
           require "/var/www/html/vendor/autoload.php";
           $app = require "/var/www/html/bootstrap/app.php";
@@ -720,44 +845,106 @@ jobs:
           docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/python3 /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf$'
           docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/php /var/www/html/artisan reverb:start '
           docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/php /var/www/html/artisan queue:work '
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" queue_restart_verified entered
           REMOTE
 
       - name: Leave maintenance mode and verify internal health
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
-          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" maintenance_exit_started entered
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan up
           test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/up)" = '200'
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" maintenance_exited not_requested
           REMOTE
 
       - name: Record successful Hub image activation
         env:
           RELEASE_SHA: ${{ github.sha }}
           HUB_IMAGE_REF: ${{ needs.prepare-production-image.outputs.image_ref }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
           test -n "$HUB_IMAGE_REF"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' bash -s" <<'REMOTE'
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
           test "$(docker inspect --format '{{.Config.Image}}' "$HUB_APP_CONTAINER")" = "$HUB_IMAGE_REF"
           test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$HUB_IMAGE_REF")" = "$RELEASE_SHA"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" activation_record_started not_requested
           docker exec -u sail -e RELEASE_SHA -e HUB_IMAGE_REF "$HUB_APP_CONTAINER" sh -c '
             set -eu
             DEPLOYED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             printf '"'"'{"sha":"%s","image_ref":"%s","deployed_at":"%s"}\n'"'"' "$RELEASE_SHA" "$HUB_IMAGE_REF" "$DEPLOYED_AT" > /var/www/html/public/deploy-marker.json
             printf '%s\n' "$DEPLOYED_AT" > /var/www/html/.build-time
           '
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" activation_recorded not_requested
           REMOTE
 
       - name: Verify public Hub smoke routes
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_IMAGE_REF: ${{ needs.prepare-production-image.outputs.image_ref }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_IMAGE_REF"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" public_smoke_started not_requested
+          REMOTE
           curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 15 https://www.mbfdhub.com/up > /dev/null
           test "$(curl --silent --show-error --location --max-time 15 --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/)" = '200'
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" public_smoke_verified not_requested
+          REMOTE
 
       - name: Remove temporary Hub source worktree after successful image activation
         env:
@@ -791,16 +978,58 @@ jobs:
           REMOTE
 
       - name: Preserve Hub image activation failure evidence
-        if: ${{ failure() && env.HUB_SSH_CONFIG != '' }}
+        if: ${{ failure() && env.HUB_SSH_CONFIG != '' && env.HUB_DEPLOYMENT_VARIABLES_VALIDATED == '1' }}
         env:
           RELEASE_SHA: ${{ github.sha }}
           HUB_IMAGE_REF: ${{ needs.prepare-production-image.outputs.image_ref }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -u
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' bash -s" <<'REMOTE' || true
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE' || true
           set -u
           HUB_APP_CONTAINER=mbfd-hub-laravel
-          echo 'Hub activation failed; preserving state only. No automatic rollback or maintenance-mode exit is attempted.'
+          HUB_SOURCE_WORKTREE="${HUB_RELEASE_ROOT:-}/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="${HUB_BACKUP_DIR:-}/$HUB_ACTIVATION_ID.state"
+          FAULT_PHASE=state_absent
+          MAINTENANCE_STATE=unknown
+          RECOVERY=not_attempted
+
+          if test -r "$HUB_ACTIVATION_STATE"; then
+            FAULT_PHASE="$(sed -n 's/^phase=//p' "$HUB_ACTIVATION_STATE" | tail -n 1)"
+            MAINTENANCE_STATE="$(sed -n 's/^maintenance_state=//p' "$HUB_ACTIVATION_STATE" | tail -n 1)"
+          fi
+          case "$FAULT_PHASE:$MAINTENANCE_STATE" in
+            pre_cutover_maintenance_requested:requested|pre_cutover_maintenance_entered:entered|pre_cutover_migration_status:entered)
+              HTTP_STATUS="$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/ 2>/dev/null || true)"
+              if test "$HTTP_STATUS" = 503; then
+                if docker exec -u sail "$HUB_APP_CONTAINER" php artisan up \
+                  && test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/)" = 200; then
+                  RECOVERY=pre_cutover_existing_release_restored
+                else
+                  RECOVERY=pre_cutover_recovery_failed
+                fi
+              else
+                RECOVERY=pre_cutover_existing_release_already_available
+              fi
+              ;;
+            *:not_requested)
+              RECOVERY=maintenance_not_owned_or_already_exited
+              ;;
+            *)
+              RECOVERY=post_migration_or_cutover_manual_decision_required
+              ;;
+          esac
+
+          if test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            && test -d "${HUB_BACKUP_DIR:-}" \
+            && test -n "${RELEASE_SHA:-}" \
+            && test -n "${HUB_IMAGE_REF:-}"; then
+            bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+              "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" fault "$MAINTENANCE_STATE" "$FAULT_PHASE" "$RECOVERY" || true
+          fi
+          echo "Hub activation failed at phase=$FAULT_PHASE maintenance_state=$MAINTENANCE_STATE recovery=$RECOVERY. No automatic database rollback is attempted."
           docker ps --filter "name=^/$HUB_APP_CONTAINER$" --format 'name={{.Names}} image={{.Image}} state={{.State}}'
           docker inspect --format 'name={{.Name}} image={{.Config.Image}} state={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{end}} revision={{index .Config.Labels "org.opencontainers.image.revision"}}' "$HUB_APP_CONTAINER" || true
           docker image inspect --format 'image={{index .RepoDigests 0}} revision={{index .Config.Labels "org.opencontainers.image.revision"}}' "$HUB_IMAGE_REF" || true

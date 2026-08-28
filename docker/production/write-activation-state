@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+state_path="${1:?activation state path is required}"
+release_sha="${2:?release SHA is required}"
+image_ref="${3:?image digest reference is required}"
+phase="${4:?activation phase is required}"
+maintenance_state="${5:?maintenance state is required}"
+fault_phase="${6:-none}"
+recovery="${7:-not_applicable}"
+
+if [[ "$state_path" != /* ]] || ! [[ "$release_sha" =~ ^[a-f0-9]{40}$ ]] || ! [[ "$image_ref" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]; then
+    echo 'Invalid immutable activation-state identity.' >&2
+    exit 1
+fi
+
+for value in "$phase" "$maintenance_state" "$fault_phase" "$recovery"; do
+    if [[ ! "$value" =~ ^[a-z0-9_]+$ ]]; then
+        echo 'Activation-state values must be lowercase identifiers.' >&2
+        exit 1
+    fi
+done
+
+state_directory="$(dirname -- "$state_path")"
+state_name="$(basename -- "$state_path")"
+
+test -d "$state_directory"
+test -w "$state_directory"
+
+umask 077
+temporary_state="$(mktemp "$state_directory/.${state_name}.XXXXXX")"
+trap 'rm -f -- "$temporary_state"' EXIT
+
+{
+    printf 'schema_version=1\n'
+    printf 'release_sha=%s\n' "$release_sha"
+    printf 'image_ref=%s\n' "$image_ref"
+    printf 'phase=%s\n' "$phase"
+    printf 'maintenance_state=%s\n' "$maintenance_state"
+    printf 'fault_phase=%s\n' "$fault_phase"
+    printf 'recovery=%s\n' "$recovery"
+    printf 'recorded_at_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+} > "$temporary_state"
+
+chmod 600 "$temporary_state"
+mv -f -- "$temporary_state" "$state_path"
+trap - EXIT

@@ -92,7 +92,7 @@ COPY composer.json composer.lock ./
 # Composer authentication is optional for local public-dependency builds and is
 # injected only as an ephemeral BuildKit secret in hosted CI.
 RUN --mount=type=secret,id=composer_auth,required=false \
-    set -eux; \
+    set -eu; \
     if [ -s /run/secrets/composer_auth ]; then \
         export COMPOSER_AUTH="{\"github-oauth\":{\"github.com\":\"$(tr -d '\r\n' < /run/secrets/composer_auth)\"}}"; \
     fi; \

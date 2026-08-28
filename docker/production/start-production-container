@@ -5,8 +5,8 @@ set -euo pipefail
 for variable in WWWUSER WWWGROUP; do
     value="${!variable:-}"
 
-    if ! [[ "$value" =~ ^[0-9]+$ ]]; then
-        echo "$variable must be a numeric UID or GID." >&2
+    if ! [[ "$value" =~ ^[0-9]+$ ]] || [[ "$value" =~ ^0+$ ]]; then
+        echo "$variable must be a non-root numeric UID or GID." >&2
         exit 1
     fi
 done

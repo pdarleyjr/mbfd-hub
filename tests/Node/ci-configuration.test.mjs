@@ -165,6 +165,24 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.doesNotMatch(sshTarget, /ssh-keyscan/);
   assert.doesNotMatch(sshTarget, /\$HOME\/\.ssh/);
 
+  const variableSyntax = workflowStep(deployment, "Validate Hub deployment variable syntax");
+  assert.match(variableSyntax, /RELEASE_SHA/);
+  assert.match(variableSyntax, /HUB_IMAGE_REF/);
+  assert.match(variableSyntax, /HUB_RELEASE_ROOT/);
+  assert.match(variableSyntax, /HUB_APP_ENV_FILE/);
+  assert.match(variableSyntax, /HUB_STORAGE_PATH/);
+  assert.match(variableSyntax, /HUB_BACKUP_DIR/);
+  assert.match(variableSyntax, /HUB_NETWORK_NAME/);
+  assert.match(variableSyntax, /HUB_WWWUSER/);
+  assert.match(variableSyntax, /HUB_WWWGROUP/);
+  assert.match(variableSyntax, /HUB_GOOGLE_SA_PATH/);
+  assert.match(variableSyntax, /HUB_ACTIVATION_ID/);
+  assert.match(variableSyntax, /HUB_DEPLOYMENT_VARIABLES_VALIDATED=1/);
+  assert.match(variableSyntax, /ghcr\\\.io\/\[a-z0-9\._\/-\]\+@sha256/);
+  assert.match(variableSyntax, /\^\/\[A-Za-z0-9\._\/-\]\+\$/);
+  assert.match(variableSyntax, /\^\[1-9\]\[0-9\]\*\$/);
+  assert.ok(deployment.indexOf("Validate Hub deployment variable syntax") < deployment.indexOf("Inspect Hub production checkout and runtime"));
+
   const preconditions = workflowStep(deployment, "Inspect Hub production checkout and runtime");
   assert.match(preconditions, /git status --short --branch/);
   assert.match(preconditions, /git diff --stat/);
@@ -223,11 +241,19 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.doesNotMatch(databaseBackup, /pg_restore --list\s+-\s*</);
   assert.match(databaseBackup, /sha256sum/);
   assert.match(databaseBackup, /BACKUP_FILE="\$HUB_BACKUP_DIR\//);
+  assert.match(databaseBackup, /PREVIOUS_IMAGE_REF/);
+  assert.match(databaseBackup, /PREVIOUS_RUNTIME_REVISION/);
+  assert.match(databaseBackup, /previous_runtime_revision=%s/);
+  assert.doesNotMatch(databaseBackup, /PREVIOUS_SHA="\$\(git rev-parse HEAD\)"/);
   assert.doesNotMatch(databaseBackup, /BACKUP_DIR=\/var\/lib\/postgresql\/data/);
 
   const maintenance = workflowStep(deployment, "Enter maintenance mode and verify queue safety");
-  assert.match(maintenance, /php artisan down --render=errors::503/);
+  assert.match(maintenance, /HUB_ACTIVATION_STATE="\$HUB_BACKUP_DIR\/\$HUB_ACTIVATION_ID\.state"/);
+  assert.match(maintenance, /pre_cutover_maintenance_requested/);
+  assert.match(maintenance, /pre_cutover_maintenance_entered/);
   assert.match(maintenance, /http:\/\/localhost\//);
+  assert.match(maintenance, /'200'/);
+  assert.match(maintenance, /php artisan down --render=errors::503/);
   assert.match(maintenance, /'503'/);
   assert.match(maintenance, /--force/);
 
@@ -241,6 +267,10 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(activation, /--cap-drop=ALL/);
   assert.match(activation, /--entrypoint php/);
   assert.match(activation, /artisan migrate:status/);
+  assert.match(activation, /migration_started/);
+  assert.match(activation, /migration_complete/);
+  assert.match(activation, /cutover_activation_started/);
+  assert.match(activation, /cutover_activated/);
   assert.match(activation, /daily-checkout:activate-ledger --release-sha="\$RELEASE_SHA" --no-interaction/);
   assert.doesNotMatch(activation, /composer install|npm ci|vite build|filament:assets|docker compose .*--build/);
   assert.doesNotMatch(activation, /docker compose .* down|docker (?:system )?prune|migrate:rollback/);
@@ -262,9 +292,17 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   const successfulActivation = workflowStep(deployment, "Record successful Hub image activation");
   assert.match(successfulActivation, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
   assert.match(successfulActivation, /HUB_IMAGE_REF/);
+  assert.match(successfulActivation, /HUB_ACTIVATION_STATE="\$HUB_BACKUP_DIR\/\$HUB_ACTIVATION_ID\.state"/);
+  assert.match(successfulActivation, /activation_record_started/);
+  assert.match(successfulActivation, /activation_recorded/);
   assert.match(successfulActivation, /docker inspect --format/);
   assert.match(successfulActivation, /deploy-marker\.json/);
   assert.match(successfulActivation, /\.build-time/);
+
+  const publicSmoke = workflowStep(deployment, "Verify public Hub smoke routes");
+  assert.match(publicSmoke, /public_smoke_started/);
+  assert.match(publicSmoke, /public_smoke_verified/);
+  assert.match(publicSmoke, /curl --fail --silent --show-error/);
 
   const worktreeCleanup = workflowStep(deployment, "Remove temporary Hub source worktree after successful image activation");
   assert.match(worktreeCleanup, /git -C "\$HUB_CHECKOUT" worktree remove "\$HUB_SOURCE_WORKTREE"/);
@@ -274,9 +312,17 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.ok(deployment.indexOf("Verify public Hub smoke routes") < deployment.indexOf("Remove temporary Hub source worktree"));
 
   const failureEvidence = workflowStep(deployment, "Preserve Hub image activation failure evidence");
-  assert.match(failureEvidence, /if:\s*\$\{\{\s*failure\(\)\s*&&\s*env\.HUB_SSH_CONFIG/);
-  assert.match(failureEvidence, /No automatic rollback or maintenance-mode exit/);
-  assert.doesNotMatch(failureEvidence, /php artisan up|migrate:rollback|docker compose/);
+  assert.match(failureEvidence, /if:\s*\$\{\{\s*failure\(\)\s*&&\s*env\.HUB_SSH_CONFIG.*HUB_DEPLOYMENT_VARIABLES_VALIDATED/);
+  assert.match(failureEvidence, /FAULT_PHASE=/);
+  assert.match(failureEvidence, /write-activation-state/);
+  assert.match(failureEvidence, /fault "\$MAINTENANCE_STATE" "\$FAULT_PHASE"/);
+  assert.match(failureEvidence, /pre_cutover_maintenance_requested:requested/);
+  assert.match(failureEvidence, /pre_cutover_maintenance_entered:entered/);
+  assert.match(failureEvidence, /pre_cutover_migration_status:entered/);
+  assert.match(failureEvidence, /php artisan up/);
+  assert.match(failureEvidence, /pre_cutover_existing_release_restored/);
+  assert.match(failureEvidence, /post_migration_or_cutover_manual_decision_required/);
+  assert.doesNotMatch(failureEvidence, /migrate:rollback|docker compose/);
 
   const aggregate = workflowJob(gates, "release-gates");
   assert.doesNotMatch(aggregate, /if:\s*\$\{\{\s*always\(\)\s*\}\}/);
@@ -293,14 +339,20 @@ test("the production image is immutable, secret-free, rehearsed, and switched wi
   const dockerfilePath = resolve(root, "docker/production/Dockerfile");
   const dockerignorePath = resolve(root, ".dockerignore");
   const imageComposePath = resolve(root, "compose.prod.image.yaml");
+  const activationStateWriterPath = resolve(root, "docker/production/write-activation-state");
+  const startupPath = resolve(root, "docker/production/start-production-container");
 
   assert.ok(existsSync(dockerfilePath), "production image Dockerfile must be tracked");
   assert.ok(existsSync(dockerignorePath), "production image build context must exclude host state");
   assert.ok(existsSync(imageComposePath), "production image service switch must use a dedicated Compose file");
+  assert.ok(existsSync(activationStateWriterPath), "activation phase evidence must be written atomically outside the image");
+  assert.ok(existsSync(startupPath), "production image must validate its runtime identity");
 
   const dockerfile = readFileSync(dockerfilePath, "utf8");
   const dockerignore = readFileSync(dockerignorePath, "utf8");
   const imageCompose = readFileSync(imageComposePath, "utf8");
+  const activationStateWriter = readFileSync(activationStateWriterPath, "utf8");
+  const startup = readFileSync(startupPath, "utf8");
   const deploy = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
   assert.match(dockerfile, /^# syntax=docker\/dockerfile:1\.7$/m);
   assert.match(dockerfile, /ubuntu:24\.04@sha256:[a-f0-9]{64}/);
@@ -309,6 +361,8 @@ test("the production image is immutable, secret-free, rehearsed, and switched wi
   assert.match(dockerfile, /php8\.5-cli/);
   assert.match(dockerfile, /composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts --optimize-autoloader/);
   assert.match(dockerfile, /--mount=type=secret,id=composer_auth/);
+  assert.match(dockerfile, /RUN --mount=type=secret,id=composer_auth,required=false \\\r?\n\s*set -eu;/);
+  assert.doesNotMatch(dockerfile, /RUN --mount=type=secret,id=composer_auth,required=false \\\r?\n\s*set -eux;/);
   assert.doesNotMatch(dockerfile, /GITHUB_TOKEN|DEPLOY_SSH_KEY|COMPOSER_AUTH=.*github\.token/);
   assert.doesNotMatch(dockerfile, /(?:ARG|ENV)\s+[^\r\n]*(?:TOKEN|SECRET|PASSWORD)/i);
   assert.match(dockerfile, /npm ci --ignore-scripts --legacy-peer-deps/);
@@ -318,6 +372,18 @@ test("the production image is immutable, secret-free, rehearsed, and switched wi
   assert.match(dockerfile, /\.git-sha/);
   assert.match(dockerfile, /rm -f \.build-time/);
   assert.doesNotMatch(dockerfile, /vendor\/laravel\/sail/);
+
+  assert.match(activationStateWriter, /umask 077/);
+  assert.match(activationStateWriter, /mktemp/);
+  assert.match(activationStateWriter, /chmod 600 "\$temporary_state"/);
+  assert.match(activationStateWriter, /mv -f --/);
+  assert.match(activationStateWriter, /release_sha=%s/);
+  assert.match(activationStateWriter, /image_ref=%s/);
+  assert.match(activationStateWriter, /phase=%s/);
+  assert.match(activationStateWriter, /maintenance_state=%s/);
+  assert.match(activationStateWriter, /ghcr\\\.io\/\[a-z0-9\._\/-\]\+@sha256:\[a-f0-9\]\{64\}/);
+  assert.doesNotMatch(activationStateWriter, /\beval\b|\bsource\b/);
+  assert.match(startup, /\[\[ "\$value" =~ \^0\+\$ \]\]/);
 
   for (const excludedPath of [".env*", "vendor/", "node_modules", "storage/", "public/build", "public/daily", ".git"]) {
     assert.match(dockerignore, new RegExp(`^${excludedPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
