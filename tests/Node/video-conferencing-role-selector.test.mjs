@@ -26,7 +26,10 @@ test("station polling and Reverb events share a single token request in flight",
 });
 
 test("station detail launches fixed station context without bundling LiveKit", () => {
-  assert.match(stationDetail, /href=\{`\/video-conferencing\/stations\/\$\{station\.station_number\}`\}/);
+  assert.match(stationDetail, /const stationNumber = Number\(station\.station_number\);/);
+  assert.match(stationDetail, /\[1, 2, 3, 4, 6\]\.includes\(stationNumber\)/);
+  assert.match(stationDetail, /href=\{`\/video-conferencing\/stations\/\$\{stationNumber\}`\}/);
+  assert.match(stationDetail, /stationNumber === 2/);
   assert.match(stationDetail, /Morning Lineup Video Conference — Station 2/);
   assert.match(stationDetail, /href="\/employee\/video-conferencing\/command"/);
   assert.doesNotMatch(stationDetail, /from ['"]livekit-client['"]/);
