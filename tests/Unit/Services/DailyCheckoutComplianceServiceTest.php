@@ -12,6 +12,7 @@ use App\Models\Station;
 use App\Services\DailyCheckoutComplianceService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -21,6 +22,7 @@ class DailyCheckoutComplianceServiceTest extends TestCase
 
     public function test_it_exposes_a_reconcilable_canonical_matrix_and_excludes_oos_and_exempt_apparatus(): void
     {
+        $this->activateBaseCutover();
         $station = Station::query()->create([
             'station_number' => 1,
             'name' => 'Station 1',
@@ -110,6 +112,7 @@ class DailyCheckoutComplianceServiceTest extends TestCase
 
     public function test_pending_review_and_unresolved_missing_or_damaged_defects_are_not_checked(): void
     {
+        $this->activateBaseCutover();
         $station = Station::query()->create([
             'station_number' => 1,
             'name' => 'Station 1',
@@ -167,6 +170,7 @@ class DailyCheckoutComplianceServiceTest extends TestCase
 
     public function test_a_pending_public_submission_cannot_override_an_already_approved_checkout(): void
     {
+        $this->activateBaseCutover();
         $station = Station::query()->create([
             'station_number' => 4,
             'name' => 'Station 4',
@@ -205,6 +209,7 @@ class DailyCheckoutComplianceServiceTest extends TestCase
 
     public function test_it_respects_the_mbfd_dst_day_boundaries_for_completed_at(): void
     {
+        $this->activateBaseCutover();
         $station = Station::query()->create([
             'station_number' => 2,
             'name' => 'Station 2',
@@ -233,6 +238,7 @@ class DailyCheckoutComplianceServiceTest extends TestCase
 
     public function test_pre_cutover_inspections_without_the_canonical_submission_identifier_do_not_satisfy_daily_compliance(): void
     {
+        $this->activateBaseCutover();
         $station = Station::query()->create([
             'station_number' => 3,
             'name' => 'Station 3',
@@ -256,8 +262,141 @@ class DailyCheckoutComplianceServiceTest extends TestCase
         $this->assertSame(1, $summary['not_checked_count']);
     }
 
+    public function test_it_fails_closed_when_no_daily_ledger_cutover_has_been_activated(): void
+    {
+        $station = Station::query()->create([
+            'station_number' => 30,
+            'name' => 'Station 30',
+            'address' => '30 Test Street',
+            'is_active' => true,
+        ]);
+        $apparatus = $this->makeApparatus($station, 'E301', 'required', 'In Service');
+        $now = CarbonImmutable::parse('2026-08-25 12:00:00', DailyCheckoutComplianceService::TIMEZONE);
+        $this->recordInspection($apparatus, CarbonImmutable::parse('2026-08-25 09:00:00', DailyCheckoutComplianceService::TIMEZONE)->utc());
+
+        $summary = app(DailyCheckoutComplianceService::class)->summaryForApparatuses(
+            $station->apparatuses()->get(),
+            $now,
+        );
+        $row = collect($summary['matrix'])->keyBy('apparatus_id')->get($apparatus->id);
+
+        $this->assertSame(0, $summary['completed']);
+        $this->assertSame(1, $summary['not_checked']);
+        $this->assertSame('not_checked', $row['state']);
+        $this->assertTrue($row['cutover_checkout_required']);
+        $this->assertFalse($row['cutover_checkout_verified']);
+        $this->assertTrue($row['cutover_activation_pending']);
+        $this->assertNull($row['cutover_activated_at_utc']);
+    }
+
+    public function test_an_activated_cutover_requires_a_strictly_later_checkout_and_preserves_post_cutover_oos_rules(): void
+    {
+        $station = Station::query()->create([
+            'station_number' => 31,
+            'name' => 'Station 31',
+            'address' => '31 Test Street',
+            'is_active' => true,
+        ]);
+        $apparatus = $this->makeApparatus($station, 'E311', 'required', 'In Service');
+        $preCutoverCheckoutAt = CarbonImmutable::parse('2026-08-25 07:00:00', DailyCheckoutComplianceService::TIMEZONE)->utc();
+        $cutoverAt = CarbonImmutable::parse('2026-08-25 08:00:00', DailyCheckoutComplianceService::TIMEZONE)->utc();
+        $firstQualifyingCheckoutAt = CarbonImmutable::parse('2026-08-25 08:15:00', DailyCheckoutComplianceService::TIMEZONE)->utc();
+        $outOfServiceAt = CarbonImmutable::parse('2026-08-25 09:00:00', DailyCheckoutComplianceService::TIMEZONE)->utc();
+        $returnedToServiceAt = CarbonImmutable::parse('2026-08-25 10:00:00', DailyCheckoutComplianceService::TIMEZONE)->utc();
+        $postReturnCheckoutAt = CarbonImmutable::parse('2026-08-25 10:15:00', DailyCheckoutComplianceService::TIMEZONE)->utc();
+        $summaryNow = CarbonImmutable::parse('2026-08-25 11:00:00', DailyCheckoutComplianceService::TIMEZONE);
+
+        $this->recordInspection($apparatus, $preCutoverCheckoutAt);
+        $this->activateCutover([$apparatus], $cutoverAt);
+
+        $beforeFreshCheckout = app(DailyCheckoutComplianceService::class)->summaryForApparatuses(
+            $station->apparatuses()->get(),
+            $summaryNow,
+        );
+        $beforeFreshRow = collect($beforeFreshCheckout['matrix'])->keyBy('apparatus_id')->get($apparatus->id);
+
+        $this->assertSame('not_checked', $beforeFreshRow['state']);
+        $this->assertTrue($beforeFreshRow['cutover_checkout_required']);
+        $this->assertFalse($beforeFreshRow['cutover_checkout_verified']);
+        $this->assertFalse($beforeFreshRow['cutover_activation_pending']);
+        $this->assertSame($cutoverAt->toIso8601String(), $beforeFreshRow['cutover_activated_at_utc']);
+
+        $this->recordInspection($apparatus, $cutoverAt);
+        $sameTimestampCheckout = app(DailyCheckoutComplianceService::class)->summaryForApparatuses(
+            $station->apparatuses()->get(),
+            $summaryNow,
+        );
+        $this->assertSame(0, $sameTimestampCheckout['completed']);
+
+        $this->recordInspection($apparatus, $firstQualifyingCheckoutAt);
+        $afterFreshCheckout = app(DailyCheckoutComplianceService::class)->summaryForApparatuses(
+            $station->apparatuses()->get(),
+            $summaryNow,
+        );
+        $this->assertSame(1, $afterFreshCheckout['completed']);
+
+        $this->transitionStatusAt($apparatus, 'Out of Service', $outOfServiceAt);
+        $this->transitionStatusAt($apparatus, 'In Service', $returnedToServiceAt);
+
+        $afterReturn = app(DailyCheckoutComplianceService::class)->summaryForApparatuses(
+            $station->apparatuses()->get(),
+            $summaryNow,
+        );
+        $afterReturnRow = collect($afterReturn['matrix'])->keyBy('apparatus_id')->get($apparatus->id);
+        $this->assertSame('not_checked', $afterReturnRow['state']);
+        $this->assertTrue($afterReturnRow['return_checkout_required']);
+        $this->assertFalse($afterReturnRow['return_checkout_verified']);
+
+        $this->recordInspection($apparatus, $returnedToServiceAt);
+        $sameTimestampReturnCheckout = app(DailyCheckoutComplianceService::class)->summaryForApparatuses(
+            $station->apparatuses()->get(),
+            $summaryNow,
+        );
+        $this->assertSame(0, $sameTimestampReturnCheckout['completed']);
+
+        $this->recordInspection($apparatus, $postReturnCheckoutAt);
+        $afterReturnCheckout = app(DailyCheckoutComplianceService::class)->summaryForApparatuses(
+            $station->apparatuses()->get(),
+            $summaryNow,
+        );
+        $afterReturnRow = collect($afterReturnCheckout['matrix'])->keyBy('apparatus_id')->get($apparatus->id);
+
+        $this->assertSame('checked', $afterReturnRow['state']);
+        $this->assertTrue($afterReturnRow['cutover_checkout_verified']);
+        $this->assertTrue($afterReturnRow['return_checkout_verified']);
+    }
+
+    public function test_a_return_recorded_in_the_same_storage_second_as_cutover_remains_ledger_authoritative(): void
+    {
+        $station = Station::query()->create([
+            'station_number' => 32,
+            'name' => 'Station 32',
+            'address' => '32 Test Street',
+            'is_active' => true,
+        ]);
+        $apparatus = $this->makeApparatus($station, 'E321', 'required', 'Out of Service');
+        $cutoverAt = CarbonImmutable::parse('2026-08-25 08:00:00', DailyCheckoutComplianceService::TIMEZONE)->utc();
+        $qualifyingCheckoutAt = CarbonImmutable::parse('2026-08-25 08:15:00', DailyCheckoutComplianceService::TIMEZONE)->utc();
+        $summaryNow = CarbonImmutable::parse('2026-08-25 09:00:00', DailyCheckoutComplianceService::TIMEZONE);
+
+        $this->activateCutover([$apparatus], $cutoverAt);
+        $this->transitionStatusAt($apparatus, 'In Service', $cutoverAt);
+        $this->recordInspection($apparatus, $qualifyingCheckoutAt);
+
+        $summary = app(DailyCheckoutComplianceService::class)->summaryForApparatuses(
+            $station->apparatuses()->get(),
+            $summaryNow,
+        );
+        $row = collect($summary['matrix'])->keyBy('apparatus_id')->get($apparatus->id);
+
+        $this->assertSame('checked', $row['state']);
+        $this->assertTrue($row['return_checkout_required']);
+        $this->assertTrue($row['return_checkout_verified']);
+    }
+
     public function test_zero_required_denominator_is_explicitly_unavailable(): void
     {
+        $this->activateBaseCutover();
         $station = Station::query()->create([
             'station_number' => 5,
             'name' => 'Station 5',
@@ -284,6 +423,7 @@ class DailyCheckoutComplianceServiceTest extends TestCase
 
     public function test_a_same_day_oos_return_requires_an_approved_checkout_after_the_return_transition(): void
     {
+        $this->activateBaseCutover();
         $station = Station::query()->create([
             'station_number' => 6,
             'name' => 'Station 6',
@@ -342,6 +482,7 @@ class DailyCheckoutComplianceServiceTest extends TestCase
 
     public function test_a_post_deployment_return_from_a_pre_ledger_oos_state_requires_a_new_checkout(): void
     {
+        $this->activateBaseCutover();
         $station = Station::query()->create([
             'station_number' => 7,
             'name' => 'Station 7',
@@ -371,6 +512,7 @@ class DailyCheckoutComplianceServiceTest extends TestCase
 
     public function test_an_ordinary_operational_status_edit_does_not_reopen_a_prior_day_oos_episode(): void
     {
+        $this->activateBaseCutover();
         $station = Station::query()->create([
             'station_number' => 8,
             'name' => 'Station 8',
@@ -439,5 +581,36 @@ class DailyCheckoutComplianceServiceTest extends TestCase
         } finally {
             $apparatus->timestamps = true;
         }
+    }
+
+    private function activateBaseCutover(): void
+    {
+        $this->activateCutover([], CarbonImmutable::parse('2020-01-01T00:00:00Z'));
+    }
+
+    /** @param list<Apparatus> $apparatuses */
+    private function activateCutover(array $apparatuses, CarbonImmutable $activatedAt): void
+    {
+        $snapshot = collect($apparatuses)
+            ->sortBy('id')
+            ->map(static fn (Apparatus $apparatus): array => [
+                'id' => (int) $apparatus->id,
+                'status' => $apparatus->status,
+            ])
+            ->values()
+            ->all();
+        $encodedSnapshot = json_encode($snapshot, JSON_THROW_ON_ERROR);
+
+        DB::table('daily_checkout_ledger_cutovers')->insert([
+            'ledger' => 'daily_checkout',
+            'release_sha' => str_repeat('c', 40),
+            'source' => 'owner_beta_activation',
+            'activated_at' => $activatedAt,
+            'apparatus_status_snapshot' => $encodedSnapshot,
+            'snapshot_sha256' => hash('sha256', $encodedSnapshot),
+            'apparatus_count' => count($snapshot),
+            'created_at' => $activatedAt,
+            'updated_at' => $activatedAt,
+        ]);
     }
 }

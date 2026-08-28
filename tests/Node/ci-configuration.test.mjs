@@ -211,13 +211,24 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(maintenance, /--force/);
 
   const activation = workflowStep(deployment, "Migrate, build, and atomically swap Hub assets");
+  assert.match(activation, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
+  assert.match(activation, /test -n "\$RELEASE_SHA"/);
+  assert.match(activation, /RELEASE_SHA='\$RELEASE_SHA' bash -s/);
+  assert.match(activation, /test "\$\(git rev-parse HEAD\)" = "\$RELEASE_SHA"/);
   assert.match(activation, /php artisan migrate:status/);
+  assert.match(activation, /daily-checkout:activate-ledger --release-sha="\$RELEASE_SHA" --no-interaction/);
   assert.match(activation, /public\/build-next/);
   assert.match(activation, /public\/daily-next/);
   assert.match(activation, /public\/build-previous/);
   assert.match(activation, /public\/daily-previous/);
   assert.match(activation, /--no-deps --force-recreate laravel\.test/);
   assert.doesNotMatch(activation, /docker compose .* down|docker (?:system )?prune/);
+  const migrationIndex = activation.indexOf("php artisan migrate --force");
+  const cutoverIndex = activation.indexOf("daily-checkout:activate-ledger");
+  const recreateIndex = activation.indexOf("--no-deps --force-recreate laravel.test");
+  assert.ok(migrationIndex >= 0 && cutoverIndex > migrationIndex && recreateIndex > cutoverIndex);
+  const cutoverCommand = activation.match(/[^\r\n]*daily-checkout:activate-ledger[^\r\n]*/)?.[0] ?? "";
+  assert.doesNotMatch(cutoverCommand, /\|\|\s*true|--force/);
 
   const backgroundServices = workflowStep(deployment, "Restart Hub queues and verify background services");
   assert.match(backgroundServices, /php artisan queue:restart/);
@@ -313,6 +324,14 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
     workflowStep(daily, "Run Daily Checkout contract and integrity tests"),
     /DailyCheckoutIntegrityTest\.php/,
   );
+  for (const testFile of [
+    "ActivateDailyCheckoutLedgerTest.php",
+    "AuditDailyCheckoutPreactivationTest.php",
+    "DailyCheckoutComplianceServiceTest.php",
+    "PublicStationDailyCheckoutContractTest.php",
+  ]) {
+    assert.match(workflowStep(daily, "Run Daily Checkout contract and integrity tests"), new RegExp(testFile.replace(/\./g, "\\.")));
+  }
 
   const assets = workflowJob(gates, "generated-assets");
   assert.match(workflowStep(assets, "Verify generated assets after build"), /REQUIRE_GENERATED_ASSETS:\s*["']1["']/);

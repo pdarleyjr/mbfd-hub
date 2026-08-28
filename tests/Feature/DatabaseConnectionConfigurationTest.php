@@ -17,5 +17,6 @@ class DatabaseConnectionConfigurationTest extends TestCase
         }
 
         $this->assertSame($expectedConnection, config('database.default'));
+        $this->assertSame($expectedConnection, config('webpush.database_connection'));
     }
 }

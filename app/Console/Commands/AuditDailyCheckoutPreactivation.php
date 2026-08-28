@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Enums\DailyCheckoutRequirement;
 use App\Models\Apparatus;
+use App\Models\DailyCheckoutLedgerCutover;
 use App\Services\DailyCheckoutChecklistEvidenceInspector;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\DailyCheckoutComplianceService;
@@ -211,6 +212,7 @@ final class AuditDailyCheckoutPreactivation extends Command
         $dailyCheckout = $schema['daily_checkout_requirement_column_present']
             && $schema['daily_checkout_template_column_present']
             && $schema['apparatus_operational_status_ledger_present']
+            && $schema['daily_checkout_ledger_cutover_present']
             && $schema['apparatus_inspection_integrity_columns_present']
             ? $compliance->summaryForApparatuses(
                 $models,
@@ -226,12 +228,15 @@ final class AuditDailyCheckoutPreactivation extends Command
         $inspectionEvidence = $schema['apparatus_inspection_integrity_columns_present']
             ? $this->inspectionEvidence($connection, $apparatusIds, $startOfDay, $startOfNextDay, $input['as_of'])
             : [];
+        $cutover = $schema['daily_checkout_ledger_cutover_present']
+            ? $this->cutoverEvidence($connection, $input['candidate_sha'], $input['as_of'])
+            : $this->missingCutoverEvidence('daily_checkout_ledger_cutover_schema_absent');
         $statusEvents = $schema['apparatus_operational_status_ledger_present']
-            ? $this->statusEvents($connection, $apparatusIds, $input['as_of'])
+            ? $this->statusEvents($connection, $apparatusIds, $input['as_of'], $cutover['activated_at'])
             : [];
 
         $rows = [];
-        $technicalIssues = $schemaIssues;
+        $technicalIssues = array_merge($schemaIssues, $cutover['issues']);
         $policyIssues = [];
         $seenPolicyIds = [];
         foreach ($apparatuses as $apparatus) {
@@ -297,6 +302,9 @@ final class AuditDailyCheckoutPreactivation extends Command
                 $policy['pre_ledger_oos_review'] ?? null,
                 $startOfDay,
                 $requiredChecklistVersion,
+                $cutover['record'],
+                array_key_exists($apparatusId, $cutover['apparatus_status_by_id']),
+                $cutover['apparatus_status_by_id'][$apparatusId] ?? null,
             );
             $rowIssues = array_merge($rowIssues, $ledger['issues']);
             unset($ledger['issues']);
@@ -422,6 +430,7 @@ final class AuditDailyCheckoutPreactivation extends Command
                 ],
             ],
             'schema' => $schema,
+            'daily_checkout_ledger_cutover' => $this->publicCutoverEvidence($cutover),
             'daily_checkout' => $dailyCheckout,
             'summary' => [
                 'snapshot_apparatus_total' => count($apparatuses),
@@ -464,11 +473,22 @@ final class AuditDailyCheckoutPreactivation extends Command
             'review_status',
             'completed_at',
         ];
+        $cutoverColumns = [
+            'ledger',
+            'release_sha',
+            'source',
+            'activated_at',
+            'apparatus_status_snapshot',
+            'snapshot_sha256',
+            'apparatus_count',
+        ];
 
         return [
             'daily_checkout_requirement_column_present' => $schema->hasColumn('apparatuses', 'daily_checkout_requirement'),
             'daily_checkout_template_column_present' => $schema->hasColumn('apparatuses', 'daily_checkout_template'),
             'apparatus_operational_status_ledger_present' => $schema->hasTable('apparatus_operational_status_events'),
+            'daily_checkout_ledger_cutover_present' => $schema->hasTable('daily_checkout_ledger_cutovers')
+                && $this->hasColumns($schema, 'daily_checkout_ledger_cutovers', $cutoverColumns),
             'apparatus_inspection_integrity_columns_present' => $schema->hasTable('apparatus_inspections')
                 && $this->hasColumns($schema, 'apparatus_inspections', $inspectionColumns),
         ];
@@ -605,14 +625,19 @@ final class AuditDailyCheckoutPreactivation extends Command
     }
 
     /** @param list<int> $apparatusIds @return array<int, list<stdClass>> */
-    private function statusEvents(Connection $connection, array $apparatusIds, CarbonImmutable $asOf): array
-    {
-        if ($apparatusIds === []) {
+    private function statusEvents(
+        Connection $connection,
+        array $apparatusIds,
+        CarbonImmutable $asOf,
+        ?CarbonImmutable $cutoverActivatedAt,
+    ): array {
+        if ($apparatusIds === [] || $cutoverActivatedAt === null) {
             return [];
         }
 
         $events = $connection->table('apparatus_operational_status_events')
             ->whereIn('apparatus_id', $apparatusIds)
+            ->where('changed_at', '>=', $cutoverActivatedAt)
             ->where('changed_at', '<=', $asOf)
             ->orderBy('apparatus_id')
             ->orderBy('changed_at')
@@ -625,6 +650,158 @@ final class AuditDailyCheckoutPreactivation extends Command
         }
 
         return $byApparatus;
+    }
+
+    /**
+     * @return array{
+     *     record: array{ledger: string, release_sha: string, source: string, activated_at_utc: string, snapshot_sha256: string, apparatus_count: int}|null,
+     *     activated_at: CarbonImmutable|null,
+     *     apparatus_status_by_id: array<int, string|null>,
+     *     issues: list<string>
+     * }
+     */
+    private function cutoverEvidence(Connection $connection, ?string $candidateSha, CarbonImmutable $asOf): array
+    {
+        $row = $connection->table('daily_checkout_ledger_cutovers')
+            ->where('ledger', DailyCheckoutLedgerCutover::LEDGER)
+            ->first([
+                'ledger',
+                'release_sha',
+                'source',
+                'activated_at',
+                'apparatus_status_snapshot',
+                'snapshot_sha256',
+                'apparatus_count',
+            ]);
+        if (! $row instanceof stdClass) {
+            return $this->missingCutoverEvidence('daily_checkout_ledger_cutover_missing');
+        }
+
+        $issues = [];
+        $activatedAt = $this->asUtc($row->activated_at);
+        if ($activatedAt === null) {
+            $issues[] = 'daily_checkout_ledger_cutover_timestamp_invalid';
+        } elseif ($activatedAt->greaterThan($asOf)) {
+            $issues[] = 'daily_checkout_ledger_cutover_after_snapshot';
+        }
+        $releaseSha = strtolower(trim((string) $row->release_sha));
+        if (preg_match('/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/', $releaseSha) !== 1) {
+            $issues[] = 'daily_checkout_ledger_cutover_release_sha_invalid';
+        } elseif ($candidateSha === null || ! hash_equals($candidateSha, $releaseSha)) {
+            $issues[] = 'daily_checkout_ledger_cutover_candidate_sha_mismatch';
+        }
+        if ($row->ledger !== DailyCheckoutLedgerCutover::LEDGER || $row->source !== DailyCheckoutLedgerCutover::SOURCE) {
+            $issues[] = 'daily_checkout_ledger_cutover_source_invalid';
+        }
+
+        $snapshot = $this->cutoverSnapshot($row->apparatus_status_snapshot);
+        if ($snapshot === null || ! is_numeric($row->apparatus_count) || (int) $row->apparatus_count !== count($snapshot)) {
+            $issues[] = 'daily_checkout_ledger_cutover_snapshot_invalid';
+            $snapshot = [];
+        } else {
+            try {
+                $encodedSnapshot = json_encode($snapshot, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                $encodedSnapshot = false;
+            }
+            if (
+                ! is_string($encodedSnapshot)
+                || ! is_string($row->snapshot_sha256)
+                || ! hash_equals($row->snapshot_sha256, hash('sha256', $encodedSnapshot))
+            ) {
+                $issues[] = 'daily_checkout_ledger_cutover_snapshot_invalid';
+                $snapshot = [];
+            }
+        }
+
+        $statusByApparatus = [];
+        foreach ($snapshot as $entry) {
+            $statusByApparatus[$entry['id']] = $entry['status'];
+        }
+
+        return [
+            'record' => [
+                'ledger' => (string) $row->ledger,
+                'release_sha' => $releaseSha,
+                'source' => (string) $row->source,
+                'activated_at_utc' => $activatedAt?->toIso8601String() ?? '',
+                'snapshot_sha256' => is_string($row->snapshot_sha256) ? $row->snapshot_sha256 : '',
+                'apparatus_count' => is_numeric($row->apparatus_count) ? (int) $row->apparatus_count : 0,
+            ],
+            'activated_at' => $activatedAt,
+            'apparatus_status_by_id' => $statusByApparatus,
+            'issues' => array_values(array_unique($issues)),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     record: null,
+     *     activated_at: null,
+     *     apparatus_status_by_id: array<int, string|null>,
+     *     issues: list<string>
+     * }
+     */
+    private function missingCutoverEvidence(string $issue): array
+    {
+        return [
+            'record' => null,
+            'activated_at' => null,
+            'apparatus_status_by_id' => [],
+            'issues' => [$issue],
+        ];
+    }
+
+    /** @return list<array{id: int, status: string|null}>|null */
+    private function cutoverSnapshot(mixed $value): ?array
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        try {
+            $snapshot = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return null;
+        }
+        if (! is_array($snapshot) || ! array_is_list($snapshot)) {
+            return null;
+        }
+
+        $normalized = [];
+        $previousId = 0;
+        foreach ($snapshot as $entry) {
+            if (
+                ! is_array($entry)
+                || ! array_key_exists('id', $entry)
+                || ! array_key_exists('status', $entry)
+                || ! is_int($entry['id'])
+                || $entry['id'] <= $previousId
+                || (! is_string($entry['status']) && $entry['status'] !== null)
+            ) {
+                return null;
+            }
+            $previousId = $entry['id'];
+            $normalized[] = [
+                'id' => $entry['id'],
+                'status' => $entry['status'],
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  array{record: array{ledger: string, release_sha: string, source: string, activated_at_utc: string, snapshot_sha256: string, apparatus_count: int}|null, activated_at: CarbonImmutable|null, apparatus_status_by_id: array<int, string|null>, issues: list<string>}  $cutover
+     * @return array<string, mixed>
+     */
+    private function publicCutoverEvidence(array $cutover): array
+    {
+        return [
+            'present' => $cutover['record'] !== null,
+            'record' => $cutover['record'],
+            'issues' => $cutover['issues'],
+        ];
     }
 
     /**
@@ -653,6 +830,7 @@ final class AuditDailyCheckoutPreactivation extends Command
      * @param  list<stdClass>  $events
      * @param  list<array{id: int, completed_at: CarbonImmutable, checklist_version: string|null}>  $approvedInspections
      * @param  array<string, mixed>|null  $preLedgerReview
+     * @param  array{ledger: string, release_sha: string, source: string, activated_at_utc: string, snapshot_sha256: string, apparatus_count: int}|null  $cutover
      * @return array<string, mixed>
      */
     private function ledgerEvidence(
@@ -662,6 +840,9 @@ final class AuditDailyCheckoutPreactivation extends Command
         ?array $preLedgerReview,
         CarbonImmutable $startOfDay,
         ?string $expectedChecklistVersion,
+        ?array $cutover,
+        bool $cutoverSnapshotContainsApparatus,
+        ?string $observedStatusAtCutover,
     ): array {
         $latest = $this->latestEvent($events);
         $openOutOfService = null;
@@ -772,7 +953,20 @@ final class AuditDailyCheckoutPreactivation extends Command
             'state' => $operationalState,
             'latest_event' => $latestEvidence['event'],
             'latest_event_matches_current_status' => $latestEvidence['matches_current_status'],
+            'pre_ledger_history' => [
+                'authority' => ($preLedgerReview['state'] ?? null) === 'history_unavailable'
+                    ? 'unavailable'
+                    : 'reviewed',
+            ],
             'pre_ledger_review' => $preLedgerReview,
+            'cutover' => $cutover === null ? null : [
+                'ledger' => $cutover['ledger'],
+                'release_sha' => $cutover['release_sha'],
+                'source' => $cutover['source'],
+                'activated_at_utc' => $cutover['activated_at_utc'],
+                'snapshot_status_available' => $cutoverSnapshotContainsApparatus,
+                'observed_operational_status' => $observedStatusAtCutover,
+            ],
             'return_to_service' => $publicReturn,
             'qualifying_post_return_inspection' => $qualifying,
             'issues' => $issues,

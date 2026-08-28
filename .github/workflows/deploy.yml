@@ -210,18 +210,24 @@ jobs:
           REMOTE
 
       - name: Migrate, build, and atomically swap Hub assets
+        env:
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          test -n "$RELEASE_SHA"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
           cd /opt/mbfd/mbfd-hub
+          test -n "$RELEASE_SHA"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
           test "$(docker inspect --format '{{.Name}}' "$HUB_APP_CONTAINER")" = "/$HUB_APP_CONTAINER"
           test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_APP_CONTAINER")" = 'laravel.test'
           docker exec -u sail "$HUB_APP_CONTAINER" composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan migrate:status --no-ansi
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan migrate --force
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan optimize:clear
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan daily-checkout:activate-ledger --release-sha="$RELEASE_SHA" --no-interaction
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan config:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan route:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan view:cache
