@@ -134,6 +134,11 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(deploy, /^on:\r?\n  workflow_dispatch:/m);
   assert.doesNotMatch(deploy, /^  push:/m);
   assert.match(deploy, /confirm_production_activation:/);
+  assert.match(
+    deploy,
+    /^permissions:\r?\n  contents: read\r?\n  pull-requests: read$/m,
+    "the deploy caller must grant every permission requested by the reusable release gate",
+  );
 
   const assertMain = workflowJob(deploy, "assert-main");
   assert.match(assertMain, /if:\s*\$\{\{\s*github\.ref\s*==\s*'refs\/heads\/main'\s*\}\}/);
