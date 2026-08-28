@@ -28,6 +28,14 @@ final class DailyCheckoutInspectionSession extends Model
         'token_hash',
         'expires_at',
         'submitted_inspection_id',
+        'prior_inspection_session_id',
+        'abandoned_at',
+        'abandoned_by_user_id',
+        'abandoned_by_session_hash',
+        'abandonment_reason',
+        'abandonment_transition_type',
+        'abandonment_transition_key',
+        'replacement_session_id',
     ];
 
     protected function casts(): array
@@ -38,6 +46,7 @@ final class DailyCheckoutInspectionSession extends Model
             'checklist_snapshot' => 'array',
             'due_tasks' => 'array',
             'expires_at' => 'immutable_datetime',
+            'abandoned_at' => 'immutable_datetime',
         ];
     }
 
@@ -54,6 +63,21 @@ final class DailyCheckoutInspectionSession extends Model
     public function submittedInspection(): BelongsTo
     {
         return $this->belongsTo(ApparatusInspection::class, 'submitted_inspection_id');
+    }
+
+    public function priorInspectionSession(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'prior_inspection_session_id');
+    }
+
+    public function replacementSession(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'replacement_session_id');
+    }
+
+    public function abandonedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'abandoned_by_user_id');
     }
 
     protected static function booted(): void
@@ -76,10 +100,25 @@ final class DailyCheckoutInspectionSession extends Model
                 'replay_key',
                 'token_hash',
                 'expires_at',
+                'prior_inspection_session_id',
             ] as $attribute) {
                 if ($session->isDirty($attribute)) {
                     throw new LogicException('Daily Checkout inspection session contracts are immutable.');
                 }
+            }
+
+            $transitionAttributes = [
+                'abandoned_at',
+                'abandoned_by_user_id',
+                'abandoned_by_session_hash',
+                'abandonment_reason',
+                'abandonment_transition_type',
+                'abandonment_transition_key',
+                'replacement_session_id',
+            ];
+            if ($session->getOriginal('abandoned_at') !== null
+                && $session->isDirty($transitionAttributes)) {
+                throw new LogicException('Daily Checkout inspection session abandonment transitions are immutable.');
             }
         });
     }

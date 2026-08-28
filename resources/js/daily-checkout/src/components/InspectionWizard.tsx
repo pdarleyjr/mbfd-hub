@@ -4,7 +4,7 @@ import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, C
 import { ApiClient } from '../utils/api';
 import { getQueuedSubmission, getQueuedSubmissionForApparatusAndChecklistVersion, onDailyCheckoutQueueChanged, queueSubmission, submitQueuedInspection } from '../utils/dailyCheckoutSubmissionQueue';
 import type { DailyCheckoutQueuedSubmission } from '../lib/db';
-import { clearInspectionProgress, clearInspectionSessionStartKey, createClientSubmissionId, getOrCreateInspectionSessionStartKey, loadInspectionProgress, saveInspectionProgress } from '../utils/storage';
+import { clearInspectionProgress, clearInspectionSessionAbandonKey, clearInspectionSessionStartKey, createClientSubmissionId, getOrCreateInspectionSessionAbandonKey, getOrCreateInspectionSessionStartKey, loadInspectionProgress, saveInspectionProgress } from '../utils/storage';
 import { useOffline } from '../hooks/useOffline';
 import OfficerStep from './OfficerStep';
 import ChecklistFieldsStep from './ChecklistFieldsStep';
@@ -19,6 +19,20 @@ const inspectionSessionIsExpired = (session: InspectionData['inspectionSession']
   const expiresAt = typeof session?.expires_at === 'string' ? Date.parse(session.expires_at) : Number.NaN;
 
   return !Number.isFinite(expiresAt) || expiresAt <= Date.now();
+};
+
+const easternDutyDate = (): string => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(Date.now()));
+  const part = (type: Intl.DateTimeFormatPartTypes): string => (
+    parts.find((entry) => entry.type === type)?.value ?? ''
+  );
+
+  return `${part('year')}-${part('month')}-${part('day')}`;
 };
 
 const restoreIssuedFireBoatChecklist = (saved: InspectionData | null): ChecklistData | null => {
@@ -91,6 +105,8 @@ export default function InspectionWizard() {
   const [hasLoadedAutosave, setHasLoadedAutosave] = useState(false);
   const [autosaveReviewMessage, setAutosaveReviewMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [abandonmentError, setAbandonmentError] = useState<string | null>(null);
+  const [abandoningPriorSession, setAbandoningPriorSession] = useState(false);
   const [serviceNotices, setServiceNotices] = useState<ApparatusServiceTicketSummary[]>([]);
   const [serviceNoticesUnavailable, setServiceNoticesUnavailable] = useState(false);
   const [queuedSubmissionBlocker, setQueuedSubmissionBlocker] = useState<DailyCheckoutQueuedSubmission | null>(null);
@@ -339,6 +355,58 @@ export default function InspectionWizard() {
     setCurrentStep('submit');
   };
 
+  const handleAbandonPriorSession = async () => {
+    const inspectionSession = checklist?.inspection_session;
+    if (!apparatus || !slug || !checklist || !inspectionSession || isOffline) return;
+
+    setAbandonmentError(null);
+    setAbandoningPriorSession(true);
+    try {
+      const todayChecklist = await ApiClient.abandonInspectionSession(
+        apparatus.id,
+        inspectionSession.id,
+        inspectionSession.token,
+        inspectionSession.replay_key,
+        getOrCreateInspectionSessionAbandonKey(slug, inspectionSession.id),
+      );
+      clearInspectionSessionAbandonKey(slug, inspectionSession.id);
+      clearInspectionProgress(slug, checklist.checklist_version);
+      clearInspectionSessionStartKey(slug, checklist.checklist_version);
+      clientSubmissionIdRef.current = null;
+      initializedChecklistKeyRef.current = `${slug}:${todayChecklist.checklist_version}`;
+      setChecklist(todayChecklist);
+      setHasLoadedAutosave(false);
+      setAutosaveReviewMessage('The prior Fire Boat inspection was explicitly abandoned. This form now uses today\'s server-issued contract.');
+      setOfficerInfo({
+        name: '',
+        rank: 'Firefighter',
+        shift: 'A',
+        unitNumber: apparatus.vehicle_number,
+      });
+      setMeterData({ engine_hours: null, miles: null });
+      setCompartments(todayChecklist.compartments);
+      setFieldValues(todayChecklist.fields.map((field) => ({
+        id: field.id,
+        value: field.id === todayChecklist.inspection_date_field_id
+          ? todayChecklist.inspection_date ?? ''
+          : field.inputType === 'checkbox'
+            ? false
+            : field.inputType === 'number' || field.inputType === 'percentage'
+              ? null
+              : '',
+      })));
+      setScheduledTasks(todayChecklist.due_tasks.map((task) => ({
+        id: task.id,
+        status: 'Present',
+        notes: null,
+      })));
+      setCurrentStep('officer');
+    } catch (err) {
+      setAbandonmentError(err instanceof Error ? err.message : 'Unable to start today\'s Fire Boat inspection.');
+      setAbandoningPriorSession(false);
+    }
+  };
+
   const handleSubmit = async (signature: string | null) => {
     if (!apparatus || !slug || !checklist) return;
 
@@ -525,6 +593,10 @@ export default function InspectionWizard() {
   }
 
   const isV2Checklist = checklist.schema_version === 2;
+  const priorDayInspectionSession = isV2Checklist
+    && checklist.inspection_session !== undefined
+    && !inspectionSessionIsExpired(checklist.inspection_session)
+    && checklist.inspection_session.duty_date !== easternDutyDate();
   const progressSteps: Array<{ step: Step; label: string }> = isV2Checklist
     ? [
         { step: 'officer', label: 'Officer' },
@@ -568,6 +640,27 @@ export default function InspectionWizard() {
           <p role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
             {autosaveReviewMessage}
           </p>
+        )}
+        {priorDayInspectionSession && (
+          <section role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+            <p className="font-semibold">A valid Fire Boat inspection from the prior duty date is still active.</p>
+            <p className="mt-1">
+              Continue and submit that server-issued contract, or explicitly close it before starting today\'s inspection. Local browser storage loss cannot start a new duty date.
+            </p>
+            {isOffline ? (
+              <p className="mt-3 font-medium">Reconnect before abandoning the prior inspection or starting today\'s inspection.</p>
+            ) : (
+              <button
+                type="button"
+                onClick={handleAbandonPriorSession}
+                disabled={abandoningPriorSession}
+                className="mt-3 rounded-lg bg-amber-800 px-4 py-2 font-semibold text-white transition-colors hover:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {abandoningPriorSession ? 'Starting Today\'s Inspection…' : 'Abandon Prior Inspection / Start Today’s Inspection'}
+              </button>
+            )}
+            {abandonmentError && <p className="mt-3 font-medium text-red-700">{abandonmentError}</p>}
+          </section>
         )}
       </div>
 

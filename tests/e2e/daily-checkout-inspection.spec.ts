@@ -179,6 +179,22 @@ const fireBoatInspectionSession = {
   replay_key: '66666666-7777-4888-8999-aaaaaaaaaaaa',
 };
 
+const fireBoatPriorDayChecklist = {
+  ...fireBoatChecklist,
+  inspection_date: '2026-08-30',
+  due_tasks: [],
+};
+
+const fireBoatPriorDayInspectionSession = {
+  ...fireBoatInspectionSession,
+  id: '22222222-3333-4444-8555-666666666666',
+  issued_at: '2026-08-30T23:55:00-04:00',
+  expires_at: '2026-08-31T11:55:00-04:00',
+  duty_date: fireBoatPriorDayChecklist.inspection_date,
+  due_tasks: fireBoatPriorDayChecklist.due_tasks,
+  replay_key: '77777777-8888-4999-8aaa-bbbbbbbbbbbb',
+};
+
 interface QueuedInspection {
   id: string;
   apparatusId: number;
@@ -207,6 +223,7 @@ type SeededQueuedInspection = QueuedInspection & {
 interface InspectionApiMock {
   readonly submissions: Array<Record<string, unknown>>;
   readonly sessionStarts: Array<Record<string, unknown>>;
+  readonly abandonments: Array<Record<string, unknown>>;
 }
 
 async function mockInspectionApi(
@@ -224,6 +241,7 @@ async function mockInspectionApi(
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
   const sessionStarts: Array<Record<string, unknown>> = [];
+  const abandonments: Array<Record<string, unknown>> = [];
   const submitStatus = options.submitStatus ?? 201;
   let abortNextSubmit = options.abortFirstSubmit ?? false;
 
@@ -305,17 +323,23 @@ async function mockInspectionApi(
     return route.fulfill({ status: 404, json: { message: `Unmocked API route: ${path}` } });
   });
 
-  return { submissions, sessionStarts };
+  return { submissions, sessionStarts, abandonments };
 }
 
 async function mockFireBoatInspectionApi(
   page: Page,
-  options: { readonly sessionStatus?: number; readonly abortFirstSessionStart?: boolean } = {},
+  options: {
+    readonly sessionStatus?: number;
+    readonly abortFirstSessionStart?: boolean;
+    readonly recoverPriorDayContract?: boolean;
+  } = {},
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
   const sessionStarts: Array<Record<string, unknown>> = [];
+  const abandonments: Array<Record<string, unknown>> = [];
   const sessionStatus = options.sessionStatus ?? 201;
   let abortNextSessionStart = options.abortFirstSessionStart ?? false;
+  let priorDayContractWasAbandoned = false;
 
   await page.route('**/images/mbfd_logo_new.png', (route) => route.fulfill({ path: 'public/images/mbfd_logo_new.png' }));
   await page.route('**/api/**', async (route) => {
@@ -332,6 +356,19 @@ async function mockFireBoatInspectionApi(
 
     if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/checklist`) {
       return route.fulfill({ json: fireBoatChecklist });
+    }
+
+    if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/inspection-sessions/${fireBoatPriorDayInspectionSession.id}/abandon` && request.method() === 'POST') {
+      abandonments.push(request.postDataJSON() as Record<string, unknown>);
+      priorDayContractWasAbandoned = true;
+
+      return route.fulfill({
+        status: 201,
+        json: {
+          ...fireBoatChecklist,
+          inspection_session: fireBoatInspectionSession,
+        },
+      });
     }
 
     if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/inspection-sessions` && request.method() === 'POST') {
@@ -351,11 +388,13 @@ async function mockFireBoatInspectionApi(
         });
       }
 
+      const recoversPriorDayContract = options.recoverPriorDayContract === true && !priorDayContractWasAbandoned;
+
       return route.fulfill({
-        status: 201,
+        status: recoversPriorDayContract ? 200 : 201,
         json: {
-          ...fireBoatChecklist,
-          inspection_session: fireBoatInspectionSession,
+          ...(recoversPriorDayContract ? fireBoatPriorDayChecklist : fireBoatChecklist),
+          inspection_session: recoversPriorDayContract ? fireBoatPriorDayInspectionSession : fireBoatInspectionSession,
         },
       });
     }
@@ -379,7 +418,7 @@ async function mockFireBoatInspectionApi(
     return route.fulfill({ status: 404, json: { message: `Unmocked API route: ${path}` } });
   });
 
-  return { submissions, sessionStarts };
+  return { submissions, sessionStarts, abandonments };
 }
 
 async function completeInspection(page: Page): Promise<void> {
@@ -713,6 +752,41 @@ test('Fire Boat retries a lost session-start response with its same local issuan
   await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
   expect(api.sessionStarts).toHaveLength(2);
   expect(api.sessionStarts[1]?.inspection_session_start_key).toBe(issuanceKey);
+});
+
+test('Fire Boat recovers a valid prior-day contract after local storage loss and starts today only by explicit abandonment', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-08-30T23:55:00-04:00') });
+  const api = await mockFireBoatInspectionApi(page, { recoverPriorDayContract: true });
+  const autosaveKey = `mbfd_autosave_inspection_fire-boat-6_${fireBoatChecklist.checklist_version}`;
+
+  await page.goto('/daily/apparatus/fire-boat-6');
+  await expect.poll(() => page.evaluate((key) => {
+    const saved = window.localStorage.getItem(key);
+
+    return saved === null ? null : JSON.parse(saved).inspectionSession?.id;
+  }, autosaveKey)).toBe(fireBoatPriorDayInspectionSession.id);
+
+  // Model loss of the local PWA/autosave state at midnight. The mocked start
+  // endpoint represents recovery through the still-valid HTTP-only binding.
+  await page.evaluate(() => window.localStorage.clear());
+  await page.clock.setFixedTime(new Date('2026-08-31T00:05:00-04:00'));
+  await page.reload();
+
+  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('A valid Fire Boat inspection from the prior duty date is still active.');
+  await expect(page.getByRole('button', { name: 'Abandon Prior Inspection / Start Today’s Inspection' })).toBeVisible();
+  expect(api.sessionStarts).toHaveLength(2);
+
+  await page.getByRole('button', { name: 'Abandon Prior Inspection / Start Today’s Inspection' }).click();
+  await expect.poll(() => api.abandonments.length).toBe(1);
+  expect(api.sessionStarts).toHaveLength(2);
+
+  expect(api.abandonments[0]).toMatchObject({
+    inspection_session_token: fireBoatPriorDayInspectionSession.token,
+    inspection_session_replay_key: fireBoatPriorDayInspectionSession.replay_key,
+    inspection_session_transition_key: expect.stringMatching(/^[0-9a-f-]{36}$/),
+  });
+  await expect(page.getByRole('button', { name: 'Abandon Prior Inspection / Start Today’s Inspection' })).not.toBeVisible();
 });
 
 test('Fire Boat v2 reload restores same-version typed fields, due-duty status, and compartment status', async ({ page }) => {

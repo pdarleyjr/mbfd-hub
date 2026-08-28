@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\DailyCheckoutRequirement;
+use App\Exceptions\DailyCheckoutInspectionSessionException;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Public\PublicApparatusResource;
 use App\Models\Apparatus;
@@ -135,16 +136,20 @@ class ApparatusController extends Controller
         $issuedAt = CarbonImmutable::now(DailyCheckoutInspectionSessionService::TIMEZONE);
         $browserBinding = $this->browserBindingForIssue($request, $issuanceKey, $inspectionSessionService);
         $actor = $request->user();
-        $issued = $inspectionSessionService->issue(
-            apparatus: $apparatus,
-            checklist: $checklist,
-            checklistHash: (string) $resolution['checklist_version'],
-            dueTasks: $checklistResolver->dueTasksFor($checklist, $issuedAt->startOfDay()),
-            actorUserId: $actor instanceof User ? (int) $actor->getKey() : null,
-            actorSessionHash: $browserBinding['hash'],
-            issuanceKey: $issuanceKey,
-            issuedAt: $issuedAt,
-        );
+        try {
+            $issued = $inspectionSessionService->issue(
+                apparatus: $apparatus,
+                checklist: $checklist,
+                checklistHash: (string) $resolution['checklist_version'],
+                dueTasks: $checklistResolver->dueTasksFor($checklist, $issuedAt->startOfDay()),
+                actorUserId: $actor instanceof User ? (int) $actor->getKey() : null,
+                actorSessionHash: $browserBinding['hash'],
+                issuanceKey: $issuanceKey,
+                issuedAt: $issuedAt,
+            );
+        } catch (DailyCheckoutInspectionSessionException $exception) {
+            return $this->inspectionSessionExceptionResponse($exception);
+        }
         $session = $issued['session'];
         $sessionChecklist = $session->checklist_snapshot;
         if (! is_array($sessionChecklist) || ! $inspectionSessionService->checklistHasIntegrity($session)) {
@@ -171,6 +176,95 @@ class ApparatusController extends Controller
         }
 
         return $response;
+    }
+
+    /**
+     * Explicitly abandons one still-valid prior-day Fire Boat contract before
+     * issuing today's contract. This route never accepts browser-state loss as
+     * authority: it requires the original server-issued token, replay key, and
+     * browser binding.
+     */
+    public function abandonInspectionSession(
+        Request $request,
+        int $id,
+        string $sessionId,
+        DailyCheckoutChecklistResolver $checklistResolver,
+        DailyCheckoutInspectionSessionService $inspectionSessionService,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'inspection_session_token' => ['required', 'string', 'regex:/\A[a-f0-9]{64}\z/i'],
+            'inspection_session_replay_key' => ['required', 'uuid'],
+            'inspection_session_transition_key' => ['required', 'uuid'],
+        ]);
+        $apparatus = Apparatus::findOrFail($id);
+        if (! $apparatus->isDailyCheckoutRequired()) {
+            return response()->json([
+                'message' => 'This apparatus is not configured for Daily Checkout.',
+            ], 409);
+        }
+
+        $resolution = $checklistResolver->resolve($apparatus);
+        if (! $resolution['usable']) {
+            Log::warning('Daily Checkout checklist resolution failed while abandoning an inspection session.', [
+                'apparatus_id' => $apparatus->id,
+                'checklist_type' => $resolution['checklist_type'],
+                'reason' => $resolution['error'],
+            ]);
+
+            return response()->json([
+                'message' => 'The Daily Checkout checklist is unavailable. Contact an officer before continuing.',
+                'code' => 'DAILY_CHECKOUT_CHECKLIST_UNAVAILABLE',
+            ], 503);
+        }
+
+        $checklist = $resolution['checklist'];
+        if (! $this->isV2Checklist($checklist)) {
+            return response()->json([
+                'message' => 'This checklist does not require an inspection duty-date session.',
+                'code' => 'DAILY_CHECKOUT_INSPECTION_SESSION_NOT_REQUIRED',
+            ], 409);
+        }
+
+        $issuedAt = CarbonImmutable::now(DailyCheckoutInspectionSessionService::TIMEZONE);
+        $actor = $request->user();
+        try {
+            $issued = $inspectionSessionService->abandonAndIssue(
+                apparatus: $apparatus,
+                priorPublicId: $sessionId,
+                priorToken: (string) $validated['inspection_session_token'],
+                priorReplayKey: (string) $validated['inspection_session_replay_key'],
+                transitionKey: (string) $validated['inspection_session_transition_key'],
+                checklist: $checklist,
+                checklistHash: (string) $resolution['checklist_version'],
+                dueTasks: $checklistResolver->dueTasksFor($checklist, $issuedAt->startOfDay()),
+                actorUserId: $actor instanceof User ? (int) $actor->getKey() : null,
+                actorSessionHash: $this->browserBindingHash($request),
+                issuedAt: $issuedAt,
+            );
+        } catch (DailyCheckoutInspectionSessionException $exception) {
+            return $this->inspectionSessionExceptionResponse($exception);
+        }
+
+        $session = $issued['session'];
+        $sessionChecklist = $session->checklist_snapshot;
+        if (! is_array($sessionChecklist) || ! $inspectionSessionService->checklistHasIntegrity($session)) {
+            return response()->json([
+                'message' => 'The Fire Boat inspection session contract could not be verified. Reconnect and start a new inspection session.',
+                'code' => 'DAILY_CHECKOUT_INSPECTION_SESSION_INVALID',
+            ], 409);
+        }
+
+        return response()->json([
+            'apparatus' => (new PublicApparatusResource($apparatus))->resolve(request()),
+            'checklist' => $sessionChecklist,
+            'checklist_version' => $session->checklist_hash,
+            'checklist_type' => $resolution['checklist_type'],
+            'checklist_item_count' => $resolution['item_count'],
+            'inspection_date' => $session->duty_date?->toDateString(),
+            'due_tasks' => $session->due_tasks,
+            'open_defects_count' => $apparatus->openDefects()->count(),
+            'inspection_session' => $inspectionSessionService->publicContract($session, $issued['token']),
+        ], $issued['created'] ? 201 : 200);
     }
 
     public function storeInspection(
@@ -582,6 +676,13 @@ class ApparatusController extends Controller
             );
         }
 
+        if ($session->abandoned_at !== null) {
+            $this->throwInspectionSessionError(
+                'This Fire Boat inspection session was abandoned before it was submitted.',
+                'DAILY_CHECKOUT_INSPECTION_SESSION_ABANDONED',
+            );
+        }
+
         if ($session->submitted_inspection_id !== null) {
             $this->throwInspectionSessionError(
                 'This Fire Boat inspection session has already been submitted.',
@@ -688,6 +789,14 @@ class ApparatusController extends Controller
             'message' => $message,
             'code' => $code,
         ], $status));
+    }
+
+    private function inspectionSessionExceptionResponse(DailyCheckoutInspectionSessionException $exception): JsonResponse
+    {
+        return response()->json([
+            'message' => $exception->getMessage(),
+            'code' => $exception->errorCode,
+        ], $exception->status);
     }
 
     private function checklistVersionMismatchResponse(string $currentChecklistVersion): JsonResponse

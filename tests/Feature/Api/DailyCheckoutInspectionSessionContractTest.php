@@ -241,7 +241,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
             ->assertCreated();
     }
 
-    public function test_same_anonymous_browser_reuses_one_active_contract_and_prunes_the_expired_unsubmitted_row(): void
+    public function test_same_anonymous_browser_reuses_one_active_contract_and_preserves_the_expired_unsubmitted_row(): void
     {
         $apparatus = $this->makeFireBoat6();
         $this->setTestTime('2026-08-31 09:00:00');
@@ -266,8 +266,8 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
             ->assertCreated();
 
         $replacement->assertJsonPath('inspection_session.duty_date', '2026-08-31');
-        $this->assertDatabaseMissing('daily_checkout_inspection_sessions', ['public_id' => $firstContract['id']]);
-        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 1);
+        $this->assertDatabaseHas('daily_checkout_inspection_sessions', ['public_id' => $firstContract['id']]);
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 2);
     }
 
     public function test_public_start_retry_after_a_lost_first_response_reuses_the_same_issuance_key_contract(): void
@@ -361,6 +361,169 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         $this->assertDatabaseCount('apparatus_inspections', 0);
     }
 
+    public function test_lost_local_storage_after_midnight_recovers_the_valid_cookie_bound_contract(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-30 23:55:00');
+        $prior = $this->startInspectionSession($apparatus);
+
+        // The browser lost its local issuance key/autosave at midnight, but
+        // its HTTP-only server binding remains. The server must recover the
+        // prior incomplete contract instead of issuing a second duty date.
+        $this->setTestTime('2026-08-31 00:05:00');
+        $recovered = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions", [
+            'inspection_session_start_key' => '10101010-1010-4010-8010-101010101010',
+        ])->assertOk();
+
+        $recovered
+            ->assertJsonPath('inspection_session.id', $prior['id'])
+            ->assertJsonPath('inspection_session.duty_date', '2026-08-30');
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 1);
+    }
+
+    public function test_expired_contract_is_preserved_and_a_new_contract_may_begin(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-30 09:00:00');
+        $expired = $this->startInspectionSession($apparatus);
+
+        $this->setTestTime('2026-08-31 00:05:00');
+        $replacement = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions")
+            ->assertCreated();
+
+        $replacement
+            ->assertJsonPath('inspection_session.duty_date', '2026-08-31')
+            ->assertJsonPath('inspection_session.id', fn (string $id): bool => $id !== $expired['id']);
+        $this->assertDatabaseHas('daily_checkout_inspection_sessions', ['public_id' => $expired['id']]);
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 2);
+    }
+
+    public function test_completed_contract_allows_a_new_contract_without_abandonment(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        $completed = $this->startInspectionSession($apparatus);
+
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspections",
+            $this->fireBoatSubmission($apparatus, $completed, '12121212-1212-4212-8212-121212121212'),
+        )->assertCreated();
+
+        $replacement = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions")
+            ->assertCreated();
+
+        $replacement->assertJsonPath('inspection_session.id', fn (string $id): bool => $id !== $completed['id']);
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 2);
+    }
+
+    public function test_explicit_abandonment_preserves_the_prior_contract_and_issues_todays_contract(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $actor = User::factory()->create();
+        Sanctum::actingAs($actor);
+        $this->setTestTime('2026-08-30 23:55:00');
+        $prior = $this->startInspectionSession($apparatus);
+
+        $this->setTestTime('2026-08-31 00:05:00');
+        $transition = $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspection-sessions/{$prior['id']}/abandon",
+            $this->abandonmentPayload($prior, '13131313-1313-4313-8313-131313131313'),
+        )->assertCreated();
+        $today = $transition->json('inspection_session');
+        $this->assertIsArray($today);
+
+        $transition->assertJsonPath('inspection_session.duty_date', '2026-08-31');
+        $priorRecord = DailyCheckoutInspectionSession::query()->where('public_id', $prior['id'])->sole();
+        $todayRecord = DailyCheckoutInspectionSession::query()->where('public_id', $today['id'])->sole();
+        $this->assertNotNull($priorRecord->abandoned_at);
+        $this->assertTrue($priorRecord->abandoned_at->greaterThan($priorRecord->issued_at));
+        $this->assertSame($actor->id, $priorRecord->abandoned_by_user_id);
+        $this->assertSame($priorRecord->actor_session_hash, $priorRecord->abandoned_by_session_hash);
+        $this->assertSame('operator_requested_start_today', $priorRecord->abandonment_reason);
+        $this->assertSame('abandon_prior_inspection_start_today', $priorRecord->abandonment_transition_type);
+        $this->assertSame('13131313-1313-4313-8313-131313131313', $priorRecord->abandonment_transition_key);
+        $this->assertSame($priorRecord->id, $todayRecord->prior_inspection_session_id);
+        $this->assertSame($todayRecord->id, $priorRecord->replacement_session_id);
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 2);
+    }
+
+    public function test_replayed_abandonment_transition_is_idempotent_and_does_not_issue_a_second_contract(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-30 23:55:00');
+        $prior = $this->startInspectionSession($apparatus);
+        $payload = $this->abandonmentPayload($prior, '14141414-1414-4414-8414-141414141414');
+
+        $this->setTestTime('2026-08-31 00:05:00');
+        $first = $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspection-sessions/{$prior['id']}/abandon",
+            $payload,
+        )->assertCreated();
+        $retry = $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspection-sessions/{$prior['id']}/abandon",
+            $payload,
+        )->assertOk();
+
+        $retry->assertJsonPath('inspection_session.id', $first->json('inspection_session.id'));
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 2);
+    }
+
+    public function test_new_day_contract_is_not_issued_until_a_valid_explicit_transition_closes_the_prior_contract(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-30 23:55:00');
+        $prior = $this->startInspectionSession($apparatus);
+
+        $this->setTestTime('2026-08-31 00:05:00');
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions")
+            ->assertOk()
+            ->assertJsonPath('inspection_session.id', $prior['id']);
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 1);
+
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspection-sessions/{$prior['id']}/abandon",
+            [],
+        )->assertUnprocessable();
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 1);
+
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspection-sessions/{$prior['id']}/abandon",
+            $this->abandonmentPayload($prior, '15151515-1515-4515-8515-151515151515'),
+        )
+            ->assertCreated()
+            ->assertJsonPath('inspection_session.duty_date', '2026-08-31');
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 2);
+    }
+
+    public function test_missing_browser_binding_cannot_abandon_a_valid_contract_or_create_a_new_duty_date(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-30 23:55:00');
+        $response = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions")
+            ->assertCreated();
+        $prior = $response->json('inspection_session');
+        $this->assertIsArray($prior);
+        $browserCookie = $this->browserBindingCookieFrom($response);
+
+        $this->setTestTime('2026-08-31 00:05:00');
+        $this->withCredentials()->withUnencryptedCookie($browserCookie->getName(), str_repeat('f', 64))
+            ->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions", [
+                'inspection_session_start_key' => '17171717-1717-4717-8717-171717171717',
+            ])
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'DAILY_CHECKOUT_INSPECTION_SESSION_ACTIVE');
+
+        $this->withCredentials()->withUnencryptedCookie($browserCookie->getName(), str_repeat('f', 64))
+            ->postJson(
+                "/api/public/apparatuses/{$apparatus->id}/inspection-sessions/{$prior['id']}/abandon",
+                $this->abandonmentPayload($prior, '16161616-1616-4616-8616-161616161616'),
+            )
+            ->assertForbidden()
+            ->assertJsonPath('code', 'DAILY_CHECKOUT_INSPECTION_SESSION_ACTOR_MISMATCH');
+
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 1);
+    }
+
     /** @return array<string, mixed> */
     private function startInspectionSession(Apparatus $apparatus): array
     {
@@ -405,6 +568,16 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         $payload['inspection_session_replay_key'] = $contract['replay_key'];
 
         return $payload;
+    }
+
+    /** @return array<string, string> */
+    private function abandonmentPayload(array $contract, string $transitionKey): array
+    {
+        return [
+            'inspection_session_token' => (string) $contract['token'],
+            'inspection_session_replay_key' => (string) $contract['replay_key'],
+            'inspection_session_transition_key' => $transitionKey,
+        ];
     }
 
     /** @return array<string, mixed> */

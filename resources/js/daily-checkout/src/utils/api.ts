@@ -74,24 +74,49 @@ export class ApiClient {
   }
 
   static async getChecklist(apparatusId: number): Promise<ChecklistData> {
-    return this.fetchChecklist(apparatusId, false);
+    return this.fetchChecklist(apparatusId, 'checklist');
   }
 
   static async startInspectionSession(apparatusId: number, issuanceKey: string): Promise<ChecklistData> {
-    return this.fetchChecklist(apparatusId, true, issuanceKey);
+    return this.fetchChecklist(
+      apparatusId,
+      'inspection-sessions',
+      { inspection_session_start_key: issuanceKey },
+      true,
+    );
+  }
+
+  static async abandonInspectionSession(
+    apparatusId: number,
+    sessionId: string,
+    token: string,
+    replayKey: string,
+    transitionKey: string,
+  ): Promise<ChecklistData> {
+    return this.fetchChecklist(
+      apparatusId,
+      `inspection-sessions/${sessionId}/abandon`,
+      {
+        inspection_session_token: token,
+        inspection_session_replay_key: replayKey,
+        inspection_session_transition_key: transitionKey,
+      },
+      true,
+    );
   }
 
   private static async fetchChecklist(
     apparatusId: number,
-    startInspectionSession: boolean,
-    issuanceKey?: string,
+    endpoint: string,
+    body?: Record<string, string>,
+    includesInspectionSession = false,
   ): Promise<ChecklistData> {
     const response = await fetch(
-      `${API_BASE}/public/apparatuses/${apparatusId}/${startInspectionSession ? 'inspection-sessions' : 'checklist'}`,
+      `${API_BASE}/public/apparatuses/${apparatusId}/${endpoint}`,
       {
-        ...(startInspectionSession ? {
+        ...(body ? {
           method: 'POST',
-          body: JSON.stringify({ inspection_session_start_key: issuanceKey }),
+          body: JSON.stringify(body),
         } : {}),
         headers: { ...DEFAULT_HEADERS },
       },
@@ -177,7 +202,7 @@ export class ApiClient {
         })()
       : [];
 
-    const inspectionSession = schemaVersion === 2 && startInspectionSession
+    const inspectionSession = schemaVersion === 2 && includesInspectionSession
       ? (() => {
           const session = payload?.inspection_session;
           if (

@@ -3,6 +3,7 @@ import { InspectionData, MeterData } from '../types';
 const STORAGE_KEYS = {
   AUTOSAVE: 'mbfd_autosave_inspection',
   SESSION_START: 'mbfd_inspection_session_start',
+  SESSION_ABANDON: 'mbfd_inspection_session_abandon',
 } as const;
 
 export const createClientSubmissionId = (): string => {
@@ -26,6 +27,10 @@ const autosaveKey = (apparatusSlug: string, checklistVersion?: string): string =
 
 const sessionStartKey = (apparatusSlug: string, checklistVersion: string): string => (
   `${STORAGE_KEYS.SESSION_START}_${apparatusSlug}_${checklistVersion}`
+);
+
+const sessionAbandonKey = (apparatusSlug: string, sessionId: string): string => (
+  `${STORAGE_KEYS.SESSION_ABANDON}_${apparatusSlug}_${sessionId}`
 );
 
 const isClientUuid = (value: string | null): value is string => (
@@ -129,5 +134,35 @@ export const clearInspectionSessionStartKey = (apparatusSlug: string, checklistV
     localStorage.removeItem(sessionStartKey(apparatusSlug, checklistVersion));
   } catch (error) {
     console.error('Failed to clear Daily Checkout session-start key:', error);
+  }
+};
+
+// The transition key is persisted only to make a lost abandonment response
+// replay safely. It is never an authorization credential; the server still
+// requires the issued contract token, replay key, and browser binding.
+export const getOrCreateInspectionSessionAbandonKey = (apparatusSlug: string, sessionId: string): string => {
+  try {
+    const key = sessionAbandonKey(apparatusSlug, sessionId);
+    const existing = localStorage.getItem(key);
+    if (isClientUuid(existing)) {
+      return existing;
+    }
+
+    const next = createClientSubmissionId();
+    localStorage.setItem(key, next);
+
+    return next;
+  } catch (error) {
+    console.error('Failed to persist Daily Checkout session-abandon key:', error);
+
+    return createClientSubmissionId();
+  }
+};
+
+export const clearInspectionSessionAbandonKey = (apparatusSlug: string, sessionId: string) => {
+  try {
+    localStorage.removeItem(sessionAbandonKey(apparatusSlug, sessionId));
+  } catch (error) {
+    console.error('Failed to clear Daily Checkout session-abandon key:', error);
   }
 };

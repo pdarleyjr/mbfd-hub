@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Exceptions\DailyCheckoutInspectionSessionException;
 use App\Models\Apparatus;
 use App\Models\DailyCheckoutInspectionSession;
 use Carbon\CarbonImmutable;
@@ -30,84 +31,182 @@ final class DailyCheckoutInspectionSessionService
         ?string $issuanceKey = null,
         ?CarbonImmutable $issuedAt = null,
     ): array {
-        $templateId = $this->requiredString($checklist['template_id'] ?? null, 'template id');
-        $templateVersion = $this->requiredString($checklist['template_version'] ?? null, 'template version');
-        if (preg_match('/\A[a-f0-9]{64}\z/i', $checklistHash) !== 1) {
-            throw new LogicException('The Daily Checkout checklist hash is invalid.');
-        }
-
+        $preparedContract = $this->prepareContract($checklist, $checklistHash, $dueTasks);
         $issuedAt = ($issuedAt ?? CarbonImmutable::now(self::TIMEZONE))->setTimezone(self::TIMEZONE);
         $requestedIssuanceKey = $this->normalizeIssuanceKey($issuanceKey);
         $sessionIssuanceKey = $requestedIssuanceKey ?? (string) Str::uuid();
-        if (! hash_equals(strtolower($checklistHash), $this->canonicalHash($checklist))) {
-            throw new LogicException('The Daily Checkout checklist snapshot does not match its hash.');
-        }
 
-        $normalizedDueTasks = $this->canonicalize($dueTasks);
-        if (! is_array($normalizedDueTasks) || ! array_is_list($normalizedDueTasks)) {
-            throw new LogicException('The Daily Checkout scheduled-duty contract is invalid.');
-        }
-
-        return DB::transaction(function () use ($apparatus, $actorUserId, $actorSessionHash, $checklist, $checklistHash, $issuedAt, $normalizedDueTasks, $requestedIssuanceKey, $sessionIssuanceKey, $templateId, $templateVersion): array {
+        return DB::transaction(function () use ($apparatus, $actorUserId, $actorSessionHash, $issuedAt, $preparedContract, $requestedIssuanceKey, $sessionIssuanceKey): array {
             // Serializing starts for one apparatus prevents concurrent browser
             // retries from creating multiple durable contracts.
             Apparatus::query()->lockForUpdate()->findOrFail($apparatus->getKey());
-            $this->pruneExpiredUnsubmitted($issuedAt);
 
-            // A replay after a lost first response must recover its original
-            // contract, even if it crosses midnight. A newly supplied key
-            // must not bypass an already active contract for this browser.
+            // An issuance-key replay must recover its original valid contract,
+            // including after midnight. A valid contract owned by this browser
+            // likewise remains authoritative until submitted, expired, or
+            // explicitly abandoned.
             $existing = $requestedIssuanceKey === null
                 ? null
-                : $this->activeContractFor(
+                : $this->activeContractForActor(
                     apparatusId: (int) $apparatus->getKey(),
                     actorUserId: $actorUserId,
                     actorSessionHash: $actorSessionHash,
-                    checklistHash: strtolower($checklistHash),
-                    dutyDate: $issuedAt->toDateString(),
                     issuedAt: $issuedAt,
                     issuanceKey: $requestedIssuanceKey,
                 );
-            $existing ??= $this->activeContractFor(
+            $existing ??= $this->activeContractForActor(
                 apparatusId: (int) $apparatus->getKey(),
                 actorUserId: $actorUserId,
                 actorSessionHash: $actorSessionHash,
-                checklistHash: strtolower($checklistHash),
-                dutyDate: $issuedAt->toDateString(),
                 issuedAt: $issuedAt,
-                issuanceKey: null,
             );
             if ($existing !== null) {
-                return [
-                    'session' => $existing,
-                    'token' => $this->tokenFor($existing->public_id, $existing->replay_key),
-                    'created' => false,
-                ];
+                return $this->issuedContract($existing, false);
             }
 
-            $publicId = (string) Str::uuid();
-            $replayKey = (string) Str::uuid();
-            $token = $this->tokenFor($publicId, $replayKey);
-            $session = DailyCheckoutInspectionSession::query()->create([
-                'public_id' => $publicId,
-                'apparatus_id' => $apparatus->getKey(),
-                'actor_user_id' => $actorUserId,
-                'actor_session_hash' => $actorSessionHash,
-                'issuance_key' => $sessionIssuanceKey,
-                'issued_at' => $issuedAt,
-                'duty_date' => $issuedAt->toDateString(),
-                'checklist_template_id' => $templateId,
-                'checklist_template_version' => $templateVersion,
-                'checklist_hash' => strtolower($checklistHash),
-                'checklist_snapshot' => $this->canonicalize($checklist),
-                'due_tasks' => $normalizedDueTasks,
-                'due_tasks_hash' => $this->canonicalHash($normalizedDueTasks),
-                'replay_key' => $replayKey,
-                'token_hash' => hash('sha256', $token),
-                'expires_at' => $issuedAt->addHours($this->expiryHours()),
+            // A missing browser binding must never become an implicit way to
+            // create a second duty date while another valid contract exists.
+            if ($this->activeContractForApparatus((int) $apparatus->getKey(), $issuedAt) !== null) {
+                throw new DailyCheckoutInspectionSessionException(
+                    'DAILY_CHECKOUT_INSPECTION_SESSION_ACTIVE',
+                    'A valid Fire Boat inspection session is already active. Reconnect with the issuing browser session or ask an officer to reconcile it.',
+                );
+            }
+
+            return $this->createContract(
+                apparatus: $apparatus,
+                preparedContract: $preparedContract,
+                actorUserId: $actorUserId,
+                actorSessionHash: $actorSessionHash,
+                issuanceKey: $sessionIssuanceKey,
+                issuedAt: $issuedAt,
+            );
+        }, 3);
+    }
+
+    /**
+     * Explicitly abandons one valid prior-day contract and issues the current
+     * duty-day contract. The transition is bound to the original session's
+     * credentials and idempotency key; browser-state loss alone cannot invoke
+     * it or create a replacement contract.
+     *
+     * @param  array<string, mixed>  $checklist
+     * @param  list<array<string, mixed>>  $dueTasks
+     * @return array{session: DailyCheckoutInspectionSession, token: string, created: bool}
+     */
+    public function abandonAndIssue(
+        Apparatus $apparatus,
+        string $priorPublicId,
+        string $priorToken,
+        string $priorReplayKey,
+        string $transitionKey,
+        array $checklist,
+        string $checklistHash,
+        array $dueTasks,
+        ?int $actorUserId,
+        ?string $actorSessionHash,
+        ?CarbonImmutable $issuedAt = null,
+    ): array {
+        $preparedContract = $this->prepareContract($checklist, $checklistHash, $dueTasks);
+        $issuedAt = ($issuedAt ?? CarbonImmutable::now(self::TIMEZONE))->setTimezone(self::TIMEZONE);
+        $transitionKey = $this->normalizeIssuanceKey($transitionKey);
+        if ($transitionKey === null) {
+            throw new LogicException('The Daily Checkout inspection-session transition key is required.');
+        }
+
+        return DB::transaction(function () use ($apparatus, $priorPublicId, $priorToken, $priorReplayKey, $transitionKey, $preparedContract, $actorUserId, $actorSessionHash, $issuedAt): array {
+            Apparatus::query()->lockForUpdate()->findOrFail($apparatus->getKey());
+            $prior = DailyCheckoutInspectionSession::query()
+                ->where('public_id', $priorPublicId)
+                ->lockForUpdate()
+                ->first();
+            if ($prior === null || (int) $prior->apparatus_id !== (int) $apparatus->getKey()) {
+                throw new DailyCheckoutInspectionSessionException(
+                    'DAILY_CHECKOUT_INSPECTION_SESSION_INVALID',
+                    'The Fire Boat inspection session is unavailable. Reconnect and start a new inspection session.',
+                );
+            }
+
+            $this->assertContractOwnership(
+                session: $prior,
+                token: $priorToken,
+                replayKey: $priorReplayKey,
+                actorUserId: $actorUserId,
+                actorSessionHash: $actorSessionHash,
+            );
+
+            if ($prior->abandoned_at !== null) {
+                if ($prior->abandonment_transition_key !== null
+                    && hash_equals($prior->abandonment_transition_key, $transitionKey)
+                    && $prior->replacement_session_id !== null) {
+                    $replacement = DailyCheckoutInspectionSession::query()
+                        ->whereKey($prior->replacement_session_id)
+                        ->first();
+                    if ($replacement !== null
+                        && (int) $replacement->apparatus_id === (int) $apparatus->getKey()
+                        && (int) $replacement->prior_inspection_session_id === (int) $prior->getKey()) {
+                        return $this->issuedContract($replacement, false);
+                    }
+                }
+
+                throw new DailyCheckoutInspectionSessionException(
+                    'DAILY_CHECKOUT_INSPECTION_SESSION_ALREADY_ABANDONED',
+                    'This Fire Boat inspection session was already abandoned and cannot be transitioned again.',
+                );
+            }
+
+            if ($prior->submitted_inspection_id !== null) {
+                throw new DailyCheckoutInspectionSessionException(
+                    'DAILY_CHECKOUT_INSPECTION_SESSION_ALREADY_SUBMITTED',
+                    'This Fire Boat inspection session has already been submitted.',
+                );
+            }
+
+            if ($prior->expires_at === null || $prior->expires_at->lessThanOrEqualTo($issuedAt)) {
+                throw new DailyCheckoutInspectionSessionException(
+                    'DAILY_CHECKOUT_INSPECTION_SESSION_EXPIRED',
+                    'This Fire Boat inspection session has expired. Reconnect and start a new inspection session.',
+                );
+            }
+
+            if ($prior->duty_date === null || $prior->duty_date->toDateString() === $issuedAt->toDateString()) {
+                throw new DailyCheckoutInspectionSessionException(
+                    'DAILY_CHECKOUT_INSPECTION_SESSION_ABANDONMENT_NOT_REQUIRED',
+                    'The active Fire Boat inspection already belongs to today and cannot be replaced by this transition.',
+                );
+            }
+
+            $otherActiveContract = $this->activeContractsForApparatus((int) $apparatus->getKey(), $issuedAt)
+                ->where('id', '!=', $prior->getKey())
+                ->orderBy('id')
+                ->first();
+            if ($otherActiveContract !== null) {
+                throw new DailyCheckoutInspectionSessionException(
+                    'DAILY_CHECKOUT_INSPECTION_SESSION_ACTIVE',
+                    'A different valid Fire Boat inspection session is already active. Reconnect with the issuing browser session or ask an officer to reconcile it.',
+                );
+            }
+
+            $replacement = $this->createContract(
+                apparatus: $apparatus,
+                preparedContract: $preparedContract,
+                actorUserId: $actorUserId,
+                actorSessionHash: $actorSessionHash,
+                issuanceKey: $transitionKey,
+                issuedAt: $issuedAt,
+                priorInspectionSessionId: (int) $prior->getKey(),
+            );
+            $prior->update([
+                'abandoned_at' => $issuedAt,
+                'abandoned_by_user_id' => $actorUserId,
+                'abandoned_by_session_hash' => $actorSessionHash,
+                'abandonment_reason' => 'operator_requested_start_today',
+                'abandonment_transition_type' => 'abandon_prior_inspection_start_today',
+                'abandonment_transition_key' => $transitionKey,
+                'replacement_session_id' => $replacement['session']->getKey(),
             ]);
 
-            return ['session' => $session, 'token' => $token, 'created' => true];
+            return $replacement;
         }, 3);
     }
 
@@ -156,33 +255,97 @@ final class DailyCheckoutInspectionSessionService
             && hash_equals($session->checklist_hash, $this->canonicalHash($session->checklist_snapshot));
     }
 
-    private function pruneExpiredUnsubmitted(CarbonImmutable $issuedAt): void
+    /**
+     * @param  array<string, mixed>  $checklist
+     * @param  list<array<string, mixed>>  $dueTasks
+     * @return array{template_id: string, template_version: string, checklist_hash: string, checklist_snapshot: array<string, mixed>, due_tasks: list<array<string, mixed>>, due_tasks_hash: string}
+     */
+    private function prepareContract(array $checklist, string $checklistHash, array $dueTasks): array
     {
-        DailyCheckoutInspectionSession::query()
-            ->whereNull('submitted_inspection_id')
-            ->where('expires_at', '<=', $issuedAt)
-            ->delete();
+        $templateId = $this->requiredString($checklist['template_id'] ?? null, 'template id');
+        $templateVersion = $this->requiredString($checklist['template_version'] ?? null, 'template version');
+        if (preg_match('/\A[a-f0-9]{64}\z/i', $checklistHash) !== 1) {
+            throw new LogicException('The Daily Checkout checklist hash is invalid.');
+        }
+
+        $canonicalChecklist = $this->canonicalize($checklist);
+        if (! is_array($canonicalChecklist) || ! hash_equals(strtolower($checklistHash), $this->canonicalHash($canonicalChecklist))) {
+            throw new LogicException('The Daily Checkout checklist snapshot does not match its hash.');
+        }
+
+        $normalizedDueTasks = $this->canonicalize($dueTasks);
+        if (! is_array($normalizedDueTasks) || ! array_is_list($normalizedDueTasks)) {
+            throw new LogicException('The Daily Checkout scheduled-duty contract is invalid.');
+        }
+
+        return [
+            'template_id' => $templateId,
+            'template_version' => $templateVersion,
+            'checklist_hash' => strtolower($checklistHash),
+            'checklist_snapshot' => $canonicalChecklist,
+            'due_tasks' => $normalizedDueTasks,
+            'due_tasks_hash' => $this->canonicalHash($normalizedDueTasks),
+        ];
     }
 
-    private function activeContractFor(
+    /**
+     * @param  array{template_id: string, template_version: string, checklist_hash: string, checklist_snapshot: array<string, mixed>, due_tasks: list<array<string, mixed>>, due_tasks_hash: string}  $preparedContract
+     * @return array{session: DailyCheckoutInspectionSession, token: string, created: bool}
+     */
+    private function createContract(
+        Apparatus $apparatus,
+        array $preparedContract,
+        ?int $actorUserId,
+        ?string $actorSessionHash,
+        string $issuanceKey,
+        CarbonImmutable $issuedAt,
+        ?int $priorInspectionSessionId = null,
+    ): array {
+        $publicId = (string) Str::uuid();
+        $replayKey = (string) Str::uuid();
+        $token = $this->tokenFor($publicId, $replayKey);
+        $session = DailyCheckoutInspectionSession::query()->create([
+            'public_id' => $publicId,
+            'apparatus_id' => $apparatus->getKey(),
+            'actor_user_id' => $actorUserId,
+            'actor_session_hash' => $actorSessionHash,
+            'issuance_key' => $issuanceKey,
+            'issued_at' => $issuedAt,
+            'duty_date' => $issuedAt->toDateString(),
+            'checklist_template_id' => $preparedContract['template_id'],
+            'checklist_template_version' => $preparedContract['template_version'],
+            'checklist_hash' => $preparedContract['checklist_hash'],
+            'checklist_snapshot' => $preparedContract['checklist_snapshot'],
+            'due_tasks' => $preparedContract['due_tasks'],
+            'due_tasks_hash' => $preparedContract['due_tasks_hash'],
+            'replay_key' => $replayKey,
+            'token_hash' => hash('sha256', $token),
+            'expires_at' => $issuedAt->addHours($this->expiryHours()),
+            'prior_inspection_session_id' => $priorInspectionSessionId,
+        ]);
+
+        return ['session' => $session, 'token' => $token, 'created' => true];
+    }
+
+    /** @return array{session: DailyCheckoutInspectionSession, token: string, created: bool} */
+    private function issuedContract(DailyCheckoutInspectionSession $session, bool $created): array
+    {
+        return [
+            'session' => $session,
+            'token' => $this->tokenFor($session->public_id, $session->replay_key),
+            'created' => $created,
+        ];
+    }
+
+    private function activeContractForActor(
         int $apparatusId,
         ?int $actorUserId,
         ?string $actorSessionHash,
-        string $checklistHash,
-        string $dutyDate,
         CarbonImmutable $issuedAt,
-        ?string $issuanceKey,
+        ?string $issuanceKey = null,
     ): ?DailyCheckoutInspectionSession {
-        $query = DailyCheckoutInspectionSession::query()
-            ->where('apparatus_id', $apparatusId)
-            ->whereNull('submitted_inspection_id')
-            ->where('expires_at', '>', $issuedAt);
-
-        if ($issuanceKey === null) {
-            $query
-                ->where('checklist_hash', $checklistHash)
-                ->whereDate('duty_date', $dutyDate);
-        } else {
+        $query = $this->activeContractsForApparatus($apparatusId, $issuedAt);
+        if ($issuanceKey !== null) {
             $query->where('issuance_key', $issuanceKey);
         }
 
@@ -199,6 +362,62 @@ final class DailyCheckoutInspectionSessionService
         }
 
         return $query->orderBy('id')->first();
+    }
+
+    private function activeContractForApparatus(int $apparatusId, CarbonImmutable $issuedAt): ?DailyCheckoutInspectionSession
+    {
+        return $this->activeContractsForApparatus($apparatusId, $issuedAt)
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function activeContractsForApparatus(int $apparatusId, CarbonImmutable $issuedAt): \Illuminate\Database\Eloquent\Builder
+    {
+        return DailyCheckoutInspectionSession::query()
+            ->where('apparatus_id', $apparatusId)
+            ->whereNull('submitted_inspection_id')
+            ->whereNull('abandoned_at')
+            ->where('expires_at', '>', $issuedAt);
+    }
+
+    private function assertContractOwnership(
+        DailyCheckoutInspectionSession $session,
+        string $token,
+        string $replayKey,
+        ?int $actorUserId,
+        ?string $actorSessionHash,
+    ): void {
+        if (! $this->tokenIsValid($session, $token)) {
+            throw new DailyCheckoutInspectionSessionException(
+                'DAILY_CHECKOUT_INSPECTION_SESSION_INVALID',
+                'The Fire Boat inspection session is unavailable. Reconnect and start a new inspection session.',
+            );
+        }
+
+        if (! hash_equals($session->replay_key, $replayKey)) {
+            throw new DailyCheckoutInspectionSessionException(
+                'DAILY_CHECKOUT_INSPECTION_SESSION_REPLAY_MISMATCH',
+                'This Fire Boat inspection replay key does not match the server-issued session.',
+            );
+        }
+
+        if ($session->actor_user_id !== null && $actorUserId !== (int) $session->actor_user_id) {
+            throw new DailyCheckoutInspectionSessionException(
+                'DAILY_CHECKOUT_INSPECTION_SESSION_ACTOR_MISMATCH',
+                'This Fire Boat inspection session was issued to a different authenticated user.',
+                403,
+            );
+        }
+
+        if ($session->actor_session_hash !== null && (
+            $actorSessionHash === null || ! hash_equals($session->actor_session_hash, $actorSessionHash)
+        )) {
+            throw new DailyCheckoutInspectionSessionException(
+                'DAILY_CHECKOUT_INSPECTION_SESSION_ACTOR_MISMATCH',
+                'This Fire Boat inspection session was issued to a different browser session.',
+                403,
+            );
+        }
     }
 
     private function tokenFor(string $publicId, string $replayKey): string
@@ -223,7 +442,7 @@ final class DailyCheckoutInspectionSessionService
         }
 
         $normalized = strtolower($issuanceKey);
-        if (preg_match('/\\A[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\\z/', $normalized) !== 1) {
+        if (preg_match('/\A[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\z/', $normalized) !== 1) {
             throw new LogicException('The Daily Checkout inspection-session issuance key is invalid.');
         }
 
