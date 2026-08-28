@@ -701,6 +701,7 @@ class ApparatusResource extends Resource
         return [
             'index' => Pages\ListApparatuses::route('/'),
             'create' => Pages\CreateApparatus::route('/create'),
+            'view' => Pages\ViewApparatus::route('/{record}'),
             'edit' => Pages\EditApparatus::route('/{record}/edit'),
             'view-inspection' => Pages\ViewInspection::route('/{record}/inspections/{inspection}'),
         ];
