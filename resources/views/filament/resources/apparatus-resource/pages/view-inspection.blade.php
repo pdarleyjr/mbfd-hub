@@ -137,6 +137,10 @@
                     </div>
                 </div>
 
+                @if($pendingChecklistV2 !== null)
+                    <x-inspection-checklist-v2-evidence :evidence="$pendingChecklistV2" />
+                @endif
+
                 @if(count($pendingDefects) > 0)
                     <h4 class="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-3">Reported pending defects ({{ count($pendingDefects) }})</h4>
                     <div class="space-y-3">
@@ -180,6 +184,10 @@
                             </p>
                             @if(filled($reviewEvent->internal_note))
                                 <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ $reviewEvent->internal_note }}</p>
+                            @endif
+                            @php($reviewChecklistV2 = data_get($reviewEvent->metadata, 'submitted_effects.checklist_v2'))
+                            @if(is_array($reviewChecklistV2))
+                                <x-inspection-checklist-v2-evidence :evidence="$reviewChecklistV2" />
                             @endif
                         </div>
                     @endforeach

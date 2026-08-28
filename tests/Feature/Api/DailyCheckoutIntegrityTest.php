@@ -374,16 +374,35 @@ class DailyCheckoutIntegrityTest extends TestCase
             ->assertCreated();
 
         $inspection = ApparatusInspection::sole()->refresh();
-        $this->assertSame($payload['field_values'], $inspection->pending_effects['checklist_v2']['field_values']);
-        $this->assertSame($payload['scheduled_tasks'], $inspection->pending_effects['checklist_v2']['scheduled_tasks']);
+        $submittedChecklistV2 = $inspection->pending_effects['checklist_v2'];
+        $this->assertSame('fire_boat_6_daily', $submittedChecklistV2['template_id']);
+        $this->assertSame('2026-07', $submittedChecklistV2['template_version']);
+        $this->assertSame([
+            'id' => 'inspection_date',
+            'name' => 'Date',
+            'input_type' => 'date',
+            'required' => true,
+            'value' => '2026-08-31',
+        ], $submittedChecklistV2['field_values'][0]);
+        $this->assertSame([
+            'id' => 'fb6-monday-fuel-tank-hold',
+            'name' => 'Fuel Tank Hold',
+            'instructions' => 'Fuel Tank Hold / Ex. Lubricate Valves / Check Fuel Filters / Sterilize Fresh Water Tank / Check Stokes Basket Condition- Secured',
+            'recurrence' => [
+                'type' => 'weekday',
+                'weekday' => 'monday',
+            ],
+            'recurrence_label' => 'Every Monday',
+            'status' => 'Present',
+            'notes' => null,
+        ], $submittedChecklistV2['scheduled_tasks'][0]);
 
         $this->actingAsAdmin();
         $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve")
             ->assertOk();
 
         $reviewEvent = $inspection->refresh()->reviewEvents()->sole();
-        $this->assertSame($payload['field_values'], $reviewEvent->metadata['submitted_effects']['checklist_v2']['field_values']);
-        $this->assertSame($payload['scheduled_tasks'], $reviewEvent->metadata['submitted_effects']['checklist_v2']['scheduled_tasks']);
+        $this->assertSame($submittedChecklistV2, $reviewEvent->metadata['submitted_effects']['checklist_v2']);
 
         $invalidValue = $this->fireBoatSubmissionWithChecklist(
             $apparatus,

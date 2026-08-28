@@ -46,6 +46,7 @@ export default function InspectionWizard() {
   const [queuedSubmissionBlocker, setQueuedSubmissionBlocker] = useState<DailyCheckoutQueuedSubmission | null>(null);
   const [queueRevision, setQueueRevision] = useState(0);
   const clientSubmissionIdRef = useRef<string | null>(null);
+  const initializedChecklistKeyRef = useRef<string | null>(null);
 
   useEffect(() => onDailyCheckoutQueueChanged(() => {
     setQueueRevision((revision) => revision + 1);
@@ -82,6 +83,34 @@ export default function InspectionWizard() {
 
         const checklistData = await ApiClient.getChecklist(foundApparatus.id);
         setChecklist(checklistData);
+
+        const queuedSubmission = await getQueuedSubmissionForApparatusAndChecklistVersion(
+          foundApparatus.id,
+          checklistData.checklist_version,
+        );
+        if (queuedSubmission) {
+          setQueuedSubmissionBlocker(queuedSubmission);
+
+          return;
+        }
+
+        const checklistKey = `${slug}:${checklistData.checklist_version}`;
+        if (initializedChecklistKeyRef.current === checklistKey) {
+          return;
+        }
+
+        initializedChecklistKeyRef.current = checklistKey;
+        clientSubmissionIdRef.current = null;
+        setHasLoadedAutosave(false);
+        setAutosaveReviewMessage(null);
+        setOfficerInfo({
+          name: '',
+          rank: 'Firefighter',
+          shift: 'A',
+          unitNumber: foundApparatus.vehicle_number,
+        });
+        setMeterData({ engine_hours: null, miles: null });
+        setCurrentStep('officer');
         setCompartments(checklistData.compartments);
         setFieldValues(checklistData.fields.map((field) => ({
           id: field.id,
@@ -99,46 +128,33 @@ export default function InspectionWizard() {
           notes: null,
         })));
 
-        const queuedSubmission = await getQueuedSubmissionForApparatusAndChecklistVersion(
-          foundApparatus.id,
-          checklistData.checklist_version,
-        );
-        if (queuedSubmission) {
-          setQueuedSubmissionBlocker(queuedSubmission);
-
-          return;
-        }
-
-        // Load autosaved data if available
-        if (!hasLoadedAutosave) {
-          const saved = loadInspectionProgress(slug, checklistData.checklist_version);
-          if (saved) {
-            if (saved.checklist_version === checklistData.checklist_version) {
-              setOfficerInfo(saved.officer);
-              if (saved.meter) {
-                setMeterData(saved.meter);
-              }
-              setCompartments(saved.compartments);
-              if (checklistData.schema_version === 2) {
-                if (saved.fieldValues) {
-                  setFieldValues(saved.fieldValues);
-                }
-                if (saved.scheduledTasks) {
-                  setScheduledTasks(saved.scheduledTasks);
-                }
-              }
-              // Resume at the first incomplete current-contract step if officer info exists.
-              if (saved.officer.name) {
-                setCurrentStep(saved.compartments.some(c => c.items.some(i => i.status !== 'Present'))
-                  ? 'compartments'
-                  : checklistData.schema_version === 2
-                    ? 'details'
-                    : 'meter');
-              }
-              setHasLoadedAutosave(true);
-            } else {
-              setAutosaveReviewMessage('A previously saved inspection uses a different checklist version. It remains saved on this device and requires officer review; this form is using the current checklist.');
+        const saved = loadInspectionProgress(slug, checklistData.checklist_version);
+        if (saved) {
+          if (saved.checklist_version === checklistData.checklist_version) {
+            setOfficerInfo(saved.officer);
+            if (saved.meter) {
+              setMeterData(saved.meter);
             }
+            setCompartments(saved.compartments);
+            if (checklistData.schema_version === 2) {
+              if (saved.fieldValues) {
+                setFieldValues(saved.fieldValues);
+              }
+              if (saved.scheduledTasks) {
+                setScheduledTasks(saved.scheduledTasks);
+              }
+            }
+            // Resume at the first incomplete current-contract step if officer info exists.
+            if (saved.officer.name) {
+              setCurrentStep(saved.compartments.some(c => c.items.some(i => i.status !== 'Present'))
+                ? 'compartments'
+                : checklistData.schema_version === 2
+                  ? 'details'
+                  : 'meter');
+            }
+            setHasLoadedAutosave(true);
+          } else {
+            setAutosaveReviewMessage('A previously saved inspection uses a different checklist version. It remains saved on this device and requires officer review; this form is using the current checklist.');
           }
         }
       } catch (err) {
@@ -149,7 +165,7 @@ export default function InspectionWizard() {
     };
 
     fetchData();
-  }, [slug, hasLoadedAutosave, queueRevision]);
+  }, [slug, queueRevision]);
 
   // Autosave progress
   useEffect(() => {

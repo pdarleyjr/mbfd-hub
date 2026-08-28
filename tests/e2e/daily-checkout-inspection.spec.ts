@@ -633,6 +633,44 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
   });
 });
 
+test('Fire Boat v2 reload restores same-version typed fields, due-duty status, and compartment status', async ({ page }) => {
+  await mockFireBoatInspectionApi(page);
+
+  await page.goto('/daily/apparatus/fire-boat-6');
+  await page.getByLabel('Full Name').fill('Captain Browser');
+  await page.getByText('Captain Browser', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue to Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Checklist Details' })).toBeVisible();
+  await page.getByLabel('High Low Tide').fill('High 10:00 / Low 16:30');
+  await page.getByLabel('Port Engine Hours').fill('45.5');
+  await page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
+    .getByRole('button', { name: 'Missing', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
+
+  await page.getByRole('group', { name: 'Status for Flashlights' })
+    .getByRole('button', { name: /Damaged/ })
+    .click();
+  await page.getByRole('button', { name: 'Review & Submit' }).click();
+
+  await page.reload();
+
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Compartment Inspection' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Status for Flashlights' })
+    .getByRole('button', { name: /Damaged/ }))
+    .toHaveAttribute('aria-pressed', 'true');
+
+  await page.getByRole('button', { name: 'Back to Checklist Details' }).click();
+  await expect(page.getByRole('heading', { name: 'Checklist Details' })).toBeVisible();
+  await expect(page.getByLabel('High Low Tide')).toHaveValue('High 10:00 / Low 16:30');
+  await expect(page.getByLabel('Port Engine Hours')).toHaveValue('45.5');
+  await expect(page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
+    .getByRole('button', { name: 'Missing', exact: true }))
+    .toHaveAttribute('aria-pressed', 'true');
+});
+
 test('a pending-review receipt tells the operator that readiness is not yet changed', async ({ page }) => {
   await mockInspectionApi(page, { reviewPendingOnSubmit: true });
 

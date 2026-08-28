@@ -216,10 +216,10 @@ class ApparatusController extends Controller
                     'has_critical_defects' => $hasCriticalDefects,
                 ];
                 if ($this->isV2Checklist($lockedResolution['checklist'])) {
-                    $pendingEffects['checklist_v2'] = [
-                        'field_values' => $prepared['field_values'],
-                        'scheduled_tasks' => $prepared['scheduled_tasks'],
-                    ];
+                    $pendingEffects['checklist_v2'] = $this->snapshotV2ChecklistEvidence(
+                        $prepared,
+                        $lockedResolution['checklist'],
+                    );
                 }
 
                 $inspection = $this->createInspection([
@@ -763,6 +763,124 @@ class ApparatusController extends Controller
 
         $this->validateV2ScheduledTasks($submission, $checklist, $inspectionDate, $checklistResolver);
         $this->validateV2CompartmentMatrix($submission, $checklist);
+    }
+
+    /**
+     * Persist the server-resolved labels and task instructions that authorized
+     * reviewers need to evaluate a V2 submission after a template changes.
+     *
+     * @param  array<string, mixed>  $submission
+     * @param  array<string, mixed>  $checklist
+     * @return array<string, mixed>
+     */
+    private function snapshotV2ChecklistEvidence(array $submission, array $checklist): array
+    {
+        $templateId = $this->canonicalChecklistString($checklist['template_id'] ?? null);
+        $templateVersion = $this->canonicalChecklistString($checklist['template_version'] ?? null);
+        if ($templateId === null || $templateVersion === null) {
+            throw new \LogicException('The validated Daily Checkout template metadata is unavailable.');
+        }
+
+        $fieldDefinitions = [];
+        foreach ($checklist['fields'] ?? [] as $field) {
+            if (! is_array($field)) {
+                throw new \LogicException('The validated Daily Checkout field definition is unavailable.');
+            }
+
+            $fieldId = $this->canonicalChecklistString($field['id'] ?? null);
+            $name = $this->canonicalChecklistString($field['name'] ?? null);
+            $inputType = $this->canonicalChecklistString($field['inputType'] ?? null);
+            if ($fieldId === null || $name === null || $inputType === null) {
+                throw new \LogicException('The validated Daily Checkout field definition is unavailable.');
+            }
+
+            $fieldDefinitions[$fieldId] = [
+                'name' => $name,
+                'input_type' => $inputType,
+                'required' => ($field['required'] ?? false) === true,
+            ];
+        }
+
+        $fieldValues = [];
+        foreach ($submission['field_values'] ?? [] as $fieldValue) {
+            if (! is_array($fieldValue)) {
+                throw new \LogicException('The validated Daily Checkout field value is unavailable.');
+            }
+
+            $fieldId = $this->canonicalChecklistString($fieldValue['id'] ?? null);
+            $definition = $fieldId === null ? null : ($fieldDefinitions[$fieldId] ?? null);
+            if ($fieldId === null || $definition === null || ! array_key_exists('value', $fieldValue)) {
+                throw new \LogicException('The validated Daily Checkout field value is unavailable.');
+            }
+
+            $fieldValues[] = [
+                'id' => $fieldId,
+                'name' => $definition['name'],
+                'input_type' => $definition['input_type'],
+                'required' => $definition['required'],
+                'value' => $fieldValue['value'],
+            ];
+        }
+
+        $taskDefinitions = [];
+        foreach ($checklist['recurringTasks'] ?? [] as $task) {
+            if (! is_array($task) || ! is_array($task['recurrence'] ?? null)) {
+                throw new \LogicException('The validated Daily Checkout scheduled-duty definition is unavailable.');
+            }
+
+            $taskId = $this->canonicalChecklistString($task['id'] ?? null);
+            $name = $this->canonicalChecklistString($task['name'] ?? null);
+            if ($taskId === null || $name === null) {
+                throw new \LogicException('The validated Daily Checkout scheduled-duty definition is unavailable.');
+            }
+
+            $taskDefinitions[$taskId] = [
+                'name' => $name,
+                'instructions' => $this->canonicalChecklistString($task['instructions'] ?? null),
+                'recurrence' => $task['recurrence'],
+                'recurrence_label' => $this->v2RecurrenceLabel($task['recurrence']),
+            ];
+        }
+
+        $scheduledTasks = [];
+        foreach ($submission['scheduled_tasks'] ?? [] as $task) {
+            if (! is_array($task)) {
+                throw new \LogicException('The validated Daily Checkout scheduled-duty result is unavailable.');
+            }
+
+            $taskId = $this->canonicalChecklistString($task['id'] ?? null);
+            $definition = $taskId === null ? null : ($taskDefinitions[$taskId] ?? null);
+            if ($taskId === null || $definition === null) {
+                throw new \LogicException('The validated Daily Checkout scheduled-duty result is unavailable.');
+            }
+
+            $scheduledTasks[] = [
+                'id' => $taskId,
+                'name' => $definition['name'],
+                'instructions' => $definition['instructions'],
+                'recurrence' => $definition['recurrence'],
+                'recurrence_label' => $definition['recurrence_label'],
+                'status' => $task['status'],
+                'notes' => $task['notes'] ?? null,
+            ];
+        }
+
+        return [
+            'template_id' => $templateId,
+            'template_version' => $templateVersion,
+            'field_values' => $fieldValues,
+            'scheduled_tasks' => $scheduledTasks,
+        ];
+    }
+
+    /** @param array<string, mixed> $recurrence */
+    private function v2RecurrenceLabel(array $recurrence): string
+    {
+        return match ($recurrence['type'] ?? null) {
+            'weekday' => 'Every '.ucfirst((string) $recurrence['weekday']),
+            'monthly_day' => 'Day '.(string) $recurrence['day'].' of each month',
+            default => 'Configured recurrence',
+        };
     }
 
     private function isValidV2FieldValue(string $inputType, mixed $value, bool $required): bool

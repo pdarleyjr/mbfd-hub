@@ -93,6 +93,49 @@ class ViewInspection extends ViewRecord
                             ->label('Reported Miles')
                             ->numeric()
                             ->placeholder('Not reported'),
+                        Infolists\Components\RepeatableEntry::make('pending_effects.checklist_v2.field_values')
+                            ->label('Checklist v2 evidence — reported fields')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('name')
+                                    ->label('Field'),
+                                Infolists\Components\TextEntry::make('value')
+                                    ->label('Reported value')
+                                    ->formatStateUsing(fn (mixed $state): string => $this->formatV2ChecklistValue($state)),
+                                Infolists\Components\TextEntry::make('input_type')
+                                    ->label('Type')
+                                    ->formatStateUsing(fn (mixed $state): string => ucfirst((string) $state)),
+                            ])
+                            ->columns(3)
+                            ->columnSpanFull()
+                            ->visible(fn (mixed $state): bool => is_array($state) && $state !== []),
+                        Infolists\Components\RepeatableEntry::make('pending_effects.checklist_v2.scheduled_tasks')
+                            ->label('Checklist v2 evidence — scheduled duties')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('name')
+                                    ->label('Duty'),
+                                Infolists\Components\TextEntry::make('status')
+                                    ->label('Result')
+                                    ->badge()
+                                    ->color(fn ($state) => match ($state) {
+                                        'Present' => 'success',
+                                        'Missing' => 'danger',
+                                        'Damaged' => 'warning',
+                                        default => 'gray',
+                                    }),
+                                Infolists\Components\TextEntry::make('recurrence_label')
+                                    ->label('Recurrence'),
+                                Infolists\Components\TextEntry::make('instructions')
+                                    ->label('Instructions')
+                                    ->columnSpanFull()
+                                    ->placeholder('No instructions'),
+                                Infolists\Components\TextEntry::make('notes')
+                                    ->label('Notes')
+                                    ->columnSpanFull()
+                                    ->placeholder('No notes'),
+                            ])
+                            ->columns(3)
+                            ->columnSpanFull()
+                            ->visible(fn (mixed $state): bool => is_array($state) && $state !== []),
                         Infolists\Components\RepeatableEntry::make('pending_effects.defects')
                             ->label('Reported Pending Defects')
                             ->schema([
@@ -145,6 +188,49 @@ class ViewInspection extends ViewRecord
                                     ->label('Review note')
                                     ->placeholder('No note')
                                     ->columnSpanFull(),
+                                Infolists\Components\RepeatableEntry::make('metadata.submitted_effects.checklist_v2.field_values')
+                                    ->label('Checklist v2 evidence — reported fields')
+                                    ->schema([
+                                        Infolists\Components\TextEntry::make('name')
+                                            ->label('Field'),
+                                        Infolists\Components\TextEntry::make('value')
+                                            ->label('Reported value')
+                                            ->formatStateUsing(fn (mixed $state): string => $this->formatV2ChecklistValue($state)),
+                                        Infolists\Components\TextEntry::make('input_type')
+                                            ->label('Type')
+                                            ->formatStateUsing(fn (mixed $state): string => ucfirst((string) $state)),
+                                    ])
+                                    ->columns(3)
+                                    ->columnSpanFull()
+                                    ->visible(fn (mixed $state): bool => is_array($state) && $state !== []),
+                                Infolists\Components\RepeatableEntry::make('metadata.submitted_effects.checklist_v2.scheduled_tasks')
+                                    ->label('Checklist v2 evidence — scheduled duties')
+                                    ->schema([
+                                        Infolists\Components\TextEntry::make('name')
+                                            ->label('Duty'),
+                                        Infolists\Components\TextEntry::make('status')
+                                            ->label('Result')
+                                            ->badge()
+                                            ->color(fn ($state) => match ($state) {
+                                                'Present' => 'success',
+                                                'Missing' => 'danger',
+                                                'Damaged' => 'warning',
+                                                default => 'gray',
+                                            }),
+                                        Infolists\Components\TextEntry::make('recurrence_label')
+                                            ->label('Recurrence'),
+                                        Infolists\Components\TextEntry::make('instructions')
+                                            ->label('Instructions')
+                                            ->columnSpanFull()
+                                            ->placeholder('No instructions'),
+                                        Infolists\Components\TextEntry::make('notes')
+                                            ->label('Notes')
+                                            ->columnSpanFull()
+                                            ->placeholder('No notes'),
+                                    ])
+                                    ->columns(3)
+                                    ->columnSpanFull()
+                                    ->visible(fn (mixed $state): bool => is_array($state) && $state !== []),
                             ])
                             ->columns(2),
                     ]),
@@ -187,5 +273,15 @@ class ViewInspection extends ViewRecord
                             ->hidden(fn ($record) => $record->defects->isNotEmpty()),
                     ]),
             ]);
+    }
+
+    private function formatV2ChecklistValue(mixed $value): string
+    {
+        return match ($value) {
+            null, '' => 'Not reported',
+            true => 'Yes',
+            false => 'No',
+            default => (string) $value,
+        };
     }
 }

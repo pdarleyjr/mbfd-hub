@@ -123,6 +123,9 @@ class ViewInspection extends Page
         $pendingDefects = is_array($pendingEffects) && is_array($pendingEffects['defects'] ?? null)
             ? $pendingEffects['defects']
             : [];
+        $pendingChecklistV2 = is_array($pendingEffects) && is_array($pendingEffects['checklist_v2'] ?? null)
+            ? $pendingEffects['checklist_v2']
+            : null;
         $reviewEvents = $this->inspection->reviewEvents;
         $currentDesignation = $this->record->designation ?? $this->inspection->designation_at_time ?? '—';
 
@@ -153,6 +156,7 @@ class ViewInspection extends Page
             'results' => $results,
             'defects' => $defects,
             'pendingDefects' => $pendingDefects,
+            'pendingChecklistV2' => $pendingChecklistV2,
             'reviewEvents' => $reviewEvents,
             'totalItems' => $totalItems,
             'presentCount' => $presentCount,
