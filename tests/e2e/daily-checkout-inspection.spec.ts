@@ -161,6 +161,7 @@ async function mockInspectionApi(
     readonly checklistVersion?: string;
     readonly reviewPendingOnSubmit?: boolean;
     readonly stationDailyCheckout?: 'canonical' | 'unavailable';
+    readonly stationNumber?: string;
   } = {},
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
@@ -177,13 +178,18 @@ async function mockInspectionApi(
     }
 
     if (path === '/api/public/stations/1') {
+      const stationWithApiNumber = {
+        ...stationDetail,
+        station_number: options.stationNumber ?? stationDetail.station_number,
+      };
+
       if (options.stationDailyCheckout === 'unavailable') {
-        const { daily_checkout: _dailyCheckout, ...stationWithoutDailyCheckout } = stationDetail;
+        const { daily_checkout: _dailyCheckout, ...stationWithoutDailyCheckout } = stationWithApiNumber;
 
         return route.fulfill({ json: stationWithoutDailyCheckout });
       }
 
-      return route.fulfill({ json: stationDetail });
+      return route.fulfill({ json: stationWithApiNumber });
     }
 
     if (path === '/api/public/stations/1/requests') {
@@ -401,6 +407,55 @@ test('station Daily Checkout is explicitly unavailable when the canonical server
   await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toBeVisible();
   await expect(page.getByText('Unavailable', { exact: true })).toBeVisible();
   await expect(page.getByText('The authoritative Daily Checkout result is unavailable. Readiness is not estimated from inspection records.', { exact: true })).toBeVisible();
+});
+
+test('a string Station 1 API value renders its conference link', async ({ page }) => {
+  await mockInspectionApi(page, { stationNumber: '1' });
+
+  await page.goto('/daily/stations/1');
+
+  await expect(page.getByRole('link', { name: 'Morning Lineup Video Conference', exact: true }))
+    .toHaveAttribute('href', '/video-conferencing/stations/1');
+  await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true })).toHaveCount(0);
+});
+
+test('a string Station 2 API value renders both authorized conference links', async ({ page }) => {
+  await mockInspectionApi(page, { stationNumber: '2' });
+
+  await page.goto('/daily/stations/1');
+
+  await expect(page.getByRole('link', { name: 'Morning Lineup Video Conference — Station 2', exact: true }))
+    .toHaveAttribute('href', '/video-conferencing/stations/2');
+  await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true }))
+    .toHaveAttribute('href', '/employee/video-conferencing/command');
+});
+
+test('a string Station 6 API value renders its conference link', async ({ page }) => {
+  await mockInspectionApi(page, { stationNumber: '6' });
+
+  await page.goto('/daily/stations/1');
+
+  await expect(page.getByRole('link', { name: 'Morning Lineup Video Conference', exact: true }))
+    .toHaveAttribute('href', '/video-conferencing/stations/6');
+  await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true })).toHaveCount(0);
+});
+
+test('an unsupported Station API value does not render conference links', async ({ page }) => {
+  await mockInspectionApi(page, { stationNumber: '5' });
+
+  await page.goto('/daily/stations/1');
+
+  await expect(page.locator('a[href^="/video-conferencing/stations/"]')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true })).toHaveCount(0);
+});
+
+test('a malformed Station API value fails closed without conference links', async ({ page }) => {
+  await mockInspectionApi(page, { stationNumber: 'not-a-station' });
+
+  await page.goto('/daily/stations/1');
+
+  await expect(page.locator('a[href^="/video-conferencing/stations/"]')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true })).toHaveCount(0);
 });
 
 test('non-empty checklist permits a complete inspection and sends its submission', async ({ page }) => {
