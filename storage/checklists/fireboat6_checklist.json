@@ -1,0 +1,203 @@
+{
+  "schema_version": 2,
+  "template_id": "fire_boat_6_daily",
+  "template_version": "2026-07",
+  "title": "FIRE BOAT 6 Daily",
+  "inspectionDateFieldId": "inspection_date",
+  "fields": [
+    { "id": "inspection_date", "name": "Date", "inputType": "date", "required": true },
+    { "id": "fb6-shift", "name": "Shift", "inputType": "text", "required": false },
+    { "id": "fb6-high-low-tide", "name": "High Low Tide", "inputType": "text", "required": false },
+    { "id": "fb6-driver-raymarine", "name": "Driver Raymarine", "inputType": "checkbox", "required": false },
+    { "id": "fb6-eng-raymarine", "name": "ENG Raymarine", "inputType": "checkbox", "required": false },
+    { "id": "fb6-ofc-raymarine", "name": "OFC Raymarine", "inputType": "checkbox", "required": false },
+    { "id": "fb6-raymarine-radar-flir-sonar-transducer", "name": "Raymarine Radar / FLIR / Sonar Transducer", "inputType": "checkbox", "required": false },
+    { "id": "fb6-port-engine-hours", "name": "Port Engine Hours", "inputType": "number", "required": false },
+    { "id": "fb6-star-engine-hours", "name": "STAR Engine Hours", "inputType": "number", "required": false },
+    { "id": "fb6-generator-hours", "name": "Generator Hours", "inputType": "number", "required": false },
+    { "id": "fb6-mbfd-radio-test", "name": "MBFD Radio Test", "inputType": "checkbox", "required": false },
+    { "id": "fb6-vhf-radio-test", "name": "VHF Radio Test", "inputType": "checkbox", "required": false },
+    { "id": "fb6-scba-id-1", "name": "SCBA ID#", "inputType": "text", "required": false },
+    { "id": "fb6-scba-id-2", "name": "SCBA ID#", "inputType": "text", "required": false },
+    { "id": "fb6-scba-id-3", "name": "SCBA ID#", "inputType": "text", "required": false },
+    { "id": "fb6-scba-id-4", "name": "SCBA ID#", "inputType": "text", "required": false },
+    { "id": "fb6-driver-radio-last-four-serial", "name": "Driver Radio Last 4 Digits of Motorola Serial Number for Assigned Radios", "inputType": "text", "required": false },
+    { "id": "fb6-engineer", "name": "Engineer", "inputType": "text", "required": false },
+    { "id": "fb6-officer", "name": "Officer", "inputType": "text", "required": false },
+    { "id": "fb6-deck-hand", "name": "Deck Hand", "inputType": "text", "required": false }
+  ],
+  "recurringTasks": [
+    {
+      "id": "fb6-monday-fuel-tank-hold",
+      "name": "Fuel Tank Hold",
+      "instructions": "Fuel Tank Hold / Ex. Lubricate Valves / Check Fuel Filters / Sterilize Fresh Water Tank / Check Stokes Basket Condition- Secured",
+      "recurrence": { "type": "weekday", "weekday": "monday" }
+    },
+    {
+      "id": "fb6-tuesday-stern-lazarete",
+      "name": "STERN LAZARETE",
+      "instructions": "Check Batteries / Wipe Engines / Clean Bilge / Inspect Hoses Clamps / Ex. Lubricate Valves / Check Alternator bolts / Ex. Fire Pump Valves",
+      "recurrence": { "type": "weekday", "weekday": "tuesday" }
+    },
+    {
+      "id": "fb6-wednesday-interior",
+      "name": "Interior",
+      "instructions": "Clean AC Filters / Vacuum-Damp mop / Swap Batteries (DEWALT) / Wipe Interior",
+      "recurrence": { "type": "weekday", "weekday": "wednesday" }
+    },
+    {
+      "id": "fb6-thursday-deck-duties",
+      "name": "Deck Duties",
+      "instructions": "Remove Scuff Marks / Ex. Nozzles-Valves / Ex. Lower Inspect Mast Assy / Shine Rub Rail",
+      "recurrence": { "type": "weekday", "weekday": "thursday" }
+    },
+    {
+      "id": "fb6-friday-bottom",
+      "name": "BOTTOM",
+      "instructions": "Inspect Jet Drives / Wire Brush Zincs / Scrape Inside of Sea Chests-Clean Grates",
+      "recurrence": { "type": "weekday", "weekday": "friday" }
+    },
+    {
+      "id": "fb6-monthly-first-day",
+      "name": "First Day of Each Month",
+      "instructions": "Grease Boat Lift / Lubricate Drive Shaft U-Joints / Lubricate Bucket Actuator / Check Fire Pump Oil",
+      "recurrence": { "type": "monthly_day", "day": 1 }
+    }
+  ],
+  "compartments": [
+    {
+      "id": "fb6-interior-cab",
+      "name": "Interior CAB",
+      "items": [
+        { "id": "fb6-interior-cab-windshield-wipers", "name": "Windshield Wipers Operational X3", "inputType": "checkbox", "expectedQuantity": 3 },
+        { "id": "fb6-interior-cab-siren", "name": "Siren", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-lift-remote", "name": "Lift Remote", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-nav-anchor-lights", "name": "NAV/Anchor Lights", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-port-deck-lights", "name": "Port Deck Lights", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-aft-deck-lights", "name": "AFT Deck Lights", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-stbd-lights", "name": "STBD Lights", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-main-cabin-lights", "name": "Main Cabin Lights", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-cuddy-cabin-lights", "name": "Cuddy Cabin Lights", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-fans", "name": "Fans", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-aft-steps-lights", "name": "AFT Steps Lights", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-engine-room-lights", "name": "Engine Room Lights", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-emerg-lights", "name": "EMERG Lights", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-ram-lights", "name": "RAM Lights", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-bilge-pumps", "name": "BILGE Pumps", "inputType": "checkbox" },
+        { "id": "fb6-interior-cab-powered-red-lights", "name": "Powered with red lights X4", "inputType": "checkbox", "expectedQuantity": 4 },
+        { "id": "fb6-interior-cab-manual-co-sea-fire", "name": "Manual CO SEA FIRE system safety pin in place", "inputType": "checkbox" }
+      ]
+    },
+    {
+      "id": "fb6-port-side-deck-upper-storage",
+      "name": "Port Side Deck Upper Storage",
+      "items": [
+        { "id": "fb6-port-upper-foam-line", "name": "FOAM LINE 3 in to 1 3/4 in with eductor", "inputType": "checkbox" }
+      ]
+    },
+    {
+      "id": "fb6-port-side-deck-lower-storage",
+      "name": "Port Side Deck Lower Storage",
+      "items": [
+        { "id": "fb6-port-lower-spanner-wrenches", "name": "Spanner Wrenches (2) (Side)", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "id": "fb6-port-lower-large-foam-nozzle", "name": "Large Foam Nozzle", "inputType": "checkbox" },
+        { "id": "fb6-port-lower-dewatering-pack", "name": "Dewatering Pack (Bottom)", "inputType": "checkbox" },
+        { "id": "fb6-port-lower-dewatering-drop-hose", "name": "Dewatering Drop Hose", "inputType": "checkbox" },
+        { "id": "fb6-port-lower-fresh-water-coil-hose-nozzle", "name": "Fresh Water Coil Hose & Nozzle", "inputType": "checkbox" },
+        { "id": "fb6-port-lower-buckets", "name": "Buckets (2)", "inputType": "checkbox", "expectedQuantity": 2 }
+      ]
+    },
+    {
+      "id": "fb6-exterior-deck-inventory",
+      "name": "Exterior Deck Inventory",
+      "items": [
+        { "id": "fb6-exterior-red-ball-bumpers", "name": "(6) Red Ball Bumpers", "inputType": "checkbox", "expectedQuantity": 6 },
+        { "id": "fb6-exterior-black-docking-shorelines", "name": "(6) Black Docking Shorelines (Rails)", "inputType": "checkbox", "expectedQuantity": 6 },
+        { "id": "fb6-exterior-black-spare-shorelines", "name": "(2) Black Spare Shorelines", "inputType": "checkbox", "expectedQuantity": 2 }
+      ]
+    },
+    {
+      "id": "fb6-front-anchor-locker",
+      "name": "FRONT ANCHOR LOCKER",
+      "items": [
+        { "id": "fb6-front-anchor-locker-anchor-chain-rope", "name": "Anchor w/Chain & Rope", "inputType": "checkbox" }
+      ]
+    },
+    {
+      "id": "fb6-medical-inventory",
+      "name": "Medical Inventory",
+      "items": [
+        { "id": "fb6-medical-airway-bag", "name": "Airway Bag", "inputType": "checkbox" },
+        { "id": "fb6-medical-med-box", "name": "Med Box", "inputType": "checkbox" },
+        { "id": "fb6-medical-lifepak-15", "name": "LifePak 15", "inputType": "checkbox" },
+        { "id": "fb6-medical-spare-o2-bottle", "name": "Spare 02 Bottle", "inputType": "checkbox" },
+        { "id": "fb6-medical-lsu-suction", "name": "LSU Suction", "inputType": "checkbox" },
+        { "id": "fb6-medical-gloves", "name": "Gloves XXL-SM (1BX)", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "id": "fb6-medical-sleeves", "name": "Sleeves (1BX)", "inputType": "checkbox", "expectedQuantity": 1 },
+        { "id": "fb6-medical-backboards", "name": "Backboards (2)", "inputType": "checkbox", "expectedQuantity": 2 }
+      ]
+    },
+    {
+      "id": "fb6-cubby-storage",
+      "name": "CUBBY STORAGE",
+      "items": [
+        { "id": "fb6-cubby-flashlights", "name": "Flashlights (3)", "inputType": "checkbox", "expectedQuantity": 3 },
+        { "id": "fb6-cubby-flir-thermal", "name": "FLIR THERMAL", "inputType": "checkbox" },
+        { "id": "fb6-cubby-drying-shammys", "name": "(2) Drying Shammy's", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "id": "fb6-cubby-throw-bags", "name": "(4) Throw Bags", "inputType": "checkbox", "expectedQuantity": 4 }
+      ]
+    },
+    {
+      "id": "fb6-inside-seats-port",
+      "name": "Inside Seats Port",
+      "items": [
+        { "id": "fb6-seats-port-snorkel-gear", "name": "(3) Snorkel Gear", "inputType": "checkbox", "expectedQuantity": 3 },
+        { "id": "fb6-seats-port-co-extinguisher", "name": "CO EXTINGUISHER", "inputType": "checkbox" },
+        { "id": "fb6-seats-port-throw-frisbee", "name": "Throw Frisbee", "inputType": "checkbox" },
+        { "id": "fb6-seats-port-green-line", "name": "Green Line", "inputType": "checkbox" }
+      ]
+    },
+    {
+      "id": "fb6-inside-seats-starboard",
+      "name": "Inside Seats Starboard",
+      "items": [
+        { "id": "fb6-seats-starboard-scba-bottles", "name": "(2) SCBA Bottles", "inputType": "checkbox", "expectedQuantity": 2 }
+      ]
+    },
+    {
+      "id": "fb6-starboard-side-upper-storage",
+      "name": "Starboard Side Upper Storage",
+      "items": [
+        { "id": "fb6-starboard-upper-hose-nozzle", "name": "50 ft 1 3/4 in Hose with Nozzle", "inputType": "checkbox" }
+      ]
+    },
+    {
+      "id": "fb6-starboard-side-lower-storage",
+      "name": "Starboard Side Lower Storage",
+      "items": [
+        { "id": "fb6-starboard-lower-double-rolled-hose", "name": "50 ft Double Rolled 1 3/4 in Hose", "inputType": "checkbox" },
+        { "id": "fb6-starboard-lower-single-rolled-hose", "name": "25 ft Single Rolled 1 3/4 in Hose", "inputType": "checkbox" },
+        { "id": "fb6-starboard-lower-bucket-grapple", "name": "Bucket W/ Grapple on a chain with rope", "inputType": "checkbox" },
+        { "id": "fb6-starboard-lower-fog-nozzle", "name": "FOG Nozzle W/ Handle", "inputType": "checkbox" },
+        { "id": "fb6-starboard-lower-smooth-bore-nozzle", "name": "Smooth Bore Nozzle W/ Handle", "inputType": "checkbox" },
+        { "id": "fb6-starboard-lower-cellar-nozzle", "name": "Cellar Nozzle", "inputType": "checkbox" },
+        { "id": "fb6-starboard-lower-fog-foam-attachment", "name": "FOG Nozzle FOAM Attachment/ Aspirator", "inputType": "checkbox" },
+        { "id": "fb6-starboard-lower-flat-compartment", "name": "Flat Compartment (2)-50 ft of 3 in to a Storz", "inputType": "checkbox", "expectedQuantity": 2 }
+      ]
+    },
+    {
+      "id": "fb6-inside-cab-storage",
+      "name": "INSIDE CAB",
+      "items": [
+        { "id": "fb6-inside-cab-life-ring", "name": "Life Ring", "inputType": "checkbox" },
+        { "id": "fb6-inside-cab-torpedo-bouy", "name": "Torpedo Bouy", "inputType": "checkbox" },
+        { "id": "fb6-inside-cab-soft-buoy", "name": "Soft Buoy", "inputType": "checkbox" },
+        { "id": "fb6-inside-cab-pfds", "name": "PFDs (8)", "inputType": "checkbox", "expectedQuantity": 8 },
+        { "id": "fb6-inside-cab-tools", "name": "Tools (Inside Bench)", "inputType": "checkbox" },
+        { "id": "fb6-inside-cab-absorbent-pads", "name": "Absorbent Pads", "inputType": "checkbox" },
+        { "id": "fb6-inside-cab-handheld-extinguishers", "name": "Handheld Extinguishers (2) Under Seats", "inputType": "checkbox", "expectedQuantity": 2 },
+        { "id": "fb6-inside-cab-large-dive-flag", "name": "Large Dive Flag", "inputType": "checkbox" }
+      ]
+    }
+  ]
+}

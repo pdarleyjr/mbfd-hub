@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Models\Apparatus;
+use Carbon\CarbonImmutable;
 use JsonException;
 
 /**
@@ -113,6 +114,37 @@ final class DailyCheckoutChecklistResolver
     }
 
     /**
+     * @param  array<string, mixed>  $checklist
+     * @return list<array<string, mixed>>
+     */
+    public function dueTasksFor(array $checklist, CarbonImmutable $inspectionDate): array
+    {
+        if (($checklist['schema_version'] ?? 1) !== 2 || ! is_array($checklist['recurringTasks'] ?? null)) {
+            return [];
+        }
+
+        $dueTasks = [];
+        foreach ($checklist['recurringTasks'] as $task) {
+            if (! is_array($task) || ! is_array($task['recurrence'] ?? null)) {
+                continue;
+            }
+
+            $recurrence = $task['recurrence'];
+            $isDue = match ($recurrence['type'] ?? null) {
+                'weekday' => strtolower($inspectionDate->format('l')) === strtolower((string) ($recurrence['weekday'] ?? '')),
+                'monthly_day' => $inspectionDate->day === ($recurrence['day'] ?? null),
+                default => false,
+            };
+
+            if ($isDue) {
+                $dueTasks[] = $task;
+            }
+        }
+
+        return $dueTasks;
+    }
+
+    /**
      * @return array{
      *     checklist_type: string,
      *     configured_template: string,
@@ -131,6 +163,19 @@ final class DailyCheckoutChecklistResolver
                 error: $template['error'],
                 configuredTemplate: $template['value'],
                 ambiguity: 'daily_checkout_template_invalid',
+            );
+        }
+
+        $fireBoatIdentity = $this->fireBoatIdentityFor($apparatus);
+        if ($fireBoatIdentity !== null) {
+            return $this->fireBoatMapping($template['template'], $template['value'], $fireBoatIdentity);
+        }
+
+        if ($template['template'] === DailyCheckoutChecklistTemplate::FireBoat6) {
+            return $this->unmapped(
+                error: 'fire_boat_6_identity_required',
+                configuredTemplate: $template['value'],
+                ambiguity: 'fire_boat_6_requires_fb6_identity',
             );
         }
 
@@ -212,6 +257,48 @@ final class DailyCheckoutChecklistResolver
             'resolution_source' => 'family',
             'family' => $family['family'],
             'identity' => $identity['identity'],
+            'ambiguity' => null,
+            'error' => null,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     checklist_type: string,
+     *     configured_template: string,
+     *     resolution_source: 'configured_template'|'pending',
+     *     family: null,
+     *     identity: 'FB6',
+     *     ambiguity: string|null,
+     *     error: string|null
+     * }
+     */
+    private function fireBoatMapping(?DailyCheckoutChecklistTemplate $template, string $configuredTemplate, string $identity): array
+    {
+        if ($template === null) {
+            return $this->unmapped(
+                error: 'specialty_template_pending',
+                configuredTemplate: $configuredTemplate,
+                identity: $identity,
+                ambiguity: 'specialty:fire_boat',
+            );
+        }
+
+        if ($template !== DailyCheckoutChecklistTemplate::FireBoat6) {
+            return $this->unmapped(
+                error: 'fire_boat_template_required',
+                configuredTemplate: $configuredTemplate,
+                identity: $identity,
+                ambiguity: 'fire_boat_6_requires_fireboat6_template',
+            );
+        }
+
+        return [
+            'checklist_type' => DailyCheckoutChecklistTemplate::FireBoat6->value,
+            'configured_template' => DailyCheckoutChecklistTemplate::FireBoat6->value,
+            'resolution_source' => 'configured_template',
+            'family' => null,
+            'identity' => $identity,
             'ambiguity' => null,
             'error' => null,
         ];
@@ -344,6 +431,22 @@ final class DailyCheckoutChecklistResolver
         return null;
     }
 
+    private function fireBoatIdentityFor(Apparatus $apparatus): ?string
+    {
+        foreach ([$apparatus->getAttribute('unit_id'), $apparatus->designation, $apparatus->name] as $value) {
+            if (! is_string($value)) {
+                continue;
+            }
+
+            $normalized = preg_replace('/[^a-z0-9]+/', '', strtolower($value)) ?? '';
+            if (in_array($normalized, ['fb6', 'fireboat6'], true)) {
+                return 'FB6';
+            }
+        }
+
+        return null;
+    }
+
     /** @return 'engine'|'rescue'|'ladder' */
     private function familyForIdentity(string $identity): string
     {
@@ -457,6 +560,16 @@ final class DailyCheckoutChecklistResolver
     /** @param array<string, mixed> $checklist */
     private function hasUnambiguousSubmissionSchema(array $checklist): bool
     {
+        return match ($checklist['schema_version'] ?? 1) {
+            1 => $this->hasUnambiguousV1SubmissionSchema($checklist),
+            2 => $this->hasUnambiguousV2SubmissionSchema($checklist),
+            default => false,
+        };
+    }
+
+    /** @param array<string, mixed> $checklist */
+    private function hasUnambiguousV1SubmissionSchema(array $checklist): bool
+    {
         $compartments = $checklist['compartments'] ?? null;
         if (! is_array($compartments) || ! array_is_list($compartments) || $compartments === []) {
             return false;
@@ -504,6 +617,132 @@ final class DailyCheckoutChecklistResolver
         }
 
         return true;
+    }
+
+    /** @param array<string, mixed> $checklist */
+    private function hasUnambiguousV2SubmissionSchema(array $checklist): bool
+    {
+        if ($this->nonEmptyString($checklist['template_id'] ?? null) === null
+            || $this->nonEmptyString($checklist['template_version'] ?? null) === null) {
+            return false;
+        }
+
+        $inspectionDateFieldId = $this->nonEmptyString($checklist['inspectionDateFieldId'] ?? null);
+        $fields = $checklist['fields'] ?? null;
+        if ($inspectionDateFieldId === null || ! is_array($fields) || ! array_is_list($fields) || $fields === []) {
+            return false;
+        }
+
+        $fieldIds = [];
+        $inspectionDateFieldIsValid = false;
+        foreach ($fields as $field) {
+            if (! is_array($field)) {
+                return false;
+            }
+
+            $fieldId = $this->nonEmptyString($field['id'] ?? null);
+            $fieldName = $this->nonEmptyString($field['name'] ?? null);
+            $inputType = $this->nonEmptyString($field['inputType'] ?? null);
+            if ($fieldId === null || $fieldName === null || ! $this->isV2InputType($inputType) || isset($fieldIds[$fieldId])) {
+                return false;
+            }
+
+            if (array_key_exists('required', $field) && ! is_bool($field['required'])) {
+                return false;
+            }
+
+            $fieldIds[$fieldId] = true;
+            if ($fieldId === $inspectionDateFieldId && $inputType === 'date') {
+                $inspectionDateFieldIsValid = true;
+            }
+        }
+
+        if (! $inspectionDateFieldIsValid) {
+            return false;
+        }
+
+        $recurringTasks = $checklist['recurringTasks'] ?? null;
+        if (! is_array($recurringTasks) || ! array_is_list($recurringTasks)) {
+            return false;
+        }
+
+        $recurringTaskIds = [];
+        foreach ($recurringTasks as $task) {
+            if (! is_array($task)) {
+                return false;
+            }
+
+            $taskId = $this->nonEmptyString($task['id'] ?? null);
+            $taskName = $this->nonEmptyString($task['name'] ?? null);
+            $recurrence = $task['recurrence'] ?? null;
+            if ($taskId === null || $taskName === null || ! is_array($recurrence) || isset($recurringTaskIds[$taskId])) {
+                return false;
+            }
+
+            $recurrenceType = $recurrence['type'] ?? null;
+            $isValidRecurrence = match ($recurrenceType) {
+                'weekday' => is_string($recurrence['weekday'] ?? null)
+                    && in_array(strtolower($recurrence['weekday']), ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], true),
+                'monthly_day' => is_int($recurrence['day'] ?? null)
+                    && $recurrence['day'] >= 1
+                    && $recurrence['day'] <= 31,
+                default => false,
+            };
+            if (! $isValidRecurrence) {
+                return false;
+            }
+
+            $recurringTaskIds[$taskId] = true;
+        }
+
+        $compartments = $checklist['compartments'] ?? null;
+        if (! is_array($compartments) || ! array_is_list($compartments) || $compartments === []) {
+            return false;
+        }
+
+        $compartmentIds = [];
+        $itemIds = [];
+        foreach ($compartments as $compartment) {
+            if (! is_array($compartment)) {
+                return false;
+            }
+
+            $compartmentId = $this->nonEmptyString($compartment['id'] ?? null);
+            $compartmentName = $this->nonEmptyString($compartment['name'] ?? $compartment['title'] ?? null);
+            $items = $compartment['items'] ?? null;
+            if ($compartmentId === null || $compartmentName === null || isset($compartmentIds[$compartmentId])
+                || ! is_array($items) || ! array_is_list($items) || $items === []) {
+                return false;
+            }
+
+            $compartmentIds[$compartmentId] = true;
+            foreach ($items as $item) {
+                if (! is_array($item)) {
+                    return false;
+                }
+
+                $itemId = $this->nonEmptyString($item['id'] ?? null);
+                $itemName = $this->nonEmptyString($item['name'] ?? null);
+                $inputType = $this->nonEmptyString($item['inputType'] ?? null);
+                if ($itemId === null || $itemName === null || ! $this->isV2InputType($inputType) || isset($itemIds[$itemId])) {
+                    return false;
+                }
+
+                if (array_key_exists('expectedQuantity', $item)
+                    && (! is_int($item['expectedQuantity']) || $item['expectedQuantity'] < 1)) {
+                    return false;
+                }
+
+                $itemIds[$itemId] = true;
+            }
+        }
+
+        return true;
+    }
+
+    private function isV2InputType(?string $inputType): bool
+    {
+        return in_array($inputType, ['text', 'number', 'date', 'checkbox', 'percentage'], true);
     }
 
     private function nonEmptyString(mixed $value): ?string

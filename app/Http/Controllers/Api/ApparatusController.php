@@ -15,6 +15,7 @@ use App\Services\ApparatusInspectionApprovalService;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\Display\DisplaySnapshotService;
 use App\Support\Security\Base64Image;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,8 +37,15 @@ class ApparatusController extends Controller
         return response()->json(PublicApparatusResource::collection($apparatuses)->resolve(request()));
     }
 
-    public function checklist(int $id, DailyCheckoutChecklistResolver $checklistResolver): JsonResponse
+    public function checklist(Request $request, int $id, DailyCheckoutChecklistResolver $checklistResolver): JsonResponse
     {
+        $inspectionDateInput = $request->validate([
+            'inspection_date' => ['nullable', 'date_format:Y-m-d'],
+        ])['inspection_date'] ?? null;
+        $inspectionDate = CarbonImmutable::parse(
+            $inspectionDateInput ?? CarbonImmutable::now(config('app.timezone'))->toDateString(),
+            config('app.timezone'),
+        )->startOfDay();
         $apparatus = Apparatus::findOrFail($id);
 
         if (! $apparatus->isDailyCheckoutRequired()) {
@@ -68,6 +76,8 @@ class ApparatusController extends Controller
             'checklist_version' => $resolution['checklist_version'],
             'checklist_type' => $resolution['checklist_type'],
             'checklist_item_count' => $resolution['item_count'],
+            'inspection_date' => $inspectionDate->toDateString(),
+            'due_tasks' => $checklistResolver->dueTasksFor($checklist, $inspectionDate),
             // This unauthenticated route only needs a warning count. Never
             // serialize defect notes, photos, resolution history, or paths.
             'open_defects_count' => $apparatus->openDefects()->count(),
@@ -94,6 +104,7 @@ class ApparatusController extends Controller
             'compartments.*.name' => ['required', 'string', 'max:255'],
             'compartments.*.items' => ['required', 'array', 'min:1'],
             'compartments.*.items.*' => ['required', 'array'],
+            'compartments.*.items.*.id' => ['nullable', 'string', 'max:255'],
             'compartments.*.items.*.name' => ['required', 'string', 'max:255'],
             'compartments.*.items.*.status' => ['required', 'string', 'in:Present,Missing,Damaged'],
             'compartments.*.items.*.notes' => ['nullable', 'string', 'max:2000'],
@@ -103,6 +114,17 @@ class ApparatusController extends Controller
             'defects.*.status' => ['required', 'string', 'in:Missing,Damaged'],
             'defects.*.notes' => ['nullable', 'string', 'max:2000'],
             'defects.*.photo' => ['nullable', 'string', 'max:7000000'],
+            'defects.*.compartment_id' => ['nullable', 'string', 'max:255'],
+            'defects.*.item_id' => ['nullable', 'string', 'max:255'],
+            'field_values' => ['nullable', 'array', 'max:100'],
+            'field_values.*' => ['required', 'array'],
+            'field_values.*.id' => ['required', 'string', 'max:255'],
+            'field_values.*.value' => ['present'],
+            'scheduled_tasks' => ['nullable', 'array', 'max:100'],
+            'scheduled_tasks.*' => ['required', 'array'],
+            'scheduled_tasks.*.id' => ['required', 'string', 'max:255'],
+            'scheduled_tasks.*.status' => ['required', 'string', 'in:Present,Missing,Damaged'],
+            'scheduled_tasks.*.notes' => ['nullable', 'string', 'max:2000'],
             'officer_signature' => ['nullable', 'string', 'max:7000000'],
             'employee_id' => ['nullable', 'integer', 'exists:employees,id'],
         ]);
@@ -140,7 +162,7 @@ class ApparatusController extends Controller
             return $this->checklistVersionMismatchResponse((string) $resolution['checklist_version']);
         }
 
-        $this->validateCompleteChecklist($validated, $resolution['checklist']);
+        $this->validateCompleteChecklist($validated, $resolution['checklist'], $checklistResolver);
 
         $storedPaths = [];
         try {
@@ -175,7 +197,7 @@ class ApparatusController extends Controller
                         'checklist_version' => $lockedResolution['checklist_version'],
                     ];
                 }
-                $this->validateCompleteChecklist($prepared, $lockedResolution['checklist']);
+                $this->validateCompleteChecklist($prepared, $lockedResolution['checklist'], $checklistResolver);
 
                 // The client may display a unit number, but the persisted identity must
                 // always come from the apparatus selected by its unique route ID.
@@ -187,6 +209,17 @@ class ApparatusController extends Controller
                     if (in_array($defectData['status'], ['Missing', 'Damaged'], true)) {
                         $hasCriticalDefects = true;
                     }
+                }
+
+                $pendingEffects = [
+                    'defects' => $prepared['defects'] ?? [],
+                    'has_critical_defects' => $hasCriticalDefects,
+                ];
+                if ($this->isV2Checklist($lockedResolution['checklist'])) {
+                    $pendingEffects['checklist_v2'] = [
+                        'field_values' => $prepared['field_values'],
+                        'scheduled_tasks' => $prepared['scheduled_tasks'],
+                    ];
                 }
 
                 $inspection = $this->createInspection([
@@ -208,10 +241,7 @@ class ApparatusController extends Controller
                     // The public route has no authenticated device or user context.
                     // Retain its validated evidence, but never apply operational
                     // effects until an authorized reviewer approves it.
-                    'pending_effects' => [
-                        'defects' => $prepared['defects'] ?? [],
-                        'has_critical_defects' => $hasCriticalDefects,
-                    ],
+                    'pending_effects' => $pendingEffects,
                     'review_status' => 'pending_review',
                     'completed_at' => now(),
                 ]);
@@ -492,8 +522,17 @@ class ApparatusController extends Controller
      * @param  array<string, mixed>  $submission
      * @param  array<string, mixed>|null  $checklist
      */
-    private function validateCompleteChecklist(array $submission, ?array $checklist): void
-    {
+    private function validateCompleteChecklist(
+        array $submission,
+        ?array $checklist,
+        DailyCheckoutChecklistResolver $checklistResolver,
+    ): void {
+        if ($this->isV2Checklist($checklist)) {
+            $this->validateCompleteV2Checklist($submission, $checklist, $checklistResolver);
+
+            return;
+        }
+
         if ($checklist === null || ! is_array($checklist['compartments'] ?? null)) {
             throw ValidationException::withMessages([
                 'compartments' => 'The Daily Checkout checklist could not be validated.',
@@ -624,6 +663,305 @@ class ApparatusController extends Controller
                 $item,
                 (string) ($defect['status'] ?? ''),
             );
+            $submittedDefects[$key] = ($submittedDefects[$key] ?? 0) + 1;
+        }
+
+        ksort($requiredDefects);
+        ksort($submittedDefects);
+        if ($submittedDefects !== $requiredDefects) {
+            throw ValidationException::withMessages([
+                'defects' => 'Every Missing or Damaged checklist item must have one matching defect record.',
+            ]);
+        }
+    }
+
+    /** @param array<string, mixed>|null $checklist */
+    private function isV2Checklist(?array $checklist): bool
+    {
+        return $checklist !== null && ($checklist['schema_version'] ?? 1) === 2;
+    }
+
+    /**
+     * V2 identifies every submitted field, task, compartment, and item by an
+     * immutable machine ID. V1 stays on its historical display-name contract.
+     *
+     * @param  array<string, mixed>  $submission
+     * @param  array<string, mixed>  $checklist
+     */
+    private function validateCompleteV2Checklist(
+        array $submission,
+        array $checklist,
+        DailyCheckoutChecklistResolver $checklistResolver,
+    ): void {
+        $fields = $checklist['fields'] ?? null;
+        $inspectionDateFieldId = $this->canonicalChecklistString($checklist['inspectionDateFieldId'] ?? null);
+        if (! is_array($fields) || $inspectionDateFieldId === null) {
+            throw ValidationException::withMessages([
+                'field_values' => 'The Daily Checkout field contract could not be validated.',
+            ]);
+        }
+
+        $expectedFields = [];
+        foreach ($fields as $field) {
+            if (! is_array($field)) {
+                throw ValidationException::withMessages([
+                    'field_values' => 'The Daily Checkout field contract could not be validated.',
+                ]);
+            }
+
+            $fieldId = $this->canonicalChecklistString($field['id'] ?? null);
+            $inputType = $this->canonicalChecklistString($field['inputType'] ?? null);
+            if ($fieldId === null || $inputType === null || isset($expectedFields[$fieldId])) {
+                throw ValidationException::withMessages([
+                    'field_values' => 'The Daily Checkout field contract could not be validated.',
+                ]);
+            }
+
+            $expectedFields[$fieldId] = [
+                'input_type' => $inputType,
+                'required' => ($field['required'] ?? false) === true,
+            ];
+        }
+
+        $submittedFieldValues = [];
+        foreach ($submission['field_values'] ?? [] as $fieldValue) {
+            $fieldId = is_array($fieldValue) ? $this->canonicalChecklistString($fieldValue['id'] ?? null) : null;
+            if ($fieldId === null || isset($submittedFieldValues[$fieldId]) || ! isset($expectedFields[$fieldId])
+                || ! is_array($fieldValue) || ! array_key_exists('value', $fieldValue)) {
+                throw ValidationException::withMessages([
+                    'field_values' => 'Each current Daily Checkout field must be submitted exactly once.',
+                ]);
+            }
+
+            if (! $this->isValidV2FieldValue(
+                $expectedFields[$fieldId]['input_type'],
+                $fieldValue['value'],
+                $expectedFields[$fieldId]['required'],
+            )) {
+                throw ValidationException::withMessages([
+                    'field_values' => 'A Daily Checkout field value does not match its configured type.',
+                ]);
+            }
+
+            $submittedFieldValues[$fieldId] = $fieldValue;
+        }
+
+        if (array_diff_key($expectedFields, $submittedFieldValues) !== []
+            || array_diff_key($submittedFieldValues, $expectedFields) !== []) {
+            throw ValidationException::withMessages([
+                'field_values' => 'The submitted inspection must include every current Daily Checkout field exactly once.',
+            ]);
+        }
+
+        $inspectionDateValue = $submittedFieldValues[$inspectionDateFieldId]['value'] ?? null;
+        $inspectionDate = $this->v2InspectionDate($inspectionDateValue);
+        if ($inspectionDate === null) {
+            throw ValidationException::withMessages([
+                'field_values' => 'The Daily Checkout inspection date is invalid.',
+            ]);
+        }
+
+        $this->validateV2ScheduledTasks($submission, $checklist, $inspectionDate, $checklistResolver);
+        $this->validateV2CompartmentMatrix($submission, $checklist);
+    }
+
+    private function isValidV2FieldValue(string $inputType, mixed $value, bool $required): bool
+    {
+        if ($value === null) {
+            return ! $required;
+        }
+
+        return match ($inputType) {
+            'text', 'date' => is_string($value),
+            'number' => (is_int($value) || is_float($value)) && is_finite((float) $value),
+            'percentage' => (is_int($value) || is_float($value))
+                && is_finite((float) $value)
+                && $value >= 0
+                && $value <= 100,
+            'checkbox' => is_bool($value),
+            default => false,
+        };
+    }
+
+    private function v2InspectionDate(mixed $value): ?CarbonImmutable
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        try {
+            $date = CarbonImmutable::createFromFormat('!Y-m-d', $value, config('app.timezone'));
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (! $date instanceof CarbonImmutable || $date->format('Y-m-d') !== $value) {
+            return null;
+        }
+
+        return $date;
+    }
+
+    /**
+     * @param  array<string, mixed>  $submission
+     * @param  array<string, mixed>  $checklist
+     */
+    private function validateV2ScheduledTasks(
+        array $submission,
+        array $checklist,
+        CarbonImmutable $inspectionDate,
+        DailyCheckoutChecklistResolver $checklistResolver,
+    ): void {
+        $expectedTasks = [];
+        foreach ($checklistResolver->dueTasksFor($checklist, $inspectionDate) as $task) {
+            $taskId = $this->canonicalChecklistString($task['id'] ?? null);
+            if ($taskId === null || isset($expectedTasks[$taskId])) {
+                throw ValidationException::withMessages([
+                    'scheduled_tasks' => 'The Daily Checkout scheduled-duty contract could not be validated.',
+                ]);
+            }
+
+            $expectedTasks[$taskId] = true;
+        }
+
+        $submittedTasks = [];
+        foreach ($submission['scheduled_tasks'] ?? [] as $task) {
+            $taskId = is_array($task) ? $this->canonicalChecklistString($task['id'] ?? null) : null;
+            if ($taskId === null || isset($submittedTasks[$taskId]) || ! isset($expectedTasks[$taskId])) {
+                throw ValidationException::withMessages([
+                    'scheduled_tasks' => 'Only scheduled Daily Checkout duties due on the inspection date may be submitted.',
+                ]);
+            }
+
+            $submittedTasks[$taskId] = true;
+        }
+
+        if (array_diff_key($expectedTasks, $submittedTasks) !== []
+            || array_diff_key($submittedTasks, $expectedTasks) !== []) {
+            throw ValidationException::withMessages([
+                'scheduled_tasks' => 'Every scheduled Daily Checkout duty due on the inspection date must be submitted exactly once.',
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $submission
+     * @param  array<string, mixed>  $checklist
+     */
+    private function validateV2CompartmentMatrix(array $submission, array $checklist): void
+    {
+        $expected = [];
+        foreach ($checklist['compartments'] ?? [] as $compartment) {
+            if (! is_array($compartment)) {
+                throw ValidationException::withMessages([
+                    'compartments' => 'The Daily Checkout checklist could not be validated.',
+                ]);
+            }
+
+            $compartmentId = $this->canonicalChecklistString($compartment['id'] ?? null);
+            $compartmentName = $this->canonicalChecklistString($compartment['name'] ?? $compartment['title'] ?? null);
+            if ($compartmentId === null || $compartmentName === null || isset($expected[$compartmentId])
+                || ! is_array($compartment['items'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'compartments' => 'The Daily Checkout checklist could not be validated.',
+                ]);
+            }
+
+            $expectedItems = [];
+            foreach ($compartment['items'] as $item) {
+                $itemId = is_array($item) ? $this->canonicalChecklistString($item['id'] ?? null) : null;
+                $itemName = is_array($item) ? $this->canonicalChecklistString($item['name'] ?? null) : null;
+                if ($itemId === null || $itemName === null || isset($expectedItems[$itemId])) {
+                    throw ValidationException::withMessages([
+                        'compartments' => 'The Daily Checkout checklist could not be validated.',
+                    ]);
+                }
+
+                $expectedItems[$itemId] = $itemName;
+            }
+
+            $expected[$compartmentId] = [
+                'name' => $compartmentName,
+                'items' => $expectedItems,
+            ];
+        }
+
+        $submittedById = [];
+        foreach ($submission['compartments'] as $compartment) {
+            $compartmentId = is_array($compartment) ? $this->canonicalChecklistString($compartment['id'] ?? null) : null;
+            if ($compartmentId === null || isset($submittedById[$compartmentId]) || ! isset($expected[$compartmentId])) {
+                throw ValidationException::withMessages([
+                    'compartments' => 'Each current Daily Checkout compartment must be submitted exactly once.',
+                ]);
+            }
+
+            $submittedById[$compartmentId] = $compartment;
+        }
+
+        if (array_diff_key($expected, $submittedById) !== [] || array_diff_key($submittedById, $expected) !== []) {
+            throw ValidationException::withMessages([
+                'compartments' => 'The submitted inspection must include every current Daily Checkout compartment exactly once.',
+            ]);
+        }
+
+        $requiredDefects = [];
+        foreach ($expected as $compartmentId => $expectedCompartment) {
+            /** @var array<string, mixed> $submittedCompartment */
+            $submittedCompartment = $submittedById[$compartmentId];
+            if (! is_array($submittedCompartment)
+                || $this->canonicalChecklistString($submittedCompartment['name'] ?? null) !== $expectedCompartment['name']
+                || ! is_array($submittedCompartment['items'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'compartments' => 'The submitted inspection does not match the current Daily Checkout checklist.',
+                ]);
+            }
+
+            $submittedItems = [];
+            foreach ($submittedCompartment['items'] as $item) {
+                $itemId = is_array($item) ? $this->canonicalChecklistString($item['id'] ?? null) : null;
+                if ($itemId === null || isset($submittedItems[$itemId]) || ! isset($expectedCompartment['items'][$itemId])
+                    || ! is_array($item)
+                    || $this->canonicalChecklistString($item['name'] ?? null) !== $expectedCompartment['items'][$itemId]) {
+                    throw ValidationException::withMessages([
+                        'compartments' => 'The submitted inspection does not match the current Daily Checkout checklist.',
+                    ]);
+                }
+
+                $submittedItems[$itemId] = $item;
+            }
+
+            if (array_diff_key($expectedCompartment['items'], $submittedItems) !== []
+                || array_diff_key($submittedItems, $expectedCompartment['items']) !== []) {
+                throw ValidationException::withMessages([
+                    'compartments' => 'The submitted inspection must contain every current Daily Checkout item exactly once.',
+                ]);
+            }
+
+            foreach ($submittedItems as $itemId => $item) {
+                if (($item['status'] ?? null) === 'Present') {
+                    continue;
+                }
+
+                $key = $this->defectKey($compartmentId, $itemId, (string) ($item['status'] ?? ''));
+                $requiredDefects[$key] = ($requiredDefects[$key] ?? 0) + 1;
+            }
+        }
+
+        $submittedDefects = [];
+        foreach ($submission['defects'] ?? [] as $defect) {
+            $compartmentId = is_array($defect) ? $this->canonicalChecklistString($defect['compartment_id'] ?? null) : null;
+            $itemId = is_array($defect) ? $this->canonicalChecklistString($defect['item_id'] ?? null) : null;
+            if ($compartmentId === null || $itemId === null || ! isset($expected[$compartmentId])
+                || ! isset($expected[$compartmentId]['items'][$itemId])
+                || ! is_array($defect)
+                || $this->canonicalChecklistString($defect['compartment'] ?? null) !== $expected[$compartmentId]['name']
+                || $this->canonicalChecklistString($defect['item'] ?? null) !== $expected[$compartmentId]['items'][$itemId]) {
+                throw ValidationException::withMessages([
+                    'defects' => 'Every Missing or Damaged checklist item must have one matching defect record.',
+                ]);
+            }
+
+            $key = $this->defectKey($compartmentId, $itemId, (string) ($defect['status'] ?? ''));
             $submittedDefects[$key] = ($submittedDefects[$key] ?? 0) + 1;
         }
 

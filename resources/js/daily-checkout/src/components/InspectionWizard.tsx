@@ -1,18 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, Compartment, Defect, MeterData, InspectionSubmission } from '../types';
+import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, MeterData, InspectionSubmission, ScheduledChecklistTaskResult } from '../types';
 import { ApiClient } from '../utils/api';
 import { getQueuedSubmission, getQueuedSubmissionForApparatusAndChecklistVersion, onDailyCheckoutQueueChanged, queueSubmission, submitQueuedInspection } from '../utils/dailyCheckoutSubmissionQueue';
 import type { DailyCheckoutQueuedSubmission } from '../lib/db';
 import { createClientSubmissionId, saveInspectionProgress, loadInspectionProgress, clearInspectionProgress } from '../utils/storage';
 import { useOffline } from '../hooks/useOffline';
 import OfficerStep from './OfficerStep';
+import ChecklistFieldsStep from './ChecklistFieldsStep';
 import MeterStep from './MeterStep';
 import CompartmentStep from './CompartmentStep';
 import SubmitStep from './SubmitStep';
 import PreviousPageButton from './PreviousPageButton';
 
-type Step = 'officer' | 'meter' | 'compartments' | 'submit';
+type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'submit';
 
 export default function InspectionWizard() {
   const { slug } = useParams<{ slug: string }>();
@@ -33,6 +34,8 @@ export default function InspectionWizard() {
     miles: null,
   });
   const [compartments, setCompartments] = useState<Compartment[]>([]);
+  const [fieldValues, setFieldValues] = useState<Array<{ id: string; value: ChecklistFieldValue }>>([]);
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledChecklistTaskResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasLoadedAutosave, setHasLoadedAutosave] = useState(false);
@@ -80,6 +83,21 @@ export default function InspectionWizard() {
         const checklistData = await ApiClient.getChecklist(foundApparatus.id);
         setChecklist(checklistData);
         setCompartments(checklistData.compartments);
+        setFieldValues(checklistData.fields.map((field) => ({
+          id: field.id,
+          value: field.id === checklistData.inspection_date_field_id
+            ? checklistData.inspection_date ?? ''
+            : field.inputType === 'checkbox'
+              ? false
+              : field.inputType === 'number' || field.inputType === 'percentage'
+                ? null
+                : '',
+        })));
+        setScheduledTasks(checklistData.due_tasks.map((task) => ({
+          id: task.id,
+          status: 'Present',
+          notes: null,
+        })));
 
         const queuedSubmission = await getQueuedSubmissionForApparatusAndChecklistVersion(
           foundApparatus.id,
@@ -101,9 +119,21 @@ export default function InspectionWizard() {
                 setMeterData(saved.meter);
               }
               setCompartments(saved.compartments);
-              // Resume at meter step if officer info exists
+              if (checklistData.schema_version === 2) {
+                if (saved.fieldValues) {
+                  setFieldValues(saved.fieldValues);
+                }
+                if (saved.scheduledTasks) {
+                  setScheduledTasks(saved.scheduledTasks);
+                }
+              }
+              // Resume at the first incomplete current-contract step if officer info exists.
               if (saved.officer.name) {
-                setCurrentStep(saved.compartments.some(c => c.items.some(i => i.status !== 'Present')) ? 'compartments' : 'meter');
+                setCurrentStep(saved.compartments.some(c => c.items.some(i => i.status !== 'Present'))
+                  ? 'compartments'
+                  : checklistData.schema_version === 2
+                    ? 'details'
+                    : 'meter');
               }
               setHasLoadedAutosave(true);
             } else {
@@ -123,24 +153,35 @@ export default function InspectionWizard() {
 
   // Autosave progress
   useEffect(() => {
-    if (slug && apparatus && checklist && (currentStep === 'meter' || currentStep === 'compartments' || currentStep === 'submit')) {
+    if (slug && apparatus && checklist && (currentStep === 'meter' || currentStep === 'details' || currentStep === 'compartments' || currentStep === 'submit')) {
       const saveData = {
         checklist_version: checklist.checklist_version,
         officer: officerInfo,
         meter: meterData,
         compartments,
+        fieldValues,
+        scheduledTasks,
       };
       saveInspectionProgress(slug, saveData);
     }
-  }, [officerInfo, meterData, compartments, currentStep, slug, apparatus, checklist]);
+  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist]);
 
   const handleOfficerSubmit = (info: OfficerInfo) => {
     setOfficerInfo(info);
-    setCurrentStep('meter');
+    setCurrentStep(checklist?.schema_version === 2 ? 'details' : 'meter');
   };
 
   const handleMeterSubmit = (data: MeterData) => {
     setMeterData(data);
+    setCurrentStep('compartments');
+  };
+
+  const handleChecklistDetailsSubmit = (
+    updatedFieldValues: Array<{ id: string; value: ChecklistFieldValue }>,
+    updatedScheduledTasks: ScheduledChecklistTaskResult[],
+  ) => {
+    setFieldValues(updatedFieldValues);
+    setScheduledTasks(updatedScheduledTasks);
     setCurrentStep('compartments');
   };
 
@@ -165,6 +206,10 @@ export default function InspectionWizard() {
               status: item.status,
               notes: item.notes,
               photo: item.photo,
+              ...(checklist.schema_version === 2 ? {
+                compartment_id: compartment.id,
+                item_id: item.id,
+              } : {}),
             });
           }
         });
@@ -191,6 +236,10 @@ export default function InspectionWizard() {
           })),
         })),
         defects,
+        ...(checklist.schema_version === 2 ? {
+          field_values: fieldValues,
+          scheduled_tasks: scheduledTasks,
+        } : {}),
         officer_signature: signature,
       };
       clientSubmissionIdRef.current = submission.client_submission_id;
@@ -246,8 +295,10 @@ export default function InspectionWizard() {
   const goBack = () => {
     if (currentStep === 'meter') {
       setCurrentStep('officer');
+    } else if (currentStep === 'details') {
+      setCurrentStep('officer');
     } else if (currentStep === 'compartments') {
-      setCurrentStep('meter');
+      setCurrentStep(checklist?.schema_version === 2 ? 'details' : 'meter');
     } else if (currentStep === 'submit') {
       setCurrentStep('compartments');
     }
@@ -314,21 +365,24 @@ export default function InspectionWizard() {
     );
   }
 
-  // Get step number for progress indicator
-  const getStepNumber = () => {
-    switch (currentStep) {
-      case 'officer': return 1;
-      case 'meter': return 2;
-      case 'compartments': return 3;
-      case 'submit': return 4;
-      default: return 1;
-    }
-  };
+  const isV2Checklist = checklist.schema_version === 2;
+  const progressSteps: Array<{ step: Step; label: string }> = isV2Checklist
+    ? [
+        { step: 'officer', label: 'Officer' },
+        { step: 'details', label: 'Details' },
+        { step: 'compartments', label: 'Check' },
+        { step: 'submit', label: 'Submit' },
+      ]
+    : [
+        { step: 'officer', label: 'Officer' },
+        { step: 'meter', label: 'Meters' },
+        { step: 'compartments', label: 'Check' },
+        { step: 'submit', label: 'Submit' },
+      ];
 
   const isStepCompleted = (step: Step) => {
-    const order: Step[] = ['officer', 'meter', 'compartments', 'submit'];
-    const currentIndex = order.indexOf(currentStep);
-    const stepIndex = order.indexOf(step);
+    const currentIndex = progressSteps.findIndex((entry) => entry.step === currentStep);
+    const stepIndex = progressSteps.findIndex((entry) => entry.step === step);
     return stepIndex < currentIndex;
   };
 
@@ -402,54 +456,28 @@ export default function InspectionWizard() {
         </p>
       )}
 
-      {/* Progress indicator — 4 steps */}
+      {/* Progress indicator */}
       <div className="mb-8">
         <div className="flex items-center justify-center space-x-2 md:space-x-4">
-          {/* Step 1: Officer Info */}
-          <div className={`flex items-center ${currentStep === 'officer' ? 'text-red-600' : 'text-neutral-400'}`}>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-              currentStep === 'officer' ? 'bg-red-600 text-white shadow-md' : 
-              isStepCompleted('officer') ? 'bg-teal-500 text-white' : 'bg-neutral-200'
-            }`}>
-              {isStepCompleted('officer') ? '✓' : '1'}
-            </div>
-            <span className="ml-2 text-sm font-medium hidden md:inline">Officer</span>
-          </div>
-          <div className={`w-6 md:w-10 h-0.5 ${isStepCompleted('officer') || currentStep === 'meter' ? 'bg-red-600' : 'bg-neutral-200'}`} />
-          
-          {/* Step 2: Meter */}
-          <div className={`flex items-center ${currentStep === 'meter' ? 'text-red-600' : 'text-neutral-400'}`}>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-              currentStep === 'meter' ? 'bg-red-600 text-white shadow-md' :
-              isStepCompleted('meter') ? 'bg-teal-500 text-white' : 'bg-neutral-200'
-            }`}>
-              {isStepCompleted('meter') ? '✓' : '2'}
-            </div>
-            <span className="ml-2 text-sm font-medium hidden md:inline">Meters</span>
-          </div>
-          <div className={`w-6 md:w-10 h-0.5 ${isStepCompleted('meter') || currentStep === 'compartments' ? 'bg-red-600' : 'bg-neutral-200'}`} />
-          
-          {/* Step 3: Compartments */}
-          <div className={`flex items-center ${currentStep === 'compartments' ? 'text-red-600' : 'text-neutral-400'}`}>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-              currentStep === 'compartments' ? 'bg-red-600 text-white shadow-md' :
-              isStepCompleted('compartments') ? 'bg-teal-500 text-white' : 'bg-neutral-200'
-            }`}>
-              {isStepCompleted('compartments') ? '✓' : '3'}
-            </div>
-            <span className="ml-2 text-sm font-medium hidden md:inline">Check</span>
-          </div>
-          <div className={`w-6 md:w-10 h-0.5 ${isStepCompleted('compartments') || currentStep === 'submit' ? 'bg-red-600' : 'bg-neutral-200'}`} />
-          
-          {/* Step 4: Submit */}
-          <div className={`flex items-center ${currentStep === 'submit' ? 'text-red-600' : 'text-neutral-400'}`}>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-              currentStep === 'submit' ? 'bg-red-600 text-white shadow-md' : 'bg-neutral-200'
-            }`}>
-              4
-            </div>
-            <span className="ml-2 text-sm font-medium hidden md:inline">Submit</span>
-          </div>
+          {progressSteps.map(({ step, label }, index) => (
+            <Fragment key={step}>
+              <div className={`flex items-center ${currentStep === step ? 'text-red-600' : 'text-neutral-400'}`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold ${
+                  currentStep === step ? 'bg-red-600 text-white shadow-md'
+                    : isStepCompleted(step) ? 'bg-teal-500 text-white'
+                      : 'bg-neutral-200'
+                }`}>
+                  {isStepCompleted(step) ? '✓' : index + 1}
+                </div>
+                <span className="ml-2 hidden text-sm font-medium md:inline">{label}</span>
+              </div>
+              {index < progressSteps.length - 1 && (
+                <div className={`h-0.5 w-6 md:w-10 ${
+                  isStepCompleted(step) || currentStep === progressSteps[index + 1].step ? 'bg-red-600' : 'bg-neutral-200'
+                }`} />
+              )}
+            </Fragment>
+          ))}
         </div>
       </div>
 
@@ -473,11 +501,22 @@ export default function InspectionWizard() {
         />
       )}
 
+      {currentStep === 'details' && (
+        <ChecklistFieldsStep
+          checklist={checklist}
+          initialFieldValues={fieldValues}
+          initialScheduledTasks={scheduledTasks}
+          onSubmit={handleChecklistDetailsSubmit}
+          onBack={goBack}
+        />
+      )}
+
       {currentStep === 'compartments' && (
         <CompartmentStep
           compartments={compartments}
           onSubmit={handleCompartmentsSubmit}
           onBack={goBack}
+          backLabel={isV2Checklist ? 'Back to Checklist Details' : undefined}
         />
       )}
 

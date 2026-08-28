@@ -122,6 +122,49 @@ const checklist = {
   },
 };
 
+const fireBoatApparatus = {
+  id: 106,
+  name: 'Fire Boat 6',
+  designation: 'FB6',
+  type: 'fireboat',
+  vehicle_number: 'FB6',
+  slug: 'fire-boat-6',
+  status: 'In Service',
+  daily_checkout_requirement: 'required',
+};
+
+const fireBoatChecklist = {
+  inspection_date: '2026-08-31',
+  checklist_version: 'c'.repeat(64),
+  due_tasks: [
+    { id: 'fb6-monday-fuel-tank-hold', name: 'Fuel Tank Hold', recurrence: { type: 'weekday', weekday: 'monday' } },
+  ],
+  checklist: {
+    schema_version: 2,
+    template_id: 'fire_boat_6_daily',
+    template_version: '2026-07',
+    inspectionDateFieldId: 'inspection_date',
+    fields: [
+      { id: 'inspection_date', name: 'Date', inputType: 'date', required: true },
+      { id: 'fb6-high-low-tide', name: 'High Low Tide', inputType: 'text', required: true },
+      { id: 'fb6-port-engine-hours', name: 'Port Engine Hours', inputType: 'number', required: true },
+    ],
+    recurringTasks: [
+      { id: 'fb6-monday-fuel-tank-hold', name: 'Fuel Tank Hold', recurrence: { type: 'weekday', weekday: 'monday' } },
+      { id: 'fb6-monthly-first-day', name: 'First Day of Each Month', recurrence: { type: 'monthly_day', day: 1 } },
+    ],
+    compartments: [
+      {
+        id: 'fb6-cubby',
+        name: 'Cubby',
+        items: [
+          { id: 'fb6-cubby-flashlights', name: 'Flashlights', inputType: 'checkbox', expectedQuantity: 3 },
+        ],
+      },
+    ],
+  },
+};
+
 interface QueuedInspection {
   id: string;
   apparatusId: number;
@@ -240,6 +283,48 @@ async function mockInspectionApi(
               message: 'Inspection recorded.',
               review_status: options.reviewPendingOnSubmit ? 'pending_review' : 'approved',
             },
+      });
+    }
+
+    return route.fulfill({ status: 404, json: { message: `Unmocked API route: ${path}` } });
+  });
+
+  return { submissions };
+}
+
+async function mockFireBoatInspectionApi(page: Page): Promise<InspectionApiMock> {
+  const submissions: Array<Record<string, unknown>> = [];
+
+  await page.route('**/images/mbfd_logo_new.png', (route) => route.fulfill({ path: 'public/images/mbfd_logo_new.png' }));
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+
+    if (path === '/api/public/apparatuses') {
+      return route.fulfill({ json: [fireBoatApparatus] });
+    }
+
+    if (path === '/api/public/employees/list') {
+      return route.fulfill({ json: [{ id: 41, name: 'Captain Browser', rank: 'Captain' }] });
+    }
+
+    if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/checklist`) {
+      return route.fulfill({ json: fireBoatChecklist });
+    }
+
+    if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/service-notices`) {
+      return route.fulfill({ json: { data: [] } });
+    }
+
+    if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/inspections` && request.method() === 'POST') {
+      submissions.push(request.postDataJSON() as Record<string, unknown>);
+
+      return route.fulfill({
+        status: 201,
+        json: {
+          success: true,
+          review_status: 'pending_review',
+        },
       });
     }
 
@@ -497,6 +582,52 @@ test('non-empty checklist permits a complete inspection and sends its submission
         items: [
           { id: 'portable-radio', status: 'Present' },
         ],
+      },
+    ],
+  });
+});
+
+test('Fire Boat v2 preserves typed field values and submits only server-due recurring duties', async ({ page }) => {
+  const api = await mockFireBoatInspectionApi(page);
+
+  await page.goto('/daily/apparatus/fire-boat-6');
+  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+
+  await page.getByLabel('Full Name').fill('Captain Browser');
+  await page.getByText('Captain Browser', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue to Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Checklist Details' })).toBeVisible();
+  await expect(page.getByLabel('Date')).toHaveValue('2026-08-31');
+  await page.getByLabel('High Low Tide').fill('High 10:00 / Low 16:30');
+  await page.getByLabel('Port Engine Hours').fill('45.5');
+  await expect(page.getByText('Fuel Tank Hold', { exact: true })).toBeVisible();
+  await expect(page.getByText('First Day of Each Month', { exact: true })).not.toBeVisible();
+  await page.getByRole('button', { name: 'Mark all due duties as present' }).click();
+  await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
+
+  await expect(page.getByText('Expected quantity: 3', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
+  await page.getByRole('button', { name: 'Review & Submit' }).click();
+  await drawInspectionSignature(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inspection Submitted for Review!' })).toBeVisible();
+  expect(api.submissions).toHaveLength(1);
+  expect(api.submissions[0]).toMatchObject({
+    checklist_version: fireBoatChecklist.checklist_version,
+    field_values: [
+      { id: 'inspection_date', value: '2026-08-31' },
+      { id: 'fb6-high-low-tide', value: 'High 10:00 / Low 16:30' },
+      { id: 'fb6-port-engine-hours', value: 45.5 },
+    ],
+    scheduled_tasks: [
+      { id: 'fb6-monday-fuel-tank-hold', status: 'Present' },
+    ],
+    compartments: [
+      {
+        id: 'fb6-cubby',
+        items: [{ id: 'fb6-cubby-flashlights', status: 'Present' }],
       },
     ],
   });

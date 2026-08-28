@@ -5,9 +5,10 @@ interface CompartmentStepProps {
   compartments: Compartment[];
   onSubmit: (compartments: Compartment[]) => void;
   onBack: () => void;
+  backLabel?: string;
 }
 
-export default function CompartmentStep({ compartments, onSubmit, onBack }: CompartmentStepProps) {
+export default function CompartmentStep({ compartments, onSubmit, onBack, backLabel = 'Back to Officer Info' }: CompartmentStepProps) {
   const [currentCompartmentIndex, setCurrentCompartmentIndex] = useState(0);
   const [compartmentData, setCompartmentData] = useState<Compartment[]>(compartments);
   const touchStartX = useRef<number>(0);
@@ -202,6 +203,9 @@ export default function CompartmentStep({ compartments, onSubmit, onBack }: Comp
         {currentCompartment.items.map((item) => (
           <div key={item.id} className="border border-gray-200 rounded-lg p-4">
             <h3 className="text-lg font-medium text-gray-900 mb-4">{item.name}</h3>
+            {item.expectedQuantity !== undefined && (
+              <p className="-mt-3 mb-4 text-sm font-medium text-neutral-600">Expected quantity: {item.expectedQuantity}</p>
+            )}
             
             {/* Large Status Buttons */}
             <div className="flex gap-2 mb-4" role="group" aria-label={`Status for ${item.name}`}>
@@ -272,7 +276,7 @@ export default function CompartmentStep({ compartments, onSubmit, onBack }: Comp
           className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 touch-manipulation"
           style={{ minWidth: 44, minHeight: 44 }}
         >
-          {currentCompartmentIndex === 0 ? 'Back to Officer Info' : 'Previous Compartment'}
+          {currentCompartmentIndex === 0 ? backLabel : 'Previous Compartment'}
         </button>
 
         <button
