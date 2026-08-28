@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+for variable in WWWUSER WWWGROUP; do
+    value="${!variable:-}"
+
+    if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+        echo "$variable must be a numeric UID or GID." >&2
+        exit 1
+    fi
+done
+
+if [ "$(getent group sail | cut -d: -f3)" != "$WWWGROUP" ]; then
+    groupmod -o -g "$WWWGROUP" sail
+fi
+
+if [ "$(id -u sail)" != "$WWWUSER" ]; then
+    usermod -o -u "$WWWUSER" -g sail sail
+fi
+
+# These paths live in the image writable layer. The separately mounted storage
+# directory is validated by the deployment preflight instead of being chowned
+# at container startup.
+chown -R sail:sail /var/www/html/bootstrap/cache /var/www/html/public
+
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
