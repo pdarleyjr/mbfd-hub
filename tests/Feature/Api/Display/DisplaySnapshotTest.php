@@ -7,6 +7,7 @@ namespace Tests\Feature\Api\Display;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
+use App\Models\DailyCheckoutLedgerCutover;
 use App\Models\Station;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -48,6 +49,7 @@ class DisplaySnapshotTest extends TestCase
             'status' => 'In Service',
             'daily_checkout_requirement' => 'required',
         ]);
+        $this->activateCutover($apparatus);
 
         ApparatusInspection::create([
             'client_submission_id' => (string) Str::uuid(),
@@ -224,5 +226,24 @@ class DisplaySnapshotTest extends TestCase
         $this->assertSame(1, $submissions['daily_checkout']['completed']);
         $this->assertSame(1, $submissions['daily_checkout']['attention']);
         $this->assertSame(1, $submissions['daily_checkout']['required_total']);
+    }
+
+    private function activateCutover(Apparatus $apparatus): void
+    {
+        $snapshot = [[
+            'id' => (int) $apparatus->id,
+            'status' => $apparatus->status,
+        ]];
+        $encodedSnapshot = json_encode($snapshot, JSON_THROW_ON_ERROR);
+
+        DailyCheckoutLedgerCutover::query()->create([
+            'ledger' => DailyCheckoutLedgerCutover::LEDGER,
+            'release_sha' => str_repeat('b', 40),
+            'source' => DailyCheckoutLedgerCutover::SOURCE,
+            'activated_at' => now()->subDay(),
+            'apparatus_status_snapshot' => $snapshot,
+            'snapshot_sha256' => hash('sha256', $encodedSnapshot),
+            'apparatus_count' => 1,
+        ]);
     }
 }

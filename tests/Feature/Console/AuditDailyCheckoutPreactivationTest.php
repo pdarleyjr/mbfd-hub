@@ -572,6 +572,130 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
         $this->assertContains('post_return_checkout_checklist_version_mismatch', $row['issues']);
     }
 
+    public function test_it_treats_zero_legacy_transition_evidence_as_history_unavailable_not_ambiguous(): void
+    {
+        $apparatus = $this->makeApparatus();
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $this->makeInspection($apparatus, CarbonImmutable::parse('2026-08-26T11:00:00Z'), (string) $resolution['checklist_version']);
+
+        $manifest = $this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+            preLedgerReview: [
+                'state' => 'history_unavailable',
+                'return_to_service_at_utc' => null,
+                'evidence_reference' => 'legacy-status-transition-count:0',
+            ],
+        );
+
+        [$status, $report] = $this->preactivate($this->writeManifest($manifest));
+
+        $this->assertSame(Command::SUCCESS, $status);
+        $this->assertSame([], $report['technical_issues']);
+        $row = $report['apparatus'][0];
+        $this->assertSame('history_unavailable', $row['oos_ledger']['pre_ledger_review']['state']);
+        $this->assertNull($row['oos_ledger']['return_to_service']);
+        $this->assertSame('not_checked', $row['canonical_daily']['state']);
+        $this->assertFalse($row['canonical_daily']['included_in_completed']);
+        $this->assertFalse(in_array('historical_oos_return_ambiguous', $row['technical_issues'], true));
+
+        $this->makeInspection($apparatus, CarbonImmutable::parse('2026-08-26T14:00:00Z'), (string) $resolution['checklist_version']);
+        [$postCutoverStatus, $postCutoverReport] = $this->preactivate($this->writeManifest($manifest));
+
+        $this->assertSame(Command::SUCCESS, $postCutoverStatus);
+        $this->assertSame('checked', $postCutoverReport['apparatus'][0]['canonical_daily']['state']);
+        $this->assertTrue($postCutoverReport['apparatus'][0]['canonical_daily']['cutover_checkout_verified']);
+    }
+
+    public function test_it_requires_a_matching_persisted_cutover_boundary_without_mutating_the_candidate(): void
+    {
+        $apparatus = $this->makeApparatus(activateCutover: false);
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $manifest = $this->writeManifest($this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+        ));
+
+        [$missingStatus, $missingReport] = $this->preactivate($manifest);
+
+        $this->assertSame(Command::FAILURE, $missingStatus);
+        $this->assertContains('daily_checkout_ledger_cutover_missing', $missingReport['technical_issues']);
+        $this->assertTrue($missingReport['read_only']);
+
+        $this->activateCutover(
+            $apparatus,
+            CarbonImmutable::parse('2026-08-26T12:00:00Z'),
+            str_repeat('b', 40),
+        );
+        [$mismatchStatus, $mismatchReport] = $this->preactivate($manifest);
+
+        $this->assertSame(Command::FAILURE, $mismatchStatus);
+        $this->assertContains('daily_checkout_ledger_cutover_candidate_sha_mismatch', $mismatchReport['technical_issues']);
+    }
+
+    public function test_it_fails_closed_when_a_persisted_cutover_snapshot_is_malformed(): void
+    {
+        $apparatus = $this->makeApparatus(activateCutover: false);
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $manifest = $this->writeManifest($this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+        ));
+        $this->activateCutover(
+            $apparatus,
+            CarbonImmutable::parse('2026-08-26T12:00:00Z'),
+            snapshot: [['id' => (int) $apparatus->id]],
+        );
+
+        [$status, $report] = $this->preactivate($manifest);
+
+        $this->assertSame(Command::FAILURE, $status);
+        $this->assertContains('daily_checkout_ledger_cutover_snapshot_invalid', $report['technical_issues']);
+    }
+
+    public function test_it_requires_evidence_for_an_actual_unresolved_historical_chronology_and_keeps_it_blocking(): void
+    {
+        $apparatus = $this->makeApparatus();
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+
+        $missingEvidenceManifest = $this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+            preLedgerReview: [
+                'state' => 'unresolved',
+                'return_to_service_at_utc' => null,
+                'evidence_reference' => null,
+            ],
+        );
+        [$missingEvidenceStatus, $missingEvidenceReport] = $this->preactivate($this->writeManifest($missingEvidenceManifest));
+
+        $this->assertSame(Command::FAILURE, $missingEvidenceStatus);
+        $this->assertContains('policy_manifest_pre_ledger_oos_evidence_missing', $missingEvidenceReport['issues']);
+
+        $ambiguousManifest = $this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+            preLedgerReview: [
+                'state' => 'unresolved',
+                'return_to_service_at_utc' => null,
+                'evidence_reference' => 'legacy-dispatch-conflict:record-42',
+            ],
+        );
+        [$ambiguousStatus, $ambiguousReport] = $this->preactivate(
+            $this->writeManifest($ambiguousManifest),
+            allowClassificationRequired: true,
+        );
+
+        $this->assertSame(Command::FAILURE, $ambiguousStatus);
+        $this->assertContains('historical_oos_return_ambiguous', $ambiguousReport['technical_issues']);
+        $this->assertContains('historical_oos_return_ambiguous', $ambiguousReport['apparatus'][0]['issues']);
+    }
+
     public function test_it_does_not_treat_a_submission_without_a_payload_hash_as_post_return_evidence(): void
     {
         $apparatus = $this->makeApparatus();
@@ -625,8 +749,40 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
         $this->assertContains('operational_status_ambiguous', $row['issues']);
     }
 
+    public function test_it_includes_a_return_recorded_in_the_cutover_storage_second(): void
+    {
+        $apparatus = $this->makeApparatus(['status' => 'Out of Service']);
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $cutoverAt = CarbonImmutable::parse('2026-08-26T12:00:00Z');
+        Apparatus::on(self::CONNECTION)
+            ->whereKey($apparatus->id)
+            ->update(['status' => 'In Service']);
+        ApparatusOperationalStatusEvent::on(self::CONNECTION)->create([
+            'apparatus_id' => $apparatus->id,
+            'previous_status' => 'Out of Service',
+            'status' => 'In Service',
+            'changed_at' => $cutoverAt,
+        ]);
+        $this->makeInspection(
+            $apparatus,
+            CarbonImmutable::parse('2026-08-26T13:00:00Z'),
+            (string) $resolution['checklist_version'],
+        );
+
+        [$status, $report] = $this->preactivate($this->writeManifest($this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+        )));
+
+        $this->assertSame(Command::SUCCESS, $status);
+        $return = $report['apparatus'][0]['oos_ledger']['return_to_service'];
+        $this->assertSame('operational_status_ledger', $return['source']);
+        $this->assertSame($cutoverAt->toIso8601String(), $return['at_utc']);
+    }
+
     /** @param array<string, mixed> $overrides */
-    private function makeApparatus(array $overrides = []): Apparatus
+    private function makeApparatus(array $overrides = [], bool $activateCutover = true): Apparatus
     {
         $station = Station::on(self::CONNECTION)->create([
             'station_number' => 1,
@@ -635,7 +791,7 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
             'is_active' => true,
         ]);
 
-        return Apparatus::withoutEvents(fn (): Apparatus => Apparatus::on(self::CONNECTION)->create(array_merge([
+        $apparatus = Apparatus::withoutEvents(fn (): Apparatus => Apparatus::on(self::CONNECTION)->create(array_merge([
             'station_id' => $station->id,
             'unit_id' => 'E1',
             'name' => 'Engine 1',
@@ -650,6 +806,11 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
             'daily_checkout_requirement' => 'required',
             'daily_checkout_template' => 'engine',
         ], $overrides)));
+        if ($activateCutover) {
+            $this->activateCutover($apparatus, CarbonImmutable::parse('2026-08-26T12:00:00Z'));
+        }
+
+        return $apparatus;
     }
 
     /**
@@ -740,6 +901,32 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
     private function freshApparatus(Apparatus $apparatus): Apparatus
     {
         return Apparatus::on(self::CONNECTION)->findOrFail($apparatus->id);
+    }
+
+    /** @param list<array{id: int, status?: string|null}>|null $snapshot */
+    private function activateCutover(
+        Apparatus $apparatus,
+        CarbonImmutable $activatedAt,
+        string $releaseSha = self::CANDIDATE_SHA,
+        ?array $snapshot = null,
+    ): void {
+        $snapshot ??= [[
+            'id' => $apparatus->id,
+            'status' => $apparatus->status,
+        ]];
+        $encodedSnapshot = json_encode($snapshot, JSON_THROW_ON_ERROR);
+
+        DB::connection(self::CONNECTION)->table('daily_checkout_ledger_cutovers')->insert([
+            'ledger' => 'daily_checkout',
+            'release_sha' => $releaseSha,
+            'source' => 'owner_beta_activation',
+            'activated_at' => $activatedAt,
+            'apparatus_status_snapshot' => $encodedSnapshot,
+            'snapshot_sha256' => hash('sha256', $encodedSnapshot),
+            'apparatus_count' => count($snapshot),
+            'created_at' => $activatedAt,
+            'updated_at' => $activatedAt,
+        ]);
     }
 
     private function makeInspection(

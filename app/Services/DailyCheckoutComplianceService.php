@@ -8,10 +8,12 @@ use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusOperationalStatusEvent;
+use App\Models\DailyCheckoutLedgerCutover;
 use App\Models\Station;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Resolves Daily Checkout compliance from the explicit apparatus policy and
@@ -35,6 +37,7 @@ final class DailyCheckoutComplianceService
     ): array {
         [$startOfDay, $startOfNextDay] = $this->localDayWindow($now);
         $evidenceAsOf = $evidenceAsOf?->utc();
+        $cutoverSignal = $this->cutoverSignal($connection);
 
         return $this->summary(
             $apparatuses,
@@ -47,7 +50,15 @@ final class DailyCheckoutComplianceService
                 $requireSubmissionPayloadHash,
             ),
             $this->unresolvedCriticalDefectApparatusIds($apparatuses, $connection),
-            $this->statusTransitionSignals($apparatuses, $startOfDay, $startOfNextDay, $connection, $evidenceAsOf),
+            $this->statusTransitionSignals(
+                $apparatuses,
+                $startOfDay,
+                $startOfNextDay,
+                $connection,
+                $evidenceAsOf,
+                $cutoverSignal['activated_at'],
+            ),
+            $cutoverSignal,
         );
     }
 
@@ -70,15 +81,24 @@ final class DailyCheckoutComplianceService
         });
         /** @var Collection<int, Apparatus> $allApparatuses */
         $allApparatuses = $apparatusByStation->flatten(1);
+        $cutoverSignal = $this->cutoverSignal();
         $inspectionSignals = $this->inspectionSignals($allApparatuses, $startOfDay, $startOfNextDay);
         $criticalDefectApparatusIds = $this->unresolvedCriticalDefectApparatusIds($allApparatuses);
-        $statusTransitionSignals = $this->statusTransitionSignals($allApparatuses, $startOfDay, $startOfNextDay);
+        $statusTransitionSignals = $this->statusTransitionSignals(
+            $allApparatuses,
+            $startOfDay,
+            $startOfNextDay,
+            null,
+            null,
+            $cutoverSignal['activated_at'],
+        );
 
         return $apparatusByStation
             ->map(function (Collection $stationApparatuses) use (
                 $inspectionSignals,
                 $criticalDefectApparatusIds,
                 $statusTransitionSignals,
+                $cutoverSignal,
             ): array {
                 /** @var Collection<int, Apparatus> $stationApparatuses */
                 return $this->summary(
@@ -86,6 +106,7 @@ final class DailyCheckoutComplianceService
                     $inspectionSignals,
                     $criticalDefectApparatusIds,
                     $statusTransitionSignals,
+                    $cutoverSignal,
                 );
             })
             ->all();
@@ -102,6 +123,7 @@ final class DailyCheckoutComplianceService
      * @param  array<int, array{latest_approved_completed_at: ?CarbonImmutable, has_pending_submission: bool}>  $inspectionSignals
      * @param  list<int>  $criticalDefectApparatusIds
      * @param  array<int, array{return_checkout_required: bool, return_checkout_cutoff: ?CarbonImmutable}>  $statusTransitionSignals
+     * @param  array{activated_at: ?CarbonImmutable, release_sha: ?string, source: ?string}  $cutoverSignal
      * @return array<string, mixed>
      */
     private function summary(
@@ -109,6 +131,7 @@ final class DailyCheckoutComplianceService
         array $inspectionSignals,
         array $criticalDefectApparatusIds,
         array $statusTransitionSignals,
+        array $cutoverSignal,
     ): array {
         $requiredTotal = 0;
         $checked = 0;
@@ -127,6 +150,8 @@ final class DailyCheckoutComplianceService
         $returnCheckoutRequired = 0;
         $matrix = [];
         $criticalDefectLookup = array_fill_keys($criticalDefectApparatusIds, true);
+        $cutoverActivatedAt = $cutoverSignal['activated_at'];
+        $cutoverActivationPending = $cutoverActivatedAt === null;
 
         foreach ($apparatuses->unique(fn (Apparatus $apparatus): int => (int) $apparatus->id) as $apparatus) {
             $apparatusId = (int) $apparatus->id;
@@ -179,6 +204,10 @@ final class DailyCheckoutComplianceService
                     hasPendingSubmission: $signal['has_pending_submission'],
                     returnCheckoutRequired: false,
                     returnCheckoutVerified: false,
+                    cutoverCheckoutRequired: false,
+                    cutoverCheckoutVerified: false,
+                    cutoverActivationPending: $cutoverActivationPending,
+                    cutoverActivatedAt: $cutoverActivatedAt,
                 );
 
                 continue;
@@ -196,6 +225,10 @@ final class DailyCheckoutComplianceService
                     hasPendingSubmission: $signal['has_pending_submission'],
                     returnCheckoutRequired: false,
                     returnCheckoutVerified: false,
+                    cutoverCheckoutRequired: false,
+                    cutoverCheckoutVerified: false,
+                    cutoverActivationPending: $cutoverActivationPending,
+                    cutoverActivatedAt: $cutoverActivatedAt,
                 );
 
                 continue;
@@ -218,6 +251,10 @@ final class DailyCheckoutComplianceService
                     hasPendingSubmission: $signal['has_pending_submission'],
                     returnCheckoutRequired: false,
                     returnCheckoutVerified: false,
+                    cutoverCheckoutRequired: false,
+                    cutoverCheckoutVerified: false,
+                    cutoverActivationPending: $cutoverActivationPending,
+                    cutoverActivatedAt: $cutoverActivatedAt,
                 );
 
                 continue;
@@ -229,7 +266,12 @@ final class DailyCheckoutComplianceService
                 $returnCheckoutRequired++;
             }
             $latestApprovedAt = $signal['latest_approved_completed_at'];
+            $cutoverCheckoutRequired = true;
+            $cutoverCheckoutVerified = $cutoverActivatedAt !== null
+                && $latestApprovedAt !== null
+                && $latestApprovedAt->greaterThan($cutoverActivatedAt);
             $hasQualifyingApprovedCheckout = $latestApprovedAt !== null
+                && $cutoverCheckoutVerified
                 && (! $checkoutRequiredAfterReturn
                     || $latestApprovedAt->greaterThan($returnSignal['return_checkout_cutoff']));
             $returnCheckoutVerified = $checkoutRequiredAfterReturn && $hasQualifyingApprovedCheckout;
@@ -247,6 +289,10 @@ final class DailyCheckoutComplianceService
                     hasPendingSubmission: $signal['has_pending_submission'],
                     returnCheckoutRequired: $checkoutRequiredAfterReturn,
                     returnCheckoutVerified: $returnCheckoutVerified,
+                    cutoverCheckoutRequired: $cutoverCheckoutRequired,
+                    cutoverCheckoutVerified: $cutoverCheckoutVerified,
+                    cutoverActivationPending: $cutoverActivationPending,
+                    cutoverActivatedAt: $cutoverActivatedAt,
                 );
 
                 continue;
@@ -265,6 +311,10 @@ final class DailyCheckoutComplianceService
                     hasPendingSubmission: $signal['has_pending_submission'],
                     returnCheckoutRequired: $checkoutRequiredAfterReturn,
                     returnCheckoutVerified: $returnCheckoutVerified,
+                    cutoverCheckoutRequired: $cutoverCheckoutRequired,
+                    cutoverCheckoutVerified: $cutoverCheckoutVerified,
+                    cutoverActivationPending: $cutoverActivationPending,
+                    cutoverActivatedAt: $cutoverActivatedAt,
                 );
 
                 continue;
@@ -283,6 +333,10 @@ final class DailyCheckoutComplianceService
                     hasPendingSubmission: true,
                     returnCheckoutRequired: $checkoutRequiredAfterReturn,
                     returnCheckoutVerified: false,
+                    cutoverCheckoutRequired: $cutoverCheckoutRequired,
+                    cutoverCheckoutVerified: false,
+                    cutoverActivationPending: $cutoverActivationPending,
+                    cutoverActivatedAt: $cutoverActivatedAt,
                 );
 
                 continue;
@@ -300,6 +354,10 @@ final class DailyCheckoutComplianceService
                 hasPendingSubmission: false,
                 returnCheckoutRequired: $checkoutRequiredAfterReturn,
                 returnCheckoutVerified: false,
+                cutoverCheckoutRequired: $cutoverCheckoutRequired,
+                cutoverCheckoutVerified: false,
+                cutoverActivationPending: $cutoverActivationPending,
+                cutoverActivatedAt: $cutoverActivatedAt,
             );
         }
 
@@ -324,6 +382,8 @@ final class DailyCheckoutComplianceService
             'completion_available' => $completionAvailable,
             'pending_submission_count' => $pendingSubmissionCount,
             'return_checkout_required_count' => $returnCheckoutRequired,
+            'cutover_active' => ! $cutoverActivationPending,
+            'cutover_activated_at_utc' => $cutoverActivatedAt?->toIso8601String(),
             'matrix' => $matrix,
 
             // Temporary compatibility aliases. These deliberately keep the
@@ -423,9 +483,10 @@ final class DailyCheckoutComplianceService
         CarbonImmutable $startOfNextDay,
         ?string $connection = null,
         ?CarbonImmutable $evidenceAsOf = null,
+        ?CarbonImmutable $cutoverActivatedAt = null,
     ): array {
         $apparatusIds = $this->apparatusIds($apparatuses);
-        if ($apparatusIds === []) {
+        if ($apparatusIds === [] || $cutoverActivatedAt === null) {
             return [];
         }
 
@@ -439,6 +500,10 @@ final class DailyCheckoutComplianceService
         } else {
             $eventQuery->where('changed_at', '<=', $evidenceAsOf);
         }
+        // The database stores these timestamps at second precision. Treat an
+        // event sharing the cutover second as ledger-authoritative rather
+        // than silently crediting readiness through an unknowable ordering.
+        $eventQuery->where('changed_at', '>=', $cutoverActivatedAt);
         $eventsByApparatus = $eventQuery
             ->get(['id', 'apparatus_id', 'previous_status', 'status', 'changed_at'])
             ->groupBy('apparatus_id');
@@ -518,7 +583,7 @@ final class DailyCheckoutComplianceService
     }
 
     /**
-     * @return array{apparatus_id: int, state: string, daily_checkout_requirement: string, out_of_service: bool, classification_required: bool, included_in_required_total: bool, included_in_completed: bool, has_pending_submission: bool, return_checkout_required: bool, return_checkout_verified: bool}
+     * @return array{apparatus_id: int, state: string, daily_checkout_requirement: string, out_of_service: bool, classification_required: bool, included_in_required_total: bool, included_in_completed: bool, has_pending_submission: bool, return_checkout_required: bool, return_checkout_verified: bool, cutover_checkout_required: bool, cutover_checkout_verified: bool, cutover_activation_pending: bool, cutover_activated_at_utc: string|null}
      */
     private function matrixRow(
         int $apparatusId,
@@ -531,6 +596,10 @@ final class DailyCheckoutComplianceService
         bool $hasPendingSubmission,
         bool $returnCheckoutRequired,
         bool $returnCheckoutVerified,
+        bool $cutoverCheckoutRequired,
+        bool $cutoverCheckoutVerified,
+        bool $cutoverActivationPending,
+        ?CarbonImmutable $cutoverActivatedAt,
     ): array {
         return [
             'apparatus_id' => $apparatusId,
@@ -543,7 +612,130 @@ final class DailyCheckoutComplianceService
             'has_pending_submission' => $hasPendingSubmission,
             'return_checkout_required' => $returnCheckoutRequired,
             'return_checkout_verified' => $returnCheckoutVerified,
+            'cutover_checkout_required' => $cutoverCheckoutRequired,
+            'cutover_checkout_verified' => $cutoverCheckoutVerified,
+            'cutover_activation_pending' => $cutoverActivationPending,
+            'cutover_activated_at_utc' => $cutoverActivatedAt?->toIso8601String(),
         ];
+    }
+
+    /** @return array{activated_at: ?CarbonImmutable, release_sha: ?string, source: ?string} */
+    private function cutoverSignal(?string $connection = null): array
+    {
+        $databaseConnection = $connection ?? (string) config('database.default');
+        if (! Schema::connection($databaseConnection)->hasTable('daily_checkout_ledger_cutovers')) {
+            return $this->inactiveCutoverSignal();
+        }
+
+        $cutover = ($connection === null ? DailyCheckoutLedgerCutover::query() : DailyCheckoutLedgerCutover::on($connection))
+            ->where('ledger', DailyCheckoutLedgerCutover::LEDGER)
+            ->first();
+        if (! $cutover instanceof DailyCheckoutLedgerCutover) {
+            return $this->inactiveCutoverSignal();
+        }
+
+        $cutoverData = $this->cutoverData($cutover);
+        if ($cutoverData === null) {
+            return $this->inactiveCutoverSignal();
+        }
+
+        return [
+            'activated_at' => $cutoverData['activated_at']->utc(),
+            'release_sha' => $cutoverData['release_sha'],
+            'source' => $cutoverData['source'],
+        ];
+    }
+
+    /** @return array{activated_at: null, release_sha: null, source: null} */
+    private function inactiveCutoverSignal(): array
+    {
+        return [
+            'activated_at' => null,
+            'release_sha' => null,
+            'source' => null,
+        ];
+    }
+
+    /**
+     * @return array{activated_at: CarbonImmutable, release_sha: string, source: string}|null
+     */
+    private function cutoverData(DailyCheckoutLedgerCutover $cutover): ?array
+    {
+        $ledger = $cutover->getAttribute('ledger');
+        $releaseSha = $cutover->getAttribute('release_sha');
+        $source = $cutover->getAttribute('source');
+        $activatedAt = $this->asImmutable($cutover->getAttribute('activated_at'));
+        $snapshot = $this->snapshotData($cutover->getAttribute('apparatus_status_snapshot'));
+        $snapshotSha256 = $cutover->getAttribute('snapshot_sha256');
+        $apparatusCount = $cutover->getAttribute('apparatus_count');
+        if (
+            $activatedAt === null
+            || $ledger !== DailyCheckoutLedgerCutover::LEDGER
+            || ! is_string($releaseSha)
+            || preg_match('/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i', $releaseSha) !== 1
+            || $source !== DailyCheckoutLedgerCutover::SOURCE
+            || $snapshot === null
+            || ! is_string($snapshotSha256)
+            || preg_match('/^[a-f0-9]{64}$/i', $snapshotSha256) !== 1
+            || ! is_int($apparatusCount)
+            || $apparatusCount !== count($snapshot)
+        ) {
+            return null;
+        }
+
+        try {
+            $encodedSnapshot = json_encode($snapshot, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        if (! hash_equals($snapshotSha256, hash('sha256', $encodedSnapshot))) {
+            return null;
+        }
+
+        return [
+            'activated_at' => $activatedAt,
+            'release_sha' => $releaseSha,
+            'source' => $source,
+        ];
+    }
+
+    /** @return list<array{id: int, status: string|null}>|null */
+    private function snapshotData(mixed $snapshot): ?array
+    {
+        if (! is_array($snapshot) || ! array_is_list($snapshot)) {
+            return null;
+        }
+
+        $normalized = [];
+        $previousId = 0;
+        foreach ($snapshot as $row) {
+            if (
+                ! is_array($row)
+                || ! array_key_exists('id', $row)
+                || ! array_key_exists('status', $row)
+            ) {
+                return null;
+            }
+
+            $id = $row['id'];
+            $status = $row['status'];
+            if (
+                ! is_int($id)
+                || $id <= $previousId
+                || (! is_string($status) && $status !== null)
+            ) {
+                return null;
+            }
+
+            $normalized[] = [
+                'id' => $id,
+                'status' => $status,
+            ];
+            $previousId = $id;
+        }
+
+        return $normalized;
     }
 
     /** @return array{0: CarbonImmutable, 1: CarbonImmutable} */

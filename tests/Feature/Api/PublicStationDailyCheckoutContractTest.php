@@ -7,6 +7,7 @@ namespace Tests\Feature\Api;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
+use App\Models\DailyCheckoutLedgerCutover;
 use App\Models\Station;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -30,6 +31,7 @@ final class PublicStationDailyCheckoutContractTest extends TestCase
         $reviewPending = $this->apparatus($station, 'E27C');
         $notChecked = $this->apparatus($station, 'E27D');
         $outOfService = $this->apparatus($station, 'E27E', 'Out of Service');
+        $this->activateCutover([$checked, $attention, $reviewPending, $notChecked, $outOfService]);
 
         $this->inspection($checked, 'approved');
         $this->inspection($attention, 'approved');
@@ -71,6 +73,8 @@ final class PublicStationDailyCheckoutContractTest extends TestCase
         $this->assertFalse($matrix[$outOfService->id]['included_in_required_total']);
         $this->assertSame('attention', $matrix[$attention->id]['state']);
         $this->assertTrue($matrix[$attention->id]['included_in_completed']);
+        $this->assertTrue($matrix[$attention->id]['cutover_checkout_required']);
+        $this->assertTrue($matrix[$attention->id]['cutover_checkout_verified']);
         $this->assertSame('review_pending', $matrix[$reviewPending->id]['state']);
         $this->assertSame('not_checked', $matrix[$notChecked->id]['state']);
         $this->assertArrayNotHasKey('operator_name', $matrix[$checked->id]);
@@ -135,6 +139,30 @@ final class PublicStationDailyCheckoutContractTest extends TestCase
             'unit_number' => $apparatus->unit_id,
             'review_status' => $reviewStatus,
             'completed_at' => now(),
+        ]);
+    }
+
+    /** @param list<Apparatus> $apparatuses */
+    private function activateCutover(array $apparatuses): void
+    {
+        $snapshot = collect($apparatuses)
+            ->sortBy('id')
+            ->map(static fn (Apparatus $apparatus): array => [
+                'id' => (int) $apparatus->id,
+                'status' => $apparatus->status,
+            ])
+            ->values()
+            ->all();
+        $encodedSnapshot = json_encode($snapshot, JSON_THROW_ON_ERROR);
+
+        DailyCheckoutLedgerCutover::query()->create([
+            'ledger' => DailyCheckoutLedgerCutover::LEDGER,
+            'release_sha' => str_repeat('e', 40),
+            'source' => DailyCheckoutLedgerCutover::SOURCE,
+            'activated_at' => now()->subDay(),
+            'apparatus_status_snapshot' => $snapshot,
+            'snapshot_sha256' => hash('sha256', $encodedSnapshot),
+            'apparatus_count' => count($snapshot),
         ]);
     }
 }

@@ -101,6 +101,27 @@ return [
             'sslmode' => 'prefer',
         ],
 
+        // This connection is reserved for an independently restored,
+        // disposable Daily Checkout candidate snapshot. It remains disabled
+        // until both explicit authorization flags are set, and the command
+        // additionally starts every PostgreSQL audit transaction read-only.
+        'daily_checkout_preactivation' => [
+            'driver' => 'pgsql',
+            'url' => env('DAILY_CHECKOUT_PREACTIVATION_DB_URL'),
+            'host' => env('DAILY_CHECKOUT_PREACTIVATION_DB_HOST', '127.0.0.1'),
+            'port' => env('DAILY_CHECKOUT_PREACTIVATION_DB_PORT', '5432'),
+            'database' => env('DAILY_CHECKOUT_PREACTIVATION_DB_DATABASE', 'laravel'),
+            'username' => env('DAILY_CHECKOUT_PREACTIVATION_DB_USERNAME', 'root'),
+            'password' => env('DAILY_CHECKOUT_PREACTIVATION_DB_PASSWORD', ''),
+            'charset' => env('DAILY_CHECKOUT_PREACTIVATION_DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DAILY_CHECKOUT_PREACTIVATION_DB_SSLMODE', 'prefer'),
+            'daily_checkout_preactivation_candidate' => env('DAILY_CHECKOUT_PREACTIVATION_CANDIDATE', false),
+            'daily_checkout_preactivation_read_only' => env('DAILY_CHECKOUT_PREACTIVATION_READ_ONLY', false),
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

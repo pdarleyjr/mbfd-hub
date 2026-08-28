@@ -262,6 +262,10 @@ jobs:
           php artisan test
           tests/Feature/Api/DailyCheckoutIntegrityTest.php
           tests/Feature/Console/AuditDailyCheckoutReadinessTest.php
+          tests/Feature/Console/ActivateDailyCheckoutLedgerTest.php
+          tests/Feature/Console/AuditDailyCheckoutPreactivationTest.php
+          tests/Unit/Services/DailyCheckoutComplianceServiceTest.php
+          tests/Feature/Api/PublicStationDailyCheckoutContractTest.php
 
   generated-assets:
     name: Generated deployment assets

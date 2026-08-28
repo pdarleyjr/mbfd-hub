@@ -190,7 +190,7 @@ final class DailyCheckoutPreactivationManifest
             throw new RuntimeException('policy_manifest_pre_ledger_oos_review_missing');
         }
         $reviewState = $this->requiredString($review, 'state', 'policy_manifest_pre_ledger_oos_review_state_invalid');
-        if (! in_array($reviewState, ['no_same_day_return', 'returned_to_service', 'not_applicable', 'unresolved'], true)) {
+        if (! in_array($reviewState, ['no_same_day_return', 'returned_to_service', 'not_applicable', 'unresolved', 'history_unavailable'], true)) {
             throw new RuntimeException('policy_manifest_pre_ledger_oos_review_state_invalid');
         }
         $reviewReturnAt = $this->nullableString($review, 'return_to_service_at_utc');
@@ -204,7 +204,7 @@ final class DailyCheckoutPreactivationManifest
         }
 
         $evidenceReference = $this->nullableString($review, 'evidence_reference');
-        if (in_array($reviewState, ['no_same_day_return', 'returned_to_service'], true) && $evidenceReference === null) {
+        if (in_array($reviewState, ['no_same_day_return', 'returned_to_service', 'unresolved', 'history_unavailable'], true) && $evidenceReference === null) {
             throw new RuntimeException('policy_manifest_pre_ledger_oos_evidence_missing');
         }
 
