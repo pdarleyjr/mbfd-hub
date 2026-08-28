@@ -352,10 +352,53 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.8
+      - name: Run Gitleaks for push and pull request candidates
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      # gitleaks-action v2 deliberately scans all history on workflow_dispatch.
+      # The deployment caller passes github.sha^ as pint_base_sha, so scan that
+      # exact immutable candidate range directly instead. Do not add
+      # --first-parent: a merge candidate's changed commits can be reachable
+      # only through its second parent.
+      - name: Verify dispatched candidate secret-scan range
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        id: dispatched-secret-scan-range
+        env:
+          SECRET_SCAN_BASE_REV: ${{ inputs.pint_base_sha }}
+          SECRET_SCAN_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          base_sha="$(git rev-parse --verify "${SECRET_SCAN_BASE_REV}^{commit}")"
+          head_sha="$(git rev-parse --verify "${SECRET_SCAN_HEAD_SHA}^{commit}")"
+          expected_base_sha="$(git rev-parse --verify "${head_sha}^")"
+          test "$head_sha" = "$GITHUB_SHA"
+          test "$base_sha" = "$expected_base_sha"
+          git merge-base --is-ancestor "$base_sha" "$head_sha"
+          printf 'base_sha=%s\n' "$base_sha" >> "$GITHUB_OUTPUT"
+          printf 'head_sha=%s\n' "$head_sha" >> "$GITHUB_OUTPUT"
+      - name: Scan dispatched candidate range for secrets
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          SECRET_SCAN_BASE_SHA: ${{ steps.dispatched-secret-scan-range.outputs.base_sha }}
+          SECRET_SCAN_HEAD_SHA: ${{ steps.dispatched-secret-scan-range.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          test -n "$SECRET_SCAN_BASE_SHA"
+          test -n "$SECRET_SCAN_HEAD_SHA"
+          docker run --rm \
+            --network=none \
+            --read-only \
+            --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            --user "$(id -u):$(id -g)" \
+            --volume "$GITHUB_WORKSPACE:/repo:ro" \
+            --workdir /repo \
+            ghcr.io/gitleaks/gitleaks:v8.24.3@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055 \
+            git --redact --verbose --exit-code 1 \
+            --log-opts="${SECRET_SCAN_BASE_SHA}..${SECRET_SCAN_HEAD_SHA}" \
+            /repo
 
   security-filesystem:
     name: Hub filesystem and configuration security thresholds
