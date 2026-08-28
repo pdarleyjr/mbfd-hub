@@ -11,6 +11,7 @@ use App\Models\ApparatusInspection;
 use App\Models\Station;
 use App\Models\User;
 use App\Services\DailyCheckoutChecklistResolver;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
@@ -20,6 +21,13 @@ use Tests\TestCase;
 class DailyCheckoutIntegrityTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        CarbonImmutable::setTestNow();
+
+        parent::tearDown();
+    }
 
     public function test_checklist_endpoint_serves_a_non_empty_tracked_checklist(): void
     {
@@ -350,6 +358,7 @@ class DailyCheckoutIntegrityTest extends TestCase
     public function test_fire_boat_6_v2_serves_only_due_recurring_tasks_and_persists_validated_typed_values(): void
     {
         $apparatus = $this->makeFireBoat6();
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-31 09:00:00', 'America/New_York'));
 
         $this->getJson("/api/public/apparatuses/{$apparatus->id}/checklist?inspection_date=2026-08-31")
             ->assertOk()
@@ -544,18 +553,28 @@ class DailyCheckoutIntegrityTest extends TestCase
             ];
         }, $checklist['fields']);
 
-        $dueTasks = app(DailyCheckoutChecklistResolver::class)->dueTasksFor(
-            $checklist,
-            \Carbon\CarbonImmutable::parse($inspectionDate),
-        );
+        $sessionResponse = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions")
+            ->assertSuccessful();
+        $browserCookie = collect($sessionResponse->headers->getCookies())
+            ->first(static fn (\Symfony\Component\HttpFoundation\Cookie $cookie): bool => $cookie->getName() === 'daily_checkout_inspection_browser');
+        if ($browserCookie instanceof \Symfony\Component\HttpFoundation\Cookie) {
+            $this->withCredentials()->withUnencryptedCookie($browserCookie->getName(), $browserCookie->getValue());
+        }
+        $contract = $sessionResponse->json('inspection_session');
+        $this->assertIsArray($contract);
+        $this->assertSame($inspectionDate, $contract['duty_date']);
 
         return $this->submissionWithChecklist($apparatus, $clientSubmissionId, [
+            'checklist_version' => $contract['checklist_hash'],
             'field_values' => $fieldValues,
             'scheduled_tasks' => array_map(static fn (array $task): array => [
                 'id' => $task['id'],
                 'status' => 'Present',
                 'notes' => null,
-            ], $dueTasks),
+            ], $contract['due_tasks']),
+            'inspection_session_id' => $contract['id'],
+            'inspection_session_token' => $contract['token'],
+            'inspection_session_replay_key' => $contract['replay_key'],
         ]);
     }
 

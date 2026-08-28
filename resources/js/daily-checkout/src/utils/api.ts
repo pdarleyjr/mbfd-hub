@@ -74,9 +74,28 @@ export class ApiClient {
   }
 
   static async getChecklist(apparatusId: number): Promise<ChecklistData> {
-    const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/checklist`, {
-      headers: { ...DEFAULT_HEADERS },
-    });
+    return this.fetchChecklist(apparatusId, false);
+  }
+
+  static async startInspectionSession(apparatusId: number, issuanceKey: string): Promise<ChecklistData> {
+    return this.fetchChecklist(apparatusId, true, issuanceKey);
+  }
+
+  private static async fetchChecklist(
+    apparatusId: number,
+    startInspectionSession: boolean,
+    issuanceKey?: string,
+  ): Promise<ChecklistData> {
+    const response = await fetch(
+      `${API_BASE}/public/apparatuses/${apparatusId}/${startInspectionSession ? 'inspection-sessions' : 'checklist'}`,
+      {
+        ...(startInspectionSession ? {
+          method: 'POST',
+          body: JSON.stringify({ inspection_session_start_key: issuanceKey }),
+        } : {}),
+        headers: { ...DEFAULT_HEADERS },
+      },
+    );
     if (!response.ok) {
       throw new ApiRequestError(
         await responseMessage(response, 'The Daily Checkout checklist is unavailable.'),
@@ -158,6 +177,48 @@ export class ApiClient {
         })()
       : [];
 
+    const inspectionSession = schemaVersion === 2 && startInspectionSession
+      ? (() => {
+          const session = payload?.inspection_session;
+          if (
+            !session
+            || typeof session.id !== 'string'
+            || !/^[a-f0-9-]{36}$/i.test(session.id)
+            || typeof session.token !== 'string'
+            || !/^[a-f0-9]{64}$/i.test(session.token)
+            || typeof session.issued_at !== 'string'
+            || typeof session.expires_at !== 'string'
+            || typeof session.duty_date !== 'string'
+            || session.duty_date !== payload?.inspection_date
+            || typeof session.checklist_template_id !== 'string'
+            || typeof session.checklist_template_version !== 'string'
+            || !isChecklistVersion(session.checklist_hash)
+            || session.checklist_hash.toLowerCase() !== checklistVersion.toLowerCase()
+            || !isChecklistVersion(session.due_tasks_hash)
+            || typeof session.replay_key !== 'string'
+            || !/^[a-f0-9-]{36}$/i.test(session.replay_key)
+            || !Array.isArray(session.due_tasks)
+            || JSON.stringify(session.due_tasks.map(parseTask)) !== JSON.stringify(dueTasks)
+          ) {
+            return v2Unavailable();
+          }
+
+          return {
+            id: session.id,
+            token: session.token,
+            issued_at: session.issued_at,
+            expires_at: session.expires_at,
+            duty_date: session.duty_date,
+            checklist_template_id: session.checklist_template_id,
+            checklist_template_version: session.checklist_template_version,
+            checklist_hash: session.checklist_hash.toLowerCase(),
+            due_tasks: dueTasks,
+            due_tasks_hash: session.due_tasks_hash.toLowerCase(),
+            replay_key: session.replay_key,
+          };
+        })()
+      : undefined;
+
     const checklist: ChecklistData = {
       checklist_version: checklistVersion.toLowerCase(),
       schema_version: schemaVersion,
@@ -167,6 +228,7 @@ export class ApiClient {
       inspection_date_field_id: schemaVersion === 2 && typeof rawChecklist?.inspectionDateFieldId === 'string' ? rawChecklist.inspectionDateFieldId : undefined,
       fields,
       due_tasks: dueTasks,
+      inspection_session: inspectionSession,
       compartments: rawCompartments.map((compartment: any, compartmentIndex: number) => {
         if (schemaVersion === 2 && (!compartment || typeof compartment.id !== 'string' || typeof (compartment.name ?? compartment.title) !== 'string')) {
           return v2Unavailable();

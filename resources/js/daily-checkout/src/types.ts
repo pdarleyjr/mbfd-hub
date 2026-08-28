@@ -100,6 +100,20 @@ export interface ScheduledChecklistTask {
   };
 }
 
+export interface InspectionSessionContract {
+  id: string;
+  token: string;
+  issued_at: string;
+  expires_at: string;
+  duty_date: string;
+  checklist_template_id: string;
+  checklist_template_version: string;
+  checklist_hash: string;
+  due_tasks: ScheduledChecklistTask[];
+  due_tasks_hash: string;
+  replay_key: string;
+}
+
 export interface ScheduledChecklistTaskResult {
   id: string;
   status: ItemStatus;
@@ -131,6 +145,7 @@ export interface ChecklistData {
   inspection_date_field_id?: string;
   fields: ChecklistField[];
   due_tasks: ScheduledChecklistTask[];
+  inspection_session?: InspectionSessionContract;
   compartments: Compartment[];
 }
 
@@ -158,6 +173,9 @@ export interface InspectionSubmission {
   compartments?: unknown[];
   field_values?: Array<{ id: string; value: ChecklistFieldValue }>;
   scheduled_tasks?: ScheduledChecklistTaskResult[];
+  inspection_session_id?: string;
+  inspection_session_token?: string;
+  inspection_session_replay_key?: string;
   officer_signature?: string | null;
 }
 
@@ -168,11 +186,14 @@ export interface MeterData {
 
 export interface InspectionData {
   checklist_version: string;
+  apparatusSnapshot?: Apparatus;
   officer: OfficerInfo;
   meter: MeterData;
   compartments: Compartment[];
   fieldValues?: Array<{ id: string; value: ChecklistFieldValue }>;
   scheduledTasks?: ScheduledChecklistTaskResult[];
+  inspectionSession?: InspectionSessionContract;
+  checklistSnapshot?: ChecklistData;
 }
 
 // ============================================

@@ -1,10 +1,10 @@
 import { Fragment, useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, MeterData, InspectionSubmission, ScheduledChecklistTaskResult } from '../types';
+import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ScheduledChecklistTaskResult } from '../types';
 import { ApiClient } from '../utils/api';
 import { getQueuedSubmission, getQueuedSubmissionForApparatusAndChecklistVersion, onDailyCheckoutQueueChanged, queueSubmission, submitQueuedInspection } from '../utils/dailyCheckoutSubmissionQueue';
 import type { DailyCheckoutQueuedSubmission } from '../lib/db';
-import { createClientSubmissionId, saveInspectionProgress, loadInspectionProgress, clearInspectionProgress } from '../utils/storage';
+import { clearInspectionProgress, clearInspectionSessionStartKey, createClientSubmissionId, getOrCreateInspectionSessionStartKey, loadInspectionProgress, saveInspectionProgress } from '../utils/storage';
 import { useOffline } from '../hooks/useOffline';
 import OfficerStep from './OfficerStep';
 import ChecklistFieldsStep from './ChecklistFieldsStep';
@@ -14,6 +14,56 @@ import SubmitStep from './SubmitStep';
 import PreviousPageButton from './PreviousPageButton';
 
 type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'submit';
+
+const inspectionSessionIsExpired = (session: InspectionData['inspectionSession']): boolean => {
+  const expiresAt = typeof session?.expires_at === 'string' ? Date.parse(session.expires_at) : Number.NaN;
+
+  return !Number.isFinite(expiresAt) || expiresAt <= Date.now();
+};
+
+const restoreIssuedFireBoatChecklist = (saved: InspectionData | null): ChecklistData | null => {
+  const session = saved?.inspectionSession;
+  const checklist = saved?.checklistSnapshot;
+  if (
+    !session
+    || !checklist
+    || checklist.schema_version !== 2
+    || checklist.checklist_version !== saved.checklist_version
+    || session.checklist_hash !== saved.checklist_version
+    || typeof session.id !== 'string'
+    || typeof session.token !== 'string'
+    || typeof session.duty_date !== 'string'
+    || !Array.isArray(session.due_tasks)
+    || inspectionSessionIsExpired(session)
+    || checklist.inspection_date !== session.duty_date
+    || JSON.stringify(checklist.due_tasks) !== JSON.stringify(session.due_tasks)
+  ) {
+    return null;
+  }
+
+  return {
+    ...checklist,
+    inspection_date: session.duty_date,
+    due_tasks: session.due_tasks,
+    inspection_session: session,
+  };
+};
+
+const restoreIssuedFireBoatApparatus = (saved: InspectionData | null, slug: string): Apparatus | null => {
+  const apparatus = saved?.apparatusSnapshot;
+  if (
+    !apparatus
+    || apparatus.slug !== slug
+    || !Number.isInteger(apparatus.id)
+    || apparatus.id < 1
+    || typeof apparatus.name !== 'string'
+    || typeof apparatus.vehicle_number !== 'string'
+  ) {
+    return null;
+  }
+
+  return apparatus;
+};
 
 export default function InspectionWizard() {
   const { slug } = useParams<{ slug: string }>();
@@ -58,9 +108,32 @@ export default function InspectionWizard() {
 
       try {
         setQueuedSubmissionBlocker(null);
-        // For now, we'll fetch all apparatuses and find the one by slug
-        const apparatuses = await ApiClient.getApparatuses();
-        const foundApparatus = apparatuses.find(a => a.slug === slug);
+        const savedBeforeChecklistFetch = loadInspectionProgress(slug, '');
+        let checklistData = restoreIssuedFireBoatChecklist(savedBeforeChecklistFetch);
+        const savedApparatus = restoreIssuedFireBoatApparatus(savedBeforeChecklistFetch, slug);
+        let saved = savedBeforeChecklistFetch;
+        let foundApparatus: Apparatus | undefined;
+        let restoredFromLocalContract = false;
+
+        if (isOffline && checklistData !== null && savedApparatus !== null) {
+          foundApparatus = savedApparatus;
+          restoredFromLocalContract = true;
+        } else {
+          try {
+            // The apparatus catalog remains the online source of truth. A
+            // persisted issued contract may only be used as a narrow offline
+            // recovery fallback for its matching apparatus snapshot.
+            const apparatuses = await ApiClient.getApparatuses();
+            foundApparatus = apparatuses.find(a => a.slug === slug);
+          } catch (error) {
+            if (checklistData !== null && savedApparatus !== null) {
+              foundApparatus = savedApparatus;
+              restoredFromLocalContract = true;
+            } else {
+              throw error;
+            }
+          }
+        }
 
         if (!foundApparatus) {
           throw new Error('Apparatus not found');
@@ -71,17 +144,54 @@ export default function InspectionWizard() {
 
         // Service status is intentionally secondary. A network or API failure
         // must never prevent the inspection checklist from loading.
-        ApiClient.getApparatusServiceNotices(foundApparatus.id)
-          .then((notices) => {
-            setServiceNotices(notices);
-            setServiceNoticesUnavailable(false);
-          })
-          .catch(() => {
-            setServiceNotices([]);
-            setServiceNoticesUnavailable(true);
-          });
+        if (!restoredFromLocalContract) {
+          ApiClient.getApparatusServiceNotices(foundApparatus.id)
+            .then((notices) => {
+              setServiceNotices(notices);
+              setServiceNoticesUnavailable(false);
+            })
+            .catch(() => {
+              setServiceNotices([]);
+              setServiceNoticesUnavailable(true);
+            });
+        }
 
-        const checklistData = await ApiClient.getChecklist(foundApparatus.id);
+        if (checklistData === null) {
+          if (isOffline && saved?.inspectionSession) {
+            throw new Error(
+              inspectionSessionIsExpired(saved.inspectionSession)
+                ? 'This server-issued Fire Boat inspection session has expired. Reconnect and start a new Fire Boat inspection.'
+                : 'A server-issued Fire Boat inspection session is required before this checkout can be submitted. Reconnect before starting a new Fire Boat inspection.',
+            );
+          }
+
+          checklistData = await ApiClient.getChecklist(foundApparatus.id);
+          saved = loadInspectionProgress(slug, checklistData.checklist_version);
+          if (checklistData.schema_version === 2) {
+            const savedSession = saved?.inspectionSession;
+            if (
+              saved?.checklist_version === checklistData.checklist_version
+              && savedSession?.checklist_hash === checklistData.checklist_version
+              && !inspectionSessionIsExpired(savedSession)
+            ) {
+              checklistData = {
+                ...checklistData,
+                inspection_date: savedSession.duty_date,
+                due_tasks: savedSession.due_tasks,
+                inspection_session: savedSession,
+              };
+            } else {
+              if (isOffline) {
+                throw new Error('A server-issued Fire Boat inspection session is required before this checkout can be submitted. Reconnect before starting a new Fire Boat inspection.');
+              }
+
+              checklistData = await ApiClient.startInspectionSession(
+                foundApparatus.id,
+                getOrCreateInspectionSessionStartKey(slug, checklistData.checklist_version),
+              );
+            }
+          }
+        }
         setChecklist(checklistData);
 
         const queuedSubmission = await getQueuedSubmissionForApparatusAndChecklistVersion(
@@ -128,9 +238,13 @@ export default function InspectionWizard() {
           notes: null,
         })));
 
-        const saved = loadInspectionProgress(slug, checklistData.checklist_version);
         if (saved) {
-          if (saved.checklist_version === checklistData.checklist_version) {
+          const canRestoreSavedProgress = saved.checklist_version === checklistData.checklist_version
+            && (
+              checklistData.schema_version !== 2
+              || saved.inspectionSession?.id === checklistData.inspection_session?.id
+            );
+          if (canRestoreSavedProgress) {
             setOfficerInfo(saved.officer);
             if (saved.meter) {
               setMeterData(saved.meter);
@@ -153,6 +267,8 @@ export default function InspectionWizard() {
                   : 'meter');
             }
             setHasLoadedAutosave(true);
+          } else if (saved.checklist_version === checklistData.checklist_version && checklistData.schema_version === 2) {
+            setAutosaveReviewMessage('The prior Fire Boat session expired or changed. Its saved answers were not copied into this new server-issued session.');
           } else {
             setAutosaveReviewMessage('A previously saved inspection uses a different checklist version. It remains saved on this device and requires officer review; this form is using the current checklist.');
           }
@@ -165,20 +281,37 @@ export default function InspectionWizard() {
     };
 
     fetchData();
-  }, [slug, queueRevision]);
+  }, [slug, queueRevision, isOffline]);
 
   // Autosave progress
   useEffect(() => {
-    if (slug && apparatus && checklist && (currentStep === 'meter' || currentStep === 'details' || currentStep === 'compartments' || currentStep === 'submit')) {
+    if (
+      slug
+      && apparatus
+      && checklist
+      && (
+        currentStep === 'meter'
+        || currentStep === 'details'
+        || currentStep === 'compartments'
+        || currentStep === 'submit'
+        || (checklist.schema_version === 2 && currentStep === 'officer')
+      )
+    ) {
       const saveData = {
         checklist_version: checklist.checklist_version,
+        apparatusSnapshot: apparatus,
         officer: officerInfo,
         meter: meterData,
         compartments,
         fieldValues,
         scheduledTasks,
+        inspectionSession: checklist.inspection_session,
+        checklistSnapshot: checklist,
       };
       saveInspectionProgress(slug, saveData);
+      if (checklist.schema_version === 2 && checklist.inspection_session) {
+        clearInspectionSessionStartKey(slug, checklist.checklist_version);
+      }
     }
   }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist]);
 
@@ -208,6 +341,13 @@ export default function InspectionWizard() {
 
   const handleSubmit = async (signature: string | null) => {
     if (!apparatus || !slug || !checklist) return;
+
+    const inspectionSession = checklist.inspection_session;
+    if (checklist.schema_version === 2 && !inspectionSession) {
+      setError('A server-issued Fire Boat inspection session is required before this checkout can be submitted.');
+
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -255,6 +395,9 @@ export default function InspectionWizard() {
         ...(checklist.schema_version === 2 ? {
           field_values: fieldValues,
           scheduled_tasks: scheduledTasks,
+          inspection_session_id: inspectionSession?.id,
+          inspection_session_token: inspectionSession?.token,
+          inspection_session_replay_key: inspectionSession?.replay_key,
         } : {}),
         officer_signature: signature,
       };

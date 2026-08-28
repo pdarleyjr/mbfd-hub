@@ -44,6 +44,7 @@ Route::prefix('admin/audit')->middleware(['web', 'auth', 'admin.role:super_admin
 Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('apparatuses', [ApparatusController::class, 'index']);
     Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class, 'checklist']);
+    Route::post('apparatuses/{apparatus}/inspection-sessions', [ApparatusController::class, 'startInspectionSession'])->middleware('throttle:30,1');
     Route::get('apparatuses/{apparatus}/service-notices', [PublicApparatusServiceTicketController::class, 'apparatusNotices']);
     Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
     Route::get('employees/list', [ApparatusController::class, 'employees']);

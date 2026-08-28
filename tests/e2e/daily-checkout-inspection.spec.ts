@@ -165,6 +165,20 @@ const fireBoatChecklist = {
   },
 };
 
+const fireBoatInspectionSession = {
+  id: '11111111-2222-4333-8444-555555555555',
+  token: 'd'.repeat(64),
+  issued_at: '2026-08-31T09:00:00-04:00',
+  expires_at: '2026-08-31T21:00:00-04:00',
+  duty_date: fireBoatChecklist.inspection_date,
+  checklist_template_id: fireBoatChecklist.checklist.template_id,
+  checklist_template_version: fireBoatChecklist.checklist.template_version,
+  checklist_hash: fireBoatChecklist.checklist_version,
+  due_tasks: fireBoatChecklist.due_tasks,
+  due_tasks_hash: 'e'.repeat(64),
+  replay_key: '66666666-7777-4888-8999-aaaaaaaaaaaa',
+};
+
 interface QueuedInspection {
   id: string;
   apparatusId: number;
@@ -192,6 +206,7 @@ type SeededQueuedInspection = QueuedInspection & {
 
 interface InspectionApiMock {
   readonly submissions: Array<Record<string, unknown>>;
+  readonly sessionStarts: Array<Record<string, unknown>>;
 }
 
 async function mockInspectionApi(
@@ -208,6 +223,7 @@ async function mockInspectionApi(
   } = {},
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
+  const sessionStarts: Array<Record<string, unknown>> = [];
   const submitStatus = options.submitStatus ?? 201;
   let abortNextSubmit = options.abortFirstSubmit ?? false;
 
@@ -289,11 +305,17 @@ async function mockInspectionApi(
     return route.fulfill({ status: 404, json: { message: `Unmocked API route: ${path}` } });
   });
 
-  return { submissions };
+  return { submissions, sessionStarts };
 }
 
-async function mockFireBoatInspectionApi(page: Page): Promise<InspectionApiMock> {
+async function mockFireBoatInspectionApi(
+  page: Page,
+  options: { readonly sessionStatus?: number; readonly abortFirstSessionStart?: boolean } = {},
+): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
+  const sessionStarts: Array<Record<string, unknown>> = [];
+  const sessionStatus = options.sessionStatus ?? 201;
+  let abortNextSessionStart = options.abortFirstSessionStart ?? false;
 
   await page.route('**/images/mbfd_logo_new.png', (route) => route.fulfill({ path: 'public/images/mbfd_logo_new.png' }));
   await page.route('**/api/**', async (route) => {
@@ -310,6 +332,32 @@ async function mockFireBoatInspectionApi(page: Page): Promise<InspectionApiMock>
 
     if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/checklist`) {
       return route.fulfill({ json: fireBoatChecklist });
+    }
+
+    if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/inspection-sessions` && request.method() === 'POST') {
+      sessionStarts.push(request.postDataJSON() as Record<string, unknown>);
+      if (abortNextSessionStart) {
+        abortNextSessionStart = false;
+
+        return route.abort('connectionreset');
+      }
+      if (sessionStatus >= 400) {
+        return route.fulfill({
+          status: sessionStatus,
+          json: {
+            message: 'A server-issued Fire Boat inspection session is required before this checkout can be submitted.',
+            code: 'DAILY_CHECKOUT_INSPECTION_SESSION_REQUIRED',
+          },
+        });
+      }
+
+      return route.fulfill({
+        status: 201,
+        json: {
+          ...fireBoatChecklist,
+          inspection_session: fireBoatInspectionSession,
+        },
+      });
     }
 
     if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/service-notices`) {
@@ -331,7 +379,7 @@ async function mockFireBoatInspectionApi(page: Page): Promise<InspectionApiMock>
     return route.fulfill({ status: 404, json: { message: `Unmocked API route: ${path}` } });
   });
 
-  return { submissions };
+  return { submissions, sessionStarts };
 }
 
 async function completeInspection(page: Page): Promise<void> {
@@ -592,6 +640,11 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
 
   await page.goto('/daily/apparatus/fire-boat-6');
   await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  expect(api.sessionStarts).toEqual([
+    expect.objectContaining({
+      inspection_session_start_key: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    }),
+  ]);
 
   await page.getByLabel('Full Name').fill('Captain Browser');
   await page.getByText('Captain Browser', { exact: true }).click();
@@ -624,6 +677,9 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
     scheduled_tasks: [
       { id: 'fb6-monday-fuel-tank-hold', status: 'Present' },
     ],
+    inspection_session_id: fireBoatInspectionSession.id,
+    inspection_session_token: fireBoatInspectionSession.token,
+    inspection_session_replay_key: fireBoatInspectionSession.replay_key,
     compartments: [
       {
         id: 'fb6-cubby',
@@ -633,8 +689,34 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
   });
 });
 
+test('Fire Boat blocks an unbound offline checkout before inspection entry', async ({ page }) => {
+  const api = await mockFireBoatInspectionApi(page, { sessionStatus: 503 });
+
+  await page.goto('/daily/apparatus/fire-boat-6');
+
+  await expect(page.getByText('Inspection Data Unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByText('A server-issued Fire Boat inspection session is required before this checkout can be submitted.', { exact: true })).toBeVisible();
+  expect(api.submissions).toHaveLength(0);
+});
+
+test('Fire Boat retries a lost session-start response with its same local issuance key', async ({ page }) => {
+  const api = await mockFireBoatInspectionApi(page, { abortFirstSessionStart: true });
+
+  await page.goto('/daily/apparatus/fire-boat-6');
+  await expect(page.getByText('Inspection Data Unavailable', { exact: true })).toBeVisible();
+  expect(api.sessionStarts).toHaveLength(1);
+  const issuanceKey = api.sessionStarts[0]?.inspection_session_start_key;
+  expect(issuanceKey).toEqual(expect.stringMatching(/^[0-9a-f-]{36}$/));
+
+  await page.reload();
+
+  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  expect(api.sessionStarts).toHaveLength(2);
+  expect(api.sessionStarts[1]?.inspection_session_start_key).toBe(issuanceKey);
+});
+
 test('Fire Boat v2 reload restores same-version typed fields, due-duty status, and compartment status', async ({ page }) => {
-  await mockFireBoatInspectionApi(page);
+  const api = await mockFireBoatInspectionApi(page);
 
   await page.goto('/daily/apparatus/fire-boat-6');
   await page.getByLabel('Full Name').fill('Captain Browser');
@@ -656,6 +738,8 @@ test('Fire Boat v2 reload restores same-version typed fields, due-duty status, a
 
   await page.reload();
 
+  expect(api.sessionStarts).toHaveLength(1);
+
   await expect(page.getByText(/Restored from autosave/)).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Compartment Inspection' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Status for Flashlights' })
@@ -668,6 +752,114 @@ test('Fire Boat v2 reload restores same-version typed fields, due-duty status, a
   await expect(page.getByLabel('Port Engine Hours')).toHaveValue('45.5');
   await expect(page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
     .getByRole('button', { name: 'Missing', exact: true }))
+    .toHaveAttribute('aria-pressed', 'true');
+});
+
+test('Fire Boat v2 reload restores an issued session when the checklist API is offline', async ({ page }) => {
+  const api = await mockFireBoatInspectionApi(page);
+
+  await page.goto('/daily/apparatus/fire-boat-6');
+  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  await expect.poll(() => page.evaluate((checklistVersion) => {
+    const saved = window.localStorage.getItem(`mbfd_autosave_inspection_fire-boat-6_${checklistVersion}`);
+
+    return saved === null ? null : JSON.parse(saved).inspectionSession?.id;
+  }, fireBoatChecklist.checklist_version)).toBe(fireBoatInspectionSession.id);
+
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+  });
+  await page.unroute('**/api/**');
+  const offlineApiPaths: string[] = [];
+  await page.route('**/api/**', async (route) => {
+    offlineApiPaths.push(new URL(route.request().url()).pathname);
+
+    return route.fulfill({ status: 503, json: { message: 'Offline' } });
+  });
+
+  await page.reload();
+
+  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  expect(offlineApiPaths).not.toContain('/api/public/apparatuses');
+  expect(offlineApiPaths).not.toContain(`/api/public/apparatuses/${fireBoatApparatus.id}/checklist`);
+  expect(offlineApiPaths).not.toContain(`/api/public/apparatuses/${fireBoatApparatus.id}/inspection-sessions`);
+  expect(api.sessionStarts).toHaveLength(1);
+});
+
+test('Fire Boat online reload uses current apparatus and service notices over its local contract snapshot', async ({ page }) => {
+  await mockFireBoatInspectionApi(page);
+
+  await page.goto('/daily/apparatus/fire-boat-6');
+  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+
+  await page.unroute('**/api/**');
+  await page.route('**/api/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+
+    if (path === '/api/public/apparatuses') {
+      return route.fulfill({ json: [{ ...fireBoatApparatus, vehicle_number: 'FB6-LIVE', status: 'Out of Service' }] });
+    }
+
+    if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/service-notices`) {
+      return route.fulfill({
+        json: {
+          data: [{ id: 901, ticket_number: 'FB6-LIVE-901', title: 'Live Fleet notice', status: 'open' }],
+        },
+      });
+    }
+
+    return route.fulfill({ status: 404, json: { message: `Unmocked API route: ${path}` } });
+  });
+
+  await page.reload();
+
+  await expect(page.getByText('Unit: FB6-LIVE', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Unit out of service' })).toBeVisible();
+  await expect(page.getByText('FB6-LIVE-901 · Live Fleet notice', { exact: true })).toBeVisible();
+});
+
+test('Fire Boat v2 reload does not reuse an expired saved session', async ({ page }) => {
+  const api = await mockFireBoatInspectionApi(page);
+  const autosaveKey = `mbfd_autosave_inspection_fire-boat-6_${fireBoatChecklist.checklist_version}`;
+
+  await page.goto('/daily/apparatus/fire-boat-6');
+  await expect.poll(() => page.evaluate((key) => {
+    const saved = window.localStorage.getItem(key);
+
+    return saved === null ? null : JSON.parse(saved).inspectionSession?.id;
+  }, autosaveKey)).toBe(fireBoatInspectionSession.id);
+  await page.evaluate((key) => {
+    const saved = JSON.parse(window.localStorage.getItem(key) ?? 'null');
+    if (!saved?.inspectionSession) {
+      throw new Error('Expected a persisted Fire Boat inspection session.');
+    }
+
+    saved.inspectionSession.id = '99999999-9999-4999-8999-999999999999';
+    saved.inspectionSession.expires_at = '2000-01-01T00:00:00-05:00';
+    saved.fieldValues = saved.fieldValues.map((field: { id: string; value: unknown }) => ({
+      ...field,
+      value: field.id === 'inspection_date' ? '1999-01-01' : field.id === 'fb6-high-low-tide' ? 'old tide data' : field.value,
+    }));
+    saved.scheduledTasks = saved.scheduledTasks.map((task: { id: string; status: string }) => ({
+      ...task,
+      status: 'Missing',
+    }));
+    window.localStorage.setItem(key, JSON.stringify(saved));
+  }, autosaveKey);
+
+  await page.reload();
+
+  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  expect(api.sessionStarts).toHaveLength(2);
+  await expect(page.getByText(/prior Fire Boat session expired/i)).toBeVisible();
+  await page.getByLabel('Full Name').fill('Captain Browser');
+  await page.getByText('Captain Browser', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue to Inspection' }).click();
+  await expect(page.getByLabel('Date')).toHaveValue('2026-08-31');
+  await expect(page.getByLabel('High Low Tide')).toHaveValue('');
+  await expect(page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
+    .getByRole('button', { name: 'Present', exact: true }))
     .toHaveAttribute('aria-pressed', 'true');
 });
 
