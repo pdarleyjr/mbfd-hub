@@ -39,14 +39,222 @@ jobs:
     with:
       pint_base_sha: ${{ format('{0}^', github.sha) }}
 
-  deploy:
+  prepare-production-image:
     needs: release-gates
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    outputs:
+      image_ref: ${{ steps.image.outputs.image_ref }}
+      image_digest: ${{ steps.image.outputs.image_digest }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Configure disposable Buildx builder
+        run: |
+          set -euo pipefail
+          docker buildx create --name mbfd-hub-production-image --driver docker-container --use
+          docker buildx inspect --bootstrap
+      - name: Build, attest, and publish immutable Hub image
+        id: image
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HUB_WWWGROUP: ${{ vars.MBFD_HUB_WWWGROUP }}
+        run: |
+          set -euo pipefail
+          test "${#GITHUB_SHA}" = 40
+          case "$HUB_WWWGROUP" in
+            ''|0|*[!0-9]*)
+              echo 'MBFD_HUB_WWWGROUP must be a non-root numeric production group ID.' >&2
+              exit 1
+              ;;
+          esac
+          IMAGE_REPOSITORY="ghcr.io/${GITHUB_REPOSITORY,,}"
+          IMAGE_TAG="$IMAGE_REPOSITORY:sha-$GITHUB_SHA"
+          IMAGE_METADATA="$RUNNER_TEMP/mbfd-hub-image-metadata.json"
+          export IMAGE_METADATA
+          printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker buildx build --push \
+            --tag "$IMAGE_TAG" \
+            --file docker/production/Dockerfile \
+            --build-arg "SOURCE_REVISION=$GITHUB_SHA" \
+            --build-arg "WWWGROUP=$HUB_WWWGROUP" \
+            --secret id=composer_auth,env=GITHUB_TOKEN \
+            --provenance=mode=max \
+            --sbom=true \
+            --metadata-file "$IMAGE_METADATA" \
+            .
+          IMAGE_DIGEST="$(node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const metadata = JSON.parse(readFileSync(process.env.IMAGE_METADATA, "utf8"));
+            const digest = metadata["containerimage.digest"];
+            if (typeof digest !== "string" || !/^sha256:[a-f0-9]{64}$/.test(digest)) process.exit(1);
+            process.stdout.write(digest);
+          ')"
+          IMAGE_REF="$IMAGE_REPOSITORY@$IMAGE_DIGEST"
+          printf 'image_ref=%s\n' "$IMAGE_REF" >> "$GITHUB_OUTPUT"
+          printf 'image_digest=%s\n' "$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+      - name: Scan published Hub image
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          scan-type: image
+          image-ref: ${{ steps.image.outputs.image_ref }}
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          format: table
+      - name: Start disposable production-image dependencies
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+          test -n "$IMAGE_REF"
+          docker pull "$IMAGE_REF"
+          REHEARSAL_ID="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          REHEARSAL_NETWORK="mbfd-hub-image-rehearsal-${REHEARSAL_ID}"
+          REHEARSAL_PG_CONTAINER="mbfd-hub-image-rehearsal-pg-${REHEARSAL_ID}"
+          REHEARSAL_REDIS_CONTAINER="mbfd-hub-image-rehearsal-redis-${REHEARSAL_ID}"
+          REHEARSAL_DIR="$RUNNER_TEMP/mbfd-hub-image-rehearsal-${REHEARSAL_ID}"
+          mkdir -p \
+            "$REHEARSAL_DIR/storage/app/private" \
+            "$REHEARSAL_DIR/storage/app/public" \
+            "$REHEARSAL_DIR/storage/framework/cache/data" \
+            "$REHEARSAL_DIR/storage/framework/sessions" \
+            "$REHEARSAL_DIR/storage/framework/views" \
+            "$REHEARSAL_DIR/storage/logs"
+          chmod -R 0777 "$REHEARSAL_DIR/storage"
+          printf 'REHEARSAL_NETWORK=%s\n' "$REHEARSAL_NETWORK" >> "$GITHUB_ENV"
+          printf 'REHEARSAL_PG_CONTAINER=%s\n' "$REHEARSAL_PG_CONTAINER" >> "$GITHUB_ENV"
+          printf 'REHEARSAL_REDIS_CONTAINER=%s\n' "$REHEARSAL_REDIS_CONTAINER" >> "$GITHUB_ENV"
+          printf 'REHEARSAL_DIR=%s\n' "$REHEARSAL_DIR" >> "$GITHUB_ENV"
+          printf 'REHEARSAL_APP_CONTAINER=mbfd-hub-laravel\n' >> "$GITHUB_ENV"
+          docker network create "$REHEARSAL_NETWORK"
+          docker run -d --name "$REHEARSAL_PG_CONTAINER" \
+            --network "$REHEARSAL_NETWORK" \
+            --network-alias pgsql \
+            -e POSTGRES_DB=mbfd_hub_image_rehearsal \
+            -e POSTGRES_USER=mbfd_image_rehearsal \
+            -e POSTGRES_HOST_AUTH_METHOD=trust \
+            postgres:16.13-alpine@sha256:4e6e670bb069649261c9c18031f0aded7bb249a5b6664ddec29c013a89310d50
+          docker run -d --name "$REHEARSAL_REDIS_CONTAINER" \
+            --network "$REHEARSAL_NETWORK" \
+            --network-alias redis \
+            redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf \
+            redis-server --appendonly no --requirepass rehearsal-only-redis-password
+          for _ in $(seq 1 60); do
+            if docker exec "$REHEARSAL_PG_CONTAINER" pg_isready -q -d mbfd_hub_image_rehearsal -U mbfd_image_rehearsal \
+              && docker exec "$REHEARSAL_REDIS_CONTAINER" redis-cli -a rehearsal-only-redis-password ping | grep -qx PONG; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec "$REHEARSAL_PG_CONTAINER" pg_isready -q -d mbfd_hub_image_rehearsal -U mbfd_image_rehearsal
+          docker exec "$REHEARSAL_REDIS_CONTAINER" redis-cli -a rehearsal-only-redis-password ping | grep -qx PONG
+          {
+            printf '%s\n' \
+              'APP_NAME=MBFD Hub Image Rehearsal' \
+              'APP_ENV=production' \
+              'APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' \
+              'APP_DEBUG=false' \
+              'APP_URL=http://127.0.0.1:8080' \
+              'APP_MAINTENANCE_DRIVER=file' \
+              'DB_CONNECTION=pgsql' \
+              'DB_HOST=pgsql' \
+              'DB_PORT=5432' \
+              'DB_DATABASE=mbfd_hub_image_rehearsal' \
+              'DB_USERNAME=mbfd_image_rehearsal' \
+              'DB_PASSWORD=' \
+              'CACHE_STORE=redis' \
+              'SESSION_DRIVER=redis' \
+              'QUEUE_CONNECTION=redis' \
+              'BROADCAST_DRIVER=reverb' \
+              'BROADCAST_CONNECTION=reverb' \
+              'REDIS_CLIENT=phpredis' \
+              'REDIS_HOST=redis' \
+              'REDIS_PASSWORD=rehearsal-only-redis-password' \
+              'REDIS_PORT=6379' \
+              'REVERB_APP_ID=rehearsal' \
+              'REVERB_APP_KEY=rehearsal-key' \
+              'REVERB_APP_SECRET=rehearsal-secret' \
+              'REVERB_HOST=127.0.0.1' \
+              'REVERB_PORT=8090' \
+              'REVERB_SCHEME=http' \
+              'REVERB_INTERNAL_HOST=127.0.0.1' \
+              'REVERB_SERVER_HOST=0.0.0.0' \
+              'REVERB_SERVER_PORT=8080' \
+              'PULSE_ENABLED=false' \
+              'SENTRY_LARAVEL_DSN=' \
+              'WORKGROUP_AI_ENABLED=false' \
+              'MAIL_MAILER=log' \
+              'FILESYSTEM_DISK=local' \
+              'PRIVATE_FILESYSTEM_DISK=local'
+          } > "$REHEARSAL_DIR/app.env"
+          {
+            printf 'HUB_IMAGE_REF=%s\n' "$IMAGE_REF"
+            printf 'HUB_APP_ENV_FILE=%s\n' "$REHEARSAL_DIR/app.env"
+            printf 'HUB_STORAGE_PATH=%s\n' "$REHEARSAL_DIR/storage"
+            printf 'HUB_NETWORK_NAME=%s\n' "$REHEARSAL_NETWORK"
+            printf 'HUB_WWWUSER=1337\n'
+            printf 'HUB_WWWGROUP=1000\n'
+            printf 'HUB_GOOGLE_SA_PATH=/dev/null\n'
+          } > "$REHEARSAL_DIR/compose.env"
+      - name: Start disposable production-image Laravel service
+        run: |
+          set -euo pipefail
+          docker compose --project-name mbfd-hub-image-rehearsal \
+            --env-file "$REHEARSAL_DIR/compose.env" \
+            -f compose.prod.image.yaml \
+            up -d --pull never --no-deps --force-recreate laravel.test
+      - name: Verify immutable production image runtime
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+          docker exec -u sail "$REHEARSAL_APP_CONTAINER" php artisan migrate --force
+          docker exec -u sail "$REHEARSAL_APP_CONTAINER" php artisan config:cache
+          docker exec -u sail "$REHEARSAL_APP_CONTAINER" php artisan route:cache
+          docker exec -u sail "$REHEARSAL_APP_CONTAINER" php artisan view:cache
+          docker exec -u sail "$REHEARSAL_APP_CONTAINER" php artisan filament:clear-cached-components
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_REF")" = "$GITHUB_SHA"
+          docker run --rm --entrypoint realpath "$IMAGE_REF" -e /
+          docker exec "$REHEARSAL_APP_CONTAINER" test -s /var/www/html/public/build/manifest.json
+          docker exec "$REHEARSAL_APP_CONTAINER" test -s /var/www/html/public/daily/index.html
+          ! docker exec "$REHEARSAL_APP_CONTAINER" test -e /var/www/html/vendor/laravel/sail
+          for _ in $(seq 1 60); do
+            if docker exec "$REHEARSAL_APP_CONTAINER" curl -fsS http://localhost:80/up > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec "$REHEARSAL_APP_CONTAINER" curl -fsS http://localhost:80/up > /dev/null
+          docker exec "$REHEARSAL_APP_CONTAINER" pgrep -af '^/usr/bin/php /var/www/html/artisan reverb:start '
+          docker exec "$REHEARSAL_APP_CONTAINER" pgrep -af '^/usr/bin/php /var/www/html/artisan queue:work '
+      - name: Remove disposable production-image rehearsal
+        if: ${{ always() }}
+        run: |
+          docker rm -f "${REHEARSAL_APP_CONTAINER:-mbfd-hub-laravel}" "${REHEARSAL_PG_CONTAINER:-missing}" "${REHEARSAL_REDIS_CONTAINER:-missing}" 2>/dev/null || true
+          docker network rm "${REHEARSAL_NETWORK:-missing}" 2>/dev/null || true
+
+  deploy:
+    needs: [release-gates, prepare-production-image]
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: self-hosted
     timeout-minutes: 60
+    permissions:
+      contents: read
+      pull-requests: read
+      packages: read
     environment:
       name: production
       url: https://www.mbfdhub.com
+    env:
+      HUB_IMAGE_REF: ${{ needs.prepare-production-image.outputs.image_ref }}
+      HUB_ACTIVATION_ID: mbfd-hub-activation-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Configure ephemeral Hub deployment SSH target
         env:
@@ -69,6 +277,35 @@ jobs:
           chmod 600 "$SSH_DIR/deploy_key" "$SSH_DIR/config"
           printf 'HUB_SSH_CONFIG=%s\n' "$SSH_DIR/config" >> "$GITHUB_ENV"
 
+      - name: Validate Hub deployment variable syntax
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_IMAGE_REF: ${{ needs.prepare-production-image.outputs.image_ref }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_APP_ENV_FILE: ${{ vars.MBFD_HUB_APP_ENV_FILE }}
+          HUB_STORAGE_PATH: ${{ vars.MBFD_HUB_STORAGE_PATH }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_NETWORK_NAME: ${{ vars.MBFD_HUB_NETWORK_NAME }}
+          HUB_WWWUSER: ${{ vars.MBFD_HUB_WWWUSER }}
+          HUB_WWWGROUP: ${{ vars.MBFD_HUB_WWWGROUP }}
+          HUB_GOOGLE_SA_PATH: ${{ vars.MBFD_HUB_GOOGLE_SA_PATH }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$HUB_IMAGE_REF" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
+          for path in "$HUB_RELEASE_ROOT" "$HUB_APP_ENV_FILE" "$HUB_STORAGE_PATH" "$HUB_BACKUP_DIR"; do
+            [[ "$path" =~ ^/[A-Za-z0-9._/-]+$ ]]
+          done
+          if [[ -n "$HUB_GOOGLE_SA_PATH" ]]; then
+            [[ "$HUB_GOOGLE_SA_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]
+          fi
+          [[ "$HUB_NETWORK_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]
+          [[ "$HUB_WWWUSER" =~ ^[1-9][0-9]*$ ]]
+          [[ "$HUB_WWWGROUP" =~ ^[1-9][0-9]*$ ]]
+          [[ "$HUB_ACTIVATION_ID" =~ ^mbfd-hub-activation-[a-f0-9]{40}-[0-9]+-[0-9]+$ ]]
+          printf 'HUB_DEPLOYMENT_VARIABLES_VALIDATED=1\n' >> "$GITHUB_ENV"
+
       - name: Inspect Hub production checkout and runtime
         env:
           RELEASE_SHA: ${{ github.sha }}
@@ -87,10 +324,21 @@ jobs:
           cd "$HUB_CHECKOUT"
           git status --short --branch
           git diff --stat
-          if test -n "$(git status --porcelain)"; then
-            echo 'Refusing to overwrite a dirty production checkout.' >&2
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+            echo 'Refusing to overwrite tracked changes in the production checkout.' >&2
             exit 1
           fi
+          UNEXPECTED_CHECKOUT_STATUS="$(git status --porcelain=v1 --untracked-files=all | grep -Ev '^\?\? \.bid-bridge-rollback\.[^/[:space:]]+$' || true)"
+          if test -n "$UNEXPECTED_CHECKOUT_STATUS"; then
+            echo 'Refusing to overwrite a dirty production checkout outside preserved Bid bridge rollback artifacts.' >&2
+            printf '%s\n' "$UNEXPECTED_CHECKOUT_STATUS" >&2
+            exit 1
+          fi
+          while IFS= read -r PRESERVED_ROLLBACK_ARTIFACT; do
+            test -f "$PRESERVED_ROLLBACK_ARTIFACT"
+            test ! -L "$PRESERVED_ROLLBACK_ARTIFACT"
+            test "$(stat -c '%a' "$PRESERVED_ROLLBACK_ARTIFACT")" = 600
+          done < <(git status --porcelain=v1 --untracked-files=all | sed -n 's/^?? //p')
 
           test "$(docker inspect --format '{{.Name}}' "$HUB_APP_CONTAINER")" = "/$HUB_APP_CONTAINER"
           test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_APP_CONTAINER")" = 'laravel.test'
@@ -109,20 +357,152 @@ jobs:
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan migrate:status --no-ansi
           REMOTE
 
+      # This source-only worktree is never a second application or stack. It is
+      # removed only after the exact image succeeds on the single live runtime.
+      - name: Prestage immutable Hub image and temporary detached source worktree
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_APP_ENV_FILE: ${{ vars.MBFD_HUB_APP_ENV_FILE }}
+          HUB_STORAGE_PATH: ${{ vars.MBFD_HUB_STORAGE_PATH }}
+          HUB_NETWORK_NAME: ${{ vars.MBFD_HUB_NETWORK_NAME }}
+          HUB_WWWUSER: ${{ vars.MBFD_HUB_WWWUSER }}
+          HUB_WWWGROUP: ${{ vars.MBFD_HUB_WWWGROUP }}
+          HUB_GOOGLE_SA_PATH: ${{ vars.MBFD_HUB_GOOGLE_SA_PATH }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_IMAGE_REF"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_APP_ENV_FILE"
+          test -n "$HUB_STORAGE_PATH"
+          test -n "$HUB_NETWORK_NAME"
+          test -n "$HUB_WWWUSER"
+          test -n "$HUB_WWWGROUP"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_APP_ENV_FILE='$HUB_APP_ENV_FILE' HUB_STORAGE_PATH='$HUB_STORAGE_PATH' HUB_NETWORK_NAME='$HUB_NETWORK_NAME' HUB_WWWUSER='$HUB_WWWUSER' HUB_WWWGROUP='$HUB_WWWGROUP' HUB_GOOGLE_SA_PATH='$HUB_GOOGLE_SA_PATH' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HUB_CHECKOUT=/opt/mbfd/mbfd-hub
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_PG_CONTAINER=mbfd-hub-pgsql
+          HUB_REDIS_CONTAINER=mbfd-hub-redis
+          HUB_GOOGLE_SA_PATH="${HUB_GOOGLE_SA_PATH:-/dev/null}"
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+
+          # This source-only worktree is never run as a second application or stack.
+          case "$HUB_RELEASE_ROOT" in
+            ''|/|"$HUB_CHECKOUT"|"$HUB_CHECKOUT"/*)
+              echo 'Hub source-worktree root must be a sibling staging directory, not the live checkout.' >&2
+              exit 1
+              ;;
+          esac
+          case "$HUB_IMAGE_REF" in
+            ghcr.io/*@sha256:[0-9a-f][0-9a-f]*)
+              ;;
+            *)
+              echo 'Hub image must be an immutable GHCR digest reference.' >&2
+              exit 1
+              ;;
+          esac
+          case "$HUB_WWWUSER:$HUB_WWWGROUP" in
+            0:*|*:0|*[!0-9:]*|:)
+              echo 'Hub runtime UID and GID must be non-root numeric values.' >&2
+              exit 1
+              ;;
+          esac
+
+          test -d "$HUB_CHECKOUT/.git"
+          cd "$HUB_CHECKOUT"
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+            echo 'Refusing to stage an image while the production checkout has tracked changes.' >&2
+            exit 1
+          fi
+          UNEXPECTED_CHECKOUT_STATUS="$(git status --porcelain=v1 --untracked-files=all | grep -Ev '^\?\? \.bid-bridge-rollback\.[^/[:space:]]+$' || true)"
+          if test -n "$UNEXPECTED_CHECKOUT_STATUS"; then
+            echo 'Refusing to stage an image around unexpected checkout artifacts.' >&2
+            printf '%s\n' "$UNEXPECTED_CHECKOUT_STATUS" >&2
+            exit 1
+          fi
+          while IFS= read -r PRESERVED_ROLLBACK_ARTIFACT; do
+            test -f "$PRESERVED_ROLLBACK_ARTIFACT"
+            test ! -L "$PRESERVED_ROLLBACK_ARTIFACT"
+            test "$(stat -c '%a' "$PRESERVED_ROLLBACK_ARTIFACT")" = 600
+          done < <(git status --porcelain=v1 --untracked-files=all | sed -n 's/^?? //p')
+          git fetch origin main --no-tags
+          test "$(git rev-parse origin/main)" = "$RELEASE_SHA"
+          git cat-file -e "$RELEASE_SHA^{commit}"
+          mkdir -p "$HUB_RELEASE_ROOT"
+          test ! -L "$HUB_SOURCE_WORKTREE"
+          if test -e "$HUB_SOURCE_WORKTREE"; then
+            test -e "$HUB_SOURCE_WORKTREE/.git"
+            test "$(git -C "$HUB_SOURCE_WORKTREE" rev-parse HEAD)" = "$RELEASE_SHA"
+            test -z "$(git -C "$HUB_SOURCE_WORKTREE" status --porcelain)"
+          else
+            git worktree add --detach "$HUB_SOURCE_WORKTREE" "$RELEASE_SHA"
+          fi
+          test -f "$HUB_SOURCE_WORKTREE/compose.prod.image.yaml"
+          test -r "$HUB_APP_ENV_FILE"
+          test -d "$HUB_STORAGE_PATH"
+          test -w "$HUB_STORAGE_PATH"
+          test "$(stat -c '%u' "$HUB_STORAGE_PATH")" = "$HUB_WWWUSER"
+          test "$(stat -c '%g' "$HUB_STORAGE_PATH")" = "$HUB_WWWGROUP"
+          if test "$HUB_GOOGLE_SA_PATH" != /dev/null; then
+            test -r "$HUB_GOOGLE_SA_PATH"
+          fi
+
+          test "$(docker inspect --format '{{.Name}}' "$HUB_APP_CONTAINER")" = "/$HUB_APP_CONTAINER"
+          test "$(docker inspect --format '{{.State.Running}}' "$HUB_APP_CONTAINER")" = true
+          test "$(docker inspect --format '{{.State.Running}}' "$HUB_PG_CONTAINER")" = true
+          test "$(docker inspect --format '{{.State.Running}}' "$HUB_REDIS_CONTAINER")" = true
+          HUB_COMPOSE_PROJECT="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$HUB_APP_CONTAINER")"
+          test -n "$HUB_COMPOSE_PROJECT"
+          docker network inspect "$HUB_NETWORK_NAME" > /dev/null
+          HUB_APP_NETWORKS="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{printf "%s\n" $name}}{{end}}' "$HUB_APP_CONTAINER")"
+          test "$HUB_APP_NETWORKS" = "$HUB_NETWORK_NAME"
+          docker exec "$HUB_APP_CONTAINER" getent ahostsv4 pgsql > /dev/null
+          docker exec "$HUB_APP_CONTAINER" getent ahostsv4 redis > /dev/null
+
+          docker pull "$HUB_IMAGE_REF"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$HUB_IMAGE_REF")" = "$RELEASE_SHA"
+          HUB_COMPOSE_ENV="$(mktemp)"
+          trap 'rm -f "$HUB_COMPOSE_ENV"' EXIT
+          umask 077
+          {
+            printf 'HUB_IMAGE_REF=%s\n' "$HUB_IMAGE_REF"
+            printf 'HUB_APP_ENV_FILE=%s\n' "$HUB_APP_ENV_FILE"
+            printf 'HUB_STORAGE_PATH=%s\n' "$HUB_STORAGE_PATH"
+            printf 'HUB_NETWORK_NAME=%s\n' "$HUB_NETWORK_NAME"
+            printf 'HUB_WWWUSER=%s\n' "$HUB_WWWUSER"
+            printf 'HUB_WWWGROUP=%s\n' "$HUB_WWWGROUP"
+            printf 'HUB_GOOGLE_SA_PATH=%s\n' "$HUB_GOOGLE_SA_PATH"
+          } > "$HUB_COMPOSE_ENV"
+          docker compose --project-name "$HUB_COMPOSE_PROJECT" \
+            --env-file "$HUB_COMPOSE_ENV" \
+            -f "$HUB_SOURCE_WORKTREE/compose.prod.image.yaml" \
+            config --no-interpolate > /dev/null
+          REMOTE
+
       - name: Verify targeted Hub database backup
         env:
           RELEASE_SHA: ${{ github.sha }}
           HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
+          test -n "$HUB_IMAGE_REF"
           test -n "$HUB_BACKUP_DIR"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' bash -s" <<'REMOTE'
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_CHECKOUT=/opt/mbfd/mbfd-hub
+          HUB_APP_CONTAINER=mbfd-hub-laravel
           HUB_PG_CONTAINER=mbfd-hub-pgsql
           HUB_PG_DATABASE=mbfd_hub
           HUB_PG_USER=mbfd_user
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
 
           test "$(docker inspect --format '{{.Name}}' "$HUB_PG_CONTAINER")" = "/$HUB_PG_CONTAINER"
           test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_PG_CONTAINER")" = 'pgsql'
@@ -134,7 +514,7 @@ jobs:
            esac
            PG_DATA_SOURCE="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Source}}{{end}}{{end}}' "$HUB_PG_CONTAINER")"
            test -n "$PG_DATA_SOURCE"
-           BACKUP_PATH_HELPER_IMAGE=sail-8.5/app
+           BACKUP_PATH_HELPER_IMAGE="$HUB_IMAGE_REF"
            case "$PG_DATA_SOURCE" in
              /mnt/*) PG_DATA_SOURCE_IN_HELPER="/host-mnt/${PG_DATA_SOURCE#/mnt/}" ;;
              *)
@@ -166,8 +546,11 @@ jobs:
            test -d "$HUB_BACKUP_DIR"
            test -w "$HUB_BACKUP_DIR"
 
-           cd "$HUB_CHECKOUT"
-           PREVIOUS_SHA="$(git rev-parse HEAD)"
+           PREVIOUS_IMAGE_REF="$(docker inspect --format '{{.Config.Image}}' "$HUB_APP_CONTAINER")"
+           PREVIOUS_RUNTIME_REVISION="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$PREVIOUS_IMAGE_REF" 2>/dev/null || true)"
+           if ! [[ "$PREVIOUS_RUNTIME_REVISION" =~ ^[a-f0-9]{40}$ ]]; then
+             PREVIOUS_RUNTIME_REVISION=legacy_unlabeled
+           fi
            BACKUP_ID="mbfd-hub-pre-activation-$(date -u +%Y%m%dT%H%M%SZ)-$RELEASE_SHA"
            BACKUP_FILE="$HUB_BACKUP_DIR/$BACKUP_ID.dump"
           umask 077
@@ -175,19 +558,42 @@ jobs:
           test -s "$BACKUP_FILE"
           docker exec -i "$HUB_PG_CONTAINER" pg_restore --list < "$BACKUP_FILE" > /dev/null
            BACKUP_SHA256="$(sha256sum "$BACKUP_FILE" | awk '{print $1}')"
-           printf 'release_sha=%s\nprevious_sha=%s\ncreated_at=%s\nbackup_file=%s\nsha256=%s\n' \
-             "$RELEASE_SHA" "$PREVIOUS_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BACKUP_FILE" "$BACKUP_SHA256" > "$HUB_BACKUP_DIR/$BACKUP_ID.metadata"
+           printf 'release_sha=%s\nimage_ref=%s\nprevious_runtime_revision=%s\nprevious_image=%s\ncreated_at=%s\nbackup_file=%s\nsha256=%s\n' \
+             "$RELEASE_SHA" "$HUB_IMAGE_REF" "$PREVIOUS_RUNTIME_REVISION" "$PREVIOUS_IMAGE_REF" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BACKUP_FILE" "$BACKUP_SHA256" > "$HUB_BACKUP_DIR/$BACKUP_ID.metadata"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" backup_verified not_requested
           echo "Verified Hub backup: $BACKUP_FILE sha256=$BACKUP_SHA256"
           REMOTE
 
       - name: Enter maintenance mode and verify queue safety
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
-          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_IMAGE_REF"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+
+          test -r "$HUB_ACTIVATION_STATE"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/)" = '200'
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" pre_cutover_maintenance_requested requested
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan down --render=errors::503
           test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/)" = '503'
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" pre_cutover_maintenance_entered entered
           QUEUE_PROCESSES="$(docker exec "$HUB_APP_CONTAINER" pgrep -af 'artisan queue:work' || true)"
           test -n "$QUEUE_PROCESSES"
           if printf '%s\n' "$QUEUE_PROCESSES" | grep -Eq -- '(^|[[:space:]])--force([[:space:]]|$)'; then
@@ -196,83 +602,183 @@ jobs:
           fi
           REMOTE
 
-      - name: Checkout exact approved candidate
+      - name: Migrate and activate immutable Hub image
         env:
           RELEASE_SHA: ${{ github.sha }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_APP_ENV_FILE: ${{ vars.MBFD_HUB_APP_ENV_FILE }}
+          HUB_STORAGE_PATH: ${{ vars.MBFD_HUB_STORAGE_PATH }}
+          HUB_NETWORK_NAME: ${{ vars.MBFD_HUB_NETWORK_NAME }}
+          HUB_WWWUSER: ${{ vars.MBFD_HUB_WWWUSER }}
+          HUB_WWWGROUP: ${{ vars.MBFD_HUB_WWWGROUP }}
+          HUB_GOOGLE_SA_PATH: ${{ vars.MBFD_HUB_GOOGLE_SA_PATH }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          test -n "$HUB_IMAGE_REF"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_APP_ENV_FILE"
+          test -n "$HUB_STORAGE_PATH"
+          test -n "$HUB_NETWORK_NAME"
+          test -n "$HUB_WWWUSER"
+          test -n "$HUB_WWWGROUP"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_APP_ENV_FILE='$HUB_APP_ENV_FILE' HUB_STORAGE_PATH='$HUB_STORAGE_PATH' HUB_NETWORK_NAME='$HUB_NETWORK_NAME' HUB_WWWUSER='$HUB_WWWUSER' HUB_WWWGROUP='$HUB_WWWGROUP' HUB_GOOGLE_SA_PATH='$HUB_GOOGLE_SA_PATH' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
-          cd /opt/mbfd/mbfd-hub
-          git fetch origin main --no-tags
-          test "$(git rev-parse origin/main)" = "$RELEASE_SHA"
-          git cat-file -e "$RELEASE_SHA^{commit}"
-          git checkout --detach "$RELEASE_SHA"
-          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_GOOGLE_SA_PATH="${HUB_GOOGLE_SA_PATH:-/dev/null}"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+
+          test -e "$HUB_SOURCE_WORKTREE/.git"
+          test "$(git -C "$HUB_SOURCE_WORKTREE" rev-parse HEAD)" = "$RELEASE_SHA"
+          test -f "$HUB_SOURCE_WORKTREE/compose.prod.image.yaml"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$HUB_IMAGE_REF")" = "$RELEASE_SHA"
+
+          run_image_artisan() {
+            IMAGE_MOUNTS=(
+              --mount "type=bind,src=$HUB_APP_ENV_FILE,dst=/var/www/html/.env,readonly"
+              --mount "type=bind,src=$HUB_STORAGE_PATH,dst=/var/www/html/storage"
+            )
+            if test "$HUB_GOOGLE_SA_PATH" != /dev/null; then
+              IMAGE_MOUNTS+=(--mount "type=bind,src=$HUB_GOOGLE_SA_PATH,dst=/run/secrets/google_service_account.json,readonly")
+            fi
+            docker run --rm --pull never \
+              --network "$HUB_NETWORK_NAME" \
+              --user "$HUB_WWWUSER:$HUB_WWWGROUP" \
+              --read-only \
+              --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+              --security-opt=no-new-privileges \
+              --cap-drop=ALL \
+              "${IMAGE_MOUNTS[@]}" \
+              --entrypoint php \
+              "$HUB_IMAGE_REF" artisan "$@"
+          }
+
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" pre_cutover_migration_status entered
+          run_image_artisan migrate:status --no-ansi
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" migration_started entered
+          run_image_artisan migrate --force
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" migration_complete entered
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" cutover_activation_started entered
+          run_image_artisan daily-checkout:activate-ledger --release-sha="$RELEASE_SHA" --no-interaction
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" cutover_activated entered
           REMOTE
 
-      - name: Migrate, build, and atomically swap Hub assets
+      - name: Switch only the Hub Laravel service to the immutable image
         env:
           RELEASE_SHA: ${{ github.sha }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_APP_ENV_FILE: ${{ vars.MBFD_HUB_APP_ENV_FILE }}
+          HUB_STORAGE_PATH: ${{ vars.MBFD_HUB_STORAGE_PATH }}
+          HUB_NETWORK_NAME: ${{ vars.MBFD_HUB_NETWORK_NAME }}
+          HUB_WWWUSER: ${{ vars.MBFD_HUB_WWWUSER }}
+          HUB_WWWGROUP: ${{ vars.MBFD_HUB_WWWGROUP }}
+          HUB_GOOGLE_SA_PATH: ${{ vars.MBFD_HUB_GOOGLE_SA_PATH }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          test -n "$HUB_IMAGE_REF"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_APP_ENV_FILE"
+          test -n "$HUB_STORAGE_PATH"
+          test -n "$HUB_NETWORK_NAME"
+          test -n "$HUB_WWWUSER"
+          test -n "$HUB_WWWGROUP"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_APP_ENV_FILE='$HUB_APP_ENV_FILE' HUB_STORAGE_PATH='$HUB_STORAGE_PATH' HUB_NETWORK_NAME='$HUB_NETWORK_NAME' HUB_WWWUSER='$HUB_WWWUSER' HUB_WWWGROUP='$HUB_WWWGROUP' HUB_GOOGLE_SA_PATH='$HUB_GOOGLE_SA_PATH' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
-          cd /opt/mbfd/mbfd-hub
-          test -n "$RELEASE_SHA"
-          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_GOOGLE_SA_PATH="${HUB_GOOGLE_SA_PATH:-/dev/null}"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+
+          test -e "$HUB_SOURCE_WORKTREE/.git"
+          test "$(git -C "$HUB_SOURCE_WORKTREE" rev-parse HEAD)" = "$RELEASE_SHA"
+          test -f "$HUB_SOURCE_WORKTREE/compose.prod.image.yaml"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$HUB_IMAGE_REF")" = "$RELEASE_SHA"
           test "$(docker inspect --format '{{.Name}}' "$HUB_APP_CONTAINER")" = "/$HUB_APP_CONTAINER"
-          test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_APP_CONTAINER")" = 'laravel.test'
-          docker exec -u sail "$HUB_APP_CONTAINER" composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
-          docker exec -u sail "$HUB_APP_CONTAINER" php artisan migrate:status --no-ansi
-          docker exec -u sail "$HUB_APP_CONTAINER" php artisan migrate --force
+          test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_APP_CONTAINER")" = laravel.test
+          HUB_COMPOSE_PROJECT="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$HUB_APP_CONTAINER")"
+          test -n "$HUB_COMPOSE_PROJECT"
+
+          HUB_COMPOSE_ENV="$(mktemp)"
+          trap 'rm -f "$HUB_COMPOSE_ENV"' EXIT
+          umask 077
+          {
+            printf 'HUB_IMAGE_REF=%s\n' "$HUB_IMAGE_REF"
+            printf 'HUB_APP_ENV_FILE=%s\n' "$HUB_APP_ENV_FILE"
+            printf 'HUB_STORAGE_PATH=%s\n' "$HUB_STORAGE_PATH"
+            printf 'HUB_NETWORK_NAME=%s\n' "$HUB_NETWORK_NAME"
+            printf 'HUB_WWWUSER=%s\n' "$HUB_WWWUSER"
+            printf 'HUB_WWWGROUP=%s\n' "$HUB_WWWGROUP"
+            printf 'HUB_GOOGLE_SA_PATH=%s\n' "$HUB_GOOGLE_SA_PATH"
+          } > "$HUB_COMPOSE_ENV"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" service_switch_started entered
+          docker compose --project-name "$HUB_COMPOSE_PROJECT" \
+            --env-file "$HUB_COMPOSE_ENV" \
+            -f "$HUB_SOURCE_WORKTREE/compose.prod.image.yaml" \
+            up -d --pull never --no-deps --force-recreate laravel.test
+
+          test "$(docker inspect --format '{{.Name}}' "$HUB_APP_CONTAINER")" = "/$HUB_APP_CONTAINER"
+          test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_APP_CONTAINER")" = laravel.test
+          test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$HUB_APP_CONTAINER")" = "$HUB_COMPOSE_PROJECT"
+          test "$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{printf "%s\n" $name}}{{end}}' "$HUB_APP_CONTAINER")" = "$HUB_NETWORK_NAME"
+          test "$(docker inspect --format '{{.Config.Image}}' "$HUB_APP_CONTAINER")" = "$HUB_IMAGE_REF"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" service_switch_recreated entered
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" post_switch_cache_started entered
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan optimize:clear
-          docker exec -u sail "$HUB_APP_CONTAINER" php artisan daily-checkout:activate-ledger --release-sha="$RELEASE_SHA" --no-interaction
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan config:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan route:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan view:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan filament:clear-cached-components
-          docker exec -u sail "$HUB_APP_CONTAINER" bash -lc 'set -euo pipefail
-            cd /var/www/html
-            rm -rf -- public/build-next public/daily-next
-            npm ci --legacy-peer-deps
-            npx vite build --outDir public/build-next --emptyOutDir
-            test -s public/build-next/manifest.json
-            php artisan filament:assets
-            cd resources/js/daily-checkout
-            npm ci --legacy-peer-deps
-            DAILY_CHECKOUT_OUT_DIR=../../../public/daily-next npm run build
-            test -s ../../../public/daily-next/index.html
-          '
-          docker exec -u sail "$HUB_APP_CONTAINER" bash -lc 'set -euo pipefail
-            cd /var/www/html
-            test -s public/build-next/manifest.json
-            test -s public/daily-next/index.html
-            archive_suffix=$(date -u +%Y%m%dT%H%M%SZ)
-            if test -e public/build-previous; then mv -- public/build-previous "public/build-previous-$archive_suffix"; fi
-            if test -e public/daily-previous; then mv -- public/daily-previous "public/daily-previous-$archive_suffix"; fi
-            if test -d public/build; then mv -- public/build public/build-previous; fi
-            if test -d public/daily; then mv -- public/daily public/daily-previous; fi
-            mv -- public/build-next public/build
-            mv -- public/daily-next public/daily
-            test -s public/build/manifest.json
-            test -s public/daily/index.html
-          '
-          docker compose -f compose.prod.yaml up -d --build --no-deps --force-recreate laravel.test
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" post_switch_cache_complete entered
           REMOTE
 
       - name: Verify Hub application health
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
-          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" health_verification_started entered
           for _ in $(seq 1 60); do
             if docker inspect --format='{{.State.Health.Status}}' "$HUB_APP_CONTAINER" | grep -qx healthy \
               && docker exec "$HUB_APP_CONTAINER" curl -fsS http://localhost:80/up > /dev/null; then
+              bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+                "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" health_verified entered
               exit 0
             fi
             sleep 1
@@ -282,11 +788,26 @@ jobs:
           REMOTE
 
       - name: Restart Hub queues and verify background services
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
-          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" queue_restart_started entered
           CACHE_DRIVER="$(docker exec -u sail "$HUB_APP_CONTAINER" php -r '
           require "/var/www/html/vendor/autoload.php";
           $app = require "/var/www/html/bootstrap/app.php";
@@ -324,33 +845,193 @@ jobs:
           docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/python3 /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf$'
           docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/php /var/www/html/artisan reverb:start '
           docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/php /var/www/html/artisan queue:work '
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" queue_restart_verified entered
           REMOTE
 
       - name: Leave maintenance mode and verify internal health
-        run: |
-          set -euo pipefail
-          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
-          set -euo pipefail
-          HUB_APP_CONTAINER=mbfd-hub-laravel
-          docker exec -u sail "$HUB_APP_CONTAINER" php artisan up
-          test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/up)" = '200'
-          REMOTE
-
-      - name: Record successful Hub candidate activation
         env:
           RELEASE_SHA: ${{ github.sha }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
           set -euo pipefail
-          cd /opt/mbfd/mbfd-hub
-          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
-          printf '{"sha":"%s","deployed_at":"%s"}\n' "$RELEASE_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > public/deploy-marker.json
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" maintenance_exit_started entered
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan up
+          test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/up)" = '200'
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" maintenance_exited not_requested
+          REMOTE
+
+      - name: Record successful Hub image activation
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_IMAGE_REF: ${{ needs.prepare-production-image.outputs.image_ref }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_IMAGE_REF"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          test "$(docker inspect --format '{{.Config.Image}}' "$HUB_APP_CONTAINER")" = "$HUB_IMAGE_REF"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$HUB_IMAGE_REF")" = "$RELEASE_SHA"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" activation_record_started not_requested
+          docker exec -u sail -e RELEASE_SHA -e HUB_IMAGE_REF "$HUB_APP_CONTAINER" sh -c '
+            set -eu
+            DEPLOYED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            printf '"'"'{"sha":"%s","image_ref":"%s","deployed_at":"%s"}\n'"'"' "$RELEASE_SHA" "$HUB_IMAGE_REF" "$DEPLOYED_AT" > /var/www/html/public/deploy-marker.json
+            printf '%s\n' "$DEPLOYED_AT" > /var/www/html/.build-time
+          '
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" activation_recorded not_requested
           REMOTE
 
       - name: Verify public Hub smoke routes
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_IMAGE_REF: ${{ needs.prepare-production-image.outputs.image_ref }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
         run: |
           set -euo pipefail
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_IMAGE_REF"
+          test -n "$HUB_RELEASE_ROOT"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" public_smoke_started not_requested
+          REMOTE
           curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 15 https://www.mbfdhub.com/up > /dev/null
           test "$(curl --silent --show-error --location --max-time 15 --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/)" = '200'
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="$HUB_BACKUP_DIR/$HUB_ACTIVATION_ID.state"
+          test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state"
+          test -r "$HUB_ACTIVATION_STATE"
+          bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" public_smoke_verified not_requested
+          REMOTE
+
+      - name: Remove temporary Hub source worktree after successful image activation
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_SHA"
+          test -n "$HUB_RELEASE_ROOT"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HUB_CHECKOUT=/opt/mbfd/mbfd-hub
+          HUB_SOURCE_WORKTREE="$HUB_RELEASE_ROOT/$RELEASE_SHA"
+
+          # This exact, clean, detached source-only worktree is never run as a
+          # service. Do not remove the live checkout or its preserved artifacts.
+          test -d "$HUB_CHECKOUT/.git"
+          test "$HUB_SOURCE_WORKTREE" = "$HUB_RELEASE_ROOT/$RELEASE_SHA"
+          case "$HUB_RELEASE_ROOT" in
+            ''|/|"$HUB_CHECKOUT"|"$HUB_CHECKOUT"/*)
+              echo 'Refusing to remove a source worktree rooted at the live checkout.' >&2
+              exit 1
+              ;;
+          esac
+          test ! -L "$HUB_SOURCE_WORKTREE"
+          test -e "$HUB_SOURCE_WORKTREE/.git"
+          test "$(git -C "$HUB_SOURCE_WORKTREE" rev-parse HEAD)" = "$RELEASE_SHA"
+          test -z "$(git -C "$HUB_SOURCE_WORKTREE" status --porcelain)"
+          git -C "$HUB_CHECKOUT" worktree remove "$HUB_SOURCE_WORKTREE"
+          test ! -e "$HUB_SOURCE_WORKTREE"
+          REMOTE
+
+      - name: Preserve Hub image activation failure evidence
+        if: ${{ failure() && env.HUB_SSH_CONFIG != '' && env.HUB_DEPLOYMENT_VARIABLES_VALIDATED == '1' }}
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          HUB_IMAGE_REF: ${{ needs.prepare-production-image.outputs.image_ref }}
+          HUB_RELEASE_ROOT: ${{ vars.MBFD_HUB_RELEASE_ROOT }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_ID: ${{ env.HUB_ACTIVATION_ID }}
+        run: |
+          set -u
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_IMAGE_REF='$HUB_IMAGE_REF' HUB_RELEASE_ROOT='$HUB_RELEASE_ROOT' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_ID='$HUB_ACTIVATION_ID' bash -s" <<'REMOTE' || true
+          set -u
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          HUB_SOURCE_WORKTREE="${HUB_RELEASE_ROOT:-}/$RELEASE_SHA"
+          HUB_ACTIVATION_STATE="${HUB_BACKUP_DIR:-}/$HUB_ACTIVATION_ID.state"
+          FAULT_PHASE=state_absent
+          MAINTENANCE_STATE=unknown
+          RECOVERY=not_attempted
+
+          if test -r "$HUB_ACTIVATION_STATE"; then
+            FAULT_PHASE="$(sed -n 's/^phase=//p' "$HUB_ACTIVATION_STATE" | tail -n 1)"
+            MAINTENANCE_STATE="$(sed -n 's/^maintenance_state=//p' "$HUB_ACTIVATION_STATE" | tail -n 1)"
+          fi
+          case "$FAULT_PHASE:$MAINTENANCE_STATE" in
+            pre_cutover_maintenance_requested:requested|pre_cutover_maintenance_entered:entered|pre_cutover_migration_status:entered)
+              HTTP_STATUS="$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/ 2>/dev/null || true)"
+              if test "$HTTP_STATUS" = 503; then
+                if docker exec -u sail "$HUB_APP_CONTAINER" php artisan up \
+                  && test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/)" = 200; then
+                  RECOVERY=pre_cutover_existing_release_restored
+                else
+                  RECOVERY=pre_cutover_recovery_failed
+                fi
+              else
+                RECOVERY=pre_cutover_existing_release_already_available
+              fi
+              ;;
+            *:not_requested)
+              RECOVERY=maintenance_not_owned_or_already_exited
+              ;;
+            *)
+              RECOVERY=post_migration_or_cutover_manual_decision_required
+              ;;
+          esac
+
+          if test -f "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+            && test -d "${HUB_BACKUP_DIR:-}" \
+            && test -n "${RELEASE_SHA:-}" \
+            && test -n "${HUB_IMAGE_REF:-}"; then
+            bash "$HUB_SOURCE_WORKTREE/docker/production/write-activation-state" \
+              "$HUB_ACTIVATION_STATE" "$RELEASE_SHA" "$HUB_IMAGE_REF" fault "$MAINTENANCE_STATE" "$FAULT_PHASE" "$RECOVERY" || true
+          fi
+          echo "Hub activation failed at phase=$FAULT_PHASE maintenance_state=$MAINTENANCE_STATE recovery=$RECOVERY. No automatic database rollback is attempted."
+          docker ps --filter "name=^/$HUB_APP_CONTAINER$" --format 'name={{.Names}} image={{.Image}} state={{.State}}'
+          docker inspect --format 'name={{.Name}} image={{.Config.Image}} state={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{end}} revision={{index .Config.Labels "org.opencontainers.image.revision"}}' "$HUB_APP_CONTAINER" || true
+          docker image inspect --format 'image={{index .RepoDigests 0}} revision={{index .Config.Labels "org.opencontainers.image.revision"}}' "$HUB_IMAGE_REF" || true
+          exit 0
+          REMOTE
