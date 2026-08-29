@@ -363,7 +363,9 @@ final class DailyCheckoutInspectionSessionService
             $query->where('actor_session_hash', $actorSessionHash);
         }
 
-        return $query->orderBy('id')->first();
+        $session = $query->orderBy('id')->first();
+
+        return $session instanceof DailyCheckoutInspectionSession ? $session : null;
     }
 
     private function activeContractForApparatus(int $apparatusId, CarbonImmutable $issuedAt): ?DailyCheckoutInspectionSession
