@@ -11,7 +11,7 @@ Group=ollama-proxy
 LoadCredential=api-key:/etc/ollama-ai-proxy/api-key
 Environment=OLLAMA_PROXY_API_KEY_FILE=%d/api-key
 Environment=OLLAMA_PROXY_HOST=127.0.0.1
-Environment=OLLAMA_PROXY_LISTEN_HOSTS=127.0.0.1,172.17.0.1
+Environment=OLLAMA_PROXY_LISTEN_HOSTS=127.0.0.1,172.20.11.1
 Environment=OLLAMA_PROXY_PORT=11440
 ExecStart=/usr/bin/python3 /opt/ollama-ai-proxy/ollama_ai_proxy.py
 Restart=on-failure

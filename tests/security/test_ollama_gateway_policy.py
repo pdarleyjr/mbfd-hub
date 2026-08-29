@@ -186,13 +186,13 @@ class GatewayPolicyTests(unittest.TestCase):
     def test_service_binds_only_loopback_and_private_docker_gateway(self) -> None:
         unit = MODULE_PATH.with_name("ollama-ai-proxy.service").read_text(encoding="utf-8")
         self.assertIn(
-            "Environment=OLLAMA_PROXY_LISTEN_HOSTS=127.0.0.1,172.17.0.1", unit
+            "Environment=OLLAMA_PROXY_LISTEN_HOSTS=127.0.0.1,172.20.11.1", unit
         )
         self.assertNotIn("OLLAMA_PROXY_LISTEN_HOSTS=0.0.0.0", unit)
 
     def test_migration_checks_both_private_listeners(self) -> None:
         migration = MODULE_PATH.with_name("migrate-ollama-ai-proxy.sh").read_text(encoding="utf-8")
-        self.assertIn("172.17.0.1:11440", migration)
+        self.assertIn("172.20.11.1:11440", migration)
 
     def test_credential_directory_expands_systemd_specifier(self) -> None:
         with mock.patch.dict(

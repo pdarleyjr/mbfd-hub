@@ -86,7 +86,7 @@ if [[ ${proxy_ready} != true ]] \
     exit 3
 fi
 
-if ! ss -ltn '( sport = :11440 )' | grep -q '172.17.0.1:11440'; then
+if ! ss -ltn '( sport = :11440 )' | grep -q '172.20.11.1:11440'; then
     cp --archive "$BACKUP_DIR/ollama-ai-proxy.service.before" "$UNIT_FILE"
     cp --archive "$BACKUP_DIR/ollama_ai_proxy.py.before" "$SCRIPT_FILE"
     systemctl daemon-reload
