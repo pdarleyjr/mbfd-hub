@@ -64,6 +64,25 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         )->assertCreated();
     }
 
+    public function test_same_authenticated_actor_reuses_its_active_contract(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        Sanctum::actingAs(User::factory()->create());
+
+        $first = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions")
+            ->assertCreated();
+        $browserCookie = $this->browserBindingCookieFrom($first);
+        $retry = $this->withCredentials()->withUnencryptedCookie($browserCookie->getName(), $browserCookie->getValue())
+            ->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions")
+            ->assertOk();
+
+        $retry
+            ->assertJsonPath('inspection_session.id', $first->json('inspection_session.id'))
+            ->assertJsonPath('inspection_session.token', $first->json('inspection_session.token'));
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 1);
+    }
+
     public function test_contract_started_before_midnight_keeps_its_original_duty_date_after_midnight(): void
     {
         $apparatus = $this->makeFireBoat6();
