@@ -151,6 +151,49 @@ class GatewayPolicyTests(unittest.TestCase):
             )
         )
 
+    def test_listener_hosts_default_to_existing_loopback_setting(self) -> None:
+        with mock.patch.dict(
+            proxy.os.environ,
+            {"OLLAMA_PROXY_HOST": "127.0.0.1"},
+            clear=True,
+        ):
+            self.assertEqual(("127.0.0.1",), proxy.listen_hosts_from_environment())
+
+    def test_listener_hosts_allow_explicit_private_multi_bind(self) -> None:
+        with mock.patch.dict(
+            proxy.os.environ,
+            {
+                "OLLAMA_PROXY_HOST": "127.0.0.1",
+                "OLLAMA_PROXY_LISTEN_HOSTS": "127.0.0.1,172.17.0.1",
+            },
+            clear=True,
+        ):
+            self.assertEqual(
+                ("127.0.0.1", "172.17.0.1"),
+                proxy.listen_hosts_from_environment(),
+            )
+
+    def test_listener_hosts_reject_empty_or_duplicate_entries(self) -> None:
+        for value in ("", "127.0.0.1,127.0.0.1"):
+            with self.subTest(value=value), mock.patch.dict(
+                proxy.os.environ,
+                {"OLLAMA_PROXY_LISTEN_HOSTS": value},
+                clear=True,
+            ):
+                with self.assertRaises(ValueError):
+                    proxy.listen_hosts_from_environment()
+
+    def test_service_binds_only_loopback_and_private_docker_gateway(self) -> None:
+        unit = MODULE_PATH.with_name("ollama-ai-proxy.service").read_text(encoding="utf-8")
+        self.assertIn(
+            "Environment=OLLAMA_PROXY_LISTEN_HOSTS=127.0.0.1,172.17.0.1", unit
+        )
+        self.assertNotIn("OLLAMA_PROXY_LISTEN_HOSTS=0.0.0.0", unit)
+
+    def test_migration_checks_both_private_listeners(self) -> None:
+        migration = MODULE_PATH.with_name("migrate-ollama-ai-proxy.sh").read_text(encoding="utf-8")
+        self.assertIn("172.17.0.1:11440", migration)
+
     def test_credential_directory_expands_systemd_specifier(self) -> None:
         with mock.patch.dict(
             proxy.os.environ,

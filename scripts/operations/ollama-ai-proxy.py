@@ -195,6 +195,16 @@ def bounded_positive_int_env(name: str, default: int, maximum: int) -> int:
     return value
 
 
+def listen_hosts_from_environment() -> tuple[str, ...]:
+    configured = os.environ.get(
+        "OLLAMA_PROXY_LISTEN_HOSTS", os.environ.get("OLLAMA_PROXY_HOST", "127.0.0.1")
+    )
+    hosts = tuple(value.strip() for value in configured.split(",") if value.strip())
+    if not hosts or len(hosts) != len(set(hosts)):
+        raise ValueError("OLLAMA_PROXY_LISTEN_HOSTS must contain distinct non-empty hosts")
+    return hosts
+
+
 def build_policy_from_environment() -> GatewayPolicy:
     return GatewayPolicy(
         general_model=os.environ.get("OLLAMA_PROXY_GENERAL_MODEL", "mbfd-general").strip(),
@@ -263,6 +273,7 @@ UPSTREAM = validate_upstream(
 )
 OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect)
 LISTEN_HOST = os.environ.get("OLLAMA_PROXY_HOST", "127.0.0.1")
+LISTEN_HOSTS = listen_hosts_from_environment()
 LISTEN_PORT = bounded_positive_int_env("OLLAMA_PROXY_PORT", 11440, 65535)
 REQUEST_TIMEOUT_SECONDS = bounded_positive_int_env("OLLAMA_PROXY_TIMEOUT_SECONDS", 600, 900)
 CLIENT_READ_TIMEOUT_SECONDS = bounded_positive_int_env(
@@ -651,5 +662,11 @@ if __name__ == "__main__":
     if not API_KEY:
         raise SystemExit("OLLAMA proxy credential is empty")
 
-    log(f"Ollama AI proxy starting on {LISTEN_HOST}:{LISTEN_PORT} -> {UPSTREAM}")
-    GatewayHTTPServer((LISTEN_HOST, LISTEN_PORT), Handler).serve_forever()
+    servers = [GatewayHTTPServer((host, LISTEN_PORT), Handler) for host in LISTEN_HOSTS]
+    log(
+        f"Ollama AI proxy starting on {', '.join(f'{host}:{LISTEN_PORT}' for host in LISTEN_HOSTS)} "
+        f"-> {UPSTREAM}"
+    )
+    for server in servers[:-1]:
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    servers[-1].serve_forever()
