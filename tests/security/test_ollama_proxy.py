@@ -117,6 +117,17 @@ class OllamaProxyStreamingTest(unittest.TestCase):
                     self.close_connection = True
                     return
 
+                if content == "sse done":
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/event-stream")
+                    self.end_headers()
+                    self.wfile.write(b'data: {"event":"delta"}\n\n')
+                    self.wfile.write(b"data: [DONE]\n\n")
+                    self.wfile.flush()
+                    time.sleep(0.5)
+                    self.close_connection = True
+                    return
+
                 self.send_response(200)
                 self.send_header("Content-Type", "application/x-ndjson")
                 self.send_header("Connection", "close")
@@ -373,6 +384,34 @@ class OllamaProxyStreamingTest(unittest.TestCase):
         self.assertEqual(32768, self.upstream_requests[0]["options"]["num_ctx"])
         self.assertEqual(gateway_request_id, self.upstream_request_ids[0])
 
+
+    def test_sse_done_closes_downstream_without_waiting_for_upstream_close(self):
+        connection = http.client.HTTPConnection("127.0.0.1", self.gateway.server_port)
+        started = time.monotonic()
+        connection.request(
+            "POST",
+            "/v1/chat/completions",
+            body=json.dumps(
+                {
+                    "model": "mbfd-general",
+                    "messages": [{"role": "user", "content": "sse done"}],
+                    "stream": True,
+                }
+            ),
+            headers={
+                "Authorization": "Bearer test-gateway-key",
+                "Content-Type": "application/json",
+            },
+        )
+        response = connection.getresponse()
+        body = response.read()
+        elapsed = time.monotonic() - started
+        connection.close()
+
+        self.assertEqual(200, response.status)
+        self.assertEqual("chunked", response.getheader("Transfer-Encoding"))
+        self.assertIn(b"data: [DONE]\n\n", body)
+        self.assertLess(elapsed, 0.3)
 
 if __name__ == "__main__":
     unittest.main()

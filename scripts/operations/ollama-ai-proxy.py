@@ -404,13 +404,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except ValueError:
             expected_length = None
         sent = 0
+        is_sse = "text/event-stream" in response.headers.get("Content-Type", "").lower()
+        sse_line_buffer = b""
         try:
             status = getattr(response, "status", getattr(response, "code", 502))
             self.send_response(status)
             for key, value in response.headers.items():
                 if (
                     key.lower() not in HOP_BY_HOP_RESPONSE_HEADERS
-                    and key.lower() != "x-request-id"
+                    and key.lower() not in {"content-length", "x-request-id"}
                 ):
                     self.send_header(key, value)
             self.send_header("X-Request-ID", self._request_id())
@@ -423,6 +425,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(chunk)
                 self.wfile.write(b"\r\n")
                 self.wfile.flush()
+                if is_sse:
+                    sse_line_buffer += chunk
+                    while b"\n" in sse_line_buffer:
+                        line, sse_line_buffer = sse_line_buffer.split(b"\n", 1)
+                        if line.rstrip(b"\r") != b"data: [DONE]":
+                            continue
+                        self.wfile.write(b"0\r\n\r\n")
+                        self.wfile.flush()
+                        return sent, "complete"
             if expected_length is not None and sent != expected_length:
                 self.close_connection = True
                 return sent, "upstream_stream_error"
