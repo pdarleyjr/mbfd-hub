@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+for variable in WWWUSER WWWGROUP; do
+    value="${!variable:-}"
+
+    if ! [[ "$value" =~ ^[0-9]+$ ]] || [[ "$value" =~ ^0+$ ]]; then
+        echo "$variable must be a non-root numeric UID or GID." >&2
+        exit 1
+    fi
+done
+
+if [ "$(id -u sail)" != "$WWWUSER" ] || [ "$(id -g sail)" != "$WWWGROUP" ]; then
+    echo 'The baked sail identity does not match the requested runtime identity.' >&2
+    exit 1
+fi
+
+if [ "$(id -u)" = '0' ] || [ "$(id -un)" != 'sail' ] \
+    || [ "$(id -u)" != "$WWWUSER" ] || [ "$(id -g)" != "$WWWGROUP" ]; then
+    echo 'The production container must start as the baked non-root sail identity.' >&2
+    exit 1
+fi
+
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf

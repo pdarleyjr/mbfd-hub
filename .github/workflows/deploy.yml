@@ -6,6 +6,14 @@ name: Deploy approved Hub candidate
 on:
   workflow_dispatch:
     inputs:
+      final_release_sha:
+        description: 'Exact 40-character main SHA represented by the immutable image.'
+        required: true
+        type: string
+      final_image_digest:
+        description: 'Exact GHCR image digest in sha256:<64 lowercase hex> form.'
+        required: true
+        type: string
       confirm_production_activation:
         description: 'I confirm this approved main candidate may activate the MBFD Hub production runtime.'
         required: true
@@ -27,12 +35,19 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Require main and explicit activation confirmation
+        env:
+          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
+          FINAL_IMAGE_DIGEST: ${{ inputs.final_image_digest }}
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/main"
           test "${{ inputs.confirm_production_activation }}" = "true"
           test -n "$GITHUB_SHA"
-
+          test "$FINAL_RELEASE_SHA" = "$GITHUB_SHA"
+          [[ "$FINAL_IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo 'final_image_digest must be a lowercase sha256 digest.' >&2
+            exit 1
+          }
   release-gates:
     needs: assert-main
     uses: ./.github/workflows/hub-release-gates.yml
@@ -107,6 +122,19 @@ jobs:
             exit 1
           fi
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan migrate:status --no-ansi
+          REMOTE
+
+      - name: Pull and verify immutable Hub image
+        env:
+          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
+          FINAL_IMAGE_DIGEST: ${{ inputs.final_image_digest }}
+        run: |
+          set -euo pipefail
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "FINAL_RELEASE_SHA='$FINAL_RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' bash -s" <<'REMOTE'
+          set -euo pipefail
+          IMAGE_REF="ghcr.io/pdarleyjr/mbfd_hub@$FINAL_IMAGE_DIGEST"
+          docker pull "$IMAGE_REF"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_REF")" = "$FINAL_RELEASE_SHA"
           REMOTE
 
       - name: Verify targeted Hub database backup
@@ -212,21 +240,36 @@ jobs:
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
           REMOTE
 
-      - name: Migrate, build, and atomically swap Hub assets
+      - name: Migrate and activate prebuilt Hub image
         env:
           RELEASE_SHA: ${{ github.sha }}
+          FINAL_IMAGE_DIGEST: ${{ inputs.final_image_digest }}
+          HUB_IMAGE_RUNTIME_ENV: ${{ vars.MBFD_HUB_IMAGE_RUNTIME_ENV }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          test -n "$FINAL_IMAGE_DIGEST"
+          test -n "$HUB_IMAGE_RUNTIME_ENV"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' bash -s" <<'REMOTE'
           set -euo pipefail
+          HUB_CHECKOUT=/opt/mbfd/mbfd-hub
           HUB_APP_CONTAINER=mbfd-hub-laravel
-          cd /opt/mbfd/mbfd-hub
-          test -n "$RELEASE_SHA"
+          IMAGE_REF="ghcr.io/pdarleyjr/mbfd_hub@$FINAL_IMAGE_DIGEST"
+
+          case "$HUB_IMAGE_RUNTIME_ENV" in
+            /*) ;;
+            *) echo 'MBFD_HUB_IMAGE_RUNTIME_ENV must be an absolute host-managed file path.' >&2; exit 1 ;;
+          esac
+          test -f "$HUB_IMAGE_RUNTIME_ENV"
+          cd "$HUB_CHECKOUT"
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_REF")" = "$RELEASE_SHA"
+
+          HUB_IMAGE_REF="$IMAGE_REF" docker compose --env-file "$HUB_IMAGE_RUNTIME_ENV" \
+            -f compose.prod.image.yaml up -d --pull never --no-build --no-deps --force-recreate laravel.test
+
           test "$(docker inspect --format '{{.Name}}' "$HUB_APP_CONTAINER")" = "/$HUB_APP_CONTAINER"
           test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_APP_CONTAINER")" = 'laravel.test'
-          docker exec -u sail "$HUB_APP_CONTAINER" composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan migrate:status --no-ansi
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan migrate --force
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan optimize:clear
@@ -235,33 +278,6 @@ jobs:
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan route:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan view:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan filament:clear-cached-components
-          docker exec -u sail "$HUB_APP_CONTAINER" bash -lc 'set -euo pipefail
-            cd /var/www/html
-            rm -rf -- public/build-next public/daily-next
-            npm ci --legacy-peer-deps
-            npx vite build --outDir public/build-next --emptyOutDir
-            test -s public/build-next/manifest.json
-            php artisan filament:assets
-            cd resources/js/daily-checkout
-            npm ci --legacy-peer-deps
-            DAILY_CHECKOUT_OUT_DIR=../../../public/daily-next npm run build
-            test -s ../../../public/daily-next/index.html
-          '
-          docker exec -u sail "$HUB_APP_CONTAINER" bash -lc 'set -euo pipefail
-            cd /var/www/html
-            test -s public/build-next/manifest.json
-            test -s public/daily-next/index.html
-            archive_suffix=$(date -u +%Y%m%dT%H%M%SZ)
-            if test -e public/build-previous; then mv -- public/build-previous "public/build-previous-$archive_suffix"; fi
-            if test -e public/daily-previous; then mv -- public/daily-previous "public/daily-previous-$archive_suffix"; fi
-            if test -d public/build; then mv -- public/build public/build-previous; fi
-            if test -d public/daily; then mv -- public/daily public/daily-previous; fi
-            mv -- public/build-next public/build
-            mv -- public/daily-next public/daily
-            test -s public/build/manifest.json
-            test -s public/daily/index.html
-          '
-          docker compose -f compose.prod.yaml up -d --build --no-deps --force-recreate laravel.test
           REMOTE
 
       - name: Verify Hub application health

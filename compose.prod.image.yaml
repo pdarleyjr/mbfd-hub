@@ -1,0 +1,38 @@
+# Dedicated Laravel-service switch for immutable production images. It never
+# declares PostgreSQL or Redis, so `up --no-deps laravel.test` cannot recreate
+# shared dependencies. The existing production network must already contain
+# their `pgsql` and `redis` aliases.
+services:
+  laravel.test:
+    image: "${HUB_IMAGE_REF:?HUB_IMAGE_REF must be an immutable image digest}"
+    container_name: mbfd-hub-laravel
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8080:8081"
+      - "127.0.0.1:8090:8080"
+    environment:
+      WWWUSER: "${HUB_WWWUSER:?HUB_WWWUSER must match the mounted storage owner}"
+      WWWGROUP: "${HUB_WWWGROUP:?HUB_WWWGROUP must match the mounted storage group}"
+      LARAVEL_SAIL: 1
+      XDEBUG_MODE: "off"
+    volumes:
+      - "${HUB_APP_ENV_FILE:?HUB_APP_ENV_FILE must point to the host-managed Laravel environment file}:/var/www/html/.env:ro"
+      - "${HUB_STORAGE_PATH:?HUB_STORAGE_PATH must be the existing writable Hub storage directory}:/var/www/html/storage"
+      - "${HUB_GOOGLE_SA_PATH:-/dev/null}:/run/secrets/google_service_account.json:ro"
+    networks:
+      - mbfd-net
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/up"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  mbfd-net:
+    external: true
+    name: "${HUB_NETWORK_NAME:?HUB_NETWORK_NAME must name the existing Hub Docker network}"
