@@ -80,7 +80,6 @@ jobs:
       - name: Build immutable Hub image once
         env:
           FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           IMAGE_LOCAL="mbfd-hub-candidate:$FINAL_RELEASE_SHA"
@@ -91,7 +90,6 @@ jobs:
             --build-arg "SOURCE_REVISION=$FINAL_RELEASE_SHA" \
             --build-arg "WWWUSER=1000" \
             --build-arg "WWWGROUP=1000" \
-            --secret id=composer_auth,env=GITHUB_TOKEN \
             "$IMAGE_BUILD_CONTEXT"
 
       - name: Test immutable Hub image contents and identity
