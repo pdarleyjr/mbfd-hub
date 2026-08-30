@@ -116,6 +116,10 @@ test("Composer CI installs use an ephemeral GitHub token instead of a persisted 
 
 test("production activation is manual, main-only, and blocked by every Hub release gate", () => {
   const deploy = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
+  const prepare = readFileSync(resolve(root, ".github/workflows/prepare-production-image.yml"), "utf8");
+  const imageCompose = readFileSync(resolve(root, "compose.prod.image.yaml"), "utf8");
+  const productionDockerfile = readFileSync(resolve(root, "docker/production/Dockerfile"), "utf8");
+  const productionEntrypoint = readFileSync(resolve(root, "docker/production/start-production-container"), "utf8");
   const gates = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
   const requiredGateJobs = [
     "ci-configuration",
@@ -134,6 +138,10 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(deploy, /^on:\r?\n  workflow_dispatch:/m);
   assert.doesNotMatch(deploy, /^  push:/m);
   assert.match(deploy, /confirm_production_activation:/);
+  assert.match(deploy, /final_release_sha:/);
+  assert.match(deploy, /final_image_digest:/);
+  assert.match(deploy, /FINAL_RELEASE_SHA/);
+  assert.match(deploy, /FINAL_IMAGE_DIGEST/);
   assert.match(
     deploy,
     /^permissions:\r?\n  contents: read\r?\n  pull-requests: read$/m,
@@ -144,6 +152,9 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(assertMain, /if:\s*\$\{\{\s*github\.ref\s*==\s*'refs\/heads\/main'\s*\}\}/);
   assert.match(assertMain, /test "\$GITHUB_REF" = "refs\/heads\/main"/);
   assert.match(assertMain, /inputs\.confirm_production_activation/);
+  assert.match(assertMain, /inputs\.final_release_sha/);
+  assert.match(assertMain, /inputs\.final_image_digest/);
+  assert.match(assertMain, /sha256:/);
 
   const releaseGateCaller = workflowJob(deploy, "release-gates");
   assert.match(releaseGateCaller, /needs:\s*assert-main/);
@@ -213,29 +224,34 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(databaseBackup, /BACKUP_FILE="\$HUB_BACKUP_DIR\//);
   assert.doesNotMatch(databaseBackup, /BACKUP_DIR=\/var\/lib\/postgresql\/data/);
 
+  const immutableImage = workflowStep(deployment, "Pull and verify immutable Hub image");
+  assert.match(immutableImage, /docker pull/);
+  assert.match(immutableImage, /ghcr\.io\//);
+  assert.match(immutableImage, /org\.opencontainers\.image\.revision/);
+  assert.match(immutableImage, /FINAL_RELEASE_SHA/);
+  assert.match(immutableImage, /FINAL_IMAGE_DIGEST/);
+
   const maintenance = workflowStep(deployment, "Enter maintenance mode and verify queue safety");
   assert.match(maintenance, /php artisan down --render=errors::503/);
   assert.match(maintenance, /http:\/\/localhost\//);
   assert.match(maintenance, /'503'/);
   assert.match(maintenance, /--force/);
 
-  const activation = workflowStep(deployment, "Migrate, build, and atomically swap Hub assets");
+  const activation = workflowStep(deployment, "Migrate and activate prebuilt Hub image");
   assert.match(activation, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
   assert.match(activation, /test -n "\$RELEASE_SHA"/);
-  assert.match(activation, /RELEASE_SHA='\$RELEASE_SHA' bash -s/);
+  assert.match(activation, /RELEASE_SHA='\$RELEASE_SHA'.*bash -s/);
   assert.match(activation, /test "\$\(git rev-parse HEAD\)" = "\$RELEASE_SHA"/);
   assert.match(activation, /php artisan migrate:status/);
+  assert.match(activation, /compose\.prod\.image\.yaml/);
+  assert.match(activation, /--no-build --no-deps --force-recreate laravel\.test/);
+  assert.doesNotMatch(activation, /composer install|npm ci|vite build|filament:assets/);
   assert.match(activation, /daily-checkout:activate-ledger --release-sha="\$RELEASE_SHA" --no-interaction/);
-  assert.match(activation, /public\/build-next/);
-  assert.match(activation, /public\/daily-next/);
-  assert.match(activation, /public\/build-previous/);
-  assert.match(activation, /public\/daily-previous/);
-  assert.match(activation, /--no-deps --force-recreate laravel\.test/);
   assert.doesNotMatch(activation, /docker compose .* down|docker (?:system )?prune/);
+  const recreateIndex = activation.indexOf("--no-build --no-deps --force-recreate laravel.test");
   const migrationIndex = activation.indexOf("php artisan migrate --force");
   const cutoverIndex = activation.indexOf("daily-checkout:activate-ledger");
-  const recreateIndex = activation.indexOf("--no-deps --force-recreate laravel.test");
-  assert.ok(migrationIndex >= 0 && cutoverIndex > migrationIndex && recreateIndex > cutoverIndex);
+  assert.ok(recreateIndex >= 0 && migrationIndex > recreateIndex && cutoverIndex > migrationIndex);
   const cutoverCommand = activation.match(/[^\r\n]*daily-checkout:activate-ledger[^\r\n]*/)?.[0] ?? "";
   assert.doesNotMatch(cutoverCommand, /\|\|\s*true|--force/);
 
@@ -252,6 +268,37 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(successfulActivation, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
   assert.match(successfulActivation, /git rev-parse HEAD/);
   assert.match(successfulActivation, /deploy-marker\.json/);
+
+  assert.doesNotMatch(deploy, /docker compose[^\r\n]*--build/);
+  assert.doesNotMatch(deploy, /docker compose[^\r\n]*(?:down|prune)/);
+
+  assert.match(prepare, /^on:\r?\n  workflow_dispatch:/m);
+  assert.doesNotMatch(prepare, /^  push:/m);
+  assert.match(prepare, /final_release_sha:/);
+  assert.match(prepare, /uses:\s*\.\/\.github\/workflows\/hub-release-gates\.yml/);
+  assert.match(prepare, /docker buildx build/);
+  assert.match(prepare, /SOURCE_REVISION/);
+  assert.match(prepare, /WWWUSER=1000/);
+  assert.match(prepare, /WWWGROUP=1000/);
+  assert.match(prepare, /docker push/);
+  assert.match(prepare, /cyclonedx/);
+  assert.match(prepare, /trivy/);
+  assert.match(prepare, /org\.opencontainers\.image\.revision/);
+  assert.doesNotMatch(prepare, /self-hosted|ssh |DEPLOY_SSH_KEY|environment:\s*\r?\n\s+name:\s*production/i);
+
+  assert.match(imageCompose, /image:\s*"\$\{HUB_IMAGE_REF/);
+  assert.match(imageCompose, /HUB_APP_ENV_FILE.*\.env:ro/);
+  assert.match(imageCompose, /HUB_STORAGE_PATH.*\/var\/www\/html\/storage/);
+  assert.match(imageCompose, /external:\s*true/);
+  assert.doesNotMatch(imageCompose, /\bbuild:/);
+  assert.doesNotMatch(imageCompose, /\.\s*:\/var\/www\/html/);
+  assert.doesNotMatch(imageCompose, /^\s{2}(?:pgsql|redis):/m);
+
+  assert.match(productionDockerfile, /ARG SOURCE_REVISION/);
+  assert.match(productionDockerfile, /org\.opencontainers\.image\.revision/);
+  assert.match(productionDockerfile, /USER sail/);
+  assert.doesNotMatch(productionEntrypoint, /\b(?:user|group)mod\b|\bchown\b/);
+  assert.match(productionEntrypoint, /baked non-root sail identity/);
 
   const aggregate = workflowJob(gates, "release-gates");
   assert.doesNotMatch(aggregate, /if:\s*\$\{\{\s*always\(\)\s*\}\}/);

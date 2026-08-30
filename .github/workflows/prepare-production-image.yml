@@ -1,0 +1,147 @@
+name: Prepare immutable Hub production image
+
+# This workflow is deliberately limited to a disposable GitHub-hosted runner.
+# It proves and publishes an immutable candidate, but never contacts production.
+on:
+  workflow_dispatch:
+    inputs:
+      final_release_sha:
+        description: 'Exact 40-character main SHA to build and publish.'
+        required: true
+        type: string
+      confirm_image_publication:
+        description: 'I confirm this exact main SHA may be published to GHCR after all gates pass.'
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: production-image-preparation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read
+  packages: write
+
+jobs:
+  assert-main:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require exact current main candidate and publication confirmation
+        env:
+          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
+          CONFIRM_IMAGE_PUBLICATION: ${{ inputs.confirm_image_publication }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$CONFIRM_IMAGE_PUBLICATION" = "true"
+          [[ "$FINAL_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo 'final_release_sha must be a lowercase 40-character commit SHA.' >&2
+            exit 1
+          }
+          test "$GITHUB_SHA" = "$FINAL_RELEASE_SHA"
+
+  release-gates:
+    needs: assert-main
+    uses: ./.github/workflows/hub-release-gates.yml
+    with:
+      pint_base_sha: ${{ format('{0}^', github.sha) }}
+
+  build-test-scan-publish:
+    needs: release-gates
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      image_ref: ${{ steps.publish.outputs.image_ref }}
+      image_digest: ${{ steps.publish.outputs.image_digest }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ inputs.final_release_sha }}
+          fetch-depth: 1
+
+      - name: Verify isolated immutable build context
+        env:
+          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$FINAL_RELEASE_SHA"
+          test -z "$(git status --porcelain)"
+          IMAGE_BUILD_CONTEXT="$RUNNER_TEMP/mbfd-hub-image-source"
+          mkdir -p "$IMAGE_BUILD_CONTEXT"
+          git archive --format=tar "$FINAL_RELEASE_SHA" | tar -x -C "$IMAGE_BUILD_CONTEXT"
+          test -z "$(find "$IMAGE_BUILD_CONTEXT" -mindepth 1 -maxdepth 1 -name .git -print -quit)"
+          printf 'IMAGE_BUILD_CONTEXT=%s\n' "$IMAGE_BUILD_CONTEXT" >> "$GITHUB_ENV"
+
+      - name: Build immutable Hub image once
+        env:
+          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          IMAGE_LOCAL="mbfd-hub-candidate:$FINAL_RELEASE_SHA"
+          printf 'IMAGE_LOCAL=%s\n' "$IMAGE_LOCAL" >> "$GITHUB_ENV"
+          docker buildx build --load \
+            --tag "$IMAGE_LOCAL" \
+            --file "$IMAGE_BUILD_CONTEXT/docker/production/Dockerfile" \
+            --build-arg "SOURCE_REVISION=$FINAL_RELEASE_SHA" \
+            --build-arg "WWWUSER=1000" \
+            --build-arg "WWWGROUP=1000" \
+            --secret id=composer_auth,env=GITHUB_TOKEN \
+            "$IMAGE_BUILD_CONTEXT"
+
+      - name: Test immutable Hub image contents and identity
+        env:
+          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_LOCAL")" = "$FINAL_RELEASE_SHA"
+          docker run --rm --entrypoint sh "$IMAGE_LOCAL" -ec '
+            test "$(id -u)" = 1000
+            test "$(id -g)" = 1000
+            test "$(id -Gn)" = sail
+            test -s /var/www/html/public/build/manifest.json
+            test -s /var/www/html/public/daily/index.html
+            test -d /var/www/html/vendor
+            ! test -e /var/www/html/vendor/laravel/sail
+          '
+
+      - name: Generate CycloneDX SBOM for immutable image
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.18.0
+        with:
+          image: ${{ env.IMAGE_LOCAL }}
+          format: cyclonedx-json
+          artifact-name: mbfd-hub-image.cyclonedx.json
+
+      - name: Scan immutable Hub image with Trivy
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_LOCAL }}
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          format: table
+
+      - name: Push tested immutable Hub image and record digest
+        id: publish
+        env:
+          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          IMAGE_REPOSITORY="ghcr.io/${GITHUB_REPOSITORY,,}"
+          IMAGE_TAG="$IMAGE_REPOSITORY:sha-$FINAL_RELEASE_SHA"
+          printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker tag "$IMAGE_LOCAL" "$IMAGE_TAG"
+          docker push "$IMAGE_TAG"
+          IMAGE_DIGEST="sha256:$(docker buildx imagetools inspect --raw "$IMAGE_TAG" | sha256sum | awk '{print $1}')"
+          case "$IMAGE_DIGEST" in sha256:[0-9a-f][0-9a-f]*) ;; *) exit 1 ;; esac
+          IMAGE_REF="$IMAGE_REPOSITORY@$IMAGE_DIGEST"
+          docker pull "$IMAGE_REF"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_REF")" = "$FINAL_RELEASE_SHA"
+          printf 'image_ref=%s\n' "$IMAGE_REF" >> "$GITHUB_OUTPUT"
+          printf 'image_digest=%s\n' "$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"

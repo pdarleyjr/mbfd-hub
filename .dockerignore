@@ -1,0 +1,20 @@
+# The production image is a source artifact. Runtime configuration and mutable
+# state are mounted only when the image is started.
+.git
+.github
+.env*
+auth.json
+vendor/
+node_modules
+**/node_modules
+storage/
+public/build
+public/daily
+public/deploy-marker.json
+public/storage
+tests/
+test-results/
+playwright-report/
+.phpunit.cache
+.phpunit.result.cache
+*.log
