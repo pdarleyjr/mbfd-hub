@@ -140,7 +140,7 @@ jobs:
           for _ in $(seq 1 10); do
             status="$(docker exec "$RUNTIME_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status || true)"
             if printf '%s\n' "$status" | grep -Eq '^php +RUNNING ' \
-              && printf '%s\n' "$status" | grep -Eq '^queue-worker_00 +RUNNING ' \
+              && printf '%s\n' "$status" | grep -Eq '^queue-worker:queue-worker_00 +RUNNING ' \
               && printf '%s\n' "$status" | grep -Eq '^reverb +RUNNING ' \
               && printf '%s\n' "$status" | grep -Eq '^scheduler +RUNNING '; then
               break
@@ -149,7 +149,7 @@ jobs:
           done
           printf '%s\n' "$status"
           printf '%s\n' "$status" | grep -Eq '^php +RUNNING '
-          printf '%s\n' "$status" | grep -Eq '^queue-worker_00 +RUNNING '
+          printf '%s\n' "$status" | grep -Eq '^queue-worker:queue-worker_00 +RUNNING '
           printf '%s\n' "$status" | grep -Eq '^reverb +RUNNING '
           printf '%s\n' "$status" | grep -Eq '^scheduler +RUNNING '
           test "$(docker exec "$RUNTIME_CONTAINER" id -u)" = 1000

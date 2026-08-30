@@ -352,7 +352,7 @@ test("the immutable image starts Supervisor without privilege-switch directives"
   assert.match(runtime, /--network none/);
   assert.match(runtime, /supervisord --version/);
   assert.match(runtime, /supervisorctl -c \/etc\/supervisor\/conf\.d\/supervisord\.conf status/);
-  assert.match(runtime, /queue-worker_00 \+RUNNING/);
+  assert.match(runtime, /queue-worker:queue-worker_00 \+RUNNING/);
   assert.match(runtime, /test "\$\(docker exec "\$RUNTIME_CONTAINER" id -u\)" = 1000/);
   assert.match(runtime, /ps -eo uid=/);
   assert.match(runtime, /trap cleanup EXIT/);
