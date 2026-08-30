@@ -55,6 +55,12 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
             'replay_key' => $contract['replay_key'],
         ]);
         $persistedContract = DailyCheckoutInspectionSession::sole();
+        $this->assertInstanceOf(CarbonImmutable::class, $persistedContract->issued_at);
+        $this->assertInstanceOf(CarbonImmutable::class, $persistedContract->duty_date);
+        $this->assertIsArray($persistedContract->checklist_snapshot);
+        $this->assertIsArray($persistedContract->due_tasks);
+        $this->assertInstanceOf(CarbonImmutable::class, $persistedContract->expires_at);
+        $this->assertNull($persistedContract->abandoned_at);
         $this->assertSame('2026-08-31', $persistedContract->duty_date?->toDateString());
         $this->assertNotSame($contract['token'], $persistedContract->token_hash);
 
@@ -458,6 +464,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         $priorRecord = DailyCheckoutInspectionSession::query()->where('public_id', $prior['id'])->sole();
         $todayRecord = DailyCheckoutInspectionSession::query()->where('public_id', $today['id'])->sole();
         $this->assertNotNull($priorRecord->abandoned_at);
+        $this->assertInstanceOf(CarbonImmutable::class, $priorRecord->abandoned_at);
         $this->assertTrue($priorRecord->abandoned_at->greaterThan($priorRecord->issued_at));
         $this->assertSame($actor->id, $priorRecord->abandoned_by_user_id);
         $this->assertSame($priorRecord->actor_session_hash, $priorRecord->abandoned_by_session_hash);

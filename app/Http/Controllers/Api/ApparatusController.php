@@ -339,10 +339,12 @@ class ApparatusController extends Controller
             ], 409);
         }
 
+        $hasInspectionSessionCredentials = $this->hasInspectionSessionCredentials($validated);
+        /** @var DailyCheckoutInspectionSession|null $inspectionSession */
         $inspectionSession = null;
         $checklist = null;
         $expectedChecklistVersion = null;
-        if ($this->hasInspectionSessionCredentials($validated)) {
+        if ($hasInspectionSessionCredentials) {
             $inspectionSession = $this->resolveInspectionSessionContract(
                 $validated,
                 $id,
@@ -373,7 +375,7 @@ class ApparatusController extends Controller
             }
         }
 
-        if (! is_array($checklist) || ! is_string($expectedChecklistVersion)
+        if (! is_array($checklist)
             || ! hash_equals($expectedChecklistVersion, $validated['checklist_version'])) {
             return $this->checklistVersionMismatchResponse((string) $expectedChecklistVersion);
         }
@@ -383,7 +385,7 @@ class ApparatusController extends Controller
         $storedPaths = [];
         try {
             $prepared = $this->prepareImages($validated, $storedPaths);
-            $result = DB::transaction(function () use ($id, $clientSubmissionId, $prepared, $checklistResolver, $inspectionSessionService, $request, $submissionPayloadHash, $inspectionSession): array {
+            $result = DB::transaction(function () use ($id, $clientSubmissionId, $prepared, $checklistResolver, $inspectionSessionService, $request, $submissionPayloadHash, $hasInspectionSessionCredentials): array {
                 $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId, true);
                 if ($existing !== null) {
                     return ['inspection' => $existing, 'created' => false];
@@ -394,15 +396,17 @@ class ApparatusController extends Controller
                     abort(409, 'This apparatus is not configured for Daily Checkout.');
                 }
 
-                $lockedInspectionSession = $inspectionSession === null
-                    ? null
-                    : $this->resolveInspectionSessionContract(
+                /** @var DailyCheckoutInspectionSession|null $lockedInspectionSession */
+                $lockedInspectionSession = null;
+                if ($hasInspectionSessionCredentials) {
+                    $lockedInspectionSession = $this->resolveInspectionSessionContract(
                         $prepared,
                         $id,
                         $request,
                         $inspectionSessionService,
                         true,
                     );
+                }
                 if ($lockedInspectionSession !== null) {
                     $lockedChecklist = $lockedInspectionSession->checklist_snapshot;
                     $lockedChecklistVersion = $lockedInspectionSession->checklist_hash;
@@ -1376,7 +1380,7 @@ class ApparatusController extends Controller
 
     /**
      * @param  array<string, mixed>  $submission
-     * @param  array<string, mixed>  $checklist
+     * @param  list<array<string, mixed>>  $dueTasks
      */
     private function validateV2ScheduledTasks(
         array $submission,
@@ -1478,8 +1482,7 @@ class ApparatusController extends Controller
         foreach ($expected as $compartmentId => $expectedCompartment) {
             /** @var array<string, mixed> $submittedCompartment */
             $submittedCompartment = $submittedById[$compartmentId];
-            if (! is_array($submittedCompartment)
-                || $this->canonicalChecklistString($submittedCompartment['name'] ?? null) !== $expectedCompartment['name']
+            if ($this->canonicalChecklistString($submittedCompartment['name'] ?? null) !== $expectedCompartment['name']
                 || ! is_array($submittedCompartment['items'] ?? null)) {
                 throw ValidationException::withMessages([
                     'compartments' => 'The submitted inspection does not match the current Daily Checkout checklist.',

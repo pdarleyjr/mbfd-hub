@@ -267,8 +267,8 @@ final class DailyCheckoutChecklistResolver
      *     checklist_type: string,
      *     configured_template: string,
      *     resolution_source: 'configured_template'|'pending',
-     *     family: null,
-     *     identity: 'FB6',
+     *     family: string|null,
+     *     identity: string|null,
      *     ambiguity: string|null,
      *     error: string|null
      * }

@@ -4,10 +4,19 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
+/**
+ * @property CarbonImmutable|null $issued_at
+ * @property CarbonImmutable|null $duty_date
+ * @property array<string, mixed>|null $checklist_snapshot
+ * @property list<array<string, mixed>>|null $due_tasks
+ * @property CarbonImmutable|null $expires_at
+ * @property CarbonImmutable|null $abandoned_at
+ */
 final class DailyCheckoutInspectionSession extends Model
 {
     protected $fillable = [
