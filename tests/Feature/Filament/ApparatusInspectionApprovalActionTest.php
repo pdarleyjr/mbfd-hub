@@ -92,6 +92,58 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         ]);
     }
 
+    public function test_authorized_reviewer_can_see_v2_checklist_evidence_before_and_after_review_in_both_inspection_views(): void
+    {
+        $inspection = $this->pendingInspectionWithV2Evidence();
+        $reviewer = $this->userWithRole('logistics_admin');
+
+        $this->actingAs($reviewer);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        Livewire::test(ViewInspection::class, [
+            'record' => $inspection->apparatus,
+            'inspection' => $inspection,
+        ])
+            ->assertSuccessful()
+            ->assertSee('Checklist v2 evidence')
+            ->assertSee('High Low Tide')
+            ->assertSee('High 10:00 / Low 16:30')
+            ->assertSee('Fuel Tank Hold')
+            ->assertSee('Every Monday');
+
+        Livewire::test(ViewStandaloneInspection::class, ['record' => $inspection->getRouteKey()])
+            ->assertSuccessful()
+            ->assertSee('Checklist v2 evidence')
+            ->assertSee('High Low Tide')
+            ->assertSee('High 10:00 / Low 16:30')
+            ->assertSee('Fuel Tank Hold')
+            ->assertSee('Every Monday');
+
+        app(ApparatusInspectionApprovalService::class)->approve($inspection->id, $reviewer);
+
+        Livewire::test(ViewInspection::class, [
+            'record' => $inspection->apparatus,
+            'inspection' => $inspection,
+        ])
+            ->assertSuccessful()
+            ->assertSee('Review History')
+            ->assertSee('Checklist v2 evidence')
+            ->assertSee('High Low Tide')
+            ->assertSee('High 10:00 / Low 16:30')
+            ->assertSee('Fuel Tank Hold')
+            ->assertSee('Every Monday');
+
+        Livewire::test(ViewStandaloneInspection::class, ['record' => $inspection->getRouteKey()])
+            ->assertSuccessful()
+            ->assertSee('Review History')
+            ->assertSee('Checklist v2 evidence')
+            ->assertSee('High Low Tide')
+            ->assertSee('High 10:00 / Low 16:30')
+            ->assertSee('Fuel Tank Hold')
+            ->assertSee('Every Monday');
+    }
+
     public function test_non_reviewer_cannot_approve_a_pending_inspection_from_the_apparatus_view(): void
     {
         $inspection = $this->pendingInspection();
@@ -224,6 +276,38 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
             ],
             'completed_at' => now(),
         ]);
+    }
+
+    private function pendingInspectionWithV2Evidence(): ApparatusInspection
+    {
+        $inspection = $this->pendingInspection();
+        $pendingEffects = $inspection->pending_effects;
+        $pendingEffects['checklist_v2'] = [
+            'template_id' => 'fire_boat_6_daily',
+            'template_version' => '2026-07',
+            'field_values' => [[
+                'id' => 'fb6-high-low-tide',
+                'name' => 'High Low Tide',
+                'input_type' => 'text',
+                'required' => false,
+                'value' => 'High 10:00 / Low 16:30',
+            ]],
+            'scheduled_tasks' => [[
+                'id' => 'fb6-monday-fuel-tank-hold',
+                'name' => 'Fuel Tank Hold',
+                'instructions' => 'Fuel Tank Hold / Check Fuel Filters',
+                'recurrence' => [
+                    'type' => 'weekday',
+                    'weekday' => 'monday',
+                ],
+                'recurrence_label' => 'Every Monday',
+                'status' => 'Present',
+                'notes' => null,
+            ]],
+        ];
+        $inspection->update(['pending_effects' => $pendingEffects]);
+
+        return $inspection->refresh();
     }
 
     private function userWithRole(string $roleName): User

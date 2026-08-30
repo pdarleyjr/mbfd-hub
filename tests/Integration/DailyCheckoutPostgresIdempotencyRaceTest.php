@@ -9,6 +9,7 @@ use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
 use App\Services\DailyCheckoutChecklistResolver;
+use App\Services\DailyCheckoutInspectionSessionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -114,6 +115,7 @@ final class DailyCheckoutPostgresIdempotencyRaceTest extends TestCase
             $request,
             $apparatus->id,
             app(DailyCheckoutChecklistResolver::class),
+            app(DailyCheckoutInspectionSessionService::class),
         );
 
         $this->assertTrue($controller->winnerWasCreated());

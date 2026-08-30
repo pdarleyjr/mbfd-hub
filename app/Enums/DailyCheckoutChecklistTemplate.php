@@ -14,6 +14,7 @@ enum DailyCheckoutChecklistTemplate: string
     case Default = 'default';
     case Engine = 'engine';
     case Engine2 = 'engine2';
+    case FireBoat6 = 'fireboat6';
     case Rescue = 'rescue';
     case Ladder1 = 'ladder1';
     case Ladder3 = 'ladder3';
@@ -31,6 +32,7 @@ enum DailyCheckoutChecklistTemplate: string
             self::Default->value => 'Default checklist - explicit operational approval required',
             self::Engine->value => 'Engine checklist',
             self::Engine2->value => 'Engine 2 checklist',
+            self::FireBoat6->value => 'Fire Boat 6 checklist',
             self::Rescue->value => 'Rescue checklist',
             self::Ladder1->value => 'Ladder 1 checklist',
             self::Ladder3->value => 'Ladder 3 checklist',

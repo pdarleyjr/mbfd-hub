@@ -2,6 +2,8 @@ import { InspectionData, MeterData } from '../types';
 
 const STORAGE_KEYS = {
   AUTOSAVE: 'mbfd_autosave_inspection',
+  SESSION_START: 'mbfd_inspection_session_start',
+  SESSION_ABANDON: 'mbfd_inspection_session_abandon',
 } as const;
 
 export const createClientSubmissionId = (): string => {
@@ -21,6 +23,18 @@ const autosaveKey = (apparatusSlug: string, checklistVersion?: string): string =
   checklistVersion && checklistVersion.trim() !== ''
     ? `${STORAGE_KEYS.AUTOSAVE}_${apparatusSlug}_${checklistVersion}`
     : `${STORAGE_KEYS.AUTOSAVE}_${apparatusSlug}`
+);
+
+const sessionStartKey = (apparatusSlug: string, checklistVersion: string): string => (
+  `${STORAGE_KEYS.SESSION_START}_${apparatusSlug}_${checklistVersion}`
+);
+
+const sessionAbandonKey = (apparatusSlug: string, sessionId: string): string => (
+  `${STORAGE_KEYS.SESSION_ABANDON}_${apparatusSlug}_${sessionId}`
+);
+
+const isClientUuid = (value: string | null): value is string => (
+  value !== null && /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(value)
 );
 
 const readInspectionProgress = (key: string): InspectionData | null => {
@@ -87,7 +101,68 @@ export const loadInspectionProgress = (
 export const clearInspectionProgress = (apparatusSlug: string, checklistVersion: string) => {
   try {
     localStorage.removeItem(autosaveKey(apparatusSlug, checklistVersion));
+    localStorage.removeItem(sessionStartKey(apparatusSlug, checklistVersion));
   } catch (error) {
     console.error('Failed to clear autosaved inspection:', error);
+  }
+};
+
+// This local key only makes the start request idempotent when a connection
+// fails after the server persists a contract but before the browser receives
+// its response. It is cleared after the issued contract is autosaved.
+export const getOrCreateInspectionSessionStartKey = (apparatusSlug: string, checklistVersion: string): string => {
+  try {
+    const key = sessionStartKey(apparatusSlug, checklistVersion);
+    const existing = localStorage.getItem(key);
+    if (isClientUuid(existing)) {
+      return existing;
+    }
+
+    const next = createClientSubmissionId();
+    localStorage.setItem(key, next);
+
+    return next;
+  } catch (error) {
+    console.error('Failed to persist Daily Checkout session-start key:', error);
+
+    return createClientSubmissionId();
+  }
+};
+
+export const clearInspectionSessionStartKey = (apparatusSlug: string, checklistVersion: string) => {
+  try {
+    localStorage.removeItem(sessionStartKey(apparatusSlug, checklistVersion));
+  } catch (error) {
+    console.error('Failed to clear Daily Checkout session-start key:', error);
+  }
+};
+
+// The transition key is persisted only to make a lost abandonment response
+// replay safely. It is never an authorization credential; the server still
+// requires the issued contract token, replay key, and browser binding.
+export const getOrCreateInspectionSessionAbandonKey = (apparatusSlug: string, sessionId: string): string => {
+  try {
+    const key = sessionAbandonKey(apparatusSlug, sessionId);
+    const existing = localStorage.getItem(key);
+    if (isClientUuid(existing)) {
+      return existing;
+    }
+
+    const next = createClientSubmissionId();
+    localStorage.setItem(key, next);
+
+    return next;
+  } catch (error) {
+    console.error('Failed to persist Daily Checkout session-abandon key:', error);
+
+    return createClientSubmissionId();
+  }
+};
+
+export const clearInspectionSessionAbandonKey = (apparatusSlug: string, sessionId: string) => {
+  try {
+    localStorage.removeItem(sessionAbandonKey(apparatusSlug, sessionId));
+  } catch (error) {
+    console.error('Failed to clear Daily Checkout session-abandon key:', error);
   }
 };

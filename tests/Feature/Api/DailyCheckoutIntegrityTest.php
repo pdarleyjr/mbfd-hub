@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
+use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
 use App\Models\User;
 use App\Services\DailyCheckoutChecklistResolver;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
@@ -19,6 +21,13 @@ use Tests\TestCase;
 class DailyCheckoutIntegrityTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        CarbonImmutable::setTestNow();
+
+        parent::tearDown();
+    }
 
     public function test_checklist_endpoint_serves_a_non_empty_tracked_checklist(): void
     {
@@ -346,6 +355,131 @@ class DailyCheckoutIntegrityTest extends TestCase
         $this->assertDatabaseCount('apparatus_inspections', 0);
     }
 
+    public function test_fire_boat_6_v2_serves_only_due_recurring_tasks_and_persists_validated_typed_values(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-31 09:00:00', 'America/New_York'));
+
+        $this->getJson("/api/public/apparatuses/{$apparatus->id}/checklist?inspection_date=2026-08-31")
+            ->assertOk()
+            ->assertJsonPath('checklist.schema_version', 2)
+            ->assertJsonPath('checklist.template_id', 'fire_boat_6_daily')
+            ->assertJsonPath('inspection_date', '2026-08-31')
+            ->assertJsonCount(1, 'due_tasks')
+            ->assertJsonPath('due_tasks.0.id', 'fb6-monday-fuel-tank-hold');
+
+        $this->getJson("/api/public/apparatuses/{$apparatus->id}/checklist?inspection_date=2026-11-01")
+            ->assertOk()
+            ->assertJsonCount(1, 'due_tasks')
+            ->assertJsonPath('due_tasks.0.id', 'fb6-monthly-first-day');
+
+        $payload = $this->fireBoatSubmissionWithChecklist(
+            $apparatus,
+            'fbfbfbfb-fbfb-4bfb-8bfb-fbfbfbfbfbfb',
+            '2026-08-31',
+        );
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)
+            ->assertCreated();
+
+        $inspection = ApparatusInspection::sole()->refresh();
+        $submittedChecklistV2 = $inspection->pending_effects['checklist_v2'];
+        $this->assertSame('fire_boat_6_daily', $submittedChecklistV2['template_id']);
+        $this->assertSame('2026-07', $submittedChecklistV2['template_version']);
+        $this->assertSame([
+            'id' => 'inspection_date',
+            'name' => 'Date',
+            'input_type' => 'date',
+            'required' => true,
+            'value' => '2026-08-31',
+        ], $submittedChecklistV2['field_values'][0]);
+        $this->assertSame([
+            'id' => 'fb6-monday-fuel-tank-hold',
+            'name' => 'Fuel Tank Hold',
+            'instructions' => 'Fuel Tank Hold / Ex. Lubricate Valves / Check Fuel Filters / Sterilize Fresh Water Tank / Check Stokes Basket Condition- Secured',
+            'recurrence' => [
+                'type' => 'weekday',
+                'weekday' => 'monday',
+            ],
+            'recurrence_label' => 'Every Monday',
+            'status' => 'Present',
+            'notes' => null,
+        ], $submittedChecklistV2['scheduled_tasks'][0]);
+
+        $this->actingAsAdmin();
+        $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve")
+            ->assertOk();
+
+        $reviewEvent = $inspection->refresh()->reviewEvents()->sole();
+        $this->assertSame($submittedChecklistV2, $reviewEvent->metadata['submitted_effects']['checklist_v2']);
+
+        $invalidValue = $this->fireBoatSubmissionWithChecklist(
+            $apparatus,
+            'abababab-fbfb-4bfb-8bfb-fbfbfbfbfbfb',
+            '2026-08-31',
+        );
+        foreach ($invalidValue['field_values'] as &$fieldValue) {
+            if ($fieldValue['id'] === 'fb6-port-engine-hours') {
+                $fieldValue['value'] = 'not-a-number';
+            }
+        }
+        unset($fieldValue);
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $invalidValue)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['field_values']);
+
+        $missingDueTask = $this->fireBoatSubmissionWithChecklist(
+            $apparatus,
+            'cdcdcdcd-fbfb-4bfb-8bfb-fbfbfbfbfbfb',
+            '2026-08-31',
+        );
+        $missingDueTask['scheduled_tasks'] = [];
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $missingDueTask)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['scheduled_tasks']);
+
+        $notDueToday = $this->fireBoatSubmissionWithChecklist(
+            $apparatus,
+            'cfcfcfcf-fbfb-4bfb-8bfb-fbfbfbfbfbfb',
+            '2026-08-31',
+        );
+        $notDueToday['scheduled_tasks'] = [[
+            'id' => 'fb6-monthly-first-day',
+            'status' => 'Present',
+            'notes' => null,
+        ]];
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $notDueToday)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['scheduled_tasks']);
+
+        $wrongMachineId = $this->fireBoatSubmissionWithChecklist(
+            $apparatus,
+            'dededede-fbfb-4bfb-8bfb-fbfbfbfbfbfb',
+            '2026-08-31',
+        );
+        $wrongMachineId['compartments'][0]['items'][0]['id'] = 'not-the-canonical-item-id';
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $wrongMachineId)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['compartments']);
+    }
+
+    public function test_legacy_v1_submission_remains_accepted_without_v2_field_or_schedule_payloads(): void
+    {
+        $apparatus = $this->makeApparatus('required');
+
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspections",
+            $this->submissionWithChecklist($apparatus, 'efefefef-efef-4fef-8fef-efefefefefef'),
+        )->assertCreated();
+
+        $inspection = ApparatusInspection::sole();
+        $this->assertArrayNotHasKey('checklist_v2', $inspection->pending_effects);
+    }
+
     public function test_public_inspection_response_is_a_minimal_receipt(): void
     {
         $apparatus = $this->makeApparatus('required');
@@ -394,6 +528,54 @@ class DailyCheckoutIntegrityTest extends TestCase
         $this->assertIsString($version);
 
         return $version;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fireBoatSubmissionWithChecklist(Apparatus $apparatus, string $clientSubmissionId, string $inspectionDate): array
+    {
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $checklist = $resolution['checklist'];
+        $this->assertIsArray($checklist);
+
+        $fieldValues = array_map(static function (array $field) use ($inspectionDate): array {
+            $value = match ($field['inputType']) {
+                'date' => $inspectionDate,
+                'number' => 1,
+                'checkbox' => true,
+                default => 'Recorded',
+            };
+
+            return [
+                'id' => $field['id'],
+                'value' => $value,
+            ];
+        }, $checklist['fields']);
+
+        $sessionResponse = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions")
+            ->assertSuccessful();
+        $browserCookie = collect($sessionResponse->headers->getCookies())
+            ->first(static fn (\Symfony\Component\HttpFoundation\Cookie $cookie): bool => $cookie->getName() === 'daily_checkout_inspection_browser');
+        if ($browserCookie instanceof \Symfony\Component\HttpFoundation\Cookie) {
+            $this->withCredentials()->withUnencryptedCookie($browserCookie->getName(), $browserCookie->getValue());
+        }
+        $contract = $sessionResponse->json('inspection_session');
+        $this->assertIsArray($contract);
+        $this->assertSame($inspectionDate, $contract['duty_date']);
+
+        return $this->submissionWithChecklist($apparatus, $clientSubmissionId, [
+            'checklist_version' => $contract['checklist_hash'],
+            'field_values' => $fieldValues,
+            'scheduled_tasks' => array_map(static fn (array $task): array => [
+                'id' => $task['id'],
+                'status' => 'Present',
+                'notes' => null,
+            ], $contract['due_tasks']),
+            'inspection_session_id' => $contract['id'],
+            'inspection_session_token' => $contract['token'],
+            'inspection_session_replay_key' => $contract['replay_key'],
+        ]);
     }
 
     private function actingAsAdmin(): User
@@ -457,6 +639,35 @@ class DailyCheckoutIntegrityTest extends TestCase
             'year' => 2020,
             'status' => 'In Service',
             'daily_checkout_requirement' => $dailyCheckoutRequirement,
+        ]);
+    }
+
+    private function makeFireBoat6(): Apparatus
+    {
+        $station = Station::firstOrCreate(
+            ['station_number' => 6],
+            [
+                'name' => 'Station 6',
+                'address' => '123 Marine Drive',
+                'is_active' => true,
+            ]
+        );
+
+        return Apparatus::create([
+            'station_id' => $station->id,
+            'unit_id' => 'FB6',
+            'name' => 'Fire Boat 6',
+            'type' => 'Fire Boat',
+            'class_description' => 'Marine',
+            'vehicle_number' => 'FB6',
+            'designation' => 'FB6',
+            'slug' => 'fire-boat-6',
+            'make' => 'Metal Shark',
+            'model' => 'Fire Boat',
+            'year' => 2020,
+            'status' => 'In Service',
+            'daily_checkout_requirement' => 'required',
+            'daily_checkout_template' => DailyCheckoutChecklistTemplate::FireBoat6->value,
         ]);
     }
 }

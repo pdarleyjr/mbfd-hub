@@ -1,5 +1,5 @@
 import {
-  Apparatus, ChecklistData, InspectionSubmission, EmployeeOption, Station, StationDetail,
+  Apparatus, ChecklistData, ChecklistField, ChecklistInputType, InspectionSubmission, EmployeeOption, ScheduledChecklistTask, Station, StationDetail,
   Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData,
   StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse,
   InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
@@ -22,6 +22,14 @@ const normalizeItemStatus = (status?: string): 'Present' | 'Missing' | 'Damaged'
 
   return 'Present';
 };
+
+const isChecklistInputType = (value: unknown): value is ChecklistInputType => (
+  value === 'text'
+  || value === 'number'
+  || value === 'date'
+  || value === 'checkbox'
+  || value === 'percentage'
+);
 
 export class ApiRequestError extends Error {
   constructor(
@@ -66,9 +74,53 @@ export class ApiClient {
   }
 
   static async getChecklist(apparatusId: number): Promise<ChecklistData> {
-    const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/checklist`, {
-      headers: { ...DEFAULT_HEADERS },
-    });
+    return this.fetchChecklist(apparatusId, 'checklist');
+  }
+
+  static async startInspectionSession(apparatusId: number, issuanceKey: string): Promise<ChecklistData> {
+    return this.fetchChecklist(
+      apparatusId,
+      'inspection-sessions',
+      { inspection_session_start_key: issuanceKey },
+      true,
+    );
+  }
+
+  static async abandonInspectionSession(
+    apparatusId: number,
+    sessionId: string,
+    token: string,
+    replayKey: string,
+    transitionKey: string,
+  ): Promise<ChecklistData> {
+    return this.fetchChecklist(
+      apparatusId,
+      `inspection-sessions/${sessionId}/abandon`,
+      {
+        inspection_session_token: token,
+        inspection_session_replay_key: replayKey,
+        inspection_session_transition_key: transitionKey,
+      },
+      true,
+    );
+  }
+
+  private static async fetchChecklist(
+    apparatusId: number,
+    endpoint: string,
+    body?: Record<string, string>,
+    includesInspectionSession = false,
+  ): Promise<ChecklistData> {
+    const response = await fetch(
+      `${API_BASE}/public/apparatuses/${apparatusId}/${endpoint}`,
+      {
+        ...(body ? {
+          method: 'POST',
+          body: JSON.stringify(body),
+        } : {}),
+        headers: { ...DEFAULT_HEADERS },
+      },
+    );
     if (!response.ok) {
       throw new ApiRequestError(
         await responseMessage(response, 'The Daily Checkout checklist is unavailable.'),
@@ -86,27 +138,165 @@ export class ApiClient {
     }
 
     const rawChecklist = payload?.checklist ?? payload;
+    const rawSchemaVersion = rawChecklist?.schema_version;
+    if (rawSchemaVersion !== undefined && rawSchemaVersion !== 1 && rawSchemaVersion !== 2) {
+      throw new ApiRequestError('The Daily Checkout checklist schema is unavailable. Contact an officer before continuing.', 503);
+    }
+
+    const schemaVersion: 1 | 2 = rawSchemaVersion === 2 ? 2 : 1;
     const rawCompartments = Array.isArray(rawChecklist?.compartments) ? rawChecklist.compartments : [];
+    const v2Unavailable = (): never => {
+      throw new ApiRequestError('The Daily Checkout checklist contract is unavailable. Contact an officer before continuing.', 503);
+    };
+    const parseTask = (task: any): ScheduledChecklistTask => {
+      if (
+        !task
+        || typeof task.id !== 'string'
+        || typeof task.name !== 'string'
+        || !task.recurrence
+        || (task.recurrence.type !== 'weekday' && task.recurrence.type !== 'monthly_day')
+      ) {
+        return v2Unavailable();
+      }
+
+      if (task.recurrence.type === 'weekday' && typeof task.recurrence.weekday !== 'string') {
+        return v2Unavailable();
+      }
+
+      if (task.recurrence.type === 'monthly_day' && (!Number.isInteger(task.recurrence.day) || task.recurrence.day < 1 || task.recurrence.day > 31)) {
+        return v2Unavailable();
+      }
+
+      return {
+        id: task.id,
+        name: task.name,
+        instructions: typeof task.instructions === 'string' ? task.instructions : undefined,
+        recurrence: task.recurrence,
+      };
+    };
+
+    const fields: ChecklistField[] = schemaVersion === 2
+      ? (() => {
+          if (!Array.isArray(rawChecklist?.fields)) return v2Unavailable();
+
+          return rawChecklist.fields.map((field: any) => {
+            if (!field || typeof field.id !== 'string' || typeof field.name !== 'string' || !isChecklistInputType(field.inputType)) {
+              return v2Unavailable();
+            }
+
+            return {
+              id: field.id,
+              name: field.name,
+              inputType: field.inputType,
+              required: field.required === true,
+            };
+          });
+        })()
+      : [];
+
+    const dueTasks = schemaVersion === 2
+      ? (() => {
+          if (!Array.isArray(payload?.due_tasks)) return v2Unavailable();
+
+          return payload.due_tasks.map(parseTask);
+        })()
+      : [];
+
+    const inspectionSession = schemaVersion === 2 && includesInspectionSession
+      ? (() => {
+          const session = payload?.inspection_session;
+          if (
+            !session
+            || typeof session.id !== 'string'
+            || !/^[a-f0-9-]{36}$/i.test(session.id)
+            || typeof session.token !== 'string'
+            || !/^[a-f0-9]{64}$/i.test(session.token)
+            || typeof session.issued_at !== 'string'
+            || typeof session.expires_at !== 'string'
+            || typeof session.duty_date !== 'string'
+            || session.duty_date !== payload?.inspection_date
+            || typeof session.checklist_template_id !== 'string'
+            || typeof session.checklist_template_version !== 'string'
+            || !isChecklistVersion(session.checklist_hash)
+            || session.checklist_hash.toLowerCase() !== checklistVersion.toLowerCase()
+            || !isChecklistVersion(session.due_tasks_hash)
+            || typeof session.replay_key !== 'string'
+            || !/^[a-f0-9-]{36}$/i.test(session.replay_key)
+            || !Array.isArray(session.due_tasks)
+            || JSON.stringify(session.due_tasks.map(parseTask)) !== JSON.stringify(dueTasks)
+          ) {
+            return v2Unavailable();
+          }
+
+          return {
+            id: session.id,
+            token: session.token,
+            issued_at: session.issued_at,
+            expires_at: session.expires_at,
+            duty_date: session.duty_date,
+            checklist_template_id: session.checklist_template_id,
+            checklist_template_version: session.checklist_template_version,
+            checklist_hash: session.checklist_hash.toLowerCase(),
+            due_tasks: dueTasks,
+            due_tasks_hash: session.due_tasks_hash.toLowerCase(),
+            replay_key: session.replay_key,
+          };
+        })()
+      : undefined;
 
     const checklist: ChecklistData = {
       checklist_version: checklistVersion.toLowerCase(),
+      schema_version: schemaVersion,
+      template_id: schemaVersion === 2 && typeof rawChecklist?.template_id === 'string' ? rawChecklist.template_id : undefined,
+      template_version: schemaVersion === 2 && typeof rawChecklist?.template_version === 'string' ? rawChecklist.template_version : undefined,
+      inspection_date: schemaVersion === 2 && typeof payload?.inspection_date === 'string' ? payload.inspection_date : undefined,
+      inspection_date_field_id: schemaVersion === 2 && typeof rawChecklist?.inspectionDateFieldId === 'string' ? rawChecklist.inspectionDateFieldId : undefined,
+      fields,
+      due_tasks: dueTasks,
+      inspection_session: inspectionSession,
       compartments: rawCompartments.map((compartment: any, compartmentIndex: number) => {
-        const compartmentId = compartment?.id ?? `compartment-${compartmentIndex + 1}`;
+        if (schemaVersion === 2 && (!compartment || typeof compartment.id !== 'string' || typeof (compartment.name ?? compartment.title) !== 'string')) {
+          return v2Unavailable();
+        }
+
+        const compartmentId = schemaVersion === 2 ? compartment.id : compartment?.id ?? `compartment-${compartmentIndex + 1}`;
 
         return {
           id: compartmentId,
-          name: compartment?.name ?? compartment?.title ?? `Compartment ${compartmentIndex + 1}`,
+          name: schemaVersion === 2 ? compartment.name ?? compartment.title : compartment?.name ?? compartment?.title ?? `Compartment ${compartmentIndex + 1}`,
           items: Array.isArray(compartment?.items)
-            ? compartment.items.map((item: any, itemIndex: number) => ({
-                id: item?.id ?? `${compartmentId}-item-${itemIndex + 1}`,
-                name: item?.name ?? `Item ${itemIndex + 1}`,
-                status: normalizeItemStatus(item?.status),
-                notes: item?.notes ?? item?.note ?? '',
-              }))
+            ? compartment.items.map((item: any, itemIndex: number) => {
+                if (schemaVersion === 2 && (!item || typeof item.id !== 'string' || typeof item.name !== 'string' || !isChecklistInputType(item.inputType))) {
+                  return v2Unavailable();
+                }
+
+                if (schemaVersion === 2 && item.expectedQuantity !== undefined && (!Number.isInteger(item.expectedQuantity) || item.expectedQuantity < 1)) {
+                  return v2Unavailable();
+                }
+
+                return {
+                  id: schemaVersion === 2 ? item.id : item?.id ?? `${compartmentId}-item-${itemIndex + 1}`,
+                  name: schemaVersion === 2 ? item.name : item?.name ?? `Item ${itemIndex + 1}`,
+                  status: normalizeItemStatus(item?.status),
+                  notes: item?.notes ?? item?.note ?? '',
+                  inputType: schemaVersion === 2 ? item.inputType : undefined,
+                  expectedQuantity: schemaVersion === 2 ? item.expectedQuantity : undefined,
+                };
+              })
             : [],
         };
       }),
     };
+
+    if (schemaVersion === 2 && (
+      !checklist.template_id
+      || !checklist.template_version
+      || !checklist.inspection_date
+      || !checklist.inspection_date_field_id
+      || !checklist.fields.some((field) => field.id === checklist.inspection_date_field_id && field.inputType === 'date')
+    )) {
+      return v2Unavailable();
+    }
 
     if (!checklist.compartments.some((compartment) => compartment.items.length > 0)) {
       throw new ApiRequestError(

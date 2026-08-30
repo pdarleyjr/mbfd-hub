@@ -1,18 +1,83 @@
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, Compartment, Defect, MeterData, InspectionSubmission } from '../types';
+import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ScheduledChecklistTaskResult } from '../types';
 import { ApiClient } from '../utils/api';
 import { getQueuedSubmission, getQueuedSubmissionForApparatusAndChecklistVersion, onDailyCheckoutQueueChanged, queueSubmission, submitQueuedInspection } from '../utils/dailyCheckoutSubmissionQueue';
 import type { DailyCheckoutQueuedSubmission } from '../lib/db';
-import { createClientSubmissionId, saveInspectionProgress, loadInspectionProgress, clearInspectionProgress } from '../utils/storage';
+import { clearInspectionProgress, clearInspectionSessionAbandonKey, clearInspectionSessionStartKey, createClientSubmissionId, getOrCreateInspectionSessionAbandonKey, getOrCreateInspectionSessionStartKey, loadInspectionProgress, saveInspectionProgress } from '../utils/storage';
 import { useOffline } from '../hooks/useOffline';
 import OfficerStep from './OfficerStep';
+import ChecklistFieldsStep from './ChecklistFieldsStep';
 import MeterStep from './MeterStep';
 import CompartmentStep from './CompartmentStep';
 import SubmitStep from './SubmitStep';
 import PreviousPageButton from './PreviousPageButton';
 
-type Step = 'officer' | 'meter' | 'compartments' | 'submit';
+type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'submit';
+
+const inspectionSessionIsExpired = (session: InspectionData['inspectionSession']): boolean => {
+  const expiresAt = typeof session?.expires_at === 'string' ? Date.parse(session.expires_at) : Number.NaN;
+
+  return !Number.isFinite(expiresAt) || expiresAt <= Date.now();
+};
+
+const easternDutyDate = (): string => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(Date.now()));
+  const part = (type: Intl.DateTimeFormatPartTypes): string => (
+    parts.find((entry) => entry.type === type)?.value ?? ''
+  );
+
+  return `${part('year')}-${part('month')}-${part('day')}`;
+};
+
+const restoreIssuedFireBoatChecklist = (saved: InspectionData | null): ChecklistData | null => {
+  const session = saved?.inspectionSession;
+  const checklist = saved?.checklistSnapshot;
+  if (
+    !session
+    || !checklist
+    || checklist.schema_version !== 2
+    || checklist.checklist_version !== saved.checklist_version
+    || session.checklist_hash !== saved.checklist_version
+    || typeof session.id !== 'string'
+    || typeof session.token !== 'string'
+    || typeof session.duty_date !== 'string'
+    || !Array.isArray(session.due_tasks)
+    || inspectionSessionIsExpired(session)
+    || checklist.inspection_date !== session.duty_date
+    || JSON.stringify(checklist.due_tasks) !== JSON.stringify(session.due_tasks)
+  ) {
+    return null;
+  }
+
+  return {
+    ...checklist,
+    inspection_date: session.duty_date,
+    due_tasks: session.due_tasks,
+    inspection_session: session,
+  };
+};
+
+const restoreIssuedFireBoatApparatus = (saved: InspectionData | null, slug: string): Apparatus | null => {
+  const apparatus = saved?.apparatusSnapshot;
+  if (
+    !apparatus
+    || apparatus.slug !== slug
+    || !Number.isInteger(apparatus.id)
+    || apparatus.id < 1
+    || typeof apparatus.name !== 'string'
+    || typeof apparatus.vehicle_number !== 'string'
+  ) {
+    return null;
+  }
+
+  return apparatus;
+};
 
 export default function InspectionWizard() {
   const { slug } = useParams<{ slug: string }>();
@@ -33,16 +98,21 @@ export default function InspectionWizard() {
     miles: null,
   });
   const [compartments, setCompartments] = useState<Compartment[]>([]);
+  const [fieldValues, setFieldValues] = useState<Array<{ id: string; value: ChecklistFieldValue }>>([]);
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledChecklistTaskResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasLoadedAutosave, setHasLoadedAutosave] = useState(false);
   const [autosaveReviewMessage, setAutosaveReviewMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [abandonmentError, setAbandonmentError] = useState<string | null>(null);
+  const [abandoningPriorSession, setAbandoningPriorSession] = useState(false);
   const [serviceNotices, setServiceNotices] = useState<ApparatusServiceTicketSummary[]>([]);
   const [serviceNoticesUnavailable, setServiceNoticesUnavailable] = useState(false);
   const [queuedSubmissionBlocker, setQueuedSubmissionBlocker] = useState<DailyCheckoutQueuedSubmission | null>(null);
   const [queueRevision, setQueueRevision] = useState(0);
   const clientSubmissionIdRef = useRef<string | null>(null);
+  const initializedChecklistKeyRef = useRef<string | null>(null);
 
   useEffect(() => onDailyCheckoutQueueChanged(() => {
     setQueueRevision((revision) => revision + 1);
@@ -54,9 +124,32 @@ export default function InspectionWizard() {
 
       try {
         setQueuedSubmissionBlocker(null);
-        // For now, we'll fetch all apparatuses and find the one by slug
-        const apparatuses = await ApiClient.getApparatuses();
-        const foundApparatus = apparatuses.find(a => a.slug === slug);
+        const savedBeforeChecklistFetch = loadInspectionProgress(slug, '');
+        let checklistData = restoreIssuedFireBoatChecklist(savedBeforeChecklistFetch);
+        const savedApparatus = restoreIssuedFireBoatApparatus(savedBeforeChecklistFetch, slug);
+        let saved = savedBeforeChecklistFetch;
+        let foundApparatus: Apparatus | undefined;
+        let restoredFromLocalContract = false;
+
+        if (isOffline && checklistData !== null && savedApparatus !== null) {
+          foundApparatus = savedApparatus;
+          restoredFromLocalContract = true;
+        } else {
+          try {
+            // The apparatus catalog remains the online source of truth. A
+            // persisted issued contract may only be used as a narrow offline
+            // recovery fallback for its matching apparatus snapshot.
+            const apparatuses = await ApiClient.getApparatuses();
+            foundApparatus = apparatuses.find(a => a.slug === slug);
+          } catch (error) {
+            if (checklistData !== null && savedApparatus !== null) {
+              foundApparatus = savedApparatus;
+              restoredFromLocalContract = true;
+            } else {
+              throw error;
+            }
+          }
+        }
 
         if (!foundApparatus) {
           throw new Error('Apparatus not found');
@@ -67,19 +160,55 @@ export default function InspectionWizard() {
 
         // Service status is intentionally secondary. A network or API failure
         // must never prevent the inspection checklist from loading.
-        ApiClient.getApparatusServiceNotices(foundApparatus.id)
-          .then((notices) => {
-            setServiceNotices(notices);
-            setServiceNoticesUnavailable(false);
-          })
-          .catch(() => {
-            setServiceNotices([]);
-            setServiceNoticesUnavailable(true);
-          });
+        if (!restoredFromLocalContract) {
+          ApiClient.getApparatusServiceNotices(foundApparatus.id)
+            .then((notices) => {
+              setServiceNotices(notices);
+              setServiceNoticesUnavailable(false);
+            })
+            .catch(() => {
+              setServiceNotices([]);
+              setServiceNoticesUnavailable(true);
+            });
+        }
 
-        const checklistData = await ApiClient.getChecklist(foundApparatus.id);
+        if (checklistData === null) {
+          if (isOffline && saved?.inspectionSession) {
+            throw new Error(
+              inspectionSessionIsExpired(saved.inspectionSession)
+                ? 'This server-issued Fire Boat inspection session has expired. Reconnect and start a new Fire Boat inspection.'
+                : 'A server-issued Fire Boat inspection session is required before this checkout can be submitted. Reconnect before starting a new Fire Boat inspection.',
+            );
+          }
+
+          checklistData = await ApiClient.getChecklist(foundApparatus.id);
+          saved = loadInspectionProgress(slug, checklistData.checklist_version);
+          if (checklistData.schema_version === 2) {
+            const savedSession = saved?.inspectionSession;
+            if (
+              saved?.checklist_version === checklistData.checklist_version
+              && savedSession?.checklist_hash === checklistData.checklist_version
+              && !inspectionSessionIsExpired(savedSession)
+            ) {
+              checklistData = {
+                ...checklistData,
+                inspection_date: savedSession.duty_date,
+                due_tasks: savedSession.due_tasks,
+                inspection_session: savedSession,
+              };
+            } else {
+              if (isOffline) {
+                throw new Error('A server-issued Fire Boat inspection session is required before this checkout can be submitted. Reconnect before starting a new Fire Boat inspection.');
+              }
+
+              checklistData = await ApiClient.startInspectionSession(
+                foundApparatus.id,
+                getOrCreateInspectionSessionStartKey(slug, checklistData.checklist_version),
+              );
+            }
+          }
+        }
         setChecklist(checklistData);
-        setCompartments(checklistData.compartments);
 
         const queuedSubmission = await getQueuedSubmissionForApparatusAndChecklistVersion(
           foundApparatus.id,
@@ -91,24 +220,73 @@ export default function InspectionWizard() {
           return;
         }
 
-        // Load autosaved data if available
-        if (!hasLoadedAutosave) {
-          const saved = loadInspectionProgress(slug, checklistData.checklist_version);
-          if (saved) {
-            if (saved.checklist_version === checklistData.checklist_version) {
-              setOfficerInfo(saved.officer);
-              if (saved.meter) {
-                setMeterData(saved.meter);
-              }
-              setCompartments(saved.compartments);
-              // Resume at meter step if officer info exists
-              if (saved.officer.name) {
-                setCurrentStep(saved.compartments.some(c => c.items.some(i => i.status !== 'Present')) ? 'compartments' : 'meter');
-              }
-              setHasLoadedAutosave(true);
-            } else {
-              setAutosaveReviewMessage('A previously saved inspection uses a different checklist version. It remains saved on this device and requires officer review; this form is using the current checklist.');
+        const checklistKey = `${slug}:${checklistData.checklist_version}`;
+        if (initializedChecklistKeyRef.current === checklistKey) {
+          return;
+        }
+
+        initializedChecklistKeyRef.current = checklistKey;
+        clientSubmissionIdRef.current = null;
+        setHasLoadedAutosave(false);
+        setAutosaveReviewMessage(null);
+        setOfficerInfo({
+          name: '',
+          rank: 'Firefighter',
+          shift: 'A',
+          unitNumber: foundApparatus.vehicle_number,
+        });
+        setMeterData({ engine_hours: null, miles: null });
+        setCurrentStep('officer');
+        setCompartments(checklistData.compartments);
+        setFieldValues(checklistData.fields.map((field) => ({
+          id: field.id,
+          value: field.id === checklistData.inspection_date_field_id
+            ? checklistData.inspection_date ?? ''
+            : field.inputType === 'checkbox'
+              ? false
+              : field.inputType === 'number' || field.inputType === 'percentage'
+                ? null
+                : '',
+        })));
+        setScheduledTasks(checklistData.due_tasks.map((task) => ({
+          id: task.id,
+          status: 'Present',
+          notes: null,
+        })));
+
+        if (saved) {
+          const canRestoreSavedProgress = saved.checklist_version === checklistData.checklist_version
+            && (
+              checklistData.schema_version !== 2
+              || saved.inspectionSession?.id === checklistData.inspection_session?.id
+            );
+          if (canRestoreSavedProgress) {
+            setOfficerInfo(saved.officer);
+            if (saved.meter) {
+              setMeterData(saved.meter);
             }
+            setCompartments(saved.compartments);
+            if (checklistData.schema_version === 2) {
+              if (saved.fieldValues) {
+                setFieldValues(saved.fieldValues);
+              }
+              if (saved.scheduledTasks) {
+                setScheduledTasks(saved.scheduledTasks);
+              }
+            }
+            // Resume at the first incomplete current-contract step if officer info exists.
+            if (saved.officer.name) {
+              setCurrentStep(saved.compartments.some(c => c.items.some(i => i.status !== 'Present'))
+                ? 'compartments'
+                : checklistData.schema_version === 2
+                  ? 'details'
+                  : 'meter');
+            }
+            setHasLoadedAutosave(true);
+          } else if (saved.checklist_version === checklistData.checklist_version && checklistData.schema_version === 2) {
+            setAutosaveReviewMessage('The prior Fire Boat session expired or changed. Its saved answers were not copied into this new server-issued session.');
+          } else {
+            setAutosaveReviewMessage('A previously saved inspection uses a different checklist version. It remains saved on this device and requires officer review; this form is using the current checklist.');
           }
         }
       } catch (err) {
@@ -119,28 +297,56 @@ export default function InspectionWizard() {
     };
 
     fetchData();
-  }, [slug, hasLoadedAutosave, queueRevision]);
+  }, [slug, queueRevision, isOffline]);
 
   // Autosave progress
   useEffect(() => {
-    if (slug && apparatus && checklist && (currentStep === 'meter' || currentStep === 'compartments' || currentStep === 'submit')) {
+    if (
+      slug
+      && apparatus
+      && checklist
+      && (
+        currentStep === 'meter'
+        || currentStep === 'details'
+        || currentStep === 'compartments'
+        || currentStep === 'submit'
+        || (checklist.schema_version === 2 && currentStep === 'officer')
+      )
+    ) {
       const saveData = {
         checklist_version: checklist.checklist_version,
+        apparatusSnapshot: apparatus,
         officer: officerInfo,
         meter: meterData,
         compartments,
+        fieldValues,
+        scheduledTasks,
+        inspectionSession: checklist.inspection_session,
+        checklistSnapshot: checklist,
       };
       saveInspectionProgress(slug, saveData);
+      if (checklist.schema_version === 2 && checklist.inspection_session) {
+        clearInspectionSessionStartKey(slug, checklist.checklist_version);
+      }
     }
-  }, [officerInfo, meterData, compartments, currentStep, slug, apparatus, checklist]);
+  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist]);
 
   const handleOfficerSubmit = (info: OfficerInfo) => {
     setOfficerInfo(info);
-    setCurrentStep('meter');
+    setCurrentStep(checklist?.schema_version === 2 ? 'details' : 'meter');
   };
 
   const handleMeterSubmit = (data: MeterData) => {
     setMeterData(data);
+    setCurrentStep('compartments');
+  };
+
+  const handleChecklistDetailsSubmit = (
+    updatedFieldValues: Array<{ id: string; value: ChecklistFieldValue }>,
+    updatedScheduledTasks: ScheduledChecklistTaskResult[],
+  ) => {
+    setFieldValues(updatedFieldValues);
+    setScheduledTasks(updatedScheduledTasks);
     setCurrentStep('compartments');
   };
 
@@ -149,8 +355,67 @@ export default function InspectionWizard() {
     setCurrentStep('submit');
   };
 
+  const handleAbandonPriorSession = async () => {
+    const inspectionSession = checklist?.inspection_session;
+    if (!apparatus || !slug || !checklist || !inspectionSession || isOffline) return;
+
+    setAbandonmentError(null);
+    setAbandoningPriorSession(true);
+    try {
+      const todayChecklist = await ApiClient.abandonInspectionSession(
+        apparatus.id,
+        inspectionSession.id,
+        inspectionSession.token,
+        inspectionSession.replay_key,
+        getOrCreateInspectionSessionAbandonKey(slug, inspectionSession.id),
+      );
+      clearInspectionSessionAbandonKey(slug, inspectionSession.id);
+      clearInspectionProgress(slug, checklist.checklist_version);
+      clearInspectionSessionStartKey(slug, checklist.checklist_version);
+      clientSubmissionIdRef.current = null;
+      initializedChecklistKeyRef.current = `${slug}:${todayChecklist.checklist_version}`;
+      setChecklist(todayChecklist);
+      setHasLoadedAutosave(false);
+      setAutosaveReviewMessage('The prior Fire Boat inspection was explicitly abandoned. This form now uses today\'s server-issued contract.');
+      setOfficerInfo({
+        name: '',
+        rank: 'Firefighter',
+        shift: 'A',
+        unitNumber: apparatus.vehicle_number,
+      });
+      setMeterData({ engine_hours: null, miles: null });
+      setCompartments(todayChecklist.compartments);
+      setFieldValues(todayChecklist.fields.map((field) => ({
+        id: field.id,
+        value: field.id === todayChecklist.inspection_date_field_id
+          ? todayChecklist.inspection_date ?? ''
+          : field.inputType === 'checkbox'
+            ? false
+            : field.inputType === 'number' || field.inputType === 'percentage'
+              ? null
+              : '',
+      })));
+      setScheduledTasks(todayChecklist.due_tasks.map((task) => ({
+        id: task.id,
+        status: 'Present',
+        notes: null,
+      })));
+      setCurrentStep('officer');
+    } catch (err) {
+      setAbandonmentError(err instanceof Error ? err.message : 'Unable to start today\'s Fire Boat inspection.');
+      setAbandoningPriorSession(false);
+    }
+  };
+
   const handleSubmit = async (signature: string | null) => {
     if (!apparatus || !slug || !checklist) return;
+
+    const inspectionSession = checklist.inspection_session;
+    if (checklist.schema_version === 2 && !inspectionSession) {
+      setError('A server-issued Fire Boat inspection session is required before this checkout can be submitted.');
+
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -165,6 +430,10 @@ export default function InspectionWizard() {
               status: item.status,
               notes: item.notes,
               photo: item.photo,
+              ...(checklist.schema_version === 2 ? {
+                compartment_id: compartment.id,
+                item_id: item.id,
+              } : {}),
             });
           }
         });
@@ -191,6 +460,13 @@ export default function InspectionWizard() {
           })),
         })),
         defects,
+        ...(checklist.schema_version === 2 ? {
+          field_values: fieldValues,
+          scheduled_tasks: scheduledTasks,
+          inspection_session_id: inspectionSession?.id,
+          inspection_session_token: inspectionSession?.token,
+          inspection_session_replay_key: inspectionSession?.replay_key,
+        } : {}),
         officer_signature: signature,
       };
       clientSubmissionIdRef.current = submission.client_submission_id;
@@ -246,8 +522,10 @@ export default function InspectionWizard() {
   const goBack = () => {
     if (currentStep === 'meter') {
       setCurrentStep('officer');
+    } else if (currentStep === 'details') {
+      setCurrentStep('officer');
     } else if (currentStep === 'compartments') {
-      setCurrentStep('meter');
+      setCurrentStep(checklist?.schema_version === 2 ? 'details' : 'meter');
     } else if (currentStep === 'submit') {
       setCurrentStep('compartments');
     }
@@ -314,21 +592,28 @@ export default function InspectionWizard() {
     );
   }
 
-  // Get step number for progress indicator
-  const getStepNumber = () => {
-    switch (currentStep) {
-      case 'officer': return 1;
-      case 'meter': return 2;
-      case 'compartments': return 3;
-      case 'submit': return 4;
-      default: return 1;
-    }
-  };
+  const isV2Checklist = checklist.schema_version === 2;
+  const priorDayInspectionSession = isV2Checklist
+    && checklist.inspection_session !== undefined
+    && !inspectionSessionIsExpired(checklist.inspection_session)
+    && checklist.inspection_session.duty_date !== easternDutyDate();
+  const progressSteps: Array<{ step: Step; label: string }> = isV2Checklist
+    ? [
+        { step: 'officer', label: 'Officer' },
+        { step: 'details', label: 'Details' },
+        { step: 'compartments', label: 'Check' },
+        { step: 'submit', label: 'Submit' },
+      ]
+    : [
+        { step: 'officer', label: 'Officer' },
+        { step: 'meter', label: 'Meters' },
+        { step: 'compartments', label: 'Check' },
+        { step: 'submit', label: 'Submit' },
+      ];
 
   const isStepCompleted = (step: Step) => {
-    const order: Step[] = ['officer', 'meter', 'compartments', 'submit'];
-    const currentIndex = order.indexOf(currentStep);
-    const stepIndex = order.indexOf(step);
+    const currentIndex = progressSteps.findIndex((entry) => entry.step === currentStep);
+    const stepIndex = progressSteps.findIndex((entry) => entry.step === step);
     return stepIndex < currentIndex;
   };
 
@@ -355,6 +640,27 @@ export default function InspectionWizard() {
           <p role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
             {autosaveReviewMessage}
           </p>
+        )}
+        {priorDayInspectionSession && (
+          <section role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+            <p className="font-semibold">A valid Fire Boat inspection from the prior duty date is still active.</p>
+            <p className="mt-1">
+              Continue and submit that server-issued contract, or explicitly close it before starting today\'s inspection. Local browser storage loss cannot start a new duty date.
+            </p>
+            {isOffline ? (
+              <p className="mt-3 font-medium">Reconnect before abandoning the prior inspection or starting today\'s inspection.</p>
+            ) : (
+              <button
+                type="button"
+                onClick={handleAbandonPriorSession}
+                disabled={abandoningPriorSession}
+                className="mt-3 rounded-lg bg-amber-800 px-4 py-2 font-semibold text-white transition-colors hover:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {abandoningPriorSession ? 'Starting Today\'s Inspection…' : 'Abandon Prior Inspection / Start Today’s Inspection'}
+              </button>
+            )}
+            {abandonmentError && <p className="mt-3 font-medium text-red-700">{abandonmentError}</p>}
+          </section>
         )}
       </div>
 
@@ -402,54 +708,28 @@ export default function InspectionWizard() {
         </p>
       )}
 
-      {/* Progress indicator — 4 steps */}
+      {/* Progress indicator */}
       <div className="mb-8">
         <div className="flex items-center justify-center space-x-2 md:space-x-4">
-          {/* Step 1: Officer Info */}
-          <div className={`flex items-center ${currentStep === 'officer' ? 'text-red-600' : 'text-neutral-400'}`}>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-              currentStep === 'officer' ? 'bg-red-600 text-white shadow-md' : 
-              isStepCompleted('officer') ? 'bg-teal-500 text-white' : 'bg-neutral-200'
-            }`}>
-              {isStepCompleted('officer') ? '✓' : '1'}
-            </div>
-            <span className="ml-2 text-sm font-medium hidden md:inline">Officer</span>
-          </div>
-          <div className={`w-6 md:w-10 h-0.5 ${isStepCompleted('officer') || currentStep === 'meter' ? 'bg-red-600' : 'bg-neutral-200'}`} />
-          
-          {/* Step 2: Meter */}
-          <div className={`flex items-center ${currentStep === 'meter' ? 'text-red-600' : 'text-neutral-400'}`}>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-              currentStep === 'meter' ? 'bg-red-600 text-white shadow-md' :
-              isStepCompleted('meter') ? 'bg-teal-500 text-white' : 'bg-neutral-200'
-            }`}>
-              {isStepCompleted('meter') ? '✓' : '2'}
-            </div>
-            <span className="ml-2 text-sm font-medium hidden md:inline">Meters</span>
-          </div>
-          <div className={`w-6 md:w-10 h-0.5 ${isStepCompleted('meter') || currentStep === 'compartments' ? 'bg-red-600' : 'bg-neutral-200'}`} />
-          
-          {/* Step 3: Compartments */}
-          <div className={`flex items-center ${currentStep === 'compartments' ? 'text-red-600' : 'text-neutral-400'}`}>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-              currentStep === 'compartments' ? 'bg-red-600 text-white shadow-md' :
-              isStepCompleted('compartments') ? 'bg-teal-500 text-white' : 'bg-neutral-200'
-            }`}>
-              {isStepCompleted('compartments') ? '✓' : '3'}
-            </div>
-            <span className="ml-2 text-sm font-medium hidden md:inline">Check</span>
-          </div>
-          <div className={`w-6 md:w-10 h-0.5 ${isStepCompleted('compartments') || currentStep === 'submit' ? 'bg-red-600' : 'bg-neutral-200'}`} />
-          
-          {/* Step 4: Submit */}
-          <div className={`flex items-center ${currentStep === 'submit' ? 'text-red-600' : 'text-neutral-400'}`}>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-              currentStep === 'submit' ? 'bg-red-600 text-white shadow-md' : 'bg-neutral-200'
-            }`}>
-              4
-            </div>
-            <span className="ml-2 text-sm font-medium hidden md:inline">Submit</span>
-          </div>
+          {progressSteps.map(({ step, label }, index) => (
+            <Fragment key={step}>
+              <div className={`flex items-center ${currentStep === step ? 'text-red-600' : 'text-neutral-400'}`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold ${
+                  currentStep === step ? 'bg-red-600 text-white shadow-md'
+                    : isStepCompleted(step) ? 'bg-teal-500 text-white'
+                      : 'bg-neutral-200'
+                }`}>
+                  {isStepCompleted(step) ? '✓' : index + 1}
+                </div>
+                <span className="ml-2 hidden text-sm font-medium md:inline">{label}</span>
+              </div>
+              {index < progressSteps.length - 1 && (
+                <div className={`h-0.5 w-6 md:w-10 ${
+                  isStepCompleted(step) || currentStep === progressSteps[index + 1].step ? 'bg-red-600' : 'bg-neutral-200'
+                }`} />
+              )}
+            </Fragment>
+          ))}
         </div>
       </div>
 
@@ -473,11 +753,22 @@ export default function InspectionWizard() {
         />
       )}
 
+      {currentStep === 'details' && (
+        <ChecklistFieldsStep
+          checklist={checklist}
+          initialFieldValues={fieldValues}
+          initialScheduledTasks={scheduledTasks}
+          onSubmit={handleChecklistDetailsSubmit}
+          onBack={goBack}
+        />
+      )}
+
       {currentStep === 'compartments' && (
         <CompartmentStep
           compartments={compartments}
           onSubmit={handleCompartmentsSubmit}
           onBack={goBack}
+          backLabel={isV2Checklist ? 'Back to Checklist Details' : undefined}
         />
       )}
 

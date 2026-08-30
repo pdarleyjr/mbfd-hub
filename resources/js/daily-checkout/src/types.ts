@@ -1,4 +1,4 @@
-export type ApparatusType = 'engine' | 'ladder1' | 'ladder3' | 'rescue' | 'rope';
+export type ApparatusType = 'engine' | 'ladder1' | 'ladder3' | 'rescue' | 'rope' | 'fireboat';
 export type DailyCheckoutRequirement = 'required' | 'exempt' | 'reserve' | 'administrative' | 'inactive' | 'unknown';
 export type DailyCheckoutState = 'checked' | 'attention' | 'review_pending' | 'not_checked' | 'out_of_service' | 'exempt' | 'classification_required';
 
@@ -79,6 +79,46 @@ export interface OfficerInfo {
 }
 
 export type ItemStatus = 'Present' | 'Missing' | 'Damaged';
+export type ChecklistInputType = 'text' | 'number' | 'date' | 'checkbox' | 'percentage';
+export type ChecklistFieldValue = string | number | boolean | null;
+
+export interface ChecklistField {
+  id: string;
+  name: string;
+  inputType: ChecklistInputType;
+  required: boolean;
+}
+
+export interface ScheduledChecklistTask {
+  id: string;
+  name: string;
+  instructions?: string;
+  recurrence: {
+    type: 'weekday' | 'monthly_day';
+    weekday?: string;
+    day?: number;
+  };
+}
+
+export interface InspectionSessionContract {
+  id: string;
+  token: string;
+  issued_at: string;
+  expires_at: string;
+  duty_date: string;
+  checklist_template_id: string;
+  checklist_template_version: string;
+  checklist_hash: string;
+  due_tasks: ScheduledChecklistTask[];
+  due_tasks_hash: string;
+  replay_key: string;
+}
+
+export interface ScheduledChecklistTaskResult {
+  id: string;
+  status: ItemStatus;
+  notes?: string | null;
+}
 
 export interface ChecklistItem {
   id: string;
@@ -86,6 +126,8 @@ export interface ChecklistItem {
   status: ItemStatus;
   notes?: string;
   photo?: string; // base64 encoded image
+  inputType?: ChecklistInputType;
+  expectedQuantity?: number;
 }
 
 export interface Compartment {
@@ -96,6 +138,14 @@ export interface Compartment {
 
 export interface ChecklistData {
   checklist_version: string;
+  schema_version: 1 | 2;
+  template_id?: string;
+  template_version?: string;
+  inspection_date?: string;
+  inspection_date_field_id?: string;
+  fields: ChecklistField[];
+  due_tasks: ScheduledChecklistTask[];
+  inspection_session?: InspectionSessionContract;
   compartments: Compartment[];
 }
 
@@ -103,6 +153,8 @@ export interface Defect {
   item: string;
   compartment: string;
   status: 'Missing' | 'Damaged';
+  compartment_id?: string;
+  item_id?: string;
   notes?: string;
   photo?: string;
 }
@@ -119,6 +171,11 @@ export interface InspectionSubmission {
   miles?: number | null;
   defects: Defect[];
   compartments?: unknown[];
+  field_values?: Array<{ id: string; value: ChecklistFieldValue }>;
+  scheduled_tasks?: ScheduledChecklistTaskResult[];
+  inspection_session_id?: string;
+  inspection_session_token?: string;
+  inspection_session_replay_key?: string;
   officer_signature?: string | null;
 }
 
@@ -129,9 +186,14 @@ export interface MeterData {
 
 export interface InspectionData {
   checklist_version: string;
+  apparatusSnapshot?: Apparatus;
   officer: OfficerInfo;
   meter: MeterData;
   compartments: Compartment[];
+  fieldValues?: Array<{ id: string; value: ChecklistFieldValue }>;
+  scheduledTasks?: ScheduledChecklistTaskResult[];
+  inspectionSession?: InspectionSessionContract;
+  checklistSnapshot?: ChecklistData;
 }
 
 // ============================================
