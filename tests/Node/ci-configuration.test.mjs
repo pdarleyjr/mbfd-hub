@@ -335,6 +335,29 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   }
 });
 
+test("the immutable image starts Supervisor without privilege-switch directives", () => {
+  const dockerfile = readFileSync(resolve(root, "docker/production/Dockerfile"), "utf8");
+  const supervisor = readFileSync(resolve(root, "docker/production/supervisord.conf"), "utf8");
+  const prepare = readFileSync(resolve(root, ".github/workflows/prepare-production-image.yml"), "utf8");
+
+  assert.match(dockerfile, /COPY docker\/production\/supervisord\.conf \/etc\/supervisor\/conf\.d\/supervisord\.conf/);
+  assert.doesNotMatch(supervisor, /^user\s*=/mi);
+  assert.match(supervisor, /\[program:php\]/);
+  assert.match(supervisor, /\[program:queue-worker\]/);
+  assert.match(supervisor, /\[program:reverb\]/);
+  assert.match(supervisor, /\[program:scheduler\]/);
+
+  const runtime = workflowStep(prepare, "Test immutable Hub Supervisor runtime readiness");
+  assert.match(runtime, /docker run --detach/);
+  assert.match(runtime, /--network none/);
+  assert.match(runtime, /supervisord --version/);
+  assert.match(runtime, /supervisorctl -c \/etc\/supervisor\/conf\.d\/supervisord\.conf status/);
+  assert.match(runtime, /queue-worker_00 \+RUNNING/);
+  assert.match(runtime, /test "\$\(docker exec "\$RUNTIME_CONTAINER" id -u\)" = 1000/);
+  assert.match(runtime, /ps -eo uid=/);
+  assert.match(runtime, /trap cleanup EXIT/);
+});
+
 test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset, security, and runtime-compatibility checks", () => {
   const gates = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
 

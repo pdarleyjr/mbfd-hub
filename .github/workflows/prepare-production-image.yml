@@ -109,6 +109,57 @@ jobs:
             ! test -e /var/www/html/vendor/laravel/sail
           '
 
+      - name: Test immutable Hub Supervisor runtime readiness
+        env:
+          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
+        run: |
+          set -euo pipefail
+          RUNTIME_CONTAINER="mbfd-hub-supervisor-runtime-${FINAL_RELEASE_SHA}"
+          cleanup() {
+            docker rm --force "$RUNTIME_CONTAINER" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker run --detach --name "$RUNTIME_CONTAINER" --network none \
+            --env WWWUSER=1000 \
+            --env WWWGROUP=1000 \
+            --env APP_ENV=production \
+            --env APP_KEY='base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' \
+            --env APP_DEBUG=false \
+            --env DB_CONNECTION=sqlite \
+            --env DB_DATABASE=/tmp/mbfd-runtime.sqlite \
+            --env CACHE_STORE=array \
+            --env SESSION_DRIVER=array \
+            --env QUEUE_CONNECTION=sync \
+            --env MAIL_MAILER=array \
+            --env BROADCAST_CONNECTION=log \
+            --env PULSE_ENABLED=false \
+            --env SENTRY_LARAVEL_DSN='' \
+            --env WORKGROUP_AI_ENABLED=false \
+            "$IMAGE_LOCAL"
+          docker exec "$RUNTIME_CONTAINER" supervisord --version
+          for attempt in $(seq 1 10); do
+            status="$(docker exec "$RUNTIME_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status || true)"
+            if printf '%s\n' "$status" | grep -Eq '^php +RUNNING ' \
+              && printf '%s\n' "$status" | grep -Eq '^queue-worker_00 +RUNNING ' \
+              && printf '%s\n' "$status" | grep -Eq '^reverb +RUNNING ' \
+              && printf '%s\n' "$status" | grep -Eq '^scheduler +RUNNING '; then
+              break
+            fi
+            sleep 1
+          done
+          printf '%s\n' "$status"
+          printf '%s\n' "$status" | grep -Eq '^php +RUNNING '
+          printf '%s\n' "$status" | grep -Eq '^queue-worker_00 +RUNNING '
+          printf '%s\n' "$status" | grep -Eq '^reverb +RUNNING '
+          printf '%s\n' "$status" | grep -Eq '^scheduler +RUNNING '
+          test "$(docker exec "$RUNTIME_CONTAINER" id -u)" = 1000
+          test "$(docker exec "$RUNTIME_CONTAINER" id -g)" = 1000
+          test "$(docker exec "$RUNTIME_CONTAINER" id -un)" = sail
+          test -z "$(docker exec "$RUNTIME_CONTAINER" ps -eo uid= | awk '$1 == 0 { print; exit }')"
+          test -z "$(docker port "$RUNTIME_CONTAINER")"
+          sleep 5
+          docker exec "$RUNTIME_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status
+
       - name: Generate CycloneDX SBOM for immutable image
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.18.0
         with:
