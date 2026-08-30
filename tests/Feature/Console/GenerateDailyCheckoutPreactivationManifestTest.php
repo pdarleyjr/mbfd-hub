@@ -19,6 +19,10 @@ final class GenerateDailyCheckoutPreactivationManifestTest extends TestCase
 
     private const CANDIDATE_SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
+    private const ACTIVATION_SHA = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+    private const CANDIDATE_IMAGE_DIGEST = 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+
     private string $candidateDatabase;
 
     /** @var list<string> */
@@ -80,6 +84,7 @@ final class GenerateDailyCheckoutPreactivationManifestTest extends TestCase
             'daily_checkout_requirement' => 'required',
             'daily_checkout_template' => 'engine',
         ]);
+        $this->activateCutover([$unknown, $required]);
         $output = $this->newManifestPath();
         $queries = [];
         DB::connection(self::CONNECTION)->listen(static function (QueryExecuted $query) use (&$queries): void {
@@ -91,6 +96,7 @@ final class GenerateDailyCheckoutPreactivationManifestTest extends TestCase
             '--snapshot-id' => 'snapshot-20260827-owner-beta',
             '--as-of' => '2026-08-27T20:00:00Z',
             '--candidate-sha' => self::CANDIDATE_SHA,
+            '--candidate-image-digest' => self::CANDIDATE_IMAGE_DIGEST,
             '--approval-reference' => 'owner-beta-pr-220',
             '--output' => $output,
             '--json' => true,
@@ -106,6 +112,7 @@ final class GenerateDailyCheckoutPreactivationManifestTest extends TestCase
 
         $this->assertSame('generated', $report['state']);
         $this->assertSame(self::CANDIDATE_SHA, $report['candidate_sha']);
+        $this->assertSame(self::CANDIDATE_IMAGE_DIGEST, $report['candidate_image_digest']);
         $this->assertSame(2, $report['source_evidence']['apparatus_count']);
         $this->assertSame(0, $report['source_evidence']['legacy_status_transition_count']);
         $this->assertSame(hash('sha256', (string) file_get_contents($output)), $report['manifest_sha256']);
@@ -118,6 +125,13 @@ final class GenerateDailyCheckoutPreactivationManifestTest extends TestCase
         $this->assertSame('engine', $byId[$required->id]['expected_checklist_type']);
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $byId[$required->id]['expected_checklist_version']);
         $this->assertSame([], $manifest['expected_absent']);
+        $this->assertSame(2, $manifest['schema_version']);
+        $this->assertSame([
+            'source_sha' => self::CANDIDATE_SHA,
+            'image_digest' => self::CANDIDATE_IMAGE_DIGEST,
+        ], $manifest['release_candidate']);
+        $this->assertSame(self::ACTIVATION_SHA, $manifest['ledger_activation']['release_sha']);
+        $this->assertSame(2, $manifest['ledger_activation']['apparatus_count']);
         foreach ($queries as $query) {
             $this->assertDoesNotMatchRegularExpression('/\b(?:insert|update|delete|alter|drop|create|replace)\b/', $query);
         }
@@ -126,6 +140,7 @@ final class GenerateDailyCheckoutPreactivationManifestTest extends TestCase
     public function test_it_refuses_to_label_observed_legacy_status_evidence_as_history_unavailable(): void
     {
         $apparatus = $this->makeApparatus('E3');
+        $this->activateCutover([$apparatus]);
         ApparatusOperationalStatusEvent::on(self::CONNECTION)->create([
             'apparatus_id' => $apparatus->id,
             'previous_status' => 'Out of Service',
@@ -139,6 +154,7 @@ final class GenerateDailyCheckoutPreactivationManifestTest extends TestCase
             '--snapshot-id' => 'snapshot-20260827-owner-beta',
             '--as-of' => '2026-08-27T20:00:00Z',
             '--candidate-sha' => self::CANDIDATE_SHA,
+            '--candidate-image-digest' => self::CANDIDATE_IMAGE_DIGEST,
             '--approval-reference' => 'owner-beta-pr-220',
             '--output' => $output,
             '--json' => true,
@@ -150,6 +166,29 @@ final class GenerateDailyCheckoutPreactivationManifestTest extends TestCase
         $report = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame('blocked', $report['state']);
         $this->assertContains('manifest_generator_legacy_status_events_require_review', $report['issues']);
+    }
+
+    public function test_it_fails_closed_without_a_persisted_immutable_activation_boundary(): void
+    {
+        $this->makeApparatus('E4');
+        $output = $this->newManifestPath();
+
+        $status = Artisan::call('daily-checkout:generate-preactivation-manifest', [
+            '--connection' => self::CONNECTION,
+            '--snapshot-id' => 'snapshot-20260827-owner-beta',
+            '--as-of' => '2026-08-27T20:00:00Z',
+            '--candidate-sha' => self::CANDIDATE_SHA,
+            '--candidate-image-digest' => self::CANDIDATE_IMAGE_DIGEST,
+            '--approval-reference' => 'owner-beta-pr-220',
+            '--output' => $output,
+            '--json' => true,
+        ]);
+
+        $this->assertSame(Command::FAILURE, $status);
+        $this->assertFileDoesNotExist($output);
+        /** @var array<string, mixed> $report */
+        $report = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertContains('daily_checkout_ledger_cutover_missing', $report['issues']);
     }
 
     /** @param array<string, string> $overrides */
@@ -187,5 +226,31 @@ final class GenerateDailyCheckoutPreactivationManifestTest extends TestCase
         $this->temporaryDirectories[] = $directory;
 
         return $directory.DIRECTORY_SEPARATOR.'manifest.json';
+    }
+
+    /** @param list<Apparatus> $apparatuses */
+    private function activateCutover(array $apparatuses): void
+    {
+        $snapshot = collect($apparatuses)
+            ->sortBy('id')
+            ->map(static fn (Apparatus $apparatus): array => [
+                'id' => (int) $apparatus->id,
+                'status' => $apparatus->status,
+            ])
+            ->values()
+            ->all();
+        $encodedSnapshot = json_encode($snapshot, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+
+        DB::connection(self::CONNECTION)->table('daily_checkout_ledger_cutovers')->insert([
+            'ledger' => 'daily_checkout',
+            'release_sha' => self::ACTIVATION_SHA,
+            'source' => 'owner_beta_activation',
+            'activated_at' => '2026-08-26T12:00:00Z',
+            'apparatus_status_snapshot' => $encodedSnapshot,
+            'snapshot_sha256' => hash('sha256', $encodedSnapshot),
+            'apparatus_count' => count($snapshot),
+            'created_at' => '2026-08-26T12:00:00Z',
+            'updated_at' => '2026-08-26T12:00:00Z',
+        ]);
     }
 }

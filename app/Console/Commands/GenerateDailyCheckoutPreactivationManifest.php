@@ -8,6 +8,7 @@ use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Enums\DailyCheckoutRequirement;
 use App\Models\Apparatus;
 use App\Services\DailyCheckoutChecklistResolver;
+use App\Services\DailyCheckoutLedgerActivationEvidence;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Database\Connection;
@@ -29,14 +30,17 @@ final class GenerateDailyCheckoutPreactivationManifest extends Command
                             {--snapshot-id= : Immutable identifier for the staged snapshot}
                             {--as-of= : ISO-8601 assessment time for the snapshot}
                             {--candidate-sha= : Immutable candidate source SHA bound to the manifest}
+                            {--candidate-image-digest= : Immutable candidate image digest bound to the manifest}
                             {--approval-reference= : Owner-beta approval evidence reference}
                             {--output= : New JSON file path for the generated manifest}
                             {--json : Emit the generation evidence as JSON}';
 
     protected $description = 'Generate a checksum-bound Daily Checkout beta manifest from a read-only candidate snapshot.';
 
-    public function handle(DailyCheckoutChecklistResolver $checklists): int
-    {
+    public function handle(
+        DailyCheckoutChecklistResolver $checklists,
+        DailyCheckoutLedgerActivationEvidence $activationEvidence,
+    ): int {
         $input = $this->input();
         if ($input['issues'] !== []) {
             return $this->emit($this->blockedReport($input, $input['issues']));
@@ -44,12 +48,12 @@ final class GenerateDailyCheckoutPreactivationManifest extends Command
 
         try {
             $connection = DB::connection($input['connection']);
-            $generation = $connection->transaction(function () use ($connection, $input, $checklists): array {
+            $generation = $connection->transaction(function () use ($connection, $input, $checklists, $activationEvidence): array {
                 if ($connection->getDriverName() === 'pgsql') {
                     $connection->statement('SET TRANSACTION READ ONLY');
                 }
 
-                return $this->generate($connection, $input, $checklists);
+                return $this->generate($connection, $input, $checklists, $activationEvidence);
             });
         } catch (RuntimeException $exception) {
             return $this->emit($this->blockedReport($input, [$exception->getMessage()]));
@@ -75,6 +79,7 @@ final class GenerateDailyCheckoutPreactivationManifest extends Command
             'state' => 'generated',
             'connection' => $input['connection'],
             'candidate_sha' => $input['candidate_sha'],
+            'candidate_image_digest' => $input['candidate_image_digest'],
             'snapshot_id' => $input['snapshot_id'],
             'as_of_utc' => $input['as_of']->toIso8601String(),
             'manifest_path' => $input['output'],
@@ -90,6 +95,7 @@ final class GenerateDailyCheckoutPreactivationManifest extends Command
      *     snapshot_id: string,
      *     as_of: CarbonImmutable,
      *     candidate_sha: string,
+     *     candidate_image_digest: string,
      *     approval_reference: string,
      *     output: string,
      *     issues: list<string>
@@ -101,6 +107,7 @@ final class GenerateDailyCheckoutPreactivationManifest extends Command
         $snapshotId = $this->optionString('snapshot-id');
         $asOfValue = $this->optionString('as-of');
         $candidateSha = $this->optionString('candidate-sha');
+        $candidateImageDigest = $this->optionString('candidate-image-digest');
         $approvalReference = $this->optionString('approval-reference');
         $output = $this->optionString('output');
         $issues = [];
@@ -132,6 +139,11 @@ final class GenerateDailyCheckoutPreactivationManifest extends Command
         } else {
             $candidateSha = strtolower($candidateSha);
         }
+        if ($candidateImageDigest === null || preg_match('/^sha256:[a-f0-9]{64}$/i', $candidateImageDigest) !== 1) {
+            $issues[] = 'manifest_generator_input_invalid:candidate_image_digest';
+        } else {
+            $candidateImageDigest = strtolower($candidateImageDigest);
+        }
         if ($approvalReference === null) {
             $issues[] = 'manifest_generator_input_missing:approval_reference';
         }
@@ -159,6 +171,7 @@ final class GenerateDailyCheckoutPreactivationManifest extends Command
             'snapshot_id' => $snapshotId ?? '',
             'as_of' => $asOf,
             'candidate_sha' => $candidateSha ?? '',
+            'candidate_image_digest' => $candidateImageDigest ?? '',
             'approval_reference' => $approvalReference ?? '',
             'output' => $output ?? '',
             'issues' => array_values(array_unique($issues)),
@@ -166,15 +179,19 @@ final class GenerateDailyCheckoutPreactivationManifest extends Command
     }
 
     /**
-     * @param  array{connection: string, snapshot_id: string, as_of: CarbonImmutable, candidate_sha: string, approval_reference: string, output: string, issues: list<string>}  $input
+     * @param  array{connection: string, snapshot_id: string, as_of: CarbonImmutable, candidate_sha: string, candidate_image_digest: string, approval_reference: string, output: string, issues: list<string>}  $input
      * @return array{
      *     manifest: array<string, mixed>,
-     *     source_evidence: array{apparatus_count: int, legacy_status_transition_count: int, status_snapshot_sha256: string},
+     *     source_evidence: array{apparatus_count: int, legacy_status_transition_count: int, status_snapshot_sha256: string}|null,
      *     issues: list<string>
      * }
      */
-    private function generate(Connection $connection, array $input, DailyCheckoutChecklistResolver $checklists): array
-    {
+    private function generate(
+        Connection $connection,
+        array $input,
+        DailyCheckoutChecklistResolver $checklists,
+        DailyCheckoutLedgerActivationEvidence $activationEvidence,
+    ): array {
         $schema = Schema::connection($input['connection']);
         if (
             ! $schema->hasTable('apparatuses')
@@ -199,6 +216,14 @@ final class GenerateDailyCheckoutPreactivationManifest extends Command
         }
 
         $legacyStatusTransitionCount = (int) $connection->table('apparatus_operational_status_events')->count();
+        $activation = $activationEvidence->read($connection, $input['as_of']);
+        if ($activation['record'] === null || $activation['issues'] !== []) {
+            return [
+                'manifest' => [],
+                'source_evidence' => null,
+                'issues' => $activation['issues'],
+            ];
+        }
         $rows = $connection->table('apparatuses')
             ->leftJoin('stations', 'stations.id', '=', 'apparatuses.station_id')
             ->orderBy('apparatuses.id')
@@ -267,10 +292,14 @@ final class GenerateDailyCheckoutPreactivationManifest extends Command
 
         return [
             'manifest' => [
-                'schema_version' => 1,
+                'schema_version' => 2,
                 'snapshot_id' => $input['snapshot_id'],
                 'as_of_utc' => $input['as_of']->toIso8601String(),
-                'candidate_sha' => $input['candidate_sha'],
+                'release_candidate' => [
+                    'source_sha' => $input['candidate_sha'],
+                    'image_digest' => $input['candidate_image_digest'],
+                ],
+                'ledger_activation' => $activation['record'],
                 'approval' => [
                     'reference' => $input['approval_reference'],
                 ],
@@ -415,7 +444,7 @@ final class GenerateDailyCheckoutPreactivationManifest extends Command
     }
 
     /**
-     * @param  array{connection: string, snapshot_id: string, as_of: CarbonImmutable, candidate_sha: string, approval_reference: string, output: string, issues: list<string>}  $input
+     * @param  array{connection: string, snapshot_id: string, as_of: CarbonImmutable, candidate_sha: string, candidate_image_digest: string, approval_reference: string, output: string, issues: list<string>}  $input
      * @param  array{apparatus_count: int, legacy_status_transition_count: int, status_snapshot_sha256: string}|null  $sourceEvidence
      * @return array<string, mixed>
      */
@@ -426,6 +455,7 @@ final class GenerateDailyCheckoutPreactivationManifest extends Command
             'state' => 'blocked',
             'connection' => $input['connection'],
             'candidate_sha' => $input['candidate_sha'],
+            'candidate_image_digest' => $input['candidate_image_digest'],
             'snapshot_id' => $input['snapshot_id'],
             'as_of_utc' => $input['as_of']->toIso8601String(),
             'manifest_path' => $input['output'],
