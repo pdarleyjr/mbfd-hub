@@ -102,6 +102,7 @@ jobs:
             test "$(id -u)" = 1000
             test "$(id -g)" = 1000
             test "$(id -Gn)" = sail
+            test "$SUPERVISOR_PHP_USER" = sail
             test -s /var/www/html/public/build/manifest.json
             test -s /var/www/html/public/daily/index.html
             test -d /var/www/html/vendor

@@ -13,6 +13,7 @@ ARG WWWGROUP
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
+    SUPERVISOR_PHP_USER=sail \
     SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=8081"
 
 WORKDIR /var/www/html
