@@ -133,7 +133,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          IMAGE_REPOSITORY="ghcr.io/${GITHUB_REPOSITORY,,}"
+          IMAGE_REPOSITORY="$(head -n 1 "$IMAGE_BUILD_CONTEXT/docker/production/image-repository")"
+          test "$IMAGE_REPOSITORY" = 'ghcr.io/pdarleyjr/mbfd-hub'
           IMAGE_TAG="$IMAGE_REPOSITORY:sha-$FINAL_RELEASE_SHA"
           printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           docker tag "$IMAGE_LOCAL" "$IMAGE_TAG"

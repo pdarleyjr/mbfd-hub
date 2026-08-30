@@ -117,6 +117,7 @@ test("Composer CI installs use an ephemeral GitHub token instead of a persisted 
 test("production activation is manual, main-only, and blocked by every Hub release gate", () => {
   const deploy = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
   const prepare = readFileSync(resolve(root, ".github/workflows/prepare-production-image.yml"), "utf8");
+  const imageRepository = readFileSync(resolve(root, "docker/production/image-repository"), "utf8").trim();
   const imageCompose = readFileSync(resolve(root, "compose.prod.image.yaml"), "utf8");
   const productionDockerfile = readFileSync(resolve(root, "docker/production/Dockerfile"), "utf8");
   const productionEntrypoint = readFileSync(resolve(root, "docker/production/start-production-container"), "utf8");
@@ -230,6 +231,8 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(immutableImage, /org\.opencontainers\.image\.revision/);
   assert.match(immutableImage, /FINAL_RELEASE_SHA/);
   assert.match(immutableImage, /FINAL_IMAGE_DIGEST/);
+  assert.match(immutableImage, /IMAGE_REPOSITORY/);
+  assert.match(immutableImage, /IMAGE_REF="\$IMAGE_REPOSITORY@\$FINAL_IMAGE_DIGEST"/);
 
   const maintenance = workflowStep(deployment, "Enter maintenance mode and verify queue safety");
   assert.match(maintenance, /php artisan down --render=errors::503/);
@@ -244,14 +247,20 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(activation, /test "\$\(git rev-parse HEAD\)" = "\$RELEASE_SHA"/);
   assert.match(activation, /php artisan migrate:status/);
   assert.match(activation, /compose\.prod\.image\.yaml/);
+  assert.match(activation, /docker compose.*run --rm --no-deps --pull never/s);
+  assert.match(activation, /--entrypoint bash/);
+  assert.match(activation, /--name "\$HUB_MIGRATION_CONTAINER"/);
+  assert.doesNotMatch(activation, /--service-ports/);
   assert.match(activation, /--no-build --no-deps --force-recreate laravel\.test/);
   assert.doesNotMatch(activation, /composer install|npm ci|vite build|filament:assets/);
   assert.match(activation, /daily-checkout:activate-ledger --release-sha="\$RELEASE_SHA" --no-interaction/);
   assert.doesNotMatch(activation, /docker compose .* down|docker (?:system )?prune/);
+  const oneOffMigrationIndex = activation.indexOf("run --rm --no-deps --pull never");
   const recreateIndex = activation.indexOf("--no-build --no-deps --force-recreate laravel.test");
   const migrationIndex = activation.indexOf("php artisan migrate --force");
   const cutoverIndex = activation.indexOf("daily-checkout:activate-ledger");
-  assert.ok(recreateIndex >= 0 && migrationIndex > recreateIndex && cutoverIndex > migrationIndex);
+  assert.ok(oneOffMigrationIndex >= 0 && migrationIndex > oneOffMigrationIndex && cutoverIndex > migrationIndex);
+  assert.ok(recreateIndex > cutoverIndex, "laravel.test must be recreated only after one-off migration and ledger activation succeed");
   const cutoverCommand = activation.match(/[^\r\n]*daily-checkout:activate-ledger[^\r\n]*/)?.[0] ?? "";
   assert.doesNotMatch(cutoverCommand, /\|\|\s*true|--force/);
 
@@ -271,6 +280,21 @@ test("production activation is manual, main-only, and blocked by every Hub relea
 
   assert.doesNotMatch(deploy, /docker compose[^\r\n]*--build/);
   assert.doesNotMatch(deploy, /docker compose[^\r\n]*(?:down|prune)/);
+
+  assert.equal(imageRepository, "ghcr.io/pdarleyjr/mbfd-hub");
+  assert.match(prepare, /docker\/production\/image-repository/);
+  assert.match(deploy, /docker\/production\/image-repository/);
+  assert.doesNotMatch(prepare, /ghcr\.io\/[\w/-]*mbfd_hub/);
+  assert.doesNotMatch(deploy, /ghcr\.io\/[\w/-]*mbfd_hub/);
+  assert.match(imageCompose, /HUB_IMAGE_REF must be an immutable image digest/);
+
+  const checkoutIndex = deployment.indexOf("Checkout exact approved candidate");
+  const pullIndex = deployment.indexOf("Pull and verify immutable Hub image");
+  const backupIndex = deployment.indexOf("Verify targeted Hub database backup");
+  const maintenanceIndex = deployment.indexOf("Enter maintenance mode and verify queue safety");
+  const healthIndex = deployment.indexOf("Verify Hub application health");
+  assert.ok(checkoutIndex >= 0 && pullIndex > checkoutIndex && backupIndex > pullIndex && maintenanceIndex > backupIndex);
+  assert.ok(healthIndex > maintenanceIndex);
 
   assert.match(prepare, /^on:\r?\n  workflow_dispatch:/m);
   assert.doesNotMatch(prepare, /^  push:/m);
