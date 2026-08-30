@@ -125,7 +125,7 @@ RUN set -eux; \
     fi; \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-COPY docker/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/production/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/production/php.ini /etc/php/8.5/cli/conf.d/99-mbfd-production.ini
 COPY docker/production/start-production-container /usr/local/bin/start-production-container
 
