@@ -23,6 +23,10 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
 
     private const CANDIDATE_SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
+    private const ACTIVATION_SHA = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+    private const CANDIDATE_IMAGE_DIGEST = 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+
     /** @var list<string> */
     private array $manifestPaths = [];
 
@@ -120,12 +124,29 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
             expectedChecklistType: 'engine',
             expectedChecklistVersion: (string) $resolution['checklist_version'],
         );
-        $manifest['candidate_sha'] = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+        $manifest['release_candidate']['source_sha'] = str_repeat('d', 40);
 
         [$status, $report] = $this->preactivate($this->writeManifest($manifest));
 
         $this->assertSame(Command::FAILURE, $status);
         $this->assertContains('policy_manifest_candidate_sha_mismatch', $report['issues']);
+    }
+
+    public function test_it_requires_the_manifest_to_bind_the_immutable_candidate_image_digest(): void
+    {
+        $apparatus = $this->makeApparatus();
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $manifest = $this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+        );
+        $manifest['release_candidate']['image_digest'] = 'sha256:'.str_repeat('d', 64);
+
+        [$status, $report] = $this->preactivate($this->writeManifest($manifest));
+
+        $this->assertSame(Command::FAILURE, $status);
+        $this->assertContains('policy_manifest_candidate_image_digest_mismatch', $report['issues']);
     }
 
     public function test_it_requires_an_explicit_expected_absent_attestation(): void
@@ -627,12 +648,129 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
         $this->activateCutover(
             $apparatus,
             CarbonImmutable::parse('2026-08-26T12:00:00Z'),
-            str_repeat('b', 40),
+            str_repeat('d', 40),
         );
         [$mismatchStatus, $mismatchReport] = $this->preactivate($manifest);
 
         $this->assertSame(Command::FAILURE, $mismatchStatus);
-        $this->assertContains('daily_checkout_ledger_cutover_candidate_sha_mismatch', $mismatchReport['technical_issues']);
+        $this->assertContains('daily_checkout_ledger_cutover_manifest_mismatch', $mismatchReport['technical_issues']);
+    }
+
+    public function test_a_later_candidate_validates_against_the_preserved_historical_activation_boundary(): void
+    {
+        $apparatus = $this->makeApparatus();
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $before = (array) DB::connection(self::CONNECTION)
+            ->table('daily_checkout_ledger_cutovers')
+            ->where('ledger', 'daily_checkout')
+            ->first();
+
+        [$firstStatus, $firstReport] = $this->preactivate($this->writeManifest($this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+        )));
+        [$secondStatus, $secondReport] = $this->preactivate($this->writeManifest($this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+        )));
+        $after = (array) DB::connection(self::CONNECTION)
+            ->table('daily_checkout_ledger_cutovers')
+            ->where('ledger', 'daily_checkout')
+            ->first();
+
+        $this->assertNotSame(self::ACTIVATION_SHA, self::CANDIDATE_SHA);
+        $this->assertSame(Command::SUCCESS, $firstStatus);
+        $this->assertSame(Command::SUCCESS, $secondStatus);
+        $this->assertTrue($firstReport['gate_passed']);
+        $this->assertSame(self::ACTIVATION_SHA, $firstReport['daily_checkout_ledger_cutover']['record']['release_sha']);
+        $this->assertSame(self::CANDIDATE_SHA, $firstReport['input']['release_candidate']['source_sha']);
+        $this->assertSame(self::CANDIDATE_IMAGE_DIGEST, $firstReport['input']['release_candidate']['image_digest']);
+        $this->assertSame($firstReport['daily_checkout_ledger_cutover'], $secondReport['daily_checkout_ledger_cutover']);
+        $this->assertSame($before, $after);
+    }
+
+    public function test_the_original_activation_candidate_still_validates_with_the_same_sha(): void
+    {
+        $apparatus = $this->makeApparatus(activateCutover: false);
+        $activatedAt = CarbonImmutable::parse('2026-08-26T12:00:00Z');
+        $this->activateCutover($apparatus, $activatedAt, self::CANDIDATE_SHA);
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+
+        [$status, $report] = $this->preactivate($this->writeManifest($this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+            activationSha: self::CANDIDATE_SHA,
+        )));
+
+        $this->assertSame(Command::SUCCESS, $status);
+        $this->assertTrue($report['gate_passed']);
+        $this->assertSame(self::CANDIDATE_SHA, $report['daily_checkout_ledger_cutover']['record']['release_sha']);
+        $this->assertSame($activatedAt->toIso8601String(), $report['daily_checkout_ledger_cutover']['record']['activated_at_utc']);
+    }
+
+    public function test_an_unknown_later_candidate_without_activation_compatibility_evidence_fails_closed(): void
+    {
+        $apparatus = $this->makeApparatus();
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $manifest = $this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+        );
+        unset($manifest['ledger_activation']);
+
+        [$status, $report] = $this->preactivate($this->writeManifest($manifest));
+
+        $this->assertSame(Command::FAILURE, $status);
+        $this->assertContains('policy_manifest_ledger_activation_missing', $report['issues']);
+    }
+
+    public function test_it_rejects_legacy_manifest_schema_before_a_candidate_query(): void
+    {
+        $apparatus = $this->makeApparatus();
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $manifest = $this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+        );
+        $manifest['schema_version'] = 1;
+
+        [$status, $report] = $this->preactivate($this->writeManifest($manifest));
+
+        $this->assertSame(Command::FAILURE, $status);
+        $this->assertContains('policy_manifest_schema_version_invalid', $report['issues']);
+    }
+
+    public function test_it_rejects_each_changed_manifest_activation_fingerprint_field(): void
+    {
+        $apparatus = $this->makeApparatus();
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $cases = [
+            'ledger' => ['replacement' => 'another_ledger', 'issue' => 'policy_manifest_ledger_activation_identity_invalid'],
+            'release_sha' => ['replacement' => str_repeat('d', 40), 'issue' => 'daily_checkout_ledger_cutover_manifest_mismatch'],
+            'source' => ['replacement' => 'other_source', 'issue' => 'policy_manifest_ledger_activation_source_invalid'],
+            'activated_at_utc' => ['replacement' => '2026-08-26T12:00:01+00:00', 'issue' => 'daily_checkout_ledger_cutover_manifest_mismatch'],
+            'snapshot_sha256' => ['replacement' => str_repeat('d', 64), 'issue' => 'daily_checkout_ledger_cutover_manifest_mismatch'],
+            'apparatus_count' => ['replacement' => 0, 'issue' => 'daily_checkout_ledger_cutover_manifest_mismatch'],
+        ];
+
+        foreach ($cases as $field => $case) {
+            $manifest = $this->manifestFor(
+                $apparatus,
+                expectedChecklistType: 'engine',
+                expectedChecklistVersion: (string) $resolution['checklist_version'],
+            );
+            $manifest['ledger_activation'][$field] = $case['replacement'];
+
+            [$status, $report] = $this->preactivate($this->writeManifest($manifest));
+
+            $this->assertSame(Command::FAILURE, $status, $field);
+            $this->assertContains($case['issue'], $report['issues'], $field);
+        }
     }
 
     public function test_it_fails_closed_when_a_persisted_cutover_snapshot_is_malformed(): void
@@ -823,14 +961,30 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
         string $expectedChecklistVersion,
         ?array $preLedgerReview = null,
         string $operationalClassification = 'active',
+        string $activationSha = self::ACTIVATION_SHA,
     ): array {
         $station = Station::on(self::CONNECTION)->findOrFail($apparatus->station_id);
+        $activationSnapshot = [[
+            'id' => (int) $apparatus->id,
+            'status' => $apparatus->status,
+        ]];
 
         return [
-            'schema_version' => 1,
+            'schema_version' => 2,
             'snapshot_id' => 'snapshot-20260826-a',
             'as_of_utc' => '2026-08-26T16:00:00+00:00',
-            'candidate_sha' => self::CANDIDATE_SHA,
+            'release_candidate' => [
+                'source_sha' => self::CANDIDATE_SHA,
+                'image_digest' => self::CANDIDATE_IMAGE_DIGEST,
+            ],
+            'ledger_activation' => [
+                'ledger' => 'daily_checkout',
+                'release_sha' => $activationSha,
+                'source' => 'owner_beta_activation',
+                'activated_at_utc' => '2026-08-26T12:00:00+00:00',
+                'snapshot_sha256' => hash('sha256', json_encode($activationSnapshot, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)),
+                'apparatus_count' => 1,
+            ],
             'approval' => [
                 'reference' => 'owner-policy-review-1',
             ],
@@ -877,6 +1031,7 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
         string $manifestPath,
         ?string $connection = null,
         ?string $candidateSha = self::CANDIDATE_SHA,
+        ?string $candidateImageDigest = self::CANDIDATE_IMAGE_DIGEST,
         bool $allowClassificationRequired = false,
     ): array {
         $arguments = [
@@ -886,6 +1041,7 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
             '--as-of' => '2026-08-26T16:00:00Z',
             '--connection' => $connection ?? self::CONNECTION,
             '--candidate-sha' => $candidateSha,
+            '--candidate-image-digest' => $candidateImageDigest,
         ];
         if ($allowClassificationRequired) {
             $arguments['--allow-classification-required'] = true;
@@ -907,7 +1063,7 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
     private function activateCutover(
         Apparatus $apparatus,
         CarbonImmutable $activatedAt,
-        string $releaseSha = self::CANDIDATE_SHA,
+        string $releaseSha = self::ACTIVATION_SHA,
         ?array $snapshot = null,
     ): void {
         $snapshot ??= [[

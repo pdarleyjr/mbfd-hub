@@ -6,10 +6,10 @@ namespace App\Console\Commands;
 
 use App\Enums\DailyCheckoutRequirement;
 use App\Models\Apparatus;
-use App\Models\DailyCheckoutLedgerCutover;
 use App\Services\DailyCheckoutChecklistEvidenceInspector;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\DailyCheckoutComplianceService;
+use App\Services\DailyCheckoutLedgerActivationEvidence;
 use App\Services\DailyCheckoutPreactivationManifest;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
@@ -36,6 +36,7 @@ final class AuditDailyCheckoutPreactivation extends Command
                             {--snapshot-id= : Immutable identifier for the staged snapshot}
                             {--as-of= : ISO-8601 assessment time for the snapshot}
                             {--candidate-sha= : Immutable candidate source SHA bound to the policy manifest}
+                            {--candidate-image-digest= : Immutable candidate image digest bound to the policy manifest}
                             {--allow-classification-required : Permit only unresolved classification holds for an owner beta}
                             {--json : Emit the complete preactivation report as JSON}';
 
@@ -46,6 +47,7 @@ final class AuditDailyCheckoutPreactivation extends Command
         DailyCheckoutChecklistResolver $checklists,
         DailyCheckoutChecklistEvidenceInspector $checklistEvidence,
         DailyCheckoutComplianceService $compliance,
+        DailyCheckoutLedgerActivationEvidence $activationEvidence,
     ): int {
         $input = $this->input();
         if ($input['issues'] !== []) {
@@ -58,6 +60,7 @@ final class AuditDailyCheckoutPreactivation extends Command
                 $input['snapshot_id'],
                 $input['as_of'],
                 $input['candidate_sha'] ?? '',
+                $input['candidate_image_digest'] ?? '',
             );
         } catch (RuntimeException $exception) {
             return $this->emit($this->blockedReport($input, [$exception->getMessage()]));
@@ -72,6 +75,7 @@ final class AuditDailyCheckoutPreactivation extends Command
                 $checklists,
                 $checklistEvidence,
                 $compliance,
+                $activationEvidence,
             ): array {
                 // PostgreSQL enforces the no-write contract at the database
                 // transaction layer. Other drivers still execute SELECT/schema
@@ -87,6 +91,7 @@ final class AuditDailyCheckoutPreactivation extends Command
                     $checklists,
                     $checklistEvidence,
                     $compliance,
+                    $activationEvidence,
                 );
             });
         } catch (Throwable) {
@@ -103,6 +108,7 @@ final class AuditDailyCheckoutPreactivation extends Command
      *     snapshot_id: string,
      *     as_of: CarbonImmutable,
      *     candidate_sha: string|null,
+     *     candidate_image_digest: string|null,
      *     allow_classification_required: bool,
      *     issues: list<string>
      * }
@@ -114,6 +120,7 @@ final class AuditDailyCheckoutPreactivation extends Command
         $snapshotId = $this->optionString('snapshot-id');
         $asOfValue = $this->optionString('as-of');
         $candidateSha = $this->optionString('candidate-sha');
+        $candidateImageDigest = $this->optionString('candidate-image-digest');
         $allowClassificationRequired = (bool) $this->option('allow-classification-required');
         $issues = [];
 
@@ -155,6 +162,13 @@ final class AuditDailyCheckoutPreactivation extends Command
         } else {
             $candidateSha = strtolower($candidateSha);
         }
+        if ($candidateImageDigest === null) {
+            $issues[] = 'preactivation_input_missing:candidate_image_digest';
+        } elseif (preg_match('/^sha256:[a-f0-9]{64}$/i', $candidateImageDigest) !== 1) {
+            $issues[] = 'preactivation_input_invalid:candidate_image_digest';
+        } else {
+            $candidateImageDigest = strtolower($candidateImageDigest);
+        }
 
         $asOf = CarbonImmutable::now('UTC');
         if ($asOfValue !== null) {
@@ -171,14 +185,15 @@ final class AuditDailyCheckoutPreactivation extends Command
             'snapshot_id' => $snapshotId ?? '',
             'as_of' => $asOf,
             'candidate_sha' => $candidateSha,
+            'candidate_image_digest' => $candidateImageDigest,
             'allow_classification_required' => $allowClassificationRequired,
             'issues' => $issues,
         ];
     }
 
     /**
-     * @param  array{connection: string, policy_manifest: string, snapshot_id: string, as_of: CarbonImmutable, candidate_sha: string|null, allow_classification_required: bool, issues: list<string>}  $input
-     * @param  array{schema_version: int, snapshot_id: string, as_of_utc: CarbonImmutable, approval_reference: string, candidate_sha: string, sha256: string, apparatus: array<int, array<string, mixed>>, expected_absent: list<array<string, string>>}  $manifest
+     * @param  array{connection: string, policy_manifest: string, snapshot_id: string, as_of: CarbonImmutable, candidate_sha: string|null, candidate_image_digest: string|null, allow_classification_required: bool, issues: list<string>}  $input
+     * @param  array{schema_version: int, snapshot_id: string, as_of_utc: CarbonImmutable, approval_reference: string, candidate_sha: string, candidate_image_digest: string, ledger_activation: array{ledger: string, release_sha: string, source: string, activated_at_utc: string, snapshot_sha256: string, apparatus_count: int}, sha256: string, apparatus: array<int, array<string, mixed>>, expected_absent: list<array<string, string>>}  $manifest
      * @return array<string, mixed>
      */
     private function report(
@@ -188,6 +203,7 @@ final class AuditDailyCheckoutPreactivation extends Command
         DailyCheckoutChecklistResolver $checklists,
         DailyCheckoutChecklistEvidenceInspector $checklistEvidence,
         DailyCheckoutComplianceService $compliance,
+        DailyCheckoutLedgerActivationEvidence $activationEvidence,
     ): array {
         $schema = $this->schema($input['connection']);
         $schemaIssues = [];
@@ -229,8 +245,11 @@ final class AuditDailyCheckoutPreactivation extends Command
             ? $this->inspectionEvidence($connection, $apparatusIds, $startOfDay, $startOfNextDay, $input['as_of'])
             : [];
         $cutover = $schema['daily_checkout_ledger_cutover_present']
-            ? $this->cutoverEvidence($connection, $input['candidate_sha'], $input['as_of'])
+            ? $activationEvidence->read($connection, $input['as_of'])
             : $this->missingCutoverEvidence('daily_checkout_ledger_cutover_schema_absent');
+        if ($cutover['record'] !== null && $cutover['record'] !== $manifest['ledger_activation']) {
+            $cutover['issues'][] = 'daily_checkout_ledger_cutover_manifest_mismatch';
+        }
         $statusEvents = $schema['apparatus_operational_status_ledger_present']
             ? $this->statusEvents($connection, $apparatusIds, $input['as_of'], $cutover['activated_at'])
             : [];
@@ -415,12 +434,19 @@ final class AuditDailyCheckoutPreactivation extends Command
                 'connection' => $input['connection'],
                 'snapshot_id' => $input['snapshot_id'],
                 'as_of_utc' => $input['as_of']->toIso8601String(),
-                'candidate_sha' => $input['candidate_sha'],
+                'release_candidate' => [
+                    'source_sha' => $input['candidate_sha'],
+                    'image_digest' => $input['candidate_image_digest'],
+                ],
                 'allow_classification_required' => $input['allow_classification_required'],
                 'policy_manifest' => [
                     'schema_version' => $manifest['schema_version'],
                     'sha256' => $manifest['sha256'],
-                    'candidate_sha' => $manifest['candidate_sha'],
+                    'release_candidate' => [
+                        'source_sha' => $manifest['candidate_sha'],
+                        'image_digest' => $manifest['candidate_image_digest'],
+                    ],
+                    'ledger_activation' => $manifest['ledger_activation'],
                     // This is deliberately an evidence pointer, not a claim
                     // that the command cryptographically verified an owner.
                     'owner_approval' => [
@@ -654,88 +680,6 @@ final class AuditDailyCheckoutPreactivation extends Command
 
     /**
      * @return array{
-     *     record: array{ledger: string, release_sha: string, source: string, activated_at_utc: string, snapshot_sha256: string, apparatus_count: int}|null,
-     *     activated_at: CarbonImmutable|null,
-     *     apparatus_status_by_id: array<int, string|null>,
-     *     issues: list<string>
-     * }
-     */
-    private function cutoverEvidence(Connection $connection, ?string $candidateSha, CarbonImmutable $asOf): array
-    {
-        $row = $connection->table('daily_checkout_ledger_cutovers')
-            ->where('ledger', DailyCheckoutLedgerCutover::LEDGER)
-            ->first([
-                'ledger',
-                'release_sha',
-                'source',
-                'activated_at',
-                'apparatus_status_snapshot',
-                'snapshot_sha256',
-                'apparatus_count',
-            ]);
-        if (! $row instanceof stdClass) {
-            return $this->missingCutoverEvidence('daily_checkout_ledger_cutover_missing');
-        }
-
-        $issues = [];
-        $activatedAt = $this->asUtc($row->activated_at);
-        if ($activatedAt === null) {
-            $issues[] = 'daily_checkout_ledger_cutover_timestamp_invalid';
-        } elseif ($activatedAt->greaterThan($asOf)) {
-            $issues[] = 'daily_checkout_ledger_cutover_after_snapshot';
-        }
-        $releaseSha = strtolower(trim((string) $row->release_sha));
-        if (preg_match('/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/', $releaseSha) !== 1) {
-            $issues[] = 'daily_checkout_ledger_cutover_release_sha_invalid';
-        } elseif ($candidateSha === null || ! hash_equals($candidateSha, $releaseSha)) {
-            $issues[] = 'daily_checkout_ledger_cutover_candidate_sha_mismatch';
-        }
-        if ($row->ledger !== DailyCheckoutLedgerCutover::LEDGER || $row->source !== DailyCheckoutLedgerCutover::SOURCE) {
-            $issues[] = 'daily_checkout_ledger_cutover_source_invalid';
-        }
-
-        $snapshot = $this->cutoverSnapshot($row->apparatus_status_snapshot);
-        if ($snapshot === null || ! is_numeric($row->apparatus_count) || (int) $row->apparatus_count !== count($snapshot)) {
-            $issues[] = 'daily_checkout_ledger_cutover_snapshot_invalid';
-            $snapshot = [];
-        } else {
-            try {
-                $encodedSnapshot = json_encode($snapshot, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-            } catch (JsonException) {
-                $encodedSnapshot = false;
-            }
-            if (
-                ! is_string($encodedSnapshot)
-                || ! is_string($row->snapshot_sha256)
-                || ! hash_equals($row->snapshot_sha256, hash('sha256', $encodedSnapshot))
-            ) {
-                $issues[] = 'daily_checkout_ledger_cutover_snapshot_invalid';
-                $snapshot = [];
-            }
-        }
-
-        $statusByApparatus = [];
-        foreach ($snapshot as $entry) {
-            $statusByApparatus[$entry['id']] = $entry['status'];
-        }
-
-        return [
-            'record' => [
-                'ledger' => (string) $row->ledger,
-                'release_sha' => $releaseSha,
-                'source' => (string) $row->source,
-                'activated_at_utc' => $activatedAt?->toIso8601String() ?? '',
-                'snapshot_sha256' => is_string($row->snapshot_sha256) ? $row->snapshot_sha256 : '',
-                'apparatus_count' => is_numeric($row->apparatus_count) ? (int) $row->apparatus_count : 0,
-            ],
-            'activated_at' => $activatedAt,
-            'apparatus_status_by_id' => $statusByApparatus,
-            'issues' => array_values(array_unique($issues)),
-        ];
-    }
-
-    /**
-     * @return array{
      *     record: null,
      *     activated_at: null,
      *     apparatus_status_by_id: array<int, string|null>,
@@ -750,45 +694,6 @@ final class AuditDailyCheckoutPreactivation extends Command
             'apparatus_status_by_id' => [],
             'issues' => [$issue],
         ];
-    }
-
-    /** @return list<array{id: int, status: string|null}>|null */
-    private function cutoverSnapshot(mixed $value): ?array
-    {
-        if (! is_string($value)) {
-            return null;
-        }
-
-        try {
-            $snapshot = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            return null;
-        }
-        if (! is_array($snapshot) || ! array_is_list($snapshot)) {
-            return null;
-        }
-
-        $normalized = [];
-        $previousId = 0;
-        foreach ($snapshot as $entry) {
-            if (
-                ! is_array($entry)
-                || ! array_key_exists('id', $entry)
-                || ! array_key_exists('status', $entry)
-                || ! is_int($entry['id'])
-                || $entry['id'] <= $previousId
-                || (! is_string($entry['status']) && $entry['status'] !== null)
-            ) {
-                return null;
-            }
-            $previousId = $entry['id'];
-            $normalized[] = [
-                'id' => $entry['id'],
-                'status' => $entry['status'],
-            ];
-        }
-
-        return $normalized;
     }
 
     /**
@@ -1107,7 +1012,7 @@ final class AuditDailyCheckoutPreactivation extends Command
     }
 
     /**
-     * @param  array{connection: string, policy_manifest: string, snapshot_id: string, as_of: CarbonImmutable, candidate_sha: string|null, allow_classification_required: bool, issues: list<string>}  $input
+     * @param  array{connection: string, policy_manifest: string, snapshot_id: string, as_of: CarbonImmutable, candidate_sha: string|null, candidate_image_digest: string|null, allow_classification_required: bool, issues: list<string>}  $input
      * @param  list<string>  $issues
      * @return array<string, mixed>
      */
@@ -1121,7 +1026,10 @@ final class AuditDailyCheckoutPreactivation extends Command
                 'connection' => $input['connection'],
                 'snapshot_id' => $input['snapshot_id'],
                 'as_of_utc' => $input['as_of']->toIso8601String(),
-                'candidate_sha' => $input['candidate_sha'],
+                'release_candidate' => [
+                    'source_sha' => $input['candidate_sha'],
+                    'image_digest' => $input['candidate_image_digest'],
+                ],
                 'allow_classification_required' => $input['allow_classification_required'],
             ],
             'schema' => null,

@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Enums\DailyCheckoutRequirement;
+use App\Models\DailyCheckoutLedgerCutover;
 use Carbon\CarbonImmutable;
 use JsonException;
 use RuntimeException;
@@ -16,7 +17,7 @@ use RuntimeException;
  */
 final class DailyCheckoutPreactivationManifest
 {
-    public const SCHEMA_VERSION = 1;
+    public const SCHEMA_VERSION = 2;
 
     /**
      * @return array{
@@ -25,6 +26,8 @@ final class DailyCheckoutPreactivationManifest
      *     as_of_utc: CarbonImmutable,
      *     approval_reference: string,
      *     candidate_sha: string,
+     *     candidate_image_digest: string,
+     *     ledger_activation: array{ledger: string, release_sha: string, source: string, activated_at_utc: string, snapshot_sha256: string, apparatus_count: int},
      *     sha256: string,
      *     apparatus: array<int, array<string, mixed>>,
      *     expected_absent: list<array<string, string>>
@@ -35,6 +38,7 @@ final class DailyCheckoutPreactivationManifest
         string $expectedSnapshotId,
         CarbonImmutable $expectedAsOf,
         string $expectedCandidateSha,
+        string $expectedCandidateImageDigest,
     ): array {
         if (! is_file($path) || ! is_readable($path)) {
             throw new RuntimeException('policy_manifest_unreadable');
@@ -69,13 +73,30 @@ final class DailyCheckoutPreactivationManifest
             throw new RuntimeException('policy_manifest_as_of_mismatch');
         }
 
+        $releaseCandidate = $decoded['release_candidate'] ?? null;
+        if (! is_array($releaseCandidate)) {
+            throw new RuntimeException('policy_manifest_release_candidate_missing');
+        }
         $candidateSha = $this->immutableSha(
-            $this->requiredString($decoded, 'candidate_sha'),
+            $this->requiredString($releaseCandidate, 'source_sha', 'policy_manifest_candidate_sha_missing'),
             'policy_manifest_candidate_sha_invalid',
         );
         if (! hash_equals($expectedCandidateSha, $candidateSha)) {
             throw new RuntimeException('policy_manifest_candidate_sha_mismatch');
         }
+        $candidateImageDigest = strtolower($this->requiredString(
+            $releaseCandidate,
+            'image_digest',
+            'policy_manifest_candidate_image_digest_missing',
+        ));
+        if (preg_match('/^sha256:[a-f0-9]{64}$/', $candidateImageDigest) !== 1) {
+            throw new RuntimeException('policy_manifest_candidate_image_digest_invalid');
+        }
+        if (! hash_equals($expectedCandidateImageDigest, $candidateImageDigest)) {
+            throw new RuntimeException('policy_manifest_candidate_image_digest_mismatch');
+        }
+
+        $ledgerActivation = $this->ledgerActivation($decoded);
 
         $approval = $decoded['approval'] ?? null;
         if (! is_array($approval)) {
@@ -139,9 +160,51 @@ final class DailyCheckoutPreactivationManifest
             'as_of_utc' => $asOf,
             'approval_reference' => $approvalReference,
             'candidate_sha' => $candidateSha,
+            'candidate_image_digest' => $candidateImageDigest,
+            'ledger_activation' => $ledgerActivation,
             'sha256' => hash('sha256', $contents),
             'apparatus' => $byId,
             'expected_absent' => $normalizedExpectedAbsent,
+        ];
+    }
+
+    /** @param array<string, mixed> $decoded @return array{ledger: string, release_sha: string, source: string, activated_at_utc: string, snapshot_sha256: string, apparatus_count: int} */
+    private function ledgerActivation(array $decoded): array
+    {
+        $activation = $decoded['ledger_activation'] ?? null;
+        if (! is_array($activation)) {
+            throw new RuntimeException('policy_manifest_ledger_activation_missing');
+        }
+        if ($this->requiredString($activation, 'ledger') !== DailyCheckoutLedgerCutover::LEDGER) {
+            throw new RuntimeException('policy_manifest_ledger_activation_identity_invalid');
+        }
+        if ($this->requiredString($activation, 'source') !== DailyCheckoutLedgerCutover::SOURCE) {
+            throw new RuntimeException('policy_manifest_ledger_activation_source_invalid');
+        }
+
+        $activatedAt = $this->parseTimestamp(
+            $this->requiredString($activation, 'activated_at_utc'),
+            'policy_manifest_ledger_activation_timestamp_invalid',
+        );
+        $snapshotSha256 = strtolower($this->requiredString($activation, 'snapshot_sha256'));
+        if (preg_match('/^[a-f0-9]{64}$/', $snapshotSha256) !== 1) {
+            throw new RuntimeException('policy_manifest_ledger_activation_snapshot_sha_invalid');
+        }
+        $apparatusCount = $activation['apparatus_count'] ?? null;
+        if (! is_int($apparatusCount) || $apparatusCount < 0) {
+            throw new RuntimeException('policy_manifest_ledger_activation_apparatus_count_invalid');
+        }
+
+        return [
+            'ledger' => DailyCheckoutLedgerCutover::LEDGER,
+            'release_sha' => $this->immutableSha(
+                $this->requiredString($activation, 'release_sha'),
+                'policy_manifest_ledger_activation_release_sha_invalid',
+            ),
+            'source' => DailyCheckoutLedgerCutover::SOURCE,
+            'activated_at_utc' => $activatedAt->toIso8601String(),
+            'snapshot_sha256' => $snapshotSha256,
+            'apparatus_count' => $apparatusCount,
         ];
     }
 
