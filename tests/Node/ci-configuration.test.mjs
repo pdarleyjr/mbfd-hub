@@ -236,8 +236,9 @@ test("production activation is manual, main-only, and blocked by every Hub relea
 
   const maintenance = workflowStep(deployment, "Enter maintenance mode and verify queue safety");
   assert.match(maintenance, /php artisan down --render=errors::503/);
-  assert.match(maintenance, /http:\/\/localhost\//);
-  assert.match(maintenance, /'503'/);
+  assert.match(maintenance, /APP_MAINTENANCE_DRIVER/);
+  assert.match(maintenance, /storage\/framework\/down/);
+  assert.doesNotMatch(maintenance, /http:\/\/localhost\//);
   assert.match(maintenance, /--force/);
 
   const activation = workflowStep(deployment, "Migrate and activate prebuilt Hub image");
