@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\AccountStatus;
 use App\Support\Workgroups\WorkgroupAccess;
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -95,11 +98,37 @@ class User extends Authenticatable implements FilamentUser
     protected function casts(): array
     {
         return [
+            'account_status' => AccountStatus::class,
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'password_changed_at' => 'datetime',
+            'security_version' => 'integer',
             'must_change_password' => 'boolean',
             'notification_preferences' => 'array',
         ];
+    }
+
+    public function isAuthenticationAllowed(): bool
+    {
+        return $this->account_status === AccountStatus::Active;
+    }
+
+    /** @return BelongsTo<Employee, $this> */
+    public function employeeProfile(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'employee_profile_id');
+    }
+
+    /** @return HasMany<AuthenticationSession, $this> */
+    public function authenticationSessions(): HasMany
+    {
+        return $this->hasMany(AuthenticationSession::class);
+    }
+
+    /** @return HasMany<PersistentLoginCredential, $this> */
+    public function persistentLoginCredentials(): HasMany
+    {
+        return $this->hasMany(PersistentLoginCredential::class);
     }
 
     /**

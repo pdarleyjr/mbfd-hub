@@ -48,6 +48,9 @@ final class IdentitySnapshotRepository
             ->select([
                 'id',
                 'employee_id',
+                'employee_profile_id',
+                'account_status',
+                'security_version',
                 'name',
                 'email',
                 'rank',
@@ -71,6 +74,9 @@ final class IdentitySnapshotRepository
             return new UserIdentity(
                 id: (int) $record->id,
                 legacyEmployeeId: $record->employee_id === null ? null : (string) $record->employee_id,
+                employeeProfileId: $record->employee_profile_id === null ? null : (int) $record->employee_profile_id,
+                accountStatus: $record->account_status === null ? null : (string) $record->account_status,
+                securityVersion: (int) $record->security_version,
                 name: (string) $record->name,
                 email: $email,
                 rank: $record->rank === null ? null : (string) $record->rank,

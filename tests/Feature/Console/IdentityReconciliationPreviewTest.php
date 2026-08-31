@@ -48,6 +48,9 @@ final class IdentityReconciliationPreviewTest extends TestCase
         $this->assertFalse($report['controls']['name_auto_match']);
         $this->assertSame(1, $report['summary']['total_users']);
         $this->assertSame(1, $report['summary']['total_employees']);
+        $this->assertNull($report['rows'][0]['user']['employee_profile_id']);
+        $this->assertSame('pending_activation', $report['rows'][0]['user']['account_status']);
+        $this->assertSame(1, $report['rows'][0]['user']['security_version']);
         $this->assertSame(['super_admin', 'training_admin'], $report['rows'][0]['preservation']['roles']);
         $this->assertSame('admin', $report['rows'][0]['preservation']['workgroups'][0]['role']);
         $this->assertTrue($report['rows'][0]['preservation']['training_access']);
