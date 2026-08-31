@@ -338,19 +338,15 @@ jobs:
           if ($cache->get($key) !== "ok") { exit(1); }
           $cache->forget($key);
           '
-          QUEUE_BEFORE="$(docker exec "$HUB_APP_CONTAINER" pgrep -f 'artisan queue:work' | sort | tr '\n' ' ')"
-          test -n "$QUEUE_BEFORE"
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan queue:restart
+          docker exec "$HUB_APP_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf restart 'queue-worker:*'
           for _ in $(seq 1 60); do
-            QUEUE_AFTER="$(docker exec "$HUB_APP_CONTAINER" pgrep -f 'artisan queue:work' | sort | tr '\n' ' ')"
-            if test -n "$QUEUE_AFTER" && test "$QUEUE_AFTER" != "$QUEUE_BEFORE"; then
+            SUPERVISOR_STATUS="$(docker exec "$HUB_APP_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status)"
+            if printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^queue-worker:queue-worker_00 +RUNNING '; then
               break
             fi
             sleep 1
           done
-          test -n "${QUEUE_AFTER:-}"
-          test "$QUEUE_AFTER" != "$QUEUE_BEFORE"
-          SUPERVISOR_STATUS="$(docker exec "$HUB_APP_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status)"
           printf '%s\n' "$SUPERVISOR_STATUS"
           printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^php +RUNNING '
           printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^queue-worker:queue-worker_00 +RUNNING '
