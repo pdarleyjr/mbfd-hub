@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api\Bid;
 
+use App\Models\Employee;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -18,6 +23,8 @@ use Tests\TestCase;
  */
 class VerifyCredentialsTest extends TestCase
 {
+    use RefreshDatabase;
+
     private const SHARED_TOKEN = 'test-bid-reader-secret-do-not-use-in-prod';
 
     protected function setUp(): void
@@ -104,5 +111,47 @@ class VerifyCredentialsTest extends TestCase
             ]);
 
         $response->assertStatus(422);
+    }
+
+    public function test_returns_admin_role_for_a_portal_employee_linked_to_a_current_bid_administrator(): void
+    {
+        $employee = Employee::create([
+            'employee_id' => '14335',
+            'name' => 'Portal Administrator',
+            'rank' => 'Chief',
+            'password' => Hash::make('portal-password'),
+        ]);
+        $user = User::factory()->create(['employee_id' => $employee->employee_id]);
+        $user->assignRole(Role::findOrCreate('admin', 'web'));
+
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.self::SHARED_TOKEN])
+            ->postJson('/api/v2/verify-credentials', [
+                'employee_id' => $employee->employee_id,
+                'password' => 'portal-password',
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('role', 'admin');
+    }
+
+    public function test_returns_member_role_for_a_portal_employee_without_current_bid_administration_entitlement(): void
+    {
+        $employee = Employee::create([
+            'employee_id' => '14336',
+            'name' => 'Portal Member',
+            'rank' => 'Firefighter',
+            'password' => Hash::make('portal-password'),
+        ]);
+        $user = User::factory()->create(['employee_id' => $employee->employee_id]);
+        $user->assignRole(Role::findOrCreate('training_admin', 'web'));
+
+        $response = $this->withHeaders(['Authorization' => 'Bearer '.self::SHARED_TOKEN])
+            ->postJson('/api/v2/verify-credentials', [
+                'employee_id' => $employee->employee_id,
+                'password' => 'portal-password',
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('role', 'member');
     }
 }

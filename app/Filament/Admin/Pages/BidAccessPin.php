@@ -57,7 +57,7 @@ class BidAccessPin extends Page implements HasForms
     {
         $user = auth()->user();
 
-        return $user && $user->hasRole(['super_admin', 'admin']);
+        return $user?->canAdministerBid() ?? false;
     }
 
     public function mount(): void

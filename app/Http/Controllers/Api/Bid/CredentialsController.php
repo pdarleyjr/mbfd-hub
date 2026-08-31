@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\Bid;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Bid\VerifyCredentialsRequest;
 use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -49,13 +50,27 @@ class CredentialsController extends Controller
         // string but the bid app expects first/last separately.
         [$firstName, $lastName] = self::splitName((string) $employee->name);
 
+        // Employee Portal authentication and the Hub Admin Panel have
+        // separate identity tables. The employee_id field is the only
+        // established cross-identity key. Resolve the current Hub role for
+        // every successful login; ambiguity or an unavailable entitlement is
+        // never elevated. Neither password nor password hash leaves this
+        // request boundary.
+        $linkedUsers = User::query()
+            ->where('employee_id', (string) $employee->employee_id)
+            ->limit(2)
+            ->get();
+        $role = $linkedUsers->count() === 1 && $linkedUsers->first()?->canAdministerBid()
+            ? 'admin'
+            : 'member';
+
         return response()->json([
             'member_id' => (int) $employee->id,
             'employee_id' => (string) $employee->employee_id,
             'first_name' => $firstName,
             'last_name' => $lastName,
             'rank' => (string) ($employee->rank ?? ''),
-            'role' => 'member',
+            'role' => $role,
         ]);
     }
 

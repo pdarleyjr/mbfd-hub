@@ -45,6 +45,20 @@ class User extends Authenticatable implements FilamentUser
     ];
 
     /**
+     * Roles permitted to administer the MBFD Bid workflow.
+     *
+     * This deliberately matches the existing Bid Access PIN page. Keep the
+     * entitlement on the authoritative Hub user/role model rather than
+     * inferring it from an Employee Portal identity attribute.
+     *
+     * @var list<string>
+     */
+    public const BID_ADMIN_ROLES = [
+        'super_admin',
+        'admin',
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -170,6 +184,11 @@ class User extends Authenticatable implements FilamentUser
             'workgroup_admin',
             'workgroup_facilitator',
         ]);
+    }
+
+    public function canAdministerBid(): bool
+    {
+        return $this->hasAnyRole(self::BID_ADMIN_ROLES);
     }
 
     /**
