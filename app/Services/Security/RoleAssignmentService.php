@@ -7,6 +7,7 @@ namespace App\Services\Security;
 use App\Models\User;
 use App\Policies\RoleAssignmentPolicy;
 use Illuminate\Auth\Access\AuthorizationException;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 final class RoleAssignmentService
@@ -36,7 +37,7 @@ final class RoleAssignmentService
         $target->syncRoles($proposedRoleNames);
         $this->permissionRegistrar->forgetCachedPermissions();
         $this->auditRecorder->record($actor, $target, 'change_role', 'allowed', null, [
-            'roles' => array_values($proposedRoleNames),
+            'roles' => $proposedRoleNames,
         ]);
     }
 
@@ -47,7 +48,14 @@ final class RoleAssignmentService
      */
     public function authorize(User $actor, User $target, array $proposedRoleNames): void
     {
-        if (! $this->policy->allows($actor, $target, $proposedRoleNames)
+        $uniqueRoleNames = array_values(array_unique($proposedRoleNames));
+        $existingRoleCount = Role::query()
+            ->where('guard_name', 'web')
+            ->whereIn('name', $uniqueRoleNames)
+            ->count();
+
+        if ($existingRoleCount !== count($uniqueRoleNames)
+            || ! $this->policy->allows($actor, $target, $proposedRoleNames)
             || ! $this->lastCriticalAdministratorGuard->allowsRoleSet($target, $proposedRoleNames)) {
             throw new AuthorizationException('The requested role assignment is not authorized.');
         }

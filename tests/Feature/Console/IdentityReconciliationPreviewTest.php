@@ -136,23 +136,30 @@ final class IdentityReconciliationPreviewTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        DB::table('roles')->insert([
-            ['id' => 1, 'name' => 'super_admin', 'guard_name' => 'web', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 2, 'name' => 'training_admin', 'guard_name' => 'web', 'created_at' => now(), 'updated_at' => now()],
+        $superAdminRoleId = DB::table('roles')->insertGetId([
+            'name' => 'super_admin',
+            'guard_name' => 'web',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
-        DB::table('permissions')->insert([
-            'id' => 1,
+        $trainingAdminRoleId = DB::table('roles')->insertGetId([
+            'name' => 'training_admin',
+            'guard_name' => 'web',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $trainingAccessPermissionId = DB::table('permissions')->insertGetId([
             'name' => 'training.access',
             'guard_name' => 'web',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
         DB::table('model_has_roles')->insert([
-            ['role_id' => 1, 'model_type' => User::class, 'model_id' => 10],
-            ['role_id' => 2, 'model_type' => User::class, 'model_id' => 10],
+            ['role_id' => $superAdminRoleId, 'model_type' => User::class, 'model_id' => 10],
+            ['role_id' => $trainingAdminRoleId, 'model_type' => User::class, 'model_id' => 10],
         ]);
         DB::table('model_has_permissions')->insert([
-            'permission_id' => 1,
+            'permission_id' => $trainingAccessPermissionId,
             'model_type' => User::class,
             'model_id' => 10,
         ]);

@@ -16,6 +16,7 @@ use App\Services\Security\RoleAssignmentService;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -47,6 +48,7 @@ final class AuthorizationPolicyFoundationTest extends TestCase
     {
         $actor = $this->userWithRole('super_admin');
         $target = User::factory()->create();
+        Role::findOrCreate('training_viewer', 'web');
 
         app(RoleAssignmentService::class)->sync($actor, $target, ['training_viewer']);
 
@@ -57,6 +59,28 @@ final class AuthorizationPolicyFoundationTest extends TestCase
             'action' => 'change_role',
             'result' => 'allowed',
         ]);
+    }
+
+    public function test_unknown_role_assignment_fails_closed_without_creating_or_changing_roles(): void
+    {
+        $actor = $this->userWithRole('super_admin');
+        $target = $this->userWithRole('workgroup_member');
+        $target->givePermissionTo(Permission::findOrCreate('existing_permission', 'web'));
+
+        try {
+            app(RoleAssignmentService::class)->sync($actor, $target, ['unknown_role']);
+            self::fail('An unknown role assignment should fail closed.');
+        } catch (AuthorizationException) {
+            self::assertFalse(Role::query()->where('name', 'unknown_role')->exists());
+            self::assertSame(['workgroup_member'], $target->fresh()->getRoleNames()->all());
+            self::assertSame(['existing_permission'], $target->fresh()->getDirectPermissions()->pluck('name')->all());
+            $this->assertDatabaseHas('security_action_events', [
+                'actor_user_id' => $actor->id,
+                'target_user_id' => $target->id,
+                'action' => 'change_role',
+                'result' => 'denied',
+            ]);
+        }
     }
 
     public function test_super_admin_cannot_grant_critical_privilege_or_target_an_equal_account(): void

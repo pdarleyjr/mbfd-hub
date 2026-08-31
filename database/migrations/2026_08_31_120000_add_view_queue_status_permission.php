@@ -5,20 +5,35 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        $permission = Permission::findOrCreate('view_queue_status', 'web');
-        $superAdmin = Role::findOrCreate('super_admin', 'web');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        $superAdmin->givePermissionTo($permission);
+        $permission = Permission::findOrCreate('view_queue_status', 'web');
+        $superAdmin = Role::query()
+            ->where('name', 'super_admin')
+            ->where('guard_name', 'web')
+            ->first();
+
+        $superAdmin?->givePermissionTo($permission);
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
     public function down(): void
     {
-        $permission = Permission::findByName('view_queue_status', 'web');
-        $permission->delete();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        Permission::query()
+            ->where('name', 'view_queue_status')
+            ->where('guard_name', 'web')
+            ->first()
+            ?->delete();
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 };
