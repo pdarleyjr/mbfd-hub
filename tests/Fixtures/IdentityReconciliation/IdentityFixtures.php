@@ -19,6 +19,9 @@ final class IdentityFixtures
         $values = array_merge([
             'id' => 10,
             'legacyEmployeeId' => '10010',
+            'employeeProfileId' => null,
+            'accountStatus' => 'pending_activation',
+            'securityVersion' => 1,
             'name' => 'Synthetic User',
             'email' => 'synthetic.user@example.test',
             'rank' => 'Firefighter',

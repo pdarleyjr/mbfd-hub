@@ -17,6 +17,9 @@ final readonly class UserIdentity
     public function __construct(
         public int $id,
         public ?string $legacyEmployeeId,
+        public ?int $employeeProfileId,
+        public ?string $accountStatus,
+        public int $securityVersion,
         public string $name,
         public string $email,
         public ?string $rank,
