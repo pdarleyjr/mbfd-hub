@@ -373,11 +373,18 @@ jobs:
           set -euo pipefail
           cd /opt/mbfd/mbfd-hub
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
-          printf '{"sha":"%s","deployed_at":"%s"}\n' "$RELEASE_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > public/deploy-marker.json
+          DEPLOY_MARKER="$(printf '{"sha":"%s","deployed_at":"%s"}' "$RELEASE_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")"
+          printf '%s\n' "$DEPLOY_MARKER" > public/deploy-marker.json
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          docker exec -u sail "$HUB_APP_CONTAINER" sh -c "printf '%s\n' '$DEPLOY_MARKER' > /var/www/html/public/deploy-marker.json"
           REMOTE
 
       - name: Verify public Hub smoke routes
+        env:
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 15 https://www.mbfdhub.com/up > /dev/null
           test "$(curl --silent --show-error --location --max-time 15 --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/)" = '200'
+          MARKER_SHA="$(curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 15 https://www.mbfdhub.com/deploy-marker.json | jq -er '.sha')"
+          test "$MARKER_SHA" = "$RELEASE_SHA"

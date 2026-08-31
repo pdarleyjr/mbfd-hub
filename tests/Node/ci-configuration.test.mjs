@@ -288,6 +288,13 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(successfulActivation, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
   assert.match(successfulActivation, /git rev-parse HEAD/);
   assert.match(successfulActivation, /deploy-marker\.json/);
+  assert.match(successfulActivation, /docker exec -u sail "\$HUB_APP_CONTAINER" sh -c/);
+  assert.match(successfulActivation, /\/var\/www\/html\/public\/deploy-marker\.json/);
+
+  const publicSmoke = workflowStep(deployment, "Verify public Hub smoke routes");
+  assert.match(publicSmoke, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
+  assert.match(publicSmoke, /deploy-marker\.json/);
+  assert.match(publicSmoke, /jq -er '\.sha'/);
 
   assert.doesNotMatch(deploy, /docker compose[^\r\n]*--build/);
   assert.doesNotMatch(deploy, /docker compose[^\r\n]*(?:down|prune)/);
