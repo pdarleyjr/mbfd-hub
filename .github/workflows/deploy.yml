@@ -301,7 +301,7 @@ jobs:
           HUB_APP_CONTAINER=mbfd-hub-laravel
           for _ in $(seq 1 60); do
             if docker inspect --format='{{.State.Health.Status}}' "$HUB_APP_CONTAINER" | grep -qx healthy \
-              && docker exec "$HUB_APP_CONTAINER" curl -fsS http://localhost:80/up > /dev/null; then
+              && docker exec "$HUB_APP_CONTAINER" curl -fsS http://localhost:8081/up > /dev/null; then
               exit 0
             fi
             sleep 1
@@ -364,7 +364,7 @@ jobs:
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan up
-          test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost/up)" = '200'
+          test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost:8081/up)" = '200'
           REMOTE
 
       - name: Record successful Hub candidate activation
