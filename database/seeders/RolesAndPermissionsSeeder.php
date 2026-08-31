@@ -17,6 +17,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $permissions = [
             'training.access',
             'training.manage_external_links',
+            'view_queue_status',
         ];
 
         foreach ($permissions as $permission) {

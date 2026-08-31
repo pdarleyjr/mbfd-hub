@@ -6,6 +6,7 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -121,5 +122,11 @@ class Employee extends Authenticatable implements FilamentUser
     public function createdVideoConferenceSessions(): HasMany
     {
         return $this->hasMany(VideoConferenceSession::class, 'created_by_employee_id');
+    }
+
+    /** @return HasOne<User, $this> */
+    public function user(): HasOne
+    {
+        return $this->hasOne(User::class, 'employee_profile_id');
     }
 }

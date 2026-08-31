@@ -29,6 +29,7 @@ use App\Http\Controllers\Employee\VideoConferencing\MuteAllStationsController;
 use App\Http\Controllers\Employee\VideoConferencing\StartDirectCallController;
 use App\Http\Controllers\Employee\VideoConferencing\StartMorningLineupController;
 use App\Http\Controllers\Employee\VideoConferencing\StationMicrophoneController;
+use App\Http\Controllers\HealthReadinessController;
 use App\Http\Controllers\IncidentsController;
 use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\VideoConferencing\ConferencePageController;
@@ -466,3 +467,4 @@ Route::middleware(['auth', 'workgroup.access'])->group(function () {
     Route::get('/reports/executive-report/pdf', [ReportExportController::class, 'exportExecutiveReport'])->name('reports.executive.pdf');
     Route::get('/reports/saver-report/pdf', [ReportExportController::class, 'exportSaverReport'])->name('reports.saver.pdf');
 });
+Route::get('/health', HealthReadinessController::class)->name('health.readiness');

@@ -1,0 +1,38 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Policies;
+
+use App\Models\User;
+
+final class RoleAssignmentPolicy
+{
+    /**
+     * @param  list<string>  $proposedRoleNames
+     */
+    public function allows(User $actor, User $target, array $proposedRoleNames): bool
+    {
+        $proposedRoleNames = array_values(array_unique($proposedRoleNames));
+        $criticalRoles = $this->criticalRoles();
+
+        if ($actor->is($target)
+            || $target->hasAnyRole($criticalRoles)
+            || array_intersect($criticalRoles, $proposedRoleNames) !== []) {
+            return false;
+        }
+
+        return $this->canDelegateAny($actor);
+    }
+
+    public function canDelegateAny(User $actor): bool
+    {
+        return $actor->hasAnyRole((array) config('security.role_assignment.delegator_roles', []));
+    }
+
+    /** @return list<string> */
+    private function criticalRoles(): array
+    {
+        return array_values((array) config('security.critical_roles', []));
+    }
+}

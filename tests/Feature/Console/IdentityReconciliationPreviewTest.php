@@ -48,6 +48,9 @@ final class IdentityReconciliationPreviewTest extends TestCase
         $this->assertFalse($report['controls']['name_auto_match']);
         $this->assertSame(1, $report['summary']['total_users']);
         $this->assertSame(1, $report['summary']['total_employees']);
+        $this->assertNull($report['rows'][0]['user']['employee_profile_id']);
+        $this->assertSame('pending_activation', $report['rows'][0]['user']['account_status']);
+        $this->assertSame(1, $report['rows'][0]['user']['security_version']);
         $this->assertSame(['super_admin', 'training_admin'], $report['rows'][0]['preservation']['roles']);
         $this->assertSame('admin', $report['rows'][0]['preservation']['workgroups'][0]['role']);
         $this->assertTrue($report['rows'][0]['preservation']['training_access']);
@@ -136,23 +139,30 @@ final class IdentityReconciliationPreviewTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        DB::table('roles')->insert([
-            ['id' => 1, 'name' => 'super_admin', 'guard_name' => 'web', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 2, 'name' => 'training_admin', 'guard_name' => 'web', 'created_at' => now(), 'updated_at' => now()],
+        $superAdminRoleId = DB::table('roles')->insertGetId([
+            'name' => 'super_admin',
+            'guard_name' => 'web',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
-        DB::table('permissions')->insert([
-            'id' => 1,
+        $trainingAdminRoleId = DB::table('roles')->insertGetId([
+            'name' => 'training_admin',
+            'guard_name' => 'web',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $trainingAccessPermissionId = DB::table('permissions')->insertGetId([
             'name' => 'training.access',
             'guard_name' => 'web',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
         DB::table('model_has_roles')->insert([
-            ['role_id' => 1, 'model_type' => User::class, 'model_id' => 10],
-            ['role_id' => 2, 'model_type' => User::class, 'model_id' => 10],
+            ['role_id' => $superAdminRoleId, 'model_type' => User::class, 'model_id' => 10],
+            ['role_id' => $trainingAdminRoleId, 'model_type' => User::class, 'model_id' => 10],
         ]);
         DB::table('model_has_permissions')->insert([
-            'permission_id' => 1,
+            'permission_id' => $trainingAccessPermissionId,
             'model_type' => User::class,
             'model_id' => 10,
         ]);

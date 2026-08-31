@@ -1,5 +1,8 @@
 <?php
 
+use App\Services\SnipeIdentity\SnipeApiIdentityDirectory;
+use App\Services\SnipeIdentity\SnipeIdentityPreview;
+use App\Services\SnipeIdentity\SnipeIdentitySnapshot;
 use App\Services\VideoConferencing\ConferenceLineupNotifier;
 use App\Services\VideoConferencing\ConferenceLineupReadinessService;
 use App\Services\VideoConferencing\ConferenceSessionService;
@@ -7,6 +10,48 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 use Symfony\Component\Console\Command\Command;
+
+Artisan::command('snipeit:reconcile-identities {--preview : Required safety acknowledgement; this command remains preview-only} {--format=table : Output format: table or json}', function (
+    SnipeIdentitySnapshot $snapshot,
+    SnipeApiIdentityDirectory $directory,
+    SnipeIdentityPreview $identityPreview,
+): int {
+    $format = strtolower((string) $this->option('format'));
+    if (! in_array($format, ['table', 'json'], true)) {
+        $this->error('Invalid format. Allowed values: table or json.');
+
+        return Command::FAILURE;
+    }
+
+    try {
+        $local = $snapshot->read();
+        $report = $identityPreview->build($local['employees'], $local['users'], $directory->users());
+    } catch (\RuntimeException $exception) {
+        $this->error($exception->getMessage());
+
+        return Command::FAILURE;
+    }
+
+    if ($format === 'json') {
+        $this->line(json_encode($report, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+
+        return Command::SUCCESS;
+    }
+
+    $this->table(
+        ['Employee #', 'Employee DB ID', 'Snipe ID', 'Classification', 'Proposed action'],
+        array_map(static fn (array $row): array => [
+            $row['employee_number'],
+            $row['employee_db_id'],
+            $row['current_snipe_numeric_id'] ?? '-',
+            $row['classification'],
+            $row['proposed_action'],
+        ], $report['rows']),
+    );
+    $this->warn('Preview only: no Snipe-IT write operation is available from this command.');
+
+    return Command::SUCCESS;
+})->purpose('Read Snipe-IT identities and emit a deterministic no-write preservation preview.');
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

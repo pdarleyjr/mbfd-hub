@@ -16,7 +16,7 @@ class QueueStatusController extends Controller
     {
         $user = $request->user();
         abort_unless(
-            $user instanceof User && $user->hasRole('super_admin'),
+            $user instanceof User && $user->can('view_queue_status'),
             403,
         );
 

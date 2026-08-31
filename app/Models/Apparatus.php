@@ -92,7 +92,7 @@ class Apparatus extends Model
                 return;
             }
 
-            $previousStatus = $apparatus->getPrevious()['status'] ?? null;
+            $previousStatus = $apparatus->getOriginal('status');
             $currentStatus = $apparatus->getAttribute('status');
             if ($previousStatus === $currentStatus) {
                 return;
