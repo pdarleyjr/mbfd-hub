@@ -1,0 +1,14 @@
+{
+    "schema_version": 1,
+    "entries": [
+        {
+            "user_id": 10,
+            "employee_id": "10010",
+            "decision": "LINK",
+            "approved_by": "Synthetic Identity Owner",
+            "approved_at": "2026-08-31T12:00:00-04:00",
+            "approval_reference": "TEST-APPROVAL-001",
+            "notes": "Synthetic fixture only"
+        }
+    ]
+}

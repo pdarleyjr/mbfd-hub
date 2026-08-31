@@ -1,0 +1,13 @@
+{
+    "schema_version": 1,
+    "entries": [
+        {
+            "user_id": 10,
+            "employee_id": " 10010 ",
+            "decision": "LINK",
+            "approved_by": "",
+            "approved_at": "not-a-timestamp",
+            "approval_reference": ""
+        }
+    ]
+}
