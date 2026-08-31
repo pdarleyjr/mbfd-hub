@@ -14,7 +14,6 @@ use App\Models\User;
 use App\Models\WorkgroupSharedUpload;
 use App\Notifications\NewSubmissionNotification;
 use App\Observers\ApparatusObserver;
-use App\Observers\SyncToScreentinker;
 use App\Observers\TodoObserver;
 use App\Observers\TrainingTodoObserver;
 use App\Observers\WorkgroupSharedUploadObserver;
@@ -52,11 +51,6 @@ class AppServiceProvider extends ServiceProvider
                 : new \App\Services\CloudflareAIService;
         });
 
-        // Spatie Permission ships with events_enabled=false. We need it on so
-        // RoleAttached fires and the SyncToScreentinker listener can mirror
-        // new admin user creations to media.mbfdhub.com. Override here in
-        // register() so HasRoles sees the flag before it dispatches.
-        config(['permission.events_enabled' => true]);
     }
 
     /**
@@ -105,17 +99,6 @@ class AppServiceProvider extends ServiceProvider
         Todo::observe(TodoObserver::class);
         TrainingTodo::observe(TrainingTodoObserver::class);
         Apparatus::observe(ApparatusObserver::class);
-
-        // Mirror admin password changes into ScreenTinker at media.mbfdhub.com.
-        // Observer covers existing-admin password updates; the RoleAttached
-        // event listener covers the new-admin-creation flow where saved()
-        // fires before assignRole() and the role check would otherwise fail.
-        // No-op if SCREENTINKER_SYNC_URL/TOKEN env vars are unset.
-        User::observe(SyncToScreentinker::class);
-        \Illuminate\Support\Facades\Event::listen(
-            \Spatie\Permission\Events\RoleAttached::class,
-            [SyncToScreentinker::class, 'onRoleAttached']
-        );
 
         // Auto-vectorize uploaded workgroup files (PDFs, DOCX, etc.) into workgroup-specs index
         WorkgroupSharedUpload::observe(WorkgroupSharedUploadObserver::class);

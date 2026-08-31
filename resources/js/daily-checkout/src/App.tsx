@@ -60,7 +60,7 @@ function App() {
         <OfflineIndicator />
         <DailyCheckoutQueueProcessor />
         <IOSInstallPrompt />
-        <main id="main-content" className="max-w-5xl mx-auto py-8 px-4">
+        <main id="main-content" data-testid="daily-workspace" className="daily-workspace mx-auto px-4 py-6 sm:px-6 md:py-8 lg:px-8 xl:px-10 2xl:px-12">
           <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route path="/" element={<Navigate to="/stations" replace />} />
