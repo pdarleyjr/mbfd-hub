@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'critical_roles' => [
+        'super_admin',
+    ],
+
+    'role_assignment' => [
+        'delegator_roles' => [
+            'super_admin',
+        ],
+        'allow_critical_role_changes' => false,
+    ],
+
+    'account_security' => [
+        // Owner approval is required before any administrative action is enabled.
+        'allowed_administrative_actions' => [],
+    ],
+
+    'recent_authentication' => [
+        'session_key' => 'auth.password_confirmed_at',
+        'thresholds_seconds' => [
+            'security_administration' => 300,
+            'credential_change' => 300,
+            'sensitive_operation' => 900,
+            'ordinary_navigation' => null,
+        ],
+    ],
+];

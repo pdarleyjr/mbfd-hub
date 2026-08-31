@@ -40,7 +40,7 @@ class UserRoleAssignmentAuthorizationTest extends TestCase
         $this->assertSame([], $target->refresh()->getRoleNames()->all());
     }
 
-    public function test_super_admin_can_assign_roles_after_generic_user_update_permission_is_granted(): void
+    public function test_super_admin_can_assign_existing_lower_roles_after_generic_user_update_permission_is_granted(): void
     {
         [$adminRole, $roles] = $this->roles();
         $updateUser = Permission::findOrCreate('update_user', 'web');
@@ -56,12 +56,12 @@ class UserRoleAssignmentAuthorizationTest extends TestCase
         $this->withoutVite();
 
         Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
-            ->fillForm(['roles' => $roles->pluck('id')->map(static fn (int $id): string => (string) $id)->all()])
+            ->fillForm(['roles' => $roles->except('super_admin')->pluck('id')->map(static fn (int $id): string => (string) $id)->all()])
             ->call('save')
             ->assertHasNoFormErrors();
 
         $this->assertSame(
-            $roles->keys()->sort()->values()->all(),
+            $roles->except('super_admin')->keys()->sort()->values()->all(),
             $target->refresh()->getRoleNames()->sort()->values()->all(),
         );
     }
