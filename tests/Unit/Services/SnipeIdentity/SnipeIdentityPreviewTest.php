@@ -37,6 +37,9 @@ final class SnipeIdentityPreviewTest extends TestCase
         $emailOnly = $preview->build($employees, $users, [
             ['id' => 43, 'employee_num' => null, 'username' => 'synthetic.user', 'email' => 'synthetic@example.test', 'name' => 'Another Person'],
         ]);
+        $both = $preview->build($employees, $users, [
+            ['id' => 44, 'employee_num' => null, 'username' => 'synthetic.user', 'email' => 'synthetic@example.test', 'name' => 'Synthetic Employee'],
+        ]);
 
         $this->assertSame('NAME_ONLY_REVIEW', $nameOnly['rows'][0]['classification']);
         $this->assertSame('OWNER_REVIEW_REQUIRED', $nameOnly['rows'][0]['proposed_action']);
@@ -44,6 +47,9 @@ final class SnipeIdentityPreviewTest extends TestCase
         $this->assertSame('EMAIL_ONLY_REVIEW', $emailOnly['rows'][0]['classification']);
         $this->assertSame('OWNER_REVIEW_REQUIRED', $emailOnly['rows'][0]['proposed_action']);
         $this->assertNull($emailOnly['rows'][0]['current_snipe_numeric_id']);
+        $this->assertSame('OWNER_REVIEW_REQUIRED', $both['rows'][0]['classification']);
+        $this->assertSame('OWNER_REVIEW_REQUIRED', $both['rows'][0]['proposed_action']);
+        $this->assertNull($both['rows'][0]['current_snipe_numeric_id']);
     }
 
     public function test_duplicates_and_missing_users_are_explicit_and_deterministic(): void

@@ -72,7 +72,7 @@ final class SnipeIdentityPreview
             $classification = 'NAME_ONLY_REVIEW';
         } elseif (count($emailOnly) > 0 && count($nameOnly) === 0) {
             $classification = 'EMAIL_ONLY_REVIEW';
-        } elseif (count($nameOnly) > 0 || count($emailOnly) > 0) {
+        } elseif (count($nameOnly) > 0) {
             $classification = 'OWNER_REVIEW_REQUIRED';
         }
 
