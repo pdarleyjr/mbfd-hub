@@ -245,6 +245,11 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(activation, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
   assert.match(activation, /test -n "\$RELEASE_SHA"/);
   assert.match(activation, /RELEASE_SHA='\$RELEASE_SHA'.*bash -s/);
+
+  const applicationHealth = workflowStep(deployment, "Verify Hub application health");
+  assert.match(applicationHealth, /\.State\.Health\.Status/);
+  assert.match(applicationHealth, /http:\/\/localhost:8081\/up/);
+  assert.doesNotMatch(applicationHealth, /localhost:80\/up/);
   assert.match(activation, /test "\$\(git rev-parse HEAD\)" = "\$RELEASE_SHA"/);
   assert.match(activation, /php artisan migrate:status/);
   assert.match(activation, /compose\.prod\.image\.yaml/);
@@ -275,6 +280,8 @@ test("production activation is manual, main-only, and blocked by every Hub relea
 
   const leaveMaintenance = workflowStep(deployment, "Leave maintenance mode and verify internal health");
   assert.match(leaveMaintenance, /php artisan up/);
+  assert.match(leaveMaintenance, /http:\/\/localhost:8081\/up/);
+  assert.doesNotMatch(leaveMaintenance, /http:\/\/localhost\/up/);
 
   const successfulActivation = workflowStep(deployment, "Record successful Hub candidate activation");
   assert.match(successfulActivation, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
