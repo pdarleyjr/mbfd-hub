@@ -445,12 +445,6 @@ parameters:
 			path: app/Filament/Resources/Under25kProjectResource/RelationManagers/UpdatesRelationManager.php
 
 		-
-			message: '#^Call to function method_exists\(\) with App\\Models\\User and ''assignRole'' will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: app/Filament/Resources/Workgroup/Pages/CreateWorkgroupMember.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$workgroup_id\.$#'
 			identifier: property.notFound
 			count: 2
@@ -461,12 +455,6 @@ parameters:
 			identifier: method.notFound
 			count: 1
 			path: app/Filament/Resources/Workgroup/RelationManagers/AttendanceRelationManager.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Filament/Resources/Workgroup/WorkgroupMemberResource.php
 
 		-
 			message: '#^Cannot access property \$id on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'

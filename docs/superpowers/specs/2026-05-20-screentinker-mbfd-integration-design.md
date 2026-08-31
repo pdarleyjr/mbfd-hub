@@ -1,8 +1,14 @@
 # ScreenTinker × MBFD Hub — Integration Design
 
 **Date:** 2026-05-20
-**Status:** ✅ Phase 1 + Phase 2 both deployed and verified end-to-end
+**Status:** Superseded on 2026-08-31; the credential-mirroring design is disabled
 **Author:** Claude Opus 4.7 (autonomous build session)
+
+> **Security notice:** This document is retained as historical context only. Do not restore the
+> password capture, observer, role-event listener, sync endpoint, or shared-password workflow
+> described below. MBFD Hub passwords must remain one-way hashes inside MBFD Hub. A future
+> ScreenTinker integration requires a passwordless federation or narrowly scoped service-principal
+> design with separate review.
 
 ---
 

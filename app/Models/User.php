@@ -3,7 +3,6 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Casts\HashedAndCaptured;
 use App\Support\Workgroups\WorkgroupAccess;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -70,7 +69,6 @@ class User extends Authenticatable implements FilamentUser
     protected $hidden = [
         'password',
         'remember_token',
-        'plain_password',
     ];
 
     /**
@@ -82,10 +80,7 @@ class User extends Authenticatable implements FilamentUser
     {
         return [
             'email_verified_at' => 'datetime',
-            // HashedAndCaptured replaces Laravel's 'hashed' cast: it hashes
-            // the password identically AND stashes the plaintext on the model
-            // for the SyncToScreentinker observer to mirror to media.mbfdhub.com.
-            'password' => HashedAndCaptured::class,
+            'password' => 'hashed',
             'must_change_password' => 'boolean',
             'notification_preferences' => 'array',
         ];
