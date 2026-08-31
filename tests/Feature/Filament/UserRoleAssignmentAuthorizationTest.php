@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
-use App\Filament\Resources\UserResource\Pages\CreateUser;
+use App\Filament\Resources\UserResource;
 use App\Filament\Resources\UserResource\Pages\EditUser;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -66,31 +66,17 @@ class UserRoleAssignmentAuthorizationTest extends TestCase
         );
     }
 
-    public function test_admin_with_generic_user_create_permission_cannot_assign_roles_to_a_new_user(): void
+    public function test_admin_with_generic_user_create_permission_cannot_create_a_user(): void
     {
-        [$adminRole, $roles] = $this->roles();
+        [$adminRole] = $this->roles();
         $adminRole->givePermissionTo(Permission::findOrCreate('create_user', 'web'));
 
         $actor = User::factory()->create();
         $actor->assignRole($adminRole);
 
         $this->actingAs($actor);
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
-        $this->withoutVite();
-
-        Livewire::test(CreateUser::class)
-            ->fillForm([
-                'name' => 'New user',
-                'email' => 'new-user@example.test',
-                'password' => 'a-new-user-password',
-                'roles' => $roles->pluck('id')->map(static fn (int $id): string => (string) $id)->all(),
-            ])
-            ->call('create')
-            ->assertHasNoFormErrors();
-
-        $created = User::query()->where('email', 'new-user@example.test')->sole();
-
-        $this->assertSame([], $created->getRoleNames()->all());
+        $this->assertFalse(UserResource::canCreate());
+        $this->assertDatabaseMissing('users', ['email' => 'new-user@example.test']);
     }
 
     /**
