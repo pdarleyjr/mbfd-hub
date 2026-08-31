@@ -16,6 +16,20 @@ const webServerEnvironment = sanitizedTestEnvironment({
   VITE_SENTRY_RELEASE: '',
 });
 
+const responsiveViewports = [
+  { name: 'phone-320', width: 320, height: 568 },
+  { name: 'phone-360', width: 360, height: 800 },
+  { name: 'phone-390', width: 390, height: 844 },
+  { name: 'phone-430', width: 430, height: 932 },
+  { name: 'tablet-768', width: 768, height: 1024 },
+  { name: 'tablet-landscape-1024', width: 1024, height: 768 },
+  { name: 'desktop-1280', width: 1280, height: 720 },
+  { name: 'wide-1440', width: 1440, height: 900 },
+  { name: 'wide-1920', width: 1920, height: 1080 },
+  { name: 'display-2560', width: 2560, height: 1440 },
+  { name: 'display-3840', width: 3840, height: 2160 },
+] as const;
+
 /**
  * Public Daily Checkout browser acceptance does not need the privileged
  * root-suite authentication setup. Keep it isolated so it can run locally
@@ -23,11 +37,12 @@ const webServerEnvironment = sanitizedTestEnvironment({
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /daily-checkout-inspection\.spec\.ts/,
+  testMatch: /daily-checkout-(inspection|responsive)\.spec\.ts/,
   timeout: 45_000,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: 'list',
+  preserveOutput: 'always',
   use: {
     baseURL,
     // This suite isolates browser-local queue replay; it does not certify the
@@ -49,10 +64,21 @@ export default defineConfig({
   projects: [
     {
       name: 'daily-checkout-chromium',
+      testMatch: /daily-checkout-inspection\.spec\.ts/,
       use: {
         browserName: 'chromium',
         viewport: { width: 1280, height: 800 },
       },
     },
+    ...responsiveViewports.map(({ name, width, height }) => ({
+      name: `daily-responsive-${name}`,
+      testMatch: /daily-checkout-responsive\.spec\.ts/,
+      use: {
+        browserName: 'chromium' as const,
+        viewport: { width, height },
+        hasTouch: width < 1024,
+        isMobile: width < 768,
+      },
+    })),
   ],
 });

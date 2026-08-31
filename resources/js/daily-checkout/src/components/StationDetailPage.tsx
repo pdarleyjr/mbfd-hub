@@ -526,11 +526,11 @@ export default function StationDetailPage() {
           {activeTab === 'apparatus' && (
             <div>
               {station.apparatuses && station.apparatuses.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-list">
+                <div className="stagger-list grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
                   {station.apparatuses.map((apparatus: Apparatus) => (
                     <div
                       key={apparatus.id}
-                      className="p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-all duration-200"
+                      className="rounded-lg border border-neutral-200 p-4 transition-all duration-200 hover:bg-neutral-50 2xl:p-5"
                     >
                       <h4 className="font-semibold text-neutral-800">{apparatus.name || apparatus.unit_id}</h4>
                       <p className="text-sm text-neutral-600">Unit: {apparatus.vehicle_number}</p>
@@ -538,7 +538,7 @@ export default function StationDetailPage() {
                       {apparatus.daily_checkout_requirement === 'required' && apparatus.slug && (
                         <Link
                           to={`/vehicle-inspections/${apparatus.slug}`}
-                          className="mt-2 inline-flex items-center text-xs text-red-600 font-medium hover:text-red-700"
+                          className="mt-2 inline-flex min-h-11 items-center text-xs font-medium text-red-600 hover:text-red-700"
                         >
                           Start Inspection
                           <svg className="ml-1 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>

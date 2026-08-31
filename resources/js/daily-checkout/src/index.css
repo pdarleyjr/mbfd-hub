@@ -16,6 +16,37 @@ code {
     monospace;
 }
 
+/* Daily-only responsive workspace: reading and form surfaces stay bounded,
+   while selector grids gain useful density on command displays. */
+.daily-workspace {
+  width: 100%;
+  max-width: 80rem;
+}
+
+@media (min-width: 1440px) {
+  .daily-workspace {
+    max-width: 110rem;
+  }
+}
+
+@media (min-width: 1920px) {
+  .daily-workspace {
+    max-width: 128rem;
+  }
+}
+
+@media (min-width: 2560px) {
+  .daily-workspace {
+    max-width: 144rem;
+  }
+}
+
+@media (min-width: 3840px) {
+  .daily-workspace {
+    max-width: 160rem;
+  }
+}
+
 /* Touch-friendly interactions */
 .touch-manipulation {
   -webkit-tap-highlight-color: transparent;

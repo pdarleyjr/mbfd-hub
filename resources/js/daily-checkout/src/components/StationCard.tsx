@@ -11,10 +11,12 @@ export default function StationCard({ station }: StationCardProps) {
   return (
     <Link
       to={`/stations/${station.id}`}
-      className="group block bg-white rounded-2xl ring-1 ring-neutral-200/80 overflow-hidden transition-all duration-200 hover:shadow-xl hover:-translate-y-1 hover:ring-neutral-300 focus:outline-none focus:ring-2 focus:ring-red-500 touch-manipulation"
+      data-testid="daily-station-card"
+      aria-label={`Open ${station.name}`}
+      className="daily-selector-card group block overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-200/80 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:ring-neutral-300 focus:outline-none focus:ring-2 focus:ring-red-500 touch-manipulation"
     >
       {/* Station Image */}
-      <div className="relative h-48 bg-gradient-to-br from-neutral-100 to-neutral-200 overflow-hidden">
+      <div className="relative h-40 overflow-hidden bg-gradient-to-br from-neutral-100 to-neutral-200 sm:h-48 2xl:h-56">
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -42,8 +44,8 @@ export default function StationCard({ station }: StationCardProps) {
       </div>
 
       {/* Card Content */}
-      <div className="p-5">
-        <h3 className="text-lg font-bold text-neutral-800 font-heading mb-3">
+      <div className="p-5 2xl:p-6">
+        <h3 className="mb-3 text-lg font-bold text-neutral-800 font-heading 2xl:text-xl">
           {station.name}
         </h3>
 
