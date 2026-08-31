@@ -348,9 +348,11 @@ jobs:
           done
           test -n "${QUEUE_AFTER:-}"
           test "$QUEUE_AFTER" != "$QUEUE_BEFORE"
-          docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/python3 /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf$'
-          docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/php /var/www/html/artisan reverb:start '
-          docker exec "$HUB_APP_CONTAINER" pgrep -af '^/usr/bin/php /var/www/html/artisan queue:work '
+          SUPERVISOR_STATUS="$(docker exec "$HUB_APP_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status)"
+          printf '%s\n' "$SUPERVISOR_STATUS"
+          printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^php +RUNNING '
+          printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^queue-worker:queue-worker_00 +RUNNING '
+          printf '%s\n' "$SUPERVISOR_STATUS" | grep -Eq '^reverb +RUNNING '
           REMOTE
 
       - name: Leave maintenance mode and verify internal health
