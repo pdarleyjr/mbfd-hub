@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Security;
 
+use App\Enums\AccountStatus;
 use App\Enums\Security\AccountSecurityAction;
 use App\Models\User;
 use App\Policies\AccountSecurityPolicy;
+use App\Services\Identity\AccountSecurityService as IdentityAccountSecurityService;
+use Carbon\CarbonInterface;
 use Illuminate\Auth\Access\AuthorizationException;
 
 final class AccountSecurityService
@@ -14,7 +17,28 @@ final class AccountSecurityService
     public function __construct(
         private readonly AccountSecurityPolicy $policy,
         private readonly SecurityAuditRecorder $auditRecorder,
+        private readonly IdentityAccountSecurityService $identityAccountSecurity,
     ) {}
+
+    /**
+     * @throws AuthorizationException
+     */
+    public function disable(User $actor, User $target, string $reason, CarbonInterface $at): User
+    {
+        $this->authorize($actor, $target, AccountSecurityAction::Disable, $reason);
+
+        return $this->identityAccountSecurity->disable($target, $reason, $at);
+    }
+
+    /**
+     * @throws AuthorizationException
+     */
+    public function enable(User $actor, User $target, string $reason, CarbonInterface $at): User
+    {
+        $this->authorize($actor, $target, AccountSecurityAction::Enable, $reason);
+
+        return $this->identityAccountSecurity->changeStatus($target, AccountStatus::Active, $reason, $at);
+    }
 
     /**
      * This only authorizes and records a future administrative action. It never
