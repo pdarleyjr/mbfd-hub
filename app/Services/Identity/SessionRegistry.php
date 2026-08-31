@@ -7,7 +7,9 @@ namespace App\Services\Identity;
 use App\Enums\SessionContextClass;
 use App\Models\AuthenticationSession;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use DateTimeInterface;
 use LogicException;
 
 final class SessionRegistry
@@ -47,17 +49,17 @@ final class SessionRegistry
 
     public function isCurrent(User $user, AuthenticationSession $session, CarbonInterface $at): bool
     {
-        $issuedAt = $session->issued_at;
-        $idleExpiresAt = $session->idle_expires_at;
-        $absoluteExpiresAt = $session->absolute_expires_at;
+        $issuedAt = $this->timestamp($session, 'issued_at');
+        $idleExpiresAt = $this->timestamp($session, 'idle_expires_at');
+        $absoluteExpiresAt = $this->timestamp($session, 'absolute_expires_at');
 
         return $user->isAuthenticationAllowed()
             && $session->user_id === $user->id
             && $session->revoked_at === null
             && $session->security_version === $user->security_version
-            && $issuedAt instanceof CarbonInterface
-            && $idleExpiresAt instanceof CarbonInterface
-            && $absoluteExpiresAt instanceof CarbonInterface
+            && $issuedAt !== null
+            && $idleExpiresAt !== null
+            && $absoluteExpiresAt !== null
             && $issuedAt->lessThanOrEqualTo($at)
             && $idleExpiresAt->isAfter($at)
             && $absoluteExpiresAt->isAfter($at);
@@ -66,5 +68,16 @@ final class SessionRegistry
     private function hashSessionId(string $laravelSessionId): string
     {
         return hash_hmac('sha256', $laravelSessionId, (string) config('app.key'));
+    }
+
+    private function timestamp(AuthenticationSession $session, string $column): ?CarbonImmutable
+    {
+        $value = $session->getRawOriginal($column);
+
+        if ($value instanceof DateTimeInterface) {
+            return CarbonImmutable::instance($value);
+        }
+
+        return is_string($value) ? CarbonImmutable::parse($value) : null;
     }
 }

@@ -110,7 +110,7 @@ class User extends Authenticatable implements FilamentUser
 
     public function isAuthenticationAllowed(): bool
     {
-        return $this->account_status === AccountStatus::Active;
+        return $this->getRawOriginal('account_status') === AccountStatus::Active->value;
     }
 
     /** @return BelongsTo<Employee, $this> */
