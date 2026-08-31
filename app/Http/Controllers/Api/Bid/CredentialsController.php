@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\Bid;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Bid\VerifyCredentialsRequest;
 use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -55,8 +56,26 @@ class CredentialsController extends Controller
             'first_name' => $firstName,
             'last_name' => $lastName,
             'rank' => (string) ($employee->rank ?? ''),
-            'role' => 'member',
+            'role' => self::resolveBidRole((string) $employee->employee_id),
         ]);
+    }
+
+    /**
+     * Resolve the authoritative Hub Admin Panel entitlement on every fresh
+     * credential exchange. Any unavailable entitlement lookup fails closed to
+     * a member response; Bid never keeps its own administrator roster.
+     */
+    private static function resolveBidRole(string $employeeId): string
+    {
+        try {
+            $user = User::query()
+                ->where('employee_id', $employeeId)
+                ->first();
+
+            return $user?->hasCurrentAdminPanelEntitlement() === true ? 'admin' : 'member';
+        } catch (\Throwable) {
+            return 'member';
+        }
     }
 
     /**

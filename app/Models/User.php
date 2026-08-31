@@ -34,6 +34,22 @@ class User extends Authenticatable implements FilamentUser
 
     public const NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS = 'station_inventory_alerts';
 
+    /**
+     * The current roles that grant access to the Filament admin panel.
+     *
+     * Bid consumes this same entitlement through the credential bridge; it
+     * must not maintain an independent administrator roster.
+     *
+     * @var list<string>
+     */
+    public const ADMIN_PANEL_ACCESS_ROLES = [
+        'super_admin',
+        'admin',
+        'logistics_admin',
+        'training_admin',
+        'training_viewer',
+    ];
+
     public const DEFAULT_NOTIFICATION_PREFERENCES = [
         self::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS => true,
         self::NOTIFICATION_PREFERENCE_STATION_INSPECTIONS => true,
@@ -197,14 +213,18 @@ class User extends Authenticatable implements FilamentUser
         // Admin panel: allow any user with a valid role
         // Training-only users will be redirected by RedirectTrainingUsers middleware
         if ($panel->getId() === 'admin') {
-            return $this->hasRole('super_admin')
-                || $this->hasRole('admin')
-                || $this->hasRole('logistics_admin')
-                || $this->hasRole('training_admin')
-                || $this->hasRole('training_viewer');
+            return $this->hasCurrentAdminPanelEntitlement();
         }
 
         return false;
+    }
+
+    /**
+     * Resolve the existing Admin Panel entitlement for a fresh Bid login.
+     */
+    public function hasCurrentAdminPanelEntitlement(): bool
+    {
+        return $this->hasAnyRole(self::ADMIN_PANEL_ACCESS_ROLES);
     }
 
     // Relationships
