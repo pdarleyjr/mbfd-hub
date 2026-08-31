@@ -43,7 +43,7 @@ export default function VehicleInspectionSelect() {
           <div className="skeleton h-4 w-72 mx-auto"></div>
         </div>
         <div className="skeleton h-11 w-full mb-4 max-w-md mx-auto"></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
           {[1,2,3,4,5,6,7,8,9].map(i => (
             <div key={i} className="p-5 rounded-xl ring-1 ring-neutral-200/60 bg-neutral-100">
               <div className="flex items-center gap-4">
@@ -88,13 +88,15 @@ export default function VehicleInspectionSelect() {
       </div>
 
       {/* Search/filter */}
-      <div className="max-w-md mx-auto mb-6">
+      <div className="mx-auto mb-6 max-w-md">
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
+            id="vehicle-search"
             type="text"
+            aria-label="Search vehicles"
             placeholder="Search by name, designation, or type..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -103,7 +105,7 @@ export default function VehicleInspectionSelect() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-list">
+      <div className="stagger-list grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
         {filteredApparatuses.map((apparatus) => {
           // Handle null slug (e.g., "Captain 5") — skip or show disabled
           if (!apparatus.slug) {
@@ -136,7 +138,7 @@ export default function VehicleInspectionSelect() {
             <Link
               key={apparatus.id}
               to={`/vehicle-inspections/${apparatus.slug}`}
-              className="block p-5 bg-neutral-100 rounded-xl ring-1 ring-neutral-200/60 hover:ring-red-300 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+              className="block min-h-24 rounded-xl bg-neutral-100 p-5 ring-1 ring-neutral-200/60 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:ring-red-300"
             >
               <div className="flex items-center gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-red-50 text-red-600 font-bold text-lg flex-shrink-0">

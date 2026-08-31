@@ -66,7 +66,7 @@ export default function StationListPage() {
           <div className="skeleton h-4 w-80 mx-auto"></div>
         </div>
         {/* Skeleton cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="daily-station-grid grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-8">
           {[1, 2, 3, 4, 5].map(i => (
             <div key={i} className="bg-white rounded-2xl ring-1 ring-neutral-200/80 overflow-hidden">
               <div className="skeleton h-48 w-full rounded-none"></div>
@@ -142,8 +142,8 @@ export default function StationListPage() {
       )}
 
       {/* Welcome Header */}
-      <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold text-neutral-800 mb-3 font-heading">MBFD Stations</h1>
+      <div className="mb-8 text-center md:mb-10">
+        <h1 className="mb-3 text-3xl font-bold text-neutral-800 font-heading xl:text-4xl">MBFD Stations</h1>
         <p className="text-neutral-500 max-w-xl mx-auto leading-relaxed">
           Select your station below to access forms, inspections, apparatus information, and more.
           Each station page contains everything you need for daily operations.
@@ -151,7 +151,7 @@ export default function StationListPage() {
       </div>
 
       {/* Stations Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 stagger-list">
+      <div data-testid="daily-station-grid" className="daily-station-grid stagger-list grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-8">
         {stations.map((station) => (
           <StationCard key={station.id} station={station} />
         ))}
