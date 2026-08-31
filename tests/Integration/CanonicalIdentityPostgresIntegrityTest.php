@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
@@ -42,7 +43,9 @@ final class CanonicalIdentityPostgresIntegrityTest extends TestCase
         }
 
         try {
-            User::factory()->create(['account_status' => 'unknown']);
+            DB::table('users')
+                ->where('id', $unlinked->id)
+                ->update(['account_status' => 'unknown']);
             $this->fail('The account-status check constraint did not reject an unknown value.');
         } catch (QueryException) {
             $this->addToAssertionCount(1);
