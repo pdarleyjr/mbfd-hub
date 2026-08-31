@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
+use App\Policies\RoleAssignmentPolicy;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -130,7 +131,10 @@ class UserResource extends Resource
 
     public static function canManageRoles(): bool
     {
-        return auth()->user()?->hasRole('super_admin') ?? false;
+        $user = auth()->user();
+
+        return $user instanceof User
+            && app(RoleAssignmentPolicy::class)->canDelegateAny($user);
     }
 
     public static function canCreate(): bool

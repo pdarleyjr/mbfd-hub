@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -27,12 +28,13 @@ class AdminPwaRoutesTest extends TestCase
         );
     }
 
-    public function test_queue_status_is_available_only_to_super_admin_users(): void
+    public function test_queue_status_requires_the_explicit_queue_status_permission(): void
     {
         $roles = collect(['super_admin', 'admin', 'logistics_admin', 'training_admin', 'training_viewer'])
             ->mapWithKeys(fn (string $name) => [$name => Role::create(['name' => $name, 'guard_name' => 'web'])]);
         $superAdmin = User::factory()->create();
         $superAdmin->assignRole($roles['super_admin']);
+        $roles['super_admin']->givePermissionTo(Permission::findOrCreate('view_queue_status', 'web'));
 
         $this->getJson('/admin/pulse/queues.json')->assertUnauthorized();
 
@@ -53,5 +55,11 @@ class AdminPwaRoutesTest extends TestCase
             ->getJson('/admin/pulse/queues.json')
             ->assertOk()
             ->assertExactJson(['pending' => 0]);
+
+        $roles['super_admin']->syncPermissions([]);
+
+        $this->actingAs($superAdmin->fresh())
+            ->getJson('/admin/pulse/queues.json')
+            ->assertForbidden();
     }
 }
