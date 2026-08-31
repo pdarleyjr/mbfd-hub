@@ -13,6 +13,7 @@ use App\Services\Identity\SessionRegistry;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 final class CanonicalIdentityFoundationTest extends TestCase
@@ -69,9 +70,13 @@ final class CanonicalIdentityFoundationTest extends TestCase
 
     public function test_invalid_account_status_is_rejected_by_the_database(): void
     {
+        $user = User::factory()->create();
+
         $this->expectException(QueryException::class);
 
-        User::factory()->create(['account_status' => 'unknown']);
+        DB::table('users')
+            ->where('id', $user->id)
+            ->update(['account_status' => 'unknown']);
     }
 
     public function test_disabling_an_account_increments_security_version_and_revokes_all_sessions(): void
