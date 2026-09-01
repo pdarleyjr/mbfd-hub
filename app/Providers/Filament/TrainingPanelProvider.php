@@ -108,6 +108,7 @@ class TrainingPanelProvider extends PanelProvider
             ])
             ->persistentMiddleware([
                 EnsureCanonicalSessionIsCurrent::class,
+                EnsureTrainingPanelAccess::class,
                 ForceFilamentPasswordChange::class,
             ])
             ->sidebarCollapsibleOnDesktop()

@@ -19,7 +19,7 @@ class SettingsPageTest extends TestCase
     {
         parent::setUp();
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
-        
+
         // Create super_admin role and assign to admin user
         $role = Role::create(['name' => 'super_admin', 'guard_name' => 'web']);
         $this->admin = User::factory()->create(['is_admin' => true]);
@@ -50,7 +50,7 @@ class SettingsPageTest extends TestCase
                 ->assertSee('Enable Push');
         } catch (\Exception $e) {
             // Skip if Livewire/Filament fails to boot in test environment
-            $this->markTestSkipped('Livewire test skipped: ' . $e->getMessage());
+            $this->markTestSkipped('Livewire test skipped: '.$e->getMessage());
         }
     }
 
@@ -63,7 +63,7 @@ class SettingsPageTest extends TestCase
                 ->assertSee('User Management')
                 ->assertSee('Manage Users');
         } catch (\Exception $e) {
-            $this->markTestSkipped('Livewire test skipped: ' . $e->getMessage());
+            $this->markTestSkipped('Livewire test skipped: '.$e->getMessage());
         }
     }
 
@@ -76,7 +76,7 @@ class SettingsPageTest extends TestCase
                 ->assertSee('Profile')
                 ->assertSee($this->admin->email);
         } catch (\Exception $e) {
-            $this->markTestSkipped('Livewire test skipped: ' . $e->getMessage());
+            $this->markTestSkipped('Livewire test skipped: '.$e->getMessage());
         }
     }
 
@@ -84,7 +84,7 @@ class SettingsPageTest extends TestCase
     {
         $response = $this->get('/admin/settings');
 
-        $response->assertRedirect('/admin/login');
+        $response->assertRedirect('/login');
     }
 
     public function test_user_resource_not_in_sidebar(): void

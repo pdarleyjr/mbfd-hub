@@ -6,6 +6,7 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Pages\SetPasswordPage;
 use App\Http\Middleware\ForcePasswordChange;
+use App\Models\Training\TrainingTodo;
 use App\Models\User;
 use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
@@ -287,11 +288,24 @@ final class ForcedPasswordChangeTest extends TestCase
         string $role,
         string $homeUrl,
     ): void {
+        $this->withoutVite();
+
         $user = User::factory()->create(['must_change_password' => false]);
         $this->grantPanelAccess($user, $role);
 
+        if ($role === 'training_admin') {
+            TrainingTodo::create([
+                'title' => 'Restricted livewire training todo',
+                'is_completed' => false,
+                'created_by' => $user->id,
+            ]);
+        }
+
+        $panelResponse = $this->actingAs($user)->get($homeUrl)->assertOk();
+
         $snapshot = $this->livewireSnapshotFrom(
-            $this->actingAs($user)->get($homeUrl)->assertOk(),
+            $panelResponse,
+            $role === 'training_admin' ? 'training-stats-widget' : null,
         );
 
         if ($role === 'workgroup_member') {
@@ -311,7 +325,7 @@ final class ForcedPasswordChangeTest extends TestCase
                     'calls' => [],
                 ]],
             ])
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     private function livewireSnapshotFrom(TestResponse $response, ?string $componentNameSuffix = null): string

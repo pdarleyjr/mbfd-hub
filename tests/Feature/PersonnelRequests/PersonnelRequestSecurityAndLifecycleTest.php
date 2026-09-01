@@ -75,8 +75,8 @@ class PersonnelRequestSecurityAndLifecycleTest extends TestCase
         $this->assertDatabaseCount('personnel_request_attachments', 2);
 
         $this->get("/employee/personnel-request-attachments/{$attachment->public_id}")->assertOk();
-        auth('employee')->logout();
-        $this->get("/employee/personnel-request-attachments/{$attachment->public_id}")->assertRedirect();
+        $this->post('/logout')->assertRedirect('/login');
+        $this->get("/employee/personnel-request-attachments/{$attachment->public_id}")->assertRedirect('/login');
         $this->actingAs($other, 'employee')
             ->get("/employee/personnel-request-attachments/{$attachment->public_id}")
             ->assertForbidden();

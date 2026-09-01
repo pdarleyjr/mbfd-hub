@@ -27,6 +27,7 @@ class EmployeeEquipmentRequestWorkflowTest extends TestCase
         ]);
 
         $this->actingAs($employee, 'employee');
+        $this->bindCanonicalSessionToLivewireTestRequests();
         Filament::setCurrentPanel(Filament::getPanel('employee'));
 
         Livewire::test(RequestEquipmentPage::class)

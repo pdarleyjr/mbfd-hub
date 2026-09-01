@@ -79,6 +79,7 @@ class PersonnelRequestPortalTest extends TestCase
         ]);
 
         $this->actingAs($officer, 'employee');
+        $this->bindCanonicalSessionToLivewireTestRequests();
         Filament::setCurrentPanel(Filament::getPanel('employee'));
 
         foreach ($stations as $station) {
@@ -138,6 +139,7 @@ class PersonnelRequestPortalTest extends TestCase
         $beneficiary = $this->employee('27212', 'Firefighter', 'Livewire Beneficiary');
         $station = Station::query()->create(['station_number' => '6', 'address' => '2300 Collins Ave', 'zip_code' => '33139', 'is_active' => true]);
         $this->actingAs($officer, 'employee');
+        $this->bindCanonicalSessionToLivewireTestRequests();
         Filament::setCurrentPanel(Filament::getPanel('employee'));
 
         $base = [
@@ -212,7 +214,7 @@ class PersonnelRequestPortalTest extends TestCase
         $admin = User::factory()->create();
         $admin->assignRole('logistics_admin');
 
-        $this->get('/admin/personnel-uniforms-equipment')->assertRedirect('/admin/login');
+        $this->get('/admin/personnel-uniforms-equipment')->assertRedirect('/login');
         $this->actingAs($admin)->get('/admin/personnel-uniforms-equipment')->assertRedirect();
         $this->get('/admin/personnel-uniforms-equipment/overview')
             ->assertOk()
