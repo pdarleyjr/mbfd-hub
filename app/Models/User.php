@@ -52,6 +52,19 @@ class User extends Authenticatable implements FilamentUser
         'training_viewer',
     ];
 
+    /**
+     * Existing canonical roles whose operators manage classroom signage.
+     * Training viewers and ordinary authenticated users are intentionally excluded.
+     *
+     * @var list<string>
+     */
+    public const MEDIA_CONTROL_ACCESS_ROLES = [
+        'super_admin',
+        'admin',
+        'logistics_admin',
+        'training_admin',
+    ];
+
     public const DEFAULT_NOTIFICATION_PREFERENCES = [
         self::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS => true,
         self::NOTIFICATION_PREFERENCE_STATION_INSPECTIONS => true,
@@ -250,6 +263,11 @@ class User extends Authenticatable implements FilamentUser
     public function hasCurrentAdminPanelEntitlement(): bool
     {
         return $this->hasAnyRole(self::ADMIN_PANEL_ACCESS_ROLES);
+    }
+
+    public function hasCurrentMediaControlEntitlement(): bool
+    {
+        return $this->hasAnyRole(self::MEDIA_CONTROL_ACCESS_ROLES);
     }
 
     // Relationships

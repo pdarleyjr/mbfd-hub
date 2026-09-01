@@ -134,4 +134,19 @@ return [
         ],
     ],
 
+    'media_control' => [
+        'authorization' => [
+            'issuer' => env('MEDIA_CONTROL_AUTH_ISSUER', 'https://www.mbfdhub.com'),
+            'service_token' => env('MEDIA_CONTROL_FEDERATION_TOKEN'),
+            'code_ttl_seconds' => 60,
+            'clients' => [
+                'media-control' => [
+                    'callbacks' => [
+                        'https://media.mbfdhub.com/api/auth/hub/callback',
+                    ],
+                ],
+            ],
+        ],
+    ],
+
 ];
