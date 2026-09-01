@@ -34,7 +34,7 @@ test('offline station requests keep a durable idempotency key and permanent 4xx 
   const sync = read('resources/js/daily-checkout/src/lib/sync.ts');
   const wizard = read('resources/js/daily-checkout/src/components/forms/StationRequestWizard.tsx');
 
-  assert.match(sync, /type !== 'station_request'/);
+  assert.match(sync, /idempotentTypes = \[[^\]]*'station_request'/s);
   assert.match(sync, /client_submission_id: createClientSubmissionId\(\)/);
   assert.match(sync, /response\.status < 500 && response\.status !== 429/);
   assert.match(wizard, /submitOrQueueWithResponse\('station_request', payload, '\/api\/public'\)/);

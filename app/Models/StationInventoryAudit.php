@@ -12,6 +12,8 @@ class StationInventoryAudit extends Model
     protected $fillable = [
         'station_id',
         'inventory_item_id',
+        'actor_user_id',
+        'actor_employee_id',
         'actor_name',
         'actor_shift',
         'action',

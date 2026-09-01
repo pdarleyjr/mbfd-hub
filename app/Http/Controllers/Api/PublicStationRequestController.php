@@ -10,6 +10,7 @@ use App\Http\Requests\StoreStationRequestRequest;
 use App\Http\Resources\Public\PublicStationRequestResource;
 use App\Models\Station;
 use App\Models\StationRequest;
+use App\Services\Identity\AuthenticatedMemberContextResolver;
 use App\Services\StationRequestSubmissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,8 +21,11 @@ class PublicStationRequestController extends Controller
     public function store(
         StoreStationRequestRequest $request,
         StationRequestSubmissionService $submissions,
+        AuthenticatedMemberContextResolver $memberContextResolver,
     ): JsonResponse {
-        $result = $submissions->submit($request->validated());
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $actor->requireEmployee();
+        $result = $submissions->submit($request->validated(), $actor);
 
         return (new PublicStationRequestResource($result->request))
             ->response()

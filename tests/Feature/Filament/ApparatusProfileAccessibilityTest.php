@@ -31,6 +31,8 @@ final class ApparatusProfileAccessibilityTest extends TestCase
 
     private Station $station;
 
+    private User $panelUser;
+
     private int $apparatusSequence = 0;
 
     protected function setUp(): void
@@ -50,8 +52,9 @@ final class ApparatusProfileAccessibilityTest extends TestCase
             Permission::findOrCreate('view_defect', 'web'),
         ]);
 
-        $user = User::factory()->create();
-        $user->assignRole($role);
+        $this->panelUser = $this->actingAsCanonicalFixture('E01-PROFILE', 'Apparatus Profile Actor');
+        $this->panelUser->assignRole($role);
+        $this->bindCanonicalSessionToLivewireTestRequests();
 
         $this->station = Station::query()->create([
             'station_number' => 1,
@@ -60,7 +63,6 @@ final class ApparatusProfileAccessibilityTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->actingAs($user);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->withoutVite();
     }
@@ -161,7 +163,7 @@ final class ApparatusProfileAccessibilityTest extends TestCase
         $apparatus = $this->createApparatus('View-only navigation');
         $this->submitDailyCheckout($apparatus);
 
-        $this->actingAs($this->viewOnlyApparatusUser());
+        $this->actingAsCanonicalUser($this->viewOnlyApparatusUser());
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
         $list = Livewire::test(ListApparatuses::class)
@@ -321,6 +323,10 @@ final class ApparatusProfileAccessibilityTest extends TestCase
             'compartments' => $compartments,
             'defects' => [],
         ])->assertCreated();
+
+        $this->actingAsCanonicalUser($this->panelUser);
+        $this->bindCanonicalSessionToLivewireTestRequests();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
     }
 
     private function viewOnlyApparatusUser(): User
@@ -337,7 +343,7 @@ final class ApparatusProfileAccessibilityTest extends TestCase
             Permission::findOrCreate('view_defect', 'web'),
         ]);
 
-        $user = User::factory()->create();
+        $user = $this->actingAsCanonicalFixture('E01-PROFILE-VIEW', 'View-only Apparatus Actor');
         $user->assignRole($role);
 
         return $user;

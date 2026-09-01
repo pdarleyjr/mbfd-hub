@@ -1,5 +1,6 @@
 import { db, type PendingSubmission } from './db';
 import { QueryClient } from '@tanstack/react-query';
+import { identityForQueueCapture, refreshOfflineIdentity, type OfflineIdentity } from './offlineIdentity';
 
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 1000;
@@ -7,6 +8,11 @@ const BASE_DELAY_MS = 1000;
 export type SubmissionOutcome = 'submitted' | 'queued';
 
 class PermanentSubmissionError extends Error {}
+
+const xsrfToken = (): string | null => {
+  const encoded = document.cookie.split('; ').find((value) => value.startsWith('XSRF-TOKEN='))?.slice(11);
+  return encoded ? decodeURIComponent(encoded) : null;
+};
 
 export function createClientSubmissionId(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
@@ -18,7 +24,8 @@ export function createClientSubmissionId(): string {
 }
 
 function withIdempotencyKey(type: string, data: Record<string, unknown>): Record<string, unknown> {
-  if (type !== 'station_request' || typeof data.client_submission_id === 'string') return data;
+  const idempotentTypes = ['station_request', 'station_inspection', 'fire_equipment_request', 'trt-inventory/submit'];
+  if (!idempotentTypes.includes(type) || typeof data.client_submission_id === 'string') return data;
   return { ...data, client_submission_id: createClientSubmissionId() };
 }
 
@@ -32,9 +39,11 @@ async function processSubmission(
 ): Promise<unknown> {
   const response = await fetch(`${apiBaseUrl}/${submission.type}`, {
     method: 'POST',
+    credentials: 'same-origin',
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
+      ...(xsrfToken() ? { 'X-XSRF-TOKEN': xsrfToken() as string } : {}),
     },
     body: JSON.stringify(submission.data),
   });
@@ -67,12 +76,16 @@ export async function enqueueSubmission(
   data: Record<string, unknown>,
 ): Promise<number> {
   const durableData = withIdempotencyKey(type, data);
+  const owner = await identityForQueueCapture();
   return db.pendingSubmissions.add({
     type,
     data: durableData,
     createdAt: new Date(),
     status: 'pending',
     retryCount: 0,
+    ownerUserId: owner.userId,
+    ownerSecurityVersion: owner.securityVersion,
+    ownershipState: 'owned',
   });
 }
 
@@ -121,7 +134,9 @@ export async function submitOrQueueWithResponse(
 export async function processPendingSubmissions(
   apiBaseUrl: string,
   queryClient?: QueryClient,
+  currentIdentity?: OfflineIdentity,
 ): Promise<{ processed: number; failed: number }> {
+  const identity = currentIdentity ?? await refreshOfflineIdentity();
   const pending = await db.pendingSubmissions
     .where('status')
     .anyOf('pending', 'failed')
@@ -133,6 +148,39 @@ export async function processPendingSubmissions(
 
   for (const submission of pending) {
     if (!navigator.onLine) break;
+
+    if (submission.ownershipState !== 'owned'
+      || !Number.isInteger(submission.ownerUserId)
+      || !Number.isInteger(submission.ownerSecurityVersion)) {
+      await db.pendingSubmissions.update(submission.id!, {
+        status: 'requires_attention',
+        ownershipState: 'legacy_unclaimed',
+        lastError: 'This saved work has no verified account owner and needs operator review.',
+        lastErrorCode: 'OFFLINE_QUEUE_OWNER_LEGACY',
+      });
+      failed++;
+      continue;
+    }
+    if (submission.ownerUserId !== identity.userId) {
+      await db.pendingSubmissions.update(submission.id!, {
+        status: 'requires_attention',
+        ownershipState: 'identity_mismatch',
+        lastError: 'This saved work belongs to a different signed-in member and was not submitted.',
+        lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
+      });
+      failed++;
+      continue;
+    }
+    if (submission.ownerSecurityVersion !== identity.securityVersion) {
+      await db.pendingSubmissions.update(submission.id!, {
+        status: 'requires_attention',
+        ownershipState: 'security_mismatch',
+        lastError: 'The account security context changed after this work was saved; operator review is required.',
+        lastErrorCode: 'OFFLINE_QUEUE_SECURITY_VERSION_MISMATCH',
+      });
+      failed++;
+      continue;
+    }
 
     try {
       await db.pendingSubmissions.update(submission.id!, {

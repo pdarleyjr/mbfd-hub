@@ -2,6 +2,7 @@ import { db, type DailyCheckoutQueuedSubmission } from '../lib/db';
 import type { InspectionSubmission } from '../types';
 import { createClientSubmissionId } from './storage';
 import { ApiClient, ApiRequestError, isChecklistVersion } from './api';
+import { identityForQueueCapture, refreshOfflineIdentity, type OfflineIdentity } from '../lib/offlineIdentity';
 
 const LEGACY_QUEUE_KEY = 'mbfd_submission_queue';
 const LEGACY_MIGRATION_KEY = 'daily-checkout-queue-migration-v1';
@@ -114,16 +115,15 @@ const normalizeLegacySubmission = (
     data: { ...data, client_submission_id: clientSubmissionId } as InspectionSubmission,
     createdAt,
     updatedAt: createdAt,
-    status: requiresAttention ? 'requires_attention' : 'pending',
+    status: 'requires_attention',
     retryCount: 0,
-    ...(requiresAttention
-      ? {
-          lastError: 'This saved inspection predates immutable checklist versions and needs officer review before it can be sent.',
-          lastErrorCode: 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED',
-          lastErrorAt: createdAt,
-          retentionExpiresAt: new Date(createdAt.getTime() + CLIENT_ERROR_RETENTION_DAYS * 24 * 60 * 60 * 1000),
-        }
-      : {}),
+    ownershipState: 'legacy_unclaimed',
+    lastError: requiresAttention
+      ? 'This saved inspection predates immutable checklist versions and account-bound queues; it needs operator review.'
+      : 'This saved inspection predates account-bound offline queues and needs operator review.',
+    lastErrorCode: 'OFFLINE_QUEUE_OWNER_LEGACY',
+    lastErrorAt: createdAt,
+    retentionExpiresAt: new Date(createdAt.getTime() + CLIENT_ERROR_RETENTION_DAYS * 24 * 60 * 60 * 1000),
   };
 };
 
@@ -251,6 +251,7 @@ export const queueSubmission = async (
   }
 
   const now = new Date();
+  const owner = await identityForQueueCapture();
   const queuedSubmission: DailyCheckoutQueuedSubmission = {
     id: `daily_${data.client_submission_id}`,
     apparatusId,
@@ -260,6 +261,9 @@ export const queueSubmission = async (
     updatedAt: now,
     status: 'pending',
     retryCount: 0,
+    ownerUserId: owner.userId,
+    ownerSecurityVersion: owner.securityVersion,
+    ownershipState: 'owned',
   };
 
   const existingById = await db.dailyCheckoutSubmissions.get(queuedSubmission.id);
@@ -390,7 +394,53 @@ const recordSubmissionFailure = async (id: string, error: unknown): Promise<void
  * module-level promise also prevents an app-level reconnect and an open
  * wizard from posting the same queued record at the same time.
  */
-export const submitQueuedInspection = (queueId: string): Promise<QueuedInspectionSubmissionResult> => {
+const quarantineOwnerMismatch = async (
+  submission: DailyCheckoutQueuedSubmission,
+  identity: OfflineIdentity,
+): Promise<boolean> => {
+  const now = new Date();
+  if (submission.ownershipState !== 'owned'
+    || !Number.isInteger(submission.ownerUserId)
+    || !Number.isInteger(submission.ownerSecurityVersion)) {
+    await db.dailyCheckoutSubmissions.update(submission.id, {
+      status: 'requires_attention',
+      ownershipState: 'legacy_unclaimed',
+      lastError: 'This saved work has no verified account owner and needs operator review.',
+      lastErrorCode: 'OFFLINE_QUEUE_OWNER_LEGACY',
+      lastErrorAt: now,
+      updatedAt: now,
+    });
+    return true;
+  }
+  if (submission.ownerUserId !== identity.userId) {
+    await db.dailyCheckoutSubmissions.update(submission.id, {
+      status: 'requires_attention',
+      ownershipState: 'identity_mismatch',
+      lastError: 'This saved Daily Checkout belongs to a different signed-in member and was not submitted.',
+      lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
+      lastErrorAt: now,
+      updatedAt: now,
+    });
+    return true;
+  }
+  if (submission.ownerSecurityVersion !== identity.securityVersion) {
+    await db.dailyCheckoutSubmissions.update(submission.id, {
+      status: 'requires_attention',
+      ownershipState: 'security_mismatch',
+      lastError: 'The account security context changed after this work was saved; operator review is required.',
+      lastErrorCode: 'OFFLINE_QUEUE_SECURITY_VERSION_MISMATCH',
+      lastErrorAt: now,
+      updatedAt: now,
+    });
+    return true;
+  }
+  return false;
+};
+
+export const submitQueuedInspection = (
+  queueId: string,
+  currentIdentity?: OfflineIdentity,
+): Promise<QueuedInspectionSubmissionResult> => {
   const inFlight = inFlightSubmissions.get(queueId);
   if (inFlight) {
     return inFlight;
@@ -399,6 +449,12 @@ export const submitQueuedInspection = (queueId: string): Promise<QueuedInspectio
   const submission = (async () => {
     const queuedSubmission = await getQueuedSubmission(queueId);
     if (!queuedSubmission) {
+      return 'not_found' as const;
+    }
+
+    const identity = currentIdentity ?? await refreshOfflineIdentity();
+    if (await quarantineOwnerMismatch(queuedSubmission, identity)) {
+      notifyQueueChanged();
       return 'not_found' as const;
     }
 
@@ -433,7 +489,7 @@ export const submitQueuedInspection = (queueId: string): Promise<QueuedInspectio
  * browser reconnects. Client-invalid records remain persisted with an error
  * state so an operator can review them instead of silently losing the payload.
  */
-export const synchronizeDailyCheckoutQueue = (): Promise<DailyCheckoutQueueSyncResult> => {
+export const synchronizeDailyCheckoutQueue = (currentIdentity?: OfflineIdentity): Promise<DailyCheckoutQueueSyncResult> => {
   if (activeQueueSynchronization) {
     return activeQueueSynchronization;
   }
@@ -443,6 +499,7 @@ export const synchronizeDailyCheckoutQueue = (): Promise<DailyCheckoutQueueSyncR
     const submittedQueueIds: string[] = [];
     const pendingReviewQueueIds: string[] = [];
 
+    const identity = currentIdentity ?? await refreshOfflineIdentity();
     for (const queuedSubmission of await getSubmissionQueue()) {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         break;
@@ -453,7 +510,7 @@ export const synchronizeDailyCheckoutQueue = (): Promise<DailyCheckoutQueueSyncR
       }
 
       try {
-        const result = await submitQueuedInspection(queuedSubmission.id);
+        const result = await submitQueuedInspection(queuedSubmission.id, identity);
         if (result === 'submitted' || result === 'pending_review') {
           submitted += 1;
           submittedQueueIds.push(queuedSubmission.id);

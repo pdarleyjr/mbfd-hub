@@ -22,6 +22,12 @@ class DailyCheckoutIntegrityTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAsCanonicalFixture();
+    }
+
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();
@@ -359,6 +365,9 @@ class DailyCheckoutIntegrityTest extends TestCase
     {
         $apparatus = $this->makeFireBoat6();
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-31 09:00:00', 'America/New_York'));
+        $actor = $this->app['auth']->guard('web')->user();
+        $this->assertInstanceOf(User::class, $actor);
+        $this->actingAsCanonicalUser($actor);
 
         $this->getJson("/api/public/apparatuses/{$apparatus->id}/checklist?inspection_date=2026-08-31")
             ->assertOk()
@@ -413,6 +422,7 @@ class DailyCheckoutIntegrityTest extends TestCase
         $reviewEvent = $inspection->refresh()->reviewEvents()->sole();
         $this->assertSame($submittedChecklistV2, $reviewEvent->metadata['submitted_effects']['checklist_v2']);
 
+        $this->actingAsCanonicalUser($actor);
         $invalidValue = $this->fireBoatSubmissionWithChecklist(
             $apparatus,
             'abababab-fbfb-4bfb-8bfb-fbfbfbfbfbfb',

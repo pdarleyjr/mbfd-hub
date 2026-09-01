@@ -13,7 +13,6 @@ use App\Services\DailyCheckoutChecklistResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class DailyCheckoutInspectionSessionContractTest extends TestCase
@@ -21,6 +20,12 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
     use RefreshDatabase;
 
     private const TIMEZONE = 'America/New_York';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAsCanonicalFixture();
+    }
 
     protected function tearDown(): void
     {
@@ -33,8 +38,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
     {
         $apparatus = $this->makeFireBoat6();
         $this->setTestTime('2026-08-31 09:00:00');
-        $actor = User::factory()->create();
-        Sanctum::actingAs($actor);
+        $actor = $this->actingAsCanonicalFixture('E01-SESSION-ACTOR');
 
         $contract = $this->startInspectionSession($apparatus);
 
@@ -74,7 +78,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
     {
         $apparatus = $this->makeFireBoat6();
         $this->setTestTime('2026-08-31 09:00:00');
-        Sanctum::actingAs(User::factory()->create());
+        $this->actingAsCanonicalFixture('E01-SESSION-REUSE');
 
         $first = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions")
             ->assertCreated();
@@ -236,7 +240,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         )->assertCreated();
     }
 
-    public function test_anonymous_fire_boat_contract_is_bound_to_an_http_only_browser_cookie(): void
+    public function test_authenticated_fire_boat_contract_is_bound_to_an_http_only_browser_cookie(): void
     {
         $apparatus = $this->makeFireBoat6();
         $this->setTestTime('2026-08-31 09:00:00');
@@ -248,7 +252,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         $this->assertIsArray($contract);
 
         $persisted = DailyCheckoutInspectionSession::sole();
-        $this->assertSame(hash('sha256', $browserCookie->getValue()), $persisted->actor_session_hash);
+        $this->assertSame(hash('sha256', $this->decryptedCookieValue($browserCookie)), $persisted->actor_session_hash);
 
         $this->withCredentials()->withUnencryptedCookie($browserCookie->getName(), str_repeat('f', 64))
             ->postJson(
@@ -266,7 +270,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
             ->assertCreated();
     }
 
-    public function test_same_anonymous_browser_reuses_one_active_contract_and_preserves_the_expired_unsubmitted_row(): void
+    public function test_same_authenticated_browser_reuses_one_active_contract_and_preserves_the_expired_unsubmitted_row(): void
     {
         $apparatus = $this->makeFireBoat6();
         $this->setTestTime('2026-08-31 09:00:00');
@@ -313,8 +317,8 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
             ->assertJsonPath('inspection_session.id', $first->json('inspection_session.id'))
             ->assertJsonPath('inspection_session.token', $first->json('inspection_session.token'));
         $this->assertSame(
-            $this->browserBindingCookieFrom($first)->getValue(),
-            $this->browserBindingCookieFrom($retry)->getValue(),
+            $this->decryptedCookieValue($this->browserBindingCookieFrom($first)),
+            $this->decryptedCookieValue($this->browserBindingCookieFrom($retry)),
         );
         $this->assertDatabaseCount('daily_checkout_inspection_sessions', 1);
     }
@@ -444,8 +448,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
     public function test_explicit_abandonment_preserves_the_prior_contract_and_issues_todays_contract(): void
     {
         $apparatus = $this->makeFireBoat6();
-        $actor = User::factory()->create();
-        Sanctum::actingAs($actor);
+        $actor = $this->actingAsCanonicalFixture('E01-ABANDON-ACTOR');
         $this->setTestTime('2026-08-30 23:55:00');
         $prior = $this->startInspectionSession($apparatus);
 
@@ -620,6 +623,14 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         return $browserCookie;
     }
 
+    private function decryptedCookieValue(\Symfony\Component\HttpFoundation\Cookie $cookie): string
+    {
+        $value = app('encrypter')->decrypt($cookie->getValue(), false);
+        $this->assertIsString($value);
+
+        return \Illuminate\Cookie\CookieValuePrefix::remove($value);
+    }
+
     /** @return array<string, mixed> */
     private function fireBoatSubmission(Apparatus $apparatus, array $contract, string $clientSubmissionId): array
     {
@@ -696,6 +707,10 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
     private function setTestTime(string $localDateTime): void
     {
         CarbonImmutable::setTestNow(CarbonImmutable::parse($localDateTime, self::TIMEZONE));
+        $actor = $this->app['auth']->guard('web')->user();
+        if ($actor instanceof User) {
+            $this->actingAsCanonicalUser($actor);
+        }
     }
 
     private function makeFireBoat6(): Apparatus

@@ -15,6 +15,15 @@ const DEFAULT_HEADERS = {
   'Content-Type': 'application/json',
 };
 
+const mutationHeaders = (): Record<string, string> => {
+  const encoded = document.cookie.split('; ').find((value) => value.startsWith('XSRF-TOKEN='))?.slice(11);
+
+  return {
+    ...DEFAULT_HEADERS,
+    ...(encoded ? { 'X-XSRF-TOKEN': decodeURIComponent(encoded) } : {}),
+  };
+};
+
 const normalizeItemStatus = (status?: string): 'Present' | 'Missing' | 'Damaged' => {
   if (status === 'Missing' || status === 'Damaged' || status === 'Present') {
     return status;
@@ -117,8 +126,9 @@ export class ApiClient {
         ...(body ? {
           method: 'POST',
           body: JSON.stringify(body),
+          credentials: 'same-origin' as const,
         } : {}),
-        headers: { ...DEFAULT_HEADERS },
+        headers: body ? mutationHeaders() : { ...DEFAULT_HEADERS },
       },
     );
     if (!response.ok) {
@@ -314,7 +324,8 @@ export class ApiClient {
   ): Promise<{ review_status?: 'approved' | 'pending_review' }> {
     const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/inspections`, {
       method: 'POST',
-      headers: { ...DEFAULT_HEADERS },
+      credentials: 'same-origin',
+      headers: mutationHeaders(),
       body: JSON.stringify(data),
     });
 
@@ -357,7 +368,8 @@ export class ApiClient {
   static async createStation(data: Partial<Station>): Promise<Station> {
     const response = await fetch(`${API_BASE}/admin/stations`, {
       method: 'POST',
-      headers: { ...DEFAULT_HEADERS },
+      credentials: 'same-origin',
+      headers: mutationHeaders(),
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -427,7 +439,8 @@ export class ApiClient {
   static async createRoomAsset(stationId: number, roomId: number, data: Partial<RoomAsset>): Promise<RoomAsset> {
     const response = await fetch(`${API_BASE}/admin/stations/${stationId}/rooms/${roomId}/assets`, {
       method: 'POST',
-      headers: { ...DEFAULT_HEADERS },
+      credentials: 'same-origin',
+      headers: mutationHeaders(),
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -589,7 +602,8 @@ export class ApiClient {
     
     const response = await fetch(url, {
       method: 'PUT',
-      headers: { ...DEFAULT_HEADERS },
+      credentials: 'same-origin',
+      headers: mutationHeaders(),
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -722,7 +736,8 @@ export class ApiClient {
     // supplyRequestsUrl is a complete signed URL from the backend - use as-is for POST
     const response = await fetch(supplyRequestsUrl, {
       method: 'POST',
-      headers: { ...DEFAULT_HEADERS },
+      credentials: 'same-origin',
+      headers: mutationHeaders(),
       body: JSON.stringify(request),
     });
     if (!response.ok) {

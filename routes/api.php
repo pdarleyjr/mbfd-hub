@@ -50,10 +50,10 @@ Route::prefix('admin/audit')->middleware(['web', 'auth', 'admin.role:super_admin
 Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('apparatuses', [ApparatusController::class, 'index']);
     Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class, 'checklist']);
-    Route::post('apparatuses/{apparatus}/inspection-sessions', [ApparatusController::class, 'startInspectionSession'])->middleware('throttle:30,1');
-    Route::post('apparatuses/{apparatus}/inspection-sessions/{session}/abandon', [ApparatusController::class, 'abandonInspectionSession'])->middleware('throttle:30,1');
+    Route::post('apparatuses/{apparatus}/inspection-sessions', [ApparatusController::class, 'startInspectionSession'])->middleware(['auth:sanctum', 'throttle:30,1']);
+    Route::post('apparatuses/{apparatus}/inspection-sessions/{session}/abandon', [ApparatusController::class, 'abandonInspectionSession'])->middleware(['auth:sanctum', 'throttle:30,1']);
     Route::get('apparatuses/{apparatus}/service-notices', [PublicApparatusServiceTicketController::class, 'apparatusNotices']);
-    Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
+    Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection'])->middleware('auth:sanctum');
     Route::get('employees/list', [ApparatusController::class, 'employees']);
 
     // Public Station Routes for Daily Checkout SPA
@@ -115,8 +115,8 @@ Route::prefix('public')->middleware('throttle:10,1')->group(function () {
     Route::post('support-chat', [SupportChatProxyController::class, 'chat']);
 });
 
-// Public Station Inspection submission (stricter rate limit)
-Route::prefix('public')->middleware('throttle:10,1')->group(function () {
+// Daily public-path submissions require a canonical member session.
+Route::prefix('public')->middleware(['auth:sanctum', 'throttle:10,1'])->group(function () {
     Route::post('station_inspection', [StationInspectionController::class, 'storePublic']);
     Route::post('fire_equipment_request', [FireEquipmentRequestController::class, 'storePublic']);
     Route::post('station_request', [PublicStationRequestController::class, 'store']);
@@ -127,8 +127,8 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('trt-inventory/catalog', [TrtInventoryController::class, 'catalogIndex']);
 });
 
-// TRT Trailer Inventory (public write - stricter rate limit)
-Route::prefix('public')->middleware('throttle:10,1')->group(function () {
+// TRT public-path write requires a canonical member session.
+Route::prefix('public')->middleware(['auth:sanctum', 'throttle:10,1'])->group(function () {
     Route::post('trt-inventory/submit', [TrtInventoryController::class, 'submit']);
 });
 
@@ -197,11 +197,11 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin.role:super_admin,admi
 
 // Big Ticket Requests
 Route::middleware('throttle:60,1')->group(function () {
-    Route::post('/big-ticket-requests', [BigTicketRequestController::class, 'store']);
+    Route::post('/big-ticket-requests', [BigTicketRequestController::class, 'store'])->middleware('auth:sanctum');
 
     // Station Inventory (v1 - legacy)
     Route::get('/station-inventory/categories', [StationInventoryController::class, 'categories']);
-    Route::post('/station-inventory-submissions', [StationInventoryController::class, 'store']);
+    Route::post('/station-inventory-submissions', [StationInventoryController::class, 'store'])->middleware('auth:sanctum');
 });
 
 Route::middleware(['web', 'auth', 'admin.role:super_admin,admin,logistics_admin', 'throttle:60,1'])->group(function () {
@@ -241,7 +241,7 @@ Route::prefix('v2')->middleware(['throttle:30,1', 'verify.bid.token'])->group(fu
 
 Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
     // PIN verification endpoint (public)
-    Route::post('/station-inventory/verify-pin', [StationInventoryV2Controller::class, 'verifyPin']);
+    Route::post('/station-inventory/verify-pin', [StationInventoryV2Controller::class, 'verifyPin'])->middleware('auth:sanctum');
 
     // Every protected endpoint validates the PIN-issued base URL in the shared
     // guard. Nested operations reuse that signature, so Laravel's exact-URL
@@ -252,12 +252,12 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
             ->name('access');
 
         // Update item count
-        Route::put('/station-inventory/{stationId}/item/{itemId}', [StationInventoryV2Controller::class, 'updateItem']);
+        Route::put('/station-inventory/{stationId}/item/{itemId}', [StationInventoryV2Controller::class, 'updateItem'])->middleware('auth:sanctum');
 
         // Supply requests
         Route::get('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'getSupplyRequests'])
             ->name('supply-requests');
-        Route::post('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'createSupplyRequest']);
+        Route::post('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'createSupplyRequest'])->middleware('auth:sanctum');
     });
 });
 

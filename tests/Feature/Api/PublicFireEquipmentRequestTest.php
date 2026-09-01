@@ -14,6 +14,12 @@ class PublicFireEquipmentRequestTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAsCanonicalFixture();
+    }
+
     private function makeStation(): Station
     {
         return Station::create([
@@ -62,7 +68,7 @@ class PublicFireEquipmentRequestTest extends TestCase
             ->assertJsonPath('priority', 'high');
 
         $request = StationRequest::query()->with('items')->sole();
-        $this->assertSame('Firefighter Test', $request->requester_name_snapshot);
+        $this->assertSame('Canonical Test Actor', $request->requester_name_snapshot);
         $this->assertSame('equipment', $request->request_type);
         $this->assertCount(2, $request->items);
         $this->assertSame('MBPD-2026-1001', $request->items[1]->pd_case_number);

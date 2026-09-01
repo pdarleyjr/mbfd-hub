@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Station;
 use App\Models\StationInventorySubmission;
+use App\Services\Identity\AuthenticatedMemberContextResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -108,8 +109,10 @@ class StationInventoryController extends Controller
     /**
      * Store a new station inventory submission with PDF generation.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, AuthenticatedMemberContextResolver $memberContextResolver): JsonResponse
     {
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $employee = $actor->requireEmployee();
         $validated = $request->validate([
             'station_id' => 'required|exists:stations,id',
             'employee_name' => 'nullable|string|max:255',
@@ -130,13 +133,13 @@ class StationInventoryController extends Controller
         // Generate PDF
         $pdfData = [
             'station' => $station,
-            'employee_name' => $validated['employee_name'] ?? 'N/A',
+            'employee_name' => $employee->name,
             'shift' => $validated['shift'] ?? 'N/A',
             'items' => $orderedItems,
             'notes' => $validated['notes'] ?? '',
             'categories' => $this->categories,
             'generated_at' => now()->timezone('America/New_York')->format('M j, Y g:i A T'),
-            'generated_by' => $request->user()?->name ?? 'Unknown',
+            'generated_by' => $employee->name,
         ];
 
         $pdf = Pdf::loadView('pdf.station-inventory', $pdfData);
@@ -154,12 +157,13 @@ class StationInventoryController extends Controller
         try {
             $submission = DB::transaction(fn (): StationInventorySubmission => StationInventorySubmission::create([
                 'station_id' => $validated['station_id'],
-                'employee_name' => $validated['employee_name'] ?? null,
+                'employee_name' => $employee->name,
                 'shift' => $validated['shift'] ?? null,
                 'items' => $orderedItems,
                 'notes' => $validated['notes'] ?? null,
                 'pdf_path' => $pdfPath,
-                'created_by' => $request->user()?->id,
+                'created_by' => $actor->userId(),
+                'actor_employee_id' => $employee->getKey(),
                 'submitted_at' => now()->timezone('America/New_York'),
             ]));
         } catch (\Throwable $exception) {

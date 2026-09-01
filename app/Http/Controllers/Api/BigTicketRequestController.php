@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Station;
 use App\Models\StationRequest;
 use App\Models\User;
+use App\Services\Identity\AuthenticatedMemberContextResolver;
 use App\Services\StationRequestLegacyAdapterService;
 use App\Services\StationRequestWorkflowService;
 use Illuminate\Http\JsonResponse;
@@ -16,8 +17,11 @@ class BigTicketRequestController extends Controller
     /**
      * Store a new big ticket request.
      */
-    public function store(Request $request, StationRequestLegacyAdapterService $adapter): JsonResponse
-    {
+    public function store(
+        Request $request,
+        StationRequestLegacyAdapterService $adapter,
+        AuthenticatedMemberContextResolver $memberContextResolver,
+    ): JsonResponse {
         $validated = $request->validate([
             'station_id' => 'required|exists:stations,id',
             'room_type' => 'required|string|max:100',
@@ -29,9 +33,9 @@ class BigTicketRequestController extends Controller
             'client_submission_id' => 'nullable|uuid',
         ]);
 
-        /** @var User|null $user */
-        $user = $request->user();
-        $result = $adapter->submitBigTicket($validated, $user);
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $actor->requireEmployee();
+        $result = $adapter->submitBigTicket($validated, $actor);
 
         return response()->json([
             'success' => true,
