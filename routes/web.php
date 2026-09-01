@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\PersonnelRequestAttachmentController as AdminPers
 use App\Http\Controllers\Admin\QueueStatusController;
 use App\Http\Controllers\Admin\VideoConferenceHealthController;
 use App\Http\Controllers\Api\Bid\AuthorizationController as BidAuthorizationController;
+use App\Http\Controllers\Api\MediaControl\AuthorizationController as MediaControlAuthorizationController;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Auth\CanonicalLoginController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
@@ -83,6 +84,10 @@ Route::post('/logout', [CanonicalLoginController::class, 'destroy'])
 Route::get('/auth/bid/authorize', BidAuthorizationController::class)
     ->middleware(['auth:web', 'throttle:30,1'])
     ->name('bid.auth.authorize');
+
+Route::get('/auth/media-control/authorize', MediaControlAuthorizationController::class)
+    ->middleware(['auth:web', 'throttle:30,1'])
+    ->name('media-control.auth.authorize');
 
 Route::get('/video-conferencing/stations/{station}', [ConferencePageController::class, 'station'])
     ->where('station', '1|2|3|4|6')

@@ -36,6 +36,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
             'workgroup.access' => \App\Http\Middleware\EnsureWorkgroupPanelAccess::class,
             'workgroup.global' => \App\Http\Middleware\EnsureGlobalWorkgroupAccess::class,
             'verify.bid.token' => \App\Http\Middleware\VerifyBidReaderToken::class,
+            'verify.media-control.token' => \App\Http\Middleware\VerifyMediaControlServiceToken::class,
             'station-inventory.signed' => \App\Http\Middleware\ValidateStationInventorySignature::class,
             'display.readonly' => \App\Http\Middleware\EnsureDisplayReadOnly::class,
             'display.token' => \App\Http\Middleware\EnsureDisplayToken::class,

@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\DatabaseAuditController;
 use App\Http\Controllers\Api\Display\DisplayController;
 use App\Http\Controllers\Api\FireEquipmentRequestController;
 use App\Http\Controllers\Api\InventoryChatController;
+use App\Http\Controllers\Api\MediaControl\AuthorizationCodeExchangeController as MediaControlAuthorizationCodeExchangeController;
 use App\Http\Controllers\Api\Public\ApparatusLayout\ApparatusLayoutController;
 use App\Http\Controllers\Api\PublicApparatusServiceTicketController;
 use App\Http\Controllers\Api\PublicStationRequestController;
@@ -237,6 +238,11 @@ Route::prefix('v2')->middleware(['throttle:30,1', 'verify.bid.token'])->group(fu
     // above; retain this endpoint until deployment telemetry proves zero use.
     Route::post('/verify-credentials', [BidCredentialsController::class, 'verifyCredentials'])
         ->name('api.v2.bid.verify-credentials');
+});
+
+Route::prefix('v2')->middleware(['throttle:30,1', 'verify.media-control.token'])->group(function () {
+    Route::post('/media-control/auth/exchange', MediaControlAuthorizationCodeExchangeController::class)
+        ->name('api.v2.media-control.auth.exchange');
 });
 
 Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
