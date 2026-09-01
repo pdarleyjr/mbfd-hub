@@ -23,8 +23,10 @@ $app = Application::configure(basePath: dirname(__DIR__))
                      \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO,
         );
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        $middleware->statefulApi();
         $middleware->web(append: [
             \App\Http\Middleware\AddBuildHeaders::class,
+            \App\Http\Middleware\EnsureCanonicalSessionIsCurrent::class,
             \App\Http\Middleware\ForcePasswordChange::class,
             \App\Http\Middleware\SetCacheHeaders::class,
         ]);

@@ -270,6 +270,27 @@ final class ReconciliationEngineTest extends TestCase
         $this->assertSame('LEDGER_DISAGREES_WITH_LEGACY_EMPLOYEE_ID', $report['rows'][0]['blocked_reason']);
     }
 
+    public function test_owner_ledger_cannot_reassign_an_existing_employee_profile_link(): void
+    {
+        $report = $this->engine->reconcile(
+            [IdentityFixtures::user(['employeeProfileId' => 99])],
+            [IdentityFixtures::employee()],
+            [new OwnerLedgerEntry(
+                userId: 10,
+                employeeId: '10010',
+                decision: 'LINK',
+                approvedBy: 'Synthetic Identity Owner',
+                approvedAt: '2026-08-31T12:00:00-04:00',
+                approvalReference: 'TEST-APPROVAL-EXISTING-LINK',
+                notes: null,
+            )],
+        );
+
+        $this->assertSame('CONFLICTING_EMPLOYEE_PROFILE_LINK', $report['rows'][0]['classification']);
+        $this->assertSame('BLOCKED', $report['rows'][0]['proposed_action']);
+        $this->assertSame('USER_ALREADY_LINKED_TO_DIFFERENT_EMPLOYEE', $report['rows'][0]['blocked_reason']);
+    }
+
     public function test_owner_ledger_references_must_exist_in_the_snapshot(): void
     {
         $user = IdentityFixtures::user(['id' => 1, 'legacyEmployeeId' => null]);
