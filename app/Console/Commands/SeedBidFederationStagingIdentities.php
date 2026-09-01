@@ -56,7 +56,7 @@ final class SeedBidFederationStagingIdentities extends Command
         );
 
         $user = User::query()->updateOrCreate(
-            ['employee_profile_id' => $employee->getKey()],
+            ['employee_id' => $employeeId],
             [
                 'name' => $name,
                 'employee_id' => $employeeId,
@@ -67,6 +67,10 @@ final class SeedBidFederationStagingIdentities extends Command
             ],
         );
 
+        // The canonical employee link is guarded against ordinary mass
+        // assignment. It must be explicitly persisted here, otherwise a
+        // valid seeded identity cannot be resolved by canonical login.
+        $user->forceFill(['employee_profile_id' => $employee->getKey()])->save();
         $user->syncRoles($role === null ? [] : [$role]);
     }
 }
