@@ -8,9 +8,11 @@ use App\Enums\AccountStatus;
 use App\Models\AuthenticationSession;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\Bid\BidRoleResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -177,6 +179,58 @@ final class CanonicalAuthorizationTest extends TestCase
         $this->exchange($code)
             ->assertOk()
             ->assertJson(['role' => 'admin']);
+    }
+
+    public function test_workgroup_admin_alone_does_not_grant_bid_administrator_access(): void
+    {
+        Role::findOrCreate('workgroup_admin', 'web');
+        $user = $this->linkedUser();
+        $user->assignRole('workgroup_admin');
+        $this->canonicalLogin($user);
+
+        $this->exchange($this->issuedCode())
+            ->assertOk()
+            ->assertJson(['role' => 'member']);
+    }
+
+    public function test_training_viewer_retains_current_admin_panel_entitlement_for_bid(): void
+    {
+        Role::findOrCreate('training_viewer', 'web');
+        $user = $this->linkedUser();
+        $user->assignRole('training_viewer');
+        $this->canonicalLogin($user);
+
+        $this->exchange($this->issuedCode())
+            ->assertOk()
+            ->assertJson(['role' => 'admin']);
+    }
+
+    public function test_entitlement_resolution_failure_fails_closed_without_returning_a_role(): void
+    {
+        $user = $this->linkedUser();
+        $this->canonicalLogin($user);
+
+        $this->app->instance(BidRoleResolver::class, new class extends BidRoleResolver
+        {
+            public function roleFor(User $user): string
+            {
+                throw new RuntimeException('Entitlement store unavailable.');
+            }
+        });
+
+        $this->exchange($this->issuedCode())
+            ->assertStatus(503)
+            ->assertExactJson(['error' => 'authorization_unavailable']);
+    }
+
+    public function test_malformed_and_unknown_authorization_codes_fail_closed(): void
+    {
+        $this->exchange('not-a-valid-code')
+            ->assertUnprocessable();
+
+        $this->exchange(str_repeat('A', 43))
+            ->assertUnauthorized()
+            ->assertExactJson(['error' => 'invalid_authorization_code']);
     }
 
     public function test_code_cannot_outlive_canonical_security_version(): void

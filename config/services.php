@@ -125,10 +125,17 @@ return [
             'code_ttl_seconds' => 60,
             'clients' => [
                 'bid' => [
-                    'callbacks' => [
-                        'https://bid.mbfdhub.com/api/auth/callback',
-                        'https://staging.bid.mbfdhub.com/api/auth/callback',
-                    ],
+                    // Production keeps both approved callbacks by default. The
+                    // isolated Hub staging environment sets this to its sole
+                    // staging callback, preventing a staging code from being
+                    // redirected to the production Bid hostname.
+                    'callbacks' => array_values(array_filter(array_map(
+                        'trim',
+                        explode(',', (string) env(
+                            'BID_AUTH_CALLBACKS',
+                            'https://bid.mbfdhub.com/api/auth/callback,https://staging.bid.mbfdhub.com/api/auth/callback',
+                        )),
+                    ))),
                 ],
             ],
         ],

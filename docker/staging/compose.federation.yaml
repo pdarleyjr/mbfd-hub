@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:16.13-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?staging database name required}
+      POSTGRES_USER: ${POSTGRES_USER:?staging database user required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?staging database password required}
+    volumes:
+      - hub-staging-postgres:/var/lib/postgresql/data
+    networks: [hub-staging]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - hub-staging-redis:/data
+    networks: [hub-staging]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  hub:
+    build:
+      context: ../..
+      dockerfile: docker/production/Dockerfile
+      args:
+        WWWUSER: ${HUB_WWWUSER:-1000}
+        WWWGROUP: ${HUB_WWWGROUP:-1000}
+        SOURCE_REVISION: ${HUB_STAGING_RELEASE_SHA:?exact Hub SHA required}
+    image: mbfd-hub-staging:${HUB_STAGING_RELEASE_SHA:?exact Hub SHA required}
+    restart: unless-stopped
+    # Never start the production supervisor here: it includes queue workers,
+    # the scheduler, and Reverb. Federation staging intentionally exposes only
+    # the HTTP app process on its isolated network.
+    entrypoint: ["/usr/bin/php", "/var/www/html/artisan", "serve", "--host=0.0.0.0", "--port=8081"]
+    env_file: ${HUB_STAGING_APP_ENV:?absolute staging app environment file required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - hub-staging-storage:/var/www/html/storage
+    networks: [hub-staging]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/up"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+  tunnel:
+    image: cloudflare/cloudflared:2025.8.0
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run", "--token", "${CLOUDFLARED_STAGING_TUNNEL_TOKEN:?staging tunnel token required}"]
+    depends_on:
+      hub:
+        condition: service_healthy
+    networks: [hub-staging]
+    security_opt: ["no-new-privileges:true"]
+
+networks:
+  hub-staging:
+    name: mbfd-hub-staging-net
+    driver: bridge
+
+volumes:
+  hub-staging-postgres:
+    name: mbfd-hub-staging-postgres
+  hub-staging-redis:
+    name: mbfd-hub-staging-redis
+  hub-staging-storage:
+    name: mbfd-hub-staging-storage

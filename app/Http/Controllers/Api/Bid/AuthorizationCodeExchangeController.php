@@ -9,6 +9,7 @@ use App\Http\Requests\Api\Bid\ExchangeBidAuthorizationCodeRequest;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\Bid\BidAuthorizationCodeBroker;
+use App\Services\Bid\BidRoleResolver;
 use Illuminate\Http\JsonResponse;
 use Throwable;
 
@@ -17,6 +18,7 @@ final class AuthorizationCodeExchangeController extends Controller
     public function __invoke(
         ExchangeBidAuthorizationCodeRequest $request,
         BidAuthorizationCodeBroker $codes,
+        BidRoleResolver $roles,
     ): JsonResponse {
         $validated = $request->validated();
         $record = $codes->redeem(
@@ -43,7 +45,7 @@ final class AuthorizationCodeExchangeController extends Controller
         }
 
         try {
-            $role = $user->hasCurrentAdminPanelEntitlement() ? 'admin' : 'member';
+            $role = $roles->roleFor($user);
         } catch (Throwable) {
             return response()->json(['error' => 'authorization_unavailable'], 503);
         }
