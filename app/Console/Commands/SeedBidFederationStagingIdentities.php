@@ -49,7 +49,9 @@ final class SeedBidFederationStagingIdentities extends Command
             ['employee_id' => $employeeId],
             [
                 'name' => $name,
-                'rank' => 'Staging',
+                // Bid translates this canonical Hub label into its FF rank
+                // code. Keep staging identities inside the shared contract.
+                'rank' => 'Firefighter',
                 'password' => Hash::make($password),
                 'must_change_password' => false,
             ],

@@ -33,6 +33,7 @@ final class SeedBidFederationStagingIdentitiesTest extends TestCase
 
             $this->assertNotNull($user->employee_profile_id);
             $this->assertSame('STG-BID-ADMIN', $user->employeeProfile?->employee_id);
+            $this->assertSame('Firefighter', $user->employeeProfile?->rank);
             $this->assertSame($user->id, app(CanonicalUserResolver::class)->byEmployeeId('STG-BID-ADMIN')?->id);
             $this->assertTrue($user->isAuthenticationAllowed());
         } finally {
