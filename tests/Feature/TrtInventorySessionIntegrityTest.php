@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\TrtInventoryCatalogItem;
 use App\Models\TrtInventorySession;
+use App\Models\TrtInventorySubmission;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -13,6 +14,12 @@ use Tests\TestCase;
 class TrtInventorySessionIntegrityTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAsCanonicalFixture();
+    }
 
     public function test_default_session_date_is_unique_when_trailer_is_null(): void
     {
@@ -65,5 +72,35 @@ class TrtInventorySessionIntegrityTest extends TestCase
         $this->assertSame($first->json('data.session_id'), $second->json('data.session_id'));
         $this->assertDatabaseCount('trt_inventory_sessions', 1);
         $this->assertDatabaseCount('trt_inventory_entries', 2);
+    }
+
+    public function test_replaying_the_same_owned_client_submission_does_not_duplicate_entries(): void
+    {
+        $catalogItem = TrtInventoryCatalogItem::query()->create([
+            'name' => 'Idempotent rescue tool',
+            'category' => 'Audit',
+            'expected_quantity' => 1,
+            'active' => true,
+        ]);
+        $payload = [
+            'client_submission_id' => 'e0100000-0000-4000-8000-000000000010',
+            'entries' => [[
+                'catalog_item_id' => $catalogItem->id,
+                'present' => true,
+                'actual_quantity' => 1,
+                'condition' => 'good',
+                'action' => 'keep',
+            ]],
+        ];
+
+        $first = $this->postJson('/api/public/trt-inventory/submit', $payload)
+            ->assertCreated();
+        $second = $this->postJson('/api/public/trt-inventory/submit', $payload)
+            ->assertOk();
+
+        $this->assertSame($first->json('data.session_id'), $second->json('data.session_id'));
+        $this->assertDatabaseCount('trt_inventory_entries', 1);
+        $this->assertDatabaseCount('trt_inventory_submissions', 1);
+        $this->assertSame(1, TrtInventorySubmission::query()->sole()->entries_count);
     }
 }

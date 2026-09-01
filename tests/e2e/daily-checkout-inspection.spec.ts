@@ -207,6 +207,9 @@ interface QueuedInspection {
   lastErrorStatus?: number;
   lastErrorCode?: string;
   retentionExpiresAt?: string;
+  ownerUserId?: number;
+  ownerSecurityVersion?: number;
+  ownershipState?: 'owned' | 'legacy_unclaimed' | 'identity_mismatch' | 'security_mismatch';
   data: {
     client_submission_id?: unknown;
     checklist_version?: unknown;
@@ -220,10 +223,26 @@ type SeededQueuedInspection = QueuedInspection & {
   updatedAt: string;
 };
 
+interface GenericQueuedSubmission {
+  id?: number;
+  type: string;
+  data: Record<string, unknown>;
+  createdAt: string;
+  status: 'pending' | 'processing' | 'failed' | 'requires_attention';
+  retryCount: number;
+  ownerUserId?: number;
+  ownerSecurityVersion?: number;
+  ownershipState?: 'owned' | 'legacy_unclaimed' | 'identity_mismatch' | 'security_mismatch';
+  lastError?: string;
+  lastErrorCode?: string;
+}
+
 interface InspectionApiMock {
   readonly submissions: Array<Record<string, unknown>>;
+  readonly genericSubmissions: Array<Record<string, unknown>>;
   readonly sessionStarts: Array<Record<string, unknown>>;
   readonly abandonments: Array<Record<string, unknown>>;
+  setIdentity(userId: number, securityVersion: number): void;
 }
 
 async function mockInspectionApi(
@@ -240,18 +259,38 @@ async function mockInspectionApi(
   } = {},
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
+  const genericSubmissions: Array<Record<string, unknown>> = [];
   const sessionStarts: Array<Record<string, unknown>> = [];
   const abandonments: Array<Record<string, unknown>> = [];
   const submitStatus = options.submitStatus ?? 201;
   let abortNextSubmit = options.abortFirstSubmit ?? false;
+  let currentIdentity = { userId: 101, securityVersion: 1 };
 
   await page.route('**/images/mbfd_logo_new.png', (route) => route.fulfill({ path: 'public/images/mbfd_logo_new.png' }));
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
 
+    if (path === '/api/me/context') {
+      return route.fulfill({
+        json: {
+          version: 1,
+          identity: { user_id: currentIdentity.userId, has_personnel_profile: true },
+          personnel: { employee_profile_id: currentIdentity.userId + 1_000, employee_number: `E${currentIdentity.userId}`, name: 'Captain Browser', rank: 'Captain' },
+          offline: { security_version: currentIdentity.securityVersion },
+          session: { authenticated: true },
+        },
+      });
+    }
+
     if (path === '/api/public/apparatuses') {
       return route.fulfill({ json: [apparatus] });
+    }
+
+    if (path === '/api/public/station_request' && request.method() === 'POST') {
+      genericSubmissions.push(request.postDataJSON() as Record<string, unknown>);
+
+      return route.fulfill({ status: 201, json: { success: true } });
     }
 
     if (path === '/api/public/stations/1') {
@@ -323,7 +362,15 @@ async function mockInspectionApi(
     return route.fulfill({ status: 404, json: { message: `Unmocked API route: ${path}` } });
   });
 
-  return { submissions, sessionStarts, abandonments };
+  return {
+    submissions,
+    genericSubmissions,
+    sessionStarts,
+    abandonments,
+    setIdentity(userId: number, securityVersion: number) {
+      currentIdentity = { userId, securityVersion };
+    },
+  };
 }
 
 async function mockFireBoatInspectionApi(
@@ -335,16 +382,30 @@ async function mockFireBoatInspectionApi(
   } = {},
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
+  const genericSubmissions: Array<Record<string, unknown>> = [];
   const sessionStarts: Array<Record<string, unknown>> = [];
   const abandonments: Array<Record<string, unknown>> = [];
   const sessionStatus = options.sessionStatus ?? 201;
   let abortNextSessionStart = options.abortFirstSessionStart ?? false;
   let priorDayContractWasAbandoned = false;
+  let currentIdentity = { userId: 101, securityVersion: 1 };
 
   await page.route('**/images/mbfd_logo_new.png', (route) => route.fulfill({ path: 'public/images/mbfd_logo_new.png' }));
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+
+    if (path === '/api/me/context') {
+      return route.fulfill({
+        json: {
+          version: 1,
+          identity: { user_id: currentIdentity.userId, has_personnel_profile: true },
+          personnel: { employee_profile_id: currentIdentity.userId + 1_000, employee_number: `E${currentIdentity.userId}`, name: 'Captain Browser', rank: 'Captain' },
+          offline: { security_version: currentIdentity.securityVersion },
+          session: { authenticated: true },
+        },
+      });
+    }
 
     if (path === '/api/public/apparatuses') {
       return route.fulfill({ json: [fireBoatApparatus] });
@@ -418,7 +479,15 @@ async function mockFireBoatInspectionApi(
     return route.fulfill({ status: 404, json: { message: `Unmocked API route: ${path}` } });
   });
 
-  return { submissions, sessionStarts, abandonments };
+  return {
+    submissions,
+    genericSubmissions,
+    sessionStarts,
+    abandonments,
+    setIdentity(userId: number, securityVersion: number) {
+      currentIdentity = { userId, securityVersion };
+    },
+  };
 }
 
 async function completeInspection(page: Page): Promise<void> {
@@ -509,6 +578,45 @@ async function addQueuedInspection(page: Page, record: SeededQueuedInspection): 
     });
     database.close();
   }, record);
+}
+
+async function addGenericQueuedSubmission(page: Page, record: GenericQueuedSubmission): Promise<void> {
+  await page.evaluate(async (queuedRecord) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('mbfd-daily-checkout');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = database.transaction('pendingSubmissions', 'readwrite');
+    const request = transaction.objectStore('pendingSubmissions').add({
+      ...queuedRecord,
+      createdAt: new Date(queuedRecord.createdAt),
+    });
+    await new Promise<void>((resolve, reject) => {
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+  }, record);
+}
+
+async function genericQueuedSubmissions(page: Page): Promise<GenericQueuedSubmission[]> {
+  return page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('mbfd-daily-checkout');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = database.transaction('pendingSubmissions', 'readonly');
+    const request = transaction.objectStore('pendingSubmissions').getAll();
+    const rows = await new Promise<GenericQueuedSubmission[]>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result as GenericQueuedSubmission[]);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+
+    return rows;
+  });
 }
 
 async function createVersionThreeQueue(page: Page, record: Omit<SeededQueuedInspection, 'checklistVersion'>): Promise<void> {
@@ -960,7 +1068,7 @@ test('a checklist without an immutable version fails closed before inspection en
   expect(api.submissions).toHaveLength(0);
 });
 
-test('upgrades a version-three queue record without losing its immutable checklist version', async ({ page }) => {
+test('upgrades a pre-E01 queue without assigning it to the current user', async ({ page }) => {
   const legacyVersion = 'a'.repeat(64);
   await createVersionThreeQueue(page, {
     id: 'daily-legacy-version-three',
@@ -989,6 +1097,9 @@ test('upgrades a version-three queue record without losing its immutable checkli
   expect(saved).toHaveLength(1);
   expect(saved[0]).toMatchObject({
     checklistVersion: legacyVersion,
+    ownershipState: 'legacy_unclaimed',
+    status: 'requires_attention',
+    lastErrorCode: 'OFFLINE_QUEUE_OWNER_LEGACY',
     data: { checklist_version: legacyVersion },
   });
   await expect(page.getByText('A saved Daily Checkout using this checklist version needs officer review.')).toBeVisible();
@@ -1037,6 +1148,7 @@ test('queued inspection syncs after reconnect while the queued success page rema
   await page.goto('/daily/apparatus/engine-1');
   await completeInspection(page);
   await context.setOffline(true);
+  await page.getByRole('button', { name: 'Close notification' }).click();
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
   await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
@@ -1044,6 +1156,9 @@ test('queued inspection syncs after reconnect while the queued success page rema
   expect(queuedBeforeRetry).toHaveLength(1);
   expect(queuedBeforeRetry[0]).toMatchObject({
     apparatusId: apparatus.id,
+    ownerUserId: 101,
+    ownerSecurityVersion: 1,
+    ownershipState: 'owned',
     data: {
       client_submission_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
       checklist_version: checklist.checklist_version,
@@ -1062,6 +1177,111 @@ test('queued inspection syncs after reconnect while the queued success page rema
   expect(api.submissions.map((submission) => submission.client_submission_id)).toEqual([
     clientSubmissionId,
   ]);
+});
+
+test('a different canonical user cannot replay the prior user offline queue', async ({ page, context }) => {
+  const api = await mockInspectionApi(page);
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect.poll(async () => (await queuedInspections(page))[0]?.ownerUserId).toBe(101);
+
+  api.setIdentity(202, 1);
+  await context.setOffline(false);
+
+  await expect.poll(async () => (await queuedInspections(page))[0]?.status).toBe('requires_attention');
+  const quarantined = (await queuedInspections(page))[0];
+  expect(quarantined).toMatchObject({
+    ownerUserId: 101,
+    ownerSecurityVersion: 1,
+    ownershipState: 'identity_mismatch',
+    lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
+  });
+  expect(api.submissions).toHaveLength(0);
+  await expect(page.getByRole('alert')).toContainText('belongs to a different signed-in member');
+  await expect(page.getByRole('alert')).not.toContainText('101');
+  await expect(page.getByRole('alert')).not.toContainText('202');
+});
+
+test('the same canonical user may safely replay after logging in again', async ({ page, context }) => {
+  const api = await mockInspectionApi(page);
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(1);
+
+  api.setIdentity(101, 1);
+  await context.setOffline(false);
+
+  await expect.poll(() => api.submissions.length).toBe(1);
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
+});
+
+test('a security-version change quarantines captured work without discarding it', async ({ page, context }) => {
+  const api = await mockInspectionApi(page);
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(1);
+
+  api.setIdentity(101, 2);
+  await context.setOffline(false);
+
+  await expect.poll(async () => (await queuedInspections(page))[0]?.ownershipState).toBe('security_mismatch');
+  expect((await queuedInspections(page))[0]).toMatchObject({
+    ownerUserId: 101,
+    ownerSecurityVersion: 1,
+    status: 'requires_attention',
+    lastErrorCode: 'OFFLINE_QUEUE_SECURITY_VERSION_MISMATCH',
+  });
+  expect(api.submissions).toHaveLength(0);
+});
+
+test('generic offline records enforce ownership per record on a shared device', async ({ page }) => {
+  const api = await mockInspectionApi(page);
+  await page.goto('/daily/stations');
+
+  await addGenericQueuedSubmission(page, {
+    type: 'station_request',
+    data: { client_submission_id: 'aaaaaaaa-0000-4000-8000-000000000001', title: 'User A record' },
+    createdAt: new Date().toISOString(),
+    status: 'pending',
+    retryCount: 0,
+    ownerUserId: 101,
+    ownerSecurityVersion: 1,
+    ownershipState: 'owned',
+  });
+  await addGenericQueuedSubmission(page, {
+    type: 'station_request',
+    data: { client_submission_id: 'bbbbbbbb-0000-4000-8000-000000000002', title: 'User B record' },
+    createdAt: new Date().toISOString(),
+    status: 'pending',
+    retryCount: 0,
+    ownerUserId: 202,
+    ownerSecurityVersion: 1,
+    ownershipState: 'owned',
+  });
+
+  api.setIdentity(202, 1);
+  await page.reload();
+
+  await expect.poll(() => api.genericSubmissions.length).toBe(1);
+  await expect.poll(async () => (await genericQueuedSubmissions(page)).length).toBe(1);
+  expect(api.genericSubmissions[0]).toMatchObject({ title: 'User B record' });
+  expect((await genericQueuedSubmissions(page))[0]).toMatchObject({
+    ownerUserId: 101,
+    ownershipState: 'identity_mismatch',
+    status: 'requires_attention',
+    lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
+  });
 });
 
 test('queued inspection reports pending review after reconnect without retaining a duplicate queue item', async ({ page, context }) => {
@@ -1188,6 +1408,9 @@ test('a current checklist submission is queued separately while an older version
     lastError: 'The checklist changed after this inspection was saved. Officer review is required.',
     lastErrorStatus: 409,
     lastErrorCode: 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED',
+    ownerUserId: 101,
+    ownerSecurityVersion: 1,
+    ownershipState: 'owned',
     data: {
       client_submission_id: olderClientSubmissionId,
       checklist_version: olderVersion,
@@ -1258,7 +1481,7 @@ test('migrates a legacy localStorage inspection only after IndexedDB retains it'
       client_submission_id: legacyInspection.data.client_submission_id,
     },
     status: 'requires_attention',
-    lastErrorCode: 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED',
+    lastErrorCode: 'OFFLINE_QUEUE_OWNER_LEGACY',
   });
   await expect.poll(() => page.evaluate(() => window.localStorage.getItem('mbfd_submission_queue'))).toBeNull();
 });

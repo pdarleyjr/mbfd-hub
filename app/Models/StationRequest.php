@@ -22,6 +22,7 @@ class StationRequest extends Model
         'room_id',
         'room_name_snapshot',
         'requested_by_employee_id',
+        'actor_user_id',
         'requester_name_snapshot',
         'request_type',
         'subject_type',

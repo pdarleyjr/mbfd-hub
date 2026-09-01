@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
+use App\Enums\AccountStatus;
+use App\Models\Employee;
 use App\Models\Station;
 use App\Models\StationInventorySubmission;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -25,6 +28,18 @@ class StationInventorySubmissionStorageTest extends TestCase
         parent::setUp();
 
         Storage::fake($this->privateDisk());
+        $employee = Employee::query()->create([
+            'employee_id' => 'E01-INVENTORY-STORAGE',
+            'name' => 'Inventory Storage Actor',
+            'rank' => 'Firefighter',
+            'password' => 'not-used',
+            'must_change_password' => false,
+        ]);
+        $user = User::factory()->create([
+            'account_status' => AccountStatus::Active,
+            'employee_profile_id' => $employee->id,
+        ]);
+        $this->actingAsCanonicalUser($user);
     }
 
     public function test_two_same_station_submissions_receive_distinct_private_pdf_paths(): void

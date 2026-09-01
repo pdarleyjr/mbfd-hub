@@ -10,6 +10,7 @@ use App\Models\ApparatusInspection;
 use App\Models\Station;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\DailyCheckoutInspectionSessionService;
+use App\Services\Identity\AuthenticatedMemberContextResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -32,6 +33,8 @@ final class DailyCheckoutPostgresIdempotencyRaceTest extends TestCase
         if (DB::connection()->getDriverName() !== 'pgsql') {
             $this->markTestSkipped('This regression requires a disposable PostgreSQL database.');
         }
+
+        $actor = $this->actingAsCanonicalFixture('E01-PG-RACE', 'PostgreSQL Race Tester');
 
         $station = Station::query()->firstOrCreate(
             ['station_number' => 901],
@@ -110,12 +113,15 @@ final class DailyCheckoutPostgresIdempotencyRaceTest extends TestCase
             [],
             ['HTTP_ACCEPT' => 'application/json'],
         );
+        $request->setLaravelSession($this->app['session']->driver());
+        $request->setUserResolver(static fn () => $actor);
 
         $response = $controller->storeInspection(
             $request,
             $apparatus->id,
             app(DailyCheckoutChecklistResolver::class),
             app(DailyCheckoutInspectionSessionService::class),
+            app(AuthenticatedMemberContextResolver::class),
         );
 
         $this->assertTrue($controller->winnerWasCreated());

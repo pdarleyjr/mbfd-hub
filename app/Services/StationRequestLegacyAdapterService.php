@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Data\StationRequestSubmissionResult;
-use App\Models\Employee;
 use App\Models\Room;
 use App\Models\Station;
-use App\Models\User;
+use App\Services\Identity\AuthenticatedActor;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -17,9 +16,9 @@ class StationRequestLegacyAdapterService
     public function __construct(private readonly StationRequestSubmissionService $submissions) {}
 
     /** @param array<string, mixed> $data */
-    public function submitBigTicket(array $data, ?User $user = null): StationRequestSubmissionResult
+    public function submitBigTicket(array $data, AuthenticatedActor $actor): StationRequestSubmissionResult
     {
-        $employee = $this->employeeForUser($user);
+        $employee = $actor->requireEmployee();
         $room = $this->unambiguousRoom(
             (int) $data['station_id'],
             $data['room_label'] ?? null,
@@ -47,8 +46,8 @@ class StationRequestLegacyAdapterService
             'station_id' => (int) $data['station_id'],
             'room_id' => $room?->id,
             'room_name_snapshot' => $room?->name ?: (filled($data['room_label'] ?? null) ? trim((string) $data['room_label']) : null),
-            'requested_by_employee_id' => $employee?->id,
-            'requester_name_snapshot' => $employee?->name ?: $user?->name ?: 'Legacy station requester',
+            'requested_by_employee_id' => $employee->id,
+            'requester_name_snapshot' => $employee->name,
             'request_type' => 'repair_service',
             'subject_type' => $data['room_type'],
             'title' => filled($data['room_label'] ?? null)
@@ -59,15 +58,14 @@ class StationRequestLegacyAdapterService
             'items' => $items->values()->all(),
             '_source' => 'legacy_big_ticket_api',
             '_metadata' => ['legacy_payload' => $data],
-        ]);
+        ], $actor);
     }
 
     /** @param array<string, mixed> $data */
-    public function submitFireEquipment(array $data, ?User $user = null): StationRequestSubmissionResult
+    public function submitFireEquipment(array $data, AuthenticatedActor $actor): StationRequestSubmissionResult
     {
+        $employee = $actor->requireEmployee();
         $station = $this->resolveStation($data);
-        $name = trim((string) ($data['requested_by_name'] ?? $data['requested_by'] ?? $user->name ?? 'Legacy station requester'));
-        $employee = $this->employeeForUser($user) ?? $this->uniqueEmployeeByName($name);
         $rawItems = $data['items'] ?? data_get($data, 'form_data.items');
         if (! is_array($rawItems) || $rawItems === []) {
             $rawItems = [[
@@ -109,8 +107,8 @@ class StationRequestLegacyAdapterService
             'station_id' => $station->id,
             'room_id' => null,
             'room_name_snapshot' => null,
-            'requested_by_employee_id' => $employee?->id,
-            'requester_name_snapshot' => $employee?->name ?: ($name !== '' ? $name : 'Legacy station requester'),
+            'requested_by_employee_id' => $employee->id,
+            'requester_name_snapshot' => $employee->name,
             'request_type' => 'equipment',
             'subject_type' => $data['equipment_type'] ?? 'equipment',
             'title' => $data['equipment_type'] ?? (count($items) === 1 ? $items[0]['item_name'] : count($items).' equipment items'),
@@ -122,7 +120,7 @@ class StationRequestLegacyAdapterService
             'items' => $items,
             '_source' => 'legacy_fire_equipment_api',
             '_metadata' => ['legacy_payload' => $legacyPayload],
-        ]);
+        ], $actor);
     }
 
     /** @param array<string, mixed> $data */
@@ -142,25 +140,6 @@ class StationRequestLegacyAdapterService
         }
 
         return $station;
-    }
-
-    private function employeeForUser(?User $user): ?Employee
-    {
-        if ($user === null || blank($user->employee_id)) {
-            return null;
-        }
-
-        return Employee::query()->where('employee_id', $user->employee_id)->first();
-    }
-
-    private function uniqueEmployeeByName(string $name): ?Employee
-    {
-        if ($name === '') {
-            return null;
-        }
-        $matches = Employee::query()->whereRaw('LOWER(name) = ?', [strtolower($name)])->limit(2)->get();
-
-        return $matches->count() === 1 ? $matches->first() : null;
     }
 
     private function unambiguousRoom(int $stationId, ?string $label, ?string $type): ?Room

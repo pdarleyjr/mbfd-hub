@@ -18,6 +18,7 @@ class StationInventorySubmission extends Model
         'notes',
         'pdf_path',
         'created_by',
+        'actor_employee_id',
         'submitted_at',
     ];
 

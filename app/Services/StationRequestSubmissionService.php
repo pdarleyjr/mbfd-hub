@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Data\StationRequestSubmissionResult;
-use App\Models\Employee;
 use App\Models\Room;
 use App\Models\StationRequest;
+use App\Services\Identity\AuthenticatedActor;
 use App\Support\Security\Base64Image;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -20,30 +21,32 @@ class StationRequestSubmissionService
     public function __construct(private readonly StationRequestSideEffectService $sideEffects) {}
 
     /** @param array<string, mixed> $data */
-    public function submit(array $data): StationRequestSubmissionResult
+    public function submit(array $data, AuthenticatedActor $actor): StationRequestSubmissionResult
     {
+        $employee = $actor->requireEmployee();
         $existing = StationRequest::query()
             ->where('client_submission_id', $data['client_submission_id'])
             ->first();
         if ($existing !== null) {
+            $this->assertReplayOwner($existing, $actor);
+
             return new StationRequestSubmissionResult($this->load($existing), false);
         }
 
         $storedPaths = [];
         try {
             $prepared = $this->prepareImages($data, $storedPaths);
-            $result = DB::transaction(function () use ($prepared): StationRequestSubmissionResult {
+            $result = DB::transaction(function () use ($prepared, $actor, $employee): StationRequestSubmissionResult {
                 $existing = StationRequest::query()
                     ->where('client_submission_id', $prepared['client_submission_id'])
                     ->lockForUpdate()
                     ->first();
                 if ($existing !== null) {
+                    $this->assertReplayOwner($existing, $actor);
+
                     return new StationRequestSubmissionResult($this->load($existing), false);
                 }
 
-                $employee = isset($prepared['requested_by_employee_id'])
-                    ? Employee::query()->find($prepared['requested_by_employee_id'])
-                    : null;
                 $room = isset($prepared['room_id'])
                     ? Room::query()
                         ->whereKey($prepared['room_id'])
@@ -69,8 +72,9 @@ class StationRequestSubmissionService
                         ?: (filled($prepared['room_name_snapshot'] ?? null)
                             ? trim((string) $prepared['room_name_snapshot'])
                             : null),
-                    'requested_by_employee_id' => $employee?->id,
-                    'requester_name_snapshot' => $employee?->name ?: ($prepared['requester_name_snapshot'] ?? 'Station requester'),
+                    'requested_by_employee_id' => $employee->id,
+                    'actor_user_id' => $actor->userId(),
+                    'requester_name_snapshot' => $employee->name,
                     'request_type' => $prepared['request_type'],
                     'subject_type' => $prepared['subject_type'],
                     'title' => $prepared['title'],
@@ -115,6 +119,7 @@ class StationRequestSubmissionService
                 ->where('client_submission_id', $data['client_submission_id'])
                 ->first();
             if ($existing !== null) {
+                $this->assertReplayOwner($existing, $actor);
                 $this->deleteStoredPaths($storedPaths);
 
                 return new StationRequestSubmissionResult($this->load($existing), false);
@@ -189,5 +194,17 @@ class StationRequestSubmissionService
     private function load(StationRequest $request): StationRequest
     {
         return $request->fresh(['station:id,station_number', 'room:id,station_id,name', 'items.roomAsset:id,room_id,name', 'updates']) ?? $request;
+    }
+
+    private function assertReplayOwner(StationRequest $request, AuthenticatedActor $actor): void
+    {
+        if ((int) $request->actor_user_id === $actor->userId()) {
+            return;
+        }
+
+        throw new HttpResponseException(response()->json([
+            'message' => 'This queued submission belongs to a different authenticated account.',
+            'code' => 'OFFLINE_QUEUE_OWNER_MISMATCH',
+        ], 409));
     }
 }

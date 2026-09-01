@@ -32,6 +32,8 @@ class StationRequestApiTest extends TestCase
 
     private RoomAsset $asset;
 
+    private User $canonicalActor;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -47,6 +49,8 @@ class StationRequestApiTest extends TestCase
             'password' => Hash::make('test-password-only'),
             'must_change_password' => false,
         ]);
+        $this->canonicalActor = User::factory()->create(['employee_profile_id' => $this->employee->id]);
+        $this->actingAsCanonicalUser($this->canonicalActor);
         $this->room = Room::query()->create([
             'station_id' => $this->station->id,
             'name' => 'Kitchen',
@@ -486,6 +490,7 @@ class StationRequestApiTest extends TestCase
         $this->postJson('/api/public/station_request', $this->equipmentPayload())->assertCreated();
         $denied = StationRequest::query()->sole();
 
+        $this->logoutCanonicalSession();
         $this->patchJson("/api/admin/station-requests/{$denied->id}/transition", [
             'status' => 'denied',
         ])->assertUnauthorized();
@@ -498,8 +503,10 @@ class StationRequestApiTest extends TestCase
 
         $payload = $this->equipmentPayload();
         $payload['client_submission_id'] = '2b232c61-ecc5-4df1-b980-3ec408088fbe';
+        $this->actingAsCanonicalUser($this->canonicalActor);
         $this->postJson('/api/public/station_request', $payload)->assertCreated();
         $cancelled = StationRequest::query()->where('status', 'pending')->sole();
+        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
         $this->patchJson("/api/admin/station-requests/{$cancelled->id}/transition", [
             'status' => 'cancelled',
         ])->assertOk();

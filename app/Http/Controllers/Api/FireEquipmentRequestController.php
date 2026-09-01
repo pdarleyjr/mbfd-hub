@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\StationRequest;
 use App\Models\User;
+use App\Services\Identity\AuthenticatedMemberContextResolver;
 use App\Services\StationRequestLegacyAdapterService;
 use App\Services\StationRequestWorkflowService;
 use Illuminate\Http\JsonResponse;
@@ -45,8 +46,11 @@ class FireEquipmentRequestController extends Controller
         return response()->json($query->latest()->paginate((int) ($validated['per_page'] ?? 15)));
     }
 
-    public function store(Request $request, StationRequestLegacyAdapterService $adapter): JsonResponse
-    {
+    public function store(
+        Request $request,
+        StationRequestLegacyAdapterService $adapter,
+        AuthenticatedMemberContextResolver $memberContextResolver,
+    ): JsonResponse {
         $validated = $request->validate([
             'station_id' => ['required', 'exists:stations,id'],
             'requested_by' => ['nullable', 'exists:users,id'],
@@ -72,16 +76,18 @@ class FireEquipmentRequestController extends Controller
             'client_submission_id' => ['nullable', 'uuid'],
         ]);
 
-        $requestingUser = isset($validated['requested_by'])
-            ? User::query()->find($validated['requested_by'])
-            : $request->user();
-        $result = $adapter->submitFireEquipment($validated, $requestingUser);
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $actor->requireEmployee();
+        $result = $adapter->submitFireEquipment($validated, $actor);
 
         return response()->json($result->request, $result->created ? 201 : 200);
     }
 
-    public function storePublic(Request $request, StationRequestLegacyAdapterService $adapter): JsonResponse
-    {
+    public function storePublic(
+        Request $request,
+        StationRequestLegacyAdapterService $adapter,
+        AuthenticatedMemberContextResolver $memberContextResolver,
+    ): JsonResponse {
         $validated = $request->validate([
             'station' => ['required', 'string', 'max:100'],
             'date' => ['required', 'date'],
@@ -99,7 +105,9 @@ class FireEquipmentRequestController extends Controller
             'client_submission_id' => ['nullable', 'uuid'],
         ]);
 
-        $result = $adapter->submitFireEquipment($validated);
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $actor->requireEmployee();
+        $result = $adapter->submitFireEquipment($validated, $actor);
 
         return response()->json($result->request, $result->created ? 201 : 200);
     }

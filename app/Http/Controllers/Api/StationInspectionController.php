@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\StationInspection;
+use App\Services\Identity\AuthenticatedMemberContextResolver;
 use App\Support\Security\Base64Image;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,9 +27,12 @@ class StationInspectionController extends Controller
         return response()->json($query->latest()->paginate($request->get('per_page', 15)));
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, AuthenticatedMemberContextResolver $memberContextResolver): JsonResponse
     {
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $actor->requireEmployee();
         $validated = $request->validate([
+            'client_submission_id' => 'nullable|uuid',
             'station_id' => 'required|exists:stations,id',
             'inspector_id' => 'required|exists:users,id',
             'inspection_date' => 'required|date',
@@ -42,6 +46,15 @@ class StationInspectionController extends Controller
             'notes' => 'nullable|string',
             'form_data.checklist.*.failImage' => 'nullable|string|max:7000000',
         ]);
+        $validated['inspector_id'] = $actor->userId();
+        if (isset($validated['client_submission_id'])) {
+            $existing = StationInspection::query()
+                ->where('client_submission_id', $validated['client_submission_id'])
+                ->first();
+            if ($existing instanceof StationInspection) {
+                return $this->idempotentResponse($existing, $actor->userId());
+            }
+        }
 
         // Process fail images in checklist items
         $formData = $validated['form_data'];
@@ -50,13 +63,13 @@ class StationInspectionController extends Controller
 
         if (is_array($checklist)) {
             foreach ($checklist as $index => &$item) {
-                if (!is_array($item)) {
+                if (! is_array($item)) {
                     continue;
                 }
                 $status = $item['status'] ?? null;
                 $failImage = $item['failImage'] ?? null;
 
-                if (strtolower($status ?? '') === 'fail' && !empty($failImage) && str_contains($failImage, 'base64')) {
+                if (strtolower($status ?? '') === 'fail' && ! empty($failImage) && str_contains($failImage, 'base64')) {
                     $area = Str::slug($item['category'] ?? $item['area'] ?? 'general');
                     $itemId = Str::slug($item['id'] ?? $item['label'] ?? $index);
                     $item['failImage'] = $this->storeFailImageOrFail($failImage, "si_{$area}_{$itemId}_{$timestamp}");
@@ -81,9 +94,12 @@ class StationInspectionController extends Controller
      * Public endpoint for the React SPA station inspection form.
      * Accepts the frontend payload shape and transforms it for storage.
      */
-    public function storePublic(Request $request): JsonResponse
+    public function storePublic(Request $request, AuthenticatedMemberContextResolver $memberContextResolver): JsonResponse
     {
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $actor->requireEmployee();
         $validated = $request->validate([
+            'client_submission_id' => 'nullable|uuid',
             'station' => 'required|string',
             'inspection_type' => 'required|string',
             'date' => 'required|date',
@@ -99,6 +115,14 @@ class StationInspectionController extends Controller
             'submitted_at' => 'nullable|string',
             'checklist.*.failImage' => 'nullable|string|max:7000000',
         ]);
+        if (isset($validated['client_submission_id'])) {
+            $existing = StationInspection::query()
+                ->where('client_submission_id', $validated['client_submission_id'])
+                ->first();
+            if ($existing instanceof StationInspection) {
+                return $this->idempotentResponse($existing, $actor->userId());
+            }
+        }
 
         // Resolve station name to station_id
         // 'name' is an accessor on Station, not a real column. Extract station_number.
@@ -109,8 +133,8 @@ class StationInspectionController extends Controller
         }
         $station = \App\Models\Station::where('station_number', $stationValue)->first();
 
-        if (!$station) {
-            return response()->json(['message' => 'Station not found: ' . $validated['station']], 422);
+        if (! $station) {
+            return response()->json(['message' => 'Station not found: '.$validated['station']], 422);
         }
 
         // Compute overall_status from checklist
@@ -122,7 +146,7 @@ class StationInspectionController extends Controller
         $timestamp = now()->format('Ymd_His');
         foreach ($checklist as $index => &$item) {
             $failImage = $item['failImage'] ?? null;
-            if (strtolower($item['status']) === 'fail' && !empty($failImage) && str_contains($failImage, 'base64')) {
+            if (strtolower($item['status']) === 'fail' && ! empty($failImage) && str_contains($failImage, 'base64')) {
                 $area = Str::slug($item['category'] ?? 'general');
                 $itemId = Str::slug($item['id'] ?? (string) $index);
                 $item['failImage'] = $this->storeFailImageOrFail($failImage, "si_{$area}_{$itemId}_{$timestamp}");
@@ -131,8 +155,9 @@ class StationInspectionController extends Controller
         unset($item);
 
         $record = StationInspection::create([
+            'client_submission_id' => $validated['client_submission_id'] ?? null,
             'station_id' => $station->id,
-            'inspector_id' => null, // Public form — no authenticated user
+            'inspector_id' => $actor->userId(),
             'inspection_date' => $validated['date'],
             'inspection_type' => $validated['inspection_type'],
             'form_data' => ['checklist' => $checklist],
@@ -190,5 +215,17 @@ class StationInspectionController extends Controller
         }
 
         return $path;
+    }
+
+    private function idempotentResponse(StationInspection $inspection, int $actorUserId): JsonResponse
+    {
+        if ((int) $inspection->inspector_id !== $actorUserId) {
+            return response()->json([
+                'message' => 'This queued submission belongs to a different authenticated account.',
+                'code' => 'OFFLINE_QUEUE_OWNER_MISMATCH',
+            ], 409);
+        }
+
+        return response()->json($inspection->load(['station', 'inspector']));
     }
 }

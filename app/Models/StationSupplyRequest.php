@@ -9,6 +9,8 @@ class StationSupplyRequest extends Model
 {
     protected $fillable = [
         'station_id',
+        'actor_user_id',
+        'actor_employee_id',
         'request_text',
         'status',
         'created_by_name',

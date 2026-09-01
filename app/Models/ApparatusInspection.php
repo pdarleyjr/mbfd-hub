@@ -28,6 +28,7 @@ class ApparatusInspection extends Model
         'submission_payload_hash',
         'checklist_version',
         'apparatus_id',
+        'actor_user_id',
         'operator_name',
         'rank',
         'shift',
@@ -61,6 +62,11 @@ class ApparatusInspection extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function actorUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'actor_user_id');
     }
 
     public function defects(): HasMany
