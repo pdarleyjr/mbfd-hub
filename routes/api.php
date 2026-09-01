@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Admin\StationRequestController as AdminStationReque
 use App\Http\Controllers\Api\AdminMetricsController;
 use App\Http\Controllers\Api\ApparatusController;
 use App\Http\Controllers\Api\AuthenticatedMemberContextController;
+use App\Http\Controllers\Api\Bid\AuthorizationCodeExchangeController as BidAuthorizationCodeExchangeController;
 use App\Http\Controllers\Api\Bid\CredentialsController as BidCredentialsController;
 use App\Http\Controllers\Api\BigTicketRequestController;
 use App\Http\Controllers\Api\DatabaseAuditController;
@@ -229,6 +230,11 @@ Route::post('/apparatus-inspections/{inspection}/reject', [ApparatusController::
 // (BID_READER_TOKEN env on this side, PORTAL_BID_READER on the Worker side).
 // =========================================================================
 Route::prefix('v2')->middleware(['throttle:30,1', 'verify.bid.token'])->group(function () {
+    Route::post('/bid/auth/exchange', BidAuthorizationCodeExchangeController::class)
+        ->name('api.v2.bid.auth.exchange');
+
+    // Transitional only. The active Bid source uses the canonical code flow
+    // above; retain this endpoint until deployment telemetry proves zero use.
     Route::post('/verify-credentials', [BidCredentialsController::class, 'verifyCredentials'])
         ->name('api.v2.bid.verify-credentials');
 });

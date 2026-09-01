@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\OperationalFormDocumentController;
 use App\Http\Controllers\Admin\PersonnelRequestAttachmentController as AdminPersonnelRequestAttachmentController;
 use App\Http\Controllers\Admin\QueueStatusController;
 use App\Http\Controllers\Admin\VideoConferenceHealthController;
+use App\Http\Controllers\Api\Bid\AuthorizationController as BidAuthorizationController;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Auth\CanonicalLoginController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
@@ -79,6 +80,10 @@ Route::middleware('guest:web')->group(function (): void {
 Route::post('/logout', [CanonicalLoginController::class, 'destroy'])
     ->middleware('auth:web')
     ->name('logout');
+
+Route::get('/auth/bid/authorize', BidAuthorizationController::class)
+    ->middleware(['auth:web', 'throttle:30,1'])
+    ->name('bid.auth.authorize');
 
 Route::get('/video-conferencing/stations/{station}', [ConferencePageController::class, 'station'])
     ->where('station', '1|2|3|4|6')

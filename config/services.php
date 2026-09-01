@@ -109,8 +109,8 @@ return [
     | MBFD Bid (Cloudflare Workers) Bridge
     |--------------------------------------------------------------------------
     |
-    | Shared bearer token gating the /api/v2/verify-credentials and
-    | /api/v2/bid/* endpoints called by the bid Worker. The same value is set
+    | Shared bearer token gating the transitional /api/v2/verify-credentials
+    | route and /api/v2/bid/* endpoints called by the Bid Worker. The same value is set
     | as PORTAL_BID_READER on the Worker side. If unset, the middleware fails
     | closed (503) — the bridge is opt-in.
     |
@@ -120,6 +120,18 @@ return [
         // Convenience: where to send a member when they click "Bid Console"
         // from the portal home. Falls back to staging during cutover.
         'console_url' => env('BID_CONSOLE_URL', 'https://staging.bid.mbfdhub.com'),
+        'authorization' => [
+            'issuer' => env('BID_AUTH_ISSUER', 'https://www.mbfdhub.com'),
+            'code_ttl_seconds' => 60,
+            'clients' => [
+                'bid' => [
+                    'callbacks' => [
+                        'https://bid.mbfdhub.com/api/auth/callback',
+                        'https://staging.bid.mbfdhub.com/api/auth/callback',
+                    ],
+                ],
+            ],
+        ],
     ],
 
 ];
