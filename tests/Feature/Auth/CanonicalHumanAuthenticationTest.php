@@ -52,6 +52,71 @@ final class CanonicalHumanAuthenticationTest extends TestCase
         $this->assertSame($registered->id, session('auth.canonical_session_id'));
     }
 
+    public function test_canonical_login_session_serves_member_context_without_a_bearer_token_and_logout_revokes_both_surfaces(): void
+    {
+        $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
+
+        $this->post('/login', [
+            'employee_id' => $user->employeeProfile->employee_id,
+            'password' => 'correct-password',
+        ])->assertRedirect('/');
+
+        $registered = AuthenticationSession::query()->sole();
+
+        $this->getJson(
+            '/api/me/context?user_id=999999&employee_id=999999&actor_id=999999',
+            $this->sameOriginHeaders(),
+        )
+            ->assertOk()
+            ->assertJsonPath('identity.user_id', $user->id)
+            ->assertJsonPath('personnel.employee_profile_id', $user->employeeProfile->id)
+            ->assertJsonPath('personnel.employee_number', $user->employeeProfile->employee_id)
+            ->assertJsonMissingPath('identity.email');
+
+        $this->assertFalse($this->app['request']->headers->has('Authorization'));
+        $context = app(\App\Services\Identity\AuthenticatedMemberContextResolver::class)
+            ->resolve($this->app['request']);
+        $this->assertSame($user->id, $context->actor()->userId());
+        $this->assertTrue($context->actor()->employee()?->is($user->employeeProfile));
+
+        $this->post('/logout')->assertRedirect('/login');
+        $this->assertNotNull($registered->fresh()->revoked_at);
+        $this->getJson('/api/me/context', $this->sameOriginHeaders())->assertUnauthorized();
+    }
+
+    public function test_disabling_a_canonical_user_revokes_the_same_web_and_api_session_without_changing_password(): void
+    {
+        $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
+        $passwordHash = $user->getRawOriginal('password');
+        $this->post('/login', [
+            'employee_id' => $user->employeeProfile->employee_id,
+            'password' => 'correct-password',
+        ])->assertRedirect('/');
+
+        app(AccountSecurityService::class)->disable($user, 'D04 test disable', CarbonImmutable::now());
+
+        $this->getJson('/api/me/context', $this->sameOriginHeaders())->assertUnauthorized();
+        $this->get('/')->assertRedirect('/login');
+        $this->assertGuest('web');
+        $this->assertSame($passwordHash, $user->fresh()->getRawOriginal('password'));
+    }
+
+    public function test_security_version_advance_cannot_regain_access_by_switching_between_api_and_web_requests(): void
+    {
+        $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
+        $this->post('/login', [
+            'employee_id' => $user->employeeProfile->employee_id,
+            'password' => 'correct-password',
+        ])->assertRedirect('/');
+
+        app(AccountSecurityService::class)->revokeAll($user, 'D04 test security version advance', CarbonImmutable::now());
+
+        $this->getJson('/api/me/context', $this->sameOriginHeaders())->assertUnauthorized();
+        $this->get('/')->assertRedirect('/login');
+        $this->getJson('/api/me/context', $this->sameOriginHeaders())->assertUnauthorized();
+        $this->assertGuest('web');
+    }
+
     public function test_invalid_password_is_generic_and_does_not_establish_or_mutate_identity_state(): void
     {
         $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
@@ -233,5 +298,14 @@ final class CanonicalHumanAuthenticationTest extends TestCase
             'password' => $password,
             'must_change_password' => false,
         ]);
+    }
+
+    /** @return array<string, string> */
+    private function sameOriginHeaders(): array
+    {
+        return [
+            'Origin' => 'http://localhost',
+            'Referer' => 'http://localhost/',
+        ];
     }
 }
