@@ -13,12 +13,15 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Credentials-bridge controller for the MBFD Bid Cloudflare Worker.
+ * Transitional credentials bridge for the MBFD Bid Cloudflare Worker.
  *
  * The bid Worker calls this endpoint when a member tries to log into the
  * bid app at https://bid.mbfdhub.com / https://staging.bid.mbfdhub.com.
  * Returns the canonical Employee Portal identity so the Worker can sign
  * its own JWT and issue a bid-app session cookie.
+ *
+ * The active Bid source uses canonical Hub authorization codes. Retain this
+ * route only until deployed telemetry proves the legacy caller is gone.
  *
  * Routes (registered in routes/api.php):
  *   POST /api/v2/verify-credentials  (verify.bid.token middleware)

@@ -39,7 +39,7 @@ class User extends Authenticatable implements FilamentUser
     /**
      * The current roles that grant access to the Filament admin panel.
      *
-     * Bid consumes this same entitlement through the credential bridge; it
+     * Bid consumes this same entitlement during canonical code exchange; it
      * must not maintain an independent administrator roster.
      *
      * @var list<string>
