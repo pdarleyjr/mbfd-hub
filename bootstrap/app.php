@@ -25,6 +25,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->web(append: [
             \App\Http\Middleware\AddBuildHeaders::class,
+            \App\Http\Middleware\EnsureCanonicalSessionIsCurrent::class,
             \App\Http\Middleware\ForcePasswordChange::class,
             \App\Http\Middleware\SetCacheHeaders::class,
         ]);

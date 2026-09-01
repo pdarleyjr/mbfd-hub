@@ -80,7 +80,7 @@ final class OwnerLedgerLoader
             throw new InvalidOwnerLedger("Owner ledger {$path} must be an object.");
         }
 
-        $allowed = ['user_id', 'employee_id', 'decision', 'approved_by', 'approved_at', 'approval_reference', 'notes'];
+        $allowed = ['user_id', 'employee_id', 'decision', 'approved_by', 'approved_at', 'approval_reference', 'notes', 'credential_action'];
         $unknown = array_diff(array_keys($row), $allowed);
         if ($unknown !== []) {
             throw new InvalidOwnerLedger("Owner ledger {$path} has unknown fields: ".implode(', ', $unknown).'.');
@@ -110,6 +110,18 @@ final class OwnerLedgerLoader
             throw new InvalidOwnerLedger("Owner ledger {$path} QUARANTINE requires user_id.");
         }
 
+        $credentialAction = $row['credential_action'] ?? null;
+        if ($credentialAction !== null
+            && (! is_string($credentialAction)
+                || ! in_array($credentialAction, ['PRESERVE_CANONICAL_HASH', 'COPY_COMPATIBLE_LEGACY_HASH'], true))) {
+            throw new InvalidOwnerLedger(
+                "Owner ledger {$path}.credential_action must be PRESERVE_CANONICAL_HASH, COPY_COMPATIBLE_LEGACY_HASH, or null.",
+            );
+        }
+        if ($credentialAction !== null && $decision !== 'LINK') {
+            throw new InvalidOwnerLedger("Owner ledger {$path}.credential_action is only valid for a LINK decision.");
+        }
+
         $approvedBy = $this->requiredString($row, 'approved_by', $path);
         $approvedAt = $this->requiredString($row, 'approved_at', $path);
         $approvalReference = $this->requiredString($row, 'approval_reference', $path);
@@ -132,6 +144,7 @@ final class OwnerLedgerLoader
             approvedAt: $approvedAt,
             approvalReference: $approvalReference,
             notes: $notes,
+            credentialAction: $credentialAction,
         );
     }
 

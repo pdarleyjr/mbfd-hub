@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\PersonnelRequestAttachmentController as AdminPers
 use App\Http\Controllers\Admin\QueueStatusController;
 use App\Http\Controllers\Admin\VideoConferenceHealthController;
 use App\Http\Controllers\Api\StationInventoryController;
+use App\Http\Controllers\Auth\CanonicalLoginController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
 use App\Http\Controllers\Employee\OperationalForms\FormGenerationController;
@@ -71,10 +72,13 @@ Route::post('/_csp-report', [\App\Http\Controllers\CspReportController::class, '
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
     ->name('csp.report');
 
-// Fallback login route (required by Filament export download middleware)
-Route::get('/login', function () {
-    return redirect('/admin/login');
-})->name('login');
+Route::middleware('guest:web')->group(function (): void {
+    Route::get('/login', [CanonicalLoginController::class, 'create'])->name('login');
+    Route::post('/login', [CanonicalLoginController::class, 'store'])->name('login.store');
+});
+Route::post('/logout', [CanonicalLoginController::class, 'destroy'])
+    ->middleware('auth:web')
+    ->name('logout');
 
 Route::get('/video-conferencing/stations/{station}', [ConferencePageController::class, 'station'])
     ->where('station', '1|2|3|4|6')

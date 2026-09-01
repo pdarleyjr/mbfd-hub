@@ -65,6 +65,23 @@ final class SessionRegistry
             && $absoluteExpiresAt->isAfter($at);
     }
 
+    public function revoke(
+        User $user,
+        string $registryId,
+        string $reason,
+        CarbonInterface $at,
+    ): void {
+        AuthenticationSession::query()
+            ->whereKey($registryId)
+            ->where('user_id', $user->id)
+            ->whereNull('revoked_at')
+            ->update([
+                'revoked_at' => $at,
+                'revoked_reason' => $reason,
+                'updated_at' => $at,
+            ]);
+    }
+
     private function hashSessionId(string $laravelSessionId): string
     {
         return hash_hmac('sha256', $laravelSessionId, (string) config('app.key'));
