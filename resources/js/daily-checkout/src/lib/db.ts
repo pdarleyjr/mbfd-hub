@@ -7,9 +7,13 @@ export interface PendingSubmission {
   type: string;
   data: Record<string, unknown>;
   createdAt: Date;
-  status: 'pending' | 'processing' | 'failed';
+  status: 'pending' | 'processing' | 'failed' | 'requires_attention';
   retryCount: number;
   lastError?: string;
+  lastErrorCode?: string;
+  ownerUserId?: number;
+  ownerSecurityVersion?: number;
+  ownershipState?: 'owned' | 'legacy_unclaimed' | 'identity_mismatch' | 'security_mismatch';
 }
 
 export interface CachedData {
@@ -33,6 +37,9 @@ export interface DailyCheckoutQueuedSubmission {
   lastErrorCode?: string;
   lastErrorAt?: Date;
   retentionExpiresAt?: Date;
+  ownerUserId?: number;
+  ownerSecurityVersion?: number;
+  ownershipState?: 'owned' | 'legacy_unclaimed' | 'identity_mismatch' | 'security_mismatch';
 }
 
 class MBFDDatabase extends Dexie {
@@ -82,6 +89,24 @@ class MBFDDatabase extends Dexie {
           ? checklistVersion
           : `legacy-${submission.id}`;
       });
+    });
+
+    // Existing records have no provable owner. Preserve them for review, but
+    // never silently assign them to whichever member signs in next.
+    this.version(5).stores({
+      pendingSubmissions: '++id, type, status, createdAt, retryCount, ownerUserId, ownershipState',
+      cachedData: 'key, updatedAt',
+      trtCatalog: 'id, category, sort_order',
+      dailyCheckoutSubmissions: '&id, &[apparatusId+checklistVersion], apparatusId, checklistVersion, status, createdAt, updatedAt, retentionExpiresAt, ownerUserId, ownershipState',
+    }).upgrade(async (transaction) => {
+      const markLegacy = (submission: PendingSubmission | DailyCheckoutQueuedSubmission) => {
+        submission.status = 'requires_attention';
+        submission.ownershipState = 'legacy_unclaimed';
+        submission.lastError = 'This saved work predates account-bound offline queues and needs operator review.';
+        submission.lastErrorCode = 'OFFLINE_QUEUE_OWNER_LEGACY';
+      };
+      await transaction.table('pendingSubmissions').toCollection().modify(markLegacy);
+      await transaction.table('dailyCheckoutSubmissions').toCollection().modify(markLegacy);
     });
   }
 }

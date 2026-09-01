@@ -2,10 +2,13 @@
 
 namespace Tests\Feature\Api;
 
+use App\Enums\AccountStatus;
+use App\Models\Employee;
 use App\Models\InventoryCategory;
 use App\Models\InventoryItem;
 use App\Models\Station;
 use App\Models\StationInventoryItem;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as RouteFacade;
@@ -15,6 +18,24 @@ use Tests\TestCase;
 class StationInventoryV2SignedUrlTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $employee = Employee::query()->create([
+            'employee_id' => 'E01-INVENTORY-TEST',
+            'name' => 'Canonical Inventory Actor',
+            'rank' => 'Captain',
+            'password' => 'not-used',
+            'must_change_password' => false,
+        ]);
+        $user = User::factory()->create([
+            'account_status' => AccountStatus::Active,
+            'employee_profile_id' => $employee->id,
+        ]);
+        $this->actingAsCanonicalUser($user);
+    }
 
     public function test_every_station_inventory_v2_route_except_pin_verification_uses_the_shared_signature_guard(): void
     {
@@ -55,7 +76,7 @@ class StationInventoryV2SignedUrlTest extends TestCase
 
         $response = $this->putJson("/api/v2/station-inventory/{$station->id}/item/{$stationItem->id}", [
             'on_hand' => 3,
-            'actor_name' => 'Test Captain',
+            'actor_name' => 'Canonical Inventory Actor',
             'actor_shift' => 'A-Day',
         ]);
 
@@ -138,7 +159,7 @@ class StationInventoryV2SignedUrlTest extends TestCase
         $this->assertDatabaseHas('station_inventory_audits', [
             'station_id' => $station->id,
             'inventory_item_id' => $catalogItem->id,
-            'actor_name' => 'Test Captain',
+            'actor_name' => 'Canonical Inventory Actor',
             'actor_shift' => 'A-Day',
             'action' => 'count_updated',
         ]);
@@ -170,12 +191,12 @@ class StationInventoryV2SignedUrlTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('request.created_by_name', 'Signed Officer')
+            ->assertJsonPath('request.created_by_name', 'Canonical Inventory Actor')
             ->assertJsonPath('request.created_by_shift', 'B-Day');
 
         $this->assertDatabaseHas('station_inventory_audits', [
             'station_id' => $station->id,
-            'actor_name' => 'Signed Officer',
+            'actor_name' => 'Canonical Inventory Actor',
             'actor_shift' => 'B-Day',
             'action' => 'note_added',
         ]);

@@ -17,6 +17,7 @@ use App\Services\ApparatusInspectionApprovalService;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\DailyCheckoutInspectionSessionService;
 use App\Services\Display\DisplaySnapshotService;
+use App\Services\Identity\AuthenticatedMemberContextResolver;
 use App\Support\Security\Base64Image;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -100,7 +101,10 @@ class ApparatusController extends Controller
         int $id,
         DailyCheckoutChecklistResolver $checklistResolver,
         DailyCheckoutInspectionSessionService $inspectionSessionService,
+        AuthenticatedMemberContextResolver $memberContextResolver,
     ): JsonResponse {
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $actor->requireEmployee();
         $issuanceKey = $request->validate([
             'inspection_session_start_key' => ['nullable', 'uuid'],
         ])['inspection_session_start_key'] ?? null;
@@ -135,14 +139,13 @@ class ApparatusController extends Controller
 
         $issuedAt = CarbonImmutable::now(DailyCheckoutInspectionSessionService::TIMEZONE);
         $browserBinding = $this->browserBindingForIssue($request, $issuanceKey, $inspectionSessionService);
-        $actor = $request->user();
         try {
             $issued = $inspectionSessionService->issue(
                 apparatus: $apparatus,
                 checklist: $checklist,
                 checklistHash: (string) $resolution['checklist_version'],
                 dueTasks: $checklistResolver->dueTasksFor($checklist, $issuedAt->startOfDay()),
-                actorUserId: $actor instanceof User ? (int) $actor->getKey() : null,
+                actorUserId: $actor->userId(),
                 actorSessionHash: $browserBinding['hash'],
                 issuanceKey: $issuanceKey,
                 issuedAt: $issuedAt,
@@ -190,7 +193,10 @@ class ApparatusController extends Controller
         string $sessionId,
         DailyCheckoutChecklistResolver $checklistResolver,
         DailyCheckoutInspectionSessionService $inspectionSessionService,
+        AuthenticatedMemberContextResolver $memberContextResolver,
     ): JsonResponse {
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $actor->requireEmployee();
         $validated = $request->validate([
             'inspection_session_token' => ['required', 'string', 'regex:/\A[a-f0-9]{64}\z/i'],
             'inspection_session_replay_key' => ['required', 'uuid'],
@@ -226,7 +232,6 @@ class ApparatusController extends Controller
         }
 
         $issuedAt = CarbonImmutable::now(DailyCheckoutInspectionSessionService::TIMEZONE);
-        $actor = $request->user();
         try {
             $issued = $inspectionSessionService->abandonAndIssue(
                 apparatus: $apparatus,
@@ -237,7 +242,7 @@ class ApparatusController extends Controller
                 checklist: $checklist,
                 checklistHash: (string) $resolution['checklist_version'],
                 dueTasks: $checklistResolver->dueTasksFor($checklist, $issuedAt->startOfDay()),
-                actorUserId: $actor instanceof User ? (int) $actor->getKey() : null,
+                actorUserId: $actor->userId(),
                 actorSessionHash: $this->browserBindingHash($request),
                 issuedAt: $issuedAt,
             );
@@ -280,7 +285,10 @@ class ApparatusController extends Controller
         int $id,
         DailyCheckoutChecklistResolver $checklistResolver,
         DailyCheckoutInspectionSessionService $inspectionSessionService,
+        AuthenticatedMemberContextResolver $memberContextResolver,
     ): JsonResponse {
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $employee = $actor->requireEmployee();
         $validated = $request->validate([
             'client_submission_id' => ['required', 'uuid'],
             'checklist_version' => ['required', 'string', 'regex:/\\A[a-f0-9]{64}\\z/i'],
@@ -326,10 +334,13 @@ class ApparatusController extends Controller
 
         $clientSubmissionId = (string) $validated['client_submission_id'];
         $validated['checklist_version'] = strtolower((string) $validated['checklist_version']);
+        $validated['operator_name'] = (string) $employee->name;
+        $validated['rank'] = (string) $employee->rank;
+        $validated['employee_id'] = (int) $employee->getKey();
         $submissionPayloadHash = $this->submissionPayloadHash($validated);
         $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId);
         if ($existing !== null) {
-            return $this->idempotentInspectionResponse($existing, $id, $submissionPayloadHash);
+            return $this->idempotentInspectionResponse($existing, $id, $submissionPayloadHash, $actor->userId());
         }
 
         $apparatus = Apparatus::findOrFail($id);
@@ -385,7 +396,7 @@ class ApparatusController extends Controller
         $storedPaths = [];
         try {
             $prepared = $this->prepareImages($validated, $storedPaths);
-            $result = DB::transaction(function () use ($id, $clientSubmissionId, $prepared, $checklistResolver, $inspectionSessionService, $request, $submissionPayloadHash, $hasInspectionSessionCredentials): array {
+            $result = DB::transaction(function () use ($id, $clientSubmissionId, $prepared, $checklistResolver, $inspectionSessionService, $request, $submissionPayloadHash, $hasInspectionSessionCredentials, $actor): array {
                 $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId, true);
                 if ($existing !== null) {
                     return ['inspection' => $existing, 'created' => false];
@@ -473,6 +484,7 @@ class ApparatusController extends Controller
                     'submission_payload_hash' => $submissionPayloadHash,
                     'checklist_version' => $lockedChecklistVersion,
                     'apparatus_id' => $lockedApparatus->id,
+                    'actor_user_id' => $actor->userId(),
                     'operator_name' => $prepared['operator_name'],
                     'rank' => $prepared['rank'],
                     'shift' => $prepared['shift'] ?? null,
@@ -484,9 +496,8 @@ class ApparatusController extends Controller
                     'results' => $prepared['compartments'] ?? null,
                     'officer_signature' => $prepared['officer_signature_path'] ?? null,
                     'employee_id' => $prepared['employee_id'] ?? null,
-                    // The public route has no authenticated device or user context.
-                    // Retain its validated evidence, but never apply operational
-                    // effects until an authorized reviewer approves it.
+                    // The authenticated actor is immutable provenance; signatures
+                    // remain evidence. Operational effects still require review.
                     'pending_effects' => $pendingEffects,
                     'review_status' => 'pending_review',
                     'completed_at' => now(),
@@ -516,7 +527,7 @@ class ApparatusController extends Controller
             if (! $result['created']) {
                 $this->deleteStoredPaths($storedPaths);
 
-                return $this->idempotentInspectionResponse($inspection, $id, $submissionPayloadHash);
+                return $this->idempotentInspectionResponse($inspection, $id, $submissionPayloadHash, $actor->userId());
             }
 
             return response()->json($this->inspectionReceipt($inspection), 201);
@@ -528,7 +539,7 @@ class ApparatusController extends Controller
 
             $existing = $this->findInspectionByClientSubmissionId($clientSubmissionId);
             if ($existing !== null) {
-                return $this->idempotentInspectionResponse($existing, $id, $submissionPayloadHash);
+                return $this->idempotentInspectionResponse($existing, $id, $submissionPayloadHash, $actor->userId());
             }
 
             throw $exception;
@@ -834,7 +845,15 @@ class ApparatusController extends Controller
         ApparatusInspection $inspection,
         int $apparatusId,
         string $submissionPayloadHash,
+        int $actorUserId,
     ): JsonResponse {
+        if ($inspection->actor_user_id !== null && (int) $inspection->actor_user_id !== $actorUserId) {
+            return response()->json([
+                'message' => 'This queued submission belongs to a different authenticated account.',
+                'code' => 'OFFLINE_QUEUE_OWNER_MISMATCH',
+            ], 409);
+        }
+
         if ((int) $inspection->apparatus_id !== $apparatusId) {
             return response()->json([
                 'message' => 'This submission identifier was already used for a different apparatus.',

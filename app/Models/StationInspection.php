@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class StationInspection extends Model
 {
     protected $fillable = [
+        'client_submission_id',
         'station_id',
         'inspector_id',
         'inspection_date',

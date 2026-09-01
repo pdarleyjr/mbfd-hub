@@ -83,7 +83,8 @@ final readonly class AuthenticatedMemberContext
      *         active_workgroup: array{id: int, name: string, membership_role: string|null}|null
      *     },
      *     operational_context: array{station: null, apparatus: null, room: null, shift: null, device: null},
-     *     session: array{authenticated: true}
+     *     session: array{authenticated: true},
+     *     offline: array{security_version: int}
      * }
      */
     public function toClientArray(): array
@@ -114,6 +115,9 @@ final readonly class AuthenticatedMemberContext
             ],
             'session' => [
                 'authenticated' => true,
+            ],
+            'offline' => [
+                'security_version' => (int) $this->user->security_version,
             ],
         ];
     }

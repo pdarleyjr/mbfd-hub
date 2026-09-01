@@ -40,6 +40,18 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
 
+    if (path === '/api/me/context') {
+      return route.fulfill({
+        json: {
+          version: 1,
+          identity: { user_id: 101, has_personnel_profile: true },
+          personnel: { employee_profile_id: 1_101, employee_number: 'E101', name: 'Responsive Tester', rank: 'Captain' },
+          offline: { security_version: 1 },
+          session: { authenticated: true },
+        },
+      });
+    }
+
     if (path === '/api/public/stations') {
       return route.fulfill({ json: { stations } });
     }

@@ -28,6 +28,12 @@ class PublicApparatusInspectionGateTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAsCanonicalFixture();
+    }
+
     private function makeApparatus(string $status = 'In Service'): Apparatus
     {
         $station = Station::create([
@@ -173,6 +179,7 @@ class PublicApparatusInspectionGateTest extends TestCase
 
         $inspection = ApparatusInspection::latest('id')->first();
 
+        $this->logoutCanonicalSession();
         $response = $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve");
 
         $response->assertStatus(401);

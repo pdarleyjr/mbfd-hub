@@ -7,6 +7,7 @@ use App\Models\Station;
 use App\Models\StationInventoryAudit;
 use App\Models\StationInventoryItem;
 use App\Models\StationSupplyRequest;
+use App\Services\Identity\AuthenticatedMemberContextResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -21,17 +22,11 @@ use Illuminate\Support\Facades\Validator;
  */
 class StationInventoryV2Controller extends Controller
 {
-    /** @return array{name: string, shift: string}|null */
-    private function signedActor(Request $request): ?array
+    private function signedShift(Request $request): string
     {
-        $actorName = $request->query('actor_name');
-        $actorShift = $request->query('actor_shift');
+        $shift = $request->query('shift_context', $request->query('actor_shift', 'Unknown'));
 
-        if (! is_string($actorName) || ! is_string($actorShift) || $actorName === '' || $actorShift === '') {
-            return null;
-        }
-
-        return ['name' => $actorName, 'shift' => $actorShift];
+        return is_string($shift) && $shift !== '' ? $shift : 'Unknown';
     }
 
     /**
@@ -39,12 +34,13 @@ class StationInventoryV2Controller extends Controller
      *
      * POST /api/v2/station-inventory/verify-pin
      */
-    public function verifyPin(Request $request): JsonResponse
+    public function verifyPin(Request $request, AuthenticatedMemberContextResolver $memberContextResolver): JsonResponse
     {
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $employee = $actor->requireEmployee();
         $validator = Validator::make($request->all(), [
             'station_id' => 'required|integer',
             'pin' => 'required|string|size:4',
-            'actor_name' => 'required|string|max:255',
             'actor_shift' => 'required|string|max:50',
         ]);
 
@@ -80,7 +76,9 @@ class StationInventoryV2Controller extends Controller
         StationInventoryAudit::create([
             'station_id' => $station->id,
             'inventory_item_id' => null,
-            'actor_name' => $request->actor_name,
+            'actor_user_id' => $actor->userId(),
+            'actor_employee_id' => $employee->getKey(),
+            'actor_name' => $employee->name,
             'actor_shift' => $request->actor_shift,
             'action' => 'pin_verified',
             'from_value' => null,
@@ -88,11 +86,9 @@ class StationInventoryV2Controller extends Controller
         ]);
 
         // Generate signed URLs (expires in 4 hours)
-        // Include actor parameters for audit trail
         $urlParams = [
             'stationId' => $station->id,
-            'actor_name' => $request->actor_name,
-            'actor_shift' => $request->actor_shift,
+            'shift_context' => $request->actor_shift,
         ];
 
         $inventoryUrl = URL::temporarySignedRoute(
@@ -175,15 +171,14 @@ class StationInventoryV2Controller extends Controller
      *
      * PUT /api/v2/station-inventory/{stationId}/item/{itemId}
      */
-    public function updateItem(Request $request, int $stationId, int $itemId): JsonResponse
-    {
-        $actor = $this->signedActor($request);
-        if ($actor === null) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired token',
-            ], 401);
-        }
+    public function updateItem(
+        Request $request,
+        int $stationId,
+        int $itemId,
+        AuthenticatedMemberContextResolver $memberContextResolver,
+    ): JsonResponse {
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $employee = $actor->requireEmployee();
 
         $validator = Validator::make($request->all(), [
             'on_hand' => 'required|integer|min:0',
@@ -229,8 +224,10 @@ class StationInventoryV2Controller extends Controller
         StationInventoryAudit::create([
             'station_id' => $stationId,
             'inventory_item_id' => $stationItem->inventory_item_id,
-            'actor_name' => $actor['name'],
-            'actor_shift' => $actor['shift'],
+            'actor_user_id' => $actor->userId(),
+            'actor_employee_id' => $employee->getKey(),
+            'actor_name' => $employee->name,
+            'actor_shift' => $this->signedShift($request),
             'action' => 'count_updated',
             'from_value' => $oldValues,
             'to_value' => [
@@ -289,15 +286,13 @@ class StationInventoryV2Controller extends Controller
      *
      * POST /api/v2/station-inventory/{stationId}/supply-requests
      */
-    public function createSupplyRequest(Request $request, int $stationId): JsonResponse
-    {
-        $actor = $this->signedActor($request);
-        if ($actor === null) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or expired token',
-            ], 401);
-        }
+    public function createSupplyRequest(
+        Request $request,
+        int $stationId,
+        AuthenticatedMemberContextResolver $memberContextResolver,
+    ): JsonResponse {
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $employee = $actor->requireEmployee();
 
         $validator = Validator::make($request->all(), [
             'request_text' => 'required|string|max:1000',
@@ -313,18 +308,22 @@ class StationInventoryV2Controller extends Controller
         // Create supply request
         $supplyRequest = StationSupplyRequest::create([
             'station_id' => $stationId,
+            'actor_user_id' => $actor->userId(),
+            'actor_employee_id' => $employee->getKey(),
             'request_text' => $request->request_text,
             'status' => 'open',
-            'created_by_name' => $actor['name'],
-            'created_by_shift' => $actor['shift'],
+            'created_by_name' => $employee->name,
+            'created_by_shift' => $this->signedShift($request),
         ]);
 
         // Create audit log
         StationInventoryAudit::create([
             'station_id' => $stationId,
             'inventory_item_id' => null,
-            'actor_name' => $actor['name'],
-            'actor_shift' => $actor['shift'],
+            'actor_user_id' => $actor->userId(),
+            'actor_employee_id' => $employee->getKey(),
+            'actor_name' => $employee->name,
+            'actor_shift' => $this->signedShift($request),
             'action' => 'note_added',
             'from_value' => null,
             'to_value' => [

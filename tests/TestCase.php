@@ -70,6 +70,14 @@ abstract class TestCase extends BaseTestCase
             ]);
         }
 
+        return $this->actingAsCanonicalUser($user);
+    }
+
+    protected function actingAsCanonicalUser(User $user): static
+    {
+        $user->forceFill(['account_status' => AccountStatus::Active])->save();
+        Auth::forgetGuards();
+
         $sessionId = Str::random(40);
         $sessionStore = $this->app['session']->driver();
         $sessionStore->setId($sessionId);
@@ -79,6 +87,7 @@ abstract class TestCase extends BaseTestCase
         $sessionCookie = (string) config('session.cookie');
         $this->withCookie($sessionCookie, $sessionId);
         $this->withCredentials();
+        $this->withHeader('Origin', (string) config('app.url'));
         Livewire::withCookie($sessionCookie, $sessionId)->actingAs($user, 'web');
 
         $now = CarbonImmutable::now();
@@ -93,6 +102,35 @@ abstract class TestCase extends BaseTestCase
         $this->app['session']->put('auth.canonical_session_id', $registered->id);
 
         return $this;
+    }
+
+    protected function actingAsCanonicalFixture(
+        string $employeeNumber = 'E01-TEST-ACTOR',
+        string $name = 'Canonical Test Actor',
+        string $rank = 'Firefighter',
+    ): User {
+        $employee = Employee::query()->create([
+            'employee_id' => $employeeNumber,
+            'name' => $name,
+            'rank' => $rank,
+            'password' => 'not-used-by-tests',
+            'must_change_password' => false,
+        ]);
+        $user = User::factory()->create([
+            'account_status' => AccountStatus::Active,
+            'employee_profile_id' => $employee->id,
+        ]);
+        $this->actingAsCanonicalUser($user);
+
+        return $user;
+    }
+
+    protected function logoutCanonicalSession(): void
+    {
+        $this->app['auth']->guard('web')->logout();
+        Auth::forgetGuards();
+        $this->flushSession();
+        $this->defaultCookies = [];
     }
 
     /**

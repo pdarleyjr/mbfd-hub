@@ -13,6 +13,12 @@ class InspectionApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAsCanonicalFixture('E01-INSPECTION-API', 'Inspection API Actor', 'Captain');
+    }
+
     /**
      * Test that POST to /api/public/apparatuses/{id}/inspections creates inspection records
      */
@@ -71,8 +77,8 @@ class InspectionApiTest extends TestCase
         // Verify record was created in database
         $this->assertDatabaseHas('apparatus_inspections', [
             'apparatus_id' => $apparatus->id,
-            'operator_name' => 'John Doe',
-            'rank' => 'Lieutenant',
+            'operator_name' => 'Inspection API Actor',
+            'rank' => 'Captain',
         ]);
 
         // Verify inspection count
