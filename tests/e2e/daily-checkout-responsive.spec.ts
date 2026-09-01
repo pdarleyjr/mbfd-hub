@@ -37,6 +37,7 @@ const unknownApparatus = {
 
 async function mockDailySelectorApi(page: Page): Promise<void> {
   await page.route('**/images/**', (route) => route.fulfill({ status: 204 }));
+  await page.route('**/favicon*', (route) => route.fulfill({ status: 204 }));
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
 

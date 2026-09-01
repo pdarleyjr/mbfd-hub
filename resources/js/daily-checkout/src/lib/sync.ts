@@ -7,6 +7,14 @@ const BASE_DELAY_MS = 1000;
 
 export type SubmissionOutcome = 'submitted' | 'queued';
 
+export interface PendingSubmissionQueueSummary {
+  total: number;
+  pending: number;
+  requiresAttention: number;
+  firstAttentionError?: string;
+  firstAttentionErrorCode?: string;
+}
+
 class PermanentSubmissionError extends Error {}
 
 const xsrfToken = (): string | null => {
@@ -87,6 +95,19 @@ export async function enqueueSubmission(
     ownerSecurityVersion: owner.securityVersion,
     ownershipState: 'owned',
   });
+}
+
+export async function getPendingSubmissionQueueSummary(): Promise<PendingSubmissionQueueSummary> {
+  const submissions = await db.pendingSubmissions.toArray();
+  const requiringAttention = submissions.filter((submission) => submission.status === 'requires_attention');
+
+  return {
+    total: submissions.length,
+    pending: submissions.length - requiringAttention.length,
+    requiresAttention: requiringAttention.length,
+    firstAttentionError: requiringAttention[0]?.lastError,
+    firstAttentionErrorCode: requiringAttention[0]?.lastErrorCode,
+  };
 }
 
 /**

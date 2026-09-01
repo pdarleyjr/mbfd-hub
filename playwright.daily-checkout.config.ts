@@ -3,6 +3,11 @@ import { loopbackBaseUrl, sanitizedTestEnvironment } from './tests/e2e/support/t
 
 const baseURL = loopbackBaseUrl('DAILY_CHECKOUT_E2E_BASE_URL', 'http://127.0.0.1:4176');
 const serverUrl = new URL(baseURL);
+const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL;
+
+if (browserChannel && !['chrome', 'msedge'].includes(browserChannel)) {
+  throw new Error('PLAYWRIGHT_BROWSER_CHANNEL must be chrome or msedge when set.');
+}
 
 if (serverUrl.pathname !== '/' || serverUrl.port === '') {
   throw new Error('DAILY_CHECKOUT_E2E_BASE_URL must use a loopback host root with an explicit port.');
@@ -37,7 +42,7 @@ const responsiveViewports = [
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /daily-checkout-(inspection|responsive)\.spec\.ts/,
+  testMatch: /(canonical-login-responsive|daily-checkout-(inspection|responsive))\.spec\.ts/,
   timeout: 45_000,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
@@ -45,6 +50,7 @@ export default defineConfig({
   preserveOutput: 'always',
   use: {
     baseURL,
+    channel: browserChannel,
     // This suite isolates browser-local queue replay; it does not certify the
     // separately deployed service-worker cache/background-sync contract.
     serviceWorkers: 'block',
@@ -72,7 +78,7 @@ export default defineConfig({
     },
     ...responsiveViewports.map(({ name, width, height }) => ({
       name: `daily-responsive-${name}`,
-      testMatch: /daily-checkout-responsive\.spec\.ts/,
+      testMatch: /(canonical-login-responsive|daily-checkout-responsive)\.spec\.ts/,
       use: {
         browserName: 'chromium' as const,
         viewport: { width, height },

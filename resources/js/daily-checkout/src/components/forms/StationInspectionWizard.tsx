@@ -62,6 +62,7 @@ export default function StationInspectionWizard() {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [submissionOutcome, setSubmissionOutcome] = useState<SubmissionOutcome | null>(null);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const sigRef = useRef<SignatureCanvas | null>(null);
 
   const [form, setForm] = useState<FormData>({
@@ -147,6 +148,7 @@ export default function StationInspectionWizard() {
   };
 
   const handleSubmit = async () => {
+    setSubmissionError(null);
     setSubmitting(true);
     try {
       const outcome = await submitOrQueue('station_inspection', {
@@ -162,7 +164,7 @@ export default function StationInspectionWizard() {
       }, '/api/public');
       setSubmissionOutcome(outcome);
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'The inspection could not be submitted. Please review the form and try again.');
+      setSubmissionError(error instanceof Error ? error.message : 'The inspection could not be submitted. Please review the form and try again.');
     } finally {
       setSubmitting(false);
     }
@@ -220,15 +222,15 @@ export default function StationInspectionWizard() {
       {step === 1 && (
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">Station</label>
-            <select value={form.station} onChange={(e) => update({ station: e.target.value })} className="w-full min-h-[44px] px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+            <label htmlFor="station-inspection-station" className="block text-sm font-medium text-neutral-700 mb-2">Station</label>
+            <select id="station-inspection-station" value={form.station} onChange={(e) => update({ station: e.target.value })} className="w-full min-h-[44px] px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
               <option value="">Select station...</option>
               {STATIONS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">Inspection Date</label>
-            <input type="date" value={form.date} onChange={(e) => update({ date: e.target.value })} className="w-full min-h-[44px] px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+            <label htmlFor="station-inspection-date" className="block text-sm font-medium text-neutral-700 mb-2">Inspection Date</label>
+            <input id="station-inspection-date" type="date" value={form.date} onChange={(e) => update({ date: e.target.value })} className="w-full min-h-[44px] px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
           </div>
         </div>
       )}
@@ -253,9 +255,9 @@ export default function StationInspectionWizard() {
                   <div key={item.id}>
                     <div className="flex items-center justify-between bg-neutral-100 rounded-lg ring-1 ring-neutral-200/60 p-3 gap-3">
                       <span className="text-sm text-neutral-700 flex-1">{item.label}</span>
-                      <div className="flex gap-1 flex-shrink-0">
+                      <div className="flex gap-1 flex-shrink-0" role="group" aria-label={`${item.label} status`}>
                         {(['pass', 'fail', 'na'] as const).map((status) => (
-                          <button key={status} onClick={() => updateChecklistItem(item.id, status)} className={`min-w-[44px] min-h-[44px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${item.status === status ? (status === 'pass' ? 'bg-emerald-600 text-white' : status === 'fail' ? 'bg-red-600 text-white' : 'bg-neutral-600 text-white') : 'bg-white text-neutral-600 ring-1 ring-neutral-200 hover:ring-neutral-300'}`}>
+                          <button type="button" key={status} onClick={() => updateChecklistItem(item.id, status)} aria-pressed={item.status === status} aria-label={`${item.label}: ${status === 'na' ? 'not applicable' : status}`} className={`min-w-[44px] min-h-[44px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${item.status === status ? (status === 'pass' ? 'bg-emerald-600 text-white' : status === 'fail' ? 'bg-red-600 text-white' : 'bg-neutral-600 text-white') : 'bg-white text-neutral-600 ring-1 ring-neutral-200 hover:ring-neutral-300'}`}>
                             {status === 'na' ? 'N/A' : status.charAt(0).toUpperCase() + status.slice(1)}
                           </button>
                         ))}
@@ -272,8 +274,9 @@ export default function StationInspectionWizard() {
                           className="w-full px-3 py-2 bg-white border border-stone-300 rounded-lg text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 resize-none"
                         />
                         <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">Photo (optional)</label>
+                          <label htmlFor={`station-inspection-photo-${item.id}`} className="block text-xs font-medium text-neutral-500 mb-1">Photo (optional)</label>
                           <input
+                            id={`station-inspection-photo-${item.id}`}
                             type="file"
                             accept="image/*"
                             capture="environment"
@@ -292,8 +295,8 @@ export default function StationInspectionWizard() {
                     {/* Extinguishing System date input */}
                     {item.id === 'kit_ext_system' && (
                       <div className="ml-4 mt-2 mb-1">
-                        <label className="block text-xs font-medium text-neutral-500 mb-1">Extinguishing System Inspection Date</label>
-                        <input type="date" value={form.extinguishingSystemDate} onChange={(e) => update({ extinguishingSystemDate: e.target.value })} className="w-full max-w-xs min-h-[40px] px-3 py-2 bg-white border border-neutral-300 rounded-lg text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                        <label htmlFor="station-inspection-extinguishing-system-date" className="block text-xs font-medium text-neutral-500 mb-1">Extinguishing System Inspection Date</label>
+                        <input id="station-inspection-extinguishing-system-date" type="date" value={form.extinguishingSystemDate} onChange={(e) => update({ extinguishingSystemDate: e.target.value })} className="w-full max-w-xs min-h-[44px] px-3 py-2 bg-white border border-neutral-300 rounded-lg text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
                       </div>
                     )}
                   </div>
@@ -303,8 +306,8 @@ export default function StationInspectionWizard() {
           ))}
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">Notes (optional)</label>
-            <textarea value={form.notes} onChange={(e) => update({ notes: e.target.value })} rows={3} placeholder="Additional observations or deficiencies..." className="w-full px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none" />
+            <label htmlFor="station-inspection-notes" className="block text-sm font-medium text-neutral-700 mb-2">Notes (optional)</label>
+            <textarea id="station-inspection-notes" value={form.notes} onChange={(e) => update({ notes: e.target.value })} rows={3} placeholder="Additional observations or deficiencies..." className="w-full px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none" />
           </div>
         </div>
       )}
@@ -312,9 +315,9 @@ export default function StationInspectionWizard() {
       {/* Step 3: Signature + SOG Mandate */}
       {step === 3 && (
         <div className="space-y-6">
-          <p className="text-neutral-600">Inspector signature:</p>
+          <p id="station-inspection-signature-label" className="text-neutral-600">Inspector signature</p>
           <div className="border-2 border-dashed border-neutral-300 rounded-xl bg-white overflow-hidden">
-            <SignatureCanvas ref={sigRef} penColor="#1a1a1a" canvasProps={{ className: 'w-full', style: { height: 200, width: '100%' } }} onEnd={handleSaveSig} />
+            <SignatureCanvas ref={sigRef} penColor="#1a1a1a" canvasProps={{ className: 'w-full', style: { height: 200, width: '100%' }, role: 'img', 'aria-labelledby': 'station-inspection-signature-label', 'aria-description': 'Draw your signature using a mouse, finger, or stylus.' }} onEnd={handleSaveSig} />
           </div>
           <button onClick={handleClearSig} className="min-h-[44px] px-4 py-2 text-sm text-neutral-500 hover:text-neutral-700 underline">Clear Signature</button>
 
@@ -363,6 +366,11 @@ export default function StationInspectionWizard() {
       )}
 
       {/* Navigation */}
+      {submissionError && (
+        <div className="mt-8 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-800" role="alert">
+          {submissionError}
+        </div>
+      )}
       <div className="flex justify-between mt-8">
         <button onClick={() => setStep((s) => s - 1)} disabled={step === 1} className="min-h-[44px] px-6 py-3 text-neutral-600 hover:text-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed">
           Previous
