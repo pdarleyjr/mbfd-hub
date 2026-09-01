@@ -7,6 +7,7 @@ use App\Filament\Pages\SetPasswordPage;
 use App\Filament\Training\Pages\Settings as TrainingSettings;
 use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
 use App\Http\Middleware\AuthenticateCanonicalPanelUser;
+use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
 use App\Http\Middleware\EnsureTrainingPanelAccess;
 use App\Http\Middleware\ForceFilamentPasswordChange;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -106,6 +107,7 @@ class TrainingPanelProvider extends PanelProvider
                 ForceFilamentPasswordChange::class,
             ])
             ->persistentMiddleware([
+                EnsureCanonicalSessionIsCurrent::class,
                 ForceFilamentPasswordChange::class,
             ])
             ->sidebarCollapsibleOnDesktop()

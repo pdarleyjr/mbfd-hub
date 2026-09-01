@@ -19,7 +19,7 @@
                 <div>
                     <h2 class="text-lg font-semibold text-red-800 dark:text-red-200">Open Bid Console</h2>
                     <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">
-                        Sign in with this same Employee ID and portal password.
+                        Continue with your canonical MBFD Hub session. The Bid console does not receive your Hub password.
                         When it&rsquo;s your turn the console shows your eligible positions and the AI advisory.
                     </p>
                 </div>

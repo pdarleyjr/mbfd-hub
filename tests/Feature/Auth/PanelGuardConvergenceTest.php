@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Auth;
 
 use App\Enums\AccountStatus;
+use App\Models\AuthenticationSession;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 final class PanelGuardConvergenceTest extends TestCase
@@ -32,6 +34,14 @@ final class PanelGuardConvergenceTest extends TestCase
         foreach (['/admin', '/employee', '/training', '/workgroups'] as $panelPath) {
             $this->get($panelPath)->assertRedirect('/login');
         }
+    }
+
+    public function test_d05_bid_authorization_route_remains_available_to_the_canonical_login_flow(): void
+    {
+        self::assertTrue(Route::has('bid.auth.authorize'), 'Test base path: '.base_path());
+
+        $this->get('/auth/bid/authorize?client_id=bid&redirect_uri=https%3A%2F%2Fstaging.bid.mbfdhub.com%2Fapi%2Fauth%2Fcallback&state=uQxS6x3Mki8aUHsi_vB1m2zY9kt_P4DSxMZ0nNfw2-I')
+            ->assertRedirect('/login');
     }
 
     public function test_canonical_login_returns_an_authorized_employee_to_the_requested_employee_area(): void
@@ -76,6 +86,38 @@ final class PanelGuardConvergenceTest extends TestCase
                 'password' => 'correct-password',
             ])
             ->assertRedirect('/');
+    }
+
+    public function test_a_revoked_canonical_session_loses_access_to_every_converted_panel(): void
+    {
+        foreach (['/admin', '/employee', '/training', '/workgroups'] as $index => $panelPath) {
+            $user = $this->linkedActiveUser('D03-REVOKED-'.$index);
+
+            $this->post('/login', [
+                'employee_id' => $user->employeeProfile->employee_id,
+                'password' => 'correct-password',
+            ])->assertRedirect('/');
+
+            $this->withCookie(
+                (string) config('session.cookie'),
+                $this->app['session.store']->getId(),
+            )->withCredentials();
+            self::assertNotNull(session('auth.canonical_session_id'));
+
+            AuthenticationSession::query()
+                ->where('user_id', $user->id)
+                ->update(['revoked_at' => now()]);
+
+            $response = $this->get($panelPath);
+
+            self::assertTrue(
+                $response->isRedirection(),
+                sprintf('%s returned %d instead of a canonical-login redirect.', $panelPath, $response->getStatusCode()),
+            );
+            $response->assertRedirect('/login');
+
+            $this->app['auth']->forgetGuards();
+        }
     }
 
     private function linkedActiveUser(string $employeeId): User

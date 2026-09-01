@@ -7,12 +7,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 /**
  * Operational personnel profile linked from the canonical User model.
  *
- * Employee records retain historical domain data and service integrations,
- * but never authenticate access to a human-facing Hub panel.
+ * Employee records retain historical domain data and the opaque transitional
+ * hash required by the deployed Bid compatibility bridge. They never
+ * authenticate access to a human-facing Hub panel.
  */
 class Employee extends Authenticatable
 {
@@ -37,6 +40,20 @@ class Employee extends Authenticatable
         'password' => 'hashed',
         'must_change_password' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $employee): void {
+            if ($employee->getRawOriginal('password') !== null) {
+                return;
+            }
+
+            $employee->forceFill([
+                'password' => Hash::make(Str::random(64)),
+                'must_change_password' => false,
+            ]);
+        });
+    }
 
     // Relationships
     /** @return HasMany<AssignedEquipment, $this> */

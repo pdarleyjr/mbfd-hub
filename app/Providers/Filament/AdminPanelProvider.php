@@ -14,6 +14,7 @@ use App\Filament\Widgets\SmartUpdatesWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
 use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
 use App\Http\Middleware\AuthenticateCanonicalPanelUser;
+use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
 use App\Http\Middleware\ForceFilamentPasswordChange;
 use App\Http\Middleware\RedirectTrainingUsers;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
@@ -182,6 +183,7 @@ class AdminPanelProvider extends PanelProvider
                 ForceFilamentPasswordChange::class,
             ])
             ->persistentMiddleware([
+                EnsureCanonicalSessionIsCurrent::class,
                 RedirectTrainingUsers::class,
                 ForceFilamentPasswordChange::class,
             ])

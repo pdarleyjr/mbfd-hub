@@ -157,22 +157,10 @@ parameters:
 			path: app/Filament/Concerns/HasExportActions.php
 
 		-
-			message: '#^Access to an undefined property App\\Filament\\Employee\\Pages\\ChangePasswordPage\:\:\$form\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Filament/Employee/Pages/ChangePasswordPage.php
-
-		-
 			message: '#^Access to an undefined property App\\Filament\\Employee\\Pages\\RequestEquipmentPage\:\:\$form\.$#'
 			identifier: property.notFound
 			count: 3
 			path: app/Filament/Employee/Pages/RequestEquipmentPage.php
-
-		-
-			message: '#^Parameter \#1 \$exception of method Filament\\Pages\\Auth\\Login\:\:getRateLimitedNotification\(\) expects DanHarrin\\LivewireRateLimiting\\Exceptions\\TooManyRequestsException, Illuminate\\Http\\Exceptions\\ThrottleRequestsException given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Filament/Pages/Auth/Login.php
 
 		-
 			message: '#^Access to an undefined property App\\Filament\\Pages\\MyProfile\:\:\$form\.$#'

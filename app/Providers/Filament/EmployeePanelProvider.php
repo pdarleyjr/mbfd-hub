@@ -14,6 +14,7 @@ use App\Filament\Pages\SetPasswordPage;
 use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
 use App\Http\Middleware\AuthenticateCanonicalPanelUser;
 use App\Http\Middleware\EnsureCanonicalEmployeeContext;
+use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
 use App\Http\Middleware\ForceFilamentPasswordChange;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -118,6 +119,7 @@ class EmployeePanelProvider extends PanelProvider
                 ForceFilamentPasswordChange::class,
             ])
             ->persistentMiddleware([
+                EnsureCanonicalSessionIsCurrent::class,
                 EnsureCanonicalEmployeeContext::class,
                 ForceFilamentPasswordChange::class,
             ])

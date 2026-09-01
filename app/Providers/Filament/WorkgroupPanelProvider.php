@@ -17,6 +17,7 @@ use App\Filament\Workgroup\Pages\SessionResultsPage;
 use App\Filament\Workgroup\Pages\SharedUploads;
 use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
 use App\Http\Middleware\AuthenticateCanonicalPanelUser;
+use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
 use App\Http\Middleware\EnsureWorkgroupPanelAccess;
 use App\Http\Middleware\ForceFilamentPasswordChange;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -136,6 +137,7 @@ class WorkgroupPanelProvider extends PanelProvider
                 ForceFilamentPasswordChange::class,
             ])
             ->persistentMiddleware([
+                EnsureCanonicalSessionIsCurrent::class,
                 EnsureWorkgroupPanelAccess::class,
                 ForceFilamentPasswordChange::class,
             ])

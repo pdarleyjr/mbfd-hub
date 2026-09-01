@@ -32,7 +32,9 @@ The Hub code is not a Hub session or bearer token. Bid logout does not destroy t
 
 ## Compatibility and retirement
 
-`POST /api/v2/verify-credentials` remains available only for deployment compatibility. The source
-rollout order is Hub authorize/exchange first, then Bid web/Worker migration. After both are deployed,
-prove zero legacy calls before removing the endpoint and Employee password controls in a separate
-authorized phase. No production or Cloudflare change is part of D05 source development.
+`POST /api/v2/verify-credentials` and the non-null `employees.password` hash remain available only
+for deployment compatibility. D03 removed normal Hub UI and command paths that issue, reset, or manage
+that Employee password; it is not a human Hub credential. The source rollout order is Hub
+authorize/exchange first, then Bid web/Worker migration. After both are deployed, prove zero legacy calls
+before removing the endpoint and compatibility storage in a separate authorized phase. No production or
+Cloudflare change is part of this source development.

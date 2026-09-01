@@ -7,16 +7,16 @@ namespace App\Console\Commands;
 use App\Models\Employee;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Throwable;
 
 class ImportPersonnel extends Command
 {
     protected $signature = 'mbfd:import-personnel {file : Path to CSV file with Name,Rank,EmployeeID columns}
-                            {--dry-run : Preview without creating records}
-                            {--credentials-output= : New file for unique onboarding credentials; required when creating employees}';
+                            {--dry-run : Preview without creating records}';
 
-    protected $description = 'Import fire department personnel into the employees table for the Employee Portal';
+    protected $description = 'Import fire department personnel into the operational employee profile table';
 
     public function handle(): int
     {
@@ -84,31 +84,6 @@ class ImportPersonnel extends Command
             return Command::SUCCESS;
         }
 
-        $employeeIds = array_column($rows, 'employeeId');
-        $existingIds = Employee::query()
-            ->whereIn('employee_id', $employeeIds)
-            ->pluck('employee_id')
-            ->all();
-        $newEmployeeIds = array_values(array_diff($employeeIds, $existingIds));
-        $credentialsOutput = $this->option('credentials-output');
-
-        if ($newEmployeeIds !== [] && blank($credentialsOutput)) {
-            $this->error('New employees require --credentials-output=<new-file.csv> so each unique temporary password can be delivered securely.');
-
-            return Command::FAILURE;
-        }
-
-        $credentialsHandle = null;
-        if ($newEmployeeIds !== []) {
-            $credentialsHandle = @fopen((string) $credentialsOutput, 'x');
-            if ($credentialsHandle === false) {
-                $this->error('Credentials output must be a writable path that does not already exist.');
-
-                return Command::FAILURE;
-            }
-            fputcsv($credentialsHandle, ['employee_id', 'temporary_password']);
-        }
-
         DB::beginTransaction();
         try {
             foreach ($rows as $data) {
@@ -120,23 +95,21 @@ class ImportPersonnel extends Command
                         'rank' => $data['rank'] ?: $existing->rank,
                     ]);
                     $updated++;
-                    $this->line("  Updated profile: {$data['name']} ({$data['employeeId']}); password unchanged");
+                    $this->line("  Updated profile: {$data['name']} ({$data['employeeId']}); compatibility hash unchanged");
 
                     continue;
                 }
 
-                // Keep generated credentials lossless across CSV readers. The
-                // default symbol set includes backslashes, which can escape a
-                // closing CSV quote and change the password an employee sees.
-                $temporaryPassword = Str::password(24, symbols: false);
+                // The non-null compatibility hash is retained only for the
+                // deployed Bid bridge. It is never issued to a human and is
+                // not a Hub credential.
                 Employee::create([
                     'name' => $data['name'],
                     'employee_id' => $data['employeeId'],
                     'rank' => $data['rank'],
-                    'password' => $temporaryPassword,
-                    'must_change_password' => true,
+                    'password' => Hash::make(Str::random(64)),
+                    'must_change_password' => false,
                 ]);
-                fputcsv($credentialsHandle, [$data['employeeId'], $temporaryPassword]);
                 $created++;
                 $this->line("  Created: {$data['name']} ({$data['employeeId']})");
             }
@@ -144,27 +117,13 @@ class ImportPersonnel extends Command
             DB::commit();
         } catch (Throwable $exception) {
             DB::rollBack();
-            if (is_resource($credentialsHandle)) {
-                fclose($credentialsHandle);
-            }
-            if (is_string($credentialsOutput) && is_file($credentialsOutput)) {
-                @unlink($credentialsOutput);
-            }
             $this->error('Import failed; no employee changes were committed: '.$exception->getMessage());
 
             return Command::FAILURE;
         }
 
-        if (is_resource($credentialsHandle)) {
-            fclose($credentialsHandle);
-            @chmod((string) $credentialsOutput, 0600);
-        }
-
         $this->newLine();
         $this->info("Import complete — Created: {$created}, Updated profiles: {$updated}, Skipped: {$skipped}");
-        if ($created > 0) {
-            $this->warn("Unique temporary credentials were written to {$credentialsOutput}. Protect, distribute, and delete that file after onboarding.");
-        }
 
         return Command::SUCCESS;
     }
