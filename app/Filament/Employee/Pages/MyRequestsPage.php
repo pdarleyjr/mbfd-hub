@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Employee\Pages;
 
-use App\Models\Employee;
+use App\Concerns\ResolvesCanonicalEmployee;
 use Filament\Pages\Page;
 
 class MyRequestsPage extends Page
 {
+    use ResolvesCanonicalEmployee;
+
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
     protected static string $view = 'filament.employee.pages.my-requests';
@@ -23,8 +25,7 @@ class MyRequestsPage extends Page
 
     public function getViewData(): array
     {
-        /** @var Employee $employee */
-        $employee = auth('employee')->user();
+        $employee = $this->authenticatedEmployee();
 
         return [
             'requests' => $employee->personnelRequests()->with(['items', 'originatingStation'])->latest()->paginate(20),

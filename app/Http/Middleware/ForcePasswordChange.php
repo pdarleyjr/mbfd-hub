@@ -18,8 +18,9 @@ class ForcePasswordChange
     {
         $user = Auth::user();
 
-        // Check if user is authenticated and must change password
-        if ($user && $user->must_change_password) {
+        // Filament enforces canonical password changes for every panel. This
+        // legacy middleware remains only for the non-panel admin routes.
+        if ($user && $user->must_change_password && $request->is('admin/*')) {
             // Allow access to the My Profile page, login, logout, Livewire requests, and assets
             if (! $request->routeIs('filament.admin.pages.my-profile') &&
                 ! $request->is('admin/my-profile') &&

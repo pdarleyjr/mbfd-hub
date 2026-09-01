@@ -6,17 +6,17 @@ use App\Filament\Admin\Pages\BidAccessPin;
 use App\Filament\Admin\Pages\EquipmentIntake;
 use App\Filament\Admin\Pages\KnowledgeBase;
 use App\Filament\Admin\Pages\TrtTrailerInventory;
-use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\NotificationSettings;
 use App\Filament\Pages\Settings;
 use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\SmartUpdatesWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
+use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
+use App\Http\Middleware\AuthenticateCanonicalPanelUser;
 use App\Http\Middleware\ForceFilamentPasswordChange;
 use App\Http\Middleware\RedirectTrainingUsers;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
-use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -52,7 +52,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login(Login::class)
+            ->login(CanonicalPanelLoginRedirectController::class)
             ->brandName('MBFD Support Hub')
             ->brandLogo(asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
@@ -177,7 +177,7 @@ class AdminPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
-                Authenticate::class,
+                AuthenticateCanonicalPanelUser::class,
                 RedirectTrainingUsers::class,
                 ForceFilamentPasswordChange::class,
             ])

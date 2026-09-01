@@ -2,6 +2,7 @@
 
 namespace App\Filament\Employee\Pages;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\PersonnelRequestStatus;
 use App\Models\AssignedEquipment;
 use App\Models\Employee;
@@ -9,6 +10,8 @@ use Filament\Pages\Page;
 
 class EmployeeDashboard extends Page
 {
+    use ResolvesCanonicalEmployee;
+
     protected static ?string $navigationIcon = 'heroicon-o-home';
 
     protected static string $view = 'filament.employee.pages.dashboard';
@@ -23,8 +26,7 @@ class EmployeeDashboard extends Page
 
     public function getViewData(): array
     {
-        /** @var Employee $employee */
-        $employee = auth('employee')->user();
+        $employee = $this->authenticatedEmployee();
 
         $equipmentCount = AssignedEquipment::where('employee_portal_id', $employee->id)->where('status', 'active')->count();
         $pendingRequests = $employee->personnelRequests()

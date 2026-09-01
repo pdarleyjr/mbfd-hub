@@ -9,22 +9,17 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-final readonly class EnsureEmployeeAuthenticated
+final readonly class EnsureCanonicalEmployeeContext
 {
     public function __construct(
         private AuthenticatedMemberContextResolver $members,
     ) {}
 
+    /**
+     * @param  Closure(Request): Response  $next
+     */
     public function handle(Request $request, Closure $next): Response
     {
-        if (! auth('web')->check()) {
-            if ($request->expectsJson()) {
-                abort(401);
-            }
-
-            return redirect()->guest(route('login'));
-        }
-
         $this->members->resolve($request)->actor()->requireEmployee();
 
         return $next($request);

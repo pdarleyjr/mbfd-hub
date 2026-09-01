@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Employee\Pages;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Models\Employee;
 use App\Models\Station;
+use App\Services\Identity\AuthenticatedMemberContextResolver;
 use App\Services\PersonnelRequests\OfficerAuthorizationService;
 use App\Services\PersonnelRequests\PersonnelCatalog;
 use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
@@ -27,6 +29,8 @@ use Illuminate\Support\Str;
 /** @property Form $form */
 class PersonnelEquipmentRequestPage extends Page
 {
+    use ResolvesCanonicalEmployee;
+
     protected static ?string $navigationIcon = 'heroicon-o-shield-exclamation';
 
     protected static string $view = 'filament.employee.pages.personnel-equipment-request';
@@ -45,15 +49,17 @@ class PersonnelEquipmentRequestPage extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
-        $employee = auth('employee')->user();
+        $employee = app(AuthenticatedMemberContextResolver::class)
+            ->resolve(request())
+            ->actor()
+            ->employee();
 
         return $employee instanceof Employee && app(OfficerAuthorizationService::class)->isAuthorized($employee);
     }
 
     public function mount(): void
     {
-        /** @var Employee $officer */
-        $officer = auth('employee')->user();
+        $officer = $this->authenticatedEmployee();
         abort_unless(app(OfficerAuthorizationService::class)->isAuthorized($officer), 403);
 
         $stationId = filter_var(request()->query('station_id'), FILTER_VALIDATE_INT) ?: null;
@@ -73,8 +79,7 @@ class PersonnelEquipmentRequestPage extends Page
 
     public function form(Form $form): Form
     {
-        /** @var Employee $officer */
-        $officer = auth('employee')->user();
+        $officer = $this->authenticatedEmployee();
         $catalog = app(PersonnelCatalog::class);
         $roster = app(PersonnelRosterSearch::class);
 
@@ -152,8 +157,7 @@ class PersonnelEquipmentRequestPage extends Page
     public function submit(PersonnelRequestSubmissionService $submissions): void
     {
         $data = $this->form->getState();
-        /** @var Employee $officer */
-        $officer = auth('employee')->user();
+        $officer = $this->authenticatedEmployee();
         $beneficiary = Employee::query()->findOrFail($data['beneficiary_employee_id']);
         $station = Station::query()->where('is_active', true)->findOrFail($data['originating_station_id']);
         $request = $submissions->submitEquipment($officer, $beneficiary, $station, $data['items'], $data['signature'], $data['idempotency_key']);
@@ -169,8 +173,7 @@ class PersonnelEquipmentRequestPage extends Page
 
     private function reviewSummary(): HtmlString
     {
-        /** @var Employee $officer */
-        $officer = auth('employee')->user();
+        $officer = $this->authenticatedEmployee();
         $beneficiary = Employee::query()->find($this->data['beneficiary_employee_id'] ?? null);
         $station = Station::query()->find($this->data['originating_station_id'] ?? null);
         $catalog = app(PersonnelCatalog::class);
