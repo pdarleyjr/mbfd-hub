@@ -34,6 +34,7 @@ final class SeedBidFederationStagingIdentitiesTest extends TestCase
             $this->assertNotNull($user->employee_profile_id);
             $this->assertSame('STG-BID-ADMIN', $user->employeeProfile?->employee_id);
             $this->assertSame($user->id, app(CanonicalUserResolver::class)->byEmployeeId('STG-BID-ADMIN')?->id);
+            $this->assertTrue($user->isAuthenticationAllowed());
         } finally {
             putenv('HUB_STAGING_BID_ADMIN_PASSWORD');
             putenv('HUB_STAGING_BID_MEMBER_PASSWORD');

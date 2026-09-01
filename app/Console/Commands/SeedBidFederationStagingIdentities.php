@@ -67,10 +67,15 @@ final class SeedBidFederationStagingIdentities extends Command
             ],
         );
 
-        // The canonical employee link is guarded against ordinary mass
-        // assignment. It must be explicitly persisted here, otherwise a
-        // valid seeded identity cannot be resolved by canonical login.
-        $user->forceFill(['employee_profile_id' => $employee->getKey()])->save();
+        // These canonical-authentication fields are guarded against ordinary
+        // mass assignment. They must be explicitly persisted here, otherwise
+        // a valid seeded identity either cannot be resolved or is denied as
+        // pending activation.
+        $user->forceFill([
+            'employee_profile_id' => $employee->getKey(),
+            'account_status' => AccountStatus::Active,
+            'security_version' => 1,
+        ])->save();
         $user->syncRoles($role === null ? [] : [$role]);
     }
 }
