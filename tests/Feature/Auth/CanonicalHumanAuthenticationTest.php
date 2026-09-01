@@ -62,6 +62,8 @@ final class CanonicalHumanAuthenticationTest extends TestCase
         ])->assertRedirect('/');
 
         $registered = AuthenticationSession::query()->sole();
+        $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
+        $this->withCredentials();
 
         $this->getJson(
             '/api/me/context?user_id=999999&employee_id=999999&actor_id=999999',
