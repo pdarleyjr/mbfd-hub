@@ -29,6 +29,28 @@ final class OwnerLedgerLoaderTest extends TestCase
         (new OwnerLedgerLoader)->load($this->fixture('owner-ledger.malformed.json'));
     }
 
+    public function test_it_loads_an_explicit_credential_transition_action_without_a_hash_value(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'identity-ledger-');
+        self::assertNotFalse($path);
+        $entry = $this->entry('TEST-CREDENTIAL-ACTION');
+        $entry['credential_action'] = 'COPY_COMPATIBLE_LEGACY_HASH';
+        file_put_contents($path, json_encode([
+            'schema_version' => 1,
+            'entries' => [$entry],
+        ], JSON_THROW_ON_ERROR));
+
+        try {
+            $entries = (new OwnerLedgerLoader)->load($path);
+
+            $this->assertSame('COPY_COMPATIBLE_LEGACY_HASH', $entries[0]->credentialAction);
+            $this->assertArrayNotHasKey('password', $entries[0]->safeApproval());
+            $this->assertArrayNotHasKey('password_hash', $entries[0]->safeApproval());
+        } finally {
+            @unlink($path);
+        }
+    }
+
     public function test_it_rejects_duplicate_user_or_employee_decisions(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'identity-ledger-');

@@ -1,0 +1,237 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Auth;
+
+use App\Enums\AccountStatus;
+use App\Models\AuthenticationSession;
+use App\Models\Employee;
+use App\Models\User;
+use App\Services\Identity\AccountSecurityService;
+use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Tests\TestCase;
+
+final class CanonicalHumanAuthenticationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private const FAILURE_MESSAGE = 'The provided credentials are invalid.';
+
+    public function test_linked_active_user_authenticates_by_employee_id_with_a_regenerated_registered_session(): void
+    {
+        $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
+        $session = $this->app['session.store'];
+        $session->setId('pre-authentication-session-id');
+        $this->withSession(['pre_authentication_probe' => true]);
+        $before = $session->getId();
+
+        $response = $this->post('/login', [
+            'employee_id' => $user->employeeProfile->employee_id,
+            'password' => 'correct-password',
+        ]);
+
+        $response->assertRedirect('/');
+        $this->assertAuthenticatedAs($user, 'web');
+        $after = $this->app['session.store']->getId();
+        $this->assertNotSame($before, $after);
+        $this->assertIsInt(session((string) config('security.recent_authentication.session_key')));
+
+        $registered = AuthenticationSession::query()->sole();
+        $this->assertSame($user->id, $registered->user_id);
+        $this->assertSame($user->security_version, $registered->security_version);
+        $this->assertSame('unmanaged_browser', $registered->context_class->value);
+        $this->assertSame(
+            hash_hmac('sha256', $after, (string) config('app.key')),
+            $registered->getRawOriginal('session_id_hash'),
+        );
+        $this->assertNotSame($after, $registered->getRawOriginal('session_id_hash'));
+        $this->assertSame($registered->id, session('auth.canonical_session_id'));
+    }
+
+    public function test_invalid_password_is_generic_and_does_not_establish_or_mutate_identity_state(): void
+    {
+        $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
+        $employeeCount = Employee::query()->count();
+        $userCount = User::query()->count();
+        $originalUser = (array) DB::table('users')->where('id', $user->id)->first();
+
+        $response = $this->from('/login')->post('/login', [
+            'employee_id' => $user->employeeProfile->employee_id,
+            'password' => 'wrong-password',
+        ]);
+
+        $response->assertRedirect('/login');
+        $response->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
+        $this->assertGuest('web');
+        $this->assertDatabaseCount('authentication_sessions', 0);
+        $this->assertSame($employeeCount, Employee::query()->count());
+        $this->assertSame($userCount, User::query()->count());
+        $this->assertSame($originalUser, (array) DB::table('users')->where('id', $user->id)->first());
+    }
+
+    public function test_unknown_employee_id_fails_without_creating_an_identity(): void
+    {
+        $response = $this->from('/login')->post('/login', [
+            'employee_id' => 'UNKNOWN-10010',
+            'password' => 'not-relevant',
+        ]);
+
+        $response->assertRedirect('/login');
+        $response->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
+        $this->assertGuest('web');
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('employees', 0);
+        $this->assertDatabaseCount('authentication_sessions', 0);
+    }
+
+    public function test_legacy_employee_id_without_canonical_profile_link_fails_closed(): void
+    {
+        $employee = $this->employee('10010', 'legacy-password');
+        User::factory()->create([
+            'employee_id' => $employee->employee_id,
+            'employee_profile_id' => null,
+            'account_status' => AccountStatus::Active,
+            'password' => Hash::make('legacy-password'),
+        ]);
+
+        $response = $this->from('/login')->post('/login', [
+            'employee_id' => $employee->employee_id,
+            'password' => 'legacy-password',
+        ]);
+
+        $response->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
+        $this->assertGuest('web');
+        $this->assertDatabaseCount('authentication_sessions', 0);
+    }
+
+    public function test_disabled_and_pending_accounts_receive_the_same_generic_denial(): void
+    {
+        foreach ([AccountStatus::Disabled, AccountStatus::PendingActivation] as $index => $status) {
+            $user = $this->linkedUser($status, 'correct-password', 'STATUS-'.$index);
+
+            $response = $this->from('/login')->post('/login', [
+                'employee_id' => $user->employeeProfile->employee_id,
+                'password' => 'correct-password',
+            ]);
+
+            $response->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
+            $this->assertGuest('web');
+        }
+
+        $this->assertDatabaseCount('authentication_sessions', 0);
+    }
+
+    public function test_security_version_mismatch_invalidates_a_canonical_session_on_the_next_request(): void
+    {
+        $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
+        $this->post('/login', [
+            'employee_id' => $user->employeeProfile->employee_id,
+            'password' => 'correct-password',
+        ])->assertRedirect('/');
+        $registered = AuthenticationSession::query()->sole();
+
+        DB::table('users')->where('id', $user->id)->increment('security_version');
+
+        $this->get('/')->assertRedirect('/login');
+        $this->assertGuest('web');
+        $this->assertNotNull($registered->fresh()->revoked_at);
+    }
+
+    public function test_password_change_and_disable_each_invalidate_previously_established_access(): void
+    {
+        foreach (['password', 'disable'] as $index => $action) {
+            $user = $this->linkedUser(AccountStatus::Active, 'correct-password', 'REVOKE-'.$index);
+            $this->post('/login', [
+                'employee_id' => $user->employeeProfile->employee_id,
+                'password' => 'correct-password',
+            ])->assertRedirect('/');
+            $registered = AuthenticationSession::query()->where('user_id', $user->id)->sole();
+            $at = CarbonImmutable::now();
+
+            if ($action === 'password') {
+                app(AccountSecurityService::class)->recordPasswordChange($user, $at);
+            } else {
+                app(AccountSecurityService::class)->disable($user, 'test disable', $at);
+            }
+
+            $this->get('/')->assertRedirect('/login');
+            $this->assertGuest('web');
+            $this->assertNotNull($registered->fresh()->revoked_at);
+        }
+    }
+
+    public function test_logout_revokes_the_current_registry_record_and_invalidates_the_session(): void
+    {
+        $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
+        $this->post('/login', [
+            'employee_id' => $user->employeeProfile->employee_id,
+            'password' => 'correct-password',
+        ])->assertRedirect('/');
+        $registered = AuthenticationSession::query()->sole();
+
+        $response = $this->post('/logout');
+
+        $response->assertRedirect('/login');
+        $this->assertGuest('web');
+        $this->assertNotNull($registered->fresh()->revoked_at);
+        $this->assertSame('logout', $registered->fresh()->revoked_reason);
+        $this->assertNull(session('auth.canonical_session_id'));
+    }
+
+    public function test_rate_limiting_is_isolated_by_exact_employee_id_on_a_shared_ip(): void
+    {
+        $first = $this->linkedUser(AccountStatus::Active, 'first-password', 'RATE-1');
+        $second = $this->linkedUser(AccountStatus::Active, 'second-password', 'RATE-2');
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->from('/login')->post('/login', [
+                'employee_id' => $first->employeeProfile->employee_id,
+                'password' => 'wrong-password',
+            ])->assertSessionHasErrors('employee_id');
+        }
+
+        $this->post('/login', [
+            'employee_id' => $second->employeeProfile->employee_id,
+            'password' => 'second-password',
+        ])->assertRedirect('/');
+        $this->assertAuthenticatedAs($second, 'web');
+    }
+
+    public function test_canonical_page_exists_without_removing_legacy_panel_login_routes(): void
+    {
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('Employee ID');
+        $this->assertTrue(app('router')->has('filament.admin.auth.login'));
+        $this->assertTrue(app('router')->has('filament.employee.auth.login'));
+    }
+
+    private function linkedUser(
+        AccountStatus $status,
+        string $password,
+        string $employeeId = '10010',
+    ): User {
+        $employee = $this->employee($employeeId, 'legacy-'.$password);
+
+        return User::factory()->create([
+            'employee_profile_id' => $employee->id,
+            'account_status' => $status,
+            'password' => Hash::make($password),
+        ])->load('employeeProfile');
+    }
+
+    private function employee(string $employeeId, string $password): Employee
+    {
+        return Employee::query()->create([
+            'employee_id' => $employeeId,
+            'name' => 'Canonical Login Test Employee',
+            'rank' => 'Firefighter',
+            'password' => $password,
+            'must_change_password' => false,
+        ]);
+    }
+}

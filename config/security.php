@@ -28,4 +28,16 @@ return [
             'ordinary_navigation' => null,
         ],
     ],
+
+    'canonical_login' => [
+        'max_attempts' => 5,
+        'decay_seconds' => 60,
+    ],
+
+    'canonical_session' => [
+        // Device posture is not inferred from request headers. D01 issues the
+        // existing unmanaged-browser profile until an enrollment service is approved.
+        'unmanaged_idle_seconds' => 3600,
+        'unmanaged_absolute_seconds' => 86400,
+    ],
 ];

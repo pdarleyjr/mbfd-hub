@@ -14,6 +14,7 @@ final readonly class OwnerLedgerEntry
         public string $approvedAt,
         public string $approvalReference,
         public ?string $notes,
+        public ?string $credentialAction = null,
     ) {}
 
     /** @return array<string, int|string|null> */
@@ -26,6 +27,7 @@ final readonly class OwnerLedgerEntry
             'approved_by' => $this->approvedBy,
             'approved_at' => $this->approvedAt,
             'approval_reference' => $this->approvalReference,
+            'credential_action' => $this->credentialAction,
         ];
     }
 }

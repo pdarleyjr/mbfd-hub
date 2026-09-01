@@ -228,6 +228,16 @@ final class ReconciliationEngine
 
         $employee = $candidateEmployees[0];
         $base['employee'] = $this->safeEmployee($employee);
+        if ($user->employeeProfileId !== null && $user->employeeProfileId !== $employee->id) {
+            return array_merge($base, [
+                'classification' => 'CONFLICTING_EMPLOYEE_PROFILE_LINK',
+                'proposed_action' => 'BLOCKED',
+                'blocked_reason' => 'USER_ALREADY_LINKED_TO_DIFFERENT_EMPLOYEE',
+                'evidence' => $ledger === null ? 'CANONICAL_LINK_AND_LEGACY_FIELD' : 'CANONICAL_LINK_AND_OWNER_LEDGER',
+                'credential_comparison' => 'NOT_COMPARABLE',
+            ]);
+        }
+
         $externalConflict = $this->externalConflict($target, array_merge($user->externalMappings, $employee->externalMappings), $duplicateSnipeIds);
         if ($externalConflict !== null) {
             return array_merge($base, [
@@ -240,6 +250,72 @@ final class ReconciliationEngine
         }
 
         $comparison = $this->credentials->compare($user->passwordHash, $employee->passwordHash);
+        $credentialAction = $ledger?->credentialAction;
+
+        if ($credentialAction === 'COPY_COMPATIBLE_LEGACY_HASH') {
+            $employeeCredential = $this->credentials->inspect($employee->passwordHash);
+            if ($employeeCredential['state'] !== 'HASH_PRESENT' || $employeeCredential['algorithm'] !== 'BCRYPT') {
+                return array_merge($base, [
+                    'classification' => 'CREDENTIAL_CONFLICT',
+                    'proposed_action' => 'BLOCKED',
+                    'blocked_reason' => $employeeCredential['state'] === 'HASH_MISSING'
+                        ? 'EMPLOYEE_HASH_MISSING'
+                        : 'ALGORITHM_INCOMPATIBLE',
+                    'evidence' => 'OWNER_APPROVED_LEDGER',
+                    'credential_comparison' => $comparison,
+                    'credential_transition' => [
+                        'state' => 'BLOCKED_LEGACY_HASH_COPY',
+                        'source_algorithm' => $employeeCredential['algorithm'],
+                    ],
+                ]);
+            }
+
+            return array_merge($base, [
+                'classification' => 'EXACT_EMPLOYEE_ID_MATCH',
+                'proposed_action' => $comparison === 'SAME_HASH' ? 'LINK' : 'LINK_AND_COPY_COMPATIBLE_HASH',
+                'blocked_reason' => null,
+                'evidence' => 'OWNER_APPROVED_LEDGER',
+                'credential_comparison' => $comparison,
+                'credential_transition' => [
+                    'state' => $comparison === 'SAME_HASH'
+                        ? 'HASHES_ALREADY_EQUAL'
+                        : 'APPROVED_COMPATIBLE_LEGACY_HASH_COPY',
+                    'source_algorithm' => 'BCRYPT',
+                ],
+            ]);
+        }
+
+        if ($credentialAction === 'PRESERVE_CANONICAL_HASH') {
+            $userCredential = $this->credentials->inspect($user->passwordHash);
+            if ($userCredential['state'] !== 'HASH_PRESENT' || $userCredential['algorithm'] === 'UNSUPPORTED') {
+                return array_merge($base, [
+                    'classification' => 'CREDENTIAL_CONFLICT',
+                    'proposed_action' => 'BLOCKED',
+                    'blocked_reason' => $userCredential['state'] === 'HASH_MISSING'
+                        ? 'USER_HASH_MISSING'
+                        : 'ALGORITHM_INCOMPATIBLE',
+                    'evidence' => 'OWNER_APPROVED_LEDGER',
+                    'credential_comparison' => $comparison,
+                    'credential_transition' => [
+                        'state' => 'BLOCKED_CANONICAL_HASH_PRESERVATION',
+                        'source_algorithm' => $userCredential['algorithm'],
+                    ],
+                ]);
+            }
+
+            return array_merge($base, [
+                'classification' => 'EXACT_EMPLOYEE_ID_MATCH',
+                'proposed_action' => 'LINK',
+                'blocked_reason' => null,
+                'evidence' => 'OWNER_APPROVED_LEDGER',
+                'credential_comparison' => $comparison,
+                'credential_transition' => [
+                    'state' => 'APPROVED_CANONICAL_HASH_PRESERVED',
+                    'source_algorithm' => $userCredential['algorithm'],
+                ],
+            ]);
+        }
+
         if ($comparison !== 'SAME_HASH') {
             return array_merge($base, [
                 'classification' => 'CREDENTIAL_CONFLICT',
@@ -247,6 +323,10 @@ final class ReconciliationEngine
                 'blocked_reason' => $comparison,
                 'evidence' => $ledger === null ? 'EXACT_LEGACY_EMPLOYEE_ID' : 'OWNER_APPROVED_LEDGER',
                 'credential_comparison' => $comparison,
+                'credential_transition' => [
+                    'state' => 'CONFLICT_REQUIRES_OWNER_CREDENTIAL_ACTION',
+                    'source_algorithm' => $this->credentials->inspect($employee->passwordHash)['algorithm'],
+                ],
             ]);
         }
 
@@ -256,6 +336,10 @@ final class ReconciliationEngine
             'blocked_reason' => null,
             'evidence' => $ledger === null ? 'EXACT_LEGACY_EMPLOYEE_ID' : 'OWNER_APPROVED_LEDGER',
             'credential_comparison' => $comparison,
+            'credential_transition' => [
+                'state' => 'HASHES_ALREADY_EQUAL',
+                'source_algorithm' => 'BCRYPT',
+            ],
         ]);
     }
 
