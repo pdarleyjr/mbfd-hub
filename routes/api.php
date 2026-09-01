@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\StationRequestController as AdminStationRequestController;
 use App\Http\Controllers\Api\AdminMetricsController;
 use App\Http\Controllers\Api\ApparatusController;
+use App\Http\Controllers\Api\AuthenticatedMemberContextController;
 use App\Http\Controllers\Api\Bid\CredentialsController as BidCredentialsController;
 use App\Http\Controllers\Api\BigTicketRequestController;
 use App\Http\Controllers\Api\DatabaseAuditController;
@@ -24,6 +25,10 @@ use App\Http\Controllers\Api\TrtInventoryController;
 use App\Http\Controllers\Workgroup\WorkgroupAIController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/me/context', AuthenticatedMemberContextController::class)
+    ->middleware(['auth:sanctum', 'throttle:120,1'])
+    ->name('api.me.context');
 
 Route::get('/user', function (Request $request) {
     return $request->user();
