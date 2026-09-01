@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Employee\Pages;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\ApparatusServiceTicketCategory;
 use App\Enums\ApparatusServiceTicketPriority;
 use App\Models\Apparatus;
-use App\Models\Employee;
 use App\Models\Station;
 use App\Services\ApparatusServiceTicketWorkflowService;
 use Filament\Forms\Components\Hidden;
@@ -26,6 +26,8 @@ use Illuminate\Support\Str;
 /** @property Form $form */
 class ApparatusServiceRequestPage extends Page
 {
+    use ResolvesCanonicalEmployee;
+
     protected static ?string $navigationIcon = 'heroicon-o-wrench-screwdriver';
 
     protected static string $view = 'filament.employee.pages.apparatus-service-request';
@@ -72,8 +74,7 @@ class ApparatusServiceRequestPage extends Page
 
     public function form(Form $form): Form
     {
-        /** @var Employee $employee */
-        $employee = auth('employee')->user();
+        $employee = $this->authenticatedEmployee();
 
         return $form->schema([
             Placeholder::make('employee_identity')
@@ -138,8 +139,7 @@ class ApparatusServiceRequestPage extends Page
     public function submit(ApparatusServiceTicketWorkflowService $workflow): void
     {
         $data = $this->form->getState();
-        /** @var Employee $employee */
-        $employee = auth('employee')->user();
+        $employee = $this->authenticatedEmployee();
         $apparatus = Apparatus::query()
             ->whereKey($data['apparatus_id'])
             ->where('station_id', $data['station_id'])

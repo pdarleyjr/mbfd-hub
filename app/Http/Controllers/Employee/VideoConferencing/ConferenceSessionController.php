@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Employee\VideoConferencing;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\VideoConferencing\ConferenceJoinRole;
 use App\Exceptions\VideoConferencing\ConferenceUnavailableException;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
 use App\Services\VideoConferencing\ConferenceCommandPinService;
 use App\Services\VideoConferencing\ConferenceSessionService;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +14,8 @@ use Illuminate\Validation\Rule;
 
 class ConferenceSessionController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function __invoke(
         Request $request,
         ConferenceSessionService $sessions,
@@ -25,8 +27,7 @@ class ConferenceSessionController extends Controller
             'join_as' => ['required_if:room,direct', 'nullable', Rule::enum(ConferenceJoinRole::class)],
             'command_pin' => ['nullable', 'string', 'regex:/^\d{4,8}$/'],
         ]);
-        /** @var Employee $employee */
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
 
         try {
             if ($validated['room'] === 'lineup') {

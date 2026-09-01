@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Employee\Pages;
 
-use App\Models\Employee;
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Services\PersonnelRequests\PersonnelCatalog;
 use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
 use Filament\Forms\Components\Hidden;
@@ -18,6 +18,8 @@ use Illuminate\Support\Str;
 
 class RequestEquipmentPage extends Page
 {
+    use ResolvesCanonicalEmployee;
+
     protected static ?string $navigationIcon = 'heroicon-o-shopping-bag';
 
     protected static string $view = 'filament.employee.pages.request-equipment';
@@ -74,8 +76,7 @@ class RequestEquipmentPage extends Page
 
     public function submit(PersonnelRequestSubmissionService $submissions): void
     {
-        /** @var Employee $employee */
-        $employee = auth('employee')->user();
+        $employee = $this->authenticatedEmployee();
         $data = $this->form->getState();
         $request = $submissions->submitUniform($employee, $data['items'], $data['idempotency_key']);
 
@@ -95,8 +96,7 @@ class RequestEquipmentPage extends Page
 
     public function getViewData(): array
     {
-        /** @var Employee $employee */
-        $employee = auth('employee')->user();
+        $employee = $this->authenticatedEmployee();
 
         return ['recentRequests' => $employee->personnelRequests()->where('type', 'uniform')->latest()->limit(5)->get()];
     }

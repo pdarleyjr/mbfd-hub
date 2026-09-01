@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Employee\VideoConferencing;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
 use App\Services\VideoConferencing\ConferenceCommandAuthorizationService;
 use App\Services\VideoConferencing\ConferenceLineupNotifier;
 use App\Services\VideoConferencing\ConferenceLineupReadinessService;
@@ -13,6 +13,8 @@ use Illuminate\Http\Request;
 
 class EndMorningLineupController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function __invoke(
         Request $request,
         ConferenceCommandAuthorizationService $authorization,
@@ -20,8 +22,7 @@ class EndMorningLineupController extends Controller
         ConferenceLineupNotifier $notifier,
         ConferenceSessionService $sessions,
     ): JsonResponse {
-        /** @var Employee $employee */
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
         $authorization->assertAuthorized($request, $employee);
         $session = $sessions->activeLineup();
         if ($session !== null) {

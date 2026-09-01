@@ -5,7 +5,7 @@ namespace App\Http\Controllers\VideoConferencing;
 use App\Exceptions\VideoConferencing\ConferenceUnavailableException;
 use App\Exceptions\VideoConferencing\EndpointInUseException;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
+use App\Models\User;
 use App\Services\VideoConferencing\ConferenceLaunchContextService;
 use App\Services\VideoConferencing\ConferenceLineupReadinessService;
 use App\Services\VideoConferencing\ConferenceSessionService;
@@ -43,8 +43,8 @@ class StationLineupTokenController extends Controller
                 'code' => $roomMode === 'direct' ? 'direct_not_started' : 'lineup_not_started',
             ], 409)->header('Cache-Control', 'no-store');
         }
-        /** @var Employee|null $employee */
-        $employee = $request->user('employee');
+        $user = $request->user();
+        $employee = $user instanceof User ? $user->employeeProfile : null;
 
         try {
             $result = $tokens->issue(

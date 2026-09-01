@@ -10,13 +10,12 @@ class EmployeeWorkspaceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_guest_is_redirected_to_employee_login_and_intended_path_is_remembered(): void
+    public function test_guest_is_redirected_to_canonical_login_and_intended_path_is_remembered(): void
     {
         $response = $this->get('/employee/forms');
 
-        $response->assertRedirect('/employee/login');
+        $response->assertRedirect('/login');
         $this->assertSame(url('/employee/forms'), session('url.intended'));
-        $this->assertSame('/employee/forms', session('employee.intended_path'));
     }
 
     public function test_authenticated_employee_can_open_workspace_without_sensitive_bootstrap_data(): void

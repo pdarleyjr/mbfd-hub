@@ -2,12 +2,14 @@
 
 namespace App\Filament\Employee\Pages;
 
-use App\Models\Employee;
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Services\OperationalForms\FrocImportLimits;
 use Filament\Pages\Page;
 
 class OperationalForms extends Page
 {
+    use ResolvesCanonicalEmployee;
+
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
     protected static string $view = 'filament.employee.pages.operational-forms';
@@ -22,8 +24,7 @@ class OperationalForms extends Page
 
     public function getViewData(): array
     {
-        /** @var Employee $employee */
-        $employee = auth('employee')->user();
+        $employee = $this->authenticatedEmployee();
 
         return [
             'operationalFormsBootstrap' => [

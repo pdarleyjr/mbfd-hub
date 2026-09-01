@@ -4,21 +4,23 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Employee\OperationalForms;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\OperationalForms\ApplyFrocImportRequest;
 use App\Http\Requests\Employee\OperationalForms\FrocImportPreviewRequest;
-use App\Models\Employee;
 use App\Services\OperationalForms\FrocImportService;
 use App\Services\OperationalForms\FrocRecordImportService;
 use App\Services\OperationalForms\OperationalFormRecordPresenter;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 final class FrocImportController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function __invoke(FrocImportPreviewRequest $request, FrocImportService $service): JsonResponse
     {
         $validated = $request->validated();
@@ -43,8 +45,7 @@ final class FrocImportController extends Controller
         OperationalFormRecordPresenter $presenter,
     ): JsonResponse {
         $validated = $request->validated();
-        /** @var Employee $employee */
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
 
         try {
             $result = $service->apply(
@@ -85,8 +86,7 @@ final class FrocImportController extends Controller
         OperationalFormRecordPresenter $presenter,
     ): JsonResponse {
         $validated = $request->validate(['revision' => ['required', 'integer', 'min:1']]);
-        /** @var Employee $employee */
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
         $restored = $service->undo($employee, $record, $import, (int) $validated['revision']);
 
         return response()->json(['record' => $presenter->present($restored)]);

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Employee\VideoConferencing;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
 use App\Models\VideoConferenceParticipation;
 use App\Services\VideoConferencing\ConferenceParticipationService;
 use Illuminate\Http\Request;
@@ -11,6 +11,8 @@ use Illuminate\Http\Response;
 
 class ConferenceStatsController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function __invoke(
         Request $request,
         VideoConferenceParticipation $participation,
@@ -22,8 +24,7 @@ class ConferenceStatsController extends Controller
             'packets_lost' => ['required', 'integer', 'min:0', 'max:1000000000'],
             'jitter_ms' => ['required', 'integer', 'min:0', 'max:60000'],
         ]);
-        /** @var Employee $employee */
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
         $participations->assertEmployee($participation, $employee);
         $participations->recordStats($participation, $validated);
 

@@ -2,22 +2,22 @@
 
 namespace App\Models;
 
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 /**
- * Employee model — completely separate from the users table.
- * Used exclusively for the Employee Portal (/employee) panel.
- * Authentication: employee_id (as "username") + password.
+ * Operational personnel profile linked from the canonical User model.
  *
- * This model is NEVER used for Admin, Training, or Workgroup panels.
+ * Employee records retain historical domain data and the opaque transitional
+ * hash required by the deployed Bid compatibility bridge. They never
+ * authenticate access to a human-facing Hub panel.
  */
-class Employee extends Authenticatable implements FilamentUser
+class Employee extends Authenticatable
 {
     use HasFactory, Notifiable;
 
@@ -41,30 +41,18 @@ class Employee extends Authenticatable implements FilamentUser
         'must_change_password' => 'boolean',
     ];
 
-    /**
-     * NOTE: Do NOT override getAuthIdentifierName() here.
-     * The default returns 'id' (auto-increment primary key) which is required
-     * for session-based auth (retrieveById uses Model::find($id)).
-     *
-     * Employee ID-based credential matching is handled by EmployeeLogin::getCredentialsFromFormData()
-     * which passes ['employee_id' => '...'] to EloquentUserProvider::retrieveByCredentials().
-     */
-
-    /**
-     * Required for Filament user menu display.
-     */
-    public function getFilamentName(): string
+    protected static function booted(): void
     {
-        return $this->name;
-    }
+        static::creating(function (self $employee): void {
+            if ($employee->getRawOriginal('password') !== null) {
+                return;
+            }
 
-    /**
-     * Allow all authenticated Employees to access the employee panel.
-     * Admin/Workgroup/Training panels will use the users table guard — never this guard.
-     */
-    public function canAccessPanel(Panel $panel): bool
-    {
-        return $panel->getId() === 'employee';
+            $employee->forceFill([
+                'password' => Hash::make(Str::random(64)),
+                'must_change_password' => false,
+            ]);
+        });
     }
 
     // Relationships

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\VideoConferencing;
 
 use App\Events\VideoConferencing\LineupStateChanged;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\VideoConferencing\ConferenceLaunchContextService;
 use App\Services\VideoConferencing\ConferenceLineupReadinessService;
 use Illuminate\Http\JsonResponse;
@@ -22,7 +23,8 @@ class StationReadyController extends Controller
             'microphone_ready' => ['required', 'boolean'],
         ]);
         $role = $launches->station($request, $validated['launch_context']);
-        $employeeId = $request->user('employee')?->getAuthIdentifier();
+        $user = $request->user();
+        $employeeId = $user instanceof User ? $user->employee_profile_id : null;
         $state = $readiness->markReady(
             $role,
             $validated['launch_context'],

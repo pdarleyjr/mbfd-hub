@@ -46,7 +46,6 @@ use App\Http\Controllers\Workgroup\FileDownloadController;
 use App\Http\Controllers\Workgroup\WorkgroupReportController;
 use App\Http\Middleware\EnsureEmployeeAuthenticated;
 use App\Http\Middleware\EnsureVideoConferenceHealthAccess;
-use App\Http\Middleware\ForcePasswordChangeMiddleware;
 use App\Support\Workgroups\WorkgroupReportSessionResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -109,11 +108,11 @@ Route::prefix('video-conferencing/api/participations')
     });
 
 Route::get('/employee/video-conferencing/command', [ConferencePageController::class, 'command'])
-    ->middleware([EnsureEmployeeAuthenticated::class, ForcePasswordChangeMiddleware::class])
+    ->middleware(EnsureEmployeeAuthenticated::class)
     ->name('employee.video-conferencing.command');
 
 Route::prefix('employee/video-conferencing/api')
-    ->middleware(['auth:employee', ForcePasswordChangeMiddleware::class, 'conference.enabled', 'throttle:conference-controls'])
+    ->middleware([EnsureEmployeeAuthenticated::class, 'conference.enabled', 'throttle:conference-controls'])
     ->name('employee.video-conferencing.api.')
     ->group(function (): void {
         Route::post('/lineup/command/authorize', CommandAuthorizationController::class)
@@ -142,7 +141,7 @@ Route::post('/webhooks/livekit', LiveKitWebhookController::class)
     ->name('webhooks.livekit');
 
 Route::prefix('employee')
-    ->middleware([EnsureEmployeeAuthenticated::class, ForcePasswordChangeMiddleware::class])
+    ->middleware(EnsureEmployeeAuthenticated::class)
     ->name('employee.personnel-requests.')
     ->group(function (): void {
         Route::get('/personnel-roster/search', PersonnelRosterSearchController::class)
@@ -169,7 +168,7 @@ Route::get('/admin/personnel-request-attachments/{attachment}', AdminPersonnelRe
     ->name('admin.personnel-request-attachments.download');
 
 Route::prefix('employee/forms/api')
-    ->middleware(['auth:employee', ForcePasswordChangeMiddleware::class, 'throttle:120,1'])
+    ->middleware([EnsureEmployeeAuthenticated::class, 'throttle:120,1'])
     ->name('employee.forms.api.')
     ->group(function (): void {
         Route::get('/form-types', [FormRecordController::class, 'formTypes'])->name('form-types');

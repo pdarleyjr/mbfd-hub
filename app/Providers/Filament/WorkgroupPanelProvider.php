@@ -2,7 +2,6 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\NotificationSettings;
 use App\Filament\Pages\SetPasswordPage;
 use App\Filament\Resources\Workgroup\CandidateProductResource;
@@ -16,9 +15,11 @@ use App\Filament\Workgroup\Pages\Notes;
 use App\Filament\Workgroup\Pages\Profile;
 use App\Filament\Workgroup\Pages\SessionResultsPage;
 use App\Filament\Workgroup\Pages\SharedUploads;
+use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
+use App\Http\Middleware\AuthenticateCanonicalPanelUser;
+use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
 use App\Http\Middleware\EnsureWorkgroupPanelAccess;
 use App\Http\Middleware\ForceFilamentPasswordChange;
-use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -43,7 +44,7 @@ class WorkgroupPanelProvider extends PanelProvider
             ->id('workgroups')
             ->path('workgroups')
             ->homeUrl('/')
-            ->login(Login::class)
+            ->login(CanonicalPanelLoginRedirectController::class)
             ->brandName('Eval Feedback Hub')
             ->brandLogo(secure_asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
@@ -131,11 +132,12 @@ class WorkgroupPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
-                Authenticate::class,
+                AuthenticateCanonicalPanelUser::class,
                 EnsureWorkgroupPanelAccess::class,
                 ForceFilamentPasswordChange::class,
             ])
             ->persistentMiddleware([
+                EnsureCanonicalSessionIsCurrent::class,
                 EnsureWorkgroupPanelAccess::class,
                 ForceFilamentPasswordChange::class,
             ])

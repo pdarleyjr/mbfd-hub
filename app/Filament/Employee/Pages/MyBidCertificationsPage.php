@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Employee\Pages;
 
-use App\Models\Employee;
+use App\Concerns\ResolvesCanonicalEmployee;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +23,8 @@ use Illuminate\Support\Facades\Log;
  */
 class MyBidCertificationsPage extends Page
 {
+    use ResolvesCanonicalEmployee;
+
     protected static ?string $navigationIcon = 'heroicon-o-check-badge';
 
     protected static string $view = 'filament.employee.pages.my-bid-certifications';
@@ -37,8 +39,7 @@ class MyBidCertificationsPage extends Page
 
     public function getViewData(): array
     {
-        /** @var Employee $employee */
-        $employee = auth('employee')->user();
+        $employee = $this->authenticatedEmployee();
 
         $payload = $this->fetchFromBidApp((string) $employee->employee_id);
 

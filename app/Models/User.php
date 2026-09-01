@@ -219,8 +219,9 @@ class User extends Authenticatable implements FilamentUser
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        // Employee panel uses its own Employee model + employee guard.
-        // The User model should NEVER handle the employee panel.
+        if ($panel->getId() === 'employee') {
+            return $this->employeeProfile()->exists();
+        }
 
         if ($panel->getId() === 'training') {
             return $this->hasRole('super_admin')

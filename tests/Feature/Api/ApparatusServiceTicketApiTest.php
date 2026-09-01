@@ -76,16 +76,17 @@ class ApparatusServiceTicketApiTest extends TestCase
 
     public function test_employee_page_requires_employee_authentication(): void
     {
-        $this->get('/employee/apparatus-service-request')->assertRedirect('/employee/login');
+        $this->get('/employee/apparatus-service-request')->assertRedirect('/login');
 
         $this->actingAs($this->employee, 'employee');
         $this->get('/employee/apparatus-service-request')->assertOk();
-        $this->get('/admin/apparatus-service-tickets')->assertRedirect('/admin/login');
+        $this->get('/admin/apparatus-service-tickets')->assertForbidden();
     }
 
     public function test_authenticated_employee_form_submits_ticket_without_impersonation_fields(): void
     {
         $this->actingAs($this->employee, 'employee');
+        $this->bindCanonicalSessionToLivewireTestRequests();
         Filament::setCurrentPanel(Filament::getPanel('employee'));
 
         Livewire::withQueryParams(['station_id' => $this->station->id, 'apparatus_id' => $this->apparatus->id])
@@ -120,6 +121,7 @@ class ApparatusServiceTicketApiTest extends TestCase
             'is_active' => true,
         ]);
         $this->actingAs($this->employee, 'employee');
+        $this->bindCanonicalSessionToLivewireTestRequests();
         Filament::setCurrentPanel(Filament::getPanel('employee'));
 
         try {

@@ -3,8 +3,6 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Employee\Pages\ApparatusServiceRequestPage;
-use App\Filament\Employee\Pages\Auth\EmployeeLogin;
-use App\Filament\Employee\Pages\ChangePasswordPage;
 use App\Filament\Employee\Pages\EmployeeDashboard;
 use App\Filament\Employee\Pages\MyEquipmentPage;
 use App\Filament\Employee\Pages\MyRequestsPage;
@@ -12,9 +10,12 @@ use App\Filament\Employee\Pages\OperationalForms;
 use App\Filament\Employee\Pages\PersonnelEquipmentRequestPage;
 use App\Filament\Employee\Pages\RequestEquipmentPage;
 use App\Filament\Employee\Pages\VideoConferencing;
-use App\Http\Middleware\ForcePasswordChangeMiddleware;
-use App\Http\Middleware\RememberEmployeeIntendedPath;
-use Filament\Http\Middleware\Authenticate;
+use App\Filament\Pages\SetPasswordPage;
+use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
+use App\Http\Middleware\AuthenticateCanonicalPanelUser;
+use App\Http\Middleware\EnsureCanonicalEmployeeContext;
+use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
+use App\Http\Middleware\ForceFilamentPasswordChange;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -47,8 +48,7 @@ class EmployeePanelProvider extends PanelProvider
         return $panel
             ->id('employee')
             ->path('employee')
-            ->login(EmployeeLogin::class)
-            ->authGuard('employee')
+            ->login(CanonicalPanelLoginRedirectController::class)
             ->brandName('MBFD Employee Portal')
             ->brandLogo(asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
@@ -73,7 +73,7 @@ class EmployeePanelProvider extends PanelProvider
                 RequestEquipmentPage::class,
                 ApparatusServiceRequestPage::class,
                 PersonnelEquipmentRequestPage::class,
-                ChangePasswordPage::class,
+                SetPasswordPage::class,
             ])
             ->widgets([])
             ->userMenuItems([
@@ -98,10 +98,6 @@ class EmployeePanelProvider extends PanelProvider
                     ->url(fn (): string => VideoConferencing::getUrl(panel: 'employee'))
                     ->icon('heroicon-o-video-camera'),
                 MenuItem::make()
-                    ->label('Change Password')
-                    ->url(fn (): string => ChangePasswordPage::getUrl(panel: 'employee'))
-                    ->icon('heroicon-o-lock-closed'),
-                MenuItem::make()
                     ->label('Return to Home')
                     ->url('/')
                     ->icon('heroicon-o-home'),
@@ -110,7 +106,6 @@ class EmployeePanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
-                RememberEmployeeIntendedPath::class,
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 VerifyCsrfToken::class,
@@ -119,17 +114,20 @@ class EmployeePanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
-                Authenticate::class,
-                ForcePasswordChangeMiddleware::class,
+                AuthenticateCanonicalPanelUser::class,
+                EnsureCanonicalEmployeeContext::class,
+                ForceFilamentPasswordChange::class,
             ])
             ->persistentMiddleware([
-                ForcePasswordChangeMiddleware::class,
+                EnsureCanonicalSessionIsCurrent::class,
+                EnsureCanonicalEmployeeContext::class,
+                ForceFilamentPasswordChange::class,
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('60s')
             ->renderHook(
                 PanelsRenderHook::PAGE_START,
-                fn () => auth('employee')->check() ? view('filament.employee.partials.back-button') : '',
+                fn () => auth('web')->check() ? view('filament.employee.partials.back-button') : '',
             )
             ->sidebarCollapsibleOnDesktop();
     }

@@ -6,7 +6,8 @@ namespace App\Services\StationActors;
 
 use App\Data\StationActors\VerifiedHumanStationActor;
 use App\Models\Employee;
-use Illuminate\Contracts\Auth\Factory as AuthFactory;
+use App\Services\Identity\AuthenticatedMemberContextResolver;
+use Illuminate\Auth\AuthenticationException;
 
 /**
  * Resolves station-actor provenance without accepting request-supplied identity.
@@ -17,12 +18,16 @@ use Illuminate\Contracts\Auth\Factory as AuthFactory;
 final readonly class StationActorResolver
 {
     public function __construct(
-        private AuthFactory $auth,
+        private AuthenticatedMemberContextResolver $members,
     ) {}
 
     public function resolveVerifiedHuman(): ?VerifiedHumanStationActor
     {
-        $employee = $this->auth->guard('employee')->user();
+        try {
+            $employee = $this->members->resolve(request())->employee();
+        } catch (AuthenticationException) {
+            return null;
+        }
 
         if (! $employee instanceof Employee) {
             return null;

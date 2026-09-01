@@ -2,12 +2,15 @@
 
 namespace App\Filament\Employee\Pages;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Models\AssignedEquipment;
 use App\Models\Employee;
 use Filament\Pages\Page;
 
 class MyEquipmentPage extends Page
 {
+    use ResolvesCanonicalEmployee;
+
     protected static ?string $navigationIcon = 'heroicon-o-shield-check';
 
     protected static string $view = 'filament.employee.pages.my-equipment';
@@ -20,8 +23,7 @@ class MyEquipmentPage extends Page
 
     public function getViewData(): array
     {
-        /** @var Employee $employee */
-        $employee = auth('employee')->user();
+        $employee = $this->authenticatedEmployee();
 
         $equipment = AssignedEquipment::query()
             ->where('employee_portal_id', $employee->id)

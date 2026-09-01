@@ -2,13 +2,14 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\NotificationSettings;
 use App\Filament\Pages\SetPasswordPage;
 use App\Filament\Training\Pages\Settings as TrainingSettings;
+use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
+use App\Http\Middleware\AuthenticateCanonicalPanelUser;
+use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
 use App\Http\Middleware\EnsureTrainingPanelAccess;
 use App\Http\Middleware\ForceFilamentPasswordChange;
-use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -33,7 +34,7 @@ class TrainingPanelProvider extends PanelProvider
             ->id('training')
             ->path('training')
             ->homeUrl('/')
-            ->login(Login::class)
+            ->login(CanonicalPanelLoginRedirectController::class)
             ->brandName('MBFD Training Division')
             ->brandLogo(secure_asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
@@ -101,11 +102,13 @@ class TrainingPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
-                Authenticate::class,
+                AuthenticateCanonicalPanelUser::class,
                 EnsureTrainingPanelAccess::class,
                 ForceFilamentPasswordChange::class,
             ])
             ->persistentMiddleware([
+                EnsureCanonicalSessionIsCurrent::class,
+                EnsureTrainingPanelAccess::class,
                 ForceFilamentPasswordChange::class,
             ])
             ->sidebarCollapsibleOnDesktop()

@@ -103,7 +103,7 @@ class MorningLineupWorkflowTest extends TestCase
     public function test_300_reuses_employee_session_and_requires_server_side_pin_before_start(): void
     {
         $this->withoutVite();
-        $this->get('/employee/video-conferencing/command')->assertRedirect('/employee/login');
+        $this->get('/employee/video-conferencing/command')->assertRedirect('/login');
         $this->actingAs($this->employee, 'employee')
             ->get('/employee/video-conferencing/command')
             ->assertOk()

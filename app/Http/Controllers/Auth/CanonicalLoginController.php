@@ -10,6 +10,7 @@ use App\Services\Identity\CanonicalSessionPolicy;
 use App\Services\Identity\CanonicalUserResolver;
 use App\Services\Identity\SessionRegistry;
 use Carbon\CarbonImmutable;
+use Filament\Facades\Filament;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -105,7 +106,7 @@ final class CanonicalLoginController extends Controller
             'context_class' => $policy['context_class']->value,
         ]);
 
-        return redirect('/');
+        return redirect($this->authorizedIntendedDestination($request, $user));
     }
 
     public function destroy(Request $request, SessionRegistry $sessions): RedirectResponse
@@ -162,5 +163,89 @@ final class CanonicalLoginController extends Controller
             $employeeId.'|'.$ip,
             (string) config('app.key'),
         );
+    }
+
+    private function authorizedIntendedDestination(Request $request, User $user): string
+    {
+        $destination = $this->normalizeInternalPath($request->session()->pull('url.intended'));
+
+        if ($destination === null) {
+            return '/';
+        }
+
+        foreach ([
+            'admin' => '/admin',
+            'employee' => '/employee',
+            'training' => '/training',
+            'workgroups' => '/workgroups',
+        ] as $panelId => $prefix) {
+            if (! $this->hasPathPrefix($destination, $prefix)) {
+                continue;
+            }
+
+            return $user->canAccessPanel(Filament::getPanel($panelId)) ? $destination : '/';
+        }
+
+        return '/';
+    }
+
+    private function normalizeInternalPath(mixed $candidate): ?string
+    {
+        if (! is_string($candidate) || $candidate === '') {
+            return null;
+        }
+
+        $decoded = $candidate;
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            $next = rawurldecode($decoded);
+
+            if ($next === $decoded) {
+                break;
+            }
+
+            $decoded = $next;
+        }
+
+        if (str_contains($decoded, '\\') || str_starts_with($decoded, '//') || preg_match('/[\x00-\x1F\x7F]/', $decoded)) {
+            return null;
+        }
+
+        $parts = parse_url($decoded);
+
+        if ($parts === false) {
+            return null;
+        }
+
+        if (isset($parts['host'])) {
+            $application = parse_url((string) config('app.url'));
+            $sameHost = strcasecmp($parts['host'], $application['host'] ?? '') === 0;
+            $samePort = ($parts['port'] ?? null) === ($application['port'] ?? null);
+
+            if (! $sameHost || ! $samePort || ! in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true)) {
+                return null;
+            }
+
+            $decoded = ($parts['path'] ?? '/').(isset($parts['query']) ? '?'.$parts['query'] : '');
+            $parts = parse_url($decoded);
+        } elseif (isset($parts['scheme'])) {
+            return null;
+        }
+
+        if (! is_array($parts) || ! str_starts_with($decoded, '/')) {
+            return null;
+        }
+
+        $segments = explode('/', $parts['path'] ?? '');
+
+        if (array_intersect($segments, ['.', '..']) !== []) {
+            return null;
+        }
+
+        return $decoded;
+    }
+
+    private function hasPathPrefix(string $path, string $prefix): bool
+    {
+        return $path === $prefix || str_starts_with($path, $prefix.'/');
     }
 }

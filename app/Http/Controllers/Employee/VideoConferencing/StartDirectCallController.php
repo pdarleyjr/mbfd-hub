@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Employee\VideoConferencing;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\VideoConferencing\ConferenceJoinRole;
 use App\Exceptions\VideoConferencing\ConferenceUnavailableException;
 use App\Exceptions\VideoConferencing\EndpointInUseException;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
 use App\Services\VideoConferencing\ConferenceCommandAuthorizationService;
 use App\Services\VideoConferencing\ConferenceSessionService;
 use App\Services\VideoConferencing\ConferenceTokenService;
@@ -17,6 +17,8 @@ use Illuminate\Validation\Rule;
 
 class StartDirectCallController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function __invoke(
         Request $request,
         ConferenceCommandAuthorizationService $authorization,
@@ -30,8 +32,7 @@ class StartDirectCallController extends Controller
         ]);
         $station = ConferenceJoinRole::from($validated['station']);
         abort_unless($station->isStation(), 422, 'A supported station is required.');
-        /** @var Employee $employee */
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
         $authorization->assertAuthorized($request, $employee);
 
         try {

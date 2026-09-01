@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Employee\VideoConferencing;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Http\Controllers\Controller;
 use App\Services\VideoConferencing\ConferenceClientFailureMonitor;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ use Illuminate\Validation\Rule;
 
 class ConferenceConnectivityFailureController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function __invoke(Request $request, ConferenceClientFailureMonitor $monitor): Response
     {
         $validated = $request->validate([
@@ -21,11 +24,11 @@ class ConferenceConnectivityFailureController extends Controller
             'failure_code' => ['required', 'string', 'max:64'],
             'session_id' => ['nullable', 'string', 'max:26'],
         ]);
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
         $clientIp = (string) $request->ip();
 
         Log::warning('Video conference client connection failed', [
-            'employee_id' => $employee?->getAuthIdentifier(),
+            'employee_id' => $employee->getAuthIdentifier(),
             'stage' => $validated['stage'],
             'room' => $validated['room'],
             'join_as' => $validated['join_as'],

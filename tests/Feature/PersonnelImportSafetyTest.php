@@ -27,9 +27,9 @@ class PersonnelImportSafetyTest extends TestCase
         file_put_contents($path, "Name,Rank,Employee ID\nUpdated Name,Lieutenant,20731\n");
 
         try {
-            $this->artisan('mbfd:import-personnel', [
-                'file' => $path,
-            ])->assertSuccessful();
+            $this->artisan('mbfd:import-personnel', ['file' => $path])
+                ->assertSuccessful()
+                ->expectsOutputToContain('compatibility hash unchanged');
         } finally {
             @unlink($path);
         }
@@ -41,43 +41,21 @@ class PersonnelImportSafetyTest extends TestCase
         $this->assertFalse($employee->must_change_password);
     }
 
-    public function test_new_employee_import_requires_a_dedicated_credentials_output_file(): void
+    public function test_new_employee_import_does_not_issue_an_employee_password(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'mbfd-personnel-');
         file_put_contents($path, "Name,Rank,Employee ID\nNew Employee,Firefighter,30001\n");
 
         try {
-            $this->artisan('mbfd:import-personnel', ['file' => $path])->assertFailed();
+            $this->artisan('mbfd:import-personnel', ['file' => $path])
+                ->assertSuccessful()
+                ->doesntExpectOutputToContain('password');
         } finally {
             @unlink($path);
         }
 
-        $this->assertDatabaseCount('employees', 0);
-    }
-
-    public function test_new_employee_receives_a_unique_generated_temporary_password(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'mbfd-personnel-');
-        $output = sys_get_temp_dir().DIRECTORY_SEPARATOR.'mbfd-credentials-'.uniqid().'.csv';
-        file_put_contents($path, "Name,Rank,Employee ID\nNew Employee,Firefighter,30001\n");
-
-        try {
-            $this->artisan('mbfd:import-personnel', [
-                'file' => $path,
-                '--credentials-output' => $output,
-            ])->assertSuccessful();
-
-            $rows = array_map('str_getcsv', file($output, FILE_IGNORE_NEW_LINES));
-            $this->assertSame(['employee_id', 'temporary_password'], $rows[0]);
-            $this->assertSame('30001', $rows[1][0]);
-            $this->assertMatchesRegularExpression('/^[A-Za-z0-9]{24}$/', $rows[1][1]);
-
-            $employee = Employee::where('employee_id', '30001')->sole();
-            $this->assertTrue(password_verify($rows[1][1], $employee->password));
-            $this->assertTrue($employee->must_change_password);
-        } finally {
-            @unlink($path);
-            @unlink($output);
-        }
+        $employee = Employee::where('employee_id', '30001')->sole();
+        $this->assertNotSame('', $employee->getRawOriginal('password'));
+        $this->assertFalse($employee->must_change_password);
     }
 }
