@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Employee\VideoConferencing;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\VideoConferencing\ConferenceJoinRole;
 use App\Exceptions\VideoConferencing\ConferenceUnavailableException;
 use App\Exceptions\VideoConferencing\EndpointInUseException;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
 use App\Services\VideoConferencing\ConferenceCommandAuthorizationService;
 use App\Services\VideoConferencing\ConferenceLineupNotifier;
 use App\Services\VideoConferencing\ConferenceSessionService;
@@ -17,6 +17,8 @@ use Illuminate\Http\Request;
 
 class StartMorningLineupController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function __invoke(
         Request $request,
         ConferenceCommandAuthorizationService $authorization,
@@ -26,8 +28,7 @@ class StartMorningLineupController extends Controller
         LiveKitProfileConfiguration $livekit,
     ): JsonResponse {
         $validated = $request->validate(['confirmed_takeover' => ['sometimes', 'boolean']]);
-        /** @var Employee $employee */
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
         $authorization->assertAuthorized($request, $employee);
 
         try {

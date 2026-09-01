@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Employee\OperationalForms;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\OperationalForms\StoreUploadedFormRequest;
-use App\Models\Employee;
 use App\Models\OperationalFormDocument;
 use App\Models\OperationalFormEvent;
 use App\Models\OperationalFormRecord;
@@ -19,12 +19,13 @@ use Throwable;
 
 class FormUploadController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function __invoke(
         StoreUploadedFormRequest $request,
         OperationalFormRecordPresenter $presenter,
     ): JsonResponse {
-        /** @var Employee $employee */
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
         /** @var UploadedFile $file */
         $file = $request->file('file');
         $title = $this->safeTitle($request->string('name')->toString());

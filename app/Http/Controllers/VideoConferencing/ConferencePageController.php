@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\VideoConferencing;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\VideoConferencing\ConferenceJoinRole;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
 use App\Services\VideoConferencing\ConferenceBootstrapFactory;
 use App\Services\VideoConferencing\ConferenceLaunchContextService;
 use Illuminate\Contracts\View\View;
@@ -12,6 +12,8 @@ use Illuminate\Http\Request;
 
 class ConferencePageController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function station(
         Request $request,
         string $station,
@@ -30,8 +32,7 @@ class ConferencePageController extends Controller
 
     public function command(Request $request, ConferenceBootstrapFactory $bootstrap): View
     {
-        /** @var Employee $employee */
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
 
         return view('video-conferencing', [
             'enabled' => (bool) config('video-conferencing.enabled'),

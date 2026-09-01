@@ -16,14 +16,14 @@ class ConferenceAccessTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_guest_is_sent_to_employee_login_with_the_full_intended_query(): void
+    public function test_guest_is_sent_to_canonical_login_with_the_full_intended_query(): void
     {
         $response = $this->get('/employee/video-conferencing?room=lineup&join_as=sta1');
 
-        $response->assertRedirect('/employee/login');
+        $response->assertRedirect('/login');
         $this->assertSame(
-            '/employee/video-conferencing?join_as=sta1&room=lineup',
-            session('employee.intended_path'),
+            url('/employee/video-conferencing?join_as=sta1&room=lineup'),
+            session('url.intended'),
         );
     }
 
@@ -158,6 +158,8 @@ class ConferenceAccessTest extends TestCase
 
     public function test_homepage_does_not_expose_a_video_conferencing_launch(): void
     {
+        $this->withoutVite();
+
         $this->get('/')
             ->assertOk()
             ->assertDontSee('Join Morning Lineup or connect directly with an MBFD station')

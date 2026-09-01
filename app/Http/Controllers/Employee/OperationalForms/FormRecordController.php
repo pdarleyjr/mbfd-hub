@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Employee\OperationalForms;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\OperationalForms\StoreFormRecordRequest;
 use App\Http\Requests\OperationalForms\UpdateFormRecordRequest;
@@ -17,6 +18,8 @@ use Illuminate\Support\Facades\DB;
 
 class FormRecordController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function __construct(
         private readonly FormRegistry $registry,
         private readonly FormDataValidator $validator,
@@ -29,7 +32,7 @@ class FormRecordController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $records = $this->ownedQuery($request->user('employee'))
+        $records = $this->ownedQuery($this->authenticatedEmployee())
             ->with([
                 'documents' => fn ($query) => $query->latest('version_number'),
                 'imports' => fn ($query) => $query->where('status', 'applied')->latest(),
@@ -43,8 +46,7 @@ class FormRecordController extends Controller
 
     public function store(StoreFormRecordRequest $request): JsonResponse
     {
-        /** @var Employee $employee */
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
         $formType = $request->string('form_type')->toString();
         $manifest = $this->registry->get($formType)->manifest();
         $data = $this->defaults($formType, $employee);
@@ -68,7 +70,7 @@ class FormRecordController extends Controller
     public function show(Request $request, string $record): JsonResponse
     {
         return response()->json([
-            'record' => $this->serialize($this->owned($request->user('employee'), $record)->load([
+            'record' => $this->serialize($this->owned($this->authenticatedEmployee(), $record)->load([
                 'documents',
                 'imports' => fn ($query) => $query->where('status', 'applied')->latest(),
             ])),
@@ -77,7 +79,7 @@ class FormRecordController extends Controller
 
     public function documents(Request $request, string $record): JsonResponse
     {
-        $owned = $this->owned($request->user('employee'), $record);
+        $owned = $this->owned($this->authenticatedEmployee(), $record);
 
         return response()->json([
             'documents' => $owned->documents()->latest('version_number')->get()->map(
@@ -88,8 +90,7 @@ class FormRecordController extends Controller
 
     public function update(UpdateFormRecordRequest $request, string $record): JsonResponse
     {
-        /** @var Employee $employee */
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
         $owned = $this->owned($employee, $record);
         $data = $this->validator->validate($owned->form_type, $request->validated('data'));
         $now = now();
@@ -129,7 +130,7 @@ class FormRecordController extends Controller
 
     public function destroy(Request $request, string $record): JsonResponse
     {
-        $owned = $this->owned($request->user('employee'), $record);
+        $owned = $this->owned($this->authenticatedEmployee(), $record);
         if ($owned->documents()->exists()) {
             return response()->json([
                 'message' => 'Records with generated PDFs cannot be deleted.',
@@ -259,7 +260,7 @@ class FormRecordController extends Controller
     {
         OperationalFormEvent::query()->create([
             'form_record_id' => $record->id,
-            'employee_id' => $request->user('employee')?->getKey(),
+            'employee_id' => $this->authenticatedEmployee()->getKey(),
             'event_type' => $event,
             'request_ip_hash' => $request->ip() ? hash('sha256', $request->ip()) : null,
             'created_at' => now(),

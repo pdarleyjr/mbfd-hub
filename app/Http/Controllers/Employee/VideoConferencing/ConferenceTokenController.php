@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Employee\VideoConferencing;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\VideoConferencing\ConferenceJoinRole;
 use App\Exceptions\VideoConferencing\ConferenceUnavailableException;
 use App\Exceptions\VideoConferencing\EndpointInUseException;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
 use App\Models\VideoConferenceSession;
 use App\Services\VideoConferencing\ConferenceCommandPinService;
 use App\Services\VideoConferencing\ConferenceTokenService;
@@ -17,6 +17,8 @@ use Illuminate\Validation\Rule;
 
 class ConferenceTokenController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function __invoke(
         Request $request,
         VideoConferenceSession $session,
@@ -29,8 +31,7 @@ class ConferenceTokenController extends Controller
             'confirmed_takeover' => ['sometimes', 'boolean'],
             'command_pin' => ['nullable', 'string', 'regex:/^\d{4,8}$/'],
         ]);
-        /** @var Employee $employee */
-        $employee = $request->user('employee');
+        $employee = $this->authenticatedEmployee();
 
         try {
             $requestedRole = ConferenceJoinRole::from($validated['join_as']);

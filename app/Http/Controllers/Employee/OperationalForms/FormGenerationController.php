@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Employee\OperationalForms;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateOperationalFormPdf;
 use App\Models\OperationalFormDocument;
@@ -13,19 +14,21 @@ use Illuminate\Http\Request;
 
 class FormGenerationController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function __invoke(
         Request $request,
         string $record,
         FormDataValidator $validator,
     ): JsonResponse {
         $owned = OperationalFormRecord::query()
-            ->where('employee_id', $request->user('employee')->getKey())
+            ->where('employee_id', $this->authenticatedEmployee()->getKey())
             ->findOrFail($record);
 
         $validator->validate($owned->form_type, $owned->data, true);
         $generation = OperationalFormGeneration::query()->firstOrCreate(
             ['form_record_id' => $owned->id, 'source_revision' => $owned->revision],
-            ['employee_id' => $request->user('employee')->getKey(), 'status' => 'queued'],
+            ['employee_id' => $this->authenticatedEmployee()->getKey(), 'status' => 'queued'],
         );
 
         if ($generation->status === 'failed') {
@@ -43,7 +46,7 @@ class FormGenerationController extends Controller
     public function status(Request $request, string $record, string $job): JsonResponse
     {
         $generation = OperationalFormGeneration::query()
-            ->where('employee_id', $request->user('employee')->getKey())
+            ->where('employee_id', $this->authenticatedEmployee()->getKey())
             ->where('form_record_id', $record)
             ->findOrFail($job);
 

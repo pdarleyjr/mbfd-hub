@@ -18,7 +18,7 @@ class StationActorResolverTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_derives_a_verified_human_only_from_the_employee_session_guard(): void
+    public function test_it_derives_a_verified_human_only_from_the_canonical_session_context(): void
     {
         $employee = Employee::query()->create([
             'employee_id' => 'F042',
@@ -29,6 +29,10 @@ class StationActorResolverTest extends TestCase
         ]);
 
         $this->actingAs($employee, 'employee');
+        $request = Request::create('/station-actor');
+        $request->setLaravelSession($this->app['session']->driver());
+        $request->setUserResolver(fn (): User => $employee->user()->firstOrFail());
+        $this->app->instance('request', $request);
 
         $actor = app(StationActorResolver::class)->resolveVerifiedHuman();
 

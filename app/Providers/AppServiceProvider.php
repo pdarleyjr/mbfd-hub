@@ -59,7 +59,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         RateLimiter::for('conference-tokens', function (Request $request): array {
-            $employeeId = $request->user('employee')?->getAuthIdentifier();
+            $user = $request->user();
+            $employeeId = $user instanceof User ? $user->employee_profile_id : null;
             $launchContext = $request->input('launch_context');
             $subject = $employeeId !== null
                 ? 'employee:'.$employeeId
@@ -73,7 +74,8 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
         RateLimiter::for('conference-controls', function (Request $request): array {
-            $employeeId = $request->user('employee')?->getAuthIdentifier();
+            $user = $request->user();
+            $employeeId = $user instanceof User ? $user->employee_profile_id : null;
             $launchContext = $request->input('launch_context');
             $subject = $employeeId !== null
                 ? 'employee:'.$employeeId

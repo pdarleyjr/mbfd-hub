@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Employee\OperationalForms;
 
+use App\Concerns\ResolvesCanonicalEmployee;
 use App\Http\Controllers\Controller;
 use App\Models\OperationalFormDocument;
 use App\Models\OperationalFormEvent;
@@ -11,6 +12,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FormDocumentController extends Controller
 {
+    use ResolvesCanonicalEmployee;
+
     public function preview(Request $request, string $document, DocumentStreamService $streamer): StreamedResponse
     {
         $owned = $this->owned($request, $document);
@@ -30,7 +33,7 @@ class FormDocumentController extends Controller
     private function owned(Request $request, string $id): OperationalFormDocument
     {
         return OperationalFormDocument::query()
-            ->whereHas('record', fn ($query) => $query->where('employee_id', $request->user('employee')->getKey()))
+            ->whereHas('record', fn ($query) => $query->where('employee_id', $this->authenticatedEmployee()->getKey()))
             ->findOrFail($id);
     }
 
@@ -39,7 +42,7 @@ class FormDocumentController extends Controller
         OperationalFormEvent::query()->create([
             'form_record_id' => $document->form_record_id,
             'document_id' => $document->id,
-            'employee_id' => $request->user('employee')->getKey(),
+            'employee_id' => $this->authenticatedEmployee()->getKey(),
             'event_type' => $event,
             'request_ip_hash' => $request->ip() ? hash('sha256', $request->ip()) : null,
             'created_at' => now(),

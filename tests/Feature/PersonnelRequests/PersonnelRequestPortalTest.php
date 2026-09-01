@@ -34,7 +34,7 @@ class PersonnelRequestPortalTest extends TestCase
             $this->employee((string) (28000 + $index), 'Firefighter', sprintf('Roster Member %02d', $index));
         }
 
-        $this->get('/employee/personnel-roster/search?q=Morgan')->assertRedirect('/employee/login');
+        $this->get('/employee/personnel-roster/search?q=Morgan')->assertRedirect('/login');
         $this->actingAs($firefighter, 'employee')->getJson('/employee/personnel-roster/search?q=Morgan')->assertForbidden();
 
         DB::statement('PRAGMA case_sensitive_like = ON');
@@ -65,7 +65,7 @@ class PersonnelRequestPortalTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->get("/employee/personnel-equipment-request?station_id={$station->id}")->assertRedirect('/employee/login');
+        $this->get("/employee/personnel-equipment-request?station_id={$station->id}")->assertRedirect('/login');
         $this->actingAs($firefighter, 'employee')->get("/employee/personnel-equipment-request?station_id={$station->id}")->assertForbidden();
     }
 
@@ -122,7 +122,7 @@ class PersonnelRequestPortalTest extends TestCase
         $this->withoutVite();
         $employee = $this->employee('27201', 'Firefighter', 'Portal Member');
 
-        $this->get('/employee/login')->assertOk()->assertDontSee('employee-global-back');
+        $this->get('/employee/login')->assertRedirect('/login');
         $this->actingAs($employee, 'employee')
             ->get('/employee/dashboard?return_to=https://evil.example/steal')
             ->assertOk()
