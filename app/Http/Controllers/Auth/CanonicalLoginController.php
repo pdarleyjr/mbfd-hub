@@ -105,7 +105,7 @@ final class CanonicalLoginController extends Controller
             'context_class' => $policy['context_class']->value,
         ]);
 
-        return redirect('/');
+        return redirect()->intended('/');
     }
 
     public function destroy(Request $request, SessionRegistry $sessions): RedirectResponse

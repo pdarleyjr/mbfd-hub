@@ -52,6 +52,19 @@ final class CanonicalHumanAuthenticationTest extends TestCase
         $this->assertSame($registered->id, session('auth.canonical_session_id'));
     }
 
+    public function test_canonical_login_restores_an_intended_federation_authorization_request(): void
+    {
+        $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
+        $intended = '/auth/bid/authorize?client_id=bid&redirect_uri=https%3A%2F%2Fbid.example.test%2Fapi%2Fauth%2Fcallback&state=federation-state';
+
+        $this->withSession(['url.intended' => $intended])
+            ->post('/login', [
+                'employee_id' => $user->employeeProfile->employee_id,
+                'password' => 'correct-password',
+            ])
+            ->assertRedirect($intended);
+    }
+
     public function test_canonical_login_session_serves_member_context_without_a_bearer_token_and_logout_revokes_both_surfaces(): void
     {
         $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
