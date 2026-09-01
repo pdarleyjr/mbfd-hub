@@ -830,6 +830,7 @@ test('Fire Boat v2 reload restores same-version typed fields, due-duty status, a
 });
 
 test('Fire Boat v2 reload restores an issued session when the checklist API is offline', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-08-31T09:00:00-04:00') });
   const api = await mockFireBoatInspectionApi(page);
 
   await page.goto('/daily/apparatus/fire-boat-6');
@@ -862,6 +863,7 @@ test('Fire Boat v2 reload restores an issued session when the checklist API is o
 });
 
 test('Fire Boat online reload uses current apparatus and service notices over its local contract snapshot', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-08-31T09:00:00-04:00') });
   await mockFireBoatInspectionApi(page);
 
   await page.goto('/daily/apparatus/fire-boat-6');
