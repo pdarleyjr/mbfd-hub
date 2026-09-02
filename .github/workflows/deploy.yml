@@ -275,17 +275,39 @@ jobs:
           IMAGE_REF="$IMAGE_REPOSITORY@$FINAL_IMAGE_DIGEST"
           test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_REF")" = "$RELEASE_SHA"
 
-          HUB_IMAGE_REF="$IMAGE_REF" docker compose --env-file "$HUB_IMAGE_RUNTIME_ENV" -f compose.prod.image.yaml run --rm --no-deps --pull never --name "$HUB_MIGRATION_CONTAINER" -e RELEASE_SHA="$RELEASE_SHA" --entrypoint bash laravel.test -lc '
+          HUB_IMAGE_REF="$IMAGE_REF" docker compose --env-file "$HUB_IMAGE_RUNTIME_ENV" -f compose.prod.image.yaml run --interactive=false --rm --no-deps --pull never --name "$HUB_MIGRATION_CONTAINER" -e RELEASE_SHA="$RELEASE_SHA" --entrypoint bash laravel.test -lc '
               set -euo pipefail
               php artisan migrate:status --no-ansi
               php artisan migrate --force
               php artisan daily-checkout:activate-ledger --release-sha="$RELEASE_SHA" --no-interaction
             '
 
+          OLD_CONTAINER_ID="$(docker inspect --format '{{.Id}}' "$HUB_APP_CONTAINER")"
+          test -n "$OLD_CONTAINER_ID"
+
           HUB_IMAGE_REF="$IMAGE_REF" docker compose --env-file "$HUB_IMAGE_RUNTIME_ENV" -f compose.prod.image.yaml up -d --pull never --no-build --no-deps --force-recreate laravel.test
 
           test "$(docker inspect --format '{{.Name}}' "$HUB_APP_CONTAINER")" = "/$HUB_APP_CONTAINER"
           test "$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$HUB_APP_CONTAINER")" = 'laravel.test'
+          NEW_CONTAINER_ID="$(docker inspect --format '{{.Id}}' "$HUB_APP_CONTAINER")"
+          test -n "$NEW_CONTAINER_ID"
+          test "$NEW_CONTAINER_ID" != "$OLD_CONTAINER_ID"
+          test "$(docker inspect --format '{{.State.Running}}' "$HUB_APP_CONTAINER")" = 'true'
+          RUNNING_IMAGE_REF="$(docker inspect --format '{{.Config.Image}}' "$HUB_APP_CONTAINER")"
+          case "$RUNNING_IMAGE_REF" in
+            *@sha256:*) ;;
+            *) echo 'Recreated Hub container is not pinned to an immutable image digest.' >&2; exit 1 ;;
+          esac
+          RUNNING_IMAGE_DIGEST="${RUNNING_IMAGE_REF##*@}"
+          test "$RUNNING_IMAGE_DIGEST" = "$FINAL_IMAGE_DIGEST"
+          APPROVED_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$IMAGE_REF")"
+          RUNNING_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$HUB_APP_CONTAINER")"
+          test "$RUNNING_IMAGE_ID" = "$APPROVED_IMAGE_ID"
+          docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$RUNNING_IMAGE_ID" | grep -Fx "$IMAGE_REF"
+          RUNNING_OCI_REVISION="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$RUNNING_IMAGE_ID")"
+          test "$RUNNING_OCI_REVISION" = "$RELEASE_SHA"
+          RUNNING_GIT_SHA="$(docker exec -u sail "$HUB_APP_CONTAINER" cat /var/www/html/.git-sha)"
+          test "$RUNNING_GIT_SHA" = "$RELEASE_SHA"
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan optimize:clear
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan config:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan route:cache
@@ -366,17 +388,33 @@ jobs:
       - name: Record successful Hub candidate activation
         env:
           RELEASE_SHA: ${{ github.sha }}
+          FINAL_IMAGE_DIGEST: ${{ inputs.final_image_digest }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          test -n "$FINAL_IMAGE_DIGEST"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' bash -s" <<'REMOTE'
           set -euo pipefail
-          cd /opt/mbfd/mbfd-hub
-          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
-          DEPLOY_MARKER="$(printf '{"sha":"%s","deployed_at":"%s"}' "$RELEASE_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")"
-          printf '%s\n' "$DEPLOY_MARKER" > public/deploy-marker.json
           HUB_APP_CONTAINER=mbfd-hub-laravel
+          test "$(docker inspect --format '{{.State.Running}}' "$HUB_APP_CONTAINER")" = 'true'
+          RUNNING_CONTAINER_ID="$(docker inspect --format '{{.Id}}' "$HUB_APP_CONTAINER")"
+          test -n "$RUNNING_CONTAINER_ID"
+          RUNNING_IMAGE_REF="$(docker inspect --format '{{.Config.Image}}' "$HUB_APP_CONTAINER")"
+          case "$RUNNING_IMAGE_REF" in
+            *@sha256:*) ;;
+            *) echo 'Running Hub container is not pinned to an immutable image digest.' >&2; exit 1 ;;
+          esac
+          RUNNING_IMAGE_DIGEST="${RUNNING_IMAGE_REF##*@}"
+          test "$RUNNING_IMAGE_DIGEST" = "$FINAL_IMAGE_DIGEST"
+          RUNNING_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$HUB_APP_CONTAINER")"
+          docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$RUNNING_IMAGE_ID" | grep -F '@' | grep -Fx "$RUNNING_IMAGE_REF"
+          RUNNING_OCI_REVISION="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$RUNNING_IMAGE_ID")"
+          test "$RUNNING_OCI_REVISION" = "$RELEASE_SHA"
+          RUNNING_GIT_SHA="$(docker exec -u sail "$HUB_APP_CONTAINER" cat /var/www/html/.git-sha)"
+          test "$RUNNING_GIT_SHA" = "$RELEASE_SHA"
+          DEPLOY_MARKER="$(printf '{"sha":"%s","image_digest":"%s","image_id":"%s","oci_revision":"%s","embedded_git_sha":"%s","container_id":"%s","deployed_at":"%s"}' "$RUNNING_GIT_SHA" "$RUNNING_IMAGE_DIGEST" "$RUNNING_IMAGE_ID" "$RUNNING_OCI_REVISION" "$RUNNING_GIT_SHA" "$RUNNING_CONTAINER_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")"
           docker exec -u sail "$HUB_APP_CONTAINER" sh -c "printf '%s\n' '$DEPLOY_MARKER' > /var/www/html/public/deploy-marker.json"
+          printf '%s\n' "$DEPLOY_MARKER" > /opt/mbfd/mbfd-hub/public/deploy-marker.json
           REMOTE
 
       - name: Verify public Hub smoke routes
