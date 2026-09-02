@@ -13,7 +13,6 @@ use App\Http\Controllers\Api\Display\DisplayController;
 use App\Http\Controllers\Api\FireEquipmentRequestController;
 use App\Http\Controllers\Api\InventoryChatController;
 use App\Http\Controllers\Api\MediaControl\AuthorizationCodeExchangeController as MediaControlAuthorizationCodeExchangeController;
-use App\Http\Controllers\Api\Public\ApparatusLayout\ApparatusLayoutController;
 use App\Http\Controllers\Api\PublicApparatusServiceTicketController;
 use App\Http\Controllers\Api\PublicStationRequestController;
 use App\Http\Controllers\Api\PushSubscriptionController;
@@ -75,12 +74,6 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('station-requests/{stationRequest}', [PublicStationRequestController::class, 'show']);
     Route::get('stations/{station}/gas-meters', [\App\Http\Controllers\Api\StationController::class, 'gasMeters']);
 
-    // Apparatus Layout Planner (public read, auth write)
-    Route::prefix('apparatus-layout')->group(function () {
-        Route::get('tools', [ApparatusLayoutController::class, 'getTools']);
-        Route::get('compartments/{apparatusId}', [ApparatusLayoutController::class, 'getCompartments']);
-        Route::get('snapshots/{apparatusId}', [ApparatusLayoutController::class, 'getSnapshots']);
-    });
 });
 
 // =========================================================================
@@ -189,12 +182,6 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin.role:super_admin,admi
     Route::apiResource('fire-equipment-requests', FireEquipmentRequestController::class);
     Route::apiResource('station-inspections', StationInspectionController::class);
 
-    // Apparatus Layout Planner (authenticated write routes)
-    Route::prefix('apparatus-layout')->group(function () {
-        Route::post('snapshots', [ApparatusLayoutController::class, 'saveSnapshot']);
-        Route::delete('snapshots/{snapshotId}', [ApparatusLayoutController::class, 'deleteSnapshot']);
-        Route::post('autosave', [ApparatusLayoutController::class, 'autoSave']);
-    });
 });
 
 // Big Ticket Requests

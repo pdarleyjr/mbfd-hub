@@ -227,9 +227,6 @@ Route::delete('/admin/operational-forms/records/{record}', [OperationalFormDelet
 // Pump Simulator - Public route for training
 Route::view('/pump-simulator', 'pump-simulator')->name('pump-simulator');
 
-// Apparatus Layout Planner - Public tool
-Route::view('/apparatus-layout', 'apparatus-layout')->name('apparatus-layout');
-
 // Serve manifest.json with no-cache headers to bypass CDN caching
 Route::get('/manifest.json', function () {
     $response = response()->file(public_path('manifest.json'), [

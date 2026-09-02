@@ -119,7 +119,6 @@ ReactDOM.render(
 | **Offline Storage** | Dexie | Latest | IndexedDB wrapper |
 | **UI Styling** | Tailwind CSS | v3 | Utility-first CSS |
 | **Form Handling** | React Hook Form | Latest | Lightweight form management |
-| **Visualization** | React Konva | Latest | Apparatus layout planner (separate SPA) |
 | **HTTP Client** | Fetch API | Standard | No external HTTP library needed |
 | **Error Tracking** | Sentry | Latest | Error monitoring + breadcrumbs |
 | **Monitoring** | PWA + Service Worker | Standard | Offline capability, push notifications |

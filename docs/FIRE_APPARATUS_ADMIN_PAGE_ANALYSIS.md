@@ -44,7 +44,7 @@ The **Fire Apparatus Admin Page** at `https://www.mbfdhub.com/admin/apparatuses`
 - Laravel Queue System (background job dispatch)
 - Apparatus Inspection Workflow (daily checkout from `/daily` app)
 - Station Inventory System (VPS location routing)
-- Workgroup Equipment Evaluation (apparatus layout constraints)
+- Workgroup Equipment Evaluation (apparatus compartment constraints)
 
 ---
 
@@ -953,7 +953,6 @@ UPSTREAM SYSTEMS:
 │  └─ Allocate equipment to apparatuses (ApparatusInventoryAllocation)
 │  └─ Track equipment placement by compartment
 │
-└─ Apparatus Layout Planner (`/apparatus-layout`)
    └─ Visual compartment design tool
    └─ Reference apparatus by ID → compartment constraints
 

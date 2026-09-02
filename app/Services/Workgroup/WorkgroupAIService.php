@@ -596,7 +596,7 @@ class WorkgroupAIService
         $lines[] = "\n7. <h2>Deployability Assessment</h2> (SAVER Dimension 5) — Portability and apparatus compartment compatibility";
         $lines[] = '   Battery interchangeability across tool types';
         $lines[] = '   Setup time from compartment to operational';
-        $lines[] = '   Integration with existing MBFD apparatus layout';
+        $lines[] = '   Integration with existing MBFD apparatus configuration';
 
         $lines[] = "\n8. <h2>Evaluator Feedback Analysis</h2> — Synthesize the anonymous evaluator comments provided above";
         $lines[] = '   Identify recurring themes (positive and negative) per brand';

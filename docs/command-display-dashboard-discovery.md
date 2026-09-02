@@ -29,7 +29,7 @@ start from zero. The hub already exposes:
 | `SmartUpdatesController` | AI-generated operational summary + action items + risks (proxies a Cloudflare Worker today) | `app/Http/Controllers/Api/SmartUpdatesController.php` (`GET /api/admin/smart-updates`) |
 | `CommandCenterAiService` | Single source of truth for ops metrics + change-driven (fingerprint) AI brief caching, dispatches `GenerateCommandCenterSummaryJob`; wired to local `qwen3.6:35b` via `LocalAIService` | `app/Services/CommandCenterAiService.php`, `app/Services/LocalAIService.php` |
 | `StationOperationsHubWidget` | Per-station rollup (today's inspections, station inspections, equipment/supply/big-ticket requests, open defects), batch-loaded, 30s poll | `app/Filament/Widgets/StationOperationsHubWidget.php` |
-| Public read API | Redacted apparatus/station/TRT endpoints already serving the daily-checkout SPA and apparatus-layout | `routes/api.php` (`/api/public/*`) |
+| Public read API | Redacted apparatus/station/TRT endpoints serving the daily-checkout SPA | `routes/api.php` (`/api/public/*`) |
 | `IncidentsController` | PulsePoint active-runs proxy with 60s server cache (public, `throttle:60,1`) | `app/Http/Controllers/IncidentsController.php` (`GET /api/incidents`) |
 
 **Feasibility verdict.** **Feasible and low-risk.** The hub already aggregates exactly the
@@ -110,11 +110,11 @@ following are explicitly **do-not-touch / do-not-modify**:
 | Styling | Tailwind 3.4.13 | `tailwind.config.js` |
 | Server state | TanStack Query 5.90.21 | `resources/js/daily-checkout/src/providers/QueryProvider.tsx` |
 | Client state | Zustand 5.0.11 | `resources/js/pump-simulator/` |
-| Canvas / motion | Konva 10.2.1 + react-konva, framer-motion 12.34.5 | `resources/js/apparatus-layout/` |
+| Motion | framer-motion 12.34.5 | `resources/js/daily-checkout/` |
 | Offline | Dexie 4.3.0 (IndexedDB), service workers | `resources/js/daily-checkout/`, `public/admin-pwa/` |
 
-Frontend is a **multi-app monorepo**: landing (`/`), Daily Checkout SPA (`/daily/*`), Apparatus
-Layout Planner (`/apparatus-layout`), Pump Simulator (`/pump-simulator`), Workgroup Data
+Frontend is a **multi-app monorepo**: landing (`/`), Daily Checkout SPA (`/daily/*`), Pump
+Simulator (`/pump-simulator`), Workgroup Data
 Dashboard, and an Admin Desktop PWA (`/admin/*`). **No Three.js is present today** — a greenfield
 opportunity for the display.
 
@@ -763,7 +763,7 @@ solid `#0F172A` fallback and a WebGL-detection guard — never blocking the data
 - `package.json`, `vite.config.js`, `tsconfig.json`, `tailwind.config.js` — stack/versions.
 - `resources/js/app.js` — Sentry bootstrap.
 - `resources/js/daily-checkout/src/main.tsx` + `components/*` — submission SPA (InspectionWizard, StationInspectionWizard, StationInventoryForm, BigTicketRequestForm, RoomAssetTracker, TrtInventoryWizard).
-- `resources/js/apparatus-layout/`, `resources/js/pump-simulator/` — Konva/Zustand patterns.
+- `resources/js/pump-simulator/` — Zustand patterns.
 
 **External repos (reference only)**
 - `D:\GitHub_Repos\media-control\frontend\js\views\{video-wall,dashboard,media-control/camera-feeds,media-control/camera-feeds-catalog}.js` — large-display + camera patterns.

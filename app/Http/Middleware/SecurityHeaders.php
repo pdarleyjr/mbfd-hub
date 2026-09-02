@@ -42,7 +42,7 @@ class SecurityHeaders
         // This permissive baseline is calibrated for Filament v3 (inline Alpine.js
         // attributes, Livewire hydration scripts), Vite's HMR client in dev, Reverb
         // WebSockets, Tailwind injected styles, Cloudflare Insights, and the React
-        // SPAs under /daily/* /pump-simulator/* /apparatus-layout/*.
+        // SPAs under /daily/* and /pump-simulator/*.
         //
         // Post-promotion monitoring: watch Sentry for CSP violation reports.
         //   docker exec mbfd-hub-laravel grep -F '[CSP]' storage/logs/laravel-$(date +%F).log
