@@ -532,6 +532,43 @@ async function drawInspectionSignature(page: Page): Promise<void> {
   await page.mouse.up();
 }
 
+test('station inspection exposes labeled controls, keyboard state buttons, and inline submission errors', async ({ page }) => {
+  await mockInspectionApi(page);
+  await page.goto('/daily/forms-hub/station-inspection');
+
+  const station = page.getByLabel('Station');
+  const inspectionDate = page.getByLabel('Inspection Date');
+  await expect(station).toBeVisible();
+  await expect(inspectionDate).toBeVisible();
+  expect((await station.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  expect((await inspectionDate.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+
+  await station.selectOption('Station 1');
+  const next = page.getByRole('button', { name: 'Next' });
+  await next.focus();
+  await page.keyboard.press('Enter');
+
+  const apparatusDoors = page.getByRole('group', { name: 'Apparatus Doors status' });
+  await expect(apparatusDoors).toBeVisible();
+  const pass = apparatusDoors.getByRole('button', { name: 'Apparatus Doors: pass' });
+  await pass.focus();
+  await page.keyboard.press('Enter');
+  await expect(pass).toHaveAttribute('aria-pressed', 'true');
+
+  for (const passAll of await page.getByRole('button', { name: 'Pass All' }).all()) {
+    await passAll.click();
+  }
+  await page.getByRole('button', { name: 'Next' }).click();
+
+  await expect(page.getByRole('img', { name: 'Inspector signature' })).toBeVisible();
+  await drawInspectionSignature(page);
+  await page.getByRole('checkbox', { name: /Saturday SOG Mandate/ }).check();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('alert')).toContainText('Unmocked API route: /api/public/station_inspection');
+});
+
 async function queuedInspections(page: Page): Promise<QueuedInspection[]> {
   return page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -1282,6 +1319,10 @@ test('generic offline records enforce ownership per record on a shared device', 
     status: 'requires_attention',
     lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
   });
+  const ownershipAlert = page.getByRole('alert').filter({ hasText: 'belongs to a different signed-in member' });
+  await expect(ownershipAlert).toBeVisible();
+  await expect(ownershipAlert).not.toContainText('101');
+  await expect(ownershipAlert).not.toContainText('202');
 });
 
 test('queued inspection reports pending review after reconnect without retaining a duplicate queue item', async ({ page, context }) => {

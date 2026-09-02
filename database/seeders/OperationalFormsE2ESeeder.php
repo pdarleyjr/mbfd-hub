@@ -30,16 +30,38 @@ class OperationalFormsE2ESeeder extends Seeder
                 'must_change_password' => false,
             ],
         );
-        $this->ensurePermissionTables();
-        $adminId = DB::table('users')->insertGetId([
-            'name' => 'Operational Forms Test Admin',
+        $canonicalUser = User::query()->firstOrNew([
+            'email' => 'forms-member@example.test',
+        ]);
+        $canonicalUser->forceFill([
+            'name' => 'Operational Forms Test Member',
+            'password' => Hash::make(env('OPERATIONAL_FORMS_E2E_PASSWORD', 'OperationalForms!1')),
+            'employee_profile_id' => $employee->id,
+            'account_status' => 'active',
+            'must_change_password' => false,
+        ])->save();
+
+        $adminEmployee = Employee::query()->updateOrCreate(
+            ['employee_id' => env('OPERATIONAL_FORMS_E2E_ADMIN_EMPLOYEE_ID', 'E215')],
+            [
+                'name' => 'Operational Forms Test Admin',
+                'rank' => 'Captain',
+                'password' => Hash::make(env('OPERATIONAL_FORMS_E2E_ADMIN_PASSWORD', 'OperationalFormsAdmin!1')),
+                'must_change_password' => false,
+            ],
+        );
+        $admin = User::query()->firstOrNew([
             'email' => env('OPERATIONAL_FORMS_E2E_ADMIN_EMAIL', 'forms-admin@example.test'),
+        ]);
+        $admin->forceFill([
+            'name' => 'Operational Forms Test Admin',
             'password' => Hash::make(env('OPERATIONAL_FORMS_E2E_ADMIN_PASSWORD', 'OperationalFormsAdmin!1')),
+            'employee_profile_id' => $adminEmployee->id,
+            'account_status' => 'active',
             'is_admin' => true,
             'must_change_password' => false,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        ])->save();
+        $this->ensurePermissionTables();
         $roleId = DB::table('roles')->insertGetId([
             'name' => 'admin',
             'guard_name' => 'web',
@@ -49,7 +71,7 @@ class OperationalFormsE2ESeeder extends Seeder
         DB::table('model_has_roles')->insert([
             'role_id' => $roleId,
             'model_type' => User::class,
-            'model_id' => $adminId,
+            'model_id' => $admin->id,
         ]);
 
         $this->seedControlledSamples($employee);
@@ -57,37 +79,51 @@ class OperationalFormsE2ESeeder extends Seeder
 
     private function ensurePermissionTables(): void
     {
-        Schema::create('permissions', function (Blueprint $table): void {
-            $table->id();
-            $table->string('name');
-            $table->string('guard_name');
-            $table->timestamps();
-            $table->unique(['name', 'guard_name']);
-        });
-        Schema::create('roles', function (Blueprint $table): void {
-            $table->id();
-            $table->string('name');
-            $table->string('guard_name');
-            $table->timestamps();
-            $table->unique(['name', 'guard_name']);
-        });
-        Schema::create('model_has_permissions', function (Blueprint $table): void {
-            $table->unsignedBigInteger('permission_id');
-            $table->string('model_type');
-            $table->unsignedBigInteger('model_id');
-            $table->primary(['permission_id', 'model_id', 'model_type']);
-        });
-        Schema::create('model_has_roles', function (Blueprint $table): void {
-            $table->unsignedBigInteger('role_id');
-            $table->string('model_type');
-            $table->unsignedBigInteger('model_id');
-            $table->primary(['role_id', 'model_id', 'model_type']);
-        });
-        Schema::create('role_has_permissions', function (Blueprint $table): void {
-            $table->unsignedBigInteger('permission_id');
-            $table->unsignedBigInteger('role_id');
-            $table->primary(['permission_id', 'role_id']);
-        });
+        if (! Schema::hasTable('permissions')) {
+            Schema::create('permissions', function (Blueprint $table): void {
+                $table->id();
+                $table->string('name');
+                $table->string('guard_name');
+                $table->timestamps();
+                $table->unique(['name', 'guard_name']);
+            });
+        }
+
+        if (! Schema::hasTable('roles')) {
+            Schema::create('roles', function (Blueprint $table): void {
+                $table->id();
+                $table->string('name');
+                $table->string('guard_name');
+                $table->timestamps();
+                $table->unique(['name', 'guard_name']);
+            });
+        }
+
+        if (! Schema::hasTable('model_has_permissions')) {
+            Schema::create('model_has_permissions', function (Blueprint $table): void {
+                $table->unsignedBigInteger('permission_id');
+                $table->string('model_type');
+                $table->unsignedBigInteger('model_id');
+                $table->primary(['permission_id', 'model_id', 'model_type']);
+            });
+        }
+
+        if (! Schema::hasTable('model_has_roles')) {
+            Schema::create('model_has_roles', function (Blueprint $table): void {
+                $table->unsignedBigInteger('role_id');
+                $table->string('model_type');
+                $table->unsignedBigInteger('model_id');
+                $table->primary(['role_id', 'model_id', 'model_type']);
+            });
+        }
+
+        if (! Schema::hasTable('role_has_permissions')) {
+            Schema::create('role_has_permissions', function (Blueprint $table): void {
+                $table->unsignedBigInteger('permission_id');
+                $table->unsignedBigInteger('role_id');
+                $table->primary(['permission_id', 'role_id']);
+            });
+        }
     }
 
     private function seedControlledSamples(Employee $employee): void

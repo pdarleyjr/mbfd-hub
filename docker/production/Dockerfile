@@ -66,7 +66,9 @@ RUN set -eux; \
         curl \
         git \
         gnupg \
+        poppler-utils \
         python3 \
+        qpdf \
         sqlite3 \
         supervisor \
         unzip \
@@ -174,6 +176,18 @@ RUN SENTRY_AUTH_TOKEN='' \
     && npm ci --ignore-scripts --legacy-peer-deps \
     && DAILY_CHECKOUT_OUT_DIR=../../../public/daily npm run build
 
+# Operational Forms executes its checked-in Node generator at runtime. Keep
+# that dependency surface to production packages only; frontend dev tooling is
+# intentionally not copied into the final PHP image.
+FROM ${NODE_IMAGE} AS pdf-generator-runtime
+
+WORKDIR /var/www/html
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts --legacy-peer-deps \
+    && test -d node_modules/pdf-lib \
+    && node --input-type=module -e "import('pdf-lib')"
+
 FROM php-runtime-base AS application-build
 
 ARG SOURCE_REVISION
@@ -230,6 +244,8 @@ LABEL org.opencontainers.image.source="https://github.com/pdarleyjr/mbfd-hub" \
       org.opencontainers.image.revision="${SOURCE_REVISION}"
 
 COPY --from=application-build --chown=sail:sail /var/www/html /var/www/html
+COPY --from=pdf-generator-runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=pdf-generator-runtime --chown=sail:sail /var/www/html/node_modules /var/www/html/node_modules
 
 RUN set -eux; \
     test -n "${SOURCE_REVISION}"; \
@@ -238,6 +254,13 @@ RUN set -eux; \
     ln -s ../storage/app/public /var/www/html/public/storage; \
     chmod -R ug=rwX /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/public; \
     test -s /var/www/html/public/build/manifest.json; \
-    test -s /var/www/html/public/daily/index.html
+    test -s /var/www/html/public/daily/index.html; \
+    command -v node; \
+    node --version; \
+    node --input-type=module -e "import('pdf-lib')"; \
+    command -v qpdf; \
+    qpdf --version; \
+    command -v pdfinfo; \
+    pdfinfo -v
 
 USER sail

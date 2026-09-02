@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 const employeeId = process.env.OPERATIONAL_FORMS_E2E_EMPLOYEE_ID ?? 'E214';
 const password = process.env.OPERATIONAL_FORMS_E2E_PASSWORD ?? 'OperationalForms!1';
-const adminEmail = process.env.OPERATIONAL_FORMS_E2E_ADMIN_EMAIL ?? 'forms-admin@example.test';
+const adminEmployeeId = process.env.OPERATIONAL_FORMS_E2E_ADMIN_EMPLOYEE_ID ?? 'E215';
 const adminPassword = process.env.OPERATIONAL_FORMS_E2E_ADMIN_PASSWORD ?? 'OperationalFormsAdmin!1';
 
 test('updated home exposes the exact operational destinations', async ({ page }, testInfo) => {
@@ -15,7 +15,7 @@ test('updated home exposes the exact operational destinations', async ({ page },
 
 test('employee can enter the controlled forms workspace and start an ICS 214', async ({ page }, testInfo) => {
   await page.goto('/employee/forms');
-  await expect(page).toHaveURL(/\/employee\/login/);
+  await expect(page).toHaveURL(/\/login/);
 
   await page.getByLabel('Employee ID').fill(employeeId);
   await page.getByLabel('Password').fill(password);
@@ -60,7 +60,8 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
 test('employee dashboard header returns members to the main MBFD Hub', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'One touch-device header acceptance is sufficient.');
 
-  await page.goto('/employee/login');
+  await page.goto('/employee/dashboard');
+  await expect(page).toHaveURL(/\/login/);
   await page.getByLabel('Employee ID').fill(employeeId);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
@@ -108,12 +109,12 @@ test('employee can submit an arbitrary completed file from the Forms library', a
 });
 
 test('employee creates a F-ROC and imports R6 activity notes into the real editor', async ({ page }, testInfo) => {
-  await page.goto('/employee/login');
+  await page.goto('/employee/forms');
+  await expect(page).toHaveURL(/\/login/);
   await page.getByLabel('Employee ID').fill(employeeId);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page).toHaveURL(/\/employee\/dashboard/, { timeout: 30_000 });
-  await page.goto('/employee/forms');
+  await expect(page).toHaveURL(/\/employee\/forms$/, { timeout: 30_000 });
   await expect(page.locator('.fi-sidebar-close-overlay')).toBeHidden();
   await expect(page.locator('.of-record-table tbody tr').filter({ hasText: 'E2E Controlled ICS 214' })).toBeVisible();
   const initialRecordCount = await page.locator('.of-record-table tbody tr').count();
@@ -205,12 +206,12 @@ test('desktop employee previews a generated flattened ICS PDF', async ({ page },
 test('admin Forms resource exposes separate controlled-form tabs', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Admin visual acceptance runs once on desktop.');
 
-  await page.goto('/admin/login');
-  await page.getByLabel('Email address').fill(adminEmail);
+  await page.goto('/admin/operational-forms');
+  await expect(page).toHaveURL(/\/login/);
+  await page.getByLabel('Employee ID').fill(adminEmployeeId);
   await page.getByLabel('Password').fill(adminPassword);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page).toHaveURL(/\/admin\/?$/, { timeout: 30_000 });
-  await page.goto('/admin/operational-forms');
+  await expect(page).toHaveURL(/\/admin\/operational-forms$/, { timeout: 30_000 });
   await expect(page.getByText('ICS 214', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('F-ROC Daily Activity Reports', { exact: true })).toBeVisible();
   await expect(page.getByText('Submitted files', { exact: true })).toBeVisible();

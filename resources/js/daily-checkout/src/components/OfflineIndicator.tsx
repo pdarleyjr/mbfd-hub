@@ -1,6 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useOffline } from '../hooks/useOffline';
 import { getDailyCheckoutQueueSummary, onDailyCheckoutQueueChanged } from '../utils/dailyCheckoutSubmissionQueue';
+import { getPendingSubmissionQueueSummary } from '../lib/sync';
+
+const attentionGuidance = (errorCode?: string, error?: string): string => {
+  switch (errorCode) {
+    case 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED':
+      return 'The checklist changed after this inspection was saved. An officer must reconcile it with the current checklist before a new submission is created.';
+    case 'OFFLINE_QUEUE_OWNER_MISMATCH':
+      return 'This saved work belongs to a different signed-in member and was not submitted. Sign in as the original member or ask an officer for help.';
+    case 'OFFLINE_QUEUE_SECURITY_VERSION_MISMATCH':
+      return 'The account security context changed after this work was saved. An officer must review it before it can be submitted.';
+    case 'OFFLINE_QUEUE_OWNER_LEGACY':
+      return 'This saved work predates account-bound offline queues. An officer must review it before it can be submitted.';
+    default:
+      return error ?? 'An officer must review the saved work before it can be submitted.';
+  }
+};
 
 export default function OfflineIndicator() {
   const isOffline = useOffline();
@@ -16,18 +32,21 @@ export default function OfflineIndicator() {
     let mounted = true;
     const updateQueue = async () => {
       try {
-        const summary = await getDailyCheckoutQueueSummary();
+        const [dailySummary, formSummary] = await Promise.all([
+          getDailyCheckoutQueueSummary(),
+          getPendingSubmissionQueueSummary(),
+        ]);
         if (!mounted) {
           return;
         }
 
-        setQueueCount(summary.total);
-        setPendingCount(summary.pending);
-        setAttentionCount(summary.requiresAttention);
-        setAttentionError(summary.firstAttentionError);
-        setAttentionErrorCode(summary.firstAttentionErrorCode);
+        setQueueCount(dailySummary.total + formSummary.total);
+        setPendingCount(dailySummary.pending + formSummary.pending);
+        setAttentionCount(dailySummary.requiresAttention + formSummary.requiresAttention);
+        setAttentionError(formSummary.firstAttentionError ?? dailySummary.firstAttentionError);
+        setAttentionErrorCode(formSummary.firstAttentionErrorCode ?? dailySummary.firstAttentionErrorCode);
       } catch (error) {
-        console.error('Failed to read the Daily Checkout submission queue:', error);
+        console.error('Failed to read the saved submission queues:', error);
       }
     };
 
@@ -64,9 +83,9 @@ export default function OfflineIndicator() {
   return (
     <>
       {/* Offline Banner */}
-      {isOffline && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-white px-4 py-2 text-center text-sm font-medium shadow-lg">
-          <span className="inline-block mr-2">⚠️</span>
+      {isOffline && attentionCount === 0 && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-white px-4 py-2 text-center text-sm font-medium shadow-lg" role="status">
+          <span className="inline-block mr-2" aria-hidden="true">⚠️</span>
           Offline Mode - Changes will be saved locally
           {queueCount > 0 && (
             <span className="ml-2 inline-block bg-yellow-600 px-2 py-0.5 rounded-full text-xs">
@@ -82,14 +101,10 @@ export default function OfflineIndicator() {
           role="alert"
         >
           <p>
-            {attentionCount} saved Daily Checkout submission{attentionCount > 1 ? 's need' : ' needs'} review before it can be sent. The payload remains saved on this device.
+            {attentionCount} saved submission{attentionCount > 1 ? 's need' : ' needs'} review before it can be sent. The payload remains saved on this device.
           </p>
-          {attentionErrorCode === 'DAILY_CHECKOUT_CHECKLIST_VERSION_REVIEW_REQUIRED' && (
-            <p className="mt-1 text-red-100">
-              The checklist changed after this inspection was saved. An officer must reconcile it with the current checklist before a new submission is created.
-            </p>
-          )}
-          {attentionError && <p className="mt-1 text-red-100">Latest server response: {attentionError}</p>}
+          <p className="mt-1 text-red-100">{attentionGuidance(attentionErrorCode, attentionError)}</p>
+          {isOffline && <p className="mt-1 text-red-100">This device is offline; the saved work will remain on this device.</p>}
         </div>
       )}
 
@@ -100,11 +115,11 @@ export default function OfflineIndicator() {
           role="alert"
         >
           <div className="flex items-start">
-            <span className="mr-2">{isOffline ? '⚠️' : '✓'}</span>
+            <span className="mr-2" aria-hidden="true">{isOffline ? '⚠️' : '✓'}</span>
             <p className="flex-1">{toastMessage}</p>
             <button
               onClick={() => setShowToast(false)}
-              className="ml-2 text-gray-400 hover:text-white"
+              className="ml-2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-white"
               aria-label="Close notification"
             >
               ✕
