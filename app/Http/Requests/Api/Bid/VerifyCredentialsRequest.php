@@ -18,7 +18,7 @@ class VerifyCredentialsRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Authorization is handled by the verify.bid.token middleware on
+        // Authorization is handled by the verify.bid.reader middleware on
         // the route definition (see routes/api.php). FormRequest just
         // validates shape.
         return true;

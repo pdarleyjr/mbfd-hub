@@ -20,6 +20,8 @@ final class CanonicalAuthorizationTest extends TestCase
 
     private const CALLBACK = 'https://staging.bid.mbfdhub.com/api/auth/callback';
 
+    private const FEDERATION_TOKEN = 'test-bid-federation-secret-do-not-use-in-prod';
+
     private const READER_TOKEN = 'test-bid-reader-secret-do-not-use-in-prod';
 
     private const STATE = 'uQxS6x3Mki8aUHsi_vB1m2zY9kt_P4DSxMZ0nNfw2-I';
@@ -29,6 +31,7 @@ final class CanonicalAuthorizationTest extends TestCase
         parent::setUp();
 
         Cache::flush();
+        config()->set('services.bid.federation_token', self::FEDERATION_TOKEN);
         config()->set('services.bid.reader_token', self::READER_TOKEN);
         config()->set('services.bid.authorization.issuer', 'https://www.mbfdhub.com');
         config()->set('services.bid.authorization.code_ttl_seconds', 60);
@@ -66,6 +69,8 @@ final class CanonicalAuthorizationTest extends TestCase
         $response->assertOk()->assertJson([
             'issuer' => 'https://www.mbfdhub.com',
             'audience' => 'bid',
+            'hub_user_id' => $user->id,
+            'security_version' => 1,
             'member_id' => $user->employeeProfile->id,
             'employee_id' => $user->employeeProfile->employee_id,
             'first_name' => 'Canonical',
@@ -199,6 +204,48 @@ final class CanonicalAuthorizationTest extends TestCase
         $this->exchange($disabledCode)->assertUnauthorized();
     }
 
+    public function test_code_cannot_outlive_canonical_employee_linkage(): void
+    {
+        $user = $this->linkedUser();
+        $this->canonicalLogin($user);
+        $code = $this->issuedCode();
+        $replacement = Employee::query()->create([
+            'employee_id' => 'BID-RELINKED',
+            'name' => 'Relinked Bid Member',
+            'rank' => 'Captain',
+        ]);
+        $user->forceFill(['employee_profile_id' => $replacement->id])->save();
+
+        $this->exchange($code)->assertUnauthorized();
+    }
+
+    public function test_exchange_requires_the_dedicated_federation_credential(): void
+    {
+        $this->canonicalLogin($this->linkedUser());
+        $code = $this->issuedCode();
+        $payload = [
+            'code' => $code,
+            'client_id' => 'bid',
+            'redirect_uri' => self::CALLBACK,
+        ];
+
+        $this->postJson('/api/v2/bid/auth/exchange', $payload)->assertUnauthorized();
+        $this->withHeaders(['Authorization' => 'Bearer invalid-token'])
+            ->postJson('/api/v2/bid/auth/exchange', $payload)
+            ->assertUnauthorized();
+        $this->withHeaders(['Authorization' => 'Bearer '.self::READER_TOKEN])
+            ->postJson('/api/v2/bid/auth/exchange', $payload)
+            ->assertUnauthorized();
+
+        $this->exchange($code)->assertOk();
+
+        $unconfiguredCode = $this->issuedCode();
+        config()->set('services.bid.federation_token', null);
+        $this->exchange($unconfiguredCode)
+            ->assertServiceUnavailable()
+            ->assertExactJson(['error' => 'bid_federation_unavailable']);
+    }
+
     private function linkedUser(string $employeeId = 'BID-1001'): User
     {
         $employee = Employee::query()->create([
@@ -259,7 +306,7 @@ final class CanonicalAuthorizationTest extends TestCase
         string $clientId = 'bid',
         string $callback = self::CALLBACK,
     ) {
-        return $this->withHeaders(['Authorization' => 'Bearer '.self::READER_TOKEN])
+        return $this->withHeaders(['Authorization' => 'Bearer '.self::FEDERATION_TOKEN])
             ->postJson('/api/v2/bid/auth/exchange', [
                 'code' => $code,
                 'client_id' => $clientId,

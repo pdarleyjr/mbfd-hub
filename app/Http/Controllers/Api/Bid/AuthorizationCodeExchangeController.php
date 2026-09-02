@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Services\Bid\BidAuthorizationCodeBroker;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 final class AuthorizationCodeExchangeController extends Controller
@@ -26,6 +27,11 @@ final class AuthorizationCodeExchangeController extends Controller
         );
 
         if ($record === null) {
+            Log::info('bid.federation.exchange', [
+                'result' => 'failure',
+                'category' => 'invalid_authorization_code',
+            ]);
+
             return response()->json(['error' => 'invalid_authorization_code'], 401);
         }
 
@@ -39,12 +45,22 @@ final class AuthorizationCodeExchangeController extends Controller
             || (int) $user->security_version !== $record['security_version']
             || ! $employee instanceof Employee
             || (int) $employee->getKey() !== $record['employee_profile_id']) {
+            Log::info('bid.federation.exchange', [
+                'result' => 'failure',
+                'category' => 'invalid_identity',
+            ]);
+
             return response()->json(['error' => 'invalid_authorization_code'], 401);
         }
 
         try {
             $role = $user->hasCurrentAdminPanelEntitlement() ? 'admin' : 'member';
         } catch (Throwable) {
+            Log::info('bid.federation.exchange', [
+                'result' => 'failure',
+                'category' => 'authorization_unavailable',
+            ]);
+
             return response()->json(['error' => 'authorization_unavailable'], 503);
         }
 
@@ -52,12 +68,18 @@ final class AuthorizationCodeExchangeController extends Controller
         $response = response()->json([
             'issuer' => $record['issuer'],
             'audience' => $record['audience'],
+            'hub_user_id' => (int) $user->getKey(),
+            'security_version' => (int) $user->security_version,
             'member_id' => (int) $employee->getKey(),
             'employee_id' => (string) $employee->employee_id,
             'first_name' => $firstName,
             'last_name' => $lastName,
             'rank' => (string) ($employee->rank ?? ''),
             'role' => $role,
+        ]);
+        Log::info('bid.federation.exchange', [
+            'result' => 'success',
+            'category' => 'exchanged',
         ]);
         $response->headers->set('Cache-Control', 'no-store, private');
 
