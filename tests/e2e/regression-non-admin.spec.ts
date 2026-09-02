@@ -24,8 +24,6 @@ const publicRoutes: ReadonlyArray<PublicRoute> = [
   { path: '/', expectedText: /MBFD|Hub|Support/i, label: 'home' },
   // The pump simulator is a public training tool — must work on every viewport
   { path: '/pump-simulator', expectedText: /pump|simulator|training/i, label: 'pump-simulator' },
-  // Apparatus layout planner
-  { path: '/apparatus-layout', expectedText: /apparatus|layout/i, label: 'apparatus-layout' },
 ];
 
 async function captureBaseline(page: Page, name: string): Promise<void> {
@@ -76,6 +74,23 @@ test.describe('non-admin routes regression', () => {
       expect(errors, `Page errors on ${route.path}: ${errors.join(', ')}`).toHaveLength(0);
     });
   }
+
+  test('removed apparatus layout does not appear in navigation or load its manifest', async ({ page }) => {
+    const requests: string[] = [];
+    const errors: string[] = [];
+
+    page.on('request', (request) => requests.push(request.url()));
+    page.on('pageerror', (error) => errors.push(error.message));
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('a[href="/apparatus-layout"]')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText('Apparatus Equipment Planner');
+    expect(requests.some((url) => url.includes('/data/tool-manifest.json'))).toBe(false);
+    expect(errors).toHaveLength(0);
+
+    const response = await page.goto('/apparatus-layout', { waitUntil: 'domcontentloaded' });
+    expect(response?.status()).toBe(404);
+  });
 
   test('admin PWA service worker is NOT registered on non-admin routes', async ({ page }) => {
     await page.goto('/');

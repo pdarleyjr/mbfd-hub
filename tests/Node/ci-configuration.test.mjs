@@ -253,15 +253,27 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(activation, /test "\$\(git rev-parse HEAD\)" = "\$RELEASE_SHA"/);
   assert.match(activation, /php artisan migrate:status/);
   assert.match(activation, /compose\.prod\.image\.yaml/);
-  assert.match(activation, /docker compose.*run --rm --no-deps --pull never/s);
+  assert.match(activation, /docker compose.*run --interactive=false --rm --no-deps --pull never/s);
   assert.match(activation, /--entrypoint bash/);
   assert.match(activation, /--name "\$HUB_MIGRATION_CONTAINER"/);
   assert.doesNotMatch(activation, /--service-ports/);
   assert.match(activation, /--no-build --no-deps --force-recreate laravel\.test/);
+  assert.match(activation, /OLD_CONTAINER_ID="\$\(docker inspect --format '\{\{\.Id\}\}' "\$HUB_APP_CONTAINER"\)"/);
+  assert.match(activation, /NEW_CONTAINER_ID="\$\(docker inspect --format '\{\{\.Id\}\}' "\$HUB_APP_CONTAINER"\)"/);
+  assert.match(activation, /test "\$NEW_CONTAINER_ID" != "\$OLD_CONTAINER_ID"/);
+  assert.match(activation, /\.State\.Running/);
+  assert.match(activation, /RUNNING_IMAGE_REF="\$\(docker inspect --format '\{\{\.Config\.Image\}\}' "\$HUB_APP_CONTAINER"\)"/);
+  assert.match(activation, /RUNNING_IMAGE_DIGEST="\$\{RUNNING_IMAGE_REF##\*@\}"/);
+  assert.match(activation, /test "\$RUNNING_IMAGE_DIGEST" = "\$FINAL_IMAGE_DIGEST"/);
+  assert.match(activation, /APPROVED_IMAGE_ID="\$\(docker image inspect --format '\{\{\.Id\}\}' "\$IMAGE_REF"\)"/);
+  assert.match(activation, /test "\$RUNNING_IMAGE_ID" = "\$APPROVED_IMAGE_ID"/);
+  assert.match(activation, /\.RepoDigests/);
+  assert.match(activation, /org\.opencontainers\.image\.revision/);
+  assert.match(activation, /\/var\/www\/html\/\.git-sha/);
   assert.doesNotMatch(activation, /composer install|npm ci|vite build|filament:assets/);
   assert.match(activation, /daily-checkout:activate-ledger --release-sha="\$RELEASE_SHA" --no-interaction/);
   assert.doesNotMatch(activation, /docker compose .* down|docker (?:system )?prune/);
-  const oneOffMigrationIndex = activation.indexOf("run --rm --no-deps --pull never");
+  const oneOffMigrationIndex = activation.indexOf("run --interactive=false --rm --no-deps --pull never");
   const recreateIndex = activation.indexOf("--no-build --no-deps --force-recreate laravel.test");
   const migrationIndex = activation.indexOf("php artisan migrate --force");
   const cutoverIndex = activation.indexOf("daily-checkout:activate-ledger");
@@ -286,10 +298,21 @@ test("production activation is manual, main-only, and blocked by every Hub relea
 
   const successfulActivation = workflowStep(deployment, "Record successful Hub candidate activation");
   assert.match(successfulActivation, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
-  assert.match(successfulActivation, /git rev-parse HEAD/);
+  assert.match(successfulActivation, /FINAL_IMAGE_DIGEST:\s*\$\{\{ inputs\.final_image_digest \}\}/);
+  assert.doesNotMatch(successfulActivation, /git rev-parse HEAD/);
+  assert.match(successfulActivation, /RUNNING_IMAGE_REF="\$\(docker inspect --format '\{\{\.Config\.Image\}\}' "\$HUB_APP_CONTAINER"\)"/);
+  assert.match(successfulActivation, /test "\$RUNNING_IMAGE_DIGEST" = "\$FINAL_IMAGE_DIGEST"/);
+  assert.match(successfulActivation, /org\.opencontainers\.image\.revision/);
+  assert.match(successfulActivation, /\/var\/www\/html\/\.git-sha/);
+  assert.match(successfulActivation, /"image_digest":"%s"/);
+  assert.match(successfulActivation, /"container_id":"%s"/);
   assert.match(successfulActivation, /deploy-marker\.json/);
   assert.match(successfulActivation, /docker exec -u sail "\$HUB_APP_CONTAINER" sh -c/);
   assert.match(successfulActivation, /\/var\/www\/html\/public\/deploy-marker\.json/);
+  assert.ok(
+    successfulActivation.indexOf("DEPLOY_MARKER=") > successfulActivation.indexOf('test "$RUNNING_GIT_SHA" = "$RELEASE_SHA"'),
+    "deployment marker must be created only after runtime provenance is verified",
+  );
 
   const publicSmoke = workflowStep(deployment, "Verify public Hub smoke routes");
   assert.match(publicSmoke, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
