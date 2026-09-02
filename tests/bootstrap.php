@@ -39,6 +39,7 @@ $testEnvironment = [
     'AWS_SECRET_ACCESS_KEY' => '',
     'BCRYPT_ROUNDS' => '4',
     'BID_CONSOLE_URL' => '',
+    'BID_FEDERATION_TOKEN' => '',
     'BID_READER_TOKEN' => '',
     'BROADCAST_DRIVER' => 'log',
     'CACHE_STORE' => 'array',

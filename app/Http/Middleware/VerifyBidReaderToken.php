@@ -14,7 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
  * /api/v2/verify-credentials) with a shared bearer token.
  *
  * The bid Cloudflare Worker holds the matching token in its
- * `PORTAL_BID_READER` env var. The portal compares against
+ * `PORTAL_BID_READER` env var. The Hub compares against
  * `config('services.bid.reader_token')`. Uses hash_equals() for
  * timing-safe comparison.
  *

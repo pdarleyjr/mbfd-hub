@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Log;
  * route only until deployed telemetry proves the legacy caller is gone.
  *
  * Routes (registered in routes/api.php):
- *   POST /api/v2/verify-credentials  (verify.bid.token middleware)
+ *   POST /api/v2/verify-credentials  (verify.bid.reader middleware)
  */
 class CredentialsController extends Controller
 {
@@ -39,12 +39,10 @@ class CredentialsController extends Controller
             ->first();
 
         if ($employee === null || ! Hash::check($password, $employee->password)) {
-            // Constant-time-ish: always log + always 401. Don't leak which
-            // half of the credential pair was wrong.
-            Log::channel(config('logging.default', 'stack'))->info(
-                'bid.verify_credentials.invalid',
-                ['employee_id' => $employeeId],
-            );
+            Log::info('bid.legacy_verify_credentials', [
+                'result' => 'failure',
+                'category' => 'invalid_credentials',
+            ]);
 
             return response()->json(['error' => 'invalid_credentials'], 401);
         }
@@ -53,7 +51,7 @@ class CredentialsController extends Controller
         // string but the bid app expects first/last separately.
         [$firstName, $lastName] = self::splitName((string) $employee->name);
 
-        return response()->json([
+        $response = response()->json([
             'member_id' => (int) $employee->id,
             'employee_id' => (string) $employee->employee_id,
             'first_name' => $firstName,
@@ -61,6 +59,12 @@ class CredentialsController extends Controller
             'rank' => (string) ($employee->rank ?? ''),
             'role' => self::resolveBidRole((string) $employee->employee_id),
         ]);
+        Log::info('bid.legacy_verify_credentials', [
+            'result' => 'success',
+            'category' => 'verified',
+        ]);
+
+        return $response;
     }
 
     /**

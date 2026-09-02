@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ApparatusController;
 use App\Http\Controllers\Api\AuthenticatedMemberContextController;
 use App\Http\Controllers\Api\Bid\AuthorizationCodeExchangeController as BidAuthorizationCodeExchangeController;
 use App\Http\Controllers\Api\Bid\CredentialsController as BidCredentialsController;
+use App\Http\Controllers\Api\Bid\IdentityRevalidationController as BidIdentityRevalidationController;
 use App\Http\Controllers\Api\BigTicketRequestController;
 use App\Http\Controllers\Api\DatabaseAuditController;
 use App\Http\Controllers\Api\Display\DisplayController;
@@ -223,19 +224,21 @@ Route::post('/apparatus-inspections/{inspection}/reject', [ApparatusController::
 
 // Station Inventory V2 (PIN-protected, real-time inventory management)
 // =========================================================================
-// MBFD Bid Cloudflare Worker bridge — POST /api/v2/verify-credentials
+// MBFD Bid Cloudflare Worker federation and transitional credential bridge
 //
-// The bid Worker calls this endpoint to validate a member's portal
-// credentials when they log into https://bid.mbfdhub.com /
-// https://staging.bid.mbfdhub.com. Gated by a shared bearer token
-// (BID_READER_TOKEN env on this side, PORTAL_BID_READER on the Worker side).
+// Canonical exchange/revalidation use BID_FEDERATION_TOKEN. The legacy password
+// verifier remains separately gated by BID_READER_TOKEN during the transition.
 // =========================================================================
-Route::prefix('v2')->middleware(['throttle:30,1', 'verify.bid.token'])->group(function () {
+Route::prefix('v2')->middleware(['throttle:30,1', 'verify.bid.federation'])->group(function () {
     Route::post('/bid/auth/exchange', BidAuthorizationCodeExchangeController::class)
         ->name('api.v2.bid.auth.exchange');
+    Route::post('/bid/auth/revalidate', BidIdentityRevalidationController::class)
+        ->name('api.v2.bid.auth.revalidate');
+});
 
+Route::prefix('v2')->middleware(['throttle:30,1', 'verify.bid.reader'])->group(function () {
     // Transitional only. The active Bid source uses the canonical code flow
-    // above; retain this endpoint until deployment telemetry proves zero use.
+    // above; retain this endpoint until production telemetry proves zero use.
     Route::post('/verify-credentials', [BidCredentialsController::class, 'verifyCredentials'])
         ->name('api.v2.bid.verify-credentials');
 });

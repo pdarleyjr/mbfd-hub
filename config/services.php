@@ -109,14 +109,14 @@ return [
     | MBFD Bid (Cloudflare Workers) Bridge
     |--------------------------------------------------------------------------
     |
-    | Shared bearer token gating the transitional /api/v2/verify-credentials
-    | route and /api/v2/bid/* endpoints called by the Bid Worker. The same value is set
-    | as PORTAL_BID_READER on the Worker side. If unset, the middleware fails
-    | closed (503) — the bridge is opt-in.
+    | Separate service credentials gate the canonical federation endpoints and
+    | the transitional password verifier. If either credential is unset, its
+    | middleware fails closed (503); neither credential falls back to the other.
     |
     */
     'bid' => [
         'reader_token' => env('BID_READER_TOKEN'),
+        'federation_token' => env('BID_FEDERATION_TOKEN'),
         // Convenience: where to send a member when they click "Bid Console"
         // from the portal home. Falls back to staging during cutover.
         'console_url' => env('BID_CONSOLE_URL', 'https://staging.bid.mbfdhub.com'),
