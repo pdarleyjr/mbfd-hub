@@ -21,7 +21,6 @@ module.exports = {
         // Non-admin routes — must NOT regress under mobile preset.
         'http://localhost:8000/',
         'http://localhost:8000/pump-simulator',
-        'http://localhost:8000/apparatus-layout',
       ],
       numberOfRuns: 3,
       settings: {

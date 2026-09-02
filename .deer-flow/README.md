@@ -207,9 +207,8 @@ Edit `workgroup_config.json` to customize:
 ## Integration Points
 
 ### Laravel Backend
-- API routes: `/api/public/apparatus-layout/*`
-- Database: PostgreSQL JSONB snapshots
 - File uploads: Filament admin panel
+- The obsolete Apparatus Layout Planner is retired; it has no active Hub API or snapshot storage.
 
 ### Cloudflare Worker
 - URL: `https://workgroup-ai.mbfdhub.com`
@@ -217,7 +216,6 @@ Edit `workgroup_config.json` to customize:
 - Vector Index: Cloudflare Vectorize
 
 ### React SPA
-- Apparatus Layout Planner
 - Evaluation submission forms
 - Results dashboard
 
