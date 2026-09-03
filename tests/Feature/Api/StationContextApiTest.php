@@ -37,6 +37,7 @@ class StationContextApiTest extends TestCase
             'requested_items' => 'SECRET personal uniform request',
             'status' => 'Pending',
         ]);
+        $this->actingAs($employee, 'employee');
 
         $response = $this->getJson("/api/public/stations/{$station->id}/activity")
             ->assertOk()
@@ -78,6 +79,7 @@ class StationContextApiTest extends TestCase
             'notes' => 'SECRET internal service note',
             'cost' => 950,
         ]);
+        $this->actingAs($employee, 'employee');
 
         $response = $this->getJson("/api/public/stations/{$station->id}/rooms/{$room->id}/profile")
             ->assertOk()
@@ -124,6 +126,7 @@ class StationContextApiTest extends TestCase
             'event_type' => 'retired',
             'event_at' => now(),
         ]);
+        $this->actingAs($employee, 'employee');
 
         $response = $this->getJson("/api/public/stations/{$station->id}/rooms/{$room->id}/profile")
             ->assertOk();

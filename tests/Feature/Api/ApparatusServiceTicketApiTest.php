@@ -144,6 +144,7 @@ class ApparatusServiceTicketApiTest extends TestCase
 
     public function test_public_station_and_apparatus_feeds_are_allowlisted_and_paginated(): void
     {
+        $this->actingAs($this->employee, 'employee');
         $service = app(ApparatusServiceTicketWorkflowService::class);
         $ticket = $service->submitFromEmployee($this->employee, $this->apparatus, [
             'client_submission_id' => '826c35fd-c6be-4b3c-953e-2a9a8cbce28f',
@@ -194,6 +195,7 @@ class ApparatusServiceTicketApiTest extends TestCase
 
     public function test_completed_tickets_leave_active_notices_but_remain_in_history(): void
     {
+        $this->actingAs($this->employee, 'employee');
         $service = app(ApparatusServiceTicketWorkflowService::class);
         $ticket = $service->createFleetTicket($this->apparatus, $this->makeAdmin('admin'), [
             'client_submission_id' => 'c8afdf15-b33b-44c8-a8a4-9f3a82818038',
@@ -218,6 +220,7 @@ class ApparatusServiceTicketApiTest extends TestCase
 
     public function test_station_activity_projects_each_ticket_workflow_event_without_private_notes(): void
     {
+        $this->actingAs($this->employee, 'employee');
         $service = app(ApparatusServiceTicketWorkflowService::class);
         $ticket = $service->submitFromEmployee($this->employee, $this->apparatus, [
             'client_submission_id' => '9d28d7ef-7733-4279-97f5-3170793518ea',

@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class ApparatusLayoutRemovalTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_planner_routes_are_removed_while_general_apparatus_routes_remain(): void
     {
         $plannerRoutes = collect(Route::getRoutes())->filter(
@@ -30,6 +33,7 @@ class ApparatusLayoutRemovalTest extends TestCase
     public function test_home_does_not_expose_the_removed_planner_and_its_retired_route_returns_404(): void
     {
         $this->withoutVite();
+        $this->actingAsCanonicalFixture();
 
         $this->get('/')
             ->assertOk()

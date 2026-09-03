@@ -176,7 +176,9 @@ jobs:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
       - name: Install Node dependencies
-        run: npm ci --ignore-scripts --legacy-peer-deps
+        run: |
+          npm ci --ignore-scripts --legacy-peer-deps
+          npm --prefix resources/js/daily-checkout ci --ignore-scripts
       - name: Prepare disposable PostgreSQL test application
         run: |
           cp .env.example .env
@@ -202,6 +204,11 @@ jobs:
           SENTRY_PROJECT_FRONTEND: ""
           VITE_SENTRY_DSN: ""
           VITE_SENTRY_RELEASE: ""
+        run: npm run build
+      - name: Build Daily Checkout test assets
+        working-directory: resources/js/daily-checkout
+        env:
+          DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
       - name: Run PHPUnit suite
         run: php artisan test --exclude-group=postgres
@@ -464,7 +471,9 @@ jobs:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
       - name: Install Node dependencies
-        run: npm ci --ignore-scripts --legacy-peer-deps
+        run: |
+          npm ci --ignore-scripts --legacy-peer-deps
+          npm --prefix resources/js/daily-checkout ci --ignore-scripts
       - name: Prepare PHP 8.5 disposable PostgreSQL test application
         run: |
           cp .env.example .env
@@ -490,6 +499,11 @@ jobs:
           SENTRY_PROJECT_FRONTEND: ""
           VITE_SENTRY_DSN: ""
           VITE_SENTRY_RELEASE: ""
+        run: npm run build
+      - name: Build Daily Checkout test assets
+        working-directory: resources/js/daily-checkout
+        env:
+          DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
       - name: Run PHP 8.5 PHPUnit compatibility suite
         run: php artisan test --exclude-group=postgres

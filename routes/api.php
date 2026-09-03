@@ -48,7 +48,7 @@ Route::prefix('admin/audit')->middleware(['web', 'auth', 'admin.role:super_admin
     Route::get('/check-employee-id/{employeeId}', [DatabaseAuditController::class, 'checkEmployeeIdCase']);
 });
 
-Route::prefix('public')->middleware('throttle:60,1')->group(function () {
+Route::prefix('public')->middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::get('apparatuses', [ApparatusController::class, 'index']);
     Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class, 'checklist']);
     Route::post('apparatuses/{apparatus}/inspection-sessions', [ApparatusController::class, 'startInspectionSession'])->middleware(['auth:sanctum', 'throttle:30,1']);

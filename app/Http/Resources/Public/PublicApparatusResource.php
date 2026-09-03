@@ -10,8 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Public, redacted view of an Apparatus for the unauthenticated daily-checkout
- * SPA. Allowlist only: identity + the fields the apparatus tab renders.
+ * Redacted view of an Apparatus for the authenticated daily-checkout SPA.
+ * Allowlist only: identity + the fields the apparatus tab renders.
  *
  * Never exposes VIN, internal notes, Snipe-IT asset ids, financials, or PM
  * history. Current meters are intentionally included because the checkout

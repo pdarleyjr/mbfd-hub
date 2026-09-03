@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
 use App\Models\User;
+use App\Services\Identity\CanonicalActivationIntent;
 use App\Services\Identity\CanonicalSessionPolicy;
 use App\Services\Identity\CanonicalUserResolver;
 use App\Services\Identity\SessionRegistry;
@@ -33,6 +35,7 @@ final class CanonicalLoginController extends Controller
     public function store(
         Request $request,
         CanonicalUserResolver $users,
+        CanonicalActivationIntent $activationIntents,
         CanonicalSessionPolicy $sessionPolicy,
         SessionRegistry $sessions,
     ): RedirectResponse {
@@ -49,14 +52,28 @@ final class CanonicalLoginController extends Controller
             return $this->denied($request, $employeeId, 'rate_limited');
         }
 
+        /** @var Employee|null $employee */
+        $employee = Employee::query()->where('employee_id', $employeeId)->first();
         $user = $users->byEmployeeId($employeeId);
         // Generate the same-cost throwaway hash for every attempt so the
         // externally generic response does not gain an obvious lookup timing path.
         $dummyHash = Hash::make(Str::random(48));
         $passwordMatches = Hash::check(
             $credentials['password'],
-            $user?->getAuthPassword() ?? $dummyHash,
+            $user?->getAuthPassword() ?? $employee?->getAuthPassword() ?? $dummyHash,
         );
+
+        if ($employee instanceof Employee && $user === null && $passwordMatches) {
+            RateLimiter::clear($throttleKey);
+            $request->session()->regenerate();
+            $activationIntents->issue($request->session(), $employee, CarbonImmutable::now());
+            Log::info('canonical_first_login_employee_verified', [
+                'employee_profile_id' => $employee->id,
+                'source_fingerprint' => hash_hmac('sha256', (string) $request->ip(), (string) config('app.key')),
+            ]);
+
+            return redirect('/activate-account');
+        }
 
         $denialReason = $this->denialReason($user, $passwordMatches);
         if ($denialReason !== null) {
@@ -122,6 +139,7 @@ final class CanonicalLoginController extends Controller
         }
 
         Auth::guard('web')->logout();
+        $request->session()->forget(CanonicalActivationIntent::SESSION_KEY);
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

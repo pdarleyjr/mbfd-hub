@@ -21,6 +21,16 @@ final class CanonicalHumanAuthenticationTest extends TestCase
 
     private const FAILURE_MESSAGE = 'The provided credentials are invalid.';
 
+    public function test_anonymous_human_surfaces_fail_closed_while_the_login_and_trust_page_remain_public(): void
+    {
+        $this->withoutVite();
+        $this->get('/')->assertRedirect('/login');
+        $this->get('/daily/stations')->assertRedirect('/login');
+        $this->getJson('/api/public/apparatuses')->assertUnauthorized();
+        $this->get('/login')->assertOk();
+        $this->get('/security-standards')->assertOk();
+    }
+
     public function test_linked_active_user_authenticates_by_employee_id_with_a_regenerated_registered_session(): void
     {
         $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
@@ -155,7 +165,22 @@ final class CanonicalHumanAuthenticationTest extends TestCase
         $this->assertDatabaseCount('authentication_sessions', 0);
     }
 
-    public function test_legacy_employee_id_without_canonical_profile_link_fails_closed(): void
+    public function test_unlinked_employee_requires_a_valid_legacy_employee_credential_before_activation(): void
+    {
+        $employee = $this->employee('UNLINKED-100', 'correct-employee-password');
+
+        $this->from('/login')->post('/login', [
+            'employee_id' => $employee->employee_id,
+            'password' => 'wrong-password',
+        ])->assertRedirect('/login')
+            ->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
+
+        $this->assertFalse(session()->has('auth.canonical_activation_intent'));
+        $this->assertDatabaseCount('users', 0);
+        $this->assertGuest('web');
+    }
+
+    public function test_legacy_employee_id_field_without_canonical_profile_link_cannot_authenticate_that_user(): void
     {
         $employee = $this->employee('10010', 'legacy-password');
         User::factory()->create([
@@ -170,8 +195,9 @@ final class CanonicalHumanAuthenticationTest extends TestCase
             'password' => 'legacy-password',
         ]);
 
-        $response->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
+        $response->assertRedirect('/activate-account');
         $this->assertGuest('web');
+        $this->assertTrue(session()->has('auth.canonical_activation_intent'));
         $this->assertDatabaseCount('authentication_sessions', 0);
     }
 

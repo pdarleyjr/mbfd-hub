@@ -171,7 +171,7 @@ export default function ApparatusList() {
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
                 {apparatus.name || apparatus.unit_id || 'Unknown'}
               </h2>
-              <p className="text-gray-600 mb-1">Unit: {apparatus.vehicle_number}</p>
+              <p className="text-gray-600 mb-1">Unit: {apparatus.vehicle_number ?? apparatus.unit_id ?? apparatus.designation ?? 'Not recorded'}</p>
               <p className="text-sm text-gray-500 capitalize">Type: {apparatus.type}</p>
               <div className="mt-4">
                 <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">

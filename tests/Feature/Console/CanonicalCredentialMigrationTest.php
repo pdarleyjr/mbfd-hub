@@ -119,7 +119,7 @@ final class CanonicalCredentialMigrationTest extends TestCase
             $user->refresh();
             $this->assertSame($employee->id, $user->employee_profile_id);
             $this->assertSame($canonicalHash, $user->getRawOriginal('password'));
-            $this->assertSame(1, $user->security_version);
+            $this->assertSame(2, $user->security_version);
         } finally {
             @unlink($ledger);
         }
@@ -139,6 +139,147 @@ final class CanonicalCredentialMigrationTest extends TestCase
 
             $this->assertSame(Command::FAILURE, $status);
             $this->assertNull($user->fresh()->employee_profile_id);
+        } finally {
+            @unlink($ledger);
+        }
+    }
+
+    public function test_link_activates_a_pending_legacy_user_without_replacing_its_identity(): void
+    {
+        [$user, $employee] = $this->identityPair('canonical-password', 'legacy-password');
+        $user->forceFill(['account_status' => AccountStatus::PendingActivation])->save();
+        $originalId = $user->id;
+        $ledger = $this->ledger($user, $employee, 'COPY_COMPATIBLE_LEGACY_HASH');
+
+        try {
+            $preview = $this->preview($ledger);
+            $status = Artisan::call('identity:reconcile-apply', [
+                '--approved-ledger' => $ledger,
+                '--snapshot-token' => $preview['snapshot_token'],
+                '--confirm' => 'APPLY_OWNER_APPROVED_LINKS',
+            ]);
+
+            $this->assertSame(Command::SUCCESS, $status, Artisan::output());
+            $user->refresh();
+            $this->assertSame($originalId, $user->id);
+            $this->assertSame($employee->employee_id, $user->employee_id);
+            $this->assertSame($employee->id, $user->employee_profile_id);
+            $this->assertSame(AccountStatus::Active, $user->account_status);
+        } finally {
+            @unlink($ledger);
+        }
+    }
+
+    public function test_create_user_copies_a_verified_legacy_bcrypt_and_is_idempotent(): void
+    {
+        $employee = Employee::query()->create([
+            'employee_id' => '20020',
+            'name' => 'Employee Only Identity',
+            'rank' => 'Firefighter',
+            'password' => 'legacy-human-password',
+            'must_change_password' => true,
+        ]);
+        $employeeHash = $employee->getRawOriginal('password');
+        $ledger = $this->createUserLedger($employee, 'LEGACY_HUMAN_BCRYPT_UNCHANGED');
+
+        try {
+            $firstPreview = $this->preview($ledger);
+            $firstStatus = Artisan::call('identity:reconcile-apply', [
+                '--approved-ledger' => $ledger,
+                '--snapshot-token' => $firstPreview['snapshot_token'],
+                '--confirm' => 'APPLY_OWNER_APPROVED_LINKS',
+            ]);
+            $firstResult = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+            $this->assertSame(Command::SUCCESS, $firstStatus);
+            $this->assertSame(1, $firstResult['users_created']);
+            $created = User::query()->where('employee_profile_id', $employee->id)->sole();
+            $this->assertSame("employee-{$employee->id}@canonical.mbfdhub.invalid", $created->email);
+            $this->assertSame($employee->employee_id, $created->employee_id);
+            $this->assertSame($employeeHash, $created->getRawOriginal('password'));
+            $this->assertSame(AccountStatus::Active, $created->account_status);
+            $this->assertTrue($created->must_change_password);
+            $this->assertCount(0, $created->roles);
+            $securityVersion = $created->security_version;
+
+            $secondPreview = $this->preview($ledger);
+            $secondStatus = Artisan::call('identity:reconcile-apply', [
+                '--approved-ledger' => $ledger,
+                '--snapshot-token' => $secondPreview['snapshot_token'],
+                '--confirm' => 'APPLY_OWNER_APPROVED_LINKS',
+            ]);
+            $secondResult = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+            $this->assertSame(Command::SUCCESS, $secondStatus);
+            $this->assertSame(0, $secondResult['users_created']);
+            $this->assertSame(1, $secondResult['already_applied']);
+            $this->assertSame(1, User::query()->where('employee_profile_id', $employee->id)->count());
+            $this->assertSame($securityVersion, $created->fresh()->security_version);
+        } finally {
+            @unlink($ledger);
+        }
+    }
+
+    public function test_create_user_with_unproven_credential_remains_pending_with_a_new_opaque_hash(): void
+    {
+        $employee = Employee::query()->create([
+            'employee_id' => '30030',
+            'name' => 'Post D03 Employee',
+            'rank' => 'Firefighter',
+            'password' => 'unproven-compatibility-password',
+            'must_change_password' => false,
+        ]);
+        $employeeHash = $employee->getRawOriginal('password');
+        $ledger = $this->createUserLedger($employee, 'POST_D03_OR_UNPROVEN_COMPATIBILITY_HASH');
+
+        try {
+            $preview = $this->preview($ledger);
+            $status = Artisan::call('identity:reconcile-apply', [
+                '--approved-ledger' => $ledger,
+                '--snapshot-token' => $preview['snapshot_token'],
+                '--confirm' => 'APPLY_OWNER_APPROVED_LINKS',
+            ]);
+
+            $this->assertSame(Command::SUCCESS, $status, Artisan::output());
+            $created = User::query()->where('employee_profile_id', $employee->id)->sole();
+            $this->assertSame(AccountStatus::PendingActivation, $created->account_status);
+            $this->assertNotSame($employeeHash, $created->getRawOriginal('password'));
+            $this->assertTrue($created->must_change_password);
+        } finally {
+            @unlink($ledger);
+        }
+    }
+
+    public function test_create_user_applies_only_explicit_ledger_entries_and_never_bulk_creates_employees(): void
+    {
+        $approved = Employee::query()->create([
+            'employee_id' => '40040',
+            'name' => 'Explicitly Approved Employee',
+            'rank' => 'Firefighter',
+            'password' => 'approved-password',
+            'must_change_password' => false,
+        ]);
+        $unapproved = Employee::query()->create([
+            'employee_id' => '50050',
+            'name' => 'Unapproved Employee',
+            'rank' => 'Firefighter',
+            'password' => 'unapproved-password',
+            'must_change_password' => false,
+        ]);
+        $ledger = $this->createUserLedger($approved, 'LEGACY_HUMAN_BCRYPT_UNCHANGED');
+
+        try {
+            $preview = $this->preview($ledger);
+            $status = Artisan::call('identity:reconcile-apply', [
+                '--approved-ledger' => $ledger,
+                '--snapshot-token' => $preview['snapshot_token'],
+                '--confirm' => 'APPLY_OWNER_APPROVED_LINKS',
+            ]);
+
+            $this->assertSame(Command::SUCCESS, $status, Artisan::output());
+            $this->assertSame(1, User::query()->count());
+            $this->assertTrue(User::query()->where('employee_profile_id', $approved->id)->exists());
+            $this->assertFalse(User::query()->where('employee_profile_id', $unapproved->id)->exists());
         } finally {
             @unlink($ledger);
         }
@@ -183,6 +324,27 @@ final class CanonicalCredentialMigrationTest extends TestCase
         file_put_contents($path, json_encode([
             'schema_version' => 1,
             'entries' => [$entry],
+        ], JSON_THROW_ON_ERROR));
+
+        return $path;
+    }
+
+    private function createUserLedger(Employee $employee, string $credentialProvenance): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'd01-create-user-ledger-');
+        self::assertNotFalse($path);
+        file_put_contents($path, json_encode([
+            'schema_version' => 1,
+            'entries' => [[
+                'user_id' => null,
+                'employee_id' => $employee->employee_id,
+                'decision' => 'CREATE_USER',
+                'approved_by' => 'Synthetic Identity Owner',
+                'approved_at' => '2026-09-03T09:00:00-04:00',
+                'approval_reference' => 'RECOVERY-TEST-CREATE-USER',
+                'notes' => 'Synthetic test approval only',
+                'credential_provenance' => $credentialProvenance,
+            ]],
         ], JSON_THROW_ON_ERROR));
 
         return $path;

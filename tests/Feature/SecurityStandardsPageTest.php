@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 final class SecurityStandardsPageTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_anonymous_user_can_view_security_standards_page(): void
     {
         $response = $this->get('/security-standards');
@@ -19,6 +22,7 @@ final class SecurityStandardsPageTest extends TestCase
 
     public function test_landing_page_footer_links_to_security_standards(): void
     {
+        $this->actingAsCanonicalFixture();
         $response = $this->get('/');
 
         $response->assertOk();

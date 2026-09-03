@@ -97,6 +97,7 @@ class StationRoomBlueprintTest extends TestCase
     {
         $station = $this->station(1);
         app(StationRoomBlueprintService::class)->sync($station);
+        $this->actingAsCanonicalFixture();
 
         $response = $this->getJson("/api/public/stations/{$station->id}/rooms")
             ->assertOk()

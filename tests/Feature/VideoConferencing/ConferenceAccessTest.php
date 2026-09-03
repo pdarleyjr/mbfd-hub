@@ -159,6 +159,7 @@ class ConferenceAccessTest extends TestCase
     public function test_homepage_does_not_expose_a_video_conferencing_launch(): void
     {
         $this->withoutVite();
+        $this->actingAsCanonicalFixture();
 
         $this->get('/')
             ->assertOk()

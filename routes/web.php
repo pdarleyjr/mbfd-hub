@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Bid\AuthorizationController as BidAuthorizationCont
 use App\Http\Controllers\Api\MediaControl\AuthorizationController as MediaControlAuthorizationController;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Auth\CanonicalLoginController;
+use App\Http\Controllers\Auth\FirstLoginCanonicalizationController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
 use App\Http\Controllers\Employee\OperationalForms\FormGenerationController;
@@ -53,7 +54,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
-});
+})->middleware('auth:web');
 
 // Public Security & Standards trust page — no auth required, indexable.
 Route::view('/security-standards', 'security-standards')
@@ -76,6 +77,10 @@ Route::post('/_csp-report', [\App\Http\Controllers\CspReportController::class, '
 Route::middleware('guest:web')->group(function (): void {
     Route::get('/login', [CanonicalLoginController::class, 'create'])->name('login');
     Route::post('/login', [CanonicalLoginController::class, 'store'])->name('login.store');
+    Route::get('/activate-account', [FirstLoginCanonicalizationController::class, 'create'])
+        ->name('activate-account.create');
+    Route::post('/activate-account', [FirstLoginCanonicalizationController::class, 'store'])
+        ->name('activate-account.store');
 });
 Route::post('/logout', [CanonicalLoginController::class, 'destroy'])
     ->middleware('auth:web')
@@ -224,8 +229,9 @@ Route::delete('/admin/operational-forms/records/{record}', [OperationalFormDelet
     ->middleware('auth:web')
     ->name('admin.operational-forms.records.destroy');
 
-// Pump Simulator - Public route for training
-Route::view('/pump-simulator', 'pump-simulator')->name('pump-simulator');
+Route::view('/pump-simulator', 'pump-simulator')
+    ->middleware('auth:web')
+    ->name('pump-simulator');
 
 // Serve manifest.json with no-cache headers to bypass CDN caching
 Route::get('/manifest.json', function () {
@@ -283,7 +289,7 @@ Route::get('/daily/{path?}', function () {
         'Pragma' => 'no-cache',
         'Expires' => '0',
     ]);
-})->where('path', '.+');
+})->where('path', '.+')->middleware('auth:web');
 
 Route::get('/__version', function () {
     $shaFile = base_path('.git-sha');

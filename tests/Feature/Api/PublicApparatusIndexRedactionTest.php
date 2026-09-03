@@ -60,6 +60,7 @@ class PublicApparatusIndexRedactionTest extends TestCase
             'daily_checkout_requirement' => 'required',
             'notes' => 'SECRET apparatus maintenance note',
         ]);
+        $this->actingAsCanonicalFixture();
     }
 
     public function test_public_apparatus_index_redacts_internal_fields(): void

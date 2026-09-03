@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Feature\OperationalForms;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class HomeNavigationTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_home_links_stations_and_operational_forms_to_the_exact_destinations(): void
     {
         $this->withoutVite();
+        $this->actingAsCanonicalFixture();
         $response = $this->get('/');
 
         $response->assertOk();

@@ -80,7 +80,7 @@ final class OwnerLedgerLoader
             throw new InvalidOwnerLedger("Owner ledger {$path} must be an object.");
         }
 
-        $allowed = ['user_id', 'employee_id', 'decision', 'approved_by', 'approved_at', 'approval_reference', 'notes', 'credential_action'];
+        $allowed = ['user_id', 'employee_id', 'decision', 'approved_by', 'approved_at', 'approval_reference', 'notes', 'credential_action', 'credential_provenance'];
         $unknown = array_diff(array_keys($row), $allowed);
         if ($unknown !== []) {
             throw new InvalidOwnerLedger("Owner ledger {$path} has unknown fields: ".implode(', ', $unknown).'.');
@@ -122,6 +122,25 @@ final class OwnerLedgerLoader
             throw new InvalidOwnerLedger("Owner ledger {$path}.credential_action is only valid for a LINK decision.");
         }
 
+        $credentialProvenance = $row['credential_provenance'] ?? null;
+        $provenanceValues = [
+            'LEGACY_HUMAN_BCRYPT_UNCHANGED',
+            'POST_D03_OR_UNPROVEN_COMPATIBILITY_HASH',
+            'MISSING_OR_UNSUPPORTED',
+        ];
+        if ($credentialProvenance !== null
+            && (! is_string($credentialProvenance) || ! in_array($credentialProvenance, $provenanceValues, true))) {
+            throw new InvalidOwnerLedger(
+                "Owner ledger {$path}.credential_provenance is not an approved classification.",
+            );
+        }
+        if ($decision === 'CREATE_USER' && $credentialProvenance === null) {
+            throw new InvalidOwnerLedger("Owner ledger {$path} CREATE_USER requires credential_provenance.");
+        }
+        if ($credentialProvenance !== null && $decision !== 'CREATE_USER') {
+            throw new InvalidOwnerLedger("Owner ledger {$path}.credential_provenance is only valid for a CREATE_USER decision.");
+        }
+
         $approvedBy = $this->requiredString($row, 'approved_by', $path);
         $approvedAt = $this->requiredString($row, 'approved_at', $path);
         $approvalReference = $this->requiredString($row, 'approval_reference', $path);
@@ -145,6 +164,7 @@ final class OwnerLedgerLoader
             approvalReference: $approvalReference,
             notes: $notes,
             credentialAction: $credentialAction,
+            credentialProvenance: $credentialProvenance,
         );
     }
 

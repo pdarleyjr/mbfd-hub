@@ -533,7 +533,7 @@ export default function StationDetailPage() {
                       className="rounded-lg border border-neutral-200 p-4 transition-all duration-200 hover:bg-neutral-50 2xl:p-5"
                     >
                       <h4 className="font-semibold text-neutral-800">{apparatus.name || apparatus.unit_id}</h4>
-                      <p className="text-sm text-neutral-600">Unit: {apparatus.vehicle_number}</p>
+                      <p className="text-sm text-neutral-600">Unit: {apparatus.vehicle_number ?? apparatus.unit_id ?? apparatus.designation ?? 'Not recorded'}</p>
                       <p className="text-sm text-neutral-500 capitalize">Type: {apparatus.type}</p>
                       {apparatus.daily_checkout_requirement === 'required' && apparatus.slug && (
                         <Link

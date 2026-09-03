@@ -12,6 +12,65 @@ use Illuminate\Support\Facades\DB;
 
 final class AccountSecurityService
 {
+    /**
+     * Complete an approved canonical identity transition as one security event.
+     *
+     * @return array{user: User, changed: bool, password_changed: bool, activated: bool}
+     */
+    public function completeCanonicalLink(
+        User $user,
+        int $employeeProfileId,
+        string $employeeId,
+        ?string $passwordHash,
+        CarbonInterface $at,
+    ): array {
+        return DB::transaction(function () use ($user, $employeeProfileId, $employeeId, $passwordHash, $at): array {
+            /** @var User $lockedUser */
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+            $changes = [];
+            $passwordChanged = false;
+            $activated = false;
+
+            if ($lockedUser->employee_profile_id !== $employeeProfileId) {
+                $changes['employee_profile_id'] = $employeeProfileId;
+            }
+            if ($lockedUser->employee_id !== $employeeId) {
+                $changes['employee_id'] = $employeeId;
+            }
+            if ($lockedUser->getRawOriginal('account_status') === AccountStatus::PendingActivation->value) {
+                $changes['account_status'] = AccountStatus::Active->value;
+                $activated = true;
+            }
+            if ($passwordHash !== null && ! hash_equals((string) $lockedUser->getRawOriginal('password'), $passwordHash)) {
+                $changes['password'] = $passwordHash;
+                $changes['password_changed_at'] = $at;
+                $passwordChanged = true;
+            }
+
+            if ($changes === []) {
+                return [
+                    'user' => $lockedUser,
+                    'changed' => false,
+                    'password_changed' => false,
+                    'activated' => false,
+                ];
+            }
+
+            $changes['security_version'] = $lockedUser->security_version + 1;
+            $changes['updated_at'] = $at;
+            DB::table('users')->where('id', $lockedUser->id)->update($changes);
+            $lockedUser = $lockedUser->fresh();
+            $this->revokeSessions($lockedUser, 'canonical identity transition', $at);
+
+            return [
+                'user' => $lockedUser,
+                'changed' => true,
+                'password_changed' => $passwordChanged,
+                'activated' => $activated,
+            ];
+        });
+    }
+
     public function disable(User $user, string $reason, CarbonInterface $at): User
     {
         return $this->changeStatus($user, AccountStatus::Disabled, $reason, $at);
