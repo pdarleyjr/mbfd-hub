@@ -4,15 +4,24 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
+use App\Enums\AccountStatus;
+use App\Enums\SessionContextClass;
 use App\Filament\Pages\SetPasswordPage;
+use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
 use App\Http\Middleware\ForcePasswordChange;
+use App\Models\AuthenticationSession;
+use App\Models\Employee;
 use App\Models\Training\TrainingTodo;
 use App\Models\User;
 use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
+use App\Services\Identity\SessionRegistry;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
@@ -77,7 +86,7 @@ final class ForcedPasswordChangeTest extends TestCase
         self::assertNotSame($setPasswordUrl, $homeUrl);
     }
 
-    public function test_password_update_keeps_the_session_valid_and_does_not_send_a_screentinker_request(): void
+    public function test_password_update_revokes_old_sessions_rotates_the_current_session_and_preserves_canonical_login(): void
     {
         Http::fake();
         config([
@@ -86,12 +95,29 @@ final class ForcedPasswordChangeTest extends TestCase
         ]);
 
         $user = User::factory()->create([
+            'account_status' => AccountStatus::Active,
             'must_change_password' => true,
             'password' => Hash::make('current-password'),
+            'password_changed_at' => null,
+            'security_version' => 7,
         ]);
+        $employee = $this->linkEmployee($user, 'PASSWORD-CHANGE-100', 'employee-password-must-not-change');
         $user->assignRole(Role::findOrCreate('admin', 'web'));
 
-        $this->actingAs($user);
+        $this->actingAsCanonicalUser($user);
+        $this->bindCanonicalSessionToLivewireTestRequests();
+        $currentSessionIdBefore = $this->app['session.store']->getId();
+        $currentRegistryIdBefore = session('auth.canonical_session_id');
+        $employeePasswordBefore = $employee->getRawOriginal('password');
+        $issuedAt = CarbonImmutable::now()->subMinute();
+        $secondBrowser = app(SessionRegistry::class)->register(
+            $user,
+            'second-browser-pre-change-session',
+            SessionContextClass::UnmanagedBrowser,
+            $issuedAt,
+            $issuedAt->addHour(),
+            $issuedAt->addDay(),
+        );
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
         Livewire::test(SetPasswordPage::class)
@@ -108,8 +134,103 @@ final class ForcedPasswordChangeTest extends TestCase
 
         self::assertFalse($user->must_change_password);
         self::assertTrue(Hash::check('A-longer-replacement-password-2026', $user->password));
+        self::assertFalse(Hash::check('current-password', $user->password));
+        self::assertSame(8, $user->security_version);
+        self::assertNotNull($user->password_changed_at);
+        self::assertSame($employeePasswordBefore, $employee->fresh()->getRawOriginal('password'));
+        self::assertNotSame($currentSessionIdBefore, $this->app['session.store']->getId());
         self::assertSame($user->password, session('password_hash_web'));
+
+        $preChangeSessions = AuthenticationSession::query()
+            ->whereIn('id', [$currentRegistryIdBefore, $secondBrowser->id])
+            ->get();
+        self::assertCount(2, $preChangeSessions);
+        foreach ($preChangeSessions as $preChangeSession) {
+            self::assertNotNull($preChangeSession->revoked_at);
+            self::assertSame('password changed', $preChangeSession->revoked_reason);
+        }
+
+        $replacement = AuthenticationSession::query()
+            ->where('user_id', $user->id)
+            ->whereNull('revoked_at')
+            ->sole();
+        self::assertSame($user->security_version, $replacement->security_version);
+        self::assertSame($replacement->id, session('auth.canonical_session_id'));
+        self::assertSame(
+            hash_hmac('sha256', $this->app['session.store']->getId(), (string) config('app.key')),
+            $replacement->getRawOriginal('session_id_hash'),
+        );
+        self::assertTrue(app(SessionRegistry::class)->isCurrent($user, $replacement, CarbonImmutable::now()));
+        self::assertIsInt(session((string) config('security.recent_authentication.session_key')));
+        $this->get('/admin')->assertOk();
+
+        $secondBrowserRequest = Request::create('/admin', 'GET');
+        $secondBrowserSession = $this->app['session']->driver();
+        $secondBrowserSession->setId('second-browser-pre-change-session');
+        $secondBrowserSession->put('auth.canonical_session_id', $secondBrowser->id);
+        $secondBrowserRequest->setLaravelSession($secondBrowserSession);
+        $secondBrowserRequest->setUserResolver(static fn (): User => $user->fresh());
+        Auth::guard('web')->login($user->fresh());
+        $secondBrowserResponse = app(EnsureCanonicalSessionIsCurrent::class)
+            ->handle($secondBrowserRequest, static fn () => response('must not be reached'));
+        self::assertSame(302, $secondBrowserResponse->getStatusCode());
+        self::assertSame(url('/login'), $secondBrowserResponse->headers->get('Location'));
+
+        $this->logoutCanonicalSession();
+        $this->from('/login')->post('/login', [
+            'employee_id' => $employee->employee_id,
+            'password' => 'current-password',
+        ])->assertRedirect('/login')->assertSessionHasErrors('employee_id');
+        $this->post('/login', [
+            'employee_id' => $employee->employee_id,
+            'password' => 'A-longer-replacement-password-2026',
+        ])->assertRedirect('/');
+        $this->assertAuthenticatedAs($user, 'web');
         Http::assertNothingSent();
+    }
+
+    public function test_employee_panel_forced_password_change_rotates_to_a_current_canonical_session(): void
+    {
+        $user = User::factory()->create([
+            'account_status' => AccountStatus::Active,
+            'must_change_password' => true,
+            'password' => Hash::make('current-password'),
+        ]);
+        $this->linkEmployee($user, 'EMPLOYEE-PANEL-100', 'employee-password-must-not-change');
+        $this->actingAsCanonicalUser($user);
+        $this->bindCanonicalSessionToLivewireTestRequests();
+        $oldRegistryId = session('auth.canonical_session_id');
+        Filament::setCurrentPanel(Filament::getPanel('employee'));
+
+        $this->get('/employee/set-password')->assertOk();
+        Livewire::test(SetPasswordPage::class)
+            ->fillForm([
+                'current_password' => 'current-password',
+                'password' => 'A-longer-replacement-password-2026',
+                'password_confirmation' => 'A-longer-replacement-password-2026',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertRedirect('/employee/dashboard');
+
+        $user->refresh();
+        self::assertFalse($user->must_change_password);
+        self::assertNotNull(AuthenticationSession::query()->findOrFail($oldRegistryId)->revoked_at);
+        self::assertSame($user->security_version, AuthenticationSession::query()
+            ->where('user_id', $user->id)
+            ->whereNull('revoked_at')
+            ->sole()
+            ->security_version);
+        $this->withCookie(
+            (string) config('session.cookie'),
+            $this->app['session.store']->getId(),
+        )->withCredentials();
+        $employeePanelResponse = $this->get('/employee/dashboard');
+        self::assertSame(
+            200,
+            $employeePanelResponse->getStatusCode(),
+            'Unexpected Employee panel redirect: '.(string) $employeePanelResponse->headers->get('Location'),
+        );
     }
 
     public function test_password_update_rejects_an_invalid_current_password(): void
@@ -120,7 +241,16 @@ final class ForcedPasswordChangeTest extends TestCase
         ]);
         $user->assignRole(Role::findOrCreate('admin', 'web'));
 
-        $this->actingAs($user);
+        $this->actingAsCanonicalUser($user);
+        $this->bindCanonicalSessionToLivewireTestRequests();
+        $beforeUser = (array) DB::table('users')->where('id', $user->id)->first();
+        $beforeSessions = AuthenticationSession::query()
+            ->where('user_id', $user->id)
+            ->orderBy('id')
+            ->get()
+            ->map(fn (AuthenticationSession $session): array => $session->getRawOriginal())
+            ->all();
+        $beforeLaravelSessionId = $this->app['session.store']->getId();
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
         Livewire::test(SetPasswordPage::class)
@@ -136,6 +266,14 @@ final class ForcedPasswordChangeTest extends TestCase
 
         self::assertTrue($user->must_change_password);
         self::assertTrue(Hash::check('current-password', $user->password));
+        self::assertSame($beforeUser, (array) DB::table('users')->where('id', $user->id)->first());
+        self::assertSame($beforeSessions, AuthenticationSession::query()
+            ->where('user_id', $user->id)
+            ->orderBy('id')
+            ->get()
+            ->map(fn (AuthenticationSession $session): array => $session->getRawOriginal())
+            ->all());
+        self::assertSame($beforeLaravelSessionId, $this->app['session.store']->getId());
     }
 
     public function test_legacy_web_password_middleware_does_not_hijack_a_livewire_update(): void
@@ -372,5 +510,22 @@ final class ForcedPasswordChangeTest extends TestCase
             'role' => 'member',
             'is_active' => true,
         ]);
+    }
+
+    private function linkEmployee(User $user, string $employeeId, string $password): Employee
+    {
+        $employee = Employee::query()->create([
+            'employee_id' => $employeeId,
+            'name' => 'Forced Password Test Employee',
+            'rank' => 'Firefighter',
+            'password' => Hash::make($password),
+            'must_change_password' => false,
+        ]);
+        $user->forceFill([
+            'employee_id' => $employeeId,
+            'employee_profile_id' => $employee->id,
+        ])->save();
+
+        return $employee;
     }
 }
