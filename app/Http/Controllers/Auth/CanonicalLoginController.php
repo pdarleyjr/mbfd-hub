@@ -173,6 +173,11 @@ final class CanonicalLoginController extends Controller
             return '/';
         }
 
+        $path = parse_url($destination, PHP_URL_PATH);
+        if ($path === '/auth/bid/authorize') {
+            return $destination;
+        }
+
         foreach ([
             'admin' => '/admin',
             'employee' => '/employee',

@@ -47,6 +47,42 @@ final class CanonicalAuthorizationTest extends TestCase
             ->assertRedirect('/login');
     }
 
+    public function test_fresh_canonical_login_resumes_the_exact_bid_authorization_destination(): void
+    {
+        $user = $this->linkedUser();
+        $authorizeUrl = $this->authorizeUrl();
+
+        $this->get($authorizeUrl)->assertRedirect('/login');
+
+        $intendedLocation = $this->post('/login', [
+            'employee_id' => $user->employeeProfile->employee_id,
+            'password' => 'canonical-user-password',
+        ])->assertRedirect()
+            ->headers->get('Location');
+        self::assertIsString($intendedLocation);
+        self::assertSame('/auth/bid/authorize', parse_url($intendedLocation, PHP_URL_PATH));
+        self::assertSame([
+            'client_id' => 'bid',
+            'redirect_uri' => self::CALLBACK,
+            'state' => self::STATE,
+        ], $this->redirectQuery($intendedLocation));
+
+        $this->withCookie(
+            (string) config('session.cookie'),
+            $this->app['session.store']->getId(),
+        )->withCredentials();
+
+        $location = $this->get($intendedLocation)
+            ->assertRedirect()
+            ->headers->get('Location');
+        self::assertIsString($location);
+        self::assertStringStartsWith(self::CALLBACK.'?', $location);
+
+        $query = $this->redirectQuery($location);
+        self::assertSame(self::STATE, $query['state'] ?? null);
+        self::assertIsString($query['code'] ?? null);
+    }
+
     public function test_active_canonical_user_with_linked_employee_receives_and_redeems_an_opaque_code(): void
     {
         $user = $this->linkedUser();

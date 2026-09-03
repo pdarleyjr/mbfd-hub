@@ -67,25 +67,27 @@ final class PanelGuardConvergenceTest extends TestCase
         );
     }
 
-    public function test_canonical_login_discards_an_unauthorized_or_external_intended_destination(): void
+    public function test_canonical_login_discards_untrusted_and_non_allowlisted_intended_destinations(): void
     {
-        $user = $this->linkedActiveUser('D03-UNAUTHORIZED');
+        foreach ([
+            '/admin',
+            '//evil.example/steal',
+            'https://evil.example/steal',
+            '/auth/evil',
+            '/not-an-authorized-panel',
+        ] as $index => $intended) {
+            $user = $this->linkedActiveUser('D03-UNAUTHORIZED-'.$index);
 
-        $this->withSession(['url.intended' => '/admin'])
-            ->post('/login', [
-                'employee_id' => $user->employeeProfile->employee_id,
-                'password' => 'correct-password',
-            ])
-            ->assertRedirect('/');
+            $this->withSession(['url.intended' => $intended])
+                ->post('/login', [
+                    'employee_id' => $user->employeeProfile->employee_id,
+                    'password' => 'correct-password',
+                ])
+                ->assertRedirect('/');
 
-        $this->post('/logout')->assertRedirect('/login');
-
-        $this->withSession(['url.intended' => '//evil.example/steal'])
-            ->post('/login', [
-                'employee_id' => $user->employeeProfile->employee_id,
-                'password' => 'correct-password',
-            ])
-            ->assertRedirect('/');
+            $this->post('/logout')->assertRedirect('/login');
+            $this->app['auth']->forgetGuards();
+        }
     }
 
     public function test_a_revoked_canonical_session_loses_access_to_every_converted_panel(): void
