@@ -8,6 +8,7 @@ use App\Enums\AccountStatus;
 use App\Models\AuthenticationSession;
 use App\Models\Employee;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +17,11 @@ use Tests\TestCase;
 final class PanelGuardConvergenceTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_employee_panel_brand_home_resolves_to_main_hub_home(): void
+    {
+        self::assertSame('/', Filament::getPanel('employee')->getHomeUrl());
+    }
 
     public function test_legacy_panel_login_routes_only_redirect_to_the_canonical_login(): void
     {

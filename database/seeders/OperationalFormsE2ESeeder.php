@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Models\Employee;
 use App\Models\OperationalFormRecord;
 use App\Models\User;
+use App\Models\Workgroup;
+use App\Models\WorkgroupMember;
 use App\Services\OperationalForms\PdfGenerationService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Seeder;
@@ -73,6 +75,24 @@ class OperationalFormsE2ESeeder extends Seeder
             'model_type' => User::class,
             'model_id' => $admin->id,
         ]);
+        $workgroup = Workgroup::query()->updateOrCreate(
+            ['name' => 'Operational Forms E2E Workgroup'],
+            [
+                'description' => 'Isolated browser navigation acceptance fixture.',
+                'is_active' => true,
+                'created_by' => $admin->id,
+            ],
+        );
+        WorkgroupMember::query()->updateOrCreate(
+            [
+                'workgroup_id' => $workgroup->id,
+                'user_id' => $admin->id,
+            ],
+            [
+                'role' => 'admin',
+                'is_active' => true,
+            ],
+        );
 
         $this->seedControlledSamples($employee);
     }

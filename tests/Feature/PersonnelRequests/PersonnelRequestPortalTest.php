@@ -128,8 +128,15 @@ class PersonnelRequestPortalTest extends TestCase
             ->get('/employee/dashboard?return_to=https://evil.example/steal')
             ->assertOk()
             ->assertSee('employee-global-back')
+            ->assertSee('MBFD Hub Home')
+            ->assertSee('href="/"', false)
+            ->assertDontSee('window.history.back()', false)
             ->assertDontSee('evil.example');
-        $this->get('/employee/request-equipment')->assertOk()->assertSee('employee-global-back');
+        $this->get('/employee/request-equipment')
+            ->assertOk()
+            ->assertSee('employee-global-back')
+            ->assertSee('MBFD Hub Home')
+            ->assertSee('href="/"', false);
     }
 
     public function test_officer_livewire_form_persists_multiple_items_and_rejects_blank_signature(): void

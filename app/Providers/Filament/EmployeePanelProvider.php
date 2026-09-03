@@ -52,6 +52,7 @@ class EmployeePanelProvider extends PanelProvider
             ->brandName('MBFD Employee Portal')
             ->brandLogo(asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
+            ->homeUrl('/')
             ->favicon(asset('favicon.ico'))
             ->darkMode(false)
             ->colors([

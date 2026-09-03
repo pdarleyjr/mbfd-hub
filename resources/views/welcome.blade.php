@@ -22,28 +22,17 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         body { font-family: 'Source Sans 3', system-ui, sans-serif; }
-        .chat-messages { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
-        .chat-messages::-webkit-scrollbar { width: 6px; }
-        .chat-messages::-webkit-scrollbar-track { background: transparent; }
-        .chat-messages::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
-        .typing-dot { animation: typing 1.4s infinite; }
-        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes typing { 0%, 60%, 100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-4px); } }
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes incidentIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
-        .loading-bar { position: relative; overflow: hidden; }
-        .loading-bar::after { content: ''; position: absolute; top: 0; left: 0; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); animation: shimmer 1.5s infinite; }
-        .msg-ai p { margin-bottom: 0.5rem; }
-        .msg-ai ul, .msg-ai ol { margin-left: 1.25rem; margin-bottom: 0.5rem; }
-        .msg-ai li { margin-bottom: 0.25rem; }
-        .msg-ai strong { font-weight: 600; }
-        .msg-ai h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
         .stagger-item { opacity: 0; animation: fadeSlideUp 0.3s cubic-bezier(0.25, 0.1, 0.25, 1) forwards; }
         .stagger-item:nth-child(1) { animation-delay: 0ms; }
         .stagger-item:nth-child(2) { animation-delay: 80ms; }
         .stagger-item:nth-child(3) { animation-delay: 160ms; }
+        .home-layout { display: grid; gap: 1.5rem; align-items: start; }
+        @media (min-width: 1024px) {
+            .home-layout { grid-template-columns: minmax(0, 3fr) minmax(22.5rem, 2fr); gap: 2rem; }
+        }
         /* PulsePoint call feed */
         .incident-row { animation: incidentIn 0.25s cubic-bezier(0,0,0.2,1) forwards; }
         .incident-row:nth-child(1) { animation-delay: 0ms; }
@@ -57,13 +46,120 @@
         .feed-scroll::-webkit-scrollbar { width: 4px; }
         .feed-scroll::-webkit-scrollbar-thumb { background: #e7e5e3; border-radius: 2px; }
         @media (prefers-reduced-motion: reduce) {
-            .typing-dot, .loading-bar::after, .shimmer-line::after { animation: none; }
+            .shimmer-line::after { animation: none; }
             .stagger-item, .incident-row { opacity: 1; animation: none; }
             * { transition-duration: 0.01ms !important; }
         }
     </style>
 </head>
 <body class="antialiased bg-neutral-50 text-neutral-800 min-h-screen">
+    @php
+        $currentUser = auth('web')->user();
+        $showAdminPanel = $currentUser instanceof \App\Models\User
+            && $currentUser->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+        $showMediaControl = $currentUser instanceof \App\Models\User
+            && $currentUser->hasCurrentMediaControlEntitlement();
+        $quickAccessItems = [
+            [
+                'title' => 'Station / Vehicles / Equipment',
+                'description' => 'Apparatus checkout, vehicle inspections, station inventory, and station requests',
+                'href' => url('/daily/stations'),
+                'accent' => 'bg-purple-500',
+                'iconSurface' => 'bg-purple-50',
+                'iconColor' => 'text-purple-600',
+                'hoverBorder' => 'hover:border-purple-300',
+                'hoverText' => 'group-hover:text-purple-700',
+                'hoverIcon' => 'group-hover:text-purple-500',
+                'icon' => 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2m-6 9 2 2 4-4',
+                'external' => false,
+                'visible' => true,
+            ],
+            [
+                'title' => 'Employee Portal',
+                'description' => 'View assigned gear, track requests, and request approved uniform items',
+                'href' => url('/employee'),
+                'accent' => 'bg-emerald-500',
+                'iconSurface' => 'bg-emerald-50',
+                'iconColor' => 'text-emerald-600',
+                'hoverBorder' => 'hover:border-emerald-300',
+                'hoverText' => 'group-hover:text-emerald-700',
+                'hoverIcon' => 'group-hover:text-emerald-500',
+                'icon' => 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7Z',
+                'external' => false,
+                'visible' => true,
+            ],
+            [
+                'title' => 'ICS Forms',
+                'description' => 'ICS 214 & F-ROC reports',
+                'href' => url('/employee/forms'),
+                'accent' => 'bg-blue-500',
+                'iconSurface' => 'bg-blue-50',
+                'iconColor' => 'text-blue-700',
+                'hoverBorder' => 'hover:border-blue-300',
+                'hoverText' => 'group-hover:text-blue-700',
+                'hoverIcon' => 'group-hover:text-blue-500',
+                'icon' => 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2m-6 0a3 3 0 0 1 6 0m-6 0a3 3 0 0 0 6 0M9 12h6m-6 4h4',
+                'external' => false,
+                'visible' => true,
+            ],
+            [
+                'title' => 'Workgroup Dashboard',
+                'description' => 'Evaluations & reviews',
+                'href' => url('/workgroups'),
+                'accent' => 'bg-indigo-500',
+                'iconSurface' => 'bg-indigo-50',
+                'iconColor' => 'text-indigo-600',
+                'hoverBorder' => 'hover:border-indigo-300',
+                'hoverText' => 'group-hover:text-indigo-700',
+                'hoverIcon' => 'group-hover:text-indigo-500',
+                'icon' => 'M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2Zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2Z',
+                'external' => false,
+                'visible' => true,
+            ],
+            [
+                'title' => 'Pump Panel',
+                'description' => 'Training simulator',
+                'href' => 'https://pdarleyjr.github.io/puc-sim-manual-ui/',
+                'accent' => 'bg-amber-500',
+                'iconSurface' => 'bg-amber-50',
+                'iconColor' => 'text-amber-600',
+                'hoverBorder' => 'hover:border-amber-300',
+                'hoverText' => 'group-hover:text-amber-700',
+                'hoverIcon' => 'group-hover:text-amber-500',
+                'icon' => 'M13 10V3L4 14h7v7l9-11h-7Z',
+                'external' => true,
+                'visible' => true,
+            ],
+            [
+                'title' => 'Videos',
+                'description' => 'Training videos, support services content, and live media',
+                'href' => 'https://videos.mbfdhub.com',
+                'accent' => 'bg-red-500',
+                'iconSurface' => 'bg-red-50',
+                'iconColor' => 'text-red-600',
+                'hoverBorder' => 'hover:border-red-300',
+                'hoverText' => 'group-hover:text-red-700',
+                'hoverIcon' => 'group-hover:text-red-500',
+                'icon' => 'm15 10 4.553-2.276A1 1 0 0 1 21 8.618v6.764a1 1 0 0 1-1.447.894L15 14M5 18h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2Z',
+                'external' => true,
+                'visible' => true,
+            ],
+            [
+                'title' => 'Media Control',
+                'description' => 'Videowall controls, displays, and classroom media management',
+                'href' => 'https://media.mbfdhub.com/api/auth/hub/start',
+                'accent' => 'bg-cyan-500',
+                'iconSurface' => 'bg-cyan-50',
+                'iconColor' => 'text-cyan-700',
+                'hoverBorder' => 'hover:border-cyan-300',
+                'hoverText' => 'group-hover:text-cyan-700',
+                'hoverIcon' => 'group-hover:text-cyan-500',
+                'icon' => 'M9.75 17 9 20l-.75.75h7.5L15 20l-.75-3M3 13h18M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z',
+                'external' => true,
+                'visible' => $showMediaControl,
+            ],
+        ];
+    @endphp
 
     <!-- Compact Header Shell -->
     <header class="sticky top-0 z-50 bg-slate-850 border-b border-slate-700/50 backdrop-blur-md h-16 flex items-center justify-between px-4 lg:px-6" style="padding-top: max(0px, env(safe-area-inset-top, 0px));">
@@ -78,25 +174,61 @@
 
         <!-- Right: Utility Actions -->
         <div class="flex items-center gap-2">
-            <a href="{{ url('/admin/login') }}" class="min-h-[44px] px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
-                <span class="hidden sm:inline">Admin Login</span>
-            </a>
+            @if($showAdminPanel)
+                <a href="{{ url('/admin') }}" data-important-target class="min-h-[44px] px-3 sm:px-4 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065Z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"></path></svg>
+                    <span>Admin Panel</span>
+                </a>
+            @endif
         </div>
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+        <div class="home-layout">
+            <section data-home-column="quick-access" aria-labelledby="quick-access-heading" class="min-w-0">
+                <h2 id="quick-access-heading" class="text-lg font-semibold text-neutral-900 font-heading flex items-center gap-2 mb-4">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    Quick Access
+                </h2>
+                <div class="space-y-3">
+                    @foreach($quickAccessItems as $item)
+                        @continue(! $item['visible'])
+                        <a
+                            href="{{ $item['href'] }}"
+                            @if($item['external']) target="_blank" rel="noopener noreferrer" @endif
+                            data-quick-access-card
+                            data-important-target
+                            class="stagger-item group block min-h-[76px] bg-white rounded-xl border border-neutral-200 shadow-sm {{ $item['hoverBorder'] }} hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 transition-all duration-200 overflow-hidden"
+                        >
+                            <span class="flex min-h-[76px]">
+                                <span class="w-1.5 {{ $item['accent'] }} flex-shrink-0" aria-hidden="true"></span>
+                                <span class="flex items-center gap-3 sm:gap-4 px-3 py-3 sm:px-4 flex-1 min-w-0">
+                                    <span class="w-11 h-11 rounded-lg {{ $item['iconSurface'] }} {{ $item['iconColor'] }} flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform" aria-hidden="true">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $item['icon'] }}"></path></svg>
+                                    </span>
+                                    <span class="flex-1 min-w-0">
+                                        <span class="block font-semibold text-neutral-900 {{ $item['hoverText'] }} font-heading text-sm sm:text-base leading-tight">{{ $item['title'] }}</span>
+                                        <span class="block text-sm text-neutral-600 mt-1 leading-snug">{{ $item['description'] }}</span>
+                                    </span>
+                                    @if($item['external'])
+                                        <svg class="w-5 h-5 text-neutral-400 {{ $item['hoverIcon'] }} transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                    @else
+                                        <svg class="w-5 h-5 text-neutral-400 {{ $item['hoverIcon'] }} transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"></path></svg>
+                                    @endif
+                                </span>
+                            </span>
+                        </a>
+                    @endforeach
+                </div>
+            </section>
 
-        <!-- ============================================================ -->
-        <!-- HERO BANNER: Live Call Feed (left) + AI Assistant (right)    -->
-        <!-- ============================================================ -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start mb-10">
-            <!-- Left: PulsePoint Live Call Feed -->
+            <!-- PulsePoint Live Call Feed -->
             <div
                 x-data="pulsePointFeed()"
                 x-init="init()"
-                class="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden stagger-item"
+                data-home-column="incidents"
+                class="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden min-w-0"
                 aria-label="MBFD Live Incident Feed"
                 aria-live="polite"
                 aria-atomic="false"
@@ -248,397 +380,6 @@
                 </div>
             </div>
 
-            <!-- Right: AI Support Assistant Panel -->
-            <div>
-                @if(env('FEATURE_AI_CHAT', true))
-                <section x-data="aiChat()">
-                    <div class="bg-white rounded-xl shadow-card border border-neutral-200 overflow-hidden">
-                        <!-- Chat Header -->
-                        <div class="bg-slate-800 px-5 py-4 flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <div class="w-9 h-9 bg-red-600 rounded-lg flex items-center justify-center shadow-sm">
-                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 class="text-white font-semibold text-sm">MBFD Support Assistant</h3>
-                                    <p class="text-slate-400 text-xs">AI-powered SOG & procedures guidance</p>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <button @click="clearConversation()" title="Clear conversation" class="text-slate-400 hover:text-slate-200 transition-colors p-1 rounded" aria-label="Clear conversation">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Messages Area -->
-                        <div class="chat-messages h-72 lg:h-80 overflow-y-auto p-4 space-y-3 bg-neutral-50/50" x-ref="chatMessages">
-                            <template x-for="(msg, idx) in messages" :key="idx">
-                                <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
-                                    <div :class="msg.role === 'user'
-                                        ? 'bg-red-600 text-white rounded-2xl rounded-br-md px-4 py-2.5 max-w-xs text-sm shadow-sm'
-                                        : 'msg-ai bg-white border border-neutral-200 text-neutral-800 rounded-2xl rounded-bl-md px-4 py-2.5 max-w-xs text-sm shadow-sm'">
-                                        <span x-html="msg.role === 'user' ? msg.content : renderMarkdown(msg.content)"></span>
-                                        <span x-show="msg.streaming" class="inline-block w-1.5 h-4 bg-red-500 ml-0.5 animate-pulse rounded-sm align-text-bottom"></span>
-                                    </div>
-                                </div>
-                            </template>
-                            <!-- Typing Indicator -->
-                            <div x-show="loading && !messages.some(m => m.streaming)" class="flex justify-start">
-                                <div class="bg-white border border-neutral-200 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <span class="typing-dot w-2 h-2 bg-red-400 rounded-full inline-block"></span>
-                                        <span class="typing-dot w-2 h-2 bg-red-400 rounded-full inline-block"></span>
-                                        <span class="typing-dot w-2 h-2 bg-red-400 rounded-full inline-block"></span>
-                                    </div>
-                                    <p class="text-xs text-neutral-500 mt-1">Searching documents...</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Loading Progress Bar -->
-                        <div x-show="loading" class="px-4 py-2 bg-neutral-50 border-t border-neutral-200">
-                            <div class="flex items-center gap-2">
-                                <div class="flex-1 h-1.5 bg-neutral-200 rounded-full loading-bar">
-                                    <div class="h-full bg-red-500 rounded-full" style="width: 100%;"></div>
-                                </div>
-                                <span class="text-xs text-neutral-500 whitespace-nowrap">Analyzing...</span>
-                            </div>
-                        </div>
-
-                        <!-- Sources -->
-                        <div x-show="lastSources.length > 0" class="px-4 py-2 bg-neutral-100/80 border-t border-neutral-200">
-                            <p class="text-xs text-neutral-500">
-                                <span class="font-medium">Sources:</span>
-                                <template x-for="src in lastSources" :key="src">
-                                    <span class="inline-block bg-white text-neutral-600 rounded px-1.5 py-0.5 ml-1 text-xs border border-neutral-200" x-text="src"></span>
-                                </template>
-                            </p>
-                        </div>
-
-                        <!-- Input Area -->
-                        <div class="p-4 border-t border-neutral-200 bg-white">
-                            <form @submit.prevent="sendMessage()" class="flex gap-2">
-                                <input
-                                    x-model="userInput"
-                                    type="text"
-                                    placeholder="Ask about SOGs, manuals, procedures..."
-                                    aria-label="Type your message to the AI assistant"
-                                    class="flex-1 min-h-[44px] bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all"
-                                    :disabled="loading"
-                                    x-ref="chatInput"
-                                >
-                                <button
-                                    type="submit"
-                                    :disabled="loading || !userInput.trim()"
-                                    class="min-h-[44px] px-4 bg-red-600 text-white rounded-xl font-medium text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 shadow-sm"
-                                >
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
-                                    <span class="hidden sm:inline">Send</span>
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                </section>
-
-                <script>
-                function aiChat() {
-                    return {
-                        expanded: true,
-                        messages: [{
-                            role: 'assistant',
-                            content: 'Welcome! I\'m the MBFD Support Assistant. Ask me anything about driver manuals, SOGs, department procedures, or station operations.\n\n*I remember our conversation — feel free to ask follow-up questions.*'
-                        }],
-                        userInput: '',
-                        loading: false,
-                        lastSources: [],
-                        streamBuffer: '',
-                        workerUrl: '/api/public/support-chat',
-
-                        get conversationHistory() {
-                            return this.messages.slice(-10).map(m => ({
-                                role: m.role,
-                                content: m.plainContent || m.content
-                            }));
-                        },
-
-                        clearConversation() {
-                            this.messages = [{
-                                role: 'assistant',
-                                content: 'Conversation cleared. How can I help you?',
-                                plainContent: 'Conversation cleared. How can I help you?'
-                            }];
-                            this.lastSources = [];
-                        },
-
-                        askQuestion(q) {
-                            this.userInput = q;
-                            this.sendMessage();
-                        },
-
-                        renderMarkdown(text) {
-                            if (!text) return '';
-                            const escaped = text
-                                .replace(/&/g, '&amp;')
-                                .replace(/</g, '&lt;')
-                                .replace(/>/g, '&gt;')
-                                .replace(/"/g, '&quot;')
-                                .replace(/'/g, '&#039;');
-                            return escaped
-                                .replace(/### (.*?)(\n|$)/g, '<h3>$1</h3>')
-                                .replace(/## (.*?)(\n|$)/g, '<h3>$1</h3>')
-                                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                                .replace(/`(.*?)`/g, '<code class="bg-neutral-100 px-1 rounded text-xs font-mono">$1</code>')
-                                .replace(/^\* (.+)$/gm, '<li>$1</li>')
-                                .replace(/^- (.+)$/gm, '<li>$1</li>')
-                                .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-                                .replace(/(<li>.*?<\/li>(\n)?)+/gs, match => '<ul class="list-disc ml-4 mb-2">' + match + '</ul>')
-                                .replace(/<\/ul>\s*<ul[^>]*>/g, '')
-                                .replace(/\n\n/g, '</p><p class="mb-2">')
-                                .replace(/\n/g, '<br>')
-                                .replace(/^/, '<p class="mb-2">').replace(/$/, '</p>')
-                                .replace(/<p class="mb-2"><\/p>/g, '');
-                        },
-
-                        async sendMessage() {
-                            const msg = this.userInput.trim();
-                            if (!msg || this.loading) return;
-
-                            this.messages.push({ role: 'user', content: msg, plainContent: msg });
-                            this.userInput = '';
-                            this.loading = true;
-                            this.lastSources = [];
-                            await this.$nextTick();
-                            this.scrollToBottom();
-
-                            const streamIndex = this.messages.length;
-                            this.messages.push({ role: 'assistant', content: '', plainContent: '', streaming: true });
-
-                            try {
-                                const resp = await fetch(this.workerUrl, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        message: msg,
-                                        history: this.conversationHistory.slice(0, -2),
-                                        stream: true
-                                    })
-                                });
-
-                                if (!resp.ok) {
-                                    const err = await resp.json().catch(() => ({}));
-                                    throw new Error(err.error || `Request failed (${resp.status})`);
-                                }
-
-                                const sourcesHeader = resp.headers.get('X-Sources');
-                                if (sourcesHeader) {
-                                    try { this.lastSources = JSON.parse(sourcesHeader); } catch(e) {}
-                                }
-
-                                const reader = resp.body.getReader();
-                                const decoder = new TextDecoder();
-                                let fullText = '';
-
-                                while (true) {
-                                    const { done, value } = await reader.read();
-                                    if (done) break;
-
-                                    const chunk = decoder.decode(value, { stream: true });
-                                    const lines = chunk.split('\n');
-
-                                    for (const line of lines) {
-                                        if (line.startsWith('data: ')) {
-                                            const data = line.slice(6).trim();
-                                            if (data === '[DONE]') continue;
-                                            try {
-                                                const parsed = JSON.parse(data);
-                                                const token = parsed.response || parsed.token || '';
-                                                if (token) {
-                                                    fullText += token;
-                                                    this.messages[streamIndex].content = fullText;
-                                                    this.messages[streamIndex].plainContent = fullText;
-                                                    this.$nextTick(() => this.scrollToBottom());
-                                                }
-                                                if (parsed.sources) {
-                                                    this.lastSources = parsed.sources;
-                                                }
-                                            } catch (e) {}
-                                        }
-                                    }
-                                }
-
-                                this.messages[streamIndex].streaming = false;
-
-                                if (!fullText) {
-                                    await this.sendMessageNonStreaming(msg, streamIndex);
-                                }
-
-                            } catch (e) {
-                                try {
-                                    await this.sendMessageNonStreaming(msg, streamIndex);
-                                } catch (e2) {
-                                    this.messages[streamIndex].content = 'Sorry, I encountered an error. Please try again.';
-                                    this.messages[streamIndex].plainContent = '';
-                                    this.messages[streamIndex].streaming = false;
-                                }
-                            } finally {
-                                this.loading = false;
-                                this.scrollToBottom();
-                            }
-                        },
-
-                        async sendMessageNonStreaming(msg, streamIndex) {
-                            const resp = await fetch(this.workerUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    message: msg,
-                                    history: this.conversationHistory.slice(0, -2),
-                                    stream: false
-                                })
-                            });
-
-                            if (!resp.ok) {
-                                const err = await resp.json().catch(() => ({}));
-                                throw new Error(err.error || 'Request failed');
-                            }
-
-                            const data = await resp.json();
-                            this.messages[streamIndex].content = data.response || '';
-                            this.messages[streamIndex].plainContent = data.response || '';
-                            this.messages[streamIndex].streaming = false;
-                            this.lastSources = data.sources || [];
-                        },
-
-                        scrollToBottom() {
-                            this.$nextTick(() => {
-                                const el = this.$refs.chatMessages;
-                                if (el) el.scrollTop = el.scrollHeight;
-                            });
-                        }
-                    };
-                }
-                </script>
-                @endif
-            </div>
-        </div>
-
-        <!-- ============================================================ -->
-        <!-- Quick Launch Cards                                           -->
-        <!-- ============================================================ -->
-        <div class="space-y-4">
-                <h2 class="text-lg font-semibold text-neutral-800 font-heading flex items-center gap-2 mb-2">
-                    <svg class="w-5 h-5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    Quick Launch
-                </h2>
-
-                <!-- Station / Vehicles / Equipment — purple accent -->
-                <a href="{{ url('/daily/stations') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-purple-300 transition-all duration-200 overflow-hidden">
-                    <div class="flex">
-                        <div class="w-1.5 bg-purple-500 flex-shrink-0 rounded-l-xl"></div>
-                        <div class="flex items-start gap-4 p-5 flex-1">
-                            <div class="w-11 h-11 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0 group-hover:scale-105 transition-transform">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-6 9l2 2 4-4"></path>
-                                </svg>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <h3 class="font-semibold text-neutral-800 group-hover:text-purple-700 font-heading text-base">Station / Vehicles / Equipment</h3>
-                                <p class="text-sm text-neutral-500 mt-0.5">Apparatus checkout, vehicle inspections, station inventory, and station requests</p>
-                            </div>
-                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-purple-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                        </div>
-                    </div>
-                </a>
-
-                <!-- Employee Portal — emerald accent -->
-                <a href="{{ url('/employee') }}" class="stagger-item group block bg-white rounded-xl shadow-card border border-neutral-200 hover:shadow-card-hover hover:border-emerald-300 transition-all duration-200 overflow-hidden">
-                    <div class="flex">
-                        <div class="w-1.5 bg-emerald-500 flex-shrink-0 rounded-l-xl"></div>
-                        <div class="flex items-start gap-4 p-5 flex-1">
-                            <div class="w-11 h-11 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0 group-hover:scale-105 transition-transform">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <h3 class="font-semibold text-neutral-800 group-hover:text-emerald-700 font-heading text-base">Employee Portal</h3>
-                                <p class="text-sm text-neutral-500 mt-0.5">View assigned gear, track requests, and request approved uniform items</p>
-                            </div>
-                            <svg class="w-5 h-5 text-neutral-300 group-hover:text-emerald-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                        </div>
-                    </div>
-                </a>
-
-            </div>
-
-        <!-- Additional Links — secondary navigation, scalable for future links -->
-        <div class="mt-8">
-            <h3 class="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-                More Tools
-            </h3>
-            <div class="flex flex-wrap gap-3">
-                <!-- Operational Forms -->
-                <a href="{{ url('/employee/forms') }}" aria-label="Open operational forms" class="group inline-flex items-center gap-2.5 bg-white rounded-lg border border-neutral-200 px-4 py-3 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200">
-                    <div class="w-8 h-8 rounded-md bg-blue-50 flex items-center justify-center text-blue-700 flex-shrink-0 group-hover:scale-105 transition-transform">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-6 0a3 3 0 016 0m-6 0a3 3 0 006 0M9 12h6m-6 4h4"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <span class="text-sm font-medium text-neutral-700 group-hover:text-blue-700 transition-colors">Forms</span>
-                        <p class="text-xs text-neutral-400">ICS 214 &amp; F-ROC reports</p>
-                    </div>
-                    <svg class="w-4 h-4 text-neutral-300 group-hover:text-blue-500 transition-colors ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                </a>
-
-                <!-- Workgroup Dashboard -->
-                <a href="{{ url('/workgroups/login') }}" class="group inline-flex items-center gap-2.5 bg-white rounded-lg border border-neutral-200 px-4 py-3 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200">
-                    <div class="w-8 h-8 rounded-md bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 group-hover:scale-105 transition-transform">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <span class="text-sm font-medium text-neutral-700 group-hover:text-indigo-700 transition-colors">Workgroup Dashboard</span>
-                        <p class="text-xs text-neutral-400">Evaluations &amp; reviews</p>
-                    </div>
-                    <svg class="w-4 h-4 text-neutral-300 group-hover:text-indigo-400 transition-colors ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                </a>
-
-                <!-- Pump Panel Simulator -->
-                <a href="https://pdarleyjr.github.io/puc-sim-manual-ui/" target="_blank" rel="noopener noreferrer" aria-label="Pump Panel training simulator (opens in new tab)" class="group inline-flex items-center gap-2.5 bg-white rounded-lg border border-neutral-200 px-4 py-3 shadow-sm hover:shadow-md hover:border-amber-300 transition-all duration-200">
-                    <div class="w-8 h-8 rounded-md bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0 group-hover:scale-105 transition-transform">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <span class="text-sm font-medium text-neutral-700 group-hover:text-amber-700 transition-colors">Pump Panel</span>
-                        <p class="text-xs text-neutral-400">Training simulator</p>
-                    </div>
-                    <svg class="w-4 h-4 text-neutral-300 group-hover:text-amber-400 transition-colors ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                </a>
-
-                <!-- MBFD Media -->
-                <a href="https://videos.mbfdhub.com" target="_blank" rel="noopener noreferrer" aria-label="Open MBFD Media video library (opens in new tab)" class="group inline-flex items-center gap-2.5 bg-white rounded-lg border border-neutral-200 px-4 py-3 shadow-sm hover:shadow-md hover:border-red-300 transition-all duration-200">
-                    <div class="w-8 h-8 rounded-md bg-red-50 flex items-center justify-center text-red-600 flex-shrink-0 group-hover:scale-105 transition-transform">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                        </svg>
-                    </div>
-                    <div class="max-w-xs">
-                        <span class="text-sm font-medium text-neutral-700 group-hover:text-red-700 transition-colors">MBFD Media</span>
-                        <p class="text-xs text-neutral-400">Watch department videos, support services content, training media, and live event broadcasts.</p>
-                        <span class="mt-1 inline-flex text-xs font-semibold text-red-600">Open MBFD Media</span>
-                    </div>
-                    <svg class="w-4 h-4 text-neutral-300 group-hover:text-red-400 transition-colors ml-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                </a>
-            </div>
         </div>
     </main>
     
