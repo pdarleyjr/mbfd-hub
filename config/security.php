@@ -34,6 +34,12 @@ return [
         'decay_seconds' => 60,
     ],
 
+    'identity_recovery' => [
+        'max_attempts' => 3,
+        'decay_seconds' => 900,
+        'intent_seconds' => 600,
+    ],
+
     'canonical_session' => [
         // Device posture is not inferred from request headers. D01 issues the
         // existing unmanaged-browser profile until an enrollment service is approved.

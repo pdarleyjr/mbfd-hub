@@ -17,6 +17,13 @@ final class PublicStationDailyCheckoutContractTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAsCanonicalFixture();
+    }
+
     public function test_station_show_exposes_the_canonical_daily_checkout_summary_and_matrix(): void
     {
         $station = Station::query()->create([

@@ -366,11 +366,11 @@
         { "name": "SCBA #4", "inputType": "text" },
         { "name": "SCBA #5", "inputType": "text" },
         { "name": "Crew Radio # - DE", "inputType": "text" },
-        { "name": "Crew Radio # - FI", "inputType": "text" },
-        { "name": "Crew Radio # - FI", "inputType": "text" },
+        { "name": "Crew Radio # - FI #1", "inputType": "text" },
+        { "name": "Crew Radio # - FI #2", "inputType": "text" },
         { "name": "OIC", "inputType": "text" },
-        { "name": "FI", "inputType": "text" },
-        { "name": "FI", "inputType": "text" }
+        { "name": "FI #1", "inputType": "text" },
+        { "name": "FI #2", "inputType": "text" }
       ]
     }
   ]

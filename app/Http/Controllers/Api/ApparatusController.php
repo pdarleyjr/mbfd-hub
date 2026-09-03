@@ -85,7 +85,7 @@ class ApparatusController extends Controller
             'checklist_item_count' => $resolution['item_count'],
             'inspection_date' => $inspectionDate->toDateString(),
             'due_tasks' => $checklistResolver->dueTasksFor($checklist, $inspectionDate),
-            // This unauthenticated route only needs a warning count. Never
+            // This browser route only needs a warning count. Never
             // serialize defect notes, photos, resolution history, or paths.
             'open_defects_count' => $apparatus->openDefects()->count(),
         ]);

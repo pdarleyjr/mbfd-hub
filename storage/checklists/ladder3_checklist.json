@@ -351,8 +351,8 @@
         { "name": "SCBA #3", "inputType": "text" },
         { "name": "SCBA #4", "inputType": "text" },
         { "name": "Radio # - DE", "inputType": "text" },
-        { "name": "Radio # - FI", "inputType": "text" },
-        { "name": "Radio # - FI", "inputType": "text" }
+        { "name": "Radio # - FI #1", "inputType": "text" },
+        { "name": "Radio # - FI #2", "inputType": "text" }
       ]
     }
   ]

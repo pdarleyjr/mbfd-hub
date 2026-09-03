@@ -44,7 +44,7 @@ class Employee extends Authenticatable
     protected static function booted(): void
     {
         static::creating(function (self $employee): void {
-            if ($employee->getRawOriginal('password') !== null) {
+            if (($employee->getAttributes()['password'] ?? null) !== null) {
                 return;
             }
 

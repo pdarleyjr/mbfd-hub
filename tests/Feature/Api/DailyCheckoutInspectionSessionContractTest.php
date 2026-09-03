@@ -34,6 +34,52 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_minimal_fb6_with_null_fleet_metadata_survives_the_full_daily_api_flow(): void
+    {
+        $station = Station::query()->create([
+            'station_number' => 6,
+            'name' => 'Station 6',
+            'address' => '123 Marine Drive',
+            'is_active' => true,
+        ]);
+        $apparatus = Apparatus::query()->create([
+            'station_id' => $station->id,
+            'unit_id' => 'FB6',
+            'name' => 'Fire Boat 6',
+            'designation' => 'Fire Boat 6',
+            'type' => 'Fire Boat',
+            'slug' => 'fb6',
+            'daily_checkout_requirement' => 'required',
+            'daily_checkout_template' => DailyCheckoutChecklistTemplate::FireBoat6->value,
+        ]);
+
+        $this->getJson('/api/public/apparatuses')
+            ->assertOk()
+            ->assertJsonPath('0.id', $apparatus->id)
+            ->assertJsonPath('0.vehicle_number', null)
+            ->assertJsonMissingPath('0.make')
+            ->assertJsonMissingPath('0.model')
+            ->assertJsonMissingPath('0.vin')
+            ->assertJsonMissingPath('0.year')
+            ->assertJsonMissingPath('0.snipeit_asset_id');
+        $this->getJson("/api/public/stations/{$station->id}/apparatus")
+            ->assertOk()
+            ->assertJsonPath('apparatuses.0.id', $apparatus->id)
+            ->assertJsonPath('apparatuses.0.vehicle_number', null);
+        $this->get('/daily/stations/6')->assertOk();
+        $this->getJson("/api/public/apparatuses/{$apparatus->id}/checklist")
+            ->assertOk()
+            ->assertJsonPath('checklist_type', 'fireboat6')
+            ->assertJsonPath('apparatus.vehicle_number', null);
+
+        $this->setTestTime('2026-08-31 09:00:00');
+        $contract = $this->startInspectionSession($apparatus);
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspections",
+            $this->fireBoatSubmission($apparatus, $contract, '10101010-1010-4010-8010-101010101010'),
+        )->assertCreated();
+    }
+
     public function test_normal_same_day_online_fire_boat_inspection_uses_a_persisted_server_contract(): void
     {
         $apparatus = $this->makeFireBoat6();

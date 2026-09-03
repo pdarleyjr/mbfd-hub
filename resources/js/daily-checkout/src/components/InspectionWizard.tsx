@@ -71,7 +71,7 @@ const restoreIssuedFireBoatApparatus = (saved: InspectionData | null, slug: stri
     || !Number.isInteger(apparatus.id)
     || apparatus.id < 1
     || typeof apparatus.name !== 'string'
-    || typeof apparatus.vehicle_number !== 'string'
+    || (apparatus.vehicle_number !== null && typeof apparatus.vehicle_number !== 'string')
   ) {
     return null;
   }
@@ -156,7 +156,7 @@ export default function InspectionWizard() {
         }
 
         setApparatus(foundApparatus);
-        setOfficerInfo(prev => ({ ...prev, unitNumber: foundApparatus.vehicle_number }));
+        setOfficerInfo(prev => ({ ...prev, unitNumber: foundApparatus.vehicle_number ?? foundApparatus.unit_id ?? '' }));
 
         // Service status is intentionally secondary. A network or API failure
         // must never prevent the inspection checklist from loading.
@@ -233,7 +233,7 @@ export default function InspectionWizard() {
           name: '',
           rank: 'Firefighter',
           shift: 'A',
-          unitNumber: foundApparatus.vehicle_number,
+          unitNumber: foundApparatus.vehicle_number ?? foundApparatus.unit_id ?? '',
         });
         setMeterData({ engine_hours: null, miles: null });
         setCurrentStep('officer');
@@ -381,7 +381,7 @@ export default function InspectionWizard() {
         name: '',
         rank: 'Firefighter',
         shift: 'A',
-        unitNumber: apparatus.vehicle_number,
+        unitNumber: apparatus.vehicle_number ?? apparatus.unit_id ?? '',
       });
       setMeterData({ engine_hours: null, miles: null });
       setCompartments(todayChecklist.compartments);
@@ -632,7 +632,7 @@ export default function InspectionWizard() {
         <h1 className="text-2xl font-bold text-neutral-800 mb-2 font-heading">
           Daily Inspection: {apparatus.name}
         </h1>
-        <p className="text-neutral-500">Unit: {apparatus.vehicle_number}</p>
+        <p className="text-neutral-500">Unit: {apparatus.vehicle_number ?? apparatus.unit_id ?? apparatus.designation ?? 'Not recorded'}</p>
         {hasLoadedAutosave && (
           <p className="text-sm text-sky-600 mt-1">📝 Restored from autosave</p>
         )}
@@ -744,7 +744,7 @@ export default function InspectionWizard() {
         <MeterStep
           apparatusId={apparatus.id}
           apparatusName={apparatus.name}
-          vehicleNumber={apparatus.vehicle_number}
+          vehicleNumber={apparatus.vehicle_number ?? apparatus.unit_id ?? ''}
           initialData={meterData}
           previousHours={apparatus.current_engine_hours ?? null}
           previousMiles={apparatus.current_miles ?? null}

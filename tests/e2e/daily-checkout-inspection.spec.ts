@@ -379,6 +379,7 @@ async function mockFireBoatInspectionApi(
     readonly sessionStatus?: number;
     readonly abortFirstSessionStart?: boolean;
     readonly recoverPriorDayContract?: boolean;
+    readonly nullFleetMetadata?: boolean;
   } = {},
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
@@ -389,6 +390,18 @@ async function mockFireBoatInspectionApi(
   let abortNextSessionStart = options.abortFirstSessionStart ?? false;
   let priorDayContractWasAbandoned = false;
   let currentIdentity = { userId: 101, securityVersion: 1 };
+  const presentedFireBoat = options.nullFleetMetadata
+    ? {
+        ...fireBoatApparatus,
+        vehicle_number: null,
+        status: null,
+        make: null,
+        model: null,
+        vin: null,
+        year: null,
+        snipeit_asset_id: null,
+      }
+    : fireBoatApparatus;
 
   await page.route('**/images/mbfd_logo_new.png', (route) => route.fulfill({ path: 'public/images/mbfd_logo_new.png' }));
   await page.route('**/api/**', async (route) => {
@@ -408,7 +421,57 @@ async function mockFireBoatInspectionApi(
     }
 
     if (path === '/api/public/apparatuses') {
-      return route.fulfill({ json: [fireBoatApparatus] });
+      return route.fulfill({ json: [presentedFireBoat] });
+    }
+
+    if (path === '/api/public/stations/6') {
+      return route.fulfill({
+        json: {
+          id: 6,
+          name: 'Station 6',
+          station_number: 6,
+          address: '2300 Pine Tree Drive',
+          city: 'Miami Beach',
+          state: 'FL',
+          zip_code: '33140',
+          phone: '',
+          is_active: true,
+          apparatuses: [presentedFireBoat],
+          daily_checkout: {
+            required_total: 1,
+            checked: 0,
+            attention: 0,
+            review_pending: 0,
+            not_checked: 1,
+            completed: 0,
+            out_of_service: 0,
+            exempt: 0,
+            classification_required: 0,
+            completion_percent: 0,
+            completion_available: true,
+            matrix: [{
+              apparatus_id: fireBoatApparatus.id,
+              state: 'not_checked',
+              daily_checkout_requirement: 'required',
+              out_of_service: false,
+              classification_required: false,
+              included_in_required_total: true,
+              included_in_completed: false,
+              has_pending_submission: false,
+              return_checkout_required: false,
+              return_checkout_verified: false,
+            }],
+          },
+        },
+      });
+    }
+
+    if (path === '/api/public/stations/6/requests') {
+      return route.fulfill({ json: { data: [] } });
+    }
+
+    if (path === '/api/public/stations/6/service-tickets') {
+      return route.fulfill({ json: { data: [], meta: { total: 0 } } });
     }
 
     if (path === '/api/public/employees/list') {
@@ -871,6 +934,36 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
       },
     ],
   });
+});
+
+test('FB6 null fleet metadata remains selectable and completes the Daily browser flow', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  const api = await mockFireBoatInspectionApi(page, { nullFleetMetadata: true });
+
+  await page.goto('/daily/stations/6');
+  await expect(page.getByRole('heading', { name: 'Station 6' })).toBeVisible();
+  await page.getByRole('button', { name: 'Apparatus', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
+  await expect(page.getByText('Unit: FB6', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Start Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  await page.getByLabel('Full Name').fill('Captain Browser');
+  await page.getByText('Captain Browser', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue to Inspection' }).click();
+  await page.getByLabel('High Low Tide').fill('High 10:00 / Low 16:30');
+  await page.getByLabel('Port Engine Hours').fill('45.5');
+  await page.getByRole('button', { name: 'Mark all due duties as present' }).click();
+  await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
+  await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
+  await page.getByRole('button', { name: 'Review & Submit' }).click();
+  await drawInspectionSignature(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inspection Submitted for Review!' })).toBeVisible();
+  expect(api.submissions).toHaveLength(1);
+  expect(pageErrors).toEqual([]);
 });
 
 test('Fire Boat blocks an unbound offline checkout before inspection entry', async ({ page }) => {

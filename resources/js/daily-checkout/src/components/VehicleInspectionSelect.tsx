@@ -122,9 +122,7 @@ export default function VehicleInspectionSelect() {
                     <h3 className="text-lg font-semibold text-neutral-500 truncate">
                       {apparatus.designation || apparatus.name || 'Unknown'}
                     </h3>
-                    <p className="text-sm text-neutral-400">
-                      Vehicle #{apparatus.vehicle_number}
-                    </p>
+                    {apparatus.vehicle_number && <p className="text-sm text-neutral-400">Vehicle #{apparatus.vehicle_number}</p>}
                     <p className="text-xs text-neutral-400 capitalize mt-0.5">
                       {apparatus.type} · No inspection available
                     </p>
@@ -148,9 +146,7 @@ export default function VehicleInspectionSelect() {
                   <h3 className="text-lg font-semibold text-neutral-800 truncate">
                     {apparatus.designation || apparatus.name || 'Unknown'}
                   </h3>
-                  <p className="text-sm text-neutral-500">
-                    Vehicle #{apparatus.vehicle_number}
-                  </p>
+                  {apparatus.vehicle_number && <p className="text-sm text-neutral-500">Vehicle #{apparatus.vehicle_number}</p>}
                   <p className="text-xs text-neutral-400 capitalize mt-0.5">
                     {apparatus.type}
                   </p>

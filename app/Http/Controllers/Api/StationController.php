@@ -30,8 +30,8 @@ use Illuminate\Support\Facades\Schema;
 class StationController extends Controller
 {
     /**
-     * Whether the current request is served via the unauthenticated public API
-     * (routes under the /api/public/* prefix). Used to apply field-redacting
+     * Whether the current request is served via the legacy public-prefix browser API
+     * (routes under /api/public/* are now authenticated). Used to apply field-redacting
      * public resources without altering the authenticated/admin responses.
      */
     private function isPublicRequest(Request $request): bool

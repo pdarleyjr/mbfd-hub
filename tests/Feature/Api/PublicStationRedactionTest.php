@@ -61,6 +61,7 @@ class PublicStationRedactionTest extends TestCase
             'status' => 'In Service',
             'notes' => 'SECRET apparatus maintenance note',
         ]);
+        $this->actingAsCanonicalFixture();
     }
 
     public function test_stations_index_redacts_internal_fields(): void

@@ -12,10 +12,10 @@ return new class extends Migration
             $table->id();
             $table->string('unit_id')->unique();
             $table->string('vin')->nullable();
-            $table->string('make');
-            $table->string('model');
+            $table->string('make')->nullable();
+            $table->string('model')->nullable();
             $table->integer('year')->nullable();
-            $table->enum('status', ['In Service', 'Out of Service', 'Maintenance'])->default('In Service');
+            $table->enum('status', ['In Service', 'Out of Service', 'Maintenance'])->nullable()->default('In Service');
             $table->integer('mileage')->default(0);
             $table->date('last_service_date')->nullable();
             $table->text('notes')->nullable();

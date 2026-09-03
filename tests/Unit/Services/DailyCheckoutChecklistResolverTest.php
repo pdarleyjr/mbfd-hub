@@ -25,7 +25,7 @@ class DailyCheckoutChecklistResolverTest extends TestCase
             ['type' => 'Rescue', 'class_description' => 'RESCUE', 'designation' => 'R3', 'expected' => 'rescue', 'error' => null],
             ['type' => 'Rescue', 'class_description' => 'RESCUE', 'designation' => 'R4', 'expected' => 'rescue', 'error' => null],
             ['type' => 'Rescue', 'class_description' => 'RESCUE', 'designation' => 'R44', 'expected' => 'rescue', 'error' => null],
-            ['type' => 'Ladder', 'class_description' => 'LADDER', 'designation' => 'L11', 'expected' => 'ladder1', 'error' => 'invalid_schema'],
+            ['type' => 'Ladder', 'class_description' => 'LADDER', 'designation' => 'L11', 'expected' => 'ladder1', 'error' => null],
         ];
 
         foreach ($cases as $case) {
@@ -43,13 +43,38 @@ class DailyCheckoutChecklistResolverTest extends TestCase
 
         foreach ([
             ['type' => 'Engine', 'class_description' => 'ENGINE', 'designation' => 'E2', 'expected' => 'engine2', 'error' => null],
-            ['type' => 'Ladder', 'class_description' => 'LADDER', 'designation' => 'L3', 'expected' => 'ladder3', 'error' => 'invalid_schema'],
+            ['type' => 'Ladder', 'class_description' => 'LADDER', 'designation' => 'L3', 'expected' => 'ladder3', 'error' => null],
         ] as $case) {
             $resolution = $resolver->resolve(new Apparatus($case));
 
             $this->assertSame($case['expected'], $resolution['checklist_type']);
             $this->assertSame('family_override', $resolution['resolution_source']);
             $this->assertSame($case['error'], $resolution['error']);
+        }
+    }
+
+    public function test_every_approved_frontline_template_is_usable(): void
+    {
+        $resolver = app(DailyCheckoutChecklistResolver::class);
+
+        foreach ([
+            ['unit_id' => 'E1', 'type' => 'Engine', 'template' => DailyCheckoutChecklistTemplate::Engine],
+            ['unit_id' => 'E2', 'type' => 'Engine', 'template' => DailyCheckoutChecklistTemplate::Engine2],
+            ['unit_id' => 'R1', 'type' => 'Rescue', 'template' => DailyCheckoutChecklistTemplate::Rescue],
+            ['unit_id' => 'L1', 'type' => 'Ladder', 'template' => DailyCheckoutChecklistTemplate::Ladder1],
+            ['unit_id' => 'L3', 'type' => 'Ladder', 'template' => DailyCheckoutChecklistTemplate::Ladder3],
+            ['unit_id' => 'FB6', 'type' => 'Fire Boat', 'template' => DailyCheckoutChecklistTemplate::FireBoat6],
+        ] as $case) {
+            $resolution = $resolver->resolve(new Apparatus([
+                'unit_id' => $case['unit_id'],
+                'designation' => $case['unit_id'],
+                'type' => $case['type'],
+                'daily_checkout_template' => $case['template']->value,
+            ]));
+
+            $this->assertTrue($resolution['usable'], $case['template']->value);
+            $this->assertNull($resolution['error'], $case['template']->value);
+            $this->assertSame($case['template']->value, $resolution['checklist_type']);
         }
     }
 

@@ -51,6 +51,7 @@ final class PublicStationApparatusInspectionDayWindowTest extends TestCase
             'year' => 2020,
             'status' => 'In Service',
         ]);
+        $this->actingAsCanonicalFixture();
     }
 
     protected function tearDown(): void

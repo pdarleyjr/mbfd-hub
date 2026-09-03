@@ -234,6 +234,7 @@ class PersonnelRequestPortalTest extends TestCase
     public function test_homepage_uses_exact_station_title_and_uniform_specific_employee_copy(): void
     {
         $this->withoutVite();
+        $this->actingAsCanonicalFixture();
         $this->get('/')
             ->assertOk()
             ->assertSee('Station / Vehicles / Equipment')

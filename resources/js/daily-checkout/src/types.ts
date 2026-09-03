@@ -1,4 +1,4 @@
-export type ApparatusType = 'engine' | 'ladder1' | 'ladder3' | 'rescue' | 'rope' | 'fireboat';
+export type ApparatusType = 'engine' | 'ladder1' | 'ladder3' | 'rescue' | 'rope' | 'fireboat' | 'fire boat';
 export type DailyCheckoutRequirement = 'required' | 'exempt' | 'reserve' | 'administrative' | 'inactive' | 'unknown';
 export type DailyCheckoutState = 'checked' | 'attention' | 'review_pending' | 'not_checked' | 'out_of_service' | 'exempt' | 'classification_required';
 
@@ -44,7 +44,7 @@ export interface Apparatus {
   name: string;
   unit_id?: string;
   type: ApparatusType;
-  vehicle_number: string;
+  vehicle_number: string | null;
   designation?: string;
   slug: string;
   status?: string;

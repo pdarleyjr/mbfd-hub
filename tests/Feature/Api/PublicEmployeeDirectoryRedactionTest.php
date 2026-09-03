@@ -14,12 +14,13 @@ class PublicEmployeeDirectoryRedactionTest extends TestCase
 
     public function test_public_operator_directory_does_not_expose_login_identifiers(): void
     {
-        Employee::create([
+        $employee = Employee::create([
             'employee_id' => '20731',
             'name' => 'Firefighter Test',
             'rank' => 'Firefighter',
             'password' => 'private-password-value',
         ]);
+        $this->actingAs($employee, 'employee');
 
         $response = $this->getJson('/api/public/employees/list');
 
