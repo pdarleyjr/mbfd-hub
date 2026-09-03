@@ -451,10 +451,16 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
   assert.match(postgres, /POSTGRES_DB:\s*mbfd_hub_test_ci/);
   assert.match(postgres, /MBFD_ALLOW_DISPOSABLE_POSTGRES:\s*["']1["']/);
   assert.match(postgres, /actions\/setup-node@/);
-  assert.match(workflowStep(postgres, "Install Node dependencies"), /npm ci --ignore-scripts --legacy-peer-deps/);
+  const postgresNodeDependencies = workflowStep(postgres, "Install Node dependencies");
+  assert.match(postgresNodeDependencies, /npm ci --ignore-scripts --legacy-peer-deps/);
+  assert.match(postgresNodeDependencies, /npm --prefix resources\/js\/daily-checkout ci --ignore-scripts/);
   const postgresTestAssets = workflowStep(postgres, "Build root test assets");
   assert.match(postgresTestAssets, /npm run build/);
   assert.match(postgresTestAssets, /SENTRY_AUTH_TOKEN:\s*""/);
+  const postgresDailyAssets = workflowStep(postgres, "Build Daily Checkout test assets");
+  assert.match(postgresDailyAssets, /working-directory:\s*resources\/js\/daily-checkout/);
+  assert.match(postgresDailyAssets, /DAILY_CHECKOUT_OUT_DIR:\s*\.\.\/\.\.\/\.\.\/public\/daily/);
+  assert.match(postgresDailyAssets, /npm run build/);
   assert.match(workflowStep(postgres, "Run PHPUnit suite"), /php artisan test --exclude-group=postgres/);
   assert.match(
     workflowStep(postgres, "Run PostgreSQL concurrency and integrity tests"),
@@ -518,10 +524,16 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
   const php85 = workflowJob(gates, "php-85-compatibility");
   assert.match(php85, /php-version:\s*["']8\.5["']/);
   assert.match(php85, /actions\/setup-node@/);
-  assert.match(workflowStep(php85, "Install Node dependencies"), /npm ci --ignore-scripts --legacy-peer-deps/);
+  const php85NodeDependencies = workflowStep(php85, "Install Node dependencies");
+  assert.match(php85NodeDependencies, /npm ci --ignore-scripts --legacy-peer-deps/);
+  assert.match(php85NodeDependencies, /npm --prefix resources\/js\/daily-checkout ci --ignore-scripts/);
   const php85TestAssets = workflowStep(php85, "Build root test assets");
   assert.match(php85TestAssets, /npm run build/);
   assert.match(php85TestAssets, /SENTRY_AUTH_TOKEN:\s*""/);
+  const php85DailyAssets = workflowStep(php85, "Build Daily Checkout test assets");
+  assert.match(php85DailyAssets, /working-directory:\s*resources\/js\/daily-checkout/);
+  assert.match(php85DailyAssets, /DAILY_CHECKOUT_OUT_DIR:\s*\.\.\/\.\.\/\.\.\/public\/daily/);
+  assert.match(php85DailyAssets, /npm run build/);
   assert.match(workflowStep(php85, "Run PHP 8.5 PHPUnit compatibility suite"), /php artisan test --exclude-group=postgres/);
   assert.match(workflowStep(php85, "Run PHP 8.5 PostgreSQL compatibility tests"), /php artisan test --group=postgres/);
 });
