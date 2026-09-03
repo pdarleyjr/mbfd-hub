@@ -47,6 +47,86 @@ final class CanonicalAuthorizationTest extends TestCase
             ->assertRedirect('/login');
     }
 
+    public function test_existing_canonical_user_resumes_the_exact_bid_authorize_destination_after_login(): void
+    {
+        $authorizeUrl = $this->authorizeUrl();
+        $user = $this->linkedUser();
+
+        $this->get($authorizeUrl)->assertRedirect('/login');
+        $loginLocation = $this->post('/login', [
+            'employee_id' => $user->employeeProfile->employee_id,
+            'password' => 'canonical-user-password',
+        ])->assertRedirect()->headers->get('Location');
+        self::assertIsString($loginLocation);
+        self::assertSame('/auth/bid/authorize', parse_url($loginLocation, PHP_URL_PATH));
+        $loginQuery = $this->redirectQuery($loginLocation);
+        self::assertSame('bid', $loginQuery['client_id'] ?? null);
+        self::assertSame(self::CALLBACK, $loginQuery['redirect_uri'] ?? null);
+        self::assertSame(self::STATE, $loginQuery['state'] ?? null);
+        $this->withCookie(
+            (string) config('session.cookie'),
+            $this->app['session.store']->getId(),
+        )->withCredentials();
+
+        $location = $this->get($loginLocation)
+            ->assertRedirect()
+            ->headers->get('Location');
+        self::assertIsString($location);
+        self::assertStringStartsWith(self::CALLBACK.'?', $location);
+
+        $query = $this->redirectQuery($location);
+        self::assertSame(self::STATE, $query['state'] ?? null);
+        self::assertIsString($query['code'] ?? null);
+        $this->exchange($query['code'])->assertOk();
+    }
+
+    public function test_first_login_canonicalization_preserves_the_bid_authorize_destination_through_activation(): void
+    {
+        $authorizeUrl = $this->authorizeUrl();
+        $employee = Employee::query()->create([
+            'employee_id' => 'BID-FIRST-LOGIN',
+            'name' => 'First Login Bid Member',
+            'rank' => 'Firefighter',
+            'password' => Hash::make('employee-legacy-password'),
+            'must_change_password' => false,
+        ]);
+
+        $this->get($authorizeUrl)->assertRedirect('/login');
+        $this->post('/login', [
+            'employee_id' => $employee->employee_id,
+            'password' => 'employee-legacy-password',
+        ])->assertRedirect('/activate-account');
+
+        $activation = $this->get('/activate-account')->assertOk();
+        $nonce = $activation->viewData('nonce');
+        self::assertIsString($nonce);
+        $this->post('/activate-account', [
+            'nonce' => $nonce,
+            'path' => 'no_existing_user',
+            'no_legacy_account_assertion' => '1',
+        ])->assertRedirect($authorizeUrl);
+
+        $user = $employee->fresh()->user;
+        self::assertInstanceOf(User::class, $user);
+        $this->assertAuthenticatedAs($user, 'web');
+        $this->assertDatabaseHas('authentication_sessions', ['user_id' => $user->id]);
+        $this->withCookie(
+            (string) config('session.cookie'),
+            $this->app['session.store']->getId(),
+        )->withCredentials();
+
+        $location = $this->get($authorizeUrl)
+            ->assertRedirect()
+            ->headers->get('Location');
+        self::assertIsString($location);
+        self::assertStringStartsWith(self::CALLBACK.'?', $location);
+
+        $query = $this->redirectQuery($location);
+        self::assertSame(self::STATE, $query['state'] ?? null);
+        self::assertIsString($query['code'] ?? null);
+        $this->exchange($query['code'])->assertOk();
+    }
+
     public function test_active_canonical_user_with_linked_employee_receives_and_redeems_an_opaque_code(): void
     {
         $user = $this->linkedUser();

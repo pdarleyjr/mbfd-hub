@@ -80,12 +80,16 @@ final class PanelGuardConvergenceTest extends TestCase
 
         $this->post('/logout')->assertRedirect('/login');
 
-        $this->withSession(['url.intended' => '//evil.example/steal'])
-            ->post('/login', [
-                'employee_id' => $user->employeeProfile->employee_id,
-                'password' => 'correct-password',
-            ])
-            ->assertRedirect('/');
+        foreach (['/auth/evil', '//evil.example/steal', 'https://evil.example/steal'] as $destination) {
+            $this->withSession(['url.intended' => $destination])
+                ->post('/login', [
+                    'employee_id' => $user->employeeProfile->employee_id,
+                    'password' => 'correct-password',
+                ])
+                ->assertRedirect('/');
+
+            $this->post('/logout')->assertRedirect('/login');
+        }
     }
 
     public function test_a_revoked_canonical_session_loses_access_to_every_converted_panel(): void
