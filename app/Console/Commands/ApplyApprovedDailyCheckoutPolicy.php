@@ -16,6 +16,7 @@ final class ApplyApprovedDailyCheckoutPolicy extends Command
 {
     protected $signature = 'daily-checkout:apply-approved-policy
                             {--dry-run : Validate and report without mutation}
+                            {--verify : Fail unless all and only the 14 approved units are already configured; never mutates}
                             {--confirm= : Must equal APPLY_APPROVED_FRONTLINE_DAILY_POLICY}';
 
     protected $description = 'Apply the owner-approved frontline Daily Checkout requirement and template mapping.';
@@ -23,14 +24,20 @@ final class ApplyApprovedDailyCheckoutPolicy extends Command
     public function handle(): int
     {
         $dryRun = (bool) $this->option('dry-run');
-        if (! $dryRun && $this->option('confirm') !== 'APPLY_APPROVED_FRONTLINE_DAILY_POLICY') {
+        $verify = (bool) $this->option('verify');
+        if ($dryRun && $verify) {
+            $this->error('Daily Checkout policy verification blocked: choose either --dry-run or --verify.');
+
+            return self::FAILURE;
+        }
+        if (! $dryRun && ! $verify && $this->option('confirm') !== 'APPLY_APPROVED_FRONTLINE_DAILY_POLICY') {
             $this->error('Daily Checkout policy apply blocked: exact confirmation was not provided.');
 
             return self::FAILURE;
         }
 
         try {
-            $result = DB::transaction(fn (): array => $this->apply($dryRun), 3);
+            $result = DB::transaction(fn (): array => $this->apply($dryRun || $verify), 3);
         } catch (RuntimeException $exception) {
             $this->error('Daily Checkout policy apply blocked: '.$exception->getMessage());
 
@@ -40,6 +47,24 @@ final class ApplyApprovedDailyCheckoutPolicy extends Command
             $this->error('Daily Checkout policy apply failed and no partial transaction was retained.');
 
             return self::FAILURE;
+        }
+
+        if ($verify) {
+            $requiredCount = Apparatus::query()
+                ->where('daily_checkout_requirement', 'required')
+                ->count();
+            $verified = $result['updated'] === 0
+                && $result['created'] === 0
+                && $result['already_configured'] === 14
+                && $requiredCount === 14;
+            $result['status'] = $verified
+                ? 'VERIFIED_APPROVED_FRONTLINE_DAILY_POLICY'
+                : 'APPROVED_FRONTLINE_DAILY_POLICY_NOT_APPLIED';
+            $result['verified'] = $verified;
+            $result['required_count'] = $requiredCount;
+            $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+
+            return $verified ? self::SUCCESS : self::FAILURE;
         }
 
         $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));

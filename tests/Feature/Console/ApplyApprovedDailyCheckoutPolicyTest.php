@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Models\Apparatus;
+use App\Models\DailyCheckoutLedgerCutover;
 use App\Models\Station;
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,6 +59,20 @@ final class ApplyApprovedDailyCheckoutPolicyTest extends TestCase
         $this->assertSame(0, Apparatus::query()->where('daily_checkout_requirement', 'required')->count());
         $this->assertFalse(Apparatus::query()->where('unit_id', 'FB6')->exists());
 
+        $verifyBeforeApply = Artisan::call('daily-checkout:apply-approved-policy', ['--verify' => true]);
+        $verifyBeforeApplyResult = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(Command::FAILURE, $verifyBeforeApply, Artisan::output());
+        $this->assertFalse($verifyBeforeApplyResult['verified']);
+        $this->assertSame(0, $verifyBeforeApplyResult['required_count']);
+        $this->assertFalse(Apparatus::query()->where('unit_id', 'FB6')->exists());
+
+        $this->assertSame(Command::SUCCESS, Artisan::call('daily-checkout:activate-ledger', [
+            '--release-sha' => str_repeat('a', 40),
+        ]), Artisan::output());
+        $cutover = DailyCheckoutLedgerCutover::query()->sole();
+        $cutoverSnapshotSha256 = $cutover->snapshot_sha256;
+        $this->assertSame(14, $cutover->apparatus_count);
+
         $first = Artisan::call('daily-checkout:apply-approved-policy', [
             '--confirm' => 'APPLY_APPROVED_FRONTLINE_DAILY_POLICY',
         ]);
@@ -81,6 +96,15 @@ final class ApplyApprovedDailyCheckoutPolicyTest extends TestCase
         $this->assertNull($fb6->model);
         $this->assertNull($fb6->vin);
         $this->assertSame('unknown', $support->fresh()->daily_checkout_requirement->value);
+        $this->assertSame($cutoverSnapshotSha256, $cutover->fresh()->snapshot_sha256);
+        $this->assertSame(14, $cutover->fresh()->apparatus_count);
+
+        $verify = Artisan::call('daily-checkout:apply-approved-policy', ['--verify' => true]);
+        $verifyResult = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(Command::SUCCESS, $verify, Artisan::output());
+        $this->assertTrue($verifyResult['verified']);
+        $this->assertSame(14, $verifyResult['already_configured']);
+        $this->assertSame(14, $verifyResult['required_count']);
 
         $second = Artisan::call('daily-checkout:apply-approved-policy', [
             '--confirm' => 'APPLY_APPROVED_FRONTLINE_DAILY_POLICY',
@@ -91,6 +115,13 @@ final class ApplyApprovedDailyCheckoutPolicyTest extends TestCase
         $this->assertSame(0, $secondResult['created']);
         $this->assertSame(14, $secondResult['already_configured']);
         $this->assertSame(1, Apparatus::query()->where('unit_id', 'FB6')->count());
+
+        $support->forceFill(['daily_checkout_requirement' => 'required'])->save();
+        $verifyExtraRequired = Artisan::call('daily-checkout:apply-approved-policy', ['--verify' => true]);
+        $verifyExtraRequiredResult = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(Command::FAILURE, $verifyExtraRequired, Artisan::output());
+        $this->assertFalse($verifyExtraRequiredResult['verified']);
+        $this->assertSame(15, $verifyExtraRequiredResult['required_count']);
     }
 
     public function test_fb6_alias_collision_fails_closed_without_mutating_any_policy(): void
