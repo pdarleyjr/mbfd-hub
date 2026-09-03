@@ -5,12 +5,63 @@ const password = process.env.OPERATIONAL_FORMS_E2E_PASSWORD ?? 'OperationalForms
 const adminEmployeeId = process.env.OPERATIONAL_FORMS_E2E_ADMIN_EMPLOYEE_ID ?? 'E215';
 const adminPassword = process.env.OPERATIONAL_FORMS_E2E_ADMIN_PASSWORD ?? 'OperationalFormsAdmin!1';
 
-test('updated home exposes the exact operational destinations', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop', 'One desktop visual is sufficient for the home navigation acceptance.');
+async function login(page: import('@playwright/test').Page, id: string, secret: string) {
+  await page.getByLabel('Employee ID').fill(id);
+  await page.getByLabel('Password').fill(secret);
+  await page.getByRole('button', { name: /sign in/i }).click();
+}
+
+test('admin uses the canonical home control to enter the Admin panel', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One desktop actual-click acceptance is sufficient.');
+
   await page.goto('/');
-  await expect(page.getByRole('link', { name: 'Station / Vehicles / Equipment' })).toHaveAttribute('href', /\/daily\/stations$/);
-  await expect(page.getByRole('link', { name: /Open operational forms/i })).toHaveAttribute('href', /\/employee\/forms$/);
-  await page.screenshot({ path: testInfo.outputPath('operational-forms-home-desktop.png'), fullPage: true });
+  await expect(page).toHaveURL(/\/login$/);
+  await login(page, adminEmployeeId, adminPassword);
+  await expect(page).toHaveURL(/\/$/);
+
+  const adminPanel = page.getByRole('link', { name: 'Admin Panel' });
+  await expect(adminPanel).toHaveAttribute('href', /\/admin$/);
+  await adminPanel.click();
+  await expect(page).toHaveURL(/\/admin(?:\/)?$/, { timeout: 30_000 });
+  await expect(page.locator('.fi-main')).toBeVisible();
+});
+
+test('entitled home exposes the exact unified Quick Access destinations', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One desktop content acceptance is sufficient.');
+
+  await page.goto('/');
+  await login(page, adminEmployeeId, adminPassword);
+  await expect(page.getByRole('heading', { name: 'Quick Access' })).toBeVisible();
+
+  const cards = page.locator('[data-quick-access-card]');
+  await expect(cards).toHaveCount(7);
+  await expect(cards).toHaveText([
+    /Station \/ Vehicles \/ Equipment/,
+    /Employee Portal/,
+    /ICS Forms/,
+    /Workgroup Dashboard/,
+    /Pump Panel/,
+    /Videos/,
+    /Media Control/,
+  ]);
+  await expect(page.getByRole('link', { name: /Station \/ Vehicles \/ Equipment/i })).toHaveAttribute('href', /\/daily\/stations$/);
+  await expect(page.getByRole('link', { name: /ICS Forms/i })).toHaveAttribute('href', /\/employee\/forms$/);
+  await expect(page.getByRole('link', { name: /Workgroup Dashboard/i })).toHaveAttribute('href', /\/workgroups$/);
+  await expect(page.getByRole('link', { name: /Pump Panel/i })).toHaveAttribute('href', 'https://pdarleyjr.github.io/puc-sim-manual-ui/');
+  await expect(page.getByRole('link', { name: /Videos/i })).toHaveAttribute('href', 'https://videos.mbfdhub.com');
+  await expect(page.getByRole('link', { name: /Media Control/i })).toHaveAttribute('href', 'https://media.mbfdhub.com/api/auth/hub/start');
+  await expect(page.getByText('MBFD Support Assistant')).toHaveCount(0);
+  await expect(page.locator('[aria-label="MBFD Live Incident Feed"]')).toBeVisible();
+});
+
+test('authorized user enters Workgroups without a second login', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One desktop actual-click acceptance is sufficient.');
+
+  await page.goto('/');
+  await login(page, adminEmployeeId, adminPassword);
+  await page.getByRole('link', { name: /Workgroup Dashboard/i }).click();
+  await expect(page).toHaveURL(/\/workgroups(?:\/dashboard)?\/?$/, { timeout: 30_000 });
+  await expect(page).not.toHaveURL(/\/login/);
 });
 
 test('employee can enter the controlled forms workspace and start an ICS 214', async ({ page }, testInfo) => {
@@ -26,7 +77,7 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
   await expect(page.locator('.fi-sidebar')).toBeHidden();
   await expect(page.locator('.fi-topbar')).toBeHidden();
   await expect(page.locator('.fi-sidebar-close-overlay')).toBeHidden();
-  await expect(page.getByRole('link', { name: 'MBFD Hub home' })).toHaveAttribute('href', '/');
+  await expect(page.getByRole('link', { name: 'MBFD Hub home', exact: true })).toHaveAttribute('href', '/');
   await expect(page.getByText('ICS 214 — Activity Log')).toBeVisible();
   await expect(page.getByText(/FROC-LOG-001-FF/)).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath(`operational-forms-library-${testInfo.project.name}.png`), fullPage: true });
@@ -79,7 +130,70 @@ test('employee dashboard header returns members to the main MBFD Hub', async ({ 
   const target = await home.boundingBox();
   expect(target?.width).toBeGreaterThanOrEqual(44);
   expect(target?.height).toBeGreaterThanOrEqual(44);
+  await home.click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { name: 'Quick Access' })).toBeVisible();
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/employee/dashboard');
+  const panelBrandHome = page.getByRole('link', { name: 'MBFD Hub Home', exact: true });
+  await expect(panelBrandHome).toHaveAttribute('href', '/');
+  await panelBrandHome.click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { name: 'Quick Access' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('employee-dashboard-home-phone.png'), fullPage: true });
+});
+
+test('home layout is ordered, aligned, touch-safe, and overflow-free from 320px through 4K', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'The responsive matrix is exercised in one authenticated browser session.');
+
+  await page.goto('/');
+  await login(page, adminEmployeeId, adminPassword);
+
+  const viewports = [
+    { name: 'phone-320', width: 320, height: 568, columns: false },
+    { name: 'phone-390', width: 390, height: 844, columns: false },
+    { name: 'tablet-portrait', width: 768, height: 1024, columns: false },
+    { name: 'tablet-landscape', width: 1024, height: 768, columns: true },
+    { name: 'desktop', width: 1440, height: 1000, columns: true },
+    { name: 'wide-desktop', width: 2560, height: 1440, columns: true },
+    { name: '4k', width: 3840, height: 2160, columns: true },
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.waitForTimeout(400);
+    const quickAccess = page.locator('[data-home-column="quick-access"]');
+    const incidents = page.locator('[data-home-column="incidents"]');
+    await expect(quickAccess).toBeVisible();
+    await expect(incidents).toBeVisible();
+
+    const [quickBox, incidentBox] = await Promise.all([quickAccess.boundingBox(), incidents.boundingBox()]);
+    expect(quickBox).not.toBeNull();
+    expect(incidentBox).not.toBeNull();
+    if (viewport.columns) {
+      expect(quickBox!.x + quickBox!.width).toBeLessThanOrEqual(incidentBox!.x);
+      expect(Math.abs(quickBox!.y - incidentBox!.y)).toBeLessThanOrEqual(8);
+    } else {
+      expect(quickBox!.y + quickBox!.height).toBeLessThanOrEqual(incidentBox!.y);
+    }
+
+    const layout = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      targets: Array.from(document.querySelectorAll<HTMLElement>('[data-important-target]')).map((target) => {
+        const rect = target.getBoundingClientRect();
+        return { width: rect.width, height: rect.height, left: rect.left, right: rect.right };
+      }),
+    }));
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+    expect(layout.targets.length).toBeGreaterThanOrEqual(7);
+    expect(layout.targets.every(({ width, height, left, right }) => (
+      width >= 44 && height >= 44 && left >= -1 && right <= layout.clientWidth + 1
+    ))).toBe(true);
+
+    await page.screenshot({ path: testInfo.outputPath(`home-${viewport.name}.png`), fullPage: true });
+  }
 });
 
 test('employee can submit an arbitrary completed file from the Forms library', async ({ page }, testInfo) => {

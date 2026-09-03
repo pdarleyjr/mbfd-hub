@@ -18,6 +18,8 @@ final class SecurityStandardsPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('Security & Standards', false);
         $response->assertSee('Standards alignment matrix', false);
+        $response->assertSee('href="'.url('/login').'"', false);
+        $response->assertDontSee('/admin/login', false);
     }
 
     public function test_landing_page_footer_links_to_security_standards(): void
