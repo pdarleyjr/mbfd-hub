@@ -1,40 +1,24 @@
 <?php
 
 /**
- * Laravel - A PHP Framework For Web Artisans
+ * Router for the PHP built-in server used by the production container.
  *
- * Custom server.php that handles SPA directories properly.
- * The PHP built-in dev server returns 404 for paths under real directories
- * (like public/daily/) when the sub-path doesn't match a real file.
- * This script intercepts those requests and routes them to Laravel.
+ * Only real public files bypass Laravel. SPA navigation must reach Laravel so
+ * route middleware, including canonical authentication, is always enforced.
  */
-
 $publicPath = getcwd();
 
 $uri = urldecode(
     parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? ''
 );
 
-// SPA catch-all: serve daily/index.html for any /daily/* path that isn't a real file
-if (preg_match('#^/daily(/|$)#', $uri)) {
-    $filePath = $publicPath . $uri;
-    // If it's a real file (JS, CSS, images), serve it directly
-    if (is_file($filePath)) {
-        return false;
-    }
-    // Otherwise serve the SPA's index.html
-    $spaIndex = $publicPath . '/daily/index.html';
-    if (is_file($spaIndex)) {
-        header('Content-Type: text/html; charset=UTF-8');
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        readfile($spaIndex);
-        return;
-    }
-}
-
-// Standard Laravel server.php behavior
-if ($uri !== '/' && file_exists($publicPath.$uri)) {
+if ($uri !== '/' && is_file($publicPath.$uri)) {
     return false;
 }
+
+// The built-in server changes these values for nested paths below a real
+// directory. Normalize them so Symfony resolves /daily/* from the site root.
+$_SERVER['SCRIPT_NAME'] = '/index.php';
+$_SERVER['PHP_SELF'] = '/index.php';
 
 require_once $publicPath.'/index.php';

@@ -279,7 +279,9 @@ jobs:
               set -euo pipefail
               php artisan migrate:status --no-ansi
               php artisan migrate --force
+              php artisan daily-checkout:apply-approved-policy --confirm=APPLY_APPROVED_FRONTLINE_DAILY_POLICY --no-interaction
               php artisan daily-checkout:activate-ledger --release-sha="$RELEASE_SHA" --no-interaction
+              php artisan daily-checkout:apply-approved-policy --verify --no-interaction
             '
 
           OLD_CONTAINER_ID="$(docker inspect --format '{{.Id}}' "$HUB_APP_CONTAINER")"
@@ -424,5 +426,7 @@ jobs:
           set -euo pipefail
           curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 15 https://www.mbfdhub.com/up > /dev/null
           test "$(curl --silent --show-error --location --max-time 15 --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/)" = '200'
+          test "$(curl --silent --show-error --max-time 15 --header 'Cookie:' --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/daily/stations/6)" = '302'
+          test "$(curl --silent --show-error --max-time 15 --header 'Cookie:' --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/api/public/stations)" = '302'
           MARKER_SHA="$(curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 15 https://www.mbfdhub.com/deploy-marker.json | jq -er '.sha')"
           test "$MARKER_SHA" = "$RELEASE_SHA"

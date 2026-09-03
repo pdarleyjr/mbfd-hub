@@ -163,6 +163,8 @@ jobs:
           test "$(docker exec "$RUNTIME_CONTAINER" id -un)" = sail
           test -z "$(docker exec "$RUNTIME_CONTAINER" ps -eo uid= | awk '$1 == 0 { print; exit }')"
           test -z "$(docker port "$RUNTIME_CONTAINER")"
+          test "$(docker exec "$RUNTIME_CONTAINER" curl --silent --show-error --max-time 10 --header 'Cookie:' --output /dev/null --write-out '%{http_code}' http://localhost:8081/daily/stations/6)" = '302'
+          test "$(docker exec "$RUNTIME_CONTAINER" curl --silent --show-error --max-time 10 --header 'Cookie:' --output /dev/null --write-out '%{http_code}' http://localhost:8081/api/public/stations)" = '302'
           sleep 5
           docker exec "$RUNTIME_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status
 

@@ -271,14 +271,33 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(activation, /org\.opencontainers\.image\.revision/);
   assert.match(activation, /\/var\/www\/html\/\.git-sha/);
   assert.doesNotMatch(activation, /composer install|npm ci|vite build|filament:assets/);
+  assert.match(
+    activation,
+    /daily-checkout:apply-approved-policy --confirm=APPLY_APPROVED_FRONTLINE_DAILY_POLICY --no-interaction/,
+  );
   assert.match(activation, /daily-checkout:activate-ledger --release-sha="\$RELEASE_SHA" --no-interaction/);
+  assert.match(activation, /daily-checkout:apply-approved-policy --verify --no-interaction/);
+  assert.doesNotMatch(activation, /identity:reconcile-apply|mbfd:provision-users/);
   assert.doesNotMatch(activation, /docker compose .* down|docker (?:system )?prune/);
   const oneOffMigrationIndex = activation.indexOf("run --interactive=false --rm --no-deps --pull never");
   const recreateIndex = activation.indexOf("--no-build --no-deps --force-recreate laravel.test");
   const migrationIndex = activation.indexOf("php artisan migrate --force");
+  const policyIndex = activation.indexOf("daily-checkout:apply-approved-policy");
   const cutoverIndex = activation.indexOf("daily-checkout:activate-ledger");
-  assert.ok(oneOffMigrationIndex >= 0 && migrationIndex > oneOffMigrationIndex && cutoverIndex > migrationIndex);
-  assert.ok(recreateIndex > cutoverIndex, "laravel.test must be recreated only after one-off migration and ledger activation succeed");
+  const policyVerifyIndex = activation.indexOf("daily-checkout:apply-approved-policy --verify");
+  assert.ok(
+    oneOffMigrationIndex >= 0 &&
+      migrationIndex > oneOffMigrationIndex &&
+      policyIndex > migrationIndex &&
+      cutoverIndex > policyIndex &&
+      policyVerifyIndex > cutoverIndex,
+  );
+  assert.ok(
+    recreateIndex > policyVerifyIndex,
+    "laravel.test must be recreated only after migration, approved policy, ledger activation, and policy verification succeed",
+  );
+  const policyCommand = activation.match(/[^\r\n]*daily-checkout:apply-approved-policy[^\r\n]*/)?.[0] ?? "";
+  assert.doesNotMatch(policyCommand, /--dry-run|\|\|\s*true/);
   const cutoverCommand = activation.match(/[^\r\n]*daily-checkout:activate-ledger[^\r\n]*/)?.[0] ?? "";
   assert.doesNotMatch(cutoverCommand, /\|\|\s*true|--force/);
 
@@ -318,6 +337,8 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(publicSmoke, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
   assert.match(publicSmoke, /deploy-marker\.json/);
   assert.match(publicSmoke, /jq -er '\.sha'/);
+  assert.match(publicSmoke, /https:\/\/www\.mbfdhub\.com\/daily\/stations\/6[^\r\n]*\)" = '302'/);
+  assert.match(publicSmoke, /https:\/\/www\.mbfdhub\.com\/api\/public\/stations[^\r\n]*\)" = '302'/);
 
   assert.doesNotMatch(deploy, /docker compose[^\r\n]*--build/);
   assert.doesNotMatch(deploy, /docker compose[^\r\n]*(?:down|prune)/);
@@ -376,6 +397,17 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   }
 });
 
+test("the PHP server routes Daily SPA navigation through Laravel authentication", () => {
+  const server = readFileSync(resolve(root, "server.php"), "utf8");
+
+  assert.doesNotMatch(server, /readfile\s*\(\s*\$spaIndex\s*\)/);
+  assert.doesNotMatch(server, /preg_match\s*\(\s*['"]#\^\/daily/);
+  assert.match(server, /is_file\s*\(\s*\$publicPath\s*\.\s*\$uri\s*\)/);
+  assert.match(server, /\$_SERVER\[['"]SCRIPT_NAME['"]\]\s*=\s*['"]\/index\.php['"]/);
+  assert.match(server, /\$_SERVER\[['"]PHP_SELF['"]\]\s*=\s*['"]\/index\.php['"]/);
+  assert.match(server, /require_once\s+\$publicPath\s*\.\s*['"]\/index\.php['"]/);
+});
+
 test("the immutable image starts Supervisor without privilege-switch directives", () => {
   const dockerfile = readFileSync(resolve(root, "docker/production/Dockerfile"), "utf8");
   const supervisor = readFileSync(resolve(root, "docker/production/supervisord.conf"), "utf8");
@@ -395,6 +427,8 @@ test("the immutable image starts Supervisor without privilege-switch directives"
   assert.match(runtime, /supervisorctl -c \/etc\/supervisor\/conf\.d\/supervisord\.conf status/);
   assert.match(runtime, /queue-worker:queue-worker_00 \+RUNNING/);
   assert.match(runtime, /test "\$\(docker exec "\$RUNTIME_CONTAINER" id -u\)" = 1000/);
+  assert.match(runtime, /http:\/\/localhost:8081\/daily\/stations\/6[^\r\n]*\)" = '302'/);
+  assert.match(runtime, /http:\/\/localhost:8081\/api\/public\/stations[^\r\n]*\)" = '302'/);
   assert.match(runtime, /ps -eo uid=/);
   assert.match(runtime, /trap cleanup EXIT/);
 });
