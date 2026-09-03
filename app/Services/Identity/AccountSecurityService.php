@@ -12,6 +12,25 @@ use Illuminate\Support\Facades\DB;
 
 final class AccountSecurityService
 {
+    public function changePassword(User $user, string $passwordHash, CarbonInterface $at): User
+    {
+        return DB::transaction(function () use ($user, $passwordHash, $at): User {
+            /** @var User $lockedUser */
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+            DB::table('users')->where('id', $lockedUser->id)->update([
+                'password' => $passwordHash,
+                'must_change_password' => false,
+                'password_changed_at' => $at,
+                'security_version' => $lockedUser->security_version + 1,
+                'updated_at' => $at,
+            ]);
+            $lockedUser = $lockedUser->fresh();
+            $this->revokeSessions($lockedUser, 'password changed', $at);
+
+            return $lockedUser;
+        });
+    }
+
     /**
      * Complete an approved canonical identity transition as one security event.
      *
