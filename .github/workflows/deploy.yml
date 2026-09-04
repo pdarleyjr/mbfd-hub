@@ -387,6 +387,19 @@ jobs:
           test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost:8081/up)" = '200'
           REMOTE
 
+      - name: Persist canonical Hermes watchdog configuration
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/mbfd/mbfd-hub
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          sudo -n bash scripts/operations/hermes-watchdog/install-hermes-watchdog.sh --apply
+          sudo -n bash scripts/operations/hermes-watchdog/install-hermes-watchdog.sh --check
+          REMOTE
+
       - name: Record successful Hub candidate activation
         env:
           RELEASE_SHA: ${{ github.sha }}

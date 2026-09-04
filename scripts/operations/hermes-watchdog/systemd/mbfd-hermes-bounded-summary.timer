@@ -1,0 +1,11 @@
+[Unit]
+Description=Run bounded MBFD operational summaries at 07:00, 14:00, and 20:00 ET
+
+[Timer]
+OnCalendar=*-*-* 07,14,20:00:00 America/New_York
+AccuracySec=30s
+Persistent=true
+Unit=mbfd-hermes-bounded-summary.service
+
+[Install]
+WantedBy=timers.target

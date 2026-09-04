@@ -1,0 +1,12 @@
+[Unit]
+Description=Run deterministic EOC source watchdog every five minutes
+
+[Timer]
+OnBootSec=2m
+OnUnitActiveSec=5m
+AccuracySec=15s
+Persistent=true
+Unit=mbfd-eoc-source-check.service
+
+[Install]
+WantedBy=timers.target

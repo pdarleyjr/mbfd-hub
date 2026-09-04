@@ -1,0 +1,26 @@
+[Unit]
+Description=MBFD bounded tool-free operational interpretation
+After=network-online.target docker.service ollama-eoc.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mbfd-aiops
+Group=mbfd-aiops
+WorkingDirectory=/opt/mbfd/hermes
+Environment=HOME=/var/lib/mbfd-aiops
+Environment=HERMES_HOME=/opt/mbfd/hermes/home
+Environment=PATH=/var/lib/mbfd-aiops/.local/bin:/opt/mbfd/hermes/home/node/bin:/opt/mbfd/hermes/home/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/bin/timeout --signal=TERM --kill-after=5s 60s /opt/mbfd/hermes/run-hermes-bounded-summary.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUQuota=75%
+MemoryMax=3G
+TimeoutStartSec=65
+UMask=0077
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/mbfd/hermes/reports /opt/mbfd/hermes/status /run/lock
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native

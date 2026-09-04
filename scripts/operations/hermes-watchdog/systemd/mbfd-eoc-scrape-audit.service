@@ -1,0 +1,23 @@
+[Unit]
+Description=MBFD deterministic EOC parser and scrape audit
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mbfd-aiops
+Group=mbfd-aiops
+ExecStart=/usr/bin/python3 /opt/mbfd/hermes/mbfd-eoc-watchdog.py --mode scrape-audit
+StateDirectory=mbfd-watchdog
+UMask=0027
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUQuota=25%
+MemoryMax=256M
+TimeoutStartSec=45
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
