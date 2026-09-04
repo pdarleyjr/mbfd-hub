@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "tunnel_id": "20cb894c-a5b0-4149-bc11-1499d772401e",
+  "tunnel_name": "mbfdhub-gmktec",
+  "hostname": "ai-portal.mbfdhub.com",
+  "origin": "http://127.0.0.1:11440",
+  "gateway_bearer_required": true,
+  "raw_backend_exposed": false
+}
