@@ -33,13 +33,9 @@ export function IOSInstallPrompt() {
 
   return (
     <div
-      role="alert"
+      role="region"
+      aria-label="Install Daily Checkout"
       style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 9999,
         padding: '16px 20px',
         background: '#1e3a5f',
         color: '#f8f6f2',
@@ -48,8 +44,6 @@ export function IOSInstallPrompt() {
         display: 'flex',
         alignItems: 'flex-start',
         gap: '12px',
-        boxShadow: '0 -2px 12px rgba(0,0,0,0.15)',
-        animation: 'slideUp 0.25s ease-out',
       }}
     >
       <div style={{ flex: 1 }}>
@@ -83,12 +77,6 @@ export function IOSInstallPrompt() {
       >
         ✕
       </button>
-      <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(100%); opacity: 0; }
-          to   { transform: translateY(0);    opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 }

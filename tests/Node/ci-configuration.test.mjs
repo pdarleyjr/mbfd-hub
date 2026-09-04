@@ -674,12 +674,24 @@ test("Daily Checkout browser acceptance uses a mocked isolated loopback build", 
   assert.match(config, /sanitizedTestEnvironment\(/);
   assert.match(config, /DAILY_CHECKOUT_OUT_DIR/);
   assert.match(config, /serviceWorkers:\s*'block'/);
+  assert.match(config, /serviceWorkers:\s*'allow'/);
+  assert.match(config, /daily-pwa-chromium/);
+  assert.match(config, /daily-webkit-iphone/);
+  assert.match(config, /daily-webkit-ipad/);
   assert.match(config, /reuseExistingServer:\s*false/);
-  assert.match(config, /testMatch:\s*\/daily-checkout-inspection\\\.spec\\\.ts\//);
+  assert.match(config, /daily-checkout-service-worker\\\.spec\\\.ts/);
   assert.match(dailySpec, /page\.route\('\*\*\/api\/\*\*'/);
   assert.match(workflowStep(daily, "Install root browser test dependencies"), /npm ci --ignore-scripts --legacy-peer-deps/);
-  assert.match(workflowStep(daily, "Install Chromium for mocked Daily Checkout Playwright"), /npx playwright install --with-deps chromium/);
+  assert.match(workflowStep(daily, "Install Chromium and WebKit for Daily Checkout Playwright"), /npx playwright install --with-deps chromium webkit/);
   assert.match(workflowStep(daily, "Run mocked Daily Checkout Playwright"), /npm run test:daily-checkout-e2e/);
+});
+
+test("Operational Forms browser acceptance includes real WebKit phone and tablet projects", () => {
+  const config = readFileSync(resolve(root, "playwright.operational-forms.config.ts"), "utf8");
+
+  assert.match(config, /webkit-iphone/);
+  assert.match(config, /webkit-ipad/);
+  assert.match(config, /browserName:\s*'webkit'/);
 });
 
 test("Lighthouse follows the approved Hub candidate activation workflow", () => {

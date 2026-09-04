@@ -92,14 +92,14 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
   await page.waitForTimeout(1_500);
   await expect(page.getByLabel('Incident name')).toHaveValue('Browser Acceptance Exercise');
   await expect(page.getByLabel('Unit name / designators')).toHaveValue('Rescue Group');
-  if (!testInfo.project.name.startsWith('phone')) {
+  if (!testInfo.project.name.includes('phone')) {
     await expect(page.locator('.of-save-state.saved')).toBeVisible();
   }
   const commandTargets = await page.locator('.of-commandbar button').evaluateAll((buttons) => buttons.map((button) => {
     const rect = button.getBoundingClientRect();
     return { width: rect.width, height: rect.height };
   }));
-  if (testInfo.project.name.startsWith('phone')) {
+  if (testInfo.project.name.includes('phone')) {
     expect(commandTargets.every(({ width, height }) => width >= 44 && height >= 44)).toBe(true);
     const viewportFit = await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
     expect(viewportFit).toBe(true);

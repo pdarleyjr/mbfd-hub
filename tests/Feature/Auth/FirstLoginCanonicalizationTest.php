@@ -48,7 +48,7 @@ final class FirstLoginCanonicalizationTest extends TestCase
         $this->assertSame($employee->employee_id, $user->employee_id);
         $this->assertSame($employeeHash, $user->getRawOriginal('password'));
         $this->assertSame(AccountStatus::Active, $user->account_status);
-        $this->assertCount(0, $user->roles);
+        $this->assertSame(['member'], $user->getRoleNames()->all());
         $this->assertAuthenticatedAs($user, 'web');
         $this->assertDatabaseCount('authentication_sessions', 1);
         $this->get('/daily/stations')->assertOk();

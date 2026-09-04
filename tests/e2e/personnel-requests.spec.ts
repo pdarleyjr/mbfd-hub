@@ -10,7 +10,7 @@ function requiredPassword(name: string): string {
 }
 
 async function loginEmployee(page: Page, employeeId: string, password: string): Promise<void> {
-  await page.goto('/employee/login');
+  await page.goto('/employee/dashboard');
   await page.getByLabel('Employee ID').fill(employeeId);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
@@ -26,8 +26,12 @@ async function screenshot(page: Page, testInfo: TestInfo, name: string, fullPage
 }
 
 test('homepage exposes the exact station and uniform-specific destinations', async ({ page }, testInfo) => {
-  await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Station / Vehicles / Equipment' })).toBeVisible();
+  await page.goto('/login');
+  await page.getByLabel('Employee ID').fill('99003');
+  await page.getByLabel('Password').fill(requiredPassword('PERSONNEL_REQUESTS_E2E_ADMIN_PASSWORD'));
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('link', { name: /Station \/ Vehicles \/ Equipment/ })).toBeVisible();
   await expect(page.getByText('request approved uniform items')).toBeVisible();
   await expectViewportFit(page);
   await screenshot(page, testInfo, 'homepage');
@@ -76,13 +80,11 @@ test('officer PPE page preserves station return target and supports pointer sign
   if (await sidebarOverlay.isVisible()) {
     const viewport = page.viewportSize();
     expect(viewport).not.toBeNull();
-    if (viewport) {
-      await page.touchscreen.tap(viewport.width - 8, 100);
-      await expect(sidebarOverlay).toBeHidden();
-    }
+    await page.touchscreen.tap(viewport!.width - 8, viewport!.height - 8);
+    await expect(sidebarOverlay).toBeHidden();
   }
 
-  const beneficiary = page.getByRole('combobox').nth(1);
+  const beneficiary = page.locator('[wire\\:key*="beneficiary_employee_id"] [role="combobox"]');
   await beneficiary.click();
   await page.keyboard.type('morgan');
   await page.getByRole('option', { name: 'Firefighter — Morgan Member — 99002' }).click();
@@ -113,8 +115,8 @@ test('officer PPE page preserves station return target and supports pointer sign
 });
 
 test('logistics administrator sees the single personnel workspace and lifecycle summaries', async ({ page }, testInfo) => {
-  await page.goto('/admin/login');
-  await page.getByLabel('Email address').fill('personnel-admin@example.test');
+  await page.goto('/admin');
+  await page.getByLabel('Employee ID').fill('99003');
   await page.getByLabel('Password').fill(requiredPassword('PERSONNEL_REQUESTS_E2E_ADMIN_PASSWORD'));
   await page.getByRole('button', { name: /sign in/i }).click();
   await page.waitForURL(/\/admin(?!\/login)/, { timeout: 20_000 });

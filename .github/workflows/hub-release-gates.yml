@@ -254,8 +254,8 @@ jobs:
         env:
           DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
-      - name: Install Chromium for mocked Daily Checkout Playwright
-        run: npx playwright install --with-deps chromium
+      - name: Install Chromium and WebKit for Daily Checkout Playwright
+        run: npx playwright install --with-deps chromium webkit
       - name: Run mocked Daily Checkout Playwright
         env:
           DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176

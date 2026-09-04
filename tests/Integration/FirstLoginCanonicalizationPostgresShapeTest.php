@@ -105,7 +105,7 @@ final class FirstLoginCanonicalizationPostgresShapeTest extends TestCase
             $this->assertSame($ordinaryEmployee->id, $created['user']->employee_profile_id);
             $this->assertSame($employeeHash, $created['user']->getRawOriginal('password'));
             $this->assertSame(AccountStatus::Active, $created['user']->account_status);
-            $this->assertFalse($created['user']->roles()->exists());
+            $this->assertSame(['member'], $created['user']->getRoleNames()->all());
 
             $privilegedEmployee = Employee::query()->where('employee_id', 'REC-P0001')->sole();
             $legacyUser = User::query()->where('email', 'legacy-privileged-1@production-shape.test')->sole();

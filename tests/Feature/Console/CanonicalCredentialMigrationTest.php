@@ -199,7 +199,7 @@ final class CanonicalCredentialMigrationTest extends TestCase
             $this->assertSame($employeeHash, $created->getRawOriginal('password'));
             $this->assertSame(AccountStatus::Active, $created->account_status);
             $this->assertTrue($created->must_change_password);
-            $this->assertCount(0, $created->roles);
+            $this->assertSame(['member'], $created->getRoleNames()->all());
             $securityVersion = $created->security_version;
 
             $secondPreview = $this->preview($ledger);

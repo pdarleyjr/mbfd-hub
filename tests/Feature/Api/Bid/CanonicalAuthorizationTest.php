@@ -293,6 +293,8 @@ final class CanonicalAuthorizationTest extends TestCase
             'employee_id' => 'BID-RELINKED',
             'name' => 'Relinked Bid Member',
             'rank' => 'Captain',
+            'password' => Hash::make('replacement-test-credential'),
+            'must_change_password' => false,
         ]);
         $user->forceFill(['employee_profile_id' => $replacement->id])->save();
 

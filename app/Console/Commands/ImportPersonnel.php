@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Employee;
+use App\Services\Identity\EmployeeBootstrapCredentialProvisioner;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Throwable;
 
 class ImportPersonnel extends Command
@@ -18,7 +17,7 @@ class ImportPersonnel extends Command
 
     protected $description = 'Import fire department personnel into the operational employee profile table';
 
-    public function handle(): int
+    public function handle(EmployeeBootstrapCredentialProvisioner $bootstrap): int
     {
         $filePath = $this->argument('file');
         $isDryRun = $this->option('dry-run');
@@ -75,10 +74,6 @@ class ImportPersonnel extends Command
         $this->info('Found '.count($rows)." valid rows, {$skipped} skipped.");
 
         if ($isDryRun) {
-            $this->table(['Name', 'Rank', 'Employee ID'], array_map(
-                fn ($r) => [$r['name'], $r['rank'], $r['employeeId']],
-                $rows
-            ));
             $this->info('[DRY RUN] No records created.');
 
             return Command::SUCCESS;
@@ -95,23 +90,19 @@ class ImportPersonnel extends Command
                         'rank' => $data['rank'] ?: $existing->rank,
                     ]);
                     $updated++;
-                    $this->line("  Updated profile: {$data['name']} ({$data['employeeId']}); compatibility hash unchanged");
+                    $this->line("Updated Employee DB ID: {$existing->id}; compatibility hash unchanged");
 
                     continue;
                 }
 
-                // The non-null compatibility hash is retained only for the
-                // deployed Bid bridge. It is never issued to a human and is
-                // not a Hub credential.
-                Employee::create([
+                $employee = Employee::create([
                     'name' => $data['name'],
                     'employee_id' => $data['employeeId'],
                     'rank' => $data['rank'],
-                    'password' => Hash::make(Str::random(64)),
-                    'must_change_password' => false,
+                    ...$bootstrap->attributesForNewEmployee(),
                 ]);
                 $created++;
-                $this->line("  Created: {$data['name']} ({$data['employeeId']})");
+                $this->line("Created first-login-ready Employee DB ID: {$employee->id}");
             }
 
             DB::commit();

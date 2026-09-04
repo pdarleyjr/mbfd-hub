@@ -110,8 +110,8 @@ export default function OfflineIndicator() {
 
       {/* Toast Notification */}
       {showToast && (
-        <div 
-          className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm bg-gray-900 text-white px-4 py-3 rounded-lg shadow-lg z-50 animate-slide-up"
+        <div
+          className="bg-gray-900 text-white px-4 py-3 shadow-lg"
           role="alert"
         >
           <div className="flex items-start">

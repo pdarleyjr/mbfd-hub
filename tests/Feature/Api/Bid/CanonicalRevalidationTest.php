@@ -108,6 +108,8 @@ final class CanonicalRevalidationTest extends TestCase
             'employee_id' => 'BID-REPLACEMENT',
             'name' => 'Replacement Bid Member',
             'rank' => 'Captain',
+            'password' => Hash::make('replacement-test-credential'),
+            'must_change_password' => false,
         ]);
         $relinked->forceFill(['employee_profile_id' => $replacement->id])->save();
         $this->postRevalidation($relinkedPayload)

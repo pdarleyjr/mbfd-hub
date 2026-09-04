@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Spatie\Permission\Models\Role;
 
 final readonly class CanonicalUserProvisioner
 {
@@ -77,6 +78,9 @@ final readonly class CanonicalUserProvisioner
             ]);
             /** @var User $user */
             $user = User::query()->findOrFail($userId);
+            if ($copyVerifiedLegacyHash) {
+                $user->assignRole(Role::findOrCreate('member', 'web'));
+            }
 
             Log::notice('canonical_identity_user_created', [
                 'user_id' => $user->id,

@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 import { loopbackBaseUrl, sanitizedTestEnvironment } from './tests/e2e/support/test-environment';
 
 const baseURL = loopbackBaseUrl('DAILY_CHECKOUT_E2E_BASE_URL', 'http://127.0.0.1:4176');
@@ -42,7 +42,7 @@ const responsiveViewports = [
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /(canonical-login-responsive|daily-checkout-(inspection|responsive))\.spec\.ts/,
+  testMatch: /(canonical-login-responsive|daily-checkout-(inspection|responsive|service-worker))\.spec\.ts/,
   timeout: 45_000,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
@@ -74,6 +74,35 @@ export default defineConfig({
       use: {
         browserName: 'chromium',
         viewport: { width: 1280, height: 800 },
+      },
+    },
+    {
+      name: 'daily-pwa-chromium',
+      testMatch: /daily-checkout-service-worker\.spec\.ts/,
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 390, height: 844 },
+        hasTouch: true,
+        isMobile: true,
+        serviceWorkers: 'allow',
+      },
+    },
+    {
+      name: 'daily-webkit-iphone',
+      testMatch: /(daily-checkout-inspection|daily-checkout-responsive)\.spec\.ts/,
+      grep: /station selector stays visible|station inspection exposes|non-empty checklist permits|queued inspection syncs|different canonical user/,
+      use: {
+        ...devices['iPhone 13'],
+        browserName: 'webkit',
+      },
+    },
+    {
+      name: 'daily-webkit-ipad',
+      testMatch: /(daily-checkout-inspection|daily-checkout-responsive)\.spec\.ts/,
+      grep: /station selector stays visible|station inspection exposes|non-empty checklist permits|queued inspection syncs|different canonical user/,
+      use: {
+        ...devices['iPad (gen 7)'],
+        browserName: 'webkit',
       },
     },
     ...responsiveViewports.map(({ name, width, height }) => ({
