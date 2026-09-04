@@ -39,7 +39,7 @@
       "reasoning_effort": "none"
     },
     "allow_tools": false,
-    "heavy_workload": "primary-ollama-small"
+    "heavy_workload": "primary-ollama-large"
   },
   "model_candidates": {
     "qwen3.5:9b": "rejected_shared_single-model_churn",
