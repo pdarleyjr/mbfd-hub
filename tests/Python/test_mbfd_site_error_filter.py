@@ -148,10 +148,12 @@ class SiteErrorMonitorIntegrationTest(unittest.TestCase):
         ):
             self.assertIn(container, self.monitor)
 
-    def test_hermes_prompt_forbids_unsupported_inferences(self):
-        self.assertIn("Do not infer container, process, secret, or configuration state", self.monitor)
-        self.assertIn("A LiveKit webhook JWT failure is not employee or admin authentication", self.monitor)
-        self.assertIn("current_state=${observed_state}", self.monitor)
+    def test_site_monitor_uses_deterministic_evidence_without_full_agent(self):
+        self.assertNotIn("timeout 420 hermes", self.monitor)
+        self.assertNotIn("hermes --provider", self.monitor)
+        self.assertIn("LLM invoked: false", self.monitor)
+        self.assertIn("Fallback: deterministic evidence is authoritative", self.monitor)
+        self.assertIn("timeout 15 sudo -u mbfd-aiops", self.monitor)
 
     def test_healthy_http_with_application_event_is_not_global_degraded_state(self):
         self.assertIn('echo "ApplicationEvent"', self.monitor)

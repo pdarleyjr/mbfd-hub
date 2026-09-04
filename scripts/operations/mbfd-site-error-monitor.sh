@@ -198,40 +198,38 @@ observed_state_for() {
 
 diagnose_and_notify() {
     local event_file=$1 timestamp=$2 severity=$3 correlation_id=$4 observed_state=$5
-    local prompt=${REPORT_DIR}/prompt-${timestamp}.txt assessment=${REPORT_DIR}/assessment-${timestamp}.txt
-    cat > "${prompt}" <<PROMPT
-/no_think
-Diagnose this NEW MBFD main/admin incident. Do not include chain-of-thought or secrets.
-Return: Severity, Current State, Historical State, Affected Service, User Impact, Evidence, Confidence, Correlation ID, Recovery State, Safe Checks, and Approval-Gated Remediation.
-severity=${severity}
-current_state=${observed_state}
-historical_state=${CURRENT_STATE}
-correlation_id=${correlation_id}
-deduplication_key=site-admin:${correlation_id}
-
-EVIDENCE RULES:
-- Use only the supplied observations. Do not infer container, process, secret, or configuration state when it is absent; report it as unknown.
-- Successful HTTP probes are current availability evidence. Do not claim a global site or login outage from an isolated application log event when those probes pass.
-- A LiveKit webhook JWT failure is not employee or admin authentication. Identify the route from evidence frames before naming the affected authentication flow.
-- A missing LiveKit room does not prove LiveKit is down. Runtime probe evidence controls container-state claims.
-- php artisan serve is the expected process inside the mbfd-hub-laravel Docker container and does not prove a non-Docker deployment.
-- Keep log occurrence time separate from collection/report time and lower confidence when evidence is incomplete.
-
-NEW EVENTS:
-$(tail -c 30000 "${event_file}")
-PROMPT
-    chgrp mbfd-aiops "${prompt}"
-    chmod 0640 "${prompt}"
-    sudo -u mbfd-aiops env ${HERMES_ENV} PROMPT_FILE="${prompt}" bash -lc \
-        'cd /opt/mbfd/hermes && timeout 420 hermes --provider custom --model qwen3.6:35b -z "$(cat "$PROMPT_FILE")"' \
-        > "${assessment}" 2>&1 || true
+    local assessment=${REPORT_DIR}/assessment-${timestamp}.txt
+    local audit=${REPORT_DIR}/audit-${timestamp}.json
+    local policy_severity=P2 notification_result=failed
+    [[ "${severity}" == "high" ]] && policy_severity=P1
+    {
+        printf 'MBFD deterministic site/admin alert\n'
+        printf 'Severity: %s\n' "${policy_severity}"
+        printf 'Current state: %s\n' "${observed_state}"
+        printf 'Historical state: %s\n' "${CURRENT_STATE}"
+        printf 'Affected service: MBFD Hub main/admin\n'
+        printf 'Correlation ID: %s\n' "${correlation_id}"
+        printf 'Incident identity: site-admin:%s\n' "${correlation_id}"
+        printf 'Evidence reference: %s\n' "${event_file}"
+        printf 'LLM invoked: false\n'
+        printf 'Fallback: deterministic evidence is authoritative\n'
+        printf '\nNEW EVENTS:\n'
+        tail -c 30000 "${event_file}"
+    } > "${assessment}"
     chgrp mbfd-aiops "${assessment}"
     chmod 0640 "${assessment}"
-    sudo -u mbfd-aiops env ${HERMES_ENV} ASSESSMENT_FILE="${assessment}" bash -lc \
+    if timeout 15 sudo -u mbfd-aiops env ${HERMES_ENV} ASSESSMENT_FILE="${assessment}" bash -lc \
         'cd /opt/mbfd/hermes && hermes send --to telegram --subject "[MBFD Site/Admin Alert]" --file "$ASSESSMENT_FILE"' \
-        >> "${REPORT_DIR}/telegram-${timestamp}.log" 2>&1 || true
+        >> "${REPORT_DIR}/telegram-${timestamp}.log" 2>&1; then
+        notification_result=sent
+    fi
     chmod 0640 "${REPORT_DIR}/telegram-${timestamp}.log" 2>/dev/null || true
-    rm -f "${prompt}"
+    jq -n --arg timestamp "$(date -Is)" --arg severity "${policy_severity}" \
+        --arg evidence_reference "${event_file}" --arg correlation_id "${correlation_id}" \
+        --arg notification_result "${notification_result}" \
+        '{schema_version:1,timestamp:$timestamp,detector:"site-error-monitor",severity:$severity,evidence_reference:$evidence_reference,llm_invoked:false,request_id:null,outcome:"deterministic_alert",fallback_status:"not_required",notification_result:$notification_result,correlation_id:$correlation_id}' \
+        > "${audit}"
+    chmod 0640 "${audit}"
 }
 
 notify_recovery() {

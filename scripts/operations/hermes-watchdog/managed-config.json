@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "legacy_hermes_cron_jobs_must_be_paused": [
+    "eoc-source-check",
+    "eoc-scrape-audit",
+    "eoc-public-brief"
+  ],
+  "legacy_systemd_units_must_be_disabled": [
+    "mbfd-hermes-daily-summary.timer"
+  ],
+  "managed_systemd_timers": [
+    "mbfd-eoc-source-check.timer",
+    "mbfd-eoc-scrape-audit.timer",
+    "mbfd-hermes-bounded-summary.timer"
+  ]
+}
