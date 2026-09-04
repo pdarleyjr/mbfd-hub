@@ -113,6 +113,7 @@ export default function InspectionWizard() {
   const [queueRevision, setQueueRevision] = useState(0);
   const clientSubmissionIdRef = useRef<string | null>(null);
   const initializedChecklistKeyRef = useRef<string | null>(null);
+  const loadedContractRef = useRef<{ slug: string; apparatus: Apparatus; checklist: ChecklistData } | null>(null);
 
   useEffect(() => onDailyCheckoutQueueChanged(() => {
     setQueueRevision((revision) => revision + 1);
@@ -123,6 +124,17 @@ export default function InspectionWizard() {
       if (!slug) return;
 
       try {
+        const loadedContract = loadedContractRef.current;
+        if (loadedContract?.slug === slug) {
+          setQueuedSubmissionBlocker(await getQueuedSubmissionForApparatusAndChecklistVersion(
+            loadedContract.apparatus.id,
+            loadedContract.checklist.checklist_version,
+          ));
+          setError(null);
+
+          return;
+        }
+
         setQueuedSubmissionBlocker(null);
         const savedBeforeChecklistFetch = loadInspectionProgress(slug, '');
         let checklistData = restoreIssuedFireBoatChecklist(savedBeforeChecklistFetch);
@@ -209,6 +221,7 @@ export default function InspectionWizard() {
           }
         }
         setChecklist(checklistData);
+        loadedContractRef.current = { slug, apparatus: foundApparatus, checklist: checklistData };
 
         const queuedSubmission = await getQueuedSubmissionForApparatusAndChecklistVersion(
           foundApparatus.id,

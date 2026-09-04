@@ -106,7 +106,9 @@ Route::prefix('display')->middleware(['display.token', 'display.readonly', 'thro
         ->where('any', '.*');
 });
 
-Route::prefix('public')->middleware('throttle:10,1')->group(function () {
+// The support worker can answer from admin-managed knowledge-base documents.
+// Require a canonical member session even though the legacy URL contains /public/.
+Route::prefix('public')->middleware(['auth:sanctum', 'throttle:10,1'])->group(function () {
     Route::post('support-chat', [SupportChatProxyController::class, 'chat']);
 });
 

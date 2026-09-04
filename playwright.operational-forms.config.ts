@@ -56,5 +56,7 @@ export default defineConfig({
     { name: 'tablet-landscape', use: { viewport: { width: 1180, height: 820 }, hasTouch: true } },
     { name: 'laptop', use: { viewport: { width: 1366, height: 768 } } },
     { name: 'desktop', use: { viewport: { width: 1440, height: 1000 } } },
+    { name: 'webkit-iphone', use: { ...devices['iPhone 13'], browserName: 'webkit' } },
+    { name: 'webkit-ipad', use: { ...devices['iPad (gen 7)'], browserName: 'webkit' } },
   ],
 });

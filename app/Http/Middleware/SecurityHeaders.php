@@ -83,13 +83,15 @@ class SecurityHeaders
             "object-src 'none'",
             "worker-src 'self' blob:",
             "manifest-src 'self'",
-            'upgrade-insecure-requests',
             // Legacy report-uri — supported by every browser. Reporting API v1
             // (report-to + Report-To header) is more powerful but adds a second
             // header and isn't supported by Safari yet; report-uri is enough for
             // an enforcement CSP.
             'report-uri /_csp-report',
         ];
+        if ($request->secure()) {
+            $cspParts[] = 'upgrade-insecure-requests';
+        }
         $response->headers->set('Content-Security-Policy', implode('; ', $cspParts));
 
         // Strip X-Powered-By from BOTH the Symfony response bag (covers PHP-FPM)

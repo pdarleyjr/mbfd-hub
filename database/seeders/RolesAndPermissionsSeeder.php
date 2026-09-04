@@ -38,6 +38,12 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'admin', 'guard_name' => 'web']
         );
 
+        // Ordinary member — Employee Portal access still requires the exact
+        // canonical employee_profile_id relationship.
+        Role::firstOrCreate(
+            ['name' => 'member', 'guard_name' => 'web']
+        );
+
         // Training admin — full training panel access
         $trainingAdmin = Role::firstOrCreate(
             ['name' => 'training_admin', 'guard_name' => 'web']
