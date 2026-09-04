@@ -1,5 +1,5 @@
 [Unit]
-Description=Ollama authenticated loopback reverse proxy
+Description=MBFD authenticated private AI Gateway
 After=network-online.target ollama.service
 Wants=network-online.target ollama.service
 Requires=ollama.service
@@ -9,10 +9,9 @@ Type=simple
 User=ollama-proxy
 Group=ollama-proxy
 LoadCredential=api-key:/etc/ollama-ai-proxy/api-key
-Environment=OLLAMA_PROXY_API_KEY_FILE=%d/api-key
-Environment=OLLAMA_PROXY_HOST=127.0.0.1
-Environment=OLLAMA_PROXY_PORT=11440
-ExecStart=/usr/bin/python3 /opt/ollama-ai-proxy/ollama_ai_proxy.py
+LoadCredential=gateway-config:/etc/ollama-ai-proxy/gateway.json
+Environment=MBFD_AI_GATEWAY_CONFIG=%d/gateway-config
+ExecStart=/usr/bin/python3 /opt/ollama-ai-proxy/mbfd_ai_gateway.py
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true

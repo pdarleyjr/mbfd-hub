@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "activation_state": "blocked_model_residency",
+  "consumer": {
+    "consumer_id": "mbfd-bid",
+    "credential_file": "%d/mbfd-bid",
+    "allowed_capabilities": [
+      "mbfd-bid-analysis"
+    ],
+    "concurrency": 1,
+    "legacy_passthrough": false,
+    "rate_limit": {
+      "requests": 30,
+      "window_seconds": 60,
+      "burst": 3
+    }
+  },
+  "capability": {
+    "capability_id": "mbfd-bid-analysis",
+    "backend": "ollama-primary",
+    "model": null,
+    "paths": [
+      "/v1/chat/completions"
+    ],
+    "concurrency": 1,
+    "timeout_seconds": 60,
+    "retries": 1,
+    "openai_options": {
+      "temperature": 0.1,
+      "top_p": 0.9,
+      "max_tokens": 640,
+      "reasoning_effort": "none"
+    },
+    "allow_tools": false
+  },
+  "model_candidates": {
+    "qwen3.5:9b": "rejected_shared_single-model_churn",
+    "qwen3.6:35b": "rejected_measured_swap_activity"
+  }
+}

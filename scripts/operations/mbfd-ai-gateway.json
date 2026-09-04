@@ -1,0 +1,242 @@
+{
+  "schema_version": 1,
+  "listeners": [
+    "127.0.0.1",
+    "172.20.11.1"
+  ],
+  "port": 11440,
+  "global": {
+    "concurrency": 2,
+    "queue_limit": 2,
+    "queue_timeout_seconds": 2,
+    "request_timeout_seconds": 600,
+    "max_request_body_bytes": 4194304
+  },
+  "host_health": {
+    "recent_oom_marker": null,
+    "recent_gpu_reset_marker": null,
+    "production_health_file": null
+  },
+  "consumers": {
+    "legacy-11440": {
+      "credential_file": "%d/api-key",
+      "allowed_capabilities": [
+        "mbfd-general",
+        "mbfd-embeddings"
+      ],
+      "concurrency": 1,
+      "legacy_passthrough": true
+    }
+  },
+  "backends": {
+    "ollama-primary": {
+      "provider": "ollama",
+      "base_url": "http://127.0.0.1:11434",
+      "enabled": true,
+      "health_timeout_seconds": 3
+    },
+    "future-llama-server": {
+      "provider": "openai_compatible",
+      "base_url": "http://127.0.0.1:11439",
+      "enabled": false,
+      "health_timeout_seconds": 3
+    },
+    "future-speaches": {
+      "provider": "speaches",
+      "base_url": "http://127.0.0.1:11441",
+      "enabled": false,
+      "health_timeout_seconds": 3
+    },
+    "future-comfyui": {
+      "provider": "comfyui",
+      "base_url": "http://127.0.0.1:8188",
+      "enabled": false,
+      "health_timeout_seconds": 3
+    }
+  },
+  "capabilities": {
+    "mbfd-general": {
+      "backend": "ollama-primary",
+      "model": "mbfd-general",
+      "paths": [
+        "/api/chat",
+        "/api/generate",
+        "/v1/chat/completions",
+        "/v1/completions",
+        "/v1/responses"
+      ],
+      "concurrency": 1,
+      "timeout_seconds": 180,
+      "retries": 0,
+      "cold_start": {
+        "mode": "wait",
+        "ready_timeout_seconds": 90
+      },
+      "ollama_options": {
+        "num_ctx": 32768
+      },
+      "heavy_workload": "primary-ollama-large"
+    },
+    "mbfd-code": {
+      "backend": "ollama-primary",
+      "model": "mbfd-code:32k",
+      "paths": [
+        "/api/chat",
+        "/api/generate",
+        "/v1/chat/completions",
+        "/v1/completions",
+        "/v1/responses"
+      ],
+      "concurrency": 1,
+      "timeout_seconds": 600,
+      "retries": 0,
+      "cold_start": {
+        "mode": "wait",
+        "ready_timeout_seconds": 180
+      },
+      "ollama_options": {
+        "num_ctx": 32768
+      },
+      "heavy_workload": "primary-ollama-large"
+    },
+    "mbfd-eoc-grounding": {
+      "backend": "ollama-primary",
+      "model": "mbfd-general",
+      "paths": [
+        "/api/chat",
+        "/api/generate",
+        "/v1/chat/completions"
+      ],
+      "concurrency": 1,
+      "timeout_seconds": 120,
+      "retries": 0,
+      "cold_start": {
+        "mode": "reject_if_cold",
+        "ready_timeout_seconds": 5
+      },
+      "ollama_options": {
+        "num_ctx": 32768
+      },
+      "heavy_workload": "primary-ollama-large"
+    },
+    "mbfd-embeddings": {
+      "backend": "ollama-primary",
+      "model": "mbfd-embeddings",
+      "paths": [
+        "/api/embed",
+        "/api/embeddings",
+        "/v1/embeddings"
+      ],
+      "concurrency": 1,
+      "timeout_seconds": 120,
+      "retries": 1,
+      "cold_start": {
+        "mode": "wait",
+        "ready_timeout_seconds": 30
+      },
+      "heavy_workload": null
+    },
+    "mbfd-transcribe": {
+      "backend": "future-speaches",
+      "model": "whisper",
+      "paths": [
+        "/v1/audio/transcriptions"
+      ],
+      "concurrency": 1,
+      "timeout_seconds": 300,
+      "retries": 0,
+      "cold_start": {
+        "mode": "reject_if_cold",
+        "ready_timeout_seconds": 2
+      },
+      "heavy_workload": "future-gpu-whisper"
+    },
+    "mbfd-image": {
+      "backend": "future-comfyui",
+      "model": "image-workflow",
+      "paths": [
+        "/mbfd/jobs/image"
+      ],
+      "concurrency": 1,
+      "timeout_seconds": 900,
+      "retries": 0,
+      "cold_start": {
+        "mode": "reject_if_cold",
+        "ready_timeout_seconds": 2
+      },
+      "heavy_workload": "future-comfyui"
+    },
+    "mbfd-ops-summary": {
+      "backend": "ollama-primary",
+      "model": "qwen3.6:35b",
+      "paths": [
+        "/api/chat",
+        "/v1/chat/completions"
+      ],
+      "concurrency": 1,
+      "timeout_seconds": 36,
+      "retries": 0,
+      "cold_start": {
+        "mode": "reject_if_cold",
+        "ready_timeout_seconds": 2
+      },
+      "ollama_options": {
+        "num_ctx": 32768
+      },
+      "heavy_workload": "primary-ollama-large"
+    }
+  },
+  "compatibility_models": {
+    "mbfd-general": "mbfd-general",
+    "mbfd-general-deep": {
+      "capability": "mbfd-general",
+      "model": "mbfd-general-deep",
+      "ollama_options": {
+        "num_ctx": 65536
+      }
+    },
+    "mbfd-embeddings": "mbfd-embeddings"
+  },
+  "heavy_workloads": {
+    "primary-ollama-large": {
+      "lease_group": "gpu-heavy",
+      "mem_available_floor_mb": 8192,
+      "declared_model_allocation_mb": 30720,
+      "memory_psi_avg10_max": 1.0,
+      "max_swap_activity_pages": 4096,
+      "deny_on_recent_oom": true,
+      "deny_on_recent_gpu_reset": true,
+      "require_production_healthy": true
+    },
+    "future-flash-next": {
+      "lease_group": "gpu-heavy",
+      "mem_available_floor_mb": 16384,
+      "declared_model_allocation_mb": 0,
+      "memory_psi_avg10_max": 0.5,
+      "max_swap_activity_pages": 1024,
+      "deny_on_recent_oom": true,
+      "deny_on_recent_gpu_reset": true,
+      "require_production_healthy": true
+    },
+    "future-comfyui": {
+      "lease_group": "gpu-heavy",
+      "mem_available_floor_mb": 8192,
+      "declared_model_allocation_mb": 0,
+      "memory_psi_avg10_max": 1.0,
+      "max_swap_activity_pages": 2048,
+      "deny_on_recent_oom": true,
+      "deny_on_recent_gpu_reset": true,
+      "require_production_healthy": true
+    },
+    "future-gpu-whisper": {
+      "lease_group": "gpu-heavy",
+      "mem_available_floor_mb": 8192,
+      "declared_model_allocation_mb": 0,
+      "memory_psi_avg10_max": 1.0,
+      "max_swap_activity_pages": 2048,
+      "deny_on_recent_oom": true,
+      "deny_on_recent_gpu_reset": true,
+      "require_production_healthy": true
+    }
+  }
+}
