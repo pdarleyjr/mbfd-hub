@@ -300,6 +300,16 @@ class TestConfiguration(unittest.TestCase):
             bid_template["capability"]["capability_id"], "mbfd-bid-analysis"
         )
         self.assertIsNone(bid_template["capability"]["model"])
+        self.assertEqual(
+            bid_template["capability"]["cold_start"],
+            {"mode": "wait", "ready_timeout_seconds": 45},
+        )
+        self.assertEqual(
+            bid_template["capability"]["ollama_options"], {"num_ctx": 16384}
+        )
+        self.assertEqual(
+            bid_template["capability"]["heavy_workload"], "primary-ollama-small"
+        )
         ingress = json.loads(
             (MODULE_PATH.parent / "mbfd-ai-gateway-ingress.json").read_text(
                 encoding="utf-8"
