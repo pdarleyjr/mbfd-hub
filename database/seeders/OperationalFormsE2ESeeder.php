@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\DepartmentUpdate;
 use App\Models\Employee;
 use App\Models\OperationalFormRecord;
 use App\Models\User;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use RuntimeException;
+use Spatie\Permission\Models\Permission;
 
 class OperationalFormsE2ESeeder extends Seeder
 {
@@ -74,6 +76,26 @@ class OperationalFormsE2ESeeder extends Seeder
             'role_id' => $roleId,
             'model_type' => User::class,
             'model_id' => $admin->id,
+        ]);
+        $admin->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.communications.view', 'web'),
+            Permission::findOrCreate('admin.communications.send', 'web'),
+            Permission::findOrCreate('admin.forms.view', 'web'),
+            Permission::findOrCreate('admin.forms.manage', 'web'),
+            Permission::findOrCreate('app.media_control.access', 'web'),
+        ]);
+        DepartmentUpdate::query()->create([
+            'title' => 'Department Operations Briefing',
+            'body' => '<p>Review the current department operations briefing before your next shift.</p>',
+            'category' => 'operations',
+            'priority' => 'important',
+            'status' => 'published',
+            'publish_at' => now()->subMinute(),
+            'send_in_app' => false,
+            'send_web_push' => false,
+            'audience' => 'everyone',
+            'author_id' => $admin->id,
         ]);
         $workgroup = Workgroup::query()->updateOrCreate(
             ['name' => 'Operational Forms E2E Workgroup'],

@@ -1,5 +1,9 @@
 <?php
 
+use App\Jobs\DeliverDepartmentUpdateNotification;
+use App\Jobs\SendDepartmentUpdateNotification;
+use App\Models\DepartmentUpdate;
+use App\Models\DepartmentUpdateNotificationDelivery;
 use App\Services\SnipeIdentity\SnipeApiIdentityDirectory;
 use App\Services\SnipeIdentity\SnipeIdentityPreview;
 use App\Services\SnipeIdentity\SnipeIdentitySnapshot;
@@ -97,6 +101,32 @@ Schedule::command('model:prune', [
 Schedule::command('personnel-equipment:notify-expirations')
     ->dailyAt('06:30')
     ->timezone('America/New_York')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+Artisan::command('department-updates:send-due-notifications', function (): int {
+    DepartmentUpdate::query()
+        ->currentlyActive()
+        ->whereNull('notification_prepared_at')
+        ->whereNull('notification_sent_at')
+        ->where(function ($query): void {
+            $query->where('send_in_app', true)->orWhere('send_web_push', true);
+        })
+        ->orderBy('id')
+        ->pluck('id')
+        ->each(fn (int $id) => SendDepartmentUpdateNotification::dispatch($id));
+
+    DepartmentUpdateNotificationDelivery::query()
+        ->whereNull('delivered_at')
+        ->orderBy('id')
+        ->pluck('id')
+        ->each(fn (int $id) => DeliverDepartmentUpdateNotification::dispatch($id));
+
+    return Command::SUCCESS;
+})->purpose('Prepare due Department Update notifications and recover pending deliveries');
+
+Schedule::command('department-updates:send-due-notifications')
+    ->everyMinute()
     ->withoutOverlapping()
     ->onOneServer();
 

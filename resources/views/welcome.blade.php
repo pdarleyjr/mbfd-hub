@@ -33,6 +33,12 @@
         @media (min-width: 1024px) {
             .home-layout { grid-template-columns: minmax(0, 3fr) minmax(22.5rem, 2fr); gap: 2rem; }
         }
+        .update-preview {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 3;
+            overflow: hidden;
+        }
         /* PulsePoint call feed */
         .incident-row { animation: incidentIn 0.25s cubic-bezier(0,0,0.2,1) forwards; }
         .incident-row:nth-child(1) { animation-delay: 0ms; }
@@ -56,7 +62,7 @@
     @php
         $currentUser = auth('web')->user();
         $showAdminPanel = $currentUser instanceof \App\Models\User
-            && $currentUser->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+            && $currentUser->hasCurrentAdminPanelEntitlement();
         $showMediaControl = $currentUser instanceof \App\Models\User
             && $currentUser->hasCurrentMediaControlEntitlement();
         $quickAccessItems = [
@@ -186,7 +192,64 @@
     <!-- Main Content -->
     <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
         <div class="home-layout">
-            <section data-home-column="quick-access" aria-labelledby="quick-access-heading" class="min-w-0">
+            <div data-home-column="primary" class="min-w-0 space-y-6">
+                <section data-home-section="department-updates" aria-labelledby="department-updates-heading" class="min-w-0 rounded-xl border border-neutral-200 bg-white shadow-sm overflow-hidden">
+                    <div class="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-3.5 sm:px-5">
+                        <h2 id="department-updates-heading" class="flex items-center gap-2 font-heading text-lg font-semibold text-neutral-900">
+                            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-700" aria-hidden="true">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 0 1-3.417.592l-2.147-6.15M18 13a3 3 0 1 0 0-6M5.436 13.683A4.001 4.001 0 0 1 7 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.998 3.998 0 0 1-1.564-.317Z"></path></svg>
+                            </span>
+                            Department Updates
+                        </h2>
+                        <a href="{{ route('updates.index') }}" data-important-target class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
+                            View All
+                        </a>
+                    </div>
+                    <div class="divide-y divide-neutral-100">
+                        @forelse($departmentUpdates as $update)
+                            @php
+                                $prioritySurface = match ($update->priority) {
+                                    \App\Enums\DepartmentUpdatePriority::Critical => 'border-l-red-600',
+                                    \App\Enums\DepartmentUpdatePriority::Important => 'border-l-amber-500',
+                                    default => 'border-l-blue-500',
+                                };
+                                $priorityBadge = match ($update->priority) {
+                                    \App\Enums\DepartmentUpdatePriority::Critical => 'bg-red-50 text-red-700',
+                                    \App\Enums\DepartmentUpdatePriority::Important => 'bg-amber-50 text-amber-800',
+                                    default => 'bg-blue-50 text-blue-700',
+                                };
+                            @endphp
+                            <article data-department-update class="border-l-4 {{ $prioritySurface }} px-4 py-4 sm:px-5">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $priorityBadge }}">{{ $update->priority->label() }}</span>
+                                    <span class="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-600">{{ $update->category->label() }}</span>
+                                    @if($update->is_pinned)
+                                        <span class="text-xs font-semibold text-neutral-500">Pinned</span>
+                                    @endif
+                                </div>
+                                <h3 class="mt-2 font-heading text-base font-bold leading-snug text-neutral-900">
+                                    <a href="{{ route('updates.show', $update) }}" class="rounded-sm hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600">{{ $update->title }}</a>
+                                </h3>
+                                <p class="update-preview mt-1.5 text-sm leading-relaxed text-neutral-600">{{ $update->excerpt(180) }}</p>
+                                <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+                                    <p class="text-xs text-neutral-500">
+                                        <time datetime="{{ $update->publish_at?->toIso8601String() }}">{{ $update->publish_at?->timezone('America/New_York')->format('M j · g:i A') }}</time>
+                                        @if($update->author?->name)<span aria-hidden="true"> · </span>{{ $update->author->name }}@endif
+                                    </p>
+                                    <a href="{{ route('updates.show', $update) }}" data-important-target class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600">Read update</a>
+                                </div>
+                            </article>
+                        @empty
+                            <div class="px-5 py-8 text-center">
+                                <svg class="mx-auto h-8 w-8 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path></svg>
+                                <p class="mt-2 font-heading text-sm font-semibold text-neutral-700">No current department updates</p>
+                                <p class="mt-1 text-xs text-neutral-500">Published notices will appear here.</p>
+                            </div>
+                        @endforelse
+                    </div>
+                </section>
+
+            <section data-home-section="quick-access" aria-labelledby="quick-access-heading" class="min-w-0">
                 <h2 id="quick-access-heading" class="text-lg font-semibold text-neutral-900 font-heading flex items-center gap-2 mb-4">
                     <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                     Quick Access
@@ -222,6 +285,7 @@
                     @endforeach
                 </div>
             </section>
+            </div>
 
             <!-- PulsePoint Live Call Feed -->
             <div

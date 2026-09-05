@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Auth\CanonicalLoginController;
 use App\Http\Controllers\Auth\EmployeePasswordResetController;
 use App\Http\Controllers\Auth\FirstLoginCanonicalizationController;
+use App\Http\Controllers\DepartmentUpdateController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
 use App\Http\Controllers\Employee\OperationalForms\FormGenerationController;
@@ -35,6 +36,7 @@ use App\Http\Controllers\Employee\VideoConferencing\StartDirectCallController;
 use App\Http\Controllers\Employee\VideoConferencing\StartMorningLineupController;
 use App\Http\Controllers\Employee\VideoConferencing\StationMicrophoneController;
 use App\Http\Controllers\HealthReadinessController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\IncidentsController;
 use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\VideoConferencing\ConferencePageController;
@@ -53,9 +55,14 @@ use App\Support\Workgroups\WorkgroupReportSessionResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-})->middleware('auth:web');
+Route::get('/', HomeController::class)->middleware('auth:web');
+
+Route::middleware('auth:web')->group(function (): void {
+    Route::get('/updates', [DepartmentUpdateController::class, 'index'])->name('updates.index');
+    Route::get('/updates/{departmentUpdate}/image', [DepartmentUpdateController::class, 'image'])->name('updates.image');
+    Route::get('/updates/{departmentUpdate}/attachment', [DepartmentUpdateController::class, 'attachment'])->name('updates.attachment');
+    Route::get('/updates/{departmentUpdate}', [DepartmentUpdateController::class, 'show'])->name('updates.show');
+});
 
 // Public Security & Standards trust page — no auth required, indexable.
 Route::view('/security-standards', 'security-standards')

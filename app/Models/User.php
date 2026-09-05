@@ -36,6 +36,8 @@ class User extends Authenticatable implements FilamentUser
 
     public const NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS = 'station_inventory_alerts';
 
+    public const NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES = 'department_updates';
+
     /**
      * The current roles that grant access to the Filament admin panel.
      *
@@ -73,6 +75,7 @@ class User extends Authenticatable implements FilamentUser
         self::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS => true,
         self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS => true,
         self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS => true,
+        self::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES => true,
     ];
 
     /**
@@ -195,6 +198,10 @@ class User extends Authenticatable implements FilamentUser
             self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS => [
                 'label' => 'Station Inventory Alerts',
                 'description' => 'Receive alerts when a station inventory submission is received.',
+            ],
+            self::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES => [
+                'label' => 'Department Updates',
+                'description' => 'Receive published department notices and operational updates.',
             ],
         ];
     }

@@ -41,5 +41,9 @@ return [
         App\Models\Todo::class => 'admin.notifications',
         App\Models\InboundEmail::class => 'admin.communications',
         App\Models\OutboundEmail::class => 'admin.communications',
+        App\Models\DepartmentUpdate::class => [
+            'view' => 'admin.communications.view',
+            'manage' => 'admin.communications.send',
+        ],
     ],
 ];
