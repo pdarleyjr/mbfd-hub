@@ -2,16 +2,16 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\DefectResource\Pages;
 use App\Models\ApparatusDefect;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Table;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
 
-use App\Filament\Concerns\EnterpriseTable;
 class DefectResource extends Resource
 {
     use EnterpriseTable;
@@ -37,15 +37,15 @@ class DefectResource extends Resource
                     ->required()
                     ->searchable()
                     ->preload(),
-                
+
                 Forms\Components\TextInput::make('compartment')
                     ->required()
                     ->maxLength(255),
-                
+
                 Forms\Components\TextInput::make('item')
                     ->required()
                     ->maxLength(255),
-                
+
                 Forms\Components\Select::make('issue_type')
                     ->required()
                     ->options([
@@ -55,11 +55,11 @@ class DefectResource extends Resource
                         'low_quantity' => 'Low Quantity',
                         'other' => 'Other',
                     ]),
-                
+
                 Forms\Components\Textarea::make('notes')
                     ->columnSpanFull()
                     ->rows(3),
-                
+
                 Forms\Components\FileUpload::make('photo_path')
                     ->label('Photo')
                     ->disk('public')
@@ -67,7 +67,7 @@ class DefectResource extends Resource
                     ->image()
                     ->imageEditor()
                     ->columnSpanFull(),
-                
+
                 Forms\Components\Select::make('status')
                     ->required()
                     ->default('open')
@@ -76,12 +76,12 @@ class DefectResource extends Resource
                         'in_progress' => 'In Progress',
                         'resolved' => 'Resolved',
                     ]),
-                
+
                 Forms\Components\Textarea::make('resolution_notes')
                     ->columnSpanFull()
                     ->rows(3)
                     ->visible(fn (Forms\Get $get) => $get('status') === 'resolved'),
-                
+
                 Forms\Components\DateTimePicker::make('resolved_at')
                     ->visible(fn (Forms\Get $get) => $get('status') === 'resolved'),
             ]);
@@ -95,36 +95,44 @@ class DefectResource extends Resource
                     ->label('Apparatus')
                     ->searchable()
                     ->sortable(),
-                
+
                 Tables\Columns\ImageColumn::make('photo_path')
                     ->label('Photo')
+                    ->getStateUsing(fn (ApparatusDefect $record): ?string => $record->availablePhotoPath())
                     ->disk('public')
                     ->width(60)
                     ->height(60),
-                
+
+                Tables\Columns\TextColumn::make('photo_availability')
+                    ->label('Photo status')
+                    ->getStateUsing(fn (ApparatusDefect $record): ?string => $record->hasMissingPhotoReference()
+                        ? 'Photo unavailable'
+                        : null)
+                    ->placeholder('—'),
+
                 Tables\Columns\TextColumn::make('compartment')
                     ->searchable()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('item')
                     ->searchable(),
-                
+
                 Tables\Columns\TextColumn::make('status')
                     ->colors([
                         'danger' => 'open',
                         'warning' => 'in_progress',
                         'success' => 'resolved',
                     ]),
-                
+
                 Tables\Columns\TextColumn::make('issue_type')
                     ->label('Issue Type')
                     ->formatStateUsing(fn ($state) => str_replace('_', ' ', ucfirst($state))),
-                
+
                 Tables\Columns\TextColumn::make('reported_date')
                     ->label('Reported Date')
                     ->date()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('resolved_at')
                     ->label('Resolved')
                     ->dateTime()
@@ -139,7 +147,7 @@ class DefectResource extends Resource
                         'resolved' => 'Resolved',
                     ])
                     ->default('open'),
-                
+
                 SelectFilter::make('issue_type')
                     ->label('Issue Type')
                     ->options([
@@ -176,7 +184,7 @@ class DefectResource extends Resource
                             ->title('Defect Resolved')
                             ->body('The defect has been marked as resolved.')
                     ),
-                
+
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([

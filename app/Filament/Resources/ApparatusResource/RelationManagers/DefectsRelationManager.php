@@ -2,16 +2,16 @@
 
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
+use App\Filament\Resources\RecommendationResource;
+use App\Models\AdminAlertEvent;
+use App\Models\ApparatusDefect;
+use App\Models\ApparatusDefectRecommendation;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use App\Models\ApparatusDefect;
-use App\Models\ApparatusDefectRecommendation;
-use App\Models\AdminAlertEvent;
-use Filament\Notifications\Notification;
-use App\Filament\Resources\RecommendationResource;
 
 class DefectsRelationManager extends RelationManager
 {
@@ -26,11 +26,11 @@ class DefectsRelationManager extends RelationManager
                 Forms\Components\TextInput::make('compartment')
                     ->required()
                     ->maxLength(255),
-                
+
                 Forms\Components\TextInput::make('item')
                     ->required()
                     ->maxLength(255),
-                
+
                 Forms\Components\Select::make('issue_type')
                     ->required()
                     ->options([
@@ -40,17 +40,17 @@ class DefectsRelationManager extends RelationManager
                         'low_quantity' => 'Low Quantity',
                         'other' => 'Other',
                     ]),
-                
+
                 Forms\Components\Textarea::make('notes')
                     ->rows(3),
-                
+
                 Forms\Components\FileUpload::make('photo_path')
                     ->label('Photo')
                     ->disk('public')
                     ->directory('defects')
                     ->image()
                     ->imageEditor(),
-                
+
                 Forms\Components\Select::make('status')
                     ->required()
                     ->default('open')
@@ -69,17 +69,24 @@ class DefectsRelationManager extends RelationManager
             ->columns([
                 Tables\Columns\ImageColumn::make('photo_path')
                     ->label('Photo')
+                    ->getStateUsing(fn (ApparatusDefect $record): ?string => $record->availablePhotoPath())
                     ->disk('public')
                     ->width(60)
                     ->height(60),
-                
+                Tables\Columns\TextColumn::make('photo_availability')
+                    ->label('Photo status')
+                    ->getStateUsing(fn (ApparatusDefect $record): ?string => $record->hasMissingPhotoReference()
+                        ? 'Photo unavailable'
+                        : null)
+                    ->placeholder('—'),
+
                 Tables\Columns\TextColumn::make('compartment')
                     ->searchable()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('item')
                     ->searchable(),
-                
+
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -88,12 +95,12 @@ class DefectsRelationManager extends RelationManager
                         'resolved' => 'success',
                         default => 'gray',
                     }),
-                
+
                 Tables\Columns\TextColumn::make('issue_type')
                     ->label('Issue Type')
                     ->badge()
                     ->formatStateUsing(fn ($state) => str_replace('_', ' ', ucfirst($state))),
-                
+
                 Tables\Columns\TextColumn::make('reported_date')
                     ->label('Reported')
                     ->date()
@@ -124,7 +131,7 @@ class DefectsRelationManager extends RelationManager
                             'resolved_at' => now(),
                         ]);
                     }),
-                
+
                 Tables\Actions\Action::make('request_replacement')
                     ->label('Request Replacement')
                     ->icon('heroicon-o-shopping-cart')
@@ -142,7 +149,7 @@ class DefectsRelationManager extends RelationManager
                             'status' => 'pending',
                             'created_by_user_id' => auth()->id(),
                         ]);
-                        
+
                         AdminAlertEvent::create([
                             'type' => 'recommendation_created',
                             'severity' => 'info',
@@ -151,16 +158,16 @@ class DefectsRelationManager extends RelationManager
                             'related_id' => $recommendation->id,
                             'created_by_user_id' => auth()->id(),
                         ]);
-                        
+
                         Notification::make()
                             ->success()
                             ->title('Replacement request created')
                             ->body('Go to Recommendations to assign an item')
                             ->send();
-                            
+
                         return redirect()->to(RecommendationResource::getUrl('edit', ['record' => $recommendation]));
                     }),
-                
+
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])

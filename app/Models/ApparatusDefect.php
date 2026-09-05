@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class ApparatusDefect extends Model
 {
@@ -83,6 +84,24 @@ class ApparatusDefect extends Model
     public function allocations()
     {
         return $this->hasMany(ApparatusInventoryAllocation::class, 'apparatus_defect_id');
+    }
+
+    public function availablePhotoPath(): ?string
+    {
+        $path = $this->getRawOriginal('photo_path');
+
+        if (! is_string($path) || trim($path) === '') {
+            return null;
+        }
+
+        return Storage::disk('public')->exists($path) ? $path : null;
+    }
+
+    public function hasMissingPhotoReference(): bool
+    {
+        $path = $this->getRawOriginal('photo_path');
+
+        return is_string($path) && trim($path) !== '' && $this->availablePhotoPath() === null;
     }
 
     public static function recordDefect(

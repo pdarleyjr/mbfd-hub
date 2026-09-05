@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   dependency-audit:
@@ -63,40 +62,11 @@ jobs:
           corepack pnpm@9.12.0 install --frozen-lockfile --ignore-scripts
           corepack pnpm@9.12.0 audit --audit-level=high
 
-  codeql:
-    name: CodeQL Analysis
-    # CodeQL upload requires GitHub Advanced Security for private repos. Keep
-    # dependency/trivy/gitleaks coverage on private runs and enable this job
-    # automatically if the repository is ever made public or GHAS is enabled.
-    if: ${{ github.event.repository.private == false }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [javascript]
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@3b1a19a80ab047f35cbb237b5bd9bdc1e14f166c # v3
-        with:
-          languages: ${{ matrix.language }}
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@3b1a19a80ab047f35cbb237b5bd9bdc1e14f166c # v3
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@3b1a19a80ab047f35cbb237b5bd9bdc1e14f166c # v3
-
   # NOTE: actions/dependency-review-action was removed 2026-05-14 — the action
   # requires GitHub Advanced Security on private repos, which this account does
   # not have. Coverage is provided by:
   #   - Dependabot (vulnerability PRs + alerts)
   #   - composer audit + per-lockfile npm/pnpm audits (in `dependency-audit` above)
   #   - aquasecurity/trivy-action (03-trivy-repo.yml)
-  #   - github/codeql-action (codeql job above)
+  #   - repository CodeQL default setup (Actions, JavaScript/TypeScript, Python)
   # Re-enable only after enabling GHAS or making the repo public.
