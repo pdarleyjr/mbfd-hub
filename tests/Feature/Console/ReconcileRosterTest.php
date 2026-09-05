@@ -6,6 +6,8 @@ namespace Tests\Feature\Console;
 
 use App\Models\Employee;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 final class ReconcileRosterTest extends TestCase
@@ -44,6 +46,16 @@ final class ReconcileRosterTest extends TestCase
 
             $this->artisan('mbfd:roster-reconcile', ['file' => $path, '--apply' => true])
                 ->assertSuccessful();
+
+            $created = Employee::query()->where('employee_id', '54321')->sole();
+            $createdHash = $created->getRawOriginal('password');
+            $this->assertNotSame('', $createdHash);
+            $this->assertFalse(Hash::check('test-owner-approved-bootstrap', $created->getAuthPassword()));
+            $this->assertFalse($created->must_change_password);
+
+            $this->artisan('mbfd:roster-reconcile', ['file' => $path, '--apply' => true])
+                ->assertSuccessful();
+            $this->assertSame($createdHash, $created->fresh()->getRawOriginal('password'));
         } finally {
             @unlink($path);
         }
@@ -60,6 +72,39 @@ final class ReconcileRosterTest extends TestCase
             'roster_status' => 'active',
         ]);
         $this->assertSame(3, Employee::query()->count());
+    }
+
+    public function test_json_dry_run_reports_exact_set_differences_without_mutation(): void
+    {
+        Employee::query()->create([
+            'employee_id' => '12345',
+            'name' => 'Existing Person',
+            'roster_status' => 'active',
+            'password' => 'existing-current-password',
+        ]);
+        Employee::query()->create([
+            'employee_id' => '99999',
+            'name' => 'Historical Person',
+            'roster_status' => 'active',
+            'password' => 'existing-historical-password',
+        ]);
+        $path = $this->rosterFile();
+
+        try {
+            $this->assertSame(0, Artisan::call('mbfd:roster-reconcile', ['file' => $path, '--json' => true]));
+            $report = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+            $this->assertSame(['12345'], $report['current_match']);
+            $this->assertSame(['54321'], $report['current_missing_from_db']);
+            $this->assertSame(['99999'], $report['db_not_in_current_roster']);
+            $this->assertSame([], $report['duplicate_collision']);
+            $this->assertFalse($report['applied']);
+        } finally {
+            @unlink($path);
+        }
+
+        $this->assertSame(2, Employee::query()->count());
+        $this->assertSame('active', Employee::query()->where('employee_id', '99999')->sole()->roster_status);
     }
 
     private function rosterFile(): string
