@@ -285,6 +285,9 @@ class TestConfiguration(unittest.TestCase):
         )
         self.assertNotIn("mbfd-bid", config.consumers)
         self.assertNotIn("mbfd-bid-analysis", config.capabilities)
+        self.assertNotIn("mbfd-transcribe", config.capabilities)
+        self.assertNotIn("future-speaches", config.backends)
+        self.assertNotIn(":11441", json.dumps(deployment))
         unit = (MODULE_PATH.parent / "ollama-ai-proxy.service").read_text(
             encoding="utf-8"
         )

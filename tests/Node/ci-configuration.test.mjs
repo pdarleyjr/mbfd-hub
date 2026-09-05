@@ -570,6 +570,20 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
   assert.match(php85DailyAssets, /npm run build/);
   assert.match(workflowStep(php85, "Run PHP 8.5 PHPUnit compatibility suite"), /php artisan test --exclude-group=postgres/);
   assert.match(workflowStep(php85, "Run PHP 8.5 PostgreSQL compatibility tests"), /php artisan test --group=postgres/);
+
+  const aiGateway = workflowJob(gates, "ai-gateway-source");
+  assert.match(aiGateway, /fetch-depth:\s*0/);
+  const aiGatewayValidation = workflowStep(aiGateway, "Validate canonical AI Gateway source");
+  assert.match(aiGatewayValidation, /python3 -m unittest[\s\\]*\r?\n?\s*tests\.security\.test_mbfd_ai_gateway/);
+  assert.match(aiGatewayValidation, /tests\.security\.test_mbfd_ai_gateway_release/);
+  assert.match(aiGatewayValidation, /python3 -m compileall/);
+  assert.match(aiGatewayValidation, /--validate-config/);
+  assert.match(aiGatewayValidation, /bash -n/);
+  assert.doesNotMatch(aiGateway, /\b(?:ssh|sudo)\b/);
+  assert.doesNotMatch(aiGateway, /\$\{\{\s*secrets\./i);
+
+  const aggregate = workflowJob(gates, "release-gates");
+  assert.match(aggregate, /^\s+- ai-gateway-source\s*$/m);
 });
 
 test("CI invokes the deploy-free shared release gate for main and pull requests", () => {

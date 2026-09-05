@@ -41,12 +41,6 @@
       "enabled": false,
       "health_timeout_seconds": 3
     },
-    "future-speaches": {
-      "provider": "speaches",
-      "base_url": "http://127.0.0.1:11441",
-      "enabled": false,
-      "health_timeout_seconds": 3
-    },
     "future-comfyui": {
       "provider": "comfyui",
       "base_url": "http://127.0.0.1:8188",
@@ -136,21 +130,6 @@
       },
       "heavy_workload": null
     },
-    "mbfd-transcribe": {
-      "backend": "future-speaches",
-      "model": "whisper",
-      "paths": [
-        "/v1/audio/transcriptions"
-      ],
-      "concurrency": 1,
-      "timeout_seconds": 300,
-      "retries": 0,
-      "cold_start": {
-        "mode": "reject_if_cold",
-        "ready_timeout_seconds": 2
-      },
-      "heavy_workload": "future-gpu-whisper"
-    },
     "mbfd-image": {
       "backend": "future-comfyui",
       "model": "image-workflow",
@@ -219,16 +198,6 @@
       "require_production_healthy": true
     },
     "future-comfyui": {
-      "lease_group": "gpu-heavy",
-      "mem_available_floor_mb": 8192,
-      "declared_model_allocation_mb": 0,
-      "memory_psi_avg10_max": 1.0,
-      "max_swap_activity_pages": 2048,
-      "deny_on_recent_oom": true,
-      "deny_on_recent_gpu_reset": true,
-      "require_production_healthy": true
-    },
-    "future-gpu-whisper": {
       "lease_group": "gpu-heavy",
       "mem_available_floor_mb": 8192,
       "declared_model_allocation_mb": 0,
