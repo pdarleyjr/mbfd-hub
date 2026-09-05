@@ -661,12 +661,6 @@ parameters:
 			path: app/Filament/Workgroup/Exports/WorkgroupScoresExporter.php
 
 		-
-			message: '#^Call to an undefined static method Filament\\Pages\\Page\:\:mount\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: app/Filament/Workgroup/Pages/AdminDashboard.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 1

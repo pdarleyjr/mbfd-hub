@@ -16,11 +16,10 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use RuntimeException;
 use Throwable;
 
+/** @property Form $form */
 final class ComposeEmail extends Page implements HasForms
 {
     use InteractsWithForms;
-
-    public Form $form;
 
     protected static ?string $navigationIcon = 'heroicon-o-pencil-square';
 

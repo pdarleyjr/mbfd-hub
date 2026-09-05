@@ -98,7 +98,7 @@ class AdminDashboard extends Page
             if ($totalProducts > 0 && $countableMembers > 0) {
                 $completedForSession = EvaluationSubmission::where('status', 'submitted')
                     ->whereIn('workgroup_member_id', $countableMemberIds)
-                    ->whereHas('candidateProduct', fn($q) => $q->where('workgroup_session_id', $activeSession->id))
+                    ->whereHas('candidateProduct', fn ($q) => $q->where('workgroup_session_id', $activeSession->id))
                     ->count();
                 $pendingEvaluations = max(0, ($totalProducts * $countableMembers) - $completedForSession);
             }
@@ -127,7 +127,7 @@ class AdminDashboard extends Page
     {
         $user = Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -140,7 +140,6 @@ class AdminDashboard extends Page
 
     public function mount(): void
     {
-        parent::mount();
         abort_unless(static::canAccess(), 403);
     }
 }
