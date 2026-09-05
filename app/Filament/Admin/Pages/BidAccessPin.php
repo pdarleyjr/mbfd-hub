@@ -83,8 +83,7 @@ class BidAccessPin extends Page implements HasForms
                         'pattern' => '\d{4,8}',
                         'autocomplete' => 'off',
                     ]),
-            ])
-            ->statePath('pin');
+            ]);
     }
 
     public function save(): void
