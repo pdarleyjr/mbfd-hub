@@ -35,17 +35,17 @@ class PersonnelUniformResource extends \App\Filament\Resources\UniformResource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false;
+        return auth()->user()?->can('admin.personnel.view') ?? false;
     }
 
     public static function canCreate(): bool
     {
-        return static::canViewAny();
+        return auth()->user()?->can('admin.personnel.manage') ?? false;
     }
 
     public static function canEdit($record): bool
     {
-        return static::canViewAny();
+        return static::canCreate();
     }
 
     public static function canDelete($record): bool

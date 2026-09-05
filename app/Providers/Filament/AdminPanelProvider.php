@@ -119,6 +119,12 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make()
                     ->label('Bid Administration')
                     ->icon('heroicon-o-key'),
+                NavigationGroup::make()
+                    ->label('Communications')
+                    ->icon('heroicon-o-envelope'),
+                NavigationGroup::make()
+                    ->label('Administration')
+                    ->icon('heroicon-o-cog-6-tooth'),
             ])
             ->userMenuItems([
                 MenuItem::make()
@@ -131,11 +137,11 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-bell')
                     ->visible(fn (): bool => auth()->user()?->canManageNotificationSettings() ?? false),
                 MenuItem::make()
-                    ->label('Users')
+                    ->label('Members & Access')
                     ->url(fn (): string => url('/admin/users'))
                     ->icon('heroicon-o-users')
                     ->sort(10)
-                    ->visible(fn (): bool => auth()->user()?->hasAnyRole(['super_admin', 'admin']) ?? false),
+                    ->visible(fn (): bool => auth()->user()?->can('admin.members.view') ?? false),
                 MenuItem::make()
                     ->label('Roles')
                     ->url(fn (): string => url('/admin/shield/roles'))
@@ -147,19 +153,19 @@ class AdminPanelProvider extends PanelProvider
                     ->url(fn (): string => \App\Filament\Resources\RecommendationResource::getUrl('index'))
                     ->icon('heroicon-o-light-bulb')
                     ->sort(12)
-                    ->visible(fn (): bool => auth()->user()?->hasAnyRole(['super_admin', 'admin']) ?? false),
+                    ->visible(fn (): bool => auth()->user()?->can('admin.projects.view') ?? false),
                 MenuItem::make()
                     ->label('Application Health')
                     ->url(fn (): string => url('/admin/health'))
                     ->icon('heroicon-o-heart')
                     ->sort(20)
-                    ->visible(fn (): bool => auth()->user()?->hasRole('super_admin') ?? false),
+                    ->visible(fn (): bool => auth()->user()?->can('admin.system.view') ?? false),
                 MenuItem::make()
                     ->label('Laravel Pulse')
                     ->url(fn (): string => url('/admin/pulse'))
                     ->icon('heroicon-o-bolt')
                     ->sort(21)
-                    ->visible(fn (): bool => auth()->user()?->hasRole('super_admin') ?? false),
+                    ->visible(fn (): bool => auth()->user()?->can('admin.system.view') ?? false),
                 MenuItem::make()
                     ->label('Return to Home')
                     ->url('/')

@@ -54,6 +54,11 @@ final class ApparatusProfileAccessibilityTest extends TestCase
 
         $this->panelUser = $this->actingAsCanonicalFixture('E01-PROFILE', 'Apparatus Profile Actor');
         $this->panelUser->assignRole($role);
+        $this->panelUser->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.fleet.view', 'web'),
+            Permission::findOrCreate('admin.fleet.manage', 'web'),
+        ]);
         $this->bindCanonicalSessionToLivewireTestRequests();
 
         $this->station = Station::query()->create([
@@ -345,6 +350,10 @@ final class ApparatusProfileAccessibilityTest extends TestCase
 
         $user = $this->actingAsCanonicalFixture('E01-PROFILE-VIEW', 'View-only Apparatus Actor');
         $user->assignRole($role);
+        $user->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.fleet.view', 'web'),
+        ]);
 
         return $user;
     }

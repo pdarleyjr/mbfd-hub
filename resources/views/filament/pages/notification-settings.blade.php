@@ -9,10 +9,10 @@
 
                 <div class="space-y-2">
                     <h2 class="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
-                        Choose which submissions should notify you.
+                        Choose how each submission should notify you.
                     </h2>
                     <p class="max-w-2xl text-sm leading-6 text-stone-600 sm:text-[0.95rem]">
-                        These preferences control whether your account is included when new submissions are broadcast. In-app alerts and browser push both honor the toggles below.
+                        Admin inbox, browser push, and city email are controlled independently for each event.
                     </p>
                 </div>
             </div>
@@ -20,7 +20,7 @@
             <div class="mt-6 grid gap-4 border-t border-stone-200/80 pt-5 text-sm text-stone-600 sm:grid-cols-3 sm:gap-6">
                 <div class="space-y-1">
                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">Default behavior</p>
-                    <p>All categories start enabled until you save a custom preference profile.</p>
+                    <p>Email starts off. Existing in-app and push recipients were preserved during migration.</p>
                 </div>
                 <div class="space-y-1">
                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">Device subscriptions</p>
@@ -28,7 +28,7 @@
                 </div>
                 <div class="space-y-1">
                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">Important note</p>
-                    <p>Turning a category off skips your user entirely, even if your browser is subscribed to push notifications.</p>
+                    <p>Email delivery requires an authoritative city email on your canonical member record.</p>
                 </div>
             </div>
         </section>

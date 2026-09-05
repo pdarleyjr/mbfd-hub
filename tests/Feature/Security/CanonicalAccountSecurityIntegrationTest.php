@@ -21,6 +21,7 @@ final class CanonicalAccountSecurityIntegrationTest extends TestCase
 
     public function test_authorized_disable_revokes_sessions_and_reactivation_does_not_restore_them(): void
     {
+        $this->confirmRecentAuthentication();
         config()->set('security.account_security.allowed_administrative_actions', ['disable', 'enable']);
         $actor = $this->superAdmin();
         $target = User::factory()->create(['account_status' => AccountStatus::Active]);
@@ -60,29 +61,28 @@ final class CanonicalAccountSecurityIntegrationTest extends TestCase
         self::assertFalse(app(SessionRegistry::class)->isCurrent($reactivated, $session->fresh(), $at->addHours(2)));
     }
 
-    public function test_default_policy_denies_reactivation_without_changing_the_target(): void
+    public function test_owner_approved_default_policy_allows_reactivation(): void
     {
+        $this->confirmRecentAuthentication();
         $actor = $this->superAdmin();
         $target = User::factory()->create(['account_status' => AccountStatus::Disabled]);
 
-        $this->expectException(AuthorizationException::class);
+        app(AccountSecurityService::class)->enable(
+            $actor,
+            $target,
+            'owner-approved default policy',
+            CarbonImmutable::parse('2026-08-31T12:00:00Z'),
+        );
 
-        try {
-            app(AccountSecurityService::class)->enable(
-                $actor,
-                $target,
-                'no owner policy',
-                CarbonImmutable::parse('2026-08-31T12:00:00Z'),
-            );
-        } finally {
-            self::assertSame(AccountStatus::Disabled, $target->fresh()->account_status);
-        }
+        self::assertSame(AccountStatus::Active, $target->fresh()->account_status);
     }
 
     public function test_critical_administrator_cannot_be_disabled_even_when_the_action_is_enabled(): void
     {
+        $this->confirmRecentAuthentication();
         config()->set('security.account_security.allowed_administrative_actions', ['disable']);
         $actor = $this->superAdmin();
+        $actor->forceFill(['account_status' => AccountStatus::Disabled])->save();
         $target = $this->superAdmin();
 
         $this->expectException(AuthorizationException::class);
@@ -95,7 +95,7 @@ final class CanonicalAccountSecurityIntegrationTest extends TestCase
                 CarbonImmutable::parse('2026-08-31T12:00:00Z'),
             );
         } finally {
-            self::assertSame(AccountStatus::PendingActivation, $target->fresh()->account_status);
+            self::assertSame(AccountStatus::Active, $target->fresh()->account_status);
             $this->assertDatabaseHas('security_action_events', [
                 'actor_user_id' => $actor->id,
                 'target_user_id' => $target->id,
@@ -108,9 +108,14 @@ final class CanonicalAccountSecurityIntegrationTest extends TestCase
     private function superAdmin(): User
     {
         Role::findOrCreate('super_admin', 'web');
-        $user = User::factory()->create();
+        $user = User::factory()->create(['account_status' => AccountStatus::Active]);
         $user->assignRole('super_admin');
 
         return $user;
+    }
+
+    private function confirmRecentAuthentication(): void
+    {
+        session()->put((string) config('security.recent_authentication.session_key'), time());
     }
 }

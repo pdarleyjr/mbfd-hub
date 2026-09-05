@@ -83,15 +83,16 @@ final class AuthorizationPolicyFoundationTest extends TestCase
         }
     }
 
-    public function test_super_admin_cannot_grant_critical_privilege_or_target_an_equal_account(): void
+    public function test_owner_authorized_super_admin_can_manage_critical_roles_but_not_self(): void
     {
         $actor = $this->userWithRole('super_admin');
         $ordinaryTarget = User::factory()->create();
         $criticalTarget = $this->userWithRole('super_admin');
         $policy = app(RoleAssignmentPolicy::class);
 
-        self::assertFalse($policy->allows($actor, $ordinaryTarget, ['super_admin']));
-        self::assertFalse($policy->allows($actor, $criticalTarget, ['training_viewer']));
+        self::assertTrue($policy->allows($actor, $ordinaryTarget, ['super_admin']));
+        self::assertTrue($policy->allows($actor, $criticalTarget, ['training_viewer']));
+        self::assertFalse($policy->allows($actor, $actor, ['training_viewer']));
     }
 
     public function test_last_critical_administrator_guard_blocks_removal_but_allows_a_safe_future_path_with_another_critical_admin(): void
@@ -106,14 +107,14 @@ final class AuthorizationPolicyFoundationTest extends TestCase
         self::assertTrue($guard->allowsRoleSet($onlyCriticalAdmin, []));
     }
 
-    public function test_administrative_recovery_fails_closed_for_workgroup_manager_admin_and_super_admin(): void
+    public function test_administrative_recovery_is_limited_to_owner_authorized_super_admin(): void
     {
         $target = User::factory()->create();
         $policy = app(AccountSecurityPolicy::class);
 
         self::assertFalse($policy->allows($this->userWithRole('workgroup_member'), $target, AccountSecurityAction::AdministrativeRecovery));
         self::assertFalse($policy->allows($this->userWithRole('admin'), $target, AccountSecurityAction::AdministrativeRecovery));
-        self::assertFalse($policy->allows($this->userWithRole('super_admin'), $target, AccountSecurityAction::AdministrativeRecovery));
+        self::assertTrue($policy->allows($this->userWithRole('super_admin'), $target, AccountSecurityAction::AdministrativeRecovery));
     }
 
     public function test_denied_administrative_recovery_is_recorded_without_a_password_value(): void
@@ -162,10 +163,25 @@ final class AuthorizationPolicyFoundationTest extends TestCase
         ));
     }
 
+    public function test_account_security_service_rejects_an_authorized_actor_without_recent_authentication(): void
+    {
+        $actor = $this->userWithRole('super_admin');
+        $target = User::factory()->create();
+
+        $this->expectException(AuthorizationException::class);
+
+        app(AccountSecurityService::class)->authorize(
+            $actor,
+            $target,
+            AccountSecurityAction::AdministrativeRecovery,
+            'stale authentication test',
+        );
+    }
+
     private function userWithRole(string $role): User
     {
         Role::findOrCreate($role, 'web');
-        $user = User::factory()->create();
+        $user = User::factory()->create(['account_status' => \App\Enums\AccountStatus::Active]);
         $user->assignRole($role);
 
         return $user;

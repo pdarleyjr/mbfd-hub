@@ -34,7 +34,7 @@ class TrtTrailerInventory extends Page
     {
         $user = auth()->user();
 
-        return $user && $user->hasRole(['super_admin', 'admin', 'logistics_admin']);
+        return $user?->can('admin.equipment.view') ?? false;
     }
 
     public function mount(): void

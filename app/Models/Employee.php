@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\Identity\EmployeeBootstrapCredentialProvisioner;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -14,6 +15,9 @@ use Illuminate\Notifications\Notifiable;
  *
  * Employee records retain historical domain data and the transitional
  * first-login credential used to create or claim a canonical User.
+ *
+ * @property string|null $city_email
+ * @property string|null $roster_status
  */
 class Employee extends Authenticatable
 {
@@ -27,6 +31,8 @@ class Employee extends Authenticatable
         'rank',
         'password',
         'must_change_password',
+        'city_email',
+        'roster_status',
     ];
 
     protected $hidden = [
@@ -38,6 +44,14 @@ class Employee extends Authenticatable
         'password' => 'hashed',
         'must_change_password' => 'boolean',
     ];
+
+    protected function cityEmail(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value): ?string => $value,
+            set: fn (?string $value): ?string => blank($value) ? null : strtolower(trim($value)),
+        );
+    }
 
     protected static function booted(): void
     {

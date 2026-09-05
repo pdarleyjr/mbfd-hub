@@ -19,24 +19,21 @@ class UserRoleAssignmentAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_with_generic_user_update_permission_cannot_assign_any_role(): void
+    public function test_admin_with_generic_user_update_permission_cannot_edit_a_member_without_members_manage(): void
     {
         [$adminRole, $roles] = $this->roles();
         $adminRole->givePermissionTo(Permission::findOrCreate('update_user', 'web'));
 
         $actor = User::factory()->create();
         $actor->assignRole($adminRole);
-        $target = User::factory()->create();
+        $actor->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.members.view', 'web'),
+        ]);
+        $target = User::factory()->create(['employee_id' => 'ROLE-TARGET-100']);
 
         $this->actingAs($actor);
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
-        $this->withoutVite();
-
-        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
-            ->fillForm(['roles' => $roles->pluck('id')->map(static fn (int $id): string => (string) $id)->all()])
-            ->call('save')
-            ->assertHasNoFormErrors();
-
+        self::assertFalse(UserResource::canEdit($target));
         $this->assertSame([], $target->refresh()->getRoleNames()->all());
     }
 
@@ -49,7 +46,7 @@ class UserRoleAssignmentAuthorizationTest extends TestCase
 
         $actor = User::factory()->create();
         $actor->assignRole($roles['super_admin']);
-        $target = User::factory()->create();
+        $target = User::factory()->create(['employee_id' => 'ROLE-TARGET-200']);
 
         $this->actingAs($actor);
         Filament::setCurrentPanel(Filament::getPanel('admin'));

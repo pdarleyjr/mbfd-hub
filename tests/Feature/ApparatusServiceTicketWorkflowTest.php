@@ -9,6 +9,7 @@ use App\Models\Apparatus;
 use App\Models\Employee;
 use App\Models\Station;
 use App\Models\User;
+use App\Models\UserNotificationSubscription;
 use App\Notifications\ApparatusServiceTicketEmployeeNotification;
 use App\Notifications\NewSubmissionNotification;
 use App\Services\ApparatusServiceTicketWorkflowService;
@@ -41,6 +42,13 @@ class ApparatusServiceTicketWorkflowTest extends TestCase
         $role = Role::findOrCreate('logistics_admin', 'web');
         $this->fleetAdmin = User::factory()->create();
         $this->fleetAdmin->assignRole($role);
+        UserNotificationSubscription::query()->create([
+            'user_id' => $this->fleetAdmin->id,
+            'event_key' => User::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS,
+            'database_enabled' => true,
+            'webpush_enabled' => false,
+            'email_enabled' => false,
+        ]);
 
         $this->station = Station::query()->create([
             'station_number' => 1,

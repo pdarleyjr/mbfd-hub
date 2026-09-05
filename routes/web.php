@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Bid\AuthorizationController as BidAuthorizationCont
 use App\Http\Controllers\Api\MediaControl\AuthorizationController as MediaControlAuthorizationController;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Auth\CanonicalLoginController;
+use App\Http\Controllers\Auth\EmployeePasswordResetController;
 use App\Http\Controllers\Auth\FirstLoginCanonicalizationController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
@@ -81,6 +82,14 @@ Route::middleware('guest:web')->group(function (): void {
         ->name('activate-account.create');
     Route::post('/activate-account', [FirstLoginCanonicalizationController::class, 'store'])
         ->name('activate-account.store');
+    Route::get('/forgot-password', [EmployeePasswordResetController::class, 'requestForm'])
+        ->name('password.request');
+    Route::post('/forgot-password', [EmployeePasswordResetController::class, 'requestLink'])
+        ->name('password.email');
+    Route::get('/reset-password/{token}', [EmployeePasswordResetController::class, 'resetForm'])
+        ->name('password.reset.form');
+    Route::post('/reset-password', [EmployeePasswordResetController::class, 'reset'])
+        ->name('password.update');
 });
 Route::post('/logout', [CanonicalLoginController::class, 'destroy'])
     ->middleware('auth:web')

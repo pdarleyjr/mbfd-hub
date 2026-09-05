@@ -75,8 +75,9 @@ final class FirstLoginCanonicalizationTest extends TestCase
         ]);
         $role = Role::findOrCreate('admin', 'web');
         $permission = Permission::findOrCreate('view_any_user', 'web');
+        $adminAccess = Permission::findOrCreate('admin.access', 'web');
         $user->assignRole($role);
-        $user->givePermissionTo($permission);
+        $user->givePermissionTo([$permission, $adminAccess]);
         $workgroup = Workgroup::query()->create(['name' => 'Recovery Workgroup', 'created_by' => $user->id]);
         WorkgroupMember::query()->create([
             'workgroup_id' => $workgroup->id,

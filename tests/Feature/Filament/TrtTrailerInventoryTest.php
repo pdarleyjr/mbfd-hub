@@ -13,6 +13,7 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -26,6 +27,10 @@ class TrtTrailerInventoryTest extends TestCase
         Role::create(['name' => 'logistics_admin', 'guard_name' => 'web']);
         $admin = User::factory()->create();
         $admin->assignRole('logistics_admin');
+        $admin->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.equipment.view', 'web'),
+        ]);
         $session = TrtInventorySession::query()->create(['session_date' => today()]);
         $catalogItem = TrtInventoryCatalogItem::query()->create([
             'name' => 'Audit Rescue Tool',

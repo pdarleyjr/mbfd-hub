@@ -53,7 +53,7 @@ class EquipmentIntake extends Page implements HasForms
             return false;
         }
 
-        return $user->hasRole(['super_admin', 'admin', 'logistics_admin']);
+        return $user->can('admin.equipment.manage');
     }
 
     public function mount(): void

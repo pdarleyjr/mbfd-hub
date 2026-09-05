@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -37,10 +38,11 @@ final class CanonicalAuthorizationTest extends TestCase
     }
 
     #[DataProvider('authorizedRoleProvider')]
-    public function test_existing_signage_roles_can_issue_and_exchange_a_canonical_code(string $role): void
+    public function test_explicit_media_entitlement_can_issue_and_exchange_a_canonical_code_across_existing_roles(string $role): void
     {
         $user = $this->linkedUser();
         $user->assignRole(Role::findOrCreate($role, 'web'));
+        $user->givePermissionTo(Permission::findOrCreate('app.media_control.access', 'web'));
         $this->canonicalLogin($user);
 
         $location = $this->get($this->authorizeUrl())
@@ -98,6 +100,7 @@ final class CanonicalAuthorizationTest extends TestCase
     {
         $user = $this->linkedUser();
         $user->assignRole(Role::findOrCreate('admin', 'web'));
+        $user->givePermissionTo(Permission::findOrCreate('app.media_control.access', 'web'));
         $this->canonicalLogin($user);
         $user->forceFill(['employee_profile_id' => null])->save();
         $this->app['auth']->forgetGuards();
@@ -197,12 +200,12 @@ final class CanonicalAuthorizationTest extends TestCase
         $this->exchange($disabledCode)->assertUnauthorized();
     }
 
-    public function test_code_cannot_outlive_role_entitlement(): void
+    public function test_code_cannot_outlive_explicit_entitlement(): void
     {
         $roleUser = $this->authorizedUser('MEDIA-ROLE');
         $this->canonicalLogin($roleUser);
         $roleCode = $this->issuedCode();
-        $roleUser->syncRoles([]);
+        $roleUser->revokePermissionTo('app.media_control.access');
         $this->exchange($roleCode)->assertForbidden();
     }
 
@@ -210,6 +213,7 @@ final class CanonicalAuthorizationTest extends TestCase
     {
         $user = $this->linkedUser($employeeId);
         $user->assignRole(Role::findOrCreate('admin', 'web'));
+        $user->givePermissionTo(Permission::findOrCreate('app.media_control.access', 'web'));
 
         return $user;
     }

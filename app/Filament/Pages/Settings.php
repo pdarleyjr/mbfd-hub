@@ -2,8 +2,8 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Pages\Page;
 use Filament\Actions\Action;
+use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
 class Settings extends Page
@@ -27,19 +27,20 @@ class Settings extends Page
     public function isSubscribed(): bool
     {
         $user = Auth::user();
+
         return $user && $user->pushSubscriptions()->exists();
     }
 
     public function getSubscriptionCount(): int
     {
         $user = Auth::user();
+
         return $user ? $user->pushSubscriptions()->count() : 0;
     }
 
     public function canManageUsers(): bool
     {
-        // Check if user has admin permissions
-        return auth()->check();
+        return auth()->user()?->can('admin.members.view') ?? false;
     }
 
     protected function getHeaderActions(): array

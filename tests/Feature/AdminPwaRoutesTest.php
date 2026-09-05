@@ -28,7 +28,7 @@ class AdminPwaRoutesTest extends TestCase
         );
     }
 
-    public function test_queue_status_requires_the_explicit_queue_status_permission(): void
+    public function test_queue_status_requires_permission_except_for_the_central_super_admin_bypass(): void
     {
         $roles = collect(['super_admin', 'admin', 'logistics_admin', 'training_admin', 'training_viewer'])
             ->mapWithKeys(fn (string $name) => [$name => Role::create(['name' => $name, 'guard_name' => 'web'])]);
@@ -60,6 +60,6 @@ class AdminPwaRoutesTest extends TestCase
 
         $this->actingAs($superAdmin->fresh())
             ->getJson('/admin/pulse/queues.json')
-            ->assertForbidden();
+            ->assertOk();
     }
 }

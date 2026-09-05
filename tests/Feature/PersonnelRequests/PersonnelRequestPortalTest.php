@@ -17,6 +17,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -220,6 +221,11 @@ class PersonnelRequestPortalTest extends TestCase
         Role::findOrCreate('logistics_admin', 'web');
         $admin = User::factory()->create();
         $admin->assignRole('logistics_admin');
+        $admin->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.personnel.view', 'web'),
+            Permission::findOrCreate('admin.equipment.view', 'web'),
+        ]);
 
         $this->get('/admin/personnel-uniforms-equipment')->assertRedirect('/login');
         $this->actingAs($admin)->get('/admin/personnel-uniforms-equipment')->assertRedirect();

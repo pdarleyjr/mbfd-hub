@@ -12,6 +12,40 @@ use Illuminate\Support\Facades\DB;
 
 final class AccountSecurityService
 {
+    public function setAdministrativeRecoveryPassword(User $user, string $passwordHash, CarbonInterface $at): User
+    {
+        return DB::transaction(function () use ($user, $passwordHash, $at): User {
+            /** @var User $lockedUser */
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+            DB::table('users')->where('id', $lockedUser->id)->update([
+                'password' => $passwordHash,
+                'must_change_password' => true,
+                'password_changed_at' => $at,
+                'security_version' => $lockedUser->security_version + 1,
+                'updated_at' => $at,
+            ]);
+            $lockedUser = $lockedUser->fresh();
+            $this->revokeSessions($lockedUser, 'administrative password recovery', $at);
+
+            return $lockedUser;
+        });
+    }
+
+    public function forcePasswordChange(User $user, CarbonInterface $at): User
+    {
+        return DB::transaction(function () use ($user, $at): User {
+            /** @var User $lockedUser */
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+            $lockedUser->forceFill([
+                'must_change_password' => true,
+                'security_version' => $lockedUser->security_version + 1,
+            ])->save();
+            $this->revokeSessions($lockedUser, 'password change required', $at);
+
+            return $lockedUser;
+        });
+    }
+
     public function changePassword(User $user, string $passwordHash, CarbonInterface $at): User
     {
         return DB::transaction(function () use ($user, $passwordHash, $at): User {
@@ -63,6 +97,7 @@ final class AccountSecurityService
             if ($passwordHash !== null && ! hash_equals((string) $lockedUser->getRawOriginal('password'), $passwordHash)) {
                 $changes['password'] = $passwordHash;
                 $changes['password_changed_at'] = $at;
+                $changes['must_change_password'] = true;
                 $passwordChanged = true;
             }
 

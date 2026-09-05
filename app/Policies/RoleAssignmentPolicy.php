@@ -16,9 +16,12 @@ final class RoleAssignmentPolicy
         $proposedRoleNames = array_values(array_unique($proposedRoleNames));
         $criticalRoles = $this->criticalRoles();
 
-        if ($actor->is($target)
-            || $target->hasAnyRole($criticalRoles)
-            || array_intersect($criticalRoles, $proposedRoleNames) !== []) {
+        if ($actor->is($target)) {
+            return false;
+        }
+
+        if (($target->hasAnyRole($criticalRoles) || array_intersect($criticalRoles, $proposedRoleNames) !== [])
+            && ! (bool) config('security.role_assignment.allow_critical_role_changes', false)) {
             return false;
         }
 

@@ -2,6 +2,8 @@
 
 namespace App\Notifications;
 
+use App\Models\User;
+use App\Notifications\Channels\BudgetedMailChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -27,7 +29,22 @@ class NewSubmissionNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        $channels = ['database'];
+        if (! $notifiable instanceof User) {
+            return [];
+        }
+
+        $eventKey = User::preferenceKeyForSubmissionType($this->submissionType);
+        $subscription = $eventKey === null
+            ? null
+            : $notifiable->notificationSubscriptions()->where('event_key', $eventKey)->first();
+        if ($subscription === null) {
+            return [];
+        }
+
+        $channels = [];
+        if ($subscription->database_enabled) {
+            $channels[] = 'database';
+        }
         $pushSubscriptionCount = $notifiable->pushSubscriptions()->count();
 
         Log::info('Preparing submission notification delivery', [
@@ -39,11 +56,28 @@ class NewSubmissionNotification extends Notification implements ShouldQueue
         ]);
 
         // Only add WebPush if user has active push subscriptions
-        if ($pushSubscriptionCount > 0) {
+        if ($subscription->webpush_enabled && $pushSubscriptionCount > 0) {
             $channels[] = WebPushChannel::class;
+        }
+        if ($subscription->email_enabled && filled($notifiable->employeeProfile?->city_email)) {
+            $channels[] = BudgetedMailChannel::class;
         }
 
         return $channels;
+    }
+
+    /** @return array{subject: string, text: string, html: string} */
+    public function toBudgetedEmail(object $notifiable): array
+    {
+        $safeTitle = e($this->title);
+        $safeBody = e($this->body);
+        $url = url($this->actionUrl);
+
+        return [
+            'subject' => $this->title,
+            'text' => $this->body."\n\nView in MBFD Hub: {$url}",
+            'html' => "<h1>{$safeTitle}</h1><p>{$safeBody}</p><p><a href=\"".e($url).'\">View in MBFD Hub</a></p>',
+        ];
     }
 
     /**
@@ -91,7 +125,7 @@ class NewSubmissionNotification extends Notification implements ShouldQueue
             ->body($this->body)
             ->icon('/images/mbfd-logo.png')
             ->badge('/images/mbfd-logo.png')
-            ->tag('mbfd-submission-' . $this->submissionType)
+            ->tag('mbfd-submission-'.$this->submissionType)
             ->data(['url' => $this->actionUrl]);
     }
 
@@ -100,6 +134,7 @@ class NewSubmissionNotification extends Notification implements ShouldQueue
         return [
             'database' => 'notifications',
             WebPushChannel::class => 'notifications',
+            BudgetedMailChannel::class => 'notifications',
         ];
     }
 

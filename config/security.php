@@ -11,12 +11,17 @@ return [
         'delegator_roles' => [
             'super_admin',
         ],
-        'allow_critical_role_changes' => false,
+        'allow_critical_role_changes' => true,
     ],
 
     'account_security' => [
-        // Owner approval is required before any administrative action is enabled.
-        'allowed_administrative_actions' => [],
+        'allowed_administrative_actions' => [
+            'administrative_recovery',
+            'force_password_change',
+            'revoke_sessions',
+            'disable',
+            'enable',
+        ],
     ],
 
     'recent_authentication' => [

@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use RuntimeException;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -50,7 +51,7 @@ final class CanonicalRevalidationTest extends TestCase
             ]);
     }
 
-    public function test_revalidation_reflects_current_admin_panel_entitlement(): void
+    public function test_revalidation_reflects_current_explicit_admin_panel_entitlement(): void
     {
         Role::findOrCreate('admin', 'web');
         $user = $this->linkedUser();
@@ -58,9 +59,10 @@ final class CanonicalRevalidationTest extends TestCase
         $this->revalidate($user)->assertOk()->assertJsonPath('role', 'member');
 
         $user->assignRole('admin');
+        $user->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
         $this->revalidate($user)->assertOk()->assertJsonPath('role', 'admin');
 
-        $user->syncRoles([]);
+        $user->revokePermissionTo('admin.access');
         $this->revalidate($user)->assertOk()->assertJsonPath('role', 'member');
     }
 
@@ -183,13 +185,16 @@ final class CanonicalRevalidationTest extends TestCase
             'must_change_password' => false,
         ]);
 
-        return User::factory()->create([
+        $user = User::factory()->create([
             'employee_id' => $employeeId,
             'employee_profile_id' => $employee->id,
             'account_status' => AccountStatus::Active,
             'password' => Hash::make('canonical-user-password'),
             'security_version' => 1,
         ])->load('employeeProfile');
+        $user->givePermissionTo(Permission::findOrCreate('app.bid.access', 'web'));
+
+        return $user;
     }
 
     private function revalidate(User $user)

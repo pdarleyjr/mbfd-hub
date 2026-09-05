@@ -5,33 +5,51 @@ declare(strict_types=1);
 namespace Tests\Unit\Models;
 
 use App\Models\User;
-use Illuminate\Support\Collection;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class UserAdminPanelEntitlementTest extends TestCase
 {
-    public function test_current_admin_panel_entitlement_uses_the_existing_panel_roles_and_is_not_sticky(): void
+    use RefreshDatabase;
+
+    public function test_current_admin_panel_entitlement_uses_explicit_permission_and_is_not_sticky(): void
     {
-        $user = new User;
-        $user->setRelation('roles', new Collection([
-            new Role(['name' => 'training_viewer', 'guard_name' => 'web']),
-        ]));
+        Permission::findOrCreate('admin.access', 'web');
+        $user = User::factory()->create();
+        $user->givePermissionTo('admin.access');
 
         $this->assertTrue($user->hasCurrentAdminPanelEntitlement());
 
-        $user->setRelation('roles', new Collection);
+        $user->revokePermissionTo('admin.access');
 
         $this->assertFalse($user->hasCurrentAdminPanelEntitlement());
     }
 
-    public function test_non_admin_panel_roles_do_not_grant_bid_admin_entitlement(): void
+    public function test_admin_permission_does_not_grant_bid_entitlement(): void
     {
-        $user = new User;
-        $user->setRelation('roles', new Collection([
-            new Role(['name' => 'workgroup_admin', 'guard_name' => 'web']),
-        ]));
+        Permission::findOrCreate('admin.access', 'web');
+        Permission::findOrCreate('app.bid.access', 'web');
+        $user = User::factory()->create();
+        $user->givePermissionTo('admin.access');
+
+        $this->assertTrue($user->hasCurrentAdminPanelEntitlement());
+        $this->assertFalse($user->hasCurrentBidEntitlement());
+    }
+
+    public function test_ordinary_role_permissions_cannot_replace_direct_entitlements(): void
+    {
+        $adminAccess = Permission::findOrCreate('admin.access', 'web');
+        $mediaAccess = Permission::findOrCreate('app.media_control.access', 'web');
+        $bidAccess = Permission::findOrCreate('app.bid.access', 'web');
+        $role = Role::findOrCreate('admin', 'web');
+        $role->givePermissionTo([$adminAccess, $mediaAccess, $bidAccess]);
+        $user = User::factory()->create();
+        $user->assignRole($role);
 
         $this->assertFalse($user->hasCurrentAdminPanelEntitlement());
+        $this->assertFalse($user->hasCurrentMediaControlEntitlement());
+        $this->assertFalse($user->hasCurrentBidEntitlement());
     }
 }

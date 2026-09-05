@@ -36,6 +36,9 @@ final class IdentityRevalidationController extends Controller
         }
 
         try {
+            if (! $user->hasCurrentBidEntitlement()) {
+                return response()->json(['error' => 'invalid_identity'], 401);
+            }
             $role = $user->hasCurrentAdminPanelEntitlement() ? 'admin' : 'member';
         } catch (Throwable) {
             Log::info('bid.federation.revalidation', [

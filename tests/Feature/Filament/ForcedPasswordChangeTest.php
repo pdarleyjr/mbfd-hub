@@ -103,6 +103,7 @@ final class ForcedPasswordChangeTest extends TestCase
         ]);
         $employee = $this->linkEmployee($user, 'PASSWORD-CHANGE-100', 'employee-password-must-not-change');
         $user->assignRole(Role::findOrCreate('admin', 'web'));
+        $user->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate('admin.access', 'web'));
 
         $this->actingAsCanonicalUser($user);
         $this->bindCanonicalSessionToLivewireTestRequests();
@@ -240,6 +241,7 @@ final class ForcedPasswordChangeTest extends TestCase
             'password' => Hash::make('current-password'),
         ]);
         $user->assignRole(Role::findOrCreate('admin', 'web'));
+        $user->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate('admin.access', 'web'));
 
         $this->actingAsCanonicalUser($user);
         $this->bindCanonicalSessionToLivewireTestRequests();
@@ -391,12 +393,14 @@ final class ForcedPasswordChangeTest extends TestCase
     {
         $user = User::factory()->create(['must_change_password' => false]);
         $user->assignRole(Role::findOrCreate('admin', 'web'));
+        $user->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate('admin.access', 'web'));
 
         $snapshot = $this->livewireSnapshotFrom(
             $this->actingAs($user)->get('/admin')->assertOk(),
         );
 
         $user->syncRoles([Role::findOrCreate('training_admin', 'web')]);
+        $user->revokePermissionTo('admin.access');
 
         $this->actingAs($user->fresh())
             ->withHeader('X-Livewire', 'true')
@@ -494,6 +498,10 @@ final class ForcedPasswordChangeTest extends TestCase
     private function grantPanelAccess(User $user, string $role): void
     {
         $user->assignRole(Role::findOrCreate($role, 'web'));
+
+        if ($role === 'admin') {
+            $user->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate('admin.access', 'web'));
+        }
 
         if ($role !== 'workgroup_member') {
             return;

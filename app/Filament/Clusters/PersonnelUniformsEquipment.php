@@ -22,6 +22,9 @@ class PersonnelUniformsEquipment extends Cluster
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false;
+        $user = auth()->user();
+
+        return ($user?->can('admin.personnel.view') ?? false)
+            || ($user?->can('admin.equipment.view') ?? false);
     }
 }
