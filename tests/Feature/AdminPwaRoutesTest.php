@@ -20,12 +20,32 @@ class AdminPwaRoutesTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertHeader('Content-Type', 'application/javascript; charset=utf-8');
+            ->assertHeader('Content-Type', 'application/javascript; charset=utf-8')
+            ->assertHeader('Service-Worker-Allowed', '/admin/');
 
         $this->assertStringContainsString(
             "addEventListener('install'",
             (string) file_get_contents(public_path('admin-pwa/service-worker.js')),
         );
+    }
+
+    public function test_background_pwa_asset_requests_do_not_replace_the_previous_admin_url(): void
+    {
+        $previousAdminUrl = url('/admin/department-updates/create');
+
+        foreach ([
+            '/admin-pwa/manifest.webmanifest',
+            '/admin/service-worker.js',
+            '/admin-pwa/service-worker.js',
+        ] as $assetPath) {
+            $response = $this
+                ->withSession(['_previous.url' => $previousAdminUrl])
+                ->get($assetPath);
+
+            $response
+                ->assertOk()
+                ->assertSessionHas('_previous.url', $previousAdminUrl);
+        }
     }
 
     public function test_queue_status_requires_permission_except_for_the_central_super_admin_bypass(): void

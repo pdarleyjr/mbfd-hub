@@ -13,6 +13,13 @@ final class CreateDepartmentUpdate extends CreateRecord
 {
     protected static string $resource = DepartmentUpdateResource::class;
 
+    public function mount(): void
+    {
+        parent::mount();
+
+        $this->previousUrl = DepartmentUpdateResource::getUrl();
+    }
+
     /** @param array<string, mixed> $data @return array<string, mixed> */
     protected function mutateFormDataBeforeCreate(array $data): array
     {

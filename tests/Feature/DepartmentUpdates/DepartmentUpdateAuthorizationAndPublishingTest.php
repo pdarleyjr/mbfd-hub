@@ -122,6 +122,16 @@ final class DepartmentUpdateAuthorizationAndPublishingTest extends TestCase
             ->assertHasFormErrors(['status']);
     }
 
+    public function test_create_cancel_fallback_never_targets_a_background_pwa_asset(): void
+    {
+        $admin = $this->adminWithDepartmentUpdatePermissions(manage: true);
+        $this->actingAs($admin);
+        session()->setPreviousUrl(url('/admin/service-worker.js'));
+
+        Livewire::test(CreateDepartmentUpdate::class)
+            ->assertSet('previousUrl', DepartmentUpdateResource::getUrl());
+    }
+
     public function test_view_only_user_cannot_forge_mutating_table_actions(): void
     {
         $viewer = $this->adminWithDepartmentUpdatePermissions(manage: false);

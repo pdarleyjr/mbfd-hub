@@ -51,6 +51,7 @@ use App\Http\Controllers\Workgroup\FileDownloadController;
 use App\Http\Controllers\Workgroup\WorkgroupReportController;
 use App\Http\Middleware\EnsureEmployeeAuthenticated;
 use App\Http\Middleware\EnsureVideoConferenceHealthAccess;
+use App\Http\Middleware\PreventPreviousUrlStorage;
 use App\Support\Workgroups\WorkgroupReportSessionResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -272,7 +273,7 @@ Route::get('/admin-pwa/manifest.webmanifest', function () {
         'Content-Type' => 'application/manifest+json',
         'Cache-Control' => 'public, max-age=300, must-revalidate',
     ]);
-});
+})->middleware(PreventPreviousUrlStorage::class);
 
 // Keep the worker URL inside its intended scope. Production web servers may
 // serve /admin-pwa/* directly and bypass Laravel's Service-Worker-Allowed
@@ -283,7 +284,7 @@ Route::get('/admin/service-worker.js', function () {
         'Service-Worker-Allowed' => '/admin/',
         'Cache-Control' => 'no-cache, must-revalidate',
     ]);
-});
+})->middleware(PreventPreviousUrlStorage::class);
 
 Route::get('/admin/pulse/queues.json', QueueStatusController::class)
     ->middleware(['auth', 'throttle:60,1'])
@@ -295,7 +296,7 @@ Route::get('/admin-pwa/service-worker.js', function () {
         'Service-Worker-Allowed' => '/admin/',
         'Cache-Control' => 'no-cache, must-revalidate',
     ]);
-});
+})->middleware(PreventPreviousUrlStorage::class);
 // --- End Admin Desktop-PWA -------------------------------------------------
 
 // Daily Checkout SPA - catch-all for React Router
