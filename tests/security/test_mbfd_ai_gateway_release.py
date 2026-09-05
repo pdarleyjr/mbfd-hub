@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 MODULE_PATH = (
     Path(__file__).parents[2] / "scripts" / "operations" / "mbfd_ai_gateway_release.py"
@@ -76,6 +77,22 @@ class TestSourceReleaseGuard(unittest.TestCase):
             state_file=self.fixture.state_path(),
             allow_initialize=allow_initialize,
         )
+
+    def test_git_calls_trust_only_the_candidate_repository(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="", stderr=""
+        )
+        with mock.patch.object(
+            release.subprocess, "run", return_value=completed
+        ) as run:
+            release._run_git(self.fixture.operations, "status", "--porcelain=v1")
+
+        command = run.call_args.args[0]
+        self.assertEqual(
+            command[:3],
+            ["git", "-c", f"safe.directory={self.fixture.root}"],
+        )
+        self.assertNotIn("safe.directory=*", command)
 
     def test_initial_convergence_requires_explicit_flag(self) -> None:
         with self.assertRaisesRegex(

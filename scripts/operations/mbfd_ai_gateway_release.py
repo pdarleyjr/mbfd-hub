@@ -44,9 +44,19 @@ class SourceRelease:
     artifacts: Mapping[str, str]
 
 
+def _git_repository_boundary(path: Path) -> Path:
+    """Return the nearest repository root without asking Git to trust it first."""
+    resolved = path.resolve()
+    for candidate in (resolved, *resolved.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return resolved
+
+
 def _run_git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
+    safe_directory = _git_repository_boundary(repo)
     result = subprocess.run(
-        ["git", *args],
+        ["git", "-c", f"safe.directory={safe_directory}", *args],
         cwd=repo,
         check=False,
         capture_output=True,
