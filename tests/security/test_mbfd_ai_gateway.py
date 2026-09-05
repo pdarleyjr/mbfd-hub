@@ -276,12 +276,29 @@ class TestConfiguration(unittest.TestCase):
             (root / "api-key").write_text(
                 "deployment-test-credential", encoding="utf-8"
             )
+            (root / "sports-intelligence-api-key").write_text(
+                "deployment-test-sports-credential", encoding="utf-8"
+            )
             path = root / "gateway.json"
             path.write_text(json.dumps(deployment), encoding="utf-8")
             config = gateway.load_config(path, {"CREDENTIALS_DIRECTORY": str(root)})
         self.assertEqual(config.listeners, ("127.0.0.1", "172.20.11.1"))
         self.assertEqual(
             config.capabilities["mbfd-ops-summary"].cold_start.mode, "reject_if_cold"
+        )
+        self.assertEqual(
+            config.consumers["sports-intelligence"].allowed_capabilities,
+            frozenset({"prm-sports-research"}),
+        )
+        self.assertEqual(
+            config.capabilities["prm-sports-research"].backend_id,
+            "ollama-prm-sports",
+        )
+        self.assertEqual(config.capabilities["prm-sports-research"].model, "qwen3.5:9b")
+        self.assertEqual(config.capabilities["prm-sports-research"].concurrency, 1)
+        self.assertEqual(
+            config.capabilities["prm-sports-research"].heavy_workload,
+            "prm-sports-medium",
         )
         self.assertNotIn("mbfd-bid", config.consumers)
         self.assertNotIn("mbfd-bid-analysis", config.capabilities)
@@ -292,6 +309,7 @@ class TestConfiguration(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertNotIn("LoadCredential=mbfd-bid:", unit)
+        self.assertIn("LoadCredential=sports-intelligence-api-key:", unit)
         bid_template = json.loads(
             (MODULE_PATH.parent / "mbfd-bid-analysis.template.json").read_text(
                 encoding="utf-8"
