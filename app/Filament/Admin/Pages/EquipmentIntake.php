@@ -14,33 +14,50 @@ class EquipmentIntake extends Page implements HasForms
     use InteractsWithForms;
 
     protected static ?string $navigationIcon = 'heroicon-o-camera';
+
     protected static ?string $navigationLabel = 'Equipment Intake';
+
     protected static ?string $title = 'Equipment Intake';
+
     protected static ?string $slug = 'equipment-intake';
+
     protected static ?string $navigationGroup = 'Inventory & Logistics';
+
     protected static ?int $navigationSort = 10;
 
     protected static string $view = 'filament.admin.pages.equipment-intake';
 
     // Mode A: AI Camera Scan form state
     public ?string $scan_brand = null;
+
     public ?string $scan_model = null;
+
     public ?string $scan_serial = null;
+
     public ?string $scan_location = null;
+
     public ?string $scan_notes = null;
+
     public ?string $scan_type = 'hardware';  // hardware | accessory | consumable | component
+
     public ?string $scan_item_name = null;   // AI-identified descriptive name
+
     public ?string $scan_category = null;    // AI-identified category (Saw, Fan, Rescue Tool, etc.)
+
     public bool $scan_processing = false;
+
     public ?string $scan_error = null;
+
     public ?string $scan_success = null;
 
     // Mode B: Bulk import state
     public array $bulk_items = [];
+
     public ?string $bulk_location = null;
 
     // Mode C: AI Bulk Import state
     public array $ai_bulk_items = [];   // each row: {thumbnail, brand, model, serial, category, notes, location_id, processing, error}
+
     public ?string $ai_bulk_global_location = null;
 
     // Shared: new location creation
@@ -49,11 +66,11 @@ class EquipmentIntake extends Page implements HasForms
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
-        return $user->hasRole(['super_admin', 'admin', 'logistics_admin']);
+        return $user->can('admin.equipment.manage');
     }
 
     public function mount(): void
@@ -75,8 +92,8 @@ class EquipmentIntake extends Page implements HasForms
         $this->scan_item_name = $item_name ?: null;
         $this->scan_category = $category ?: null;
         // Only set notes if AI found something useful and field is currently empty
-        if ($notes && !$this->scan_notes) {
-            $this->scan_notes = 'AI: ' . $notes;
+        if ($notes && ! $this->scan_notes) {
+            $this->scan_notes = 'AI: '.$notes;
         }
         $this->scan_error = null;
         $this->scan_processing = false;
@@ -99,11 +116,21 @@ class EquipmentIntake extends Page implements HasForms
     public function approveAndSaveWithData(string $brand = '', string $model = '', string $serial = '', string $item_name = '', string $category = ''): void
     {
         // Override PHP properties with the values passed from Alpine
-        if ($brand)     $this->scan_brand     = $brand;
-        if ($model)     $this->scan_model      = $model;
-        if ($serial)    $this->scan_serial     = $serial;
-        if ($item_name) $this->scan_item_name  = $item_name;
-        if ($category)  $this->scan_category   = $category;
+        if ($brand) {
+            $this->scan_brand = $brand;
+        }
+        if ($model) {
+            $this->scan_model = $model;
+        }
+        if ($serial) {
+            $this->scan_serial = $serial;
+        }
+        if ($item_name) {
+            $this->scan_item_name = $item_name;
+        }
+        if ($category) {
+            $this->scan_category = $category;
+        }
 
         // Now call the standard save flow
         $this->approveAndSave();
@@ -120,20 +147,21 @@ class EquipmentIntake extends Page implements HasForms
                 ->body('Please select a location before saving.')
                 ->danger()
                 ->send();
+
             return;
         }
 
         $snipeIt = app(SnipeItService::class);
 
         $result = $snipeIt->createAsset([
-            'brand'       => $this->scan_brand,
-            'model'       => $this->scan_model,
-            'serial'      => $this->scan_serial,
+            'brand' => $this->scan_brand,
+            'model' => $this->scan_model,
+            'serial' => $this->scan_serial,
             'location_id' => $this->scan_location,
-            'notes'       => $this->scan_notes,
-            'category'    => $this->scan_category ?: 'General',
-            'item_name'   => $this->scan_item_name,
-            'scan_type'   => $this->scan_type ?? 'hardware',
+            'notes' => $this->scan_notes,
+            'category' => $this->scan_category ?: 'General',
+            'item_name' => $this->scan_item_name,
+            'scan_type' => $this->scan_type ?? 'hardware',
         ]);
 
         if ($result['success']) {
@@ -187,10 +215,11 @@ class EquipmentIntake extends Page implements HasForms
                 ->body('Please select a location for the bulk import.')
                 ->danger()
                 ->send();
+
             return;
         }
 
-        $validItems = array_filter($this->bulk_items, fn($item) => !empty($item['name']));
+        $validItems = array_filter($this->bulk_items, fn ($item) => ! empty($item['name']));
 
         if (empty($validItems)) {
             Notification::make()
@@ -198,6 +227,7 @@ class EquipmentIntake extends Page implements HasForms
                 ->body('Please add at least one item with a name.')
                 ->warning()
                 ->send();
+
             return;
         }
 
@@ -209,31 +239,31 @@ class EquipmentIntake extends Page implements HasForms
         $consumableCategories = ['Consumable', 'Medical', 'Medical Supply'];
         $assetPayloads = [];
         foreach ($validItems as $item) {
-            $qty          = max(1, (int) ($item['quantity'] ?? 1));
+            $qty = max(1, (int) ($item['quantity'] ?? 1));
             $categoryName = $item['category'] ?? 'General';
             $isConsumable = in_array($categoryName, $consumableCategories, true);
 
             if ($isConsumable) {
                 // One consumable entry with qty
                 $assetPayloads[] = [
-                    'name'        => $item['name'],
-                    'model'       => $item['name'],
-                    'category'    => $categoryName,
-                    'qty'         => $qty,
-                    'notes'       => $item['notes'] ?? '',
-                    'serial'      => null,
+                    'name' => $item['name'],
+                    'model' => $item['name'],
+                    'category' => $categoryName,
+                    'qty' => $qty,
+                    'notes' => $item['notes'] ?? '',
+                    'serial' => null,
                     'location_id' => $this->bulk_location,
                 ];
             } else {
                 // Hardware: create one asset per unit
                 for ($i = 0; $i < $qty; $i++) {
                     $assetPayloads[] = [
-                        'name'        => $item['name'],
-                        'model'       => $item['name'],
-                        'category'    => $categoryName,
-                        'qty'         => 1,
-                        'notes'       => $item['notes'] ?? '',
-                        'serial'      => null,
+                        'name' => $item['name'],
+                        'model' => $item['name'],
+                        'category' => $categoryName,
+                        'qty' => 1,
+                        'notes' => $item['notes'] ?? '',
+                        'serial' => null,
                         'location_id' => $this->bulk_location,
                     ];
                 }
@@ -253,7 +283,7 @@ class EquipmentIntake extends Page implements HasForms
         if ($successCount > 0) {
             Notification::make()
                 ->title('Bulk Import Complete')
-                ->body("{$successCount} item(s) logged to Snipe-IT." . ($failCount > 0 ? " {$failCount} failed." : ''))
+                ->body("{$successCount} item(s) logged to Snipe-IT.".($failCount > 0 ? " {$failCount} failed." : ''))
                 ->success()
                 ->send();
         }
@@ -299,23 +329,20 @@ class EquipmentIntake extends Page implements HasForms
      * Called from Alpine.js when the AI has finished analyzing one image in bulk mode.
      * Adds a new row to the ai_bulk_items array with the returned data.
      *
-     * @param string $brand
-     * @param string $model
-     * @param string $serial
-     * @param string $thumbnail  data-URI thumbnail of the image
-     * @param int    $index      which slot to update (-1 = append new row)
+     * @param  string  $thumbnail  data-URI thumbnail of the image
+     * @param  int  $index  which slot to update (-1 = append new row)
      */
     public function aiBulkAddResult(string $brand, string $model, string $serial, string $thumbnail, int $index = -1): void
     {
         $row = [
-            'thumbnail'   => $thumbnail,
-            'brand'       => $brand !== 'Unknown' ? $brand : '',
-            'model'       => $model !== 'Unknown' ? $model : '',
-            'serial'      => $serial !== 'Unknown' ? $serial : '',
-            'category'    => 'General',
-            'notes'       => '',
+            'thumbnail' => $thumbnail,
+            'brand' => $brand !== 'Unknown' ? $brand : '',
+            'model' => $model !== 'Unknown' ? $model : '',
+            'serial' => $serial !== 'Unknown' ? $serial : '',
+            'category' => 'General',
+            'notes' => '',
             'location_id' => $this->ai_bulk_global_location ?? '',
-            'error'       => null,
+            'error' => null,
         ];
 
         if ($index >= 0 && isset($this->ai_bulk_items[$index])) {
@@ -331,14 +358,14 @@ class EquipmentIntake extends Page implements HasForms
     public function aiBulkRowError(string $message, int $index = -1): void
     {
         $row = [
-            'thumbnail'   => '',
-            'brand'       => '',
-            'model'       => '',
-            'serial'      => '',
-            'category'    => 'General',
-            'notes'       => '',
+            'thumbnail' => '',
+            'brand' => '',
+            'model' => '',
+            'serial' => '',
+            'category' => 'General',
+            'notes' => '',
             'location_id' => $this->ai_bulk_global_location ?? '',
-            'error'       => $message,
+            'error' => $message,
         ];
 
         if ($index >= 0 && isset($this->ai_bulk_items[$index])) {
@@ -353,10 +380,13 @@ class EquipmentIntake extends Page implements HasForms
      */
     public function applyGlobalLocationToBulk(): void
     {
-        if (empty($this->ai_bulk_global_location)) return;
+        if (empty($this->ai_bulk_global_location)) {
+            return;
+        }
 
         $this->ai_bulk_items = array_map(function ($item) {
             $item['location_id'] = $this->ai_bulk_global_location;
+
             return $item;
         }, $this->ai_bulk_items);
     }
@@ -376,7 +406,7 @@ class EquipmentIntake extends Page implements HasForms
     public function submitAiBulkItems(): void
     {
         $validItems = array_filter($this->ai_bulk_items, function ($item) {
-            return !empty($item['brand']) || !empty($item['model']) || !empty($item['serial']);
+            return ! empty($item['brand']) || ! empty($item['model']) || ! empty($item['serial']);
         });
 
         if (empty($validItems)) {
@@ -385,6 +415,7 @@ class EquipmentIntake extends Page implements HasForms
                 ->body('Please scan some equipment photos first.')
                 ->warning()
                 ->send();
+
             return;
         }
 
@@ -403,25 +434,26 @@ class EquipmentIntake extends Page implements HasForms
                 ->body('Please assign a location to all items before submitting. Use "Apply to All" for bulk assignment.')
                 ->danger()
                 ->send();
+
             return;
         }
 
         $snipeIt = app(SnipeItService::class);
 
-        $assetPayloads = array_map(fn($item) => [
-            'brand'       => $item['brand'] ?: 'Unknown',
-            'model'       => $item['model'] ?: ($item['brand'] ?: 'Unknown Equipment'),
-            'serial'      => $item['serial'] ?: null,
-            'category'    => $item['category'] ?: 'General',
-            'notes'       => $item['notes'] ?? '',
+        $assetPayloads = array_map(fn ($item) => [
+            'brand' => $item['brand'] ?: 'Unknown',
+            'model' => $item['model'] ?: ($item['brand'] ?: 'Unknown Equipment'),
+            'serial' => $item['serial'] ?: null,
+            'category' => $item['category'] ?: 'General',
+            'notes' => $item['notes'] ?? '',
             'location_id' => $item['location_id'],
-            'qty'         => 1,
+            'qty' => 1,
         ], array_values($validItems));
 
         $results = $snipeIt->bulkCreateAssets($assetPayloads);
 
         $successCount = 0;
-        $failCount    = 0;
+        $failCount = 0;
         foreach ($results as $result) {
             if ($result['success']) {
                 $successCount++;
@@ -434,7 +466,7 @@ class EquipmentIntake extends Page implements HasForms
         if ($successCount > 0) {
             Notification::make()
                 ->title('AI Bulk Import Complete')
-                ->body("{$successCount} item(s) logged to Snipe-IT." . ($failCount > 0 ? " {$failCount} failed — check logs." : ''))
+                ->body("{$successCount} item(s) logged to Snipe-IT.".($failCount > 0 ? " {$failCount} failed — check logs." : ''))
                 ->success()
                 ->send();
         } else {
@@ -474,6 +506,7 @@ class EquipmentIntake extends Page implements HasForms
                 ->body('Please enter a name for the new location.')
                 ->warning()
                 ->send();
+
             return;
         }
 

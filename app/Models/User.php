@@ -91,6 +91,9 @@ class User extends Authenticatable implements FilamentUser
         'must_change_password',
         'notification_preferences',
         'employee_id',
+        'employee_profile_id',
+        'account_status',
+        'last_login_at',
     ];
 
     /**
@@ -118,6 +121,7 @@ class User extends Authenticatable implements FilamentUser
             'security_version' => 'integer',
             'must_change_password' => 'boolean',
             'notification_preferences' => 'array',
+            'last_login_at' => 'datetime',
         ];
     }
 
@@ -142,6 +146,12 @@ class User extends Authenticatable implements FilamentUser
     public function persistentLoginCredentials(): HasMany
     {
         return $this->hasMany(PersistentLoginCredential::class);
+    }
+
+    /** @return HasMany<UserNotificationSubscription, $this> */
+    public function notificationSubscriptions(): HasMany
+    {
+        return $this->hasMany(UserNotificationSubscription::class);
     }
 
     /**
@@ -262,12 +272,25 @@ class User extends Authenticatable implements FilamentUser
      */
     public function hasCurrentAdminPanelEntitlement(): bool
     {
-        return $this->hasAnyRole(self::ADMIN_PANEL_ACCESS_ROLES);
+        return $this->hasRole('super_admin') || $this->hasDirectWebPermission('admin.access');
     }
 
     public function hasCurrentMediaControlEntitlement(): bool
     {
-        return $this->hasAnyRole(self::MEDIA_CONTROL_ACCESS_ROLES);
+        return $this->hasRole('super_admin') || $this->hasDirectWebPermission('app.media_control.access');
+    }
+
+    public function hasCurrentBidEntitlement(): bool
+    {
+        return $this->hasRole('super_admin') || $this->hasDirectWebPermission('app.bid.access');
+    }
+
+    public function hasDirectWebPermission(string $permission): bool
+    {
+        return $this->permissions()
+            ->where('guard_name', 'web')
+            ->where('name', $permission)
+            ->exists();
     }
 
     // Relationships

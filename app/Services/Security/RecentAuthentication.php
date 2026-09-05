@@ -7,6 +7,7 @@ namespace App\Services\Security;
 use App\Enums\Security\RecentAuthenticationAction;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
+use Illuminate\Contracts\Session\Session;
 use Illuminate\Http\Request;
 
 final class RecentAuthentication
@@ -43,5 +44,13 @@ final class RecentAuthentication
             : null;
 
         return $this->isSatisfied($authenticatedAt, $action);
+    }
+
+    public function isSatisfiedForSession(Session $session, RecentAuthenticationAction $action): bool
+    {
+        return $this->isSatisfied(
+            $session->get((string) config('security.recent_authentication.session_key')),
+            $action,
+        );
     }
 }

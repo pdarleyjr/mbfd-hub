@@ -146,7 +146,7 @@ class ApparatusServiceTicketAdminTest extends TestCase
         $this->assertFalse(Gate::forUser($training)->allows('viewAny', ApparatusServiceTicket::class));
         $this->assertFalse(ApparatusServiceTicketResource::canViewAny());
         $this->get(ApparatusServiceTicketResource::getUrl('index'))
-            ->assertRedirect('/training');
+            ->assertForbidden();
     }
 
     private function ticket(string $status, string $title, string $priority): ApparatusServiceTicket

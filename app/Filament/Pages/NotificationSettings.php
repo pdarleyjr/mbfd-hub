@@ -3,7 +3,8 @@
 namespace App\Filament\Pages;
 
 use App\Models\User;
-use Filament\Forms\Components\Grid;
+use App\Models\UserNotificationSubscription;
+use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -35,7 +36,23 @@ class NotificationSettings extends Page implements HasForms
         /** @var User|null $user */
         $user = Auth::user();
 
-        $this->form->fill($user?->getResolvedNotificationPreferences() ?? User::DEFAULT_NOTIFICATION_PREFERENCES);
+        $subscriptions = $user instanceof User
+            ? $user->notificationSubscriptions()->get()->keyBy('event_key')
+            : collect();
+        $state = collect(array_keys(User::notificationPreferenceDefinitions()))
+            ->mapWithKeys(function (string $key) use ($subscriptions): array {
+                $subscription = $subscriptions->get($key);
+
+                return [$key => [
+                    'database' => $subscription instanceof UserNotificationSubscription
+                        && $subscription->database_enabled,
+                    'webpush' => $subscription instanceof UserNotificationSubscription
+                        && $subscription->webpush_enabled,
+                    'email' => $subscription instanceof UserNotificationSubscription
+                        && $subscription->email_enabled,
+                ]];
+            })->all();
+        $this->form->fill($state);
     }
 
     public static function canAccess(): bool
@@ -49,22 +66,15 @@ class NotificationSettings extends Page implements HasForms
 
         return $form
             ->schema([
-                Grid::make([
-                    'default' => 1,
-                    'xl' => 2,
-                ])
-                    ->schema(
-                        collect($definitions)
-                            ->map(
-                                fn (array $definition, string $key): Toggle => Toggle::make($key)
-                                    ->label($definition['label'])
-                                    ->helperText($definition['description'])
-                                    ->default(User::DEFAULT_NOTIFICATION_PREFERENCES[$key] ?? true)
-                                    ->inline(false)
-                            )
-                            ->values()
-                            ->all()
-                    ),
+                ...collect($definitions)->map(
+                    fn (array $definition, string $key): Fieldset => Fieldset::make($definition['label'])
+                        ->schema([
+                            Toggle::make("{$key}.database")->label('Admin inbox'),
+                            Toggle::make("{$key}.webpush")->label('Web push'),
+                            Toggle::make("{$key}.email")->label('City email'),
+                        ])
+                        ->columns(3),
+                )->values()->all(),
             ])
             ->statePath('data');
     }
@@ -78,18 +88,19 @@ class NotificationSettings extends Page implements HasForms
 
         $data = $this->form->getState();
 
-        $preferences = collect(array_keys(User::DEFAULT_NOTIFICATION_PREFERENCES))
-            ->mapWithKeys(fn (string $key): array => [$key => (bool) ($data[$key] ?? true)])
-            ->all();
-
-        $user->forceFill([
-            'notification_preferences' => $preferences,
-        ])->save();
+        foreach (array_keys(User::notificationPreferenceDefinitions()) as $key) {
+            $channels = (array) ($data[$key] ?? []);
+            $user->notificationSubscriptions()->updateOrCreate(['event_key' => $key], [
+                'database_enabled' => (bool) ($channels['database'] ?? false),
+                'webpush_enabled' => (bool) ($channels['webpush'] ?? false),
+                'email_enabled' => (bool) ($channels['email'] ?? false),
+            ]);
+        }
 
         Notification::make()
             ->success()
             ->title('Notification preferences saved')
-            ->body('Submission alerts for this account have been updated.')
+            ->body('Each delivery channel has been updated independently.')
             ->send();
     }
 

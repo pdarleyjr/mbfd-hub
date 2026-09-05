@@ -38,7 +38,11 @@ class CredentialsController extends Controller
             ->where('employee_id', $employeeId)
             ->first();
 
-        if ($employee === null || ! Hash::check($password, $employee->password)) {
+        $user = $employee?->user;
+        if ($employee === null
+            || ! $user instanceof User
+            || ! $user->hasCurrentBidEntitlement()
+            || ! Hash::check($password, $employee->password)) {
             Log::info('bid.legacy_verify_credentials', [
                 'result' => 'failure',
                 'category' => 'invalid_credentials',

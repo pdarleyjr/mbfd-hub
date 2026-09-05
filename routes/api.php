@@ -28,6 +28,10 @@ use App\Http\Controllers\Workgroup\WorkgroupAIController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+Route::post('/v2/email/inbound', \App\Http\Controllers\Api\InboundEmailController::class)
+    ->middleware('throttle:120,1')
+    ->name('api.v2.email.inbound');
+
 Route::get('/me/context', AuthenticatedMemberContextController::class)
     ->middleware(['auth:sanctum', 'throttle:120,1'])
     ->name('api.me.context');

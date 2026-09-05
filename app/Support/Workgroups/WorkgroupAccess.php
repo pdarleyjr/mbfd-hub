@@ -19,7 +19,9 @@ final class WorkgroupAccess
 {
     public function isGlobalViewer(User $user): bool
     {
-        return $user->hasRole('super_admin') || $user->can('workgroup.global_access');
+        return $user->hasRole('super_admin')
+            || $user->can('admin.workgroups.view')
+            || $user->can('workgroup.global_access');
     }
 
     public function canEnterPanel(User $user): bool
@@ -38,7 +40,7 @@ final class WorkgroupAccess
 
     public function canManageWorkgroup(User $user, Workgroup $workgroup): bool
     {
-        if ($user->hasRole('super_admin')) {
+        if ($user->hasRole('super_admin') || $user->can('admin.workgroups.manage')) {
             return true;
         }
 
@@ -51,6 +53,7 @@ final class WorkgroupAccess
     public function canManageAnyWorkgroup(User $user): bool
     {
         return $user->hasRole('super_admin')
+            || $user->can('admin.workgroups.manage')
             || $this->activeMembershipsFor($user)
                 ->whereIn('role', ['admin', 'facilitator'])
                 ->exists();
@@ -279,7 +282,7 @@ final class WorkgroupAccess
             return $query->whereRaw('1 = 0');
         }
 
-        if ($user->hasRole('super_admin')) {
+        if ($user->hasRole('super_admin') || $user->can('admin.workgroups.manage')) {
             return $query;
         }
 

@@ -15,8 +15,7 @@ final class AccountSecurityPolicy
             return $actor->is($target);
         }
 
-        if ($actor->is($target)
-            || $target->hasAnyRole((array) config('security.critical_roles', []))) {
+        if ($actor->is($target)) {
             return false;
         }
 

@@ -20,9 +20,13 @@ class ApparatusServiceTicketSideEffectService
         $this->forgetReadModels($ticket);
 
         $recipients = User::query()
-            ->whereHas('roles', fn ($query) => $query->whereIn('name', ['super_admin', 'admin', 'logistics_admin']))
-            ->get()
-            ->filter(fn (User $user): bool => $user->wantsNotificationPreference(User::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS));
+            ->whereHas('notificationSubscriptions', fn ($query) => $query
+                ->where('event_key', User::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS)
+                ->where(fn ($channels) => $channels
+                    ->where('database_enabled', true)
+                    ->orWhere('webpush_enabled', true)
+                    ->orWhere('email_enabled', true)))
+            ->get();
 
         if ($recipients->isNotEmpty()) {
             Notification::send($recipients, new NewSubmissionNotification(

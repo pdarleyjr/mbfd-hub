@@ -58,6 +58,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::before(function (User $user, string $ability, array $arguments): ?bool {
+            if ($user->hasRole('super_admin')) {
+                return true;
+            }
+
+            return app(\App\Services\Security\AdminCapabilityGate::class)
+                ->decision($user, $ability, $arguments);
+        });
+
         RateLimiter::for('conference-tokens', function (Request $request): array {
             $user = $request->user();
             $employeeId = $user instanceof User ? $user->employee_profile_id : null;
@@ -93,9 +102,10 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        // Allow super_admin users to access the Laravel Pulse dashboard
+        // Super Administrators bypass this Gate; delegated system viewers use
+        // the same normalized permission as the Filament page and navigation.
         Gate::define('viewPulse', function (\App\Models\User $user) {
-            return $user->hasRole('super_admin');
+            return $user->hasDirectWebPermission('admin.system.view');
         });
 
         Todo::observe(TodoObserver::class);
@@ -123,7 +133,6 @@ class AppServiceProvider extends ServiceProvider
         StationInspection::created(function (StationInspection $inspection) {
             $stationName = $inspection->station?->name ?? 'Unknown Station';
             $this->notifySubmissionRoles(
-                ['super_admin', 'logistics_admin'],
                 'station_inspection',
                 'New Station Inspection Submitted',
                 "A station inspection for {$stationName} has been submitted.",
@@ -134,7 +143,6 @@ class AppServiceProvider extends ServiceProvider
         EvaluationSubmission::created(function (EvaluationSubmission $submission) {
             $productName = $submission->candidateProduct?->name ?? 'a product';
             $this->notifySubmissionRoles(
-                ['super_admin', 'workgroup_facilitator'],
                 'evaluation_submission',
                 'New Evaluation Submitted',
                 "An evaluation for {$productName} has been submitted.",
@@ -148,7 +156,6 @@ class AppServiceProvider extends ServiceProvider
                 ?? $inspection->apparatus?->designation
                 ?? 'Unknown';
             $this->notifySubmissionRoles(
-                ['super_admin', 'logistics_admin'],
                 'apparatus_inspection',
                 'New Vehicle Inspection',
                 "A vehicle inspection for {$unitName} has been submitted.",
@@ -162,7 +169,6 @@ class AppServiceProvider extends ServiceProvider
             $shift = $submission->shift ?: 'Unknown shift';
 
             $this->notifySubmissionRoles(
-                ['super_admin', 'logistics_admin'],
                 'station_inventory_submission',
                 'New Station Inventory Submission',
                 "Station {$stationName} submitted an inventory alert for {$shift} shift by {$employeeName}.",
@@ -188,10 +194,9 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Dispatch a NewSubmissionNotification to all users with the given roles.
+     * Dispatch a NewSubmissionNotification to explicitly subscribed users.
      */
     private function notifySubmissionRoles(
-        array $roles,
         string $submissionType,
         string $title,
         string $body,
@@ -199,10 +204,18 @@ class AppServiceProvider extends ServiceProvider
     ): void {
         $preferenceKey = User::preferenceKeyForSubmissionType($submissionType);
 
-        $recipients = User::whereHas('roles', fn ($q) => $q->whereIn('name', $roles))
-            ->get()
-            ->filter(fn (User $user): bool => $preferenceKey === null || $user->wantsNotificationPreference($preferenceKey))
-            ->values();
+        if ($preferenceKey === null) {
+            return;
+        }
+
+        $recipients = User::query()
+            ->whereHas('notificationSubscriptions', fn ($query) => $query
+                ->where('event_key', $preferenceKey)
+                ->where(fn ($channels) => $channels
+                    ->where('database_enabled', true)
+                    ->orWhere('webpush_enabled', true)
+                    ->orWhere('email_enabled', true)))
+            ->get();
 
         if ($recipients->isEmpty()) {
             return;

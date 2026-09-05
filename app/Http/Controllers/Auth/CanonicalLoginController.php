@@ -111,6 +111,7 @@ final class CanonicalLoginController extends Controller
         }
 
         $request->session()->put('auth.canonical_session_id', $registered->id);
+        $user->forceFill(['last_login_at' => $issuedAt])->save();
         $request->session()->put(
             (string) config('security.recent_authentication.session_key'),
             $issuedAt->getTimestamp(),

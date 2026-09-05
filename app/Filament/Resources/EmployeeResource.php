@@ -100,6 +100,6 @@ class EmployeeResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->hasAnyRole(['super_admin', 'admin']) ?? false;
+        return auth()->user()?->can('admin.personnel.view') ?? false;
     }
 }

@@ -98,7 +98,7 @@ class OperationalFormRecordResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false;
+        return auth()->user()?->can('admin.forms.view') ?? false;
     }
 
     public static function canCreate(): bool
@@ -113,7 +113,7 @@ class OperationalFormRecordResource extends Resource
 
     public static function canDelete($record): bool
     {
-        return auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false;
+        return auth()->user()?->can('admin.forms.manage') ?? false;
     }
 
     public static function getPages(): array

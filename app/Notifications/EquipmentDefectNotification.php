@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Notifications\Channels\BudgetedMailChannel;
 use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class EquipmentDefectNotification extends Notification
@@ -24,10 +24,11 @@ class EquipmentDefectNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return [BudgetedMailChannel::class];
     }
 
-    public function toMail(object $notifiable): MailMessage
+    /** @return array{subject: string, text: string} */
+    public function toBudgetedEmail(object $notifiable): array
     {
         $subject = $this->type === 'damaged'
             ? "Equipment DAMAGED: {$this->assetName} ({$this->assetTag}) on {$this->apparatusName}"
@@ -35,27 +36,24 @@ class EquipmentDefectNotification extends Notification
 
         $statusLabel = $this->type === 'damaged' ? 'DAMAGED' : 'MISSING';
 
-        $message = (new MailMessage())
-            ->subject($subject)
-            ->greeting("Equipment Defect Alert — {$statusLabel}")
-            ->line("**Equipment:** {$this->assetName} (Tag: {$this->assetTag})")
-            ->line("**Apparatus:** {$this->apparatusName}")
-            ->line("**Reported by:** {$this->operatorName}")
-            ->line("**Status:** {$statusLabel}")
-            ->line("**Inspection Ref:** {$this->inspectionRef}");
-
-        if ($this->notes) {
-            $message->line("**Notes:** {$this->notes}");
-        }
-
         $snipeitUrl = rtrim(config('snipeit.url', 'https://inventory.mbfdhub.com'), '/api/v1');
-        $message->action('View in Snipe-IT', $snipeitUrl)
-            ->line('The equipment status has been automatically changed to Out for Repair in Snipe-IT.');
-
+        $lines = [
+            "Equipment Defect Alert — {$statusLabel}",
+            "Equipment: {$this->assetName} (Tag: {$this->assetTag})",
+            "Apparatus: {$this->apparatusName}",
+            "Reported by: {$this->operatorName}",
+            "Status: {$statusLabel}",
+            "Inspection Ref: {$this->inspectionRef}",
+        ];
+        if ($this->notes !== '') {
+            $lines[] = "Notes: {$this->notes}";
+        }
+        $lines[] = "View in Snipe-IT: {$snipeitUrl}";
+        $lines[] = 'The equipment status has been automatically changed to Out for Repair in Snipe-IT.';
         if ($this->type === 'damaged') {
-            $message->line('A maintenance work order has been created.');
+            $lines[] = 'A maintenance work order has been created.';
         }
 
-        return $message;
+        return ['subject' => $subject, 'text' => implode("\n", $lines)];
     }
 }

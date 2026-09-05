@@ -16,6 +16,7 @@
         button { width: 100%; min-height: 44px; margin-top: 1.5rem; padding: .8rem; border: 0; border-radius: .4rem; background: #b91c1c; color: white; font: inherit; font-weight: 700; cursor: pointer; }
         button:focus-visible { outline: 3px solid #bfdbfe; outline-offset: 2px; }
         .error { margin-top: .5rem; color: #b91c1c; font-weight: 700; }
+        .help { display: block; margin-top: 1rem; text-align: center; color: #1d4ed8; }
     </style>
 </head>
 <body>
@@ -38,6 +39,7 @@
 
         <button type="submit">Sign in</button>
     </form>
+    <a class="help" href="{{ route('password.request') }}">Forgot your password?</a>
 </main>
 </body>
 </html>

@@ -24,10 +24,15 @@ class KnowledgeBase extends Page implements HasForms
     use InteractsWithForms;
 
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
+
     protected static ?string $navigationLabel = 'AI Knowledge Base';
+
     protected static ?string $title = 'AI Knowledge Base';
+
     protected static ?string $slug = 'knowledge-base';
+
     protected static ?string $navigationGroup = 'Administration';
+
     protected static ?int $navigationSort = 90;
 
     protected static string $view = 'filament.admin.pages.knowledge-base';
@@ -39,9 +44,7 @@ class KnowledgeBase extends Page implements HasForms
 
     public static function canAccess(): bool
     {
-        // RAG ingestion changes what the public chatbot "knows", so restrict to
-        // full administrators. Widen here if more roles should manage documents.
-        return auth()->user()?->hasRole('super_admin') ?? false;
+        return auth()->user()?->can('admin.system.manage') ?? false;
     }
 
     public function mount(): void
@@ -85,6 +88,7 @@ class KnowledgeBase extends Page implements HasForms
 
             if (! $file) {
                 Notification::make()->title('No file selected')->warning()->send();
+
                 return;
             }
 

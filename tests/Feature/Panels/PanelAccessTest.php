@@ -4,6 +4,7 @@ namespace Tests\Feature\Panels;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -22,9 +23,10 @@ class PanelAccessTest extends TestCase
         $user = User::factory()->create();
         Role::create(['name' => 'admin', 'guard_name' => 'web']);
         $user->assignRole('admin');
-        
+        $user->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
+
         $response = $this->actingAs($user)->get('/admin');
-        
+
         // Panel may return 200, 302 (redirect to dashboard), or 500 if plugins fail in test env
         $this->assertTrue(
             in_array($response->status(), [200, 302, 500]),
@@ -37,9 +39,9 @@ class PanelAccessTest extends TestCase
         $user = User::factory()->create();
         Role::create(['name' => 'training_viewer', 'guard_name' => 'web']);
         $user->assignRole('training_viewer');
-        
+
         $response = $this->actingAs($user)->get('/training');
-        
+
         $this->assertTrue(
             in_array($response->status(), [200, 302, 500]),
             "Training panel should be accessible or return known status. Got: {$response->status()}"
@@ -49,22 +51,22 @@ class PanelAccessTest extends TestCase
     public function test_guests_are_redirected_from_admin_panel(): void
     {
         $response = $this->get('/admin');
-        
+
         // Filament redirects guests to panel-specific login
         $this->assertTrue(
             $response->isRedirect(),
-            "Guests should be redirected from admin panel"
+            'Guests should be redirected from admin panel'
         );
     }
 
     public function test_guests_are_redirected_from_training_panel(): void
     {
         $response = $this->get('/training');
-        
+
         // Filament redirects guests to panel-specific login
         $this->assertTrue(
             $response->isRedirect(),
-            "Guests should be redirected from training panel"
+            'Guests should be redirected from training panel'
         );
     }
 
@@ -73,9 +75,10 @@ class PanelAccessTest extends TestCase
         $user = User::factory()->create();
         Role::create(['name' => 'admin', 'guard_name' => 'web']);
         $user->assignRole('admin');
-        
+        $user->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
+
         $response = $this->actingAs($user)->get('/admin');
-        
+
         $this->assertTrue(
             in_array($response->status(), [200, 302, 500]),
             "Admin panel should load. Got: {$response->status()}"
@@ -87,9 +90,9 @@ class PanelAccessTest extends TestCase
         $user = User::factory()->create();
         Role::create(['name' => 'training_viewer', 'guard_name' => 'web']);
         $user->assignRole('training_viewer');
-        
+
         $response = $this->actingAs($user)->get('/training');
-        
+
         $this->assertTrue(
             in_array($response->status(), [200, 302, 500]),
             "Training panel should load. Got: {$response->status()}"

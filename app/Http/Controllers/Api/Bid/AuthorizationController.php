@@ -22,7 +22,7 @@ final class AuthorizationController extends Controller
         $context = $contexts->resolve($request);
         $employee = $context->employee();
 
-        if (! $employee instanceof Employee) {
+        if (! $employee instanceof Employee || ! $context->user()->hasCurrentBidEntitlement()) {
             return $this->callback($validated['redirect_uri'], [
                 'error' => 'access_denied',
                 'state' => $validated['state'],

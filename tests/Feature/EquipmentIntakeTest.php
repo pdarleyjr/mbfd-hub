@@ -3,12 +3,13 @@
 namespace Tests\Feature;
 
 use App\Filament\Admin\Pages\EquipmentIntake;
+use App\Models\User;
 use App\Services\SnipeItService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use Tests\TestCase;
-use App\Models\User;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Tests\TestCase;
 
 class EquipmentIntakeTest extends TestCase
 {
@@ -31,6 +32,10 @@ class EquipmentIntakeTest extends TestCase
 
         // Assign admin role (uses spatie/laravel-permission)
         $this->adminUser->assignRole('admin');
+        $this->adminUser->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.equipment.manage', 'web'),
+        ]);
     }
 
     /**

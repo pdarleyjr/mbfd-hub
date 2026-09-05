@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\OperationalForms;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -17,6 +18,7 @@ class HomeNavigationTest extends TestCase
         $this->withoutVite();
         $user = $this->actingAsCanonicalFixture();
         $user->assignRole(Role::findOrCreate('admin', 'web'));
+        $user->givePermissionTo(Permission::findOrCreate('app.media_control.access', 'web'));
 
         $response = $this->get('/');
 
@@ -64,6 +66,7 @@ class HomeNavigationTest extends TestCase
         $this->withoutVite();
         $user = $this->actingAsCanonicalFixture();
         $user->assignRole(Role::findOrCreate('logistics_admin', 'web'));
+        $user->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
 
         $response = $this->get('/');
 

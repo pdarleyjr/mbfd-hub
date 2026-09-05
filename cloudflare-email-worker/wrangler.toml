@@ -1,0 +1,10 @@
+name = "mbfd-hub-inbound-email"
+main = "src/index.ts"
+compatibility_date = "2026-09-04"
+
+[vars]
+HUB_INBOUND_URL = "https://mbfdhub.com/api/v2/email/inbound"
+MAX_RAW_BYTES = "3000000"
+
+# Set HUB_INBOUND_SECRET only with `wrangler secret put`. This Worker uses no
+# KV, D1, R2, Queues, Durable Objects, Workflows, or service bindings.

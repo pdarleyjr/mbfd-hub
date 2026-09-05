@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -108,6 +109,7 @@ final class CanonicalAuthorizationTest extends TestCase
 
         $user = $employee->fresh()->user;
         self::assertInstanceOf(User::class, $user);
+        $user->givePermissionTo(Permission::findOrCreate('app.bid.access', 'web'));
         $this->assertAuthenticatedAs($user, 'web');
         $this->assertDatabaseHas('authentication_sessions', ['user_id' => $user->id]);
         $this->withCookie(
@@ -251,7 +253,7 @@ final class CanonicalAuthorizationTest extends TestCase
         $this->exchange($expiredCode)->assertUnauthorized();
     }
 
-    public function test_bid_role_is_derived_from_current_canonical_user_authorization(): void
+    public function test_bid_role_is_derived_from_current_explicit_admin_entitlement(): void
     {
         Role::findOrCreate('admin', 'web');
         $user = $this->linkedUser();
@@ -259,6 +261,7 @@ final class CanonicalAuthorizationTest extends TestCase
 
         $code = $this->issuedCode();
         $user->assignRole('admin');
+        $user->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
         $this->exchange($code)
             ->assertOk()
             ->assertJson(['role' => 'admin']);
@@ -338,13 +341,16 @@ final class CanonicalAuthorizationTest extends TestCase
             'must_change_password' => false,
         ]);
 
-        return User::factory()->create([
+        $user = User::factory()->create([
             'employee_id' => $employeeId,
             'employee_profile_id' => $employee->id,
             'account_status' => AccountStatus::Active,
             'password' => Hash::make('canonical-user-password'),
             'security_version' => 1,
         ])->load('employeeProfile');
+        $user->givePermissionTo(Permission::findOrCreate('app.bid.access', 'web'));
+
+        return $user;
     }
 
     private function canonicalLogin(User $user): void

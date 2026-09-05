@@ -54,6 +54,9 @@ final class AuthorizationCodeExchangeController extends Controller
         }
 
         try {
+            if (! $user->hasCurrentBidEntitlement()) {
+                return response()->json(['error' => 'invalid_authorization_code'], 401);
+            }
             $role = $user->hasCurrentAdminPanelEntitlement() ? 'admin' : 'member';
         } catch (Throwable) {
             Log::info('bid.federation.exchange', [

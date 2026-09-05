@@ -37,7 +37,10 @@ final class PrivilegedCredentialAdministrationTest extends TestCase
     public function test_admin_cannot_reset_a_super_admin_through_ui_or_forged_table_action(): void
     {
         $actor = $this->adminWithUserManagementAccess();
-        $target = User::factory()->create(['password' => Hash::make('original-password')]);
+        $target = User::factory()->create([
+            'employee_id' => 'FORGED-PASSWORD-100',
+            'password' => Hash::make('original-password'),
+        ]);
         $target->assignRole(Role::findOrCreate('super_admin', 'web'));
 
         $this->actingAs($actor);
@@ -54,7 +57,10 @@ final class PrivilegedCredentialAdministrationTest extends TestCase
     public function test_admin_edit_form_cannot_accept_a_forged_password_field(): void
     {
         $actor = $this->adminWithUserManagementAccess();
-        $target = User::factory()->create(['password' => Hash::make('original-password')]);
+        $target = User::factory()->create([
+            'employee_id' => 'FORGED-PASSWORD-200',
+            'password' => Hash::make('original-password'),
+        ]);
 
         $this->actingAs($actor);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
@@ -74,14 +80,14 @@ final class PrivilegedCredentialAdministrationTest extends TestCase
         self::assertTrue(Hash::check('original-password', $target->password));
     }
 
-    public function test_administrative_user_creation_is_disabled_until_activation_policy_exists(): void
+    public function test_owner_approved_administrative_user_creation_requires_members_manage_permission(): void
     {
         $actor = $this->adminWithUserManagementAccess();
         $actor->givePermissionTo(Permission::findOrCreate('create_user', 'web'));
 
         $this->actingAs($actor);
 
-        self::assertFalse(UserResource::canCreate());
+        self::assertTrue(UserResource::canCreate());
     }
 
     public function test_workgroup_manager_cannot_reset_a_same_group_super_admin_by_forging_an_action(): void
@@ -153,6 +159,11 @@ final class PrivilegedCredentialAdministrationTest extends TestCase
 
         $actor = User::factory()->create();
         $actor->assignRole($adminRole);
+        $actor->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.members.view', 'web'),
+            Permission::findOrCreate('admin.members.manage', 'web'),
+        ]);
 
         return $actor;
     }
