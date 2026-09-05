@@ -24,32 +24,53 @@ final class RosterHtmlParser
         }
 
         $xpath = new DOMXPath($document);
-        $table = $xpath->query('//table')->item(0);
-        if (! $table instanceof DOMElement) {
+        $tables = $xpath->query('//table');
+        if ($tables->length === 0) {
             throw new InvalidArgumentException('The roster export does not contain a table.');
         }
 
+        $table = null;
+        $headerRow = null;
         $headers = [];
-        foreach ($xpath->query('.//tr[1]/*[self::th or self::td]', $table) as $index => $cell) {
-            $headers[$this->normalize((string) $cell->textContent)] = $index;
+        foreach ($tables as $candidate) {
+            foreach ($xpath->query('.//tr', $candidate) as $row) {
+                $candidateHeaders = [];
+                foreach ($xpath->query('./*[self::th or self::td]', $row) as $index => $cell) {
+                    $candidateHeaders[$this->normalize((string) $cell->textContent)] = $index;
+                }
+                if ($this->headerIndex($candidateHeaders, ['employee id', 'employeeid', 'emp id', 'id']) !== null
+                    && $this->headerIndex($candidateHeaders, ['name', 'employee name']) !== null) {
+                    $table = $candidate;
+                    $headerRow = $row;
+                    $headers = $candidateHeaders;
+                    break 2;
+                }
+            }
         }
-        $employeeIdIndex = $this->headerIndex($headers, ['employee id', 'employeeid', 'id']);
-        $nameIndex = $this->headerIndex($headers, ['name', 'employee name']);
-        if ($employeeIdIndex === null || $nameIndex === null) {
+        if (! $table instanceof DOMElement || ! $headerRow instanceof DOMElement) {
             throw new InvalidArgumentException('The roster export must contain Employee ID and Name columns.');
         }
 
-        $rankIndex = $this->headerIndex($headers, ['rank', 'classification']);
-        $assignmentIndex = $this->headerIndex($headers, ['assignment', 'station', 'current assignment']);
+        $employeeIdIndex = $this->headerIndex($headers, ['employee id', 'employeeid', 'emp id', 'id']);
+        $nameIndex = $this->headerIndex($headers, ['name', 'employee name']);
+
+        $rankIndex = $this->headerIndex($headers, ['rank', 'classification', 'position']);
+        $assignmentIndex = $this->headerIndex($headers, ['assignment', 'unit', 'station', 'current assignment']);
         $seen = [];
         $rows = [];
-        foreach ($xpath->query('.//tr', $table) as $rowIndex => $row) {
-            if ($rowIndex === 0) {
+        $pastHeader = false;
+        foreach ($xpath->query('.//tr', $table) as $row) {
+            if ($row === $headerRow) {
+                $pastHeader = true;
+
+                continue;
+            }
+            if (! $pastHeader) {
                 continue;
             }
             $cells = iterator_to_array($xpath->query('./*[self::th or self::td]', $row));
             $employeeId = trim((string) ($cells[$employeeIdIndex]->textContent ?? ''));
-            $name = trim((string) ($cells[$nameIndex]->textContent ?? ''));
+            $name = $this->normalizeName((string) ($cells[$nameIndex]->textContent ?? ''));
             if ($employeeId === '' && $name === '') {
                 continue;
             }
@@ -98,5 +119,33 @@ final class RosterHtmlParser
         $value = trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    private function normalizeName(string $value): string
+    {
+        $value = trim((string) preg_replace('/\s+/', ' ', $value));
+        if (! str_contains($value, ',')) {
+            return $value;
+        }
+
+        [$lastName, $givenNames] = array_map('trim', explode(',', $value, 2));
+        $suffix = null;
+        if (preg_match('/\s+(JR\.?|SR\.?|II|III|IV)$/i', $lastName, $matches) === 1) {
+            $lastName = trim(substr($lastName, 0, -strlen($matches[0])));
+            $suffix = match (strtoupper(rtrim($matches[1], '.'))) {
+                'JR' => 'Jr.',
+                'SR' => 'Sr.',
+                default => strtoupper($matches[1]),
+            };
+        }
+
+        $name = mb_convert_case(mb_strtolower(trim($givenNames.' '.$lastName)), MB_CASE_TITLE, 'UTF-8');
+        $name = (string) preg_replace_callback(
+            "/(?<=[\x{27}\x{2019}])\p{Ll}/u",
+            static fn (array $matches): string => mb_strtoupper($matches[0], 'UTF-8'),
+            $name,
+        );
+
+        return $suffix === null ? $name : $name.' '.$suffix;
     }
 }

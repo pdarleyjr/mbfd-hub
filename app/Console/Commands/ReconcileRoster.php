@@ -31,11 +31,11 @@ final class ReconcileRoster extends Command
             $employee = $existing->get($row['employee_id']);
 
             return $employee instanceof Employee
-                && ($employee->name !== $row['name'] || $employee->rank !== $row['rank'] || $employee->roster_status !== 'active');
+                && $employee->roster_status !== 'active';
         });
         $departed = $existing->reject(fn (Employee $employee): bool => $incomingIds->contains((string) $employee->employee_id));
 
-        $this->table(['Roster rows', 'Exact updates', 'New IDs', 'Not in roster'], [[
+        $this->table(['Roster rows', 'Status reactivations', 'New IDs', 'Not in roster'], [[
             count($rows), $changed->count(), $new->count(), $departed->count(),
         ]]);
         if (! $this->option('apply')) {
@@ -46,10 +46,13 @@ final class ReconcileRoster extends Command
 
         DB::transaction(function () use ($rows, $incomingIds): void {
             foreach ($rows as $row) {
-                Employee::query()->updateOrCreate(
+                $employee = Employee::query()->firstOrCreate(
                     ['employee_id' => $row['employee_id']],
                     ['name' => $row['name'], 'rank' => $row['rank'], 'roster_status' => 'active'],
                 );
+                if (! $employee->wasRecentlyCreated && $employee->roster_status !== 'active') {
+                    $employee->update(['roster_status' => 'active']);
+                }
             }
             Employee::query()->whereNotIn('employee_id', $incomingIds)->update(['roster_status' => 'departed']);
         });
