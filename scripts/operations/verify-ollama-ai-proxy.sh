@@ -17,6 +17,8 @@ readonly SCRIPT_FILE="/opt/ollama-ai-proxy/mbfd_ai_gateway.py"
 readonly UNIT_FILE="/etc/systemd/system/ollama-ai-proxy.service"
 readonly SOURCE_RELEASE="${SOURCE_DIR}/mbfd_ai_gateway_release.py"
 readonly SOURCE_SMOKE="${SOURCE_DIR}/mbfd-ai-gateway-smoke.py"
+readonly LISTENER_WAIT_ATTEMPTS=40
+readonly LISTENER_WAIT_INTERVAL_SECONDS=0.25
 
 release_arguments=(
     --source-dir "${SOURCE_DIR}"
@@ -40,13 +42,24 @@ release_arguments=(
 
 systemctl is-active --quiet ollama-ai-proxy.service
 systemctl is-enabled --quiet ollama-ai-proxy.service
-actual_listeners="$(ss -ltnH '( sport = :11440 )' | awk '{print $4}' | sort)"
 expected_listeners=$'127.0.0.1:11440\n172.20.11.1:11440'
+actual_listeners=""
+listener_attempt=0
+for ((listener_attempt = 1; listener_attempt <= LISTENER_WAIT_ATTEMPTS; listener_attempt++)); do
+    actual_listeners="$(ss -ltnH '( sport = :11440 )' | awk '{print $4}' | sort)"
+    if [[ ${actual_listeners} == "${expected_listeners}" ]]; then
+        break
+    fi
+    if ((listener_attempt < LISTENER_WAIT_ATTEMPTS)); then
+        sleep "${LISTENER_WAIT_INTERVAL_SECONDS}"
+    fi
+done
 if [[ ${actual_listeners} != "${expected_listeners}" ]]; then
     echo "Gateway listener scope is not exact" >&2
     printf 'observed_listeners=%s\n' "${actual_listeners}" >&2
     exit 2
 fi
+printf 'GATEWAY_LISTENER_WAIT_ATTEMPTS_USED=%s\n' "${listener_attempt}"
 
 if grep -q '11441' "${CONFIG_FILE}"; then
     echo "Retired BID experiment port 11441 remains in gateway configuration" >&2
