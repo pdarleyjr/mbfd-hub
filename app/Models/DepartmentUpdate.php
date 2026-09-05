@@ -40,6 +40,9 @@ use Illuminate\Support\Str;
  * @property string|null $attachment_path
  * @property string|null $attachment_name
  * @property int|null $author_id
+ * @property int $notification_cancelled_count
+ * @property int $notification_delivered_count
+ * @property int $notification_pending_count
  * @property-read User|null $author
  */
 class DepartmentUpdate extends Model
@@ -100,6 +103,29 @@ class DepartmentUpdate extends Model
     public function notificationDeliveries(): HasMany
     {
         return $this->hasMany(DepartmentUpdateNotificationDelivery::class);
+    }
+
+    public function notificationDeliveryStatus(): string
+    {
+        if ($this->notification_pending_count > 0) {
+            return 'Pending';
+        }
+
+        if ($this->notification_delivered_count > 0 && $this->notification_cancelled_count > 0) {
+            return 'Completed with cancellations';
+        }
+
+        if ($this->notification_delivered_count > 0) {
+            return 'Delivered';
+        }
+
+        if ($this->notification_cancelled_count > 0 || $this->notification_prepared_at !== null) {
+            return 'Cancelled / No deliveries sent';
+        }
+
+        return ($this->send_in_app || $this->send_web_push)
+            ? 'Awaiting preparation'
+            : 'Not requested';
     }
 
     public function scopeCurrentlyActive(Builder $query): Builder

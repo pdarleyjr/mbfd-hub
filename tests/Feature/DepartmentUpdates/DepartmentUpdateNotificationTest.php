@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\DepartmentUpdates;
 
 use App\Enums\AccountStatus;
+use App\Filament\Resources\DepartmentUpdateResource;
 use App\Jobs\DeliverDepartmentUpdateNotification;
 use App\Jobs\SendDepartmentUpdateNotification;
 use App\Models\DepartmentUpdate;
@@ -17,8 +18,10 @@ use App\Services\DepartmentUpdates\DepartmentUpdateAudienceResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use NotificationChannels\WebPush\WebPushChannel;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
@@ -254,11 +257,102 @@ final class DepartmentUpdateNotificationTest extends TestCase
         self::assertNull($update->fresh()->notification_sent_at);
     }
 
+    public function test_notification_status_is_delivered_when_all_deliveries_are_delivered(): void
+    {
+        $update = $this->update();
+        $this->delivery($update, ['delivered_at' => now()]);
+
+        self::assertSame('Delivered', $this->notificationStatus($update));
+    }
+
+    public function test_notification_status_is_cancelled_when_all_deliveries_are_cancelled(): void
+    {
+        $update = $this->update();
+        $this->delivery($update, ['cancelled_at' => now()]);
+
+        self::assertSame('Cancelled / No deliveries sent', $this->notificationStatus($update));
+    }
+
+    public function test_notification_status_reports_mixed_terminal_outcomes(): void
+    {
+        $update = $this->update();
+        $this->delivery($update, ['delivered_at' => now()]);
+        $this->delivery($update, ['cancelled_at' => now()]);
+
+        self::assertSame('Completed with cancellations', $this->notificationStatus($update));
+    }
+
+    public function test_notification_status_is_pending_only_when_real_pending_delivery_exists(): void
+    {
+        $update = $this->update();
+        $this->delivery($update, ['delivered_at' => now()]);
+        $this->delivery($update);
+
+        self::assertSame('Pending', $this->notificationStatus($update));
+    }
+
+    public function test_notification_status_is_not_requested_when_no_channel_was_requested(): void
+    {
+        $update = $this->update(['send_in_app' => false, 'send_web_push' => false]);
+
+        self::assertSame('Not requested', $this->notificationStatus($update));
+    }
+
+    public function test_notification_status_without_a_delivery_ledger_is_not_pending(): void
+    {
+        $update = $this->update();
+
+        self::assertSame('Awaiting preparation', $this->notificationStatus($update));
+
+        $update->update(['notification_prepared_at' => now()]);
+        self::assertSame('Cancelled / No deliveries sent', $this->notificationStatus($update));
+    }
+
+    public function test_notification_status_does_not_query_per_record(): void
+    {
+        $delivered = $this->update();
+        $this->delivery($delivered, ['delivered_at' => now()]);
+        $cancelled = $this->update();
+        $this->delivery($cancelled, ['cancelled_at' => now()]);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $updates = DepartmentUpdateResource::getEloquentQuery()->get();
+        $queriesAfterListLoad = count(DB::getQueryLog());
+        foreach ($updates as $update) {
+            self::assertInstanceOf(DepartmentUpdate::class, $update);
+            $update->notificationDeliveryStatus();
+        }
+
+        self::assertSame($queriesAfterListLoad, count(DB::getQueryLog()));
+        DB::disableQueryLog();
+    }
+
     private function runJob(DepartmentUpdate $update): void
     {
         (new SendDepartmentUpdateNotification($update->id))->handle(
             app(DepartmentUpdateAudienceResolver::class),
         );
+    }
+
+    /** @param array<string, mixed> $overrides */
+    private function delivery(DepartmentUpdate $update, array $overrides = []): DepartmentUpdateNotificationDelivery
+    {
+        return DepartmentUpdateNotificationDelivery::query()->create(array_merge([
+            'department_update_id' => $update->id,
+            'user_id' => User::factory()->create()->id,
+            'channel' => 'database',
+            'notification_id' => (string) Str::uuid(),
+        ], $overrides));
+    }
+
+    private function notificationStatus(DepartmentUpdate $update): string
+    {
+        $statusUpdate = DepartmentUpdateResource::getEloquentQuery()->findOrFail($update->id);
+        self::assertInstanceOf(DepartmentUpdate::class, $statusUpdate);
+
+        return $statusUpdate->notificationDeliveryStatus();
     }
 
     /** @param array<string, mixed> $overrides */

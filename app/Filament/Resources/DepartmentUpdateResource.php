@@ -22,6 +22,7 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 final class DepartmentUpdateResource extends Resource
@@ -184,15 +185,16 @@ final class DepartmentUpdateResource extends Resource
                 Tables\Columns\TextColumn::make('author.name')->label('Author')->placeholder('Former user'),
                 Tables\Columns\TextColumn::make('publish_at')->dateTime(timezone: 'America/New_York')->sortable(),
                 Tables\Columns\TextColumn::make('expires_at')->dateTime(timezone: 'America/New_York')->placeholder('No expiration')->sortable(),
-                Tables\Columns\TextColumn::make('notification_sent_at')
+                Tables\Columns\TextColumn::make('notification_delivery_status')
                     ->label('Notification')
-                    ->formatStateUsing(fn (mixed $state, DepartmentUpdate $record): string => $state !== null
-                        ? 'Sent'
-                        : (($record->send_in_app || $record->send_web_push) ? 'Pending' : 'Not requested'))
+                    ->state(fn (DepartmentUpdate $record): string => $record->notificationDeliveryStatus())
                     ->badge()
-                    ->color(fn (mixed $state, DepartmentUpdate $record): string => $state !== null
-                        ? 'success'
-                        : (($record->send_in_app || $record->send_web_push) ? 'warning' : 'gray')),
+                    ->color(fn (string $state): string => match ($state) {
+                        'Delivered' => 'success',
+                        'Pending', 'Awaiting preparation' => 'warning',
+                        'Completed with cancellations' => 'info',
+                        default => 'gray',
+                    }),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->options(DepartmentUpdateStatus::options()),
@@ -271,6 +273,21 @@ final class DepartmentUpdateResource extends Resource
             'view' => Pages\ViewDepartmentUpdate::route('/{record}'),
             'edit' => Pages\EditDepartmentUpdate::route('/{record}/edit'),
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->withCount([
+            'notificationDeliveries as notification_delivered_count' => fn (Builder $query): Builder => $query
+                ->whereNotNull('delivered_at')
+                ->whereNull('cancelled_at'),
+            'notificationDeliveries as notification_cancelled_count' => fn (Builder $query): Builder => $query
+                ->whereNull('delivered_at')
+                ->whereNotNull('cancelled_at'),
+            'notificationDeliveries as notification_pending_count' => fn (Builder $query): Builder => $query
+                ->whereNull('delivered_at')
+                ->whereNull('cancelled_at'),
+        ]);
     }
 
     public static function canViewAny(): bool
