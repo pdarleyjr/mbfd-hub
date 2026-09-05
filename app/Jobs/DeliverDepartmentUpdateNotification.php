@@ -42,21 +42,35 @@ final class DeliverDepartmentUpdateNotification implements ShouldBeUnique, Shoul
         $delivery = DepartmentUpdateNotificationDelivery::query()
             ->with(['departmentUpdate', 'user'])
             ->find($this->deliveryId);
-        if (! $delivery instanceof DepartmentUpdateNotificationDelivery || $delivery->delivered_at !== null) {
+        if (! $delivery instanceof DepartmentUpdateNotificationDelivery
+            || $delivery->delivered_at !== null
+            || $delivery->cancelled_at !== null) {
             return;
         }
 
         $update = $delivery->departmentUpdate;
         $recipient = $delivery->user;
-        if (! $update instanceof DepartmentUpdate || $recipient === null || ! $recipient->isAuthenticationAllowed()) {
-            $this->markDelivered($delivery);
+        if (! $update instanceof DepartmentUpdate) {
+            $this->markCancelled($delivery, 'update_unavailable');
+
+            return;
+        }
+
+        if (! $update->isActiveForNotificationDelivery($delivery->channel)) {
+            $this->markCancelled($delivery, 'update_not_deliverable');
+
+            return;
+        }
+
+        if ($recipient === null || ! $recipient->isAuthenticationAllowed()) {
+            $this->markCancelled($delivery, 'recipient_unavailable');
 
             return;
         }
 
         $notification = DepartmentUpdateNotification::fromUpdate($update);
         if (! in_array($delivery->channel, $notification->via($recipient), true)) {
-            $this->markDelivered($delivery);
+            $this->markCancelled($delivery, 'channel_unavailable');
 
             return;
         }
@@ -71,16 +85,45 @@ final class DeliverDepartmentUpdateNotification implements ShouldBeUnique, Shoul
 
     private function markDelivered(DepartmentUpdateNotificationDelivery $delivery): void
     {
-        DB::transaction(function () use ($delivery): void {
+        $this->markTerminal($delivery, delivered: true);
+    }
+
+    private function markCancelled(DepartmentUpdateNotificationDelivery $delivery, string $reason): void
+    {
+        $this->markTerminal($delivery, delivered: false, cancellationReason: $reason);
+    }
+
+    private function markTerminal(
+        DepartmentUpdateNotificationDelivery $delivery,
+        bool $delivered,
+        ?string $cancellationReason = null,
+    ): void {
+        DB::transaction(function () use ($delivery, $delivered, $cancellationReason): void {
             $current = DepartmentUpdateNotificationDelivery::query()->lockForUpdate()->find($delivery->id);
-            if (! $current instanceof DepartmentUpdateNotificationDelivery || $current->delivered_at !== null) {
+            if (! $current instanceof DepartmentUpdateNotificationDelivery
+                || $current->delivered_at !== null
+                || $current->cancelled_at !== null) {
                 return;
             }
 
-            $current->forceFill(['delivered_at' => now()])->saveQuietly();
+            $current->forceFill($delivered
+                ? ['delivered_at' => now()]
+                : ['cancelled_at' => now(), 'cancellation_reason' => $cancellationReason]
+            )->saveQuietly();
             $update = DepartmentUpdate::query()->lockForUpdate()->find($current->department_update_id);
-            if ($update instanceof DepartmentUpdate && ! $update->notificationDeliveries()->whereNull('delivered_at')->exists()) {
-                $update->forceFill(['notification_sent_at' => now()])->saveQuietly();
+            if (! $update instanceof DepartmentUpdate) {
+                return;
+            }
+
+            $hasPendingDeliveries = $update->notificationDeliveries()
+                ->whereNull('delivered_at')
+                ->whereNull('cancelled_at')
+                ->exists();
+            if (! $hasPendingDeliveries) {
+                $hasCancelledDeliveries = $update->notificationDeliveries()->whereNotNull('cancelled_at')->exists();
+                $update->forceFill([
+                    'notification_sent_at' => $hasCancelledDeliveries ? null : now(),
+                ])->saveQuietly();
             }
         });
     }

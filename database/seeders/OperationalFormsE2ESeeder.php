@@ -79,8 +79,8 @@ class OperationalFormsE2ESeeder extends Seeder
         ]);
         $admin->givePermissionTo([
             Permission::findOrCreate('admin.access', 'web'),
-            Permission::findOrCreate('admin.communications.view', 'web'),
-            Permission::findOrCreate('admin.communications.send', 'web'),
+            Permission::findOrCreate('admin.department_updates.view', 'web'),
+            Permission::findOrCreate('admin.department_updates.manage', 'web'),
             Permission::findOrCreate('admin.forms.view', 'web'),
             Permission::findOrCreate('admin.forms.manage', 'web'),
             Permission::findOrCreate('app.media_control.access', 'web'),

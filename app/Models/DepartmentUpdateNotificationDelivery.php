@@ -15,11 +15,16 @@ final class DepartmentUpdateNotificationDelivery extends Model
         'channel',
         'notification_id',
         'delivered_at',
+        'cancelled_at',
+        'cancellation_reason',
     ];
 
     protected function casts(): array
     {
-        return ['delivered_at' => 'immutable_datetime'];
+        return [
+            'delivered_at' => 'immutable_datetime',
+            'cancelled_at' => 'immutable_datetime',
+        ];
     }
 
     /** @return BelongsTo<DepartmentUpdate, $this> */

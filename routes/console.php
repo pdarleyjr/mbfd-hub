@@ -118,6 +118,7 @@ Artisan::command('department-updates:send-due-notifications', function (): int {
 
     DepartmentUpdateNotificationDelivery::query()
         ->whereNull('delivered_at')
+        ->whereNull('cancelled_at')
         ->orderBy('id')
         ->pluck('id')
         ->each(fn (int $id) => DeliverDepartmentUpdateNotification::dispatch($id));

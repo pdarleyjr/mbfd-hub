@@ -42,8 +42,8 @@ return [
         App\Models\InboundEmail::class => 'admin.communications',
         App\Models\OutboundEmail::class => 'admin.communications',
         App\Models\DepartmentUpdate::class => [
-            'view' => 'admin.communications.view',
-            'manage' => 'admin.communications.send',
+            'view' => 'admin.department_updates.view',
+            'manage' => 'admin.department_updates.manage',
         ],
     ],
 ];

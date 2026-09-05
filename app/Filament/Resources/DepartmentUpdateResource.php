@@ -65,10 +65,14 @@ final class DepartmentUpdateResource extends Resource
                 ->schema([
                     Forms\Components\Select::make('status')
                         ->label('Publish to MBFD Hub')
-                        ->options(DepartmentUpdateStatus::options())
+                        ->options([
+                            DepartmentUpdateStatus::Draft->value => DepartmentUpdateStatus::Draft->label(),
+                            DepartmentUpdateStatus::Published->value => DepartmentUpdateStatus::Published->label(),
+                        ])
+                        ->rule('in:draft,published')
                         ->required()
                         ->default(DepartmentUpdateStatus::Draft->value)
-                        ->helperText('Choose Draft, Published, or Archived. Published updates appear when their publish time is due.'),
+                        ->helperText('Choose Draft or Published. Archive an already-published update from the table.'),
                     Forms\Components\Toggle::make('is_pinned')
                         ->label('Pin to top')
                         ->default(false),
@@ -205,8 +209,10 @@ final class DepartmentUpdateResource extends Resource
                     ->icon('heroicon-o-paper-airplane')
                     ->color('success')
                     ->requiresConfirmation()
-                    ->visible(fn (DepartmentUpdate $record): bool => $record->status !== DepartmentUpdateStatus::Published)
+                    ->authorize(fn (DepartmentUpdate $record): bool => self::canEdit($record))
+                    ->visible(fn (DepartmentUpdate $record): bool => $record->status === DepartmentUpdateStatus::Draft)
                     ->action(function (DepartmentUpdate $record): void {
+                        abort_unless(self::canEdit($record) && $record->status === DepartmentUpdateStatus::Draft, 403);
                         $record->update([
                             'status' => DepartmentUpdateStatus::Published,
                             'publish_at' => $record->publish_at ?? now(),
@@ -217,13 +223,21 @@ final class DepartmentUpdateResource extends Resource
                     ->icon('heroicon-o-pause')
                     ->color('warning')
                     ->requiresConfirmation()
+                    ->authorize(fn (DepartmentUpdate $record): bool => self::canEdit($record))
                     ->visible(fn (DepartmentUpdate $record): bool => $record->status === DepartmentUpdateStatus::Published)
-                    ->action(fn (DepartmentUpdate $record) => $record->update(['status' => DepartmentUpdateStatus::Draft])),
+                    ->action(function (DepartmentUpdate $record): void {
+                        abort_unless(self::canEdit($record) && $record->status === DepartmentUpdateStatus::Published, 403);
+                        $record->update(['status' => DepartmentUpdateStatus::Draft]);
+                    }),
                 Tables\Actions\Action::make('archive')
                     ->icon('heroicon-o-archive-box')
                     ->requiresConfirmation()
-                    ->visible(fn (DepartmentUpdate $record): bool => $record->status !== DepartmentUpdateStatus::Archived)
-                    ->action(fn (DepartmentUpdate $record) => $record->update(['status' => DepartmentUpdateStatus::Archived])),
+                    ->authorize(fn (DepartmentUpdate $record): bool => self::canEdit($record))
+                    ->visible(fn (DepartmentUpdate $record): bool => $record->canArchiveAsPublishedHistory())
+                    ->action(function (DepartmentUpdate $record): void {
+                        abort_unless(self::canEdit($record) && $record->canArchiveAsPublishedHistory(), 403);
+                        $record->archiveAsPublishedHistory();
+                    }),
                 Tables\Actions\DeleteAction::make(),
                 Tables\Actions\RestoreAction::make(),
             ])

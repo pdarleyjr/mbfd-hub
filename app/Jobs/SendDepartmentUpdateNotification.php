@@ -47,7 +47,11 @@ final class SendDepartmentUpdateNotification implements ShouldBeUnique, ShouldQu
             }
 
             if ($update->notification_prepared_at !== null) {
-                return $update->notificationDeliveries()->whereNull('delivered_at')->pluck('id')->all();
+                return $update->notificationDeliveries()
+                    ->whereNull('delivered_at')
+                    ->whereNull('cancelled_at')
+                    ->pluck('id')
+                    ->all();
             }
 
             if (! $update->isDueForNotification()) {
@@ -73,7 +77,11 @@ final class SendDepartmentUpdateNotification implements ShouldBeUnique, ShouldQu
                 'notification_sent_at' => $hasDeliveries ? null : now(),
             ])->saveQuietly();
 
-            return $update->notificationDeliveries()->whereNull('delivered_at')->pluck('id')->all();
+            return $update->notificationDeliveries()
+                ->whereNull('delivered_at')
+                ->whereNull('cancelled_at')
+                ->pluck('id')
+                ->all();
         });
 
         foreach ($deliveryIds as $deliveryId) {

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\UserNotificationSubscription;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +36,7 @@ return new class extends Migration
             $table->json('audience_user_ids')->nullable();
             $table->timestampTz('notification_sent_at')->nullable();
             $table->timestampTz('notification_prepared_at')->nullable();
+            $table->timestampTz('first_published_at')->nullable();
             $table->timestampsTz();
             $table->softDeletesTz();
 
@@ -52,38 +54,41 @@ return new class extends Migration
             $table->string('channel', 64);
             $table->uuid('notification_id')->unique();
             $table->timestampTz('delivered_at')->nullable()->index();
+            $table->timestampTz('cancelled_at')->nullable()->index();
+            $table->string('cancellation_reason', 64)->nullable();
             $table->timestampsTz();
             $table->unique(['department_update_id', 'user_id', 'channel'], 'department_update_delivery_unique');
         });
 
         $now = now();
-        DB::table('users')->orderBy('id')->pluck('id')->each(function (int $userId) use ($now): void {
-            DB::table('user_notification_subscriptions')->insertOrIgnore([
-                'user_id' => $userId,
-                'event_key' => 'department_updates',
-                'database_enabled' => true,
-                'webpush_enabled' => true,
-                'email_enabled' => false,
+        DB::table('users')->orderBy('id')->pluck('id')->each(
+            fn (int $userId) => UserNotificationSubscription::ensureDepartmentUpdatesForUser($userId),
+        );
+
+        foreach (['admin.department_updates.view', 'admin.department_updates.manage'] as $permission) {
+            DB::table('permissions')->insertOrIgnore([
+                'name' => $permission,
+                'guard_name' => 'web',
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
-        });
+        }
 
         $adminAccessPermissionId = DB::table('permissions')
             ->where('guard_name', 'web')
             ->where('name', 'admin.access')
             ->value('id');
-        $communicationsPermissionIds = DB::table('permissions')
+        $departmentUpdatePermissionIds = DB::table('permissions')
             ->where('guard_name', 'web')
-            ->whereIn('name', ['admin.communications.view', 'admin.communications.send'])
+            ->whereIn('name', ['admin.department_updates.view', 'admin.department_updates.manage'])
             ->pluck('id');
-        if ($adminAccessPermissionId !== null && $communicationsPermissionIds->count() === 2) {
+        if ($adminAccessPermissionId !== null && $departmentUpdatePermissionIds->count() === 2) {
             $adminUserIds = DB::table('model_has_permissions')
                 ->where('permission_id', $adminAccessPermissionId)
                 ->where('model_type', 'App\\Models\\User')
                 ->pluck('model_id');
-            $adminUserIds->each(function (int $userId) use ($communicationsPermissionIds): void {
-                $communicationsPermissionIds->each(function (int $permissionId) use ($userId): void {
+            $adminUserIds->each(function (int $userId) use ($departmentUpdatePermissionIds): void {
+                $departmentUpdatePermissionIds->each(function (int $permissionId) use ($userId): void {
                     DB::table('model_has_permissions')->insertOrIgnore([
                         'permission_id' => $permissionId,
                         'model_type' => 'App\\Models\\User',

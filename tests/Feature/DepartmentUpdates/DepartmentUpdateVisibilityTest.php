@@ -36,7 +36,10 @@ final class DepartmentUpdateVisibilityTest extends TestCase
         $this->update($author, 'Draft', ['status' => DepartmentUpdateStatus::Draft]);
         $this->update($author, 'Future', ['publish_at' => now()->addMinute()]);
         $this->update($author, 'Expired', ['expires_at' => now()->subMinute()]);
-        $this->update($author, 'Archived', ['status' => DepartmentUpdateStatus::Archived]);
+        $this->update($author, 'Archived', [
+            'status' => DepartmentUpdateStatus::Archived,
+            'first_published_at' => now()->subHours(2),
+        ]);
         $this->update($author, 'Older pinned', ['is_pinned' => true, 'publish_at' => now()->subHours(3)]);
         $this->update($author, 'Newest pinned', ['is_pinned' => true, 'publish_at' => now()->subHour()]);
 
@@ -58,7 +61,10 @@ final class DepartmentUpdateVisibilityTest extends TestCase
         $author = User::factory()->create();
 
         $this->update($author, 'Expired', ['expires_at' => now()->subMinute()]);
-        $this->update($author, 'Archived', ['status' => DepartmentUpdateStatus::Archived]);
+        $this->update($author, 'Archived', [
+            'status' => DepartmentUpdateStatus::Archived,
+            'first_published_at' => now()->subHours(2),
+        ]);
         $this->update($author, 'Draft', ['status' => DepartmentUpdateStatus::Draft]);
         $this->update($author, 'Future', ['publish_at' => now()->addMinute()]);
 

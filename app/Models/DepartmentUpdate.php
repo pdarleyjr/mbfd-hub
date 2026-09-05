@@ -32,6 +32,7 @@ use Illuminate\Support\Str;
  * @property \Carbon\CarbonImmutable|null $expires_at
  * @property \Carbon\CarbonImmutable|null $notification_sent_at
  * @property \Carbon\CarbonImmutable|null $notification_prepared_at
+ * @property \Carbon\CarbonImmutable|null $first_published_at
  * @property string|null $cta_label
  * @property string|null $cta_url
  * @property string|null $image_path
@@ -67,6 +68,7 @@ class DepartmentUpdate extends Model
         'audience_user_ids',
         'notification_sent_at',
         'notification_prepared_at',
+        'first_published_at',
     ];
 
     protected function casts(): array
@@ -84,6 +86,7 @@ class DepartmentUpdate extends Model
             'expires_at' => 'immutable_datetime',
             'notification_sent_at' => 'immutable_datetime',
             'notification_prepared_at' => 'immutable_datetime',
+            'first_published_at' => 'immutable_datetime',
         ];
     }
 
@@ -122,20 +125,61 @@ class DepartmentUpdate extends Model
     public function scopePublishedArchive(Builder $query): Builder
     {
         return $query
-            ->whereIn('status', [
-                DepartmentUpdateStatus::Published->value,
-                DepartmentUpdateStatus::Archived->value,
-            ])
-            ->whereNotNull('publish_at')
-            ->where('publish_at', '<=', now());
+            ->where(function (Builder $query): void {
+                $query->where(function (Builder $query): void {
+                    $query->where('status', DepartmentUpdateStatus::Published->value)
+                        ->whereNotNull('publish_at')
+                        ->where('publish_at', '<=', now());
+                })->orWhere(function (Builder $query): void {
+                    $query->where('status', DepartmentUpdateStatus::Archived->value)
+                        ->whereNotNull('first_published_at')
+                        ->where('first_published_at', '<=', now());
+                });
+            });
     }
 
     public function isPublishedHistory(): bool
     {
-        return in_array($this->status, [
-            DepartmentUpdateStatus::Published,
-            DepartmentUpdateStatus::Archived,
-        ], true) && $this->publish_at !== null && $this->publish_at->lessThanOrEqualTo(now());
+        if ($this->status === DepartmentUpdateStatus::Archived) {
+            return $this->first_published_at !== null
+                && $this->first_published_at->lessThanOrEqualTo(now());
+        }
+
+        return $this->status === DepartmentUpdateStatus::Published
+            && $this->publish_at !== null
+            && $this->publish_at->lessThanOrEqualTo(now());
+    }
+
+    public function canArchiveAsPublishedHistory(): bool
+    {
+        return $this->status === DepartmentUpdateStatus::Published
+            && $this->publish_at !== null
+            && $this->publish_at->lessThanOrEqualTo(now());
+    }
+
+    public function archiveAsPublishedHistory(): bool
+    {
+        if (! $this->canArchiveAsPublishedHistory()) {
+            return false;
+        }
+
+        return $this->update([
+            'status' => DepartmentUpdateStatus::Archived,
+            'first_published_at' => $this->first_published_at ?? $this->publish_at,
+        ]);
+    }
+
+    public function isActiveForNotificationDelivery(string $channel): bool
+    {
+        return $this->status === DepartmentUpdateStatus::Published
+            && $this->publish_at !== null
+            && $this->publish_at->lessThanOrEqualTo(now())
+            && ($this->expires_at === null || $this->expires_at->isFuture())
+            && match ($channel) {
+                'database' => $this->send_in_app,
+                \NotificationChannels\WebPush\WebPushChannel::class => $this->send_web_push,
+                default => false,
+            };
     }
 
     public function isDueForNotification(): bool

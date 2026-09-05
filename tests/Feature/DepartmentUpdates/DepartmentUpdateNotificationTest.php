@@ -182,6 +182,78 @@ final class DepartmentUpdateNotificationTest extends TestCase
         self::assertNotNull($update->fresh()->notification_sent_at);
     }
 
+    public function test_unpublished_update_is_cancelled_after_delivery_preparation(): void
+    {
+        Queue::fake();
+        $recipient = $this->member('1013', 'Firefighter');
+        $update = $this->update();
+        $this->runJob($update);
+        $delivery = DepartmentUpdateNotificationDelivery::query()->sole();
+
+        $update->update(['status' => 'draft']);
+        Notification::fake();
+        (new DeliverDepartmentUpdateNotification($delivery->id))->handle();
+
+        Notification::assertNothingSent();
+        self::assertNull($delivery->fresh()->delivered_at);
+        self::assertNotNull($delivery->fresh()->cancelled_at);
+        self::assertNull($update->fresh()->notification_sent_at);
+    }
+
+    public function test_expired_update_is_cancelled_after_delivery_preparation(): void
+    {
+        Queue::fake();
+        $recipient = $this->member('1014', 'Firefighter');
+        $update = $this->update();
+        $this->runJob($update);
+        $delivery = DepartmentUpdateNotificationDelivery::query()->sole();
+
+        Date::setTestNow(CarbonImmutable::parse('2026-09-05 16:00:00'));
+        $update->update(['expires_at' => now()->subMinute()]);
+        Notification::fake();
+        (new DeliverDepartmentUpdateNotification($delivery->id))->handle();
+
+        Notification::assertNothingSent();
+        self::assertNull($delivery->fresh()->delivered_at);
+        self::assertNotNull($delivery->fresh()->cancelled_at);
+        self::assertNull($update->fresh()->notification_sent_at);
+    }
+
+    public function test_unchanged_due_delivery_sends_once_and_is_not_cancelled(): void
+    {
+        Queue::fake();
+        $recipient = $this->member('1015', 'Firefighter');
+        $update = $this->update();
+        $this->runJob($update);
+        $delivery = DepartmentUpdateNotificationDelivery::query()->sole();
+
+        Notification::fake();
+        (new DeliverDepartmentUpdateNotification($delivery->id))->handle();
+        (new DeliverDepartmentUpdateNotification($delivery->id))->handle();
+
+        Notification::assertSentToTimes($recipient, DepartmentUpdateNotification::class, 1);
+        self::assertNotNull($delivery->fresh()->delivered_at);
+        self::assertNull($delivery->fresh()->cancelled_at);
+    }
+
+    public function test_disabled_publisher_channel_is_cancelled_after_delivery_preparation(): void
+    {
+        Queue::fake();
+        $recipient = $this->member('1016', 'Firefighter');
+        $update = $this->update();
+        $this->runJob($update);
+        $delivery = DepartmentUpdateNotificationDelivery::query()->sole();
+
+        $update->update(['send_in_app' => false]);
+        Notification::fake();
+        (new DeliverDepartmentUpdateNotification($delivery->id))->handle();
+
+        Notification::assertNothingSent();
+        self::assertNull($delivery->fresh()->delivered_at);
+        self::assertNotNull($delivery->fresh()->cancelled_at);
+        self::assertNull($update->fresh()->notification_sent_at);
+    }
+
     private function runJob(DepartmentUpdate $update): void
     {
         (new SendDepartmentUpdateNotification($update->id))->handle(
