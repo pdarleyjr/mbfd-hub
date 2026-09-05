@@ -35,7 +35,6 @@ REQUIRED_CAPABILITIES = frozenset(
         "mbfd-code",
         "mbfd-eoc-grounding",
         "mbfd-embeddings",
-        "mbfd-transcribe",
         "mbfd-image",
         "mbfd-ops-summary",
     }

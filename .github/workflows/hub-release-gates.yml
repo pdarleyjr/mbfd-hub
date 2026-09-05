@@ -532,6 +532,40 @@ jobs:
           DISPOSABLE_POSTGRES_PASSWORD: ""
         run: php artisan test --group=postgres
 
+  ai-gateway-source:
+    name: Canonical AI Gateway source and release safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Validate canonical AI Gateway source
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q \
+            scripts/operations/mbfd_ai_gateway.py \
+            scripts/operations/mbfd_ai_gateway_release.py \
+            scripts/operations/mbfd-ai-gateway-smoke.py \
+            tests/security/mbfd_ai_gateway_predeploy_smoke.py \
+            tests/security/test_mbfd_ai_gateway.py \
+            tests/security/test_mbfd_ai_gateway_release.py
+          python3 -m unittest \
+            tests.security.test_mbfd_ai_gateway \
+            tests.security.test_mbfd_ai_gateway_release \
+            -v
+          credential_directory="$(mktemp -d)"
+          trap 'rm -rf -- "${credential_directory}"' EXIT
+          printf '%s\n' 'ci-only-gateway-validation-credential' >"${credential_directory}/api-key"
+          chmod 0600 "${credential_directory}/api-key"
+          CREDENTIALS_DIRECTORY="${credential_directory}" \
+            python3 scripts/operations/mbfd_ai_gateway.py \
+              --validate-config scripts/operations/mbfd-ai-gateway.json
+          bash -n \
+            scripts/operations/migrate-ollama-ai-proxy.sh \
+            scripts/operations/verify-ollama-ai-proxy.sh
+
   release-gates:
     name: All required Hub release gates
     needs:
@@ -546,6 +580,7 @@ jobs:
       - security-secrets
       - security-filesystem
       - php-85-compatibility
+      - ai-gateway-source
     runs-on: ubuntu-latest
     steps:
       - name: Confirm all required Hub release gates passed
