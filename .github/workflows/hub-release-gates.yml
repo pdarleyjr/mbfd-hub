@@ -59,6 +59,9 @@ jobs:
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
       - name: Install Node dependencies
         run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Install inbound Email Worker dependencies
+        working-directory: cloudflare-email-worker
+        run: npm ci --ignore-scripts
       - name: PHP lint
         run: |
           set -euo pipefail
@@ -83,6 +86,11 @@ jobs:
           VITE_SENTRY_DSN: ""
           VITE_SENTRY_RELEASE: ""
         run: npm run build
+      - name: Inbound Email Worker typecheck and tests
+        working-directory: cloudflare-email-worker
+        run: |
+          npm run check
+          npm test
 
   # This retains the historical formatting baseline in every run without
   # allowing unrelated existing debt to mask the candidate-scoped hard gate.
@@ -348,6 +356,11 @@ jobs:
         working-directory: resources/js/daily-checkout
         run: |
           npm ci --ignore-scripts --legacy-peer-deps
+          npm audit --audit-level=high
+      - name: Inbound Email Worker NPM security audit
+        working-directory: cloudflare-email-worker
+        run: |
+          npm ci --ignore-scripts
           npm audit --audit-level=high
 
   security-secrets:
