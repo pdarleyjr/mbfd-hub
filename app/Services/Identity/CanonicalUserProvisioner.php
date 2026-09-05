@@ -7,6 +7,7 @@ namespace App\Services\Identity;
 use App\Enums\AccountStatus;
 use App\Models\Employee;
 use App\Models\User;
+use App\Models\UserNotificationSubscription;
 use App\Services\IdentityReconciliation\CredentialInspector;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +35,8 @@ final readonly class CanonicalUserProvisioner
                 if ($existing->employee_id !== $employee->employee_id || $existing->email !== $email) {
                     throw new RuntimeException("Employee {$employee->id} is linked to a different canonical User.");
                 }
+
+                UserNotificationSubscription::ensureDepartmentUpdatesForUser($existing->id);
 
                 return [
                     'user' => $existing,
@@ -76,6 +79,7 @@ final readonly class CanonicalUserProvisioner
                 'created_at' => $at,
                 'updated_at' => $at,
             ]);
+            UserNotificationSubscription::ensureDepartmentUpdatesForUser($userId);
             /** @var User $user */
             $user = User::query()->findOrFail($userId);
             if ($copyVerifiedLegacyHash) {

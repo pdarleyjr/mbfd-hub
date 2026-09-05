@@ -23,12 +23,15 @@ final class AdminCapabilityGate
             ? null
             : config('admin-capabilities.models.'.$modelClass);
 
-        if (! is_string($capability)) {
+        if (! is_string($capability) && ! is_array($capability)) {
             return null;
         }
 
         $access = in_array($ability, ['viewAny', 'view'], true) ? 'view' : 'manage';
+        $permission = is_array($capability)
+            ? ($capability[$access] ?? null)
+            : $capability.'.'.$access;
 
-        return $user->hasDirectWebPermission($capability.'.'.$access);
+        return is_string($permission) && $user->hasDirectWebPermission($permission);
     }
 }

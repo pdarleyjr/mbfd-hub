@@ -26,6 +26,19 @@ test('admin uses the canonical home control to enter the Admin panel', async ({ 
   await expect(page.locator('.fi-main')).toBeVisible();
 });
 
+test('admin can open Department Updates management', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One desktop admin acceptance is sufficient.');
+
+  await page.goto('/');
+  await login(page, adminEmployeeId, adminPassword);
+  await page.goto('/admin/department-updates');
+
+  await expect(page).toHaveURL(/\/admin\/department-updates$/);
+  await expect(page.getByRole('heading', { name: 'Department Updates' })).toBeVisible();
+  await expect(page.getByText('Department Operations Briefing')).toBeVisible();
+  await expect(page.getByRole('link', { name: /new department update/i })).toBeVisible();
+});
+
 test('entitled home exposes the exact unified Quick Access destinations', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One desktop content acceptance is sufficient.');
 
@@ -163,17 +176,30 @@ test('home layout is ordered, aligned, touch-safe, and overflow-free from 320px 
   for (const viewport of viewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.waitForTimeout(400);
-    const quickAccess = page.locator('[data-home-column="quick-access"]');
+    const primary = page.locator('[data-home-column="primary"]');
+    const updates = page.locator('[data-home-section="department-updates"]');
+    const quickAccess = page.locator('[data-home-section="quick-access"]');
     const incidents = page.locator('[data-home-column="incidents"]');
+    await expect(primary).toBeVisible();
+    await expect(updates).toBeVisible();
     await expect(quickAccess).toBeVisible();
     await expect(incidents).toBeVisible();
+    await expect(updates.getByRole('link', { name: 'Department Operations Briefing' })).toBeVisible();
 
-    const [quickBox, incidentBox] = await Promise.all([quickAccess.boundingBox(), incidents.boundingBox()]);
+    const [primaryBox, updateBox, quickBox, incidentBox] = await Promise.all([
+      primary.boundingBox(),
+      updates.boundingBox(),
+      quickAccess.boundingBox(),
+      incidents.boundingBox(),
+    ]);
+    expect(primaryBox).not.toBeNull();
+    expect(updateBox).not.toBeNull();
     expect(quickBox).not.toBeNull();
     expect(incidentBox).not.toBeNull();
+    expect(updateBox!.y + updateBox!.height).toBeLessThanOrEqual(quickBox!.y + 1);
     if (viewport.columns) {
-      expect(quickBox!.x + quickBox!.width).toBeLessThanOrEqual(incidentBox!.x);
-      expect(Math.abs(quickBox!.y - incidentBox!.y)).toBeLessThanOrEqual(8);
+      expect(primaryBox!.x + primaryBox!.width).toBeLessThanOrEqual(incidentBox!.x);
+      expect(Math.abs(updateBox!.y - incidentBox!.y)).toBeLessThanOrEqual(8);
     } else {
       expect(quickBox!.y + quickBox!.height).toBeLessThanOrEqual(incidentBox!.y);
     }

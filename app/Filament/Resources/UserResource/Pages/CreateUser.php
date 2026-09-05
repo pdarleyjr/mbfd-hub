@@ -5,6 +5,7 @@ namespace App\Filament\Resources\UserResource\Pages;
 use App\Filament\Resources\UserResource;
 use App\Models\Employee;
 use App\Models\User;
+use App\Models\UserNotificationSubscription;
 use App\Services\Identity\CanonicalCityEmailService;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -39,6 +40,7 @@ class CreateUser extends CreateRecord
     {
         /** @var User $user */
         $user = $this->record;
+        UserNotificationSubscription::ensureDepartmentUpdatesForUser($user->id);
         foreach (array_keys(User::notificationPreferenceDefinitions()) as $eventKey) {
             $user->notificationSubscriptions()->firstOrCreate(
                 ['event_key' => $eventKey],

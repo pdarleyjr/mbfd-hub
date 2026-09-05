@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\OperationalForms;
 
+use App\Models\DepartmentUpdate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -23,6 +24,9 @@ class HomeNavigationTest extends TestCase
         $response = $this->get('/');
 
         $response->assertOk();
+        $response->assertSee('Department Updates');
+        $response->assertSee('No current department updates');
+        $response->assertSeeInOrder(['Department Updates', 'Quick Access', 'MBFD Live Incidents']);
         $response->assertSee('Quick Access');
         $response->assertSeeInOrder([
             'Station / Vehicles / Equipment',
@@ -59,6 +63,38 @@ class HomeNavigationTest extends TestCase
         $response->assertSee('x-data="pulsePointFeed()"', false);
         $response->assertSee('function pulsePointFeed()', false);
         $response->assertSee('/api/incidents', false);
+    }
+
+    public function test_home_renders_only_active_department_updates_in_the_primary_column(): void
+    {
+        $this->withoutVite();
+        $author = $this->actingAsCanonicalFixture();
+        DepartmentUpdate::query()->create([
+            'title' => 'Active operations notice',
+            'body' => '<p>Review the current operational notice.</p>',
+            'category' => 'operations',
+            'priority' => 'important',
+            'status' => 'published',
+            'publish_at' => now()->subMinute(),
+            'author_id' => $author->id,
+        ]);
+        DepartmentUpdate::query()->create([
+            'title' => 'Draft notice',
+            'body' => '<p>Not public.</p>',
+            'category' => 'general',
+            'priority' => 'normal',
+            'status' => 'draft',
+            'author_id' => $author->id,
+        ]);
+
+        $response = $this->get('/');
+
+        $response->assertOk()
+            ->assertSee('data-home-column="primary"', false)
+            ->assertSee('data-home-section="department-updates"', false)
+            ->assertSee('data-home-section="quick-access"', false)
+            ->assertSee('Active operations notice')
+            ->assertDontSee('Draft notice');
     }
 
     public function test_admin_staying_user_sees_direct_admin_panel_link_without_legacy_login(): void
