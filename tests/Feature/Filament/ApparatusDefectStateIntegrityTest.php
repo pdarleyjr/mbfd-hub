@@ -14,6 +14,7 @@ use App\Services\ApparatusInspectionApprovalService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -23,6 +24,33 @@ use Tests\TestCase;
 final class ApparatusDefectStateIntegrityTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_missing_defect_photo_is_reported_without_rendering_a_broken_storage_url(): void
+    {
+        Storage::fake('public');
+        $defect = ApparatusDefect::query()->create([
+            'apparatus_id' => $this->createApparatus()->id,
+            'compartment' => 'Cab',
+            'item' => 'Portable radio',
+            'status' => 'open',
+            'issue_type' => 'damaged',
+            'reported_date' => now()->toDateString(),
+            'photo_path' => 'defects/missing-audit-photo.jpg',
+        ]);
+
+        $this->actingAs($this->defectManager());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        Livewire::test(ListDefects::class)
+            ->call('loadTable')
+            ->assertCanSeeTableRecords([$defect])
+            ->assertTableColumnStateSet('photo_availability', 'Photo unavailable', $defect)
+            ->assertTableColumnStateSet('photo_path', null, $defect)
+            ->assertDontSee('/storage/defects/missing-audit-photo.jpg');
+
+        $this->assertSame('defects/missing-audit-photo.jpg', $defect->fresh()->photo_path);
+    }
 
     public function test_approved_missing_and_damaged_checkout_defects_are_open_workflow_rows(): void
     {
