@@ -273,16 +273,44 @@ class TestConfiguration(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            (root / "api-key").write_text(
-                "deployment-test-credential", encoding="utf-8"
-            )
-            (root / "sports-intelligence-api-key").write_text(
-                "deployment-test-sports-credential", encoding="utf-8"
-            )
+            credential_names = {
+                value["credential_file"].removeprefix("%d/")
+                for value in deployment["consumers"].values()
+            }
+            for index, credential_name in enumerate(sorted(credential_names)):
+                (root / credential_name).write_text(
+                    f"deployment-test-credential-{index}", encoding="utf-8"
+                )
             path = root / "gateway.json"
             path.write_text(json.dumps(deployment), encoding="utf-8")
             config = gateway.load_config(path, {"CREDENTIALS_DIRECTORY": str(root)})
-        self.assertEqual(config.listeners, ("127.0.0.1", "172.20.11.1"))
+        self.assertEqual(config.listeners, ("127.0.0.1", "172.20.0.1"))
+        expected_consumers = {
+            "legacy-11440",
+            "sports-intelligence",
+            "mbfd-hub",
+            "media-control",
+            "hermes",
+            "command",
+            "eoc",
+            "ts-orchestrator",
+            "mbfd-support-ai",
+            "external-coding",
+        }
+        self.assertEqual(set(config.consumers), expected_consumers)
+        self.assertEqual(
+            config.consumers["mbfd-hub"].allowed_capabilities,
+            frozenset({"mbfd-general"}),
+        )
+        self.assertEqual(
+            config.consumers["hermes"].allowed_capabilities,
+            frozenset({"mbfd-ops-summary"}),
+        )
+        self.assertEqual(
+            config.consumers["external-coding"].allowed_capabilities,
+            frozenset({"mbfd-code"}),
+        )
+        self.assertEqual(config.capabilities["mbfd-general"].model, "qwen3.6:35b")
         self.assertEqual(
             config.capabilities["mbfd-ops-summary"].cold_start.mode, "reject_if_cold"
         )
@@ -300,6 +328,18 @@ class TestConfiguration(unittest.TestCase):
             config.capabilities["prm-sports-research"].heavy_workload,
             "prm-sports-medium",
         )
+        self.assertEqual(
+            config.capabilities["mbfd-eoc-grounding"].backend_id,
+            "ollama-eoc",
+        )
+        self.assertEqual(
+            config.capabilities["mbfd-eoc-grounding"].model,
+            "qwen3.5:9b",
+        )
+        self.assertEqual(
+            config.backends["ollama-eoc"].base_url,
+            "http://172.20.0.1:11437",
+        )
         self.assertNotIn("mbfd-bid", config.consumers)
         self.assertNotIn("mbfd-bid-analysis", config.capabilities)
         self.assertNotIn("mbfd-transcribe", config.capabilities)
@@ -310,6 +350,14 @@ class TestConfiguration(unittest.TestCase):
         )
         self.assertNotIn("LoadCredential=mbfd-bid:", unit)
         self.assertIn("LoadCredential=sports-intelligence-api-key:", unit)
+        for consumer in expected_consumers - {"legacy-11440", "sports-intelligence"}:
+            self.assertIn(f"LoadCredential={consumer}-api-key:", unit)
+        deployer = (MODULE_PATH.parent / "migrate-ollama-ai-proxy.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("APPLICATION_CREDENTIAL_FILES", deployer)
+        self.assertIn('"${APPLICATION_CREDENTIAL_FILES[@]}"', deployer)
+        self.assertIn("for credential_file in", deployer)
         bid_template = json.loads(
             (MODULE_PATH.parent / "mbfd-bid-analysis.template.json").read_text(
                 encoding="utf-8"
@@ -459,6 +507,42 @@ class TestIdentityAndRouting(unittest.TestCase):
         self.assertEqual(selection.backend.backend_id, "ollama-primary")
         self.assertEqual(selection.capability.model, "qwen3.6:35b")
         self.assertEqual(selection.capability.cold_start.mode, "reject_if_cold")
+
+    def test_nonlegacy_consumer_requires_capability_header(self):
+        with self.assertRaises(gateway.GatewayError) as caught:
+            gateway.resolve_capability(
+                self.config,
+                self.config.consumers["hermes"],
+                "/api/chat",
+                {"model": "mbfd-ops-summary", "messages": []},
+                None,
+            )
+        self.assertEqual(caught.exception.classification, "admission_denied")
+        self.assertEqual(caught.exception.status, 403)
+
+    def test_nonlegacy_consumer_model_must_equal_capability_header(self):
+        with self.assertRaises(gateway.GatewayError) as caught:
+            gateway.resolve_capability(
+                self.config,
+                self.config.consumers["hermes"],
+                "/api/chat",
+                {"model": "qwen3.6:35b", "messages": []},
+                "mbfd-ops-summary",
+            )
+        self.assertEqual(caught.exception.classification, "admission_denied")
+        self.assertEqual(caught.exception.status, 403)
+
+    def test_nonlegacy_consumer_cannot_use_compatibility_alias(self):
+        with self.assertRaises(gateway.GatewayError) as caught:
+            gateway.resolve_capability(
+                self.config,
+                self.config.consumers["hermes"],
+                "/api/chat",
+                {"model": "mbfd-general-deep", "messages": []},
+                "mbfd-ops-summary",
+            )
+        self.assertEqual(caught.exception.classification, "admission_denied")
+        self.assertEqual(caught.exception.status, 403)
 
     def test_model_alias_selects_capability_and_rewrites_physical_model(self):
         selection = gateway.resolve_capability(

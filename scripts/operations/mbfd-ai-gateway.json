@@ -2,7 +2,7 @@
   "schema_version": 1,
   "listeners": [
     "127.0.0.1",
-    "172.20.11.1"
+    "172.20.0.1"
   ],
   "port": 11440,
   "global": {
@@ -34,6 +34,70 @@
       ],
       "concurrency": 1,
       "legacy_passthrough": false
+    },
+    "mbfd-hub": {
+      "credential_file": "%d/mbfd-hub-api-key",
+      "allowed_capabilities": [
+        "mbfd-general"
+      ],
+      "concurrency": 1,
+      "legacy_passthrough": false
+    },
+    "media-control": {
+      "credential_file": "%d/media-control-api-key",
+      "allowed_capabilities": [
+        "mbfd-general"
+      ],
+      "concurrency": 1,
+      "legacy_passthrough": false
+    },
+    "hermes": {
+      "credential_file": "%d/hermes-api-key",
+      "allowed_capabilities": [
+        "mbfd-ops-summary"
+      ],
+      "concurrency": 1,
+      "legacy_passthrough": false
+    },
+    "command": {
+      "credential_file": "%d/command-api-key",
+      "allowed_capabilities": [
+        "mbfd-general"
+      ],
+      "concurrency": 1,
+      "legacy_passthrough": false
+    },
+    "eoc": {
+      "credential_file": "%d/eoc-api-key",
+      "allowed_capabilities": [
+        "mbfd-eoc-grounding"
+      ],
+      "concurrency": 1,
+      "legacy_passthrough": false
+    },
+    "ts-orchestrator": {
+      "credential_file": "%d/ts-orchestrator-api-key",
+      "allowed_capabilities": [
+        "mbfd-general"
+      ],
+      "concurrency": 1,
+      "legacy_passthrough": false
+    },
+    "mbfd-support-ai": {
+      "credential_file": "%d/mbfd-support-ai-api-key",
+      "allowed_capabilities": [
+        "mbfd-general"
+      ],
+      "concurrency": 1,
+      "legacy_passthrough": false
+    },
+    "external-coding": {
+      "credential_file": "%d/external-coding-api-key",
+      "allowed_capabilities": [
+        "mbfd-code"
+      ],
+      "concurrency": 1,
+      "legacy_passthrough": false
     }
   },
   "backends": {
@@ -46,6 +110,12 @@
     "ollama-prm-sports": {
       "provider": "ollama",
       "base_url": "http://172.31.241.7:11434",
+      "enabled": true,
+      "health_timeout_seconds": 3
+    },
+    "ollama-eoc": {
+      "provider": "ollama",
+      "base_url": "http://172.20.0.1:11437",
       "enabled": true,
       "health_timeout_seconds": 3
     },
@@ -65,7 +135,7 @@
   "capabilities": {
     "mbfd-general": {
       "backend": "ollama-primary",
-      "model": "mbfd-general",
+      "model": "qwen3.6:35b",
       "paths": [
         "/api/chat",
         "/api/generate",
@@ -108,24 +178,24 @@
       "heavy_workload": "primary-ollama-large"
     },
     "mbfd-eoc-grounding": {
-      "backend": "ollama-primary",
-      "model": "mbfd-general",
+      "backend": "ollama-eoc",
+      "model": "qwen3.5:9b",
       "paths": [
         "/api/chat",
         "/api/generate",
         "/v1/chat/completions"
       ],
       "concurrency": 1,
-      "timeout_seconds": 120,
+      "timeout_seconds": 90,
       "retries": 0,
       "cold_start": {
-        "mode": "reject_if_cold",
-        "ready_timeout_seconds": 5
+        "mode": "wait",
+        "ready_timeout_seconds": 60
       },
       "ollama_options": {
         "num_ctx": 32768
       },
-      "heavy_workload": "primary-ollama-large"
+      "heavy_workload": "eoc-private-medium"
     },
     "mbfd-embeddings": {
       "backend": "ollama-primary",
@@ -224,6 +294,16 @@
       "lease_group": "gpu-heavy",
       "mem_available_floor_mb": 8192,
       "declared_model_allocation_mb": 8192,
+      "memory_psi_avg10_max": 1.0,
+      "max_swap_activity_pages": 4096,
+      "deny_on_recent_oom": true,
+      "deny_on_recent_gpu_reset": true,
+      "require_production_healthy": true
+    },
+    "eoc-private-medium": {
+      "lease_group": "gpu-heavy",
+      "mem_available_floor_mb": 8192,
+      "declared_model_allocation_mb": 9216,
       "memory_psi_avg10_max": 1.0,
       "max_swap_activity_pages": 4096,
       "deny_on_recent_oom": true,

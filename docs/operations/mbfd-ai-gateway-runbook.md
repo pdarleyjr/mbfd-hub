@@ -14,16 +14,23 @@ The source of truth is `scripts/operations/`:
 - `mbfd-ai-gateway.json` — secret-free live registry template;
 - `ollama-ai-proxy.service` — systemd service and credential bindings;
 - `migrate-ollama-ai-proxy.sh` — guarded update and rollback transaction;
+- `provision-mbfd-ai-gateway-consumers.sh` — idempotent, non-disclosing
+  per-consumer credential provisioning;
 - `verify-ollama-ai-proxy.sh` — provenance, parity, listener, auth, and smoke gate;
 - `mbfd-ai-gateway-smoke.py` — inference-free authenticated smoke client;
 - `mbfd_ai_gateway_release.py` — exact-source and stale-source guard;
 - `mbfd-ai-gateway-ingress.json` — public-ingress declaration.
 
-Credentials remain root-owned files under `/etc/ollama-ai-proxy`. The PRM
-consumer uses `sports-intelligence-api-key`, provisioned out of band and copied
-to the Sports secret store as `mbfd_ai_gateway_credential`. Never place a
-credential on a command line, in Git, in this runbook, or in release evidence.
-The deployment and smoke scripts read it internally and print no value.
+Credentials remain root-owned mode-0600 files under `/etc/ollama-ai-proxy`.
+The PRM consumer uses `sports-intelligence-api-key`, provisioned out of band and
+copied to the Sports secret store as `mbfd_ai_gateway_credential`. The retained
+MBFD consumers each use a different `<consumer>-api-key` file. Before deploying
+the expanded registry, run `provision-mbfd-ai-gateway-consumers.sh` as root. It
+creates only missing credentials, refuses unsafe existing paths or modes,
+checks uniqueness, and reports only short SHA-256 fingerprints. Never place a
+credential on a command line, in Git, in this runbook, browser JavaScript, or
+release evidence. Deployment and smoke clients read credentials internally and
+print no value.
 
 Port 11440 is the canonical gateway. Port 11441 belonged to the rejected BID
 experiment; it must remain closed and must not be reused. Raw Ollama port 11434
@@ -35,6 +42,30 @@ The `sports-intelligence` consumer is restricted to the
 the private Sports Ollama backend and the validated `qwen3.5:9b` model through
 the global `gpu-heavy` admission lease. PRM requests retain `keep_alive=0` so
 the Sports model unloads after every bounded job.
+
+The retained MBFD consumer/capability pairs are fail closed:
+
+- `mbfd-hub`, `media-control`, `command`, `ts-orchestrator`, and
+  `mbfd-support-ai` -> `mbfd-general`;
+- `hermes` -> `mbfd-ops-summary`;
+- `eoc` -> `mbfd-eoc-grounding` on the private EOC provider;
+- `external-coding` -> `mbfd-code`.
+
+The initial `mbfd-general` rollout uses the stable `qwen3.6:35b` binding. This
+physical binding is gateway-only and must never appear in an application
+configuration. Applications send their logical capability as both the request
+model and `X-MBFD-Capability`, authenticate with their own credential, and send
+an `X-Request-ID`. The gateway rejects a non-legacy request when the capability
+header is absent or differs from the request model, and it never resolves a
+compatibility alias for a non-legacy identity. There is no silent capability
+substitution. Only the explicitly marked `legacy-11440` identity retains the
+temporary compatibility-alias behavior needed for bounded migration; remove
+that identity after every registered application has cut over.
+
+The two private listeners are `127.0.0.1:11440` and
+`172.20.0.1:11440`. The latter is the retained `mbfd-ai` bridge gateway and
+replaces the legacy bridge-owned `172.20.11.1` address so retirement of ports
+11435/11438 cannot remove the gateway's container ingress.
 
 ## Candidate gate
 

@@ -308,7 +308,7 @@ class TestPersistedReleaseSurface(unittest.TestCase):
             "mbfd-ai-gateway-smoke.py",
             "UNAUTHENTICATED_HEALTH_STATUS",
             "127.0.0.1:11440",
-            "172.20.11.1:11440",
+            "172.20.0.1:11440",
             "GATEWAY_CANONICAL_SOURCE=PASS",
             "LISTENER_WAIT_ATTEMPTS",
             "LISTENER_WAIT_INTERVAL_SECONDS",
@@ -316,6 +316,59 @@ class TestPersistedReleaseSurface(unittest.TestCase):
         ):
             self.assertIn(required, verifier)
         self.assertNotIn("cat /etc/ollama-ai-proxy/api-key", verifier)
+
+    def test_consumer_credential_provisioner_is_secret_safe_and_idempotent(
+        self,
+    ) -> None:
+        provisioner = (
+            self.operations / "provision-mbfd-ai-gateway-consumers.sh"
+        ).read_text(encoding="utf-8")
+        for consumer in (
+            "mbfd-hub",
+            "media-control",
+            "hermes",
+            "command",
+            "eoc",
+            "ts-orchestrator",
+            "mbfd-support-ai",
+            "external-coding",
+        ):
+            self.assertIn(f'"{consumer}"', provisioner)
+        for required in (
+            "umask 077",
+            "openssl rand -hex 32",
+            "sha256sum",
+            "STATE=CREATED",
+            "STATE=EXISTING",
+            "[[ -L ${credential_file} ]]",
+            "root:root 600",
+        ):
+            self.assertIn(required, provisioner)
+        self.assertNotIn('cat "${credential_file}"', provisioner)
+        self.assertNotIn("set -x", provisioner)
+
+    def test_deployed_smoke_authenticates_each_consumer_and_denies_wrong_capability(
+        self,
+    ) -> None:
+        smoke = (self.operations / "mbfd-ai-gateway-smoke.py").read_text(
+            encoding="utf-8"
+        )
+        for credential_name in (
+            "api-key",
+            "sports-intelligence-api-key",
+            "mbfd-hub-api-key",
+            "media-control-api-key",
+            "hermes-api-key",
+            "command-api-key",
+            "eoc-api-key",
+            "ts-orchestrator-api-key",
+            "mbfd-support-ai-api-key",
+            "external-coding-api-key",
+        ):
+            self.assertIn(f'"{credential_name}"', smoke)
+        self.assertIn("incorrect-capability", smoke)
+        self.assertIn("admission_denied", smoke)
+        self.assertIn("mbfd-image", smoke)
 
     def test_runbook_defines_exact_release_and_rollback_contract(self) -> None:
         runbook = (

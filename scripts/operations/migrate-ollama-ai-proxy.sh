@@ -13,6 +13,16 @@ readonly PROTECTED_REF="refs/remotes/origin/main"
 readonly CREDENTIAL_DIR="/etc/ollama-ai-proxy"
 readonly LEGACY_CREDENTIAL="${CREDENTIAL_DIR}/api-key"
 readonly SPORTS_CREDENTIAL="${CREDENTIAL_DIR}/sports-intelligence-api-key"
+readonly APPLICATION_CREDENTIAL_FILES=(
+    "${CREDENTIAL_DIR}/mbfd-hub-api-key"
+    "${CREDENTIAL_DIR}/media-control-api-key"
+    "${CREDENTIAL_DIR}/hermes-api-key"
+    "${CREDENTIAL_DIR}/command-api-key"
+    "${CREDENTIAL_DIR}/eoc-api-key"
+    "${CREDENTIAL_DIR}/ts-orchestrator-api-key"
+    "${CREDENTIAL_DIR}/mbfd-support-ai-api-key"
+    "${CREDENTIAL_DIR}/external-coding-api-key"
+)
 readonly CONFIG_FILE="${CREDENTIAL_DIR}/gateway.json"
 readonly STATE_FILE="${CREDENTIAL_DIR}/deployment-source.json"
 readonly UNIT_FILE="/etc/systemd/system/ollama-ai-proxy.service"
@@ -47,18 +57,23 @@ for required in \
     "${SOURCE_VERIFY}" \
     "${SOURCE_DEPLOY}" \
     "${LEGACY_CREDENTIAL}" \
-    "${SPORTS_CREDENTIAL}"; do
+    "${SPORTS_CREDENTIAL}" \
+    "${APPLICATION_CREDENTIAL_FILES[@]}"; do
     if [[ ! -f ${required} || -L ${required} ]]; then
         echo "Required gateway artifact is missing or symlinked: ${required}" >&2
         exit 2
     fi
 done
 
-if [[ $(stat -c '%U:%G %a' "${LEGACY_CREDENTIAL}") != "root:root 600" \
-    || $(stat -c '%U:%G %a' "${SPORTS_CREDENTIAL}") != "root:root 600" ]]; then
-    echo "Gateway credential has unsafe ownership or mode" >&2
-    exit 2
-fi
+for credential_file in \
+    "${LEGACY_CREDENTIAL}" \
+    "${SPORTS_CREDENTIAL}" \
+    "${APPLICATION_CREDENTIAL_FILES[@]}"; do
+    if [[ $(stat -c '%U:%G %a' "${credential_file}") != "root:root 600" ]]; then
+        echo "Gateway credential has unsafe ownership or mode: ${credential_file}" >&2
+        exit 2
+    fi
+done
 
 release_arguments=(
     --source-dir "${SOURCE_DIR}"
