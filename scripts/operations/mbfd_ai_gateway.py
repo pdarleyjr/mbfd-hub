@@ -785,17 +785,35 @@ def resolve_capability(
             400, "admission_denied", "A logical capability or model is required"
         )
     requested_model = requested_model.strip()
+    header_capability = requested_capability.strip() if requested_capability else None
 
-    compatibility = config.compatibility_models.get(requested_model)
-    inferred = requested_model if requested_model in config.capabilities else None
-    if compatibility:
-        inferred = compatibility.capability_id
-    capability_id = requested_capability.strip() if requested_capability else inferred
+    if not consumer.legacy_passthrough:
+        if not header_capability:
+            raise GatewayError(
+                403,
+                "admission_denied",
+                "Logical capability header is required for this consumer",
+            )
+        if requested_model != header_capability:
+            raise GatewayError(
+                403,
+                "admission_denied",
+                "Request model must equal the logical capability header",
+            )
+        compatibility = None
+        inferred = requested_model if requested_model in config.capabilities else None
+    else:
+        compatibility = config.compatibility_models.get(requested_model)
+        inferred = requested_model if requested_model in config.capabilities else None
+        if compatibility:
+            inferred = compatibility.capability_id
+
+    capability_id = header_capability or inferred
     if not capability_id or capability_id not in config.capabilities:
         raise GatewayError(
             403, "admission_denied", "Requested logical capability is not registered"
         )
-    if requested_capability and inferred and inferred != capability_id:
+    if header_capability and inferred and inferred != capability_id:
         raise GatewayError(
             403, "admission_denied", "Capability header and request model disagree"
         )

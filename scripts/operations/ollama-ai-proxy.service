@@ -10,6 +10,14 @@ User=ollama-proxy
 Group=ollama-proxy
 LoadCredential=api-key:/etc/ollama-ai-proxy/api-key
 LoadCredential=sports-intelligence-api-key:/etc/ollama-ai-proxy/sports-intelligence-api-key
+LoadCredential=mbfd-hub-api-key:/etc/ollama-ai-proxy/mbfd-hub-api-key
+LoadCredential=media-control-api-key:/etc/ollama-ai-proxy/media-control-api-key
+LoadCredential=hermes-api-key:/etc/ollama-ai-proxy/hermes-api-key
+LoadCredential=command-api-key:/etc/ollama-ai-proxy/command-api-key
+LoadCredential=eoc-api-key:/etc/ollama-ai-proxy/eoc-api-key
+LoadCredential=ts-orchestrator-api-key:/etc/ollama-ai-proxy/ts-orchestrator-api-key
+LoadCredential=mbfd-support-ai-api-key:/etc/ollama-ai-proxy/mbfd-support-ai-api-key
+LoadCredential=external-coding-api-key:/etc/ollama-ai-proxy/external-coding-api-key
 LoadCredential=gateway-config:/etc/ollama-ai-proxy/gateway.json
 Environment=MBFD_AI_GATEWAY_CONFIG=%d/gateway-config
 ExecStart=/usr/bin/python3 /opt/ollama-ai-proxy/mbfd_ai_gateway.py

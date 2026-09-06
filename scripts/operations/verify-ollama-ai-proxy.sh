@@ -12,6 +12,16 @@ readonly PROTECTED_REF="refs/remotes/origin/main"
 readonly CREDENTIAL_DIR="/etc/ollama-ai-proxy"
 readonly CREDENTIAL_FILE="${CREDENTIAL_DIR}/api-key"
 readonly SPORTS_CREDENTIAL_FILE="${CREDENTIAL_DIR}/sports-intelligence-api-key"
+readonly APPLICATION_CREDENTIAL_FILES=(
+    "${CREDENTIAL_DIR}/mbfd-hub-api-key"
+    "${CREDENTIAL_DIR}/media-control-api-key"
+    "${CREDENTIAL_DIR}/hermes-api-key"
+    "${CREDENTIAL_DIR}/command-api-key"
+    "${CREDENTIAL_DIR}/eoc-api-key"
+    "${CREDENTIAL_DIR}/ts-orchestrator-api-key"
+    "${CREDENTIAL_DIR}/mbfd-support-ai-api-key"
+    "${CREDENTIAL_DIR}/external-coding-api-key"
+)
 readonly STATE_FILE="${CREDENTIAL_DIR}/deployment-source.json"
 readonly CONFIG_FILE="${CREDENTIAL_DIR}/gateway.json"
 readonly SCRIPT_FILE="/opt/ollama-ai-proxy/mbfd_ai_gateway.py"
@@ -37,6 +47,9 @@ release_arguments=(
 
 [[ $(stat -c '%U:%G %a' "${CREDENTIAL_FILE}") == "root:root 600" ]]
 [[ $(stat -c '%U:%G %a' "${SPORTS_CREDENTIAL_FILE}") == "root:root 600" ]]
+for credential_file in "${APPLICATION_CREDENTIAL_FILES[@]}"; do
+    [[ $(stat -c '%U:%G %a' "${credential_file}") == "root:root 600" ]]
+done
 [[ $(stat -c '%U:%G %a' "${CONFIG_FILE}") == "root:root 600" ]]
 [[ $(stat -c '%U:%G %a' "${STATE_FILE}") == "root:root 600" ]]
 [[ $(stat -c '%U:%G %a' "${SCRIPT_FILE}") == "root:root 755" ]]
@@ -44,7 +57,7 @@ release_arguments=(
 
 systemctl is-active --quiet ollama-ai-proxy.service
 systemctl is-enabled --quiet ollama-ai-proxy.service
-expected_listeners=$'127.0.0.1:11440\n172.20.11.1:11440'
+expected_listeners=$'127.0.0.1:11440\n172.20.0.1:11440'
 actual_listeners=""
 listener_attempt=0
 for ((listener_attempt = 1; listener_attempt <= LISTENER_WAIT_ATTEMPTS; listener_attempt++)); do
@@ -82,5 +95,5 @@ printf 'UNAUTHENTICATED_HEALTH_STATUS=%s\n' "${unauthenticated_status}"
 CREDENTIALS_DIRECTORY="${CREDENTIAL_DIR}" \
     /usr/bin/python3 "${SOURCE_SMOKE}"
 
-printf 'GATEWAY_LISTENERS=127.0.0.1:11440,172.20.11.1:11440\n'
+printf 'GATEWAY_LISTENERS=127.0.0.1:11440,172.20.0.1:11440\n'
 printf 'GATEWAY_CANONICAL_SOURCE=PASS\n'
