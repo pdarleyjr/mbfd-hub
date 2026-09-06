@@ -293,6 +293,10 @@ class TestPersistedReleaseSurface(unittest.TestCase):
         self.assertIn("--initialize-source-state", deployer)
         self.assertIn("STATE_WAS_PRESENT", deployer)
         self.assertIn('rm -f -- "${STATE_FILE}"', deployer)
+        self.assertIn("deployment_failure()", deployer)
+        self.assertIn("trap 'deployment_failure \"$?\"' ERR", deployer)
+        self.assertIn('exit "${status}"', deployer)
+        self.assertNotIn("trap 'if [[ ${deployment_started}", deployer)
 
     def test_verifier_checks_provenance_parity_auth_and_listener_scope(self) -> None:
         verifier = (self.operations / "verify-ollama-ai-proxy.sh").read_text(
@@ -306,6 +310,9 @@ class TestPersistedReleaseSurface(unittest.TestCase):
             "127.0.0.1:11440",
             "172.20.11.1:11440",
             "GATEWAY_CANONICAL_SOURCE=PASS",
+            "LISTENER_WAIT_ATTEMPTS",
+            "LISTENER_WAIT_INTERVAL_SECONDS",
+            'sleep "${LISTENER_WAIT_INTERVAL_SECONDS}"',
         ):
             self.assertIn(required, verifier)
         self.assertNotIn("cat /etc/ollama-ai-proxy/api-key", verifier)

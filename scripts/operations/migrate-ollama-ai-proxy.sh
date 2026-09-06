@@ -117,8 +117,17 @@ restore_previous() {
     echo "Gateway deployment failed; prior files restored from ${BACKUP_DIR}" >&2
 }
 
+deployment_failure() {
+    local status="${1:-1}"
+    trap - ERR
+    if [[ ${deployment_started} == true ]]; then
+        restore_previous
+    fi
+    exit "${status}"
+}
+
 deployment_started=false
-trap 'if [[ ${deployment_started} == true ]]; then restore_previous; fi' ERR
+trap 'deployment_failure "$?"' ERR
 
 deployment_started=true
 install -d -o root -g root -m 0755 "${INSTALL_DIR}"
