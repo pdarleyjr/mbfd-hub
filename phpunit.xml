@@ -27,7 +27,7 @@
         <env name="APP_URL" value="http://localhost" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
         <env name="AI_ANALYSIS_ENABLED" value="false" force="true"/>
-        <env name="AI_DRIVER" value="local" force="true"/>
+        <env name="AI_GATEWAY_ENABLED" value="false" force="true"/>
         <env name="AWS_ACCESS_KEY_ID" value="" force="true"/>
         <env name="AWS_ENDPOINT" value="" force="true"/>
         <env name="AWS_SECRET_ACCESS_KEY" value="" force="true"/>

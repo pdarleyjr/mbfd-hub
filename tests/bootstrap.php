@@ -29,7 +29,7 @@ if ($allowDisposablePostgres
 $testEnvironment = [
     'ABLY_KEY' => '',
     'AI_ANALYSIS_ENABLED' => 'false',
-    'AI_DRIVER' => 'local',
+    'AI_GATEWAY_ENABLED' => 'false',
     'APP_ENV' => 'testing',
     'APP_KEY' => 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
     'APP_MAINTENANCE_DRIVER' => 'file',

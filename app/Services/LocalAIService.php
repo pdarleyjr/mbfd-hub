@@ -19,8 +19,8 @@ use Illuminate\Support\Str;
  * ['result' => ['response' => ...]] shape, so every inherited method
  * (generateAdminBulletSummary, prioritizeProjects, analyzeProject,
  * generateWeeklySummary, parseAIResponse, extractTextFromResponse) keeps
- * working unchanged. Bound over CloudflareAIService in AppServiceProvider
- * when cloudflare.ai.driver === 'local'.
+ * working unchanged. Bound over CloudflareAIService for every application
+ * request in AppServiceProvider.
  */
 class LocalAIService extends CloudflareAIService
 {
@@ -40,7 +40,8 @@ class LocalAIService extends CloudflareAIService
 
     public function isEnabled(): bool
     {
-        return $this->checkHealth()['available'];
+        return (bool) config('cloudflare.ai.enabled', true)
+            && $this->checkHealth()['available'];
     }
 
     /**

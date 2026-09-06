@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
+use App\Services\CloudflareAIService;
 use App\Services\LocalAIService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
@@ -27,6 +28,7 @@ class LocalAIServiceTest extends TestCase
         config()->set('cloudflare.ai.gateway.url', 'http://gateway.test:11440');
         config()->set('cloudflare.ai.gateway.capability', 'mbfd-general');
         config()->set('cloudflare.ai.gateway.credential_file', $this->credentialFile);
+        config()->set('cloudflare.ai.enabled', true);
 
         Cache::flush();
         Http::preventStrayRequests();
@@ -37,6 +39,19 @@ class LocalAIServiceTest extends TestCase
         @unlink($this->credentialFile);
 
         parent::tearDown();
+    }
+
+    public function test_container_binding_cannot_bypass_the_canonical_gateway(): void
+    {
+        config()->set('cloudflare.ai.driver', 'cloudflare');
+
+        $this->assertInstanceOf(LocalAIService::class, app(CloudflareAIService::class));
+    }
+
+    public function test_deployable_configuration_has_no_direct_provider_model_catalog(): void
+    {
+        $this->assertNull(config('services.cloudflare.ai'));
+        $this->assertArrayNotHasKey('models', config('cloudflare.ai'));
     }
 
     public function test_health_check_is_available_when_exact_model_is_present(): void
