@@ -10,8 +10,8 @@ export PATH=/var/lib/mbfd-aiops/.local/bin:/opt/mbfd/hermes/home/node/bin:/opt/m
 OUT_DIR=/opt/mbfd/hermes/reports
 STATE_DIR=/opt/mbfd/hermes/status
 LOCK_FILE=/run/lock/mbfd-hermes-bounded-summary.lock
-OLLAMA_URL=http://127.0.0.1:11434/api/chat
-MODEL=qwen3.6:35b
+GATEWAY_URL=http://127.0.0.1:11440/api/chat
+CAPABILITY=mbfd-ops-summary
 MAX_EVIDENCE_BYTES=14000
 MAX_MODEL_CALLS=2
 REQUEST_TIMEOUT_SECONDS=36
@@ -31,13 +31,14 @@ EVIDENCE="$OUT_DIR/mbfd-hermes-evidence-$TS.txt"
 EVIDENCE_FULL="$OUT_DIR/.evidence-full-$TS.txt"
 REQUEST="$OUT_DIR/.request-$TS.json"
 RESPONSE="$OUT_DIR/.response-$TS.json"
+RESPONSE_HEADERS="$OUT_DIR/.response-headers-$TS.txt"
 SUMMARY="$OUT_DIR/mbfd-hermes-summary-$TS.txt"
 FALLBACK="$OUT_DIR/mbfd-hermes-fallback-$TS.txt"
 META="$OUT_DIR/mbfd-hermes-audit-$TS.json"
 DELIVERY_LOG="$OUT_DIR/telegram-delivery-$TS.log"
 
 cleanup() {
-  rm -f "$REQUEST" "$RESPONSE" "$EVIDENCE_FULL"
+  rm -f "$REQUEST" "$RESPONSE" "$RESPONSE_HEADERS" "$EVIDENCE_FULL"
 }
 trap cleanup EXIT
 
@@ -74,7 +75,7 @@ fi
 } >"$EVIDENCE_FULL"
 head -c "$MAX_EVIDENCE_BYTES" "$EVIDENCE_FULL" >"$EVIDENCE"
 
-jq -n --rawfile evidence "$EVIDENCE" --arg model "$MODEL" --arg request_id "$REQUEST_ID" '{
+jq -n --rawfile evidence "$EVIDENCE" --arg model "$CAPABILITY" --arg request_id "$REQUEST_ID" '{
   model: $model,
   stream: false,
   think: false,
@@ -82,25 +83,42 @@ jq -n --rawfile evidence "$EVIDENCE" --arg model "$MODEL" --arg request_id "$REQ
     {role:"system",content:"You are a bounded MBFD operations summarizer. Use only the supplied deterministic evidence. Do not call tools, browse, delegate, or infer missing facts. Keep output under 1200 words. Label P0/P1/P2/P3, cite local evidence references, and explicitly state unavailable evidence."},
     {role:"user",content:("Request ID: " + $request_id + "\nSummarize this evidence with sections Overall Status, Immediate P0/P1, Deferred P2, Trends P3, EOC Freshness, Services and Containers, Capacity Memory OOM GPU, Backups, Cloudflare HLS Cameras, and Manual Actions.\n\n" + $evidence)}
   ],
-  options: {num_ctx:8192,num_predict:768,temperature:0.1}
+  options: {num_predict:768,temperature:0.1}
 }' >"$REQUEST"
 
 attempts=0
 llm_outcome=failed
-while (( attempts < MAX_MODEL_CALLS )); do
+gateway_auth=unavailable
+gateway_token=
+credential_file="${CREDENTIALS_DIRECTORY:-}/ai-gateway-api-key"
+if [[ -n "${CREDENTIALS_DIRECTORY:-}" && -r "$credential_file" ]]; then
+  gateway_token=$(tr -d '\r\n' <"$credential_file")
+  if [[ "$gateway_token" =~ ^[A-Za-z0-9_-]{32,256}$ ]]; then
+    gateway_auth=available
+  fi
+fi
+
+while [[ "$gateway_auth" == available ]] && (( attempts < MAX_MODEL_CALLS )); do
   attempts=$((attempts + 1))
   request_timeout=$REQUEST_TIMEOUT_SECONDS
   if (( attempts > 1 )); then
     request_timeout=$RETRY_TIMEOUT_SECONDS
   fi
   if curl --silent --show-error --fail --connect-timeout 3 --max-time "$request_timeout" \
-      --header 'Content-Type: application/json' --data-binary "@$REQUEST" "$OLLAMA_URL" >"$RESPONSE" \
+      --config <(printf 'header = "Authorization: Bearer %s"\n' "$gateway_token") \
+      --header 'Content-Type: application/json' \
+      --header "X-MBFD-Capability: $CAPABILITY" \
+      --header "X-Request-ID: $REQUEST_ID" \
+      --dump-header "$RESPONSE_HEADERS" \
+      --data-binary "@$REQUEST" "$GATEWAY_URL" >"$RESPONSE" \
+      && tr -d '\r' <"$RESPONSE_HEADERS" | grep -Fxiq "X-Request-ID: $REQUEST_ID" \
       && jq -e '.message.content | type == "string" and length > 0' "$RESPONSE" >/dev/null 2>&1; then
     jq -r '.message.content' "$RESPONSE" >"$SUMMARY"
     llm_outcome=completed
     break
   fi
 done
+unset gateway_token
 
 fallback_status=not_required
 deliver_file="$SUMMARY"
@@ -128,13 +146,15 @@ fi
 jq -n \
   --arg timestamp "$(date -Is)" \
   --arg request_id "$REQUEST_ID" \
+  --arg capability "$CAPABILITY" \
+  --arg gateway_auth "$gateway_auth" \
   --arg evidence_reference "$EVIDENCE" \
   --arg outcome "$llm_outcome" \
   --arg fallback_status "$fallback_status" \
   --arg notification_result "$notification_result" \
   --argjson model_calls "$attempts" \
   --argjson evidence_bytes "$(wc -c <"$EVIDENCE")" \
-  '{schema_version:1,timestamp:$timestamp,detector:"scheduled-summary",severity:"P2",evidence_reference:$evidence_reference,llm_invoked:true,request_id:$request_id,outcome:$outcome,fallback_status:$fallback_status,notification_result:$notification_result,model_calls:$model_calls,max_model_calls:2,evidence_bytes:$evidence_bytes,max_evidence_bytes:14000,model:"qwen3.6:35b",tools_exposed:[]}' >"$META"
+  '{schema_version:1,timestamp:$timestamp,detector:"scheduled-summary",severity:"P2",evidence_reference:$evidence_reference,llm_invoked:($model_calls > 0),request_id:$request_id,outcome:$outcome,fallback_status:$fallback_status,notification_result:$notification_result,model_calls:$model_calls,max_model_calls:2,evidence_bytes:$evidence_bytes,max_evidence_bytes:14000,model:$capability,capability:$capability,gateway_auth:$gateway_auth,tools_exposed:[]}' >"$META"
 
 cp "$META" "$STATE_DIR/last-bounded-summary.json"
 printf 'audit=%s\nresult=%s\n' "$META" "$deliver_file"
