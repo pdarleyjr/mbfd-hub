@@ -19,7 +19,9 @@ The source of truth is `scripts/operations/`:
 - `mbfd_ai_gateway_release.py` — exact-source and stale-source guard;
 - `mbfd-ai-gateway-ingress.json` — public-ingress declaration.
 
-Credentials remain root-owned files under `/etc/ollama-ai-proxy`. Never place a
+Credentials remain root-owned files under `/etc/ollama-ai-proxy`. The PRM
+consumer uses `sports-intelligence-api-key`, provisioned out of band and copied
+to the Sports secret store as `mbfd_ai_gateway_credential`. Never place a
 credential on a command line, in Git, in this runbook, or in release evidence.
 The deployment and smoke scripts read it internally and print no value.
 
@@ -27,6 +29,12 @@ Port 11440 is the canonical gateway. Port 11441 belonged to the rejected BID
 experiment; it must remain closed and must not be reused. Raw Ollama port 11434
 is not locked down by this source-persistence procedure; that is a later,
 explicit consolidation gate.
+
+The `sports-intelligence` consumer is restricted to the
+`prm-sports-research` capability at concurrency one. That capability targets
+the private Sports Ollama backend and the validated `qwen3.5:9b` model through
+the global `gpu-heavy` admission lease. PRM requests retain `keep_alive=0` so
+the Sports model unloads after every bounded job.
 
 ## Candidate gate
 

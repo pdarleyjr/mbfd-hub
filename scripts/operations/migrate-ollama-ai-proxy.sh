@@ -12,6 +12,7 @@ readonly INITIALIZATION_MODE="${3:-}"
 readonly PROTECTED_REF="refs/remotes/origin/main"
 readonly CREDENTIAL_DIR="/etc/ollama-ai-proxy"
 readonly LEGACY_CREDENTIAL="${CREDENTIAL_DIR}/api-key"
+readonly SPORTS_CREDENTIAL="${CREDENTIAL_DIR}/sports-intelligence-api-key"
 readonly CONFIG_FILE="${CREDENTIAL_DIR}/gateway.json"
 readonly STATE_FILE="${CREDENTIAL_DIR}/deployment-source.json"
 readonly UNIT_FILE="/etc/systemd/system/ollama-ai-proxy.service"
@@ -45,14 +46,16 @@ for required in \
     "${SOURCE_RELEASE}" \
     "${SOURCE_VERIFY}" \
     "${SOURCE_DEPLOY}" \
-    "${LEGACY_CREDENTIAL}"; do
+    "${LEGACY_CREDENTIAL}" \
+    "${SPORTS_CREDENTIAL}"; do
     if [[ ! -f ${required} || -L ${required} ]]; then
         echo "Required gateway artifact is missing or symlinked: ${required}" >&2
         exit 2
     fi
 done
 
-if [[ $(stat -c '%U:%G %a' "${LEGACY_CREDENTIAL}") != "root:root 600" ]]; then
+if [[ $(stat -c '%U:%G %a' "${LEGACY_CREDENTIAL}") != "root:root 600" \
+    || $(stat -c '%U:%G %a' "${SPORTS_CREDENTIAL}") != "root:root 600" ]]; then
     echo "Gateway credential has unsafe ownership or mode" >&2
     exit 2
 fi

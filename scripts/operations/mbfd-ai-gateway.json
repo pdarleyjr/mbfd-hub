@@ -26,12 +26,26 @@
       ],
       "concurrency": 1,
       "legacy_passthrough": true
+    },
+    "sports-intelligence": {
+      "credential_file": "%d/sports-intelligence-api-key",
+      "allowed_capabilities": [
+        "prm-sports-research"
+      ],
+      "concurrency": 1,
+      "legacy_passthrough": false
     }
   },
   "backends": {
     "ollama-primary": {
       "provider": "ollama",
       "base_url": "http://127.0.0.1:11434",
+      "enabled": true,
+      "health_timeout_seconds": 3
+    },
+    "ollama-prm-sports": {
+      "provider": "ollama",
+      "base_url": "http://172.31.241.7:11434",
       "enabled": true,
       "health_timeout_seconds": 3
     },
@@ -163,6 +177,24 @@
         "num_ctx": 32768
       },
       "heavy_workload": "primary-ollama-large"
+    },
+    "prm-sports-research": {
+      "backend": "ollama-prm-sports",
+      "model": "qwen3.5:9b",
+      "paths": [
+        "/api/chat"
+      ],
+      "concurrency": 1,
+      "timeout_seconds": 120,
+      "retries": 0,
+      "cold_start": {
+        "mode": "wait",
+        "ready_timeout_seconds": 120
+      },
+      "ollama_options": {
+        "num_ctx": 32768
+      },
+      "heavy_workload": "prm-sports-medium"
     }
   },
   "compatibility_models": {
@@ -174,13 +206,24 @@
         "num_ctx": 65536
       }
     },
-    "mbfd-embeddings": "mbfd-embeddings"
+    "mbfd-embeddings": "mbfd-embeddings",
+    "qwen3.5:9b": "prm-sports-research"
   },
   "heavy_workloads": {
     "primary-ollama-large": {
       "lease_group": "gpu-heavy",
       "mem_available_floor_mb": 8192,
       "declared_model_allocation_mb": 30720,
+      "memory_psi_avg10_max": 1.0,
+      "max_swap_activity_pages": 4096,
+      "deny_on_recent_oom": true,
+      "deny_on_recent_gpu_reset": true,
+      "require_production_healthy": true
+    },
+    "prm-sports-medium": {
+      "lease_group": "gpu-heavy",
+      "mem_available_floor_mb": 8192,
+      "declared_model_allocation_mb": 8192,
       "memory_psi_avg10_max": 1.0,
       "max_swap_activity_pages": 4096,
       "deny_on_recent_oom": true,

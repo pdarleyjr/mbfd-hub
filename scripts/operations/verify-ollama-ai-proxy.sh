@@ -11,6 +11,7 @@ readonly EXPECTED_SOURCE_SHA="${2:?exact 40-character source SHA is required}"
 readonly PROTECTED_REF="refs/remotes/origin/main"
 readonly CREDENTIAL_DIR="/etc/ollama-ai-proxy"
 readonly CREDENTIAL_FILE="${CREDENTIAL_DIR}/api-key"
+readonly SPORTS_CREDENTIAL_FILE="${CREDENTIAL_DIR}/sports-intelligence-api-key"
 readonly STATE_FILE="${CREDENTIAL_DIR}/deployment-source.json"
 readonly CONFIG_FILE="${CREDENTIAL_DIR}/gateway.json"
 readonly SCRIPT_FILE="/opt/ollama-ai-proxy/mbfd_ai_gateway.py"
@@ -33,6 +34,7 @@ release_arguments=(
     --live-unit "${UNIT_FILE}"
 
 [[ $(stat -c '%U:%G %a' "${CREDENTIAL_FILE}") == "root:root 600" ]]
+[[ $(stat -c '%U:%G %a' "${SPORTS_CREDENTIAL_FILE}") == "root:root 600" ]]
 [[ $(stat -c '%U:%G %a' "${CONFIG_FILE}") == "root:root 600" ]]
 [[ $(stat -c '%U:%G %a' "${STATE_FILE}") == "root:root 600" ]]
 [[ $(stat -c '%U:%G %a' "${SCRIPT_FILE}") == "root:root 755" ]]
