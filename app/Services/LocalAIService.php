@@ -9,35 +9,39 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
- * Local Ollama-backed AI service — a drop-in replacement for
- * {@see CloudflareAIService} that routes all generation to the on-prem
- * qwen3.6:35b model via Ollama's OpenAI-compatible endpoint.
+ * Private MBFD AI Gateway service — a drop-in replacement for
+ * {@see CloudflareAIService} that uses only the logical capability contract.
  *
- * It normalizes Ollama responses into the Cloudflare Workers-AI
+ * It normalizes gateway responses into the Cloudflare Workers-AI
  * ['result' => ['response' => ...]] shape, so every inherited method
  * (generateAdminBulletSummary, prioritizeProjects, analyzeProject,
  * generateWeeklySummary, parseAIResponse, extractTextFromResponse) keeps
- * working unchanged. Bound over CloudflareAIService in AppServiceProvider
- * when cloudflare.ai.driver === 'local'.
+ * working unchanged. Bound over CloudflareAIService for every application
+ * request in AppServiceProvider.
  */
 class LocalAIService extends CloudflareAIService
 {
     protected string $baseUrl;
 
-    protected string $localModel;
+    protected string $capability;
+
+    protected string $credentialFile;
 
     public function __construct()
     {
         parent::__construct();
-        $this->baseUrl = rtrim((string) config('cloudflare.ai.local.url', 'http://host.docker.internal:11434'), '/');
-        $this->localModel = (string) config('cloudflare.ai.local.model', 'qwen3.6:35b');
+        $this->baseUrl = rtrim((string) config('cloudflare.ai.gateway.url', 'http://172.20.0.1:11440'), '/');
+        $this->capability = (string) config('cloudflare.ai.gateway.capability', 'mbfd-general');
+        $this->credentialFile = (string) config('cloudflare.ai.gateway.credential_file', '/run/secrets/mbfd-hub-ai-gateway-token');
     }
 
     public function isEnabled(): bool
     {
-        return $this->checkHealth()['available'];
+        return (bool) config('cloudflare.ai.enabled', true)
+            && $this->checkHealth()['available'];
     }
 
     /**
@@ -53,25 +57,38 @@ class LocalAIService extends CloudflareAIService
      */
     public function checkHealth(): array
     {
-        $cacheKey = 'local_ai_health:'.md5($this->baseUrl.':'.$this->localModel);
+        $cacheKey = 'local_ai_health:'.md5($this->baseUrl.':'.$this->capability.':'.$this->credentialFile);
 
         return Cache::remember($cacheKey, now()->addSeconds(60), function (): array {
-            if ($this->baseUrl === '' || $this->localModel === '') {
+            if ($this->baseUrl === '' || $this->capability === '' || $this->credentialFile === '') {
                 return [
                     'configured' => false,
                     'reachable' => false,
                     'model_exists' => false,
                     'available' => false,
-                    'error' => 'Ollama URL or model not configured',
+                    'error' => 'AI gateway configuration is incomplete',
                 ];
             }
 
             try {
-                $response = Http::connectTimeout(3)
+                $headers = $this->gatewayHeaders();
+            } catch (\RuntimeException) {
+                return [
+                    'configured' => false,
+                    'reachable' => false,
+                    'model_exists' => false,
+                    'available' => false,
+                    'error' => 'AI gateway credential is unavailable',
+                ];
+            }
+
+            try {
+                $response = Http::withHeaders($headers)
+                    ->connectTimeout(3)
                     ->timeout(5)
                     ->get("{$this->baseUrl}/api/tags");
             } catch (ConnectionException $exception) {
-                Log::warning('Local AI health check: Ollama unreachable', [
+                Log::warning('AI gateway health check failed', [
                     'error' => $exception->getMessage(),
                 ]);
 
@@ -80,12 +97,12 @@ class LocalAIService extends CloudflareAIService
                     'reachable' => false,
                     'model_exists' => false,
                     'available' => false,
-                    'error' => 'Ollama unreachable: '.$exception->getMessage(),
+                    'error' => 'AI gateway unreachable: '.$exception->getMessage(),
                 ];
             }
 
             if (! $response->successful()) {
-                Log::warning('Local AI health check: Ollama returned non-200', [
+                Log::warning('AI gateway health check returned non-200', [
                     'status' => $response->status(),
                 ]);
 
@@ -94,7 +111,7 @@ class LocalAIService extends CloudflareAIService
                     'reachable' => false,
                     'model_exists' => false,
                     'available' => false,
-                    'error' => "Ollama returned HTTP {$response->status()}",
+                    'error' => "AI gateway returned HTTP {$response->status()}",
                 ];
             }
 
@@ -105,14 +122,14 @@ class LocalAIService extends CloudflareAIService
             }
 
             if (! is_array($inventory) || ! isset($inventory['models']) || ! is_array($inventory['models'])) {
-                Log::warning('Local AI health check: Ollama returned malformed model inventory');
+                Log::warning('AI gateway health check returned malformed capability inventory');
 
                 return [
                     'configured' => true,
                     'reachable' => true,
                     'model_exists' => false,
                     'available' => false,
-                    'error' => 'Ollama returned malformed model inventory',
+                    'error' => 'AI gateway returned malformed capability inventory',
                 ];
             }
 
@@ -122,11 +139,11 @@ class LocalAIService extends CloudflareAIService
                 ->map(fn (string $name): string => $this->normalizeModelName($name))
                 ->values()
                 ->all();
-            $modelExists = in_array($this->normalizeModelName($this->localModel), $models, true);
+            $modelExists = in_array($this->normalizeModelName($this->capability), $models, true);
 
             if (! $modelExists) {
-                Log::warning('Local AI health check: configured model not found', [
-                    'model' => $this->localModel,
+                Log::warning('AI gateway health check did not advertise capability', [
+                    'capability' => $this->capability,
                     'available_models' => array_slice($models, 0, 10),
                 ]);
 
@@ -135,7 +152,7 @@ class LocalAIService extends CloudflareAIService
                     'reachable' => true,
                     'model_exists' => false,
                     'available' => false,
-                    'error' => "Model '{$this->localModel}' not found in Ollama",
+                    'error' => "Capability '{$this->capability}' not advertised by AI gateway",
                 ];
             }
 
@@ -170,9 +187,9 @@ class LocalAIService extends CloudflareAIService
     }
 
     /**
-     * Run the local model and return a Cloudflare-shaped response array.
+     * Run the gateway capability and return a Cloudflare-shaped response array.
      *
-     * @param  string  $model  Ignored (callers pass @cf/... ids); always uses the local model.
+     * @param  string  $model  Ignored; the gateway always receives the configured logical capability.
      * @param  array<int, array{role: string, content: string}>  $messages
      * @param  array<string, mixed>  $options
      * @return array{result: array{response: string}}
@@ -181,7 +198,7 @@ class LocalAIService extends CloudflareAIService
     {
         // Interactive browser requests may use a shorter ceiling than the
         // global cold-load timeout. Never forward this transport option.
-        $requestTimeout = (int) ($options['request_timeout'] ?? config('cloudflare.ai.local.timeout', 120));
+        $requestTimeout = (int) ($options['request_timeout'] ?? config('cloudflare.ai.gateway.timeout', 120));
         $responseSchema = $options['response_schema'] ?? null;
         unset($options['request_timeout']);
         unset($options['response_schema']);
@@ -190,7 +207,7 @@ class LocalAIService extends CloudflareAIService
             $temperature = (float) ($options['temperature'] ?? 0.1);
             $maxTokens = (int) ($options['max_tokens'] ?? 2048);
             $response = $this->postWithBoundedRetry("{$this->baseUrl}/api/chat", [
-                'model' => $this->localModel,
+                'model' => $this->capability,
                 'messages' => $messages,
                 'stream' => false,
                 'think' => false,
@@ -210,18 +227,13 @@ class LocalAIService extends CloudflareAIService
             'temperature' => 0.3,
             'max_tokens' => 2048,
         ], $options, [
-            // qwen3.6 is a thinking model; reasoning_effort:none keeps replies
-            // fast and guarantees non-empty `content`. Force the local model id
-            // regardless of any @cf/... id the caller passed.
-            'model' => $this->localModel,
+            'model' => $this->capability,
             'messages' => $messages,
             'reasoning_effort' => 'none',
         ]);
 
-        // Local LLM cold-load (weights into VRAM) can take ~45s before the
-        // first token; the Cloudflare 30s request timeout is too short for
-        // that. Use the local-specific timeout (default 120s). Warm calls
-        // return in a few seconds.
+        // The private gateway may cold-load its routed model, so retain the
+        // existing bounded 120-second default instead of the cloud timeout.
         $response = $this->postWithBoundedRetry("{$this->baseUrl}/v1/chat/completions", $payload, $requestTimeout);
 
         $content = (string) data_get($response->json(), 'choices.0.message.content', '');
@@ -239,12 +251,14 @@ class LocalAIService extends CloudflareAIService
     private function postWithBoundedRetry(string $url, array $payload, int $timeout): Response
     {
         $attempt = 0;
+        $headers = $this->gatewayHeaders();
 
         while (true) {
             $attempt++;
 
             try {
-                $response = Http::timeout($timeout)
+                $response = Http::withHeaders($headers)
+                    ->timeout($timeout)
                     ->connectTimeout(10)
                     ->post($url, $payload);
             } catch (ConnectionException $exception) {
@@ -265,16 +279,37 @@ class LocalAIService extends CloudflareAIService
             }
 
             if (! $response->successful()) {
-                Log::error('Local AI request failed', [
+                Log::error('AI gateway request failed', [
                     'status' => $response->status(),
                     'response_bytes' => strlen($response->body()),
                     'attempts' => $attempt,
                 ]);
-                throw new \RuntimeException("Local AI request failed: {$response->status()}");
+                throw new \RuntimeException("AI gateway request failed: {$response->status()}");
             }
 
             return $response;
         }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function gatewayHeaders(): array
+    {
+        if ($this->credentialFile === '' || ! is_file($this->credentialFile) || ! is_readable($this->credentialFile)) {
+            throw new \RuntimeException('AI gateway credential is unavailable');
+        }
+
+        $credential = @file_get_contents($this->credentialFile);
+        if ($credential === false || trim($credential) === '') {
+            throw new \RuntimeException('AI gateway credential is unavailable');
+        }
+
+        return [
+            'Authorization' => 'Bearer '.trim($credential),
+            'X-MBFD-Capability' => $this->capability,
+            'X-Request-ID' => (string) Str::uuid(),
+        ];
     }
 
     /**
@@ -297,7 +332,7 @@ class LocalAIService extends CloudflareAIService
             ],
         ];
 
-        $result = $this->runModel($this->localModel, $messages);
+        $result = $this->runModel($this->capability, $messages);
 
         return [
             'message' => $result['result']['response'] ?? '',

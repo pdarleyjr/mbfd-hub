@@ -12,8 +12,7 @@ index_name = "mbfd-rag-index"
 [vars]
 SUPPORT_HUB_URL = "https://www.mbfdhub.com"
 ALLOWED_ORIGIN = "https://www.mbfdhub.com"
-# Local-LLM bridge (Ollama OpenAI-compatible) for landing-chat generation.
-# Retrieval still uses Workers AI embeddings + Vectorize. Secrets BRIDGE_TOKEN
-# and INGEST_SECRET are set via `wrangler secret put` (never committed).
-BRIDGE_URL = "https://office-ai.mbfdhub.com/v1"
-BRIDGE_MODEL = "qwen3.6:35b"
+# Landing-chat generation uses the private gateway. Retrieval remains on
+# Workers AI embeddings + Vectorize. Unique secret AI_GATEWAY_TOKEN and the
+# independent INGEST_SECRET are installed with `wrangler secret put`.
+AI_GATEWAY_URL = "https://ai-portal.mbfdhub.com"

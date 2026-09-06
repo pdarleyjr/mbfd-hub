@@ -375,6 +375,7 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(imageCompose, /image:\s*"\$\{HUB_IMAGE_REF/);
   assert.match(imageCompose, /HUB_APP_ENV_FILE.*\.env:ro/);
   assert.match(imageCompose, /HUB_STORAGE_PATH.*\/var\/www\/html\/storage/);
+  assert.match(imageCompose, /HUB_AI_GATEWAY_CREDENTIAL_SOURCE_FILE.*\/run\/secrets\/mbfd-hub-ai-gateway-token:ro/);
   assert.match(imageCompose, /external:\s*true/);
   assert.doesNotMatch(imageCompose, /\bbuild:/);
   assert.doesNotMatch(imageCompose, /\.\s*:\/var\/www\/html/);

@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
  * Dispatched by {@see DisplayAiService::ensureFresh()} ONLY when the sanitised
  * snapshot fingerprint changed and no job is already pending. Running async
  * keeps the display API request path free of any LLM latency and only loads
- * the local model when there is genuinely new information to describe.
+ * the gateway only when there is genuinely new information to describe.
  *
  * On any failure the last-good cached brief is left untouched (the endpoint
  * serves it as "stale").
@@ -47,7 +47,7 @@ class GenerateDisplayAiSnapshotJob implements ShouldQueue
     public function handle(CloudflareAIService $ai): void
     {
         try {
-            $model = (string) config('cloudflare.ai.local.model', 'qwen3.6:35b');
+            $model = (string) config('cloudflare.ai.gateway.capability', 'mbfd-general');
             $messages = $this->buildMessages($this->sanitizedSnapshot);
 
             $response = $ai->runModel($model, $messages, [
@@ -107,7 +107,7 @@ class GenerateDisplayAiSnapshotJob implements ShouldQueue
   "data_gaps": ["string"],
   "confidence": 0.0,
   "generated_at": "ISO-8601",
-  "model": "qwen3.6:35b"
+  "model": "mbfd-general"
 }
 JSON;
 
@@ -193,7 +193,7 @@ JSON;
             'data_gaps' => $dataGaps,
             'confidence' => $confidence,
             'generated_at' => now()->toISOString(),
-            'model' => (string) config('cloudflare.ai.local.model', 'qwen3.6:35b'),
+            'model' => (string) config('cloudflare.ai.gateway.capability', 'mbfd-general'),
         ];
     }
 }

@@ -21,6 +21,7 @@ services:
       - "${HUB_APP_ENV_FILE:?HUB_APP_ENV_FILE must point to the host-managed Laravel environment file}:/var/www/html/.env:ro"
       - "${HUB_STORAGE_PATH:?HUB_STORAGE_PATH must be the existing writable Hub storage directory}:/var/www/html/storage"
       - "${HUB_GOOGLE_SA_PATH:-/dev/null}:/run/secrets/google_service_account.json:ro"
+      - "${HUB_AI_GATEWAY_CREDENTIAL_SOURCE_FILE:?HUB_AI_GATEWAY_CREDENTIAL_SOURCE_FILE must point to the protected Hub gateway credential}:/run/secrets/mbfd-hub-ai-gateway-token:ro"
     networks:
       - mbfd-net
     security_opt:

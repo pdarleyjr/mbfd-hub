@@ -31,10 +31,17 @@ def get(port: int, path: str, token: str) -> tuple[int, dict]:
 
 def main() -> int:
     with tempfile.TemporaryDirectory() as temp:
-        credential = Path(temp) / "api-key"
-        credential.write_text("isolated-predeploy-credential", encoding="utf-8")
+        config_path = MODULE_PATH.parent / "mbfd-ai-gateway.json"
+        raw_config = json.loads(config_path.read_text(encoding="utf-8"))
+        credentials: dict[str, str] = {}
+        for consumer_id, consumer in raw_config["consumers"].items():
+            credential_value = f"isolated-predeploy-{consumer_id}-credential"
+            credential_path = Path(consumer["credential_file"].replace("%d", temp))
+            credential_path.write_text(credential_value, encoding="utf-8")
+            credentials[consumer_id] = credential_value
+
         config = gateway.load_config(
-            MODULE_PATH.parent / "mbfd-ai-gateway.json",
+            config_path,
             {"CREDENTIALS_DIRECTORY": temp},
         )
         config.listeners = ("127.0.0.1",)
@@ -53,9 +60,7 @@ def main() -> int:
                 "/v1/models",
                 "/api/version",
             ):
-                status, _payload = get(
-                    config.port, path, "isolated-predeploy-credential"
-                )
+                status, _payload = get(config.port, path, credentials["legacy-11440"])
                 if status != 200:
                     raise RuntimeError(f"{path} returned {status}")
                 print(f"PASS {path} status=200")

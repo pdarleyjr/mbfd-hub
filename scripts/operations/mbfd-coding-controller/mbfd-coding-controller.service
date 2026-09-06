@@ -1,0 +1,55 @@
+[Unit]
+Description=MBFD Coding Controller — exclusive-session provider for MBFD AI Gateway
+After=network-online.target ollama.service
+Wants=network-online.target ollama.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=mbfd-coding
+Group=mbfd-coding
+ExecStart=/opt/mbfd-coding-controller/venv/bin/python /opt/mbfd-coding-controller/controller.py
+WorkingDirectory=/opt/mbfd-coding-controller
+Restart=on-failure
+RestartSec=10
+
+Environment=OLLAMA_UPSTREAM=http://127.0.0.1:11434
+Environment=CONTROLLER_HOST=127.0.0.1
+Environment=CONTROLLER_PORT=11436
+Environment=LOCK_PATH=/run/lock/mbfd-coding-controller.lock
+Environment=LOG_DIR=/var/log/mbfd-coding-controller
+Environment=INACTIVITY_TIMEOUT_S=1200
+Environment=MONITOR_INTERVAL_S=1
+Environment=MONITOR_IDLE_INTERVAL_S=10
+Environment=COOLDOWN_S=60
+Environment=MIN_AVAILABLE_RAM_GIB=16
+Environment=PREFERRED_AVAILABLE_RAM_GIB=20
+Environment=MAX_SWAP_DELTA_GIB=1
+Environment=APPROVED_MODEL=mbfd-code:32k
+Environment=GENERAL_MODEL=qwen3.6:35b
+Environment=SUPPRESS_UNITS=mbfd-hermes-bounded-summary.timer
+
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectClock=true
+PrivateDevices=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=true
+UMask=0077
+
+ReadWritePaths=/var/log/mbfd-coding-controller /run/lock
+ReadOnlyPaths=/opt/mbfd-coding-controller
+
+[Install]
+WantedBy=multi-user.target

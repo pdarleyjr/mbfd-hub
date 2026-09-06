@@ -2,7 +2,6 @@ import json
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 WATCHDOG = ROOT / "scripts" / "operations" / "hermes-watchdog"
 
@@ -54,6 +53,47 @@ class HermesWatchdogPersistenceTests(unittest.TestCase):
         obsolete = "timeout " + "420 hermes"
         self.assertNotIn(obsolete, content)
         self.assertNotIn("hermes --provider", content)
+
+    def test_bounded_summary_uses_gateway_logical_capability(self):
+        script = (WATCHDOG / "run-hermes-bounded-summary.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("GATEWAY_URL=http://127.0.0.1:11440/api/chat", script)
+        self.assertIn("CAPABILITY=mbfd-ops-summary", script)
+        self.assertIn("CREDENTIALS_DIRECTORY", script)
+        self.assertIn("Authorization: Bearer", script)
+        self.assertIn("X-MBFD-Capability", script)
+        self.assertIn("X-Request-ID", script)
+        self.assertIn("--dump-header", script)
+        self.assertNotIn("127.0.0.1:11434", script)
+        self.assertNotIn("qwen3.6:35b", script)
+
+    def test_bounded_summary_preserves_accepted_bounds_and_fallback(self):
+        script = (WATCHDOG / "run-hermes-bounded-summary.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("MAX_MODEL_CALLS=2", script)
+        self.assertIn("REQUEST_TIMEOUT_SECONDS=36", script)
+        self.assertIn("RETRY_TIMEOUT_SECONDS=6", script)
+        self.assertIn("fallback_status=deterministic_report_used", script)
+        self.assertIn("tools_exposed:[]", script)
+
+    def test_deterministic_watchdog_remains_ai_independent(self):
+        watchdog = (WATCHDOG / "mbfd-eoc-watchdog.py").read_text(encoding="utf-8")
+        self.assertNotIn("11440", watchdog)
+        self.assertNotIn("Authorization: Bearer", watchdog)
+        self.assertNotIn("mbfd-ops-summary", watchdog)
+
+    def test_bounded_summary_unit_loads_only_its_consumer_credential(self):
+        unit = (
+            WATCHDOG / "systemd" / "mbfd-hermes-bounded-summary.service"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "LoadCredential=ai-gateway-api-key:/etc/ollama-ai-proxy/hermes-api-key",
+            unit,
+        )
+        self.assertIn("After=network-online.target ollama-ai-proxy.service", unit)
+        self.assertNotIn("ollama-eoc.service", unit)
 
 
 if __name__ == "__main__":
