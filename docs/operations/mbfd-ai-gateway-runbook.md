@@ -62,6 +62,11 @@ substitution. Only the explicitly marked `legacy-11440` identity retains the
 temporary compatibility-alias behavior needed for bounded migration; remove
 that identity after every registered application has cut over.
 
+The general capability permits 180 seconds for the first cold response byte and
+360 seconds for the request. This covers the previously measured stable-model
+cold start without forcing application timeouts below the retained Hub/TS
+six-minute boundary; it is not a license for unbounded retries or substitution.
+
 The two private listeners are `127.0.0.1:11440` and
 `172.20.0.1:11440`. The latter is the retained `mbfd-ai` bridge gateway and
 replaces the legacy bridge-owned `172.20.11.1` address so retirement of ports

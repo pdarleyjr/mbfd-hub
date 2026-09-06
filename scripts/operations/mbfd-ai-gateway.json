@@ -144,11 +144,11 @@
         "/v1/responses"
       ],
       "concurrency": 1,
-      "timeout_seconds": 180,
+      "timeout_seconds": 360,
       "retries": 0,
       "cold_start": {
         "mode": "wait",
-        "ready_timeout_seconds": 90
+        "ready_timeout_seconds": 180
       },
       "ollama_options": {
         "num_ctx": 32768

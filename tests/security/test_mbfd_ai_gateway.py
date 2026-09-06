@@ -311,6 +311,11 @@ class TestConfiguration(unittest.TestCase):
             frozenset({"mbfd-code"}),
         )
         self.assertEqual(config.capabilities["mbfd-general"].model, "qwen3.6:35b")
+        self.assertEqual(config.capabilities["mbfd-general"].timeout_seconds, 360)
+        self.assertEqual(
+            config.capabilities["mbfd-general"].cold_start.ready_timeout_seconds,
+            180,
+        )
         self.assertEqual(
             config.capabilities["mbfd-ops-summary"].cold_start.mode, "reject_if_cold"
         )
