@@ -32,6 +32,32 @@ model, and transitional states report none. The inference request still enters
 authoritative and can deny with 503. The general model is never exposed through
 the coding provider catalog.
 
+## Windows / Roo Code caller handoff
+
+`start-mbfd-coding-gateway-tunnel.ps1` is the source-controlled replacement
+transport for the previous user-owned 11436 tunnel. It forwards Windows
+loopback 11440 to GMKtec loopback 11440 and carries no credential. It fails
+closed if the local bind or SSH forwarding cannot be established.
+
+The Roo Code profile is the component that authenticates to the gateway. The
+Release Captain must configure and physically accept the installed extension
+with:
+
+- provider `OpenAI Compatible`;
+- base URL `http://127.0.0.1:11440/v1`;
+- API key set to the unique `external-coding` credential through the UI, where
+  it belongs in VS Code secret storage, never in this script or a repository;
+- model ID `mbfd-code` (logical, never `mbfd-code:32k`); and
+- custom header `X-MBFD-Capability: mbfd-code`.
+
+The accepted caller must also supply a fresh, safe `X-Request-ID` for every
+request and verify the echoed value. A fixed custom-header value is not
+sufficient. Support for that behavior must be proved against the actually
+installed Roo Code version before switching the profile. If the installed
+extension cannot generate and correlate request IDs, caller migration remains
+blocked; do not assign a legacy identity, omit the capability header, expose a
+static browser credential, or point Roo Code at 11436 as a workaround.
+
 OpenAI-compatible chat and completion requests use the same controller
 admission path as native Ollama chat/generate requests. Catalog endpoints expose
 only the approved coding model, and the catch-all proxy cannot reach inference

@@ -1,7 +1,6 @@
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER = ROOT / "scripts" / "operations" / "mbfd-coding-controller"
 
@@ -17,6 +16,7 @@ class CodingControllerPersistenceTests(unittest.TestCase):
             "mbfd-coding-controller.sudoers",
             "pytest.ini",
             "requirements.txt",
+            "start-mbfd-coding-gateway-tunnel.ps1",
             "test_controller.py",
         }
         actual = {
@@ -82,6 +82,22 @@ class CodingControllerPersistenceTests(unittest.TestCase):
         self.assertIn("registry no longer references 11436", normalized)
         self.assertIn("single-session exclusivity", normalized)
         self.assertIn("virtual readiness", normalized)
+
+    def test_windows_coding_tunnel_targets_only_canonical_gateway(self):
+        tunnel = (
+            CONTROLLER / "start-mbfd-coding-gateway-tunnel.ps1"
+        ).read_text(encoding="utf-8")
+        self.assertIn("127.0.0.1:11440:127.0.0.1:11440", tunnel)
+        self.assertNotIn("11436", tunnel)
+        self.assertNotIn("Bearer", tunnel)
+
+        readme = (CONTROLLER / "README.md").read_text(encoding="utf-8")
+        normalized = " ".join(readme.split())
+        self.assertIn("Roo Code", normalized)
+        self.assertIn("OpenAI Compatible", normalized)
+        self.assertIn("X-MBFD-Capability", normalized)
+        self.assertIn("X-Request-ID", normalized)
+        self.assertIn("VS Code secret storage", normalized)
 
 
 if __name__ == "__main__":

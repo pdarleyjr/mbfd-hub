@@ -2,17 +2,15 @@
 """Automated tests for MBFD Coding Controller."""
 
 import asyncio
-import json
-import math
 import os
 import sys
 import tempfile
 import time
 from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
+import httpx
 import pytest
 import pytest_asyncio
-import httpx
 from httpx import ASGITransport
 
 os.environ["OLLAMA_UPSTREAM"] = "http://mock-ollama:11434"
@@ -189,7 +187,7 @@ class TestEndSession:
         ctrl.state.state = ctrl.ControllerState.CODING
         ctrl.state.model_loaded = True
 
-        with patch.object(ctrl, "unload_model", new_callable=AsyncMock) as mock_unload, \
+        with patch.object(ctrl, "unload_model", new_callable=AsyncMock), \
              patch.object(ctrl, "wait_model_absent", new_callable=AsyncMock, return_value=True), \
              patch.object(ctrl, "ollama_post", new_callable=AsyncMock, return_value={}), \
              patch.object(ctrl, "restore_background_services", new_callable=AsyncMock), \
