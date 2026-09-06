@@ -49,7 +49,10 @@ The retained MBFD consumer/capability pairs are fail closed:
   `mbfd-support-ai` -> `mbfd-general`;
 - `hermes` -> `mbfd-ops-summary`;
 - `eoc` -> `mbfd-eoc-grounding` on the private EOC provider;
-- `external-coding` -> `mbfd-code`.
+- `external-coding` -> `mbfd-code` through the loopback lifecycle controller
+  on 11436. The controller remains the only owner of coding-session admission,
+  physical model allowlisting, resource aborts, idle release, and stable-model
+  recovery; applications never call 11436 or raw 11434.
 
 The initial `mbfd-general` rollout uses the stable `qwen3.6:35b` binding. This
 physical binding is gateway-only and must never appear in an application

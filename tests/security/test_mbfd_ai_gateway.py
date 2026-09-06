@@ -345,6 +345,18 @@ class TestConfiguration(unittest.TestCase):
             config.backends["ollama-eoc"].base_url,
             "http://172.20.0.1:11437",
         )
+        self.assertEqual(
+            config.backends["coding-controller"].base_url,
+            "http://127.0.0.1:11436",
+        )
+        self.assertEqual(
+            config.capabilities["mbfd-code"].backend_id,
+            "coding-controller",
+        )
+        self.assertEqual(
+            config.capabilities["mbfd-code"].paths,
+            frozenset({"/v1/chat/completions"}),
+        )
         self.assertNotIn("mbfd-bid", config.consumers)
         self.assertNotIn("mbfd-bid-analysis", config.capabilities)
         self.assertNotIn("mbfd-transcribe", config.capabilities)

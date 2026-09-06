@@ -372,6 +372,7 @@ class TestPersistedReleaseSurface(unittest.TestCase):
         self.assertIn("incorrect-capability", smoke)
         self.assertIn("admission_denied", smoke)
         self.assertIn("mbfd-image", smoke)
+        self.assertIn('"coding-controller"', smoke)
 
     def test_ci_validation_materializes_every_gateway_credential(self) -> None:
         workflow = (

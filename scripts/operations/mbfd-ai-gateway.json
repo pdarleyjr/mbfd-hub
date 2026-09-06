@@ -119,6 +119,12 @@
       "enabled": true,
       "health_timeout_seconds": 3
     },
+    "coding-controller": {
+      "provider": "ollama",
+      "base_url": "http://127.0.0.1:11436",
+      "enabled": true,
+      "health_timeout_seconds": 3
+    },
     "future-llama-server": {
       "provider": "openai_compatible",
       "base_url": "http://127.0.0.1:11439",
@@ -156,14 +162,10 @@
       "heavy_workload": "primary-ollama-large"
     },
     "mbfd-code": {
-      "backend": "ollama-primary",
+      "backend": "coding-controller",
       "model": "mbfd-code:32k",
       "paths": [
-        "/api/chat",
-        "/api/generate",
-        "/v1/chat/completions",
-        "/v1/completions",
-        "/v1/responses"
+        "/v1/chat/completions"
       ],
       "concurrency": 1,
       "timeout_seconds": 600,

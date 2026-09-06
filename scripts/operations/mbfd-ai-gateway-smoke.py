@@ -99,7 +99,12 @@ def main() -> int:
         if path == "/health/backends":
             backend_states = {
                 name: payload["backends"][name]["service"]
-                for name in ("ollama-primary", "ollama-eoc", "ollama-prm-sports")
+                for name in (
+                    "ollama-primary",
+                    "ollama-eoc",
+                    "ollama-prm-sports",
+                    "coding-controller",
+                )
             }
             capability_states = {
                 name: payload["capabilities"][name]["state"]
