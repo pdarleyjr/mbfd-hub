@@ -327,6 +327,10 @@ class TestConfiguration(unittest.TestCase):
             config.capabilities["prm-sports-research"].backend_id,
             "ollama-prm-sports",
         )
+        self.assertEqual(
+            config.backends["ollama-prm-sports"].base_url,
+            "http://172.31.241.10:11434",
+        )
         self.assertEqual(config.capabilities["prm-sports-research"].model, "qwen3.5:9b")
         self.assertEqual(config.capabilities["prm-sports-research"].concurrency, 1)
         self.assertEqual(
