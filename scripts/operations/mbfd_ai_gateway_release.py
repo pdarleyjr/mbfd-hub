@@ -19,6 +19,7 @@ SOURCE_ARTIFACTS = (
     "mbfd-ai-gateway.json",
     "ollama-ai-proxy.service",
     "migrate-ollama-ai-proxy.sh",
+    "provision-mbfd-ai-gateway-consumers.sh",
     "verify-ollama-ai-proxy.sh",
     "mbfd-ai-gateway-smoke.py",
     "mbfd_ai_gateway_release.py",

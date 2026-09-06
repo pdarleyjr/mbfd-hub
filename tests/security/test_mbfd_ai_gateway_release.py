@@ -320,6 +320,9 @@ class TestPersistedReleaseSurface(unittest.TestCase):
     def test_consumer_credential_provisioner_is_secret_safe_and_idempotent(
         self,
     ) -> None:
+        self.assertIn(
+            "provision-mbfd-ai-gateway-consumers.sh", release.SOURCE_ARTIFACTS
+        )
         provisioner = (
             self.operations / "provision-mbfd-ai-gateway-consumers.sh"
         ).read_text(encoding="utf-8")
