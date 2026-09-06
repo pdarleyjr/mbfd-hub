@@ -370,6 +370,28 @@ class TestPersistedReleaseSurface(unittest.TestCase):
         self.assertIn("admission_denied", smoke)
         self.assertIn("mbfd-image", smoke)
 
+    def test_ci_validation_materializes_every_gateway_credential(self) -> None:
+        workflow = (
+            self.root / ".github" / "workflows" / "hub-release-gates.yml"
+        ).read_text(encoding="utf-8")
+        for credential_name in (
+            "api-key",
+            "sports-intelligence-api-key",
+            "mbfd-hub-api-key",
+            "media-control-api-key",
+            "hermes-api-key",
+            "command-api-key",
+            "eoc-api-key",
+            "ts-orchestrator-api-key",
+            "mbfd-support-ai-api-key",
+            "external-coding-api-key",
+        ):
+            self.assertIn(credential_name, workflow)
+        self.assertIn('>"${credential_directory}/${credential_name}"', workflow)
+        self.assertIn(
+            'chmod 0600 "${credential_directory}/${credential_name}"', workflow
+        )
+
     def test_runbook_defines_exact_release_and_rollback_contract(self) -> None:
         runbook = (
             self.root / "docs" / "operations" / "mbfd-ai-gateway-runbook.md"

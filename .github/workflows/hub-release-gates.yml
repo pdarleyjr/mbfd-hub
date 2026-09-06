@@ -557,17 +557,29 @@ jobs:
             -v
           credential_directory="$(mktemp -d)"
           trap 'rm -rf -- "${credential_directory}"' EXIT
-          printf '%s\n' 'ci-only-gateway-validation-credential' >"${credential_directory}/api-key"
-          printf '%s\n' 'ci-only-sports-gateway-validation-credential' \
-            >"${credential_directory}/sports-intelligence-api-key"
-          chmod 0600 \
-            "${credential_directory}/api-key" \
-            "${credential_directory}/sports-intelligence-api-key"
+          credential_index=0
+          for credential_name in \
+            api-key \
+            sports-intelligence-api-key \
+            mbfd-hub-api-key \
+            media-control-api-key \
+            hermes-api-key \
+            command-api-key \
+            eoc-api-key \
+            ts-orchestrator-api-key \
+            mbfd-support-ai-api-key \
+            external-coding-api-key; do
+            printf 'ci-only-%s-%s\n' "${credential_index}" "${credential_name}" \
+              >"${credential_directory}/${credential_name}"
+            chmod 0600 "${credential_directory}/${credential_name}"
+            credential_index=$((credential_index + 1))
+          done
           CREDENTIALS_DIRECTORY="${credential_directory}" \
             python3 scripts/operations/mbfd_ai_gateway.py \
               --validate-config scripts/operations/mbfd-ai-gateway.json
           bash -n \
             scripts/operations/migrate-ollama-ai-proxy.sh \
+            scripts/operations/provision-mbfd-ai-gateway-consumers.sh \
             scripts/operations/verify-ollama-ai-proxy.sh
 
   release-gates:
