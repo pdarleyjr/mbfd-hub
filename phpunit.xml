@@ -67,7 +67,8 @@
         <env name="MAIL_URL" value="" force="true"/>
         <env name="OH_DEAR_HEALTH_CHECK_SECRET" value="" force="true"/>
         <env name="OH_DEAR_HEALTH_CHECK_URL" value="" force="true"/>
-        <env name="OLLAMA_URL" value="" force="true"/>
+        <env name="AI_GATEWAY_CREDENTIAL_FILE" value="" force="true"/>
+        <env name="AI_GATEWAY_URL" value="" force="true"/>
         <env name="PULSE_ENABLED" value="false" force="true"/>
         <env name="PULSEPOINT_WORKER_URL" value="" force="true"/>
         <env name="PRIVATE_FILESYSTEM_DISK" value="local" force="true"/>

@@ -41,8 +41,8 @@ class AppServiceProvider extends ServiceProvider
             \App\Http\Responses\LoginResponse::class,
         );
 
-        // Route command-center / capital-project AI to the on-prem Ollama
-        // (qwen3.6:35b) when AI_DRIVER=local. All callers resolve
+        // Route command-center / capital-project AI through the canonical
+        // private MBFD AI Gateway when AI_DRIVER=local. All callers resolve
         // CloudflareAIService via the container, so this one binding repoints
         // SmartUpdatesWidget, CapitalProject analysis, and the summary commands.
         $this->app->bind(\App\Services\CloudflareAIService::class, function () {

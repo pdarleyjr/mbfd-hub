@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
  * Gathers operational metrics (shared by the dashboard widget and the
  * background job) and manages a cached AI summary that is regenerated ONLY
  * when the underlying data changes — detected via a fingerprint of the
- * metrics. This keeps the local LLM (qwen3.6) idle (and out of RAM) unless
+ * metrics. This keeps gateway-routed generation idle unless
  * there is genuinely new information to summarize.
  *
  * Flow: the widget polls every ~2 min and calls ensureFresh(), which is

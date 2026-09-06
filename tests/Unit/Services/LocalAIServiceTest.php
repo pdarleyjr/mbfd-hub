@@ -13,23 +13,38 @@ use Tests\TestCase;
 
 class LocalAIServiceTest extends TestCase
 {
+    private string $credentialFile;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        config()->set('cloudflare.ai.local.url', 'http://ollama.test:11434');
-        config()->set('cloudflare.ai.local.model', 'qwen3.6:35b');
+        $credentialFile = tempnam(sys_get_temp_dir(), 'mbfd-hub-gateway-test-');
+        $this->assertNotFalse($credentialFile);
+        $this->credentialFile = $credentialFile;
+        file_put_contents($this->credentialFile, 'unit-test-credential');
+
+        config()->set('cloudflare.ai.gateway.url', 'http://gateway.test:11440');
+        config()->set('cloudflare.ai.gateway.capability', 'mbfd-general');
+        config()->set('cloudflare.ai.gateway.credential_file', $this->credentialFile);
 
         Cache::flush();
         Http::preventStrayRequests();
     }
 
+    protected function tearDown(): void
+    {
+        @unlink($this->credentialFile);
+
+        parent::tearDown();
+    }
+
     public function test_health_check_is_available_when_exact_model_is_present(): void
     {
         Http::fake([
-            'http://ollama.test:11434/api/tags' => Http::response([
+            'http://gateway.test:11440/api/tags' => Http::response([
                 'models' => [
-                    ['name' => 'qwen3.6:35b'],
+                    ['name' => 'mbfd-general'],
                     ['name' => 'nomic-embed-text:latest'],
                 ],
             ]),
@@ -50,10 +65,10 @@ class LocalAIServiceTest extends TestCase
 
     public function test_health_check_normalizes_the_latest_model_alias(): void
     {
-        config()->set('cloudflare.ai.local.model', 'qwen3.6');
+        config()->set('cloudflare.ai.gateway.capability', 'mbfd-general');
         Http::fake([
-            'http://ollama.test:11434/api/tags' => Http::response([
-                'models' => [['name' => 'qwen3.6:latest']],
+            'http://gateway.test:11440/api/tags' => Http::response([
+                'models' => [['name' => 'mbfd-general:latest']],
             ]),
         ]);
 
@@ -66,7 +81,7 @@ class LocalAIServiceTest extends TestCase
     public function test_health_check_is_unavailable_when_configured_model_is_missing(): void
     {
         Http::fake([
-            'http://ollama.test:11434/api/tags' => Http::response([
+            'http://gateway.test:11440/api/tags' => Http::response([
                 'models' => [['name' => 'another-model:latest']],
             ]),
         ]);
@@ -78,14 +93,14 @@ class LocalAIServiceTest extends TestCase
             'reachable' => true,
             'model_exists' => false,
             'available' => false,
-            'error' => "Model 'qwen3.6:35b' not found in Ollama",
+            'error' => "Capability 'mbfd-general' not advertised by AI gateway",
         ], $result);
     }
 
     public function test_health_check_is_unavailable_after_http_failure(): void
     {
         Http::fake([
-            'http://ollama.test:11434/api/tags' => Http::response([], 503),
+            'http://gateway.test:11440/api/tags' => Http::response([], 503),
         ]);
 
         $result = (new LocalAIService)->checkHealth();
@@ -95,14 +110,14 @@ class LocalAIServiceTest extends TestCase
             'reachable' => false,
             'model_exists' => false,
             'available' => false,
-            'error' => 'Ollama returned HTTP 503',
+            'error' => 'AI gateway returned HTTP 503',
         ], $result);
     }
 
     public function test_health_check_is_unavailable_after_connection_timeout(): void
     {
         Http::fake([
-            'http://ollama.test:11434/api/tags' => Http::failedConnection('cURL error 28: Operation timed out'),
+            'http://gateway.test:11440/api/tags' => Http::failedConnection('cURL error 28: Operation timed out'),
         ]);
 
         $result = (new LocalAIService)->checkHealth();
@@ -111,14 +126,14 @@ class LocalAIServiceTest extends TestCase
         $this->assertFalse($result['reachable']);
         $this->assertFalse($result['model_exists']);
         $this->assertFalse($result['available']);
-        $this->assertStringStartsWith('Ollama unreachable:', (string) $result['error']);
+        $this->assertStringStartsWith('AI gateway unreachable:', (string) $result['error']);
         $this->assertStringContainsString('timed out', (string) $result['error']);
     }
 
     public function test_health_check_rejects_malformed_json(): void
     {
         Http::fake([
-            'http://ollama.test:11434/api/tags' => Http::response(
+            'http://gateway.test:11440/api/tags' => Http::response(
                 '{"models":',
                 200,
                 ['Content-Type' => 'application/json'],
@@ -132,14 +147,14 @@ class LocalAIServiceTest extends TestCase
             'reachable' => true,
             'model_exists' => false,
             'available' => false,
-            'error' => 'Ollama returned malformed model inventory',
+            'error' => 'AI gateway returned malformed capability inventory',
         ], $result);
     }
 
     public function test_health_check_uses_cached_result_within_ttl(): void
     {
         Http::fakeSequence()
-            ->push(['models' => [['name' => 'qwen3.6:35b']]])
+            ->push(['models' => [['name' => 'mbfd-general']]])
             ->push(['models' => []]);
 
         $service = new LocalAIService;
@@ -154,7 +169,7 @@ class LocalAIServiceTest extends TestCase
     public function test_health_check_refreshes_after_cache_expiry(): void
     {
         Http::fakeSequence()
-            ->push(['models' => [['name' => 'qwen3.6:35b']]])
+            ->push(['models' => [['name' => 'mbfd-general']]])
             ->push(['models' => []]);
 
         $service = new LocalAIService;
@@ -170,7 +185,7 @@ class LocalAIServiceTest extends TestCase
     {
         Http::fakeSequence()
             ->pushStatus(503)
-            ->push(['models' => [['name' => 'qwen3.6:35b']]]);
+            ->push(['models' => [['name' => 'mbfd-general']]]);
 
         $service = new LocalAIService;
         $this->assertFalse($service->checkHealth()['available']);
@@ -186,8 +201,8 @@ class LocalAIServiceTest extends TestCase
     public function test_health_check_only_lists_models_and_does_not_load_one(): void
     {
         Http::fake([
-            'http://ollama.test:11434/api/tags' => Http::response([
-                'models' => [['name' => 'qwen3.6:35b']],
+            'http://gateway.test:11440/api/tags' => Http::response([
+                'models' => [['name' => 'mbfd-general']],
             ]),
         ]);
 
@@ -195,11 +210,14 @@ class LocalAIServiceTest extends TestCase
 
         Http::assertSentCount(1);
         Http::assertSent(fn (Request $request): bool => $request->method() === 'GET'
-            && $request->url() === 'http://ollama.test:11434/api/tags'
+            && $request->url() === 'http://gateway.test:11440/api/tags'
+            && ($request->header('Authorization')[0] ?? '') === 'Bearer unit-test-credential'
+            && ($request->header('X-MBFD-Capability')[0] ?? '') === 'mbfd-general'
+            && preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/', $request->header('X-Request-ID')[0] ?? '') === 1
             && $request->body() === '');
     }
 
-    public function test_structured_requests_use_ollama_native_schema_endpoint(): void
+    public function test_structured_requests_use_gateway_native_schema_endpoint(): void
     {
         $schema = [
             'type' => 'object',
@@ -208,7 +226,7 @@ class LocalAIServiceTest extends TestCase
         ];
 
         Http::fake([
-            'http://ollama.test:11434/api/chat' => Http::response([
+            'http://gateway.test:11440/api/chat' => Http::response([
                 'message' => ['content' => '{"labor":[]}'],
             ]),
         ]);
@@ -223,8 +241,8 @@ class LocalAIServiceTest extends TestCase
 
         $this->assertSame('{"labor":[]}', data_get($result, 'result.response'));
         Http::assertSent(function (Request $request) use ($schema): bool {
-            return $request->url() === 'http://ollama.test:11434/api/chat'
-                && $request['model'] === 'qwen3.6:35b'
+            return $request->url() === 'http://gateway.test:11440/api/chat'
+                && $request['model'] === 'mbfd-general'
                 && $request['format'] === $schema
                 && $request['stream'] === false
                 && $request['think'] === false
@@ -245,16 +263,76 @@ class LocalAIServiceTest extends TestCase
             ]);
             $this->fail('Expected the provider failure to be raised.');
         } catch (\RuntimeException $exception) {
-            $this->assertSame('Local AI request failed: 503', $exception->getMessage());
+            $this->assertSame('AI gateway request failed: 503', $exception->getMessage());
         }
 
         Http::assertSentCount(2);
         Log::shouldHaveReceived('error')->once()->withArgs(
-            fn (string $message, array $context): bool => $message === 'Local AI request failed'
+            fn (string $message, array $context): bool => $message === 'AI gateway request failed'
                 && $context['status'] === 503
                 && $context['attempts'] === 2
                 && ! array_key_exists('body', $context)
                 && ! str_contains(json_encode($context, JSON_THROW_ON_ERROR), 'sensitive'),
         );
+    }
+
+    public function test_structured_request_uses_the_frozen_gateway_contract(): void
+    {
+        $credentialFile = tempnam(sys_get_temp_dir(), 'mbfd-hub-gateway-test-');
+        $this->assertNotFalse($credentialFile);
+        file_put_contents($credentialFile, 'unit-test-credential');
+
+        try {
+            config()->set('cloudflare.ai.gateway.url', 'http://gateway.test:11440');
+            config()->set('cloudflare.ai.gateway.capability', 'mbfd-general');
+            config()->set('cloudflare.ai.gateway.credential_file', $credentialFile);
+
+            Http::fake([
+                'http://gateway.test:11440/api/chat' => Http::response([
+                    'message' => ['content' => '{"labor":[]}'],
+                ]),
+            ]);
+
+            $result = (new LocalAIService)->runModel('ignored', [
+                ['role' => 'user', 'content' => 'test'],
+            ], [
+                'response_schema' => [
+                    'type' => 'object',
+                    'properties' => ['labor' => ['type' => 'array']],
+                ],
+            ]);
+
+            $this->assertSame('{"labor":[]}', data_get($result, 'result.response'));
+            Http::assertSent(function (Request $request): bool {
+                $requestId = $request->header('X-Request-ID')[0] ?? '';
+
+                return $request->url() === 'http://gateway.test:11440/api/chat'
+                    && ($request->header('Authorization')[0] ?? '') === 'Bearer unit-test-credential'
+                    && ($request->header('X-MBFD-Capability')[0] ?? '') === 'mbfd-general'
+                    && preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/', $requestId) === 1
+                    && $request['model'] === 'mbfd-general';
+            });
+        } finally {
+            @unlink($credentialFile);
+        }
+    }
+
+    public function test_missing_gateway_credential_fails_closed_without_a_request(): void
+    {
+        config()->set('cloudflare.ai.gateway.url', 'http://gateway.test:11440');
+        config()->set('cloudflare.ai.gateway.capability', 'mbfd-general');
+        config()->set('cloudflare.ai.gateway.credential_file', sys_get_temp_dir().'/missing-mbfd-hub-gateway-credential');
+        Http::fake();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('AI gateway credential is unavailable');
+
+        try {
+            (new LocalAIService)->runModel('ignored', [
+                ['role' => 'user', 'content' => 'test'],
+            ]);
+        } finally {
+            Http::assertNothingSent();
+        }
     }
 }

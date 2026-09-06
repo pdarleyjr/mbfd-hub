@@ -99,7 +99,7 @@ class DisplayAiSnapshotTest extends TestCase
 
         $brief = $response->json('brief');
         $this->assertSame('descriptive', $brief['mode']);
-        $this->assertSame('qwen3.6:35b', $brief['model']);
+        $this->assertSame('mbfd-general', $brief['model']);
     }
 
     public function test_forbidden_words_are_stripped_from_output(): void
@@ -135,7 +135,7 @@ class DisplayAiSnapshotTest extends TestCase
             'data_gaps' => [],
             'confidence' => 0.9,
             'generated_at' => now()->toISOString(),
-            'model' => 'qwen3.6:35b',
+            'model' => 'mbfd-general',
         ]);
 
         $this->assertStringNotContainsString('should', strtolower($cleaned['briefing']));
@@ -173,7 +173,7 @@ class FakeDescriptiveAiService extends CloudflareAIService
             'data_gaps' => ['Incident feed status was not available in the snapshot.'],
             'confidence' => 0.8,
             'generated_at' => now()->toISOString(),
-            'model' => 'qwen3.6:35b',
+            'model' => 'mbfd-general',
         ]);
 
         return ['result' => ['response' => $json]];
@@ -208,7 +208,7 @@ class FakePrescriptiveAiService extends CloudflareAIService
             'data_gaps' => [],
             'confidence' => 0.95,
             'generated_at' => now()->toISOString(),
-            'model' => 'qwen3.6:35b',
+            'model' => 'mbfd-general',
         ]);
 
         return ['result' => ['response' => $json]];

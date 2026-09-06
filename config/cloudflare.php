@@ -6,16 +6,15 @@ return [
         'account_id' => env('CLOUDFLARE_ACCOUNT_ID', ''),
         'api_token' => env('CLOUDFLARE_API_TOKEN', ''),
 
-        // AI backend driver: 'local' routes generation to on-prem Ollama
-        // (qwen3.6:35b) via LocalAIService; 'cloudflare' uses Workers AI.
+        // AI backend driver: 'local' routes generation through the canonical
+        // private MBFD AI Gateway; 'cloudflare' uses Workers AI.
         'driver' => env('AI_DRIVER', 'local'),
-        'local' => [
-            'url' => env('OLLAMA_URL', 'http://host.docker.internal:11434'),
-            'model' => env('OLLAMA_MODEL', 'qwen3.6:35b'),
-            // Local model cold-load (~45s) + generation can exceed the 30s CF
-            // default; allow plenty of headroom so command-center calls don't
-            // fail on a cold model. Warm calls finish in a few seconds.
-            'timeout' => (int) env('OLLAMA_TIMEOUT', 120),
+        'gateway' => [
+            'url' => env('AI_GATEWAY_URL', 'http://172.20.0.1:11440'),
+            'capability' => env('AI_GATEWAY_CAPABILITY', 'mbfd-general'),
+            // This is a protected file reference, never the credential value.
+            'credential_file' => env('AI_GATEWAY_CREDENTIAL_FILE', '/run/secrets/mbfd-hub-ai-gateway-token'),
+            'timeout' => (int) env('AI_GATEWAY_TIMEOUT', 120),
         ],
 
         'models' => [

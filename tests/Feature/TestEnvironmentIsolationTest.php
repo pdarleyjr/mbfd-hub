@@ -16,7 +16,8 @@ final class TestEnvironmentIsolationTest extends TestCase
         foreach ([
             'cloudflare.ai.account_id',
             'cloudflare.ai.api_token',
-            'cloudflare.ai.local.url',
+            'cloudflare.ai.gateway.url',
+            'cloudflare.ai.gateway.credential_file',
             'cloudflare.worker_api_secret',
             'cloudflare.worker_url',
             'filesystems.disks.r2.endpoint',
@@ -80,6 +81,8 @@ final class TestEnvironmentIsolationTest extends TestCase
 
         foreach ([
             'APP_ENV',
+            'AI_GATEWAY_CREDENTIAL_FILE',
+            'AI_GATEWAY_URL',
             'APP_KEY',
             'APP_URL',
             'CACHE_STORE',
