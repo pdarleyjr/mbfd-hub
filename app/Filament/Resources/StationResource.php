@@ -221,6 +221,7 @@ class StationResource extends Resource
 
             RelationManagers\SingleGasMetersRelationManager::class,
             RelationManagers\StationInventoryItemsRelationManager::class,
+            RelationManagers\InventorySubmissionsRelationManager::class,
             RelationManagers\StationSupplyRequestsRelationManager::class,
             RelationManagers\StationRequestsRelationManager::class,
             RelationManagers\StationInspectionsRelationManager::class,

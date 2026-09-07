@@ -8,6 +8,8 @@ use App\Enums\PersonnelRequestStatus;
 use App\Models\Employee;
 use App\Models\PersonnelRequest;
 use App\Models\User;
+use App\Services\Display\DisplaySnapshotService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -77,7 +79,10 @@ final class PersonnelRequestWorkflowService
                 'metadata' => $metadata ?: null,
             ]);
 
-            DB::afterCommit(fn () => $this->notifier->statusChanged($locked));
+            DB::afterCommit(function () use ($locked): void {
+                $this->notifier->statusChanged($locked);
+                $this->forgetStationReadModels($locked);
+            });
 
             return $locked->fresh(['items', 'updates']);
         });
@@ -126,6 +131,19 @@ final class PersonnelRequestWorkflowService
     {
         return in_array($request->status, [PersonnelRequestStatus::NeedsInformation, PersonnelRequestStatus::Acknowledged], true)
             && filled($request->information_requested);
+    }
+
+    private function forgetStationReadModels(PersonnelRequest $request): void
+    {
+        if ($request->originating_station_id === null) {
+            return;
+        }
+
+        Cache::forget(DisplaySnapshotService::SNAPSHOT_CACHE_KEY);
+        Cache::forget(DisplaySnapshotService::STATIONS_CACHE_KEY);
+        Cache::forget("station.{$request->originating_station_id}.detail");
+        Cache::forget("station.{$request->originating_station_id}.activity");
+        Cache::forget("station.{$request->originating_station_id}.personnel-equipment-requests");
     }
 
     public function addNote(PersonnelRequest $request, User $actor, ?string $employeeVisibleNote, ?string $internalNote): PersonnelRequest

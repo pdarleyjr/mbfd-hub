@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\ApparatusResource\Pages\ViewApparatus;
 use App\Filament\Resources\ApparatusResource\Pages\ViewInspection;
+use App\Filament\Resources\ApparatusResource\RelationManagers\InspectionsRelationManager;
 use App\Filament\Resources\InspectionResource\Pages\ViewInspection as ViewStandaloneInspection;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
@@ -25,6 +27,41 @@ use Tests\TestCase;
 final class ApparatusInspectionApprovalActionTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_apparatus_relation_exposes_canonical_review_actions_without_generic_mutation(): void
+    {
+        $inspection = $this->pendingInspection();
+        $reviewer = $this->userWithRole('logistics_admin');
+
+        $this->actingAs($reviewer);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        Livewire::test(InspectionsRelationManager::class, [
+            'ownerRecord' => $inspection->apparatus,
+            'pageClass' => ViewApparatus::class,
+            'lazy' => false,
+        ])
+            ->call('loadTable')
+            ->assertSuccessful()
+            ->assertCanSeeTableRecords([$inspection])
+            ->assertTableActionExists('view_results', record: $inspection)
+            ->assertTableActionExists('approveInspection', record: $inspection)
+            ->assertTableActionExists('rejectInspection', record: $inspection)
+            ->assertTableActionDoesNotExist('edit', record: $inspection)
+            ->assertTableActionDoesNotExist('delete', record: $inspection)
+            ->assertTableActionDoesNotExist('create')
+            ->callTableAction('approveInspection', $inspection)
+            ->assertHasNoTableActionErrors();
+
+        self::assertSame('approved', $inspection->fresh()->review_status);
+        self::assertSame($inspection->apparatus_id, $inspection->fresh()->apparatus_id);
+        self::assertDatabaseHas('apparatus_inspection_review_events', [
+            'apparatus_inspection_id' => $inspection->id,
+            'status' => 'approved',
+            'changed_by_user_id' => $reviewer->id,
+        ]);
+    }
 
     public function test_authorized_reviewer_can_see_pending_evidence_and_approve_from_the_apparatus_inspection_view(): void
     {

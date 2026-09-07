@@ -119,7 +119,7 @@ test('logistics administrator sees the single personnel workspace and lifecycle 
   await page.getByLabel('Employee ID').fill('99003');
   await page.getByLabel('Password').fill(requiredPassword('PERSONNEL_REQUESTS_E2E_ADMIN_PASSWORD'));
   await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/admin(?!\/login)/, { timeout: 20_000 });
+  await expect(page).toHaveURL(/\/admin$/, { timeout: 20_000 });
   await page.goto('/admin/personnel-uniforms-equipment/overview', { waitUntil: 'domcontentloaded' });
 
   await expect(page.getByRole('heading', { name: 'Personnel Uniforms / Equipment' }).first()).toBeVisible();

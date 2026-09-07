@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Public;
 
+use App\Models\Apparatus;
+use App\Models\ApparatusInspection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -18,15 +20,22 @@ class PublicApparatusInspectionResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        /** @var ApparatusInspection $inspection */
+        $inspection = $this->resource;
+        $apparatusRelation = $inspection->getRelationValue('apparatus');
+        $apparatus = $apparatusRelation instanceof Apparatus ? $apparatusRelation : null;
+
         return [
-            'id' => $this->id,
-            'apparatus_name' => $this->apparatus?->designation
-                ?: $this->apparatus?->name
-                ?: $this->apparatus?->unit_id
+            'id' => $inspection->id,
+            'inspection_reference' => $inspection->inspection_reference,
+            'apparatus_name' => $apparatus?->designation
+                ?: $apparatus?->name
+                ?: $apparatus?->getAttribute('unit_id')
                 ?: 'Unknown',
-            'shift' => $this->shift,
-            'completed_at' => $this->completed_at ?? $this->created_at,
-            'defect_count' => $this->defects()->count(),
+            'shift' => $inspection->shift,
+            'completed_at' => $inspection->completed_at ?? $inspection->created_at,
+            'defect_count' => (int) ($inspection->getAttribute('defects_count') ?? $inspection->defects()->count()),
+            'review_status' => $inspection->review_status ?: 'pending_review',
         ];
     }
 }

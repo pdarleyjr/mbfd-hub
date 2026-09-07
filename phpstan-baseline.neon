@@ -361,12 +361,6 @@ parameters:
 			path: app/Filament/Resources/StationResource/RelationManagers/CapitalProjectsRelationManager.php
 
 		-
-			message: '#^Call to static method getUrl\(\) on an unknown class App\\Filament\\Resources\\StationInventorySubmissionResource\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Filament/Resources/StationResource/RelationManagers/InventorySubmissionsRelationManager.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$station_number\.$#'
 			identifier: property.notFound
 			count: 1
@@ -1621,36 +1615,6 @@ parameters:
 			path: app/Http/Resources/CapitalProjectResource.php
 
 		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusInspectionResource\:\:\$apparatus\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Resources/Public/PublicApparatusInspectionResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusInspectionResource\:\:\$created_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicApparatusInspectionResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusInspectionResource\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicApparatusInspectionResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusInspectionResource\:\:\$shift\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicApparatusInspectionResource.php
-
-		-
-			message: '#^Call to an undefined method App\\Http\\Resources\\Public\\PublicApparatusInspectionResource\:\:defects\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicApparatusInspectionResource.php
-
-		-
 			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicApparatusResource\:\:\$currentDefects\.$#'
 			identifier: property.notFound
 			count: 1
@@ -1841,36 +1805,6 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Resources/Public/PublicRoomResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$created_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicStationInspectionResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicStationInspectionResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$inspection_date\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicStationInspectionResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$inspection_type\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicStationInspectionResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$overall_status\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicStationInspectionResource.php
 
 		-
 			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationResource\:\:\$id\.$#'

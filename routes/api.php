@@ -70,6 +70,8 @@ Route::prefix('public')->middleware(['auth:sanctum', 'throttle:60,1'])->group(fu
     Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class, 'projects']);
     Route::get('stations/{station}/inspections', [\App\Http\Controllers\Api\StationController::class, 'stationInspections']);
     Route::get('stations/{station}/apparatus-inspections', [\App\Http\Controllers\Api\StationController::class, 'apparatusInspections']);
+    Route::get('stations/{station}/personnel-equipment-requests', [\App\Http\Controllers\Api\StationController::class, 'personnelEquipmentRequests']);
+    Route::get('stations/{station}/inventory', [\App\Http\Controllers\Api\StationController::class, 'inventoryActivity']);
     Route::get('stations/{station}/equipment-requests', [\App\Http\Controllers\Api\StationController::class, 'equipmentRequests']);
     Route::get('stations/{station}/requests', [PublicStationRequestController::class, 'index']);
     Route::get('stations/{station}/service-tickets', [PublicApparatusServiceTicketController::class, 'stationIndex']);
@@ -186,7 +188,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin.role:super_admin,admi
 
     // Phase 5: Fire Equipment Requests & Station Inspections
     Route::apiResource('fire-equipment-requests', FireEquipmentRequestController::class);
-    Route::apiResource('station-inspections', StationInspectionController::class);
+    Route::apiResource('station-inspections', StationInspectionController::class)->only(['index', 'show']);
 
 });
 

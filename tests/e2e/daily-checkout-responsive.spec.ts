@@ -109,6 +109,18 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
       return route.fulfill({ json: { data: [], meta: { total: 0 } } });
     }
 
+    if (path.endsWith('/personnel-equipment-requests')) {
+      return route.fulfill({ json: { requests: [] } });
+    }
+
+    if (path.endsWith('/inspections') || path.endsWith('/apparatus-inspections')) {
+      return route.fulfill({ json: { inspections: [] } });
+    }
+
+    if (path.endsWith('/inventory')) {
+      return route.fulfill({ json: { submissions: [], supply_requests: [] } });
+    }
+
     return route.fulfill({ status: 404, json: { message: `Unmocked Daily API route: ${path}` } });
   });
 }

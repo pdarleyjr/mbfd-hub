@@ -9,6 +9,8 @@ use App\Enums\PersonnelRequestType;
 use App\Models\Employee;
 use App\Models\PersonnelRequest;
 use App\Models\Station;
+use App\Services\Display\DisplaySnapshotService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -122,7 +124,10 @@ final class PersonnelRequestSubmissionService
                 'employee_visible_note' => 'Request submitted.',
             ]);
 
-            DB::afterCommit(fn () => $this->notifier->created($request));
+            DB::afterCommit(function () use ($request): void {
+                $this->notifier->created($request);
+                $this->forgetStationReadModels($request);
+            });
 
             return $request;
         });
@@ -212,5 +217,18 @@ final class PersonnelRequestSubmissionService
         }
 
         return $existing->load('items');
+    }
+
+    private function forgetStationReadModels(PersonnelRequest $request): void
+    {
+        if ($request->originating_station_id === null || $request->type !== PersonnelRequestType::Equipment) {
+            return;
+        }
+
+        Cache::forget(DisplaySnapshotService::SNAPSHOT_CACHE_KEY);
+        Cache::forget(DisplaySnapshotService::STATIONS_CACHE_KEY);
+        Cache::forget("station.{$request->originating_station_id}.detail");
+        Cache::forget("station.{$request->originating_station_id}.activity");
+        Cache::forget("station.{$request->originating_station_id}.personnel-equipment-requests");
     }
 }

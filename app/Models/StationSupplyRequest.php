@@ -31,6 +31,16 @@ class StationSupplyRequest extends Model
         return $this->belongsTo(Station::class);
     }
 
+    public function actorUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'actor_user_id');
+    }
+
+    public function actorEmployee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'actor_employee_id');
+    }
+
     /**
      * Scope to get open requests
      */

@@ -323,7 +323,7 @@ Route::get('/__version', function () {
 // Station Inventory PDF Download
 Route::get('/inventory-pdf/{submission}', [StationInventoryController::class, 'downloadPdf'])
     ->name('download-inventory-pdf')
-    ->middleware(['auth', 'admin.role:super_admin,admin,logistics_admin']);
+    ->middleware('auth');
 
 // Workgroup File Downloads & Preview
 Route::get('/workgroup/file/{file}/download', [FileDownloadController::class, 'downloadFile'])

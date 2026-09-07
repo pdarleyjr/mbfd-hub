@@ -6,14 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Public\PublicApparatusInspectionResource;
 use App\Http\Resources\Public\PublicApparatusResource;
 use App\Http\Resources\Public\PublicGasMeterResource;
+use App\Http\Resources\Public\PublicPersonnelEquipmentRequestResource;
 use App\Http\Resources\Public\PublicProjectResource;
 use App\Http\Resources\Public\PublicRoomAssetResource;
 use App\Http\Resources\Public\PublicRoomResource;
 use App\Http\Resources\Public\PublicStationInspectionResource;
+use App\Http\Resources\Public\PublicStationInventorySubmissionResource;
 use App\Http\Resources\Public\PublicStationRequestResource;
 use App\Http\Resources\Public\PublicStationResource;
+use App\Http\Resources\Public\PublicStationSupplyRequestResource;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
+use App\Models\PersonnelRequest;
 use App\Models\Room;
 use App\Models\RoomAsset;
 use App\Models\RoomAudit;
@@ -714,12 +718,11 @@ class StationController extends Controller
 
         $inspections = ApparatusInspection::whereIn('apparatus_id', $apparatusIds)
             ->whereNotNull('completed_at')
-            // Pending public submissions are evidence for officer review, not
-            // an operationally completed checkout for the public station view.
-            ->where('review_status', 'approved')
+            ->whereIn('review_status', ['pending_review', 'approved', 'rejected'])
             ->where('completed_at', '>=', $startOfDay->utc())
             ->where('completed_at', '<', $startOfNextDay->utc())
             ->with('apparatus')
+            ->withCount('defects')
             ->orderBy('completed_at', 'desc')
             ->get();
 
@@ -729,6 +732,46 @@ class StationController extends Controller
             'apparatus_inspection_history_only' => true,
             'inspections' => PublicApparatusInspectionResource::collection($inspections)->resolve(request()),
             'total' => $inspections->count(),
+        ]);
+    }
+
+    /** Station-scoped personnel equipment requests, redacted for the station profile. */
+    public function personnelEquipmentRequests(int $id): JsonResponse
+    {
+        $station = Station::findOrFail($id);
+        $requests = PersonnelRequest::query()
+            ->where('originating_station_id', $station->id)
+            ->where('type', 'equipment')
+            ->with('items')
+            ->withCount('items')
+            ->latest('created_at')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'station_id' => $station->id,
+            'requests' => PublicPersonnelEquipmentRequestResource::collection($requests)->resolve(request()),
+            'total' => $requests->count(),
+        ]);
+    }
+
+    /** Canonical inventory submissions and supply follow-up for the station profile. */
+    public function inventoryActivity(int $id): JsonResponse
+    {
+        $station = Station::findOrFail($id);
+        $submissions = $station->inventorySubmissions()
+            ->latest('submitted_at')
+            ->limit(50)
+            ->get();
+        $supplyRequests = $station->supplyRequests()
+            ->latest('created_at')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'station_id' => $station->id,
+            'submissions' => PublicStationInventorySubmissionResource::collection($submissions)->resolve(request()),
+            'supply_requests' => PublicStationSupplyRequestResource::collection($supplyRequests)->resolve(request()),
         ]);
     }
 

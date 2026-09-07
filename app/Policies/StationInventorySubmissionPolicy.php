@@ -2,8 +2,8 @@
 
 namespace App\Policies;
 
-use App\Models\User;
 use App\Models\StationInventorySubmission;
+use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class StationInventorySubmissionPolicy
@@ -31,7 +31,7 @@ class StationInventorySubmissionPolicy
      */
     public function create(User $user): bool
     {
-        return $user->can('create_station::inventory::submission');
+        return false;
     }
 
     /**
@@ -39,7 +39,7 @@ class StationInventorySubmissionPolicy
      */
     public function update(User $user, StationInventorySubmission $stationInventorySubmission): bool
     {
-        return $user->can('update_station::inventory::submission');
+        return false;
     }
 
     /**
@@ -47,7 +47,7 @@ class StationInventorySubmissionPolicy
      */
     public function delete(User $user, StationInventorySubmission $stationInventorySubmission): bool
     {
-        return $user->can('delete_station::inventory::submission');
+        return false;
     }
 
     /**
@@ -55,7 +55,7 @@ class StationInventorySubmissionPolicy
      */
     public function deleteAny(User $user): bool
     {
-        return $user->can('delete_any_station::inventory::submission');
+        return false;
     }
 
     /**
@@ -63,7 +63,7 @@ class StationInventorySubmissionPolicy
      */
     public function forceDelete(User $user, StationInventorySubmission $stationInventorySubmission): bool
     {
-        return $user->can('force_delete_station::inventory::submission');
+        return false;
     }
 
     /**
@@ -71,7 +71,7 @@ class StationInventorySubmissionPolicy
      */
     public function forceDeleteAny(User $user): bool
     {
-        return $user->can('force_delete_any_station::inventory::submission');
+        return false;
     }
 
     /**
@@ -79,7 +79,7 @@ class StationInventorySubmissionPolicy
      */
     public function restore(User $user, StationInventorySubmission $stationInventorySubmission): bool
     {
-        return $user->can('restore_station::inventory::submission');
+        return false;
     }
 
     /**
@@ -87,7 +87,7 @@ class StationInventorySubmissionPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('restore_any_station::inventory::submission');
+        return false;
     }
 
     /**
@@ -95,7 +95,7 @@ class StationInventorySubmissionPolicy
      */
     public function replicate(User $user, StationInventorySubmission $stationInventorySubmission): bool
     {
-        return $user->can('replicate_station::inventory::submission');
+        return false;
     }
 
     /**
@@ -103,6 +103,6 @@ class StationInventorySubmissionPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('reorder_station::inventory::submission');
+        return false;
     }
 }

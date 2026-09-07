@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use RuntimeException;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class PersonnelRequestsE2ESeeder extends Seeder
@@ -38,6 +39,11 @@ class PersonnelRequestsE2ESeeder extends Seeder
             'is_admin' => true,
         ])->save();
         $admin->syncRoles([$role]);
+        $admin->syncPermissions([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.personnel.view', 'web'),
+            Permission::findOrCreate('admin.equipment.view', 'web'),
+        ]);
 
         $officer = Employee::query()->updateOrCreate(
             ['employee_id' => '99001'],

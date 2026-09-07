@@ -94,7 +94,7 @@ final class PublicStationApparatusInspectionDayWindowTest extends TestCase
         $this->assertSame([$included->id], collect($response->json('inspections'))->pluck('id')->all());
     }
 
-    public function test_public_station_inspections_exclude_pending_review_submissions(): void
+    public function test_public_station_history_includes_pending_approved_and_rejected_evidence(): void
     {
         $now = CarbonImmutable::parse('2026-08-25 12:00:00', self::OPERATIONAL_TIMEZONE);
         Carbon::setTestNow($now);
@@ -109,12 +109,23 @@ final class PublicStationApparatusInspectionDayWindowTest extends TestCase
             createdAt: $this->newYorkTime('2026-08-25 09:00:00'),
             reviewStatus: 'pending_review',
         );
+        $rejected = $this->createInspection(
+            completedAt: $this->newYorkTime('2026-08-25 10:00:00'),
+            createdAt: $this->newYorkTime('2026-08-25 10:00:00'),
+            reviewStatus: 'rejected',
+        );
 
         $response = $this->getJson("/api/public/stations/{$this->station->id}/apparatus-inspections");
 
-        $response->assertOk()->assertJsonPath('total', 1);
-        $this->assertSame([$approved->id], collect($response->json('inspections'))->pluck('id')->all());
-        $this->assertNotContains($pending->id, collect($response->json('inspections'))->pluck('id')->all());
+        $response->assertOk()->assertJsonPath('total', 3);
+        $this->assertEqualsCanonicalizing(
+            [$approved->id, $pending->id, $rejected->id],
+            collect($response->json('inspections'))->pluck('id')->all(),
+        );
+        $this->assertEqualsCanonicalizing(
+            ['approved', 'pending_review', 'rejected'],
+            collect($response->json('inspections'))->pluck('review_status')->all(),
+        );
     }
 
     private function createInspection(

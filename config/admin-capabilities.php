@@ -14,7 +14,11 @@ return [
         App\Models\UnitMasterVehicle::class => 'admin.fleet',
         App\Models\Station::class => 'admin.stations',
         App\Models\StationInspection::class => 'admin.stations',
+        App\Models\StationInventorySubmission::class => [
+            'view' => 'admin.stations.view',
+        ],
         App\Models\StationRequest::class => 'admin.stations',
+        App\Models\StationSupplyRequest::class => 'admin.stations',
         App\Models\RoomAsset::class => 'admin.stations',
         App\Models\SingleGasMeter::class => 'admin.stations',
         App\Models\AssignedEquipment::class => 'admin.equipment',

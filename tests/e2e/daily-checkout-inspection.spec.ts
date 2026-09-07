@@ -256,6 +256,7 @@ async function mockInspectionApi(
     readonly reviewPendingOnSubmit?: boolean;
     readonly stationDailyCheckout?: 'canonical' | 'unavailable';
     readonly stationNumber?: string;
+    readonly stationWorkflowHistory?: boolean;
   } = {},
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
@@ -314,6 +315,33 @@ async function mockInspectionApi(
 
     if (path === '/api/public/stations/1/service-tickets') {
       return route.fulfill({ json: { data: [], meta: { total: 0 } } });
+    }
+
+    if (path === '/api/public/stations/1/inspections') {
+      return route.fulfill({
+        json: {
+          inspections: options.stationWorkflowHistory ? [{
+            id: 701,
+            inspection_date: '2026-09-06',
+            inspection_type: 'Saturday Station Inspection',
+            overall_status: 'pass',
+            review_status: 'reviewed',
+            created_at: '2026-09-06T14:00:00Z',
+          }] : [],
+        },
+      });
+    }
+
+    if (path === '/api/public/stations/1/apparatus-inspections') {
+      return route.fulfill({
+        json: {
+          inspections: options.stationWorkflowHistory ? [
+            { id: 801, inspection_reference: 'INS-E1-PENDING', apparatus_name: 'E1', shift: 'A', completed_at: '2026-09-06T13:00:00Z', defect_count: 1, review_status: 'pending_review' },
+            { id: 802, inspection_reference: 'INS-E2-APPROVED', apparatus_name: 'E2', shift: 'A', completed_at: '2026-09-06T12:00:00Z', defect_count: 0, review_status: 'approved' },
+            { id: 803, inspection_reference: 'INS-R1-REJECTED', apparatus_name: 'R1', shift: 'A', completed_at: '2026-09-06T11:00:00Z', defect_count: 2, review_status: 'rejected' },
+          ] : [],
+        },
+      });
     }
 
     if (path === '/api/public/employees/list') {
@@ -789,6 +817,20 @@ test('station Daily Checkout is explicitly unavailable when the canonical server
   await expect(page.getByText('The authoritative Daily Checkout result is unavailable. Readiness is not estimated from inspection records.', { exact: true })).toBeVisible();
 });
 
+test('station profile renders date-only station evidence and every current-day apparatus review state', async ({ page }) => {
+  await mockInspectionApi(page, { stationWorkflowHistory: true });
+
+  await page.goto('/daily/stations/1');
+  await page.getByRole('button', { name: 'Inspections', exact: true }).click();
+
+  await expect(page.getByRole('heading', { name: 'Station inspections', exact: true })).toBeVisible();
+  await expect(page.getByText('Sep 6, 2026', { exact: true })).toBeVisible();
+  await expect(page.getByText('Pending Review', { exact: true })).toBeVisible();
+  await expect(page.getByText('Approved', { exact: true })).toBeVisible();
+  await expect(page.getByText('Rejected', { exact: true })).toBeVisible();
+  await expect(page.getByText('Today’s submitted evidence. Pending Review does not count as a completed Daily Checkout.', { exact: true })).toBeVisible();
+});
+
 test('a string Station 1 API value renders its conference link', async ({ page }) => {
   await mockInspectionApi(page, { stationNumber: '1' });
 
@@ -1185,6 +1227,7 @@ test('a pending-review receipt tells the operator that readiness is not yet chan
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
   await expect(page.getByRole('heading', { name: 'Inspection Submitted for Review!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toHaveCount(0);
   await expect(page.getByText('before it changes readiness, defects, or meter records.')).toBeVisible();
 });
 

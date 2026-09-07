@@ -509,8 +509,9 @@ class ApparatusController extends Controller
                     $lockedInspectionSession->update(['submitted_inspection_id' => $inspection->id]);
                 }
 
-                DB::afterCommit(function (): void {
-                    $this->forgetDisplayReadModels();
+                $stationId = (int) $lockedApparatus->station_id;
+                DB::afterCommit(function () use ($stationId): void {
+                    $this->forgetDisplayReadModels($stationId);
                 });
 
                 return ['inspection' => $inspection, 'created' => true];
@@ -968,10 +969,13 @@ class ApparatusController extends Controller
         }
     }
 
-    private function forgetDisplayReadModels(): void
+    private function forgetDisplayReadModels(int $stationId): void
     {
         Cache::forget(DisplaySnapshotService::SNAPSHOT_CACHE_KEY);
         Cache::forget(DisplaySnapshotService::STATIONS_CACHE_KEY);
+        Cache::forget("station.{$stationId}.detail");
+        Cache::forget("station.{$stationId}.activity");
+        Cache::forget("station.{$stationId}.apparatus-inspections");
     }
 
     /**
