@@ -15,6 +15,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 SOURCE_ARTIFACTS = (
+    "mbfd_ai_gateway_admission_release.py",
     "mbfd_ai_gateway.py",
     "mbfd-ai-gateway.json",
     "ollama-ai-proxy.service",

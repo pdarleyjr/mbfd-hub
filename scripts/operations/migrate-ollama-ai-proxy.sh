@@ -9,6 +9,11 @@ fi
 readonly SOURCE_DIR="${1:?source directory is required}"
 readonly EXPECTED_SOURCE_SHA="${2:?exact 40-character source SHA is required}"
 readonly INITIALIZATION_MODE="${3:-}"
+if [[ ${INITIALIZATION_MODE} == --admission-only ]]; then
+    exec /usr/bin/python3 "${SOURCE_DIR}/mbfd_ai_gateway_admission_release.py" \
+        "${SOURCE_DIR}" "${EXPECTED_SOURCE_SHA}" \
+        --expected-live-config-sha256 "${4:?reviewed live config hash is required}"
+fi
 readonly PROTECTED_REF="refs/remotes/origin/main"
 readonly CREDENTIAL_DIR="/etc/ollama-ai-proxy"
 readonly LEGACY_CREDENTIAL="${CREDENTIAL_DIR}/api-key"

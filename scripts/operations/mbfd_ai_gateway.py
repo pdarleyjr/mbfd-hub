@@ -16,6 +16,7 @@ import http.client
 import http.server
 import ipaddress
 import json
+import math
 import os
 import re
 import socket
@@ -85,6 +86,8 @@ HOP_BY_HOP_RESPONSE_HEADERS = frozenset(
         "transfer-encoding",
         "upgrade",
         "x-request-id",
+        "x-mbfd-gateway-release",
+        "x-mbfd-model-cold",
     }
 )
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
@@ -93,11 +96,20 @@ REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
 class GatewayError(Exception):
     """An expected boundary failure with a stable machine classification."""
 
-    def __init__(self, status: int, classification: str, message: str):
+    def __init__(
+        self,
+        status: int,
+        classification: str,
+        message: str,
+        *,
+        admission: dict[str, Any] | None = None,
+    ):
         super().__init__(message)
         self.status = status
         self.classification = classification
         self.message = message
+        self.admission = admission
+        self.retry_after_seconds = 30 if status in (429, 503) else None
 
 
 @dataclasses.dataclass(slots=True)
@@ -165,6 +177,7 @@ class HeavyWorkloadPolicy:
     declared_model_allocation_mb: int = 0
     memory_psi_avg10_max: float = 100.0
     max_swap_activity_pages: int | None = None
+    max_swap_pages_per_second: float | None = None
     deny_on_recent_oom: bool = False
     deny_on_recent_gpu_reset: bool = False
     require_production_healthy: bool = False
@@ -195,6 +208,7 @@ class GatewayConfig:
     compatibility_models: dict[str, CompatibilityModel]
     heavy_workloads: dict[str, HeavyWorkloadPolicy]
     host_health: HostHealthConfig
+    release_sha: str | None = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -224,6 +238,17 @@ class HostHealthSnapshot:
     recent_gpu_reset: bool
     production_healthy: bool
     swap_activity_pages: int
+    swap_window_seconds: float = 0.0
+    swap_pages_per_second: float = 0.0
+    swap_sample_valid: bool = True
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class SwapSample:
+    recent_pages: int = 0
+    window_seconds: float = 0.0
+    pages_per_second: float = 0.0
+    valid: bool = True
 
 
 def _duplicate_rejecting_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -421,6 +446,11 @@ def load_config(
     ).items():
         item = _mapping(value, f"heavy_workloads.{workload_id}")
         max_swap = item.get("max_swap_activity_pages")
+        max_swap_rate = item.get("max_swap_pages_per_second")
+        if max_swap is not None and max_swap_rate is not None:
+            raise ValueError(
+                "swap policy must choose explicit rate or legacy pages, not both"
+            )
         workloads[workload_id] = HeavyWorkloadPolicy(
             workload_id=workload_id,
             lease_group=_string(
@@ -448,6 +478,16 @@ def load_config(
                     max_swap,
                     f"heavy_workloads.{workload_id}.max_swap_activity_pages",
                     minimum=0,
+                )
+            ),
+            max_swap_pages_per_second=(
+                None
+                if max_swap_rate is None
+                else _number(
+                    max_swap_rate,
+                    f"heavy_workloads.{workload_id}.max_swap_pages_per_second",
+                    minimum=0,
+                    maximum=1_000_000,
                 )
             ),
             deny_on_recent_oom=_bool(
@@ -717,6 +757,12 @@ def load_config(
             capability_id, backend_model, ollama_options
         )
 
+    release_sha = root.get("release_sha")
+    if release_sha is not None and (
+        not isinstance(release_sha, str)
+        or not re.fullmatch(r"[a-f0-9]{40}", release_sha)
+    ):
+        raise ValueError("release_sha must be an exact source SHA")
     return GatewayConfig(
         listeners,
         port,
@@ -727,6 +773,7 @@ def load_config(
         compatibility,
         workloads,
         host_health,
+        release_sha=release_sha,
     )
 
 
@@ -1008,7 +1055,9 @@ class HostHealthProbe:
         self.oom_marker = oom_marker
         self.gpu_reset_marker = gpu_reset_marker
         self.production_health_file = production_health_file
-        self._last_swap: tuple[int, int] | None = None
+        self._last_swap: tuple[int, int, float] | None = None
+        self._swap_lock = threading.Lock()
+        self._swap_cached = SwapSample()
 
     @staticmethod
     def _mem_available_mb() -> int:
@@ -1035,20 +1084,42 @@ class HostHealthProbe:
             pass
         return 0.0
 
-    def _swap_activity(self) -> int:
-        current = {"pswpin": 0, "pswpout": 0}
-        try:
-            for line in Path("/proc/vmstat").read_text(encoding="ascii").splitlines():
-                key, _, value = line.partition(" ")
-                if key in current:
-                    current[key] = int(value)
-        except (OSError, ValueError):
-            return 0
-        pair = (current["pswpin"], current["pswpout"])
-        previous, self._last_swap = self._last_swap, pair
-        if previous is None:
-            return 0
-        return max(0, pair[0] - previous[0]) + max(0, pair[1] - previous[1])
+    def _swap_sample(self) -> SwapSample:
+        # Serialize counter read + timestamp + update. Requests less than one
+        # second apart share a sample, so concurrent callers cannot erase a
+        # measured burst with a zero-delta follow-up. No background thread or
+        # unbounded sample history is required.
+        with self._swap_lock:
+            now = time.monotonic()
+            previous = self._last_swap
+            if not math.isfinite(now) or (previous and now < previous[2]):
+                return SwapSample(valid=False)
+            if previous and now - previous[2] < 1.0:
+                return self._swap_cached
+            current: dict[str, int] = {}
+            try:
+                for line in (
+                    Path("/proc/vmstat").read_text(encoding="ascii").splitlines()
+                ):
+                    key, _, value = line.partition(" ")
+                    if key in {"pswpin", "pswpout"}:
+                        current[key] = int(value)
+                incoming, outgoing = current["pswpin"], current["pswpout"]
+                if min(incoming, outgoing) < 0:
+                    raise ValueError("invalid swap counter")
+            except (OSError, ValueError, KeyError):
+                return SwapSample(valid=False)
+            self._last_swap = (incoming, outgoing, now)
+            if previous is None:
+                sample = SwapSample()
+            elif incoming < previous[0] or outgoing < previous[1]:
+                sample = SwapSample(valid=False)
+            else:
+                pages = incoming - previous[0] + outgoing - previous[1]
+                elapsed = now - previous[2]
+                sample = SwapSample(pages, elapsed, pages / elapsed)
+            self._swap_cached = sample
+            return sample
 
     @staticmethod
     def _marker(path: str | None) -> bool:
@@ -1066,13 +1137,17 @@ class HostHealthProbe:
                 )
             except OSError:
                 production_healthy = False
+        swap = self._swap_sample()
         return HostHealthSnapshot(
             mem_available_mb=self._mem_available_mb(),
             memory_psi_avg10=self._psi_avg10(),
             recent_oom=self._marker(self.oom_marker),
             recent_gpu_reset=self._marker(self.gpu_reset_marker),
             production_healthy=production_healthy,
-            swap_activity_pages=self._swap_activity(),
+            swap_activity_pages=swap.recent_pages,
+            swap_window_seconds=swap.window_seconds,
+            swap_pages_per_second=swap.pages_per_second,
+            swap_sample_valid=swap.valid,
         )
 
 
@@ -1087,10 +1162,13 @@ class _HeavyLease:
         self.workload_id = workload_id
         self.requires_allocation = requires_allocation
         self.group: str | None = None
+        self.evidence: dict[str, Any] = {}
 
     def __enter__(self):
         if self.workload_id is not None:
-            self.group = self.manager._enter(self.workload_id, self.requires_allocation)
+            self.group = self.manager._enter(
+                self.workload_id, self.requires_allocation, self.evidence
+            )
         return self
 
     def __exit__(self, *_args):
@@ -1113,10 +1191,24 @@ class HeavyLeaseManager:
     ) -> _HeavyLease:
         return _HeavyLease(self, workload_id, requires_allocation)
 
-    def _enter(self, workload_id: str, requires_allocation: bool) -> str:
+    def _enter(
+        self,
+        workload_id: str,
+        requires_allocation: bool,
+        evidence: dict[str, Any] | None = None,
+    ) -> str:
         policy = self.policies[workload_id]
         state = self.probe.snapshot()
         reasons = []
+        admission = {
+            "host": dataclasses.asdict(state),
+            "lease_group": policy.lease_group,
+            "max_swap_pages_per_second": policy.max_swap_pages_per_second,
+        }
+        if evidence is not None:
+            evidence.update(admission)
+        if not state.swap_sample_valid:
+            reasons.append("swap measurement unavailable")
         if state.mem_available_mb < policy.mem_available_floor_mb:
             reasons.append("MemAvailable below policy floor")
         if (
@@ -1132,6 +1224,11 @@ class HeavyLeaseManager:
             and state.swap_activity_pages > policy.max_swap_activity_pages
         ):
             reasons.append("swap activity exceeds policy")
+        if (
+            policy.max_swap_pages_per_second is not None
+            and state.swap_pages_per_second > policy.max_swap_pages_per_second
+        ):
+            reasons.append("swap rate exceeds policy")
         if policy.deny_on_recent_oom and state.recent_oom:
             reasons.append("recent OOM marker is active")
         if policy.deny_on_recent_gpu_reset and state.recent_gpu_reset:
@@ -1139,13 +1236,19 @@ class HeavyLeaseManager:
         if policy.require_production_healthy and not state.production_healthy:
             reasons.append("production health is not approved")
         if reasons:
-            raise GatewayError(503, "admission_denied", "; ".join(reasons))
+            raise GatewayError(
+                503,
+                "admission_denied",
+                "; ".join(reasons),
+                admission={**admission, "reasons": reasons},
+            )
         with self._lock:
             if policy.lease_group in self._leases:
                 raise GatewayError(
                     429,
                     "admission_denied",
                     "Conflicting heavy workload lease is active",
+                    admission=admission,
                 )
             self._leases[policy.lease_group] = workload_id
         return policy.lease_group
@@ -1477,6 +1580,8 @@ class GatewayRequestHandler(http.server.BaseHTTPRequestHandler):
         self._selected_model: str | None = None
         self._retry_count = 0
         self._finished = False
+        self._admission_evidence: dict[str, Any] | None = None
+        self._model_cold: bool | None = None
 
     def _finish(self, status: int, classification: str | None = None) -> None:
         if self._finished:
@@ -1507,17 +1612,28 @@ class GatewayRequestHandler(http.server.BaseHTTPRequestHandler):
                 "token_usage": None,
                 "tool_call_count": None,
                 "error_classification": classification,
+                "admission": self._admission_evidence,
+                "gateway_release_sha": self.app.config.release_sha,
+                "model_cold": self._model_cold,
             }
         )
 
     def _json(
-        self, status: int, payload: dict[str, Any], *, close: bool = False
+        self,
+        status: int,
+        payload: dict[str, Any],
+        *,
+        close: bool = False,
+        retry_after_seconds: int | None = None,
     ) -> None:
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Request-ID", self._request_id)
+        self._provenance_headers()
+        if retry_after_seconds is not None:
+            self.send_header("Retry-After", str(retry_after_seconds))
         if close:
             self.send_header("Connection", "close")
             self.close_connection = True
@@ -1525,6 +1641,7 @@ class GatewayRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _error(self, error: GatewayError, *, close: bool = False) -> None:
+        self._admission_evidence = error.admission
         self._json(
             error.status,
             {
@@ -1533,11 +1650,20 @@ class GatewayRequestHandler(http.server.BaseHTTPRequestHandler):
                     "type": "mbfd_gateway_error",
                     "classification": error.classification,
                     "request_id": self._request_id,
+                    "admission": error.admission,
                 }
             },
             close=close,
+            retry_after_seconds=error.retry_after_seconds,
         )
         self._finish(error.status, error.classification)
+
+    def _provenance_headers(self) -> None:
+        if self._consumer is not None:
+            if self.app.config.release_sha:
+                self.send_header("X-MBFD-Gateway-Release", self.app.config.release_sha)
+            if self._model_cold is not None:
+                self.send_header("X-MBFD-Model-Cold", str(self._model_cold).lower())
 
     def _authenticate(self) -> Consumer:
         self._consumer = self.app.credentials.resolve(
@@ -1600,6 +1726,7 @@ class GatewayRequestHandler(http.server.BaseHTTPRequestHandler):
             if key.lower() not in HOP_BY_HOP_RESPONSE_HEADERS:
                 self.send_header(key, value)
         self.send_header("X-Request-ID", self._request_id)
+        self._provenance_headers()
         self.send_header("Transfer-Encoding", "chunked")
         self.end_headers()
         classification = None
@@ -1769,6 +1896,7 @@ class GatewayRequestHandler(http.server.BaseHTTPRequestHandler):
                 )
 
             cold = readiness.classification == "model_cold"
+            self._model_cold = cold
             request_timeout = min(
                 selection.capability.timeout_seconds,
                 self.app.config.limits.request_timeout_seconds,
@@ -1789,7 +1917,8 @@ class GatewayRequestHandler(http.server.BaseHTTPRequestHandler):
             with self.app.heavy_leases.acquire(
                 selection.capability.heavy_workload,
                 requires_allocation=cold,
-            ):
+            ) as heavy_lease:
+                self._admission_evidence = heavy_lease.evidence
                 try:
                     if cold:
                         self.app.mark_model_state(
