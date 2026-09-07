@@ -9,7 +9,7 @@ use App\Http\Requests\Api\Bid\AuthorizeBidRequest;
 use App\Models\Employee;
 use App\Services\Bid\BidAuthorizationCodeBroker;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response;
 
 final class AuthorizationController extends Controller
 {
@@ -17,7 +17,7 @@ final class AuthorizationController extends Controller
         AuthorizeBidRequest $request,
         AuthenticatedMemberContextResolver $contexts,
         BidAuthorizationCodeBroker $codes,
-    ): RedirectResponse {
+    ): Response {
         $validated = $request->validated();
         $context = $contexts->resolve($request);
         $employee = $context->employee();
@@ -43,9 +43,14 @@ final class AuthorizationController extends Controller
     }
 
     /** @param array<string, string> $query */
-    private function callback(string $redirectUri, array $query): RedirectResponse
+    private function callback(string $redirectUri, array $query): Response
     {
-        $response = redirect()->away($redirectUri.'?'.http_build_query($query));
+        // End the same-origin login form navigation before opening Bid. A 302
+        // here makes browsers apply the login page's form-action 'self' to the
+        // cross-origin callback, leaving an authenticated user on a stale form.
+        $response = response()->view('auth.bid-handoff', [
+            'destination' => $redirectUri.'?'.http_build_query($query),
+        ]);
         $response->headers->set('Cache-Control', 'no-store, private');
         $response->headers->set('Pragma', 'no-cache');
 

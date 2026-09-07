@@ -13,10 +13,19 @@ forward, or verify the Hub password on the canonical path.
 2. Hub requires the canonical `web` login and a current D01 authentication-session record, then
    resolves D02 `AuthenticatedMemberContext`. An unlinked User is denied; no name or email lookup
    is attempted.
-3. Hub redirects only to one of these exact callbacks:
+3. Hub returns a no-store HTML handoff at its authorization endpoint, which
+   opens only one of these exact callbacks in a new document navigation:
 
    - `https://bid.mbfdhub.com/api/auth/callback`
    - `https://staging.bid.mbfdhub.com/api/auth/callback`
+
+   The handoff ends the same-origin password-form navigation before crossing
+   to Bid. This preserves `form-action 'self'`: a direct HTTP redirect after
+   password submission is blocked by that policy in browsers, leaving a stale
+   login form whose next submission returns 419. The handoff works without
+   JavaScript and includes a Continue to Bid link if automatic navigation is
+   unavailable. Authentication, entitlements, callback validation, state and
+   one-use authorization-code checks still apply.
 
 4. Success returns `code` and the unchanged `state`. The opaque 256-bit code is stored only as a
    SHA-256 cache key for 60 seconds and is bound server-side to the Hub issuer, `bid` audience,
