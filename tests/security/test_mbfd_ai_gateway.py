@@ -694,6 +694,25 @@ class FakeProbe:
 
 
 class TestAdmission(unittest.TestCase):
+    def test_denial_preserves_exact_host_snapshot_and_recovery_without_policy_change(self):
+        probe = FakeProbe(mem=1)
+        manager = gateway.HeavyLeaseManager(self.config.heavy_workloads, probe)
+        workload = next(iter(self.config.heavy_workloads))
+        self.config.heavy_workloads[workload].mem_available_floor_mb = 4096
+        with self.assertRaises(gateway.GatewayError) as caught:
+            with manager.acquire(workload, requires_allocation=True):
+                self.fail("low-memory request was admitted")
+        error = caught.exception
+        self.assertEqual(error.retry_after_seconds, 30)
+        self.assertEqual(error.admission["host"]["mem_available_mb"], 1)
+        self.assertIn("MemAvailable below policy floor", error.admission["reasons"])
+        self.assertEqual(manager.snapshot(), {})
+        probe.mem = 65536
+        with manager.acquire(workload, requires_allocation=True):
+            self.assertTrue(manager.snapshot())
+        self.assertEqual(manager.snapshot(), {})
+        self.assertEqual(error.admission["host"]["mem_available_mb"], 1)
+
     def setUp(self):
         self.fixture = ConfigFixture()
         self.config = gateway.load_config(self.fixture.path)
@@ -1020,6 +1039,31 @@ class TestModelReadiness(unittest.TestCase):
 
 
 class TestHTTPGateway(unittest.TestCase):
+    def test_admission_http_and_log_share_measurements_request_id_and_retry(self):
+        def policy(config):
+            config["heavy_workloads"]["primary-ollama-large"]["mem_available_floor_mb"] = 4096
+        backend, server, logs, app = self.make_servers(
+            {"available": ["mbfd-general"], "loaded": ["mbfd-general"]}, policy,
+        )
+        app.heavy_leases.probe = FakeProbe(mem=1024)
+        status, headers, body = request(server, "POST", "/api/chat",
+            payload={"model": "mbfd-general", "messages": [{"role": "user", "content": "do-not-log-me"}]})
+        self.assertEqual(status, 503)
+        self.assertEqual(headers["Retry-After"], "30")
+        error = json.loads(body)["error"]
+        self.assertEqual(error["request_id"], headers["X-Request-ID"])
+        self.assertEqual(error["admission"]["host"]["mem_available_mb"], 1024)
+        for _ in range(100):
+            if logs.getvalue().strip():
+                break
+            time.sleep(0.002)
+        record = json.loads(logs.getvalue().splitlines()[-1])
+        self.assertEqual(record["admission"], error["admission"])
+        self.assertEqual(record["request_id"], error["request_id"])
+        self.assertNotIn("do-not-log-me", logs.getvalue())
+        self.assertNotIn("legacy-secret", logs.getvalue())
+        self.assertFalse(any(item[0] == "POST" for item in backend.requests))
+
     def make_servers(self, script, mutate=None):
         backend = ScriptedBackend(script)
         backend_thread = threading.Thread(target=backend.serve_forever, daemon=True)
