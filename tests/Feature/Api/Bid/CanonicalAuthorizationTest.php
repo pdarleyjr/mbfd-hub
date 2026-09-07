@@ -69,9 +69,7 @@ final class CanonicalAuthorizationTest extends TestCase
             $this->app['session.store']->getId(),
         )->withCredentials();
 
-        $location = $this->get($loginLocation)
-            ->assertRedirect()
-            ->headers->get('Location');
+        $location = $this->handoffDestination($loginLocation);
         self::assertIsString($location);
         self::assertStringStartsWith(self::CALLBACK.'?', $location);
 
@@ -117,9 +115,7 @@ final class CanonicalAuthorizationTest extends TestCase
             $this->app['session.store']->getId(),
         )->withCredentials();
 
-        $location = $this->get($authorizeUrl)
-            ->assertRedirect()
-            ->headers->get('Location');
+        $location = $this->handoffDestination($authorizeUrl);
         self::assertIsString($location);
         self::assertStringStartsWith(self::CALLBACK.'?', $location);
 
@@ -134,9 +130,7 @@ final class CanonicalAuthorizationTest extends TestCase
         $user = $this->linkedUser();
         $this->canonicalLogin($user);
 
-        $location = $this->get($this->authorizeUrl())
-            ->assertRedirect()
-            ->headers->get('Location');
+        $location = $this->handoffDestination($this->authorizeUrl());
         self::assertIsString($location);
         self::assertStringStartsWith(self::CALLBACK.'?', $location);
 
@@ -186,6 +180,28 @@ final class CanonicalAuthorizationTest extends TestCase
             ->assertRedirect('/login');
     }
 
+    public function test_production_callback_uses_the_same_guarded_handoff(): void
+    {
+        $this->canonicalLogin($this->linkedUser());
+        $callback = 'https://bid.mbfdhub.com/api/auth/callback';
+        $destination = $this->handoffDestination($this->authorizeUrl(callback: $callback));
+        self::assertStringStartsWith($callback.'?', $destination);
+        $query = $this->redirectQuery($destination);
+        self::assertSame(self::STATE, $query['state'] ?? null);
+        $this->exchange($query['code'], callback: $callback)->assertOk();
+    }
+
+    public function test_handoff_preserves_access_denied_for_users_without_bid_entitlement(): void
+    {
+        $user = $this->linkedUser();
+        $user->revokePermissionTo('app.bid.access');
+        $this->canonicalLogin($user);
+        $query = $this->redirectQuery($this->handoffDestination($this->authorizeUrl()));
+        self::assertSame('access_denied', $query['error'] ?? null);
+        self::assertSame(self::STATE, $query['state'] ?? null);
+        self::assertArrayNotHasKey('code', $query);
+    }
+
     public function test_unlinked_user_fails_closed_without_identity_inference(): void
     {
         $user = $this->linkedUser();
@@ -193,9 +209,7 @@ final class CanonicalAuthorizationTest extends TestCase
         $user->forceFill(['employee_profile_id' => null])->save();
         $this->app['auth']->forgetGuards();
 
-        $location = $this->get($this->authorizeUrl())
-            ->assertRedirect()
-            ->headers->get('Location');
+        $location = $this->handoffDestination($this->authorizeUrl());
         self::assertIsString($location);
 
         $query = $this->redirectQuery($location);
@@ -377,11 +391,26 @@ final class CanonicalAuthorizationTest extends TestCase
         ]);
     }
 
+    private function handoffDestination(string $url): string
+    {
+        $response = $this->get($url)
+            ->assertOk()
+            ->assertViewIs('auth.bid-handoff')
+            ->assertHeaderMissing('Location');
+        self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        self::assertStringContainsString("form-action 'self';", (string) $response->headers->get('Content-Security-Policy'));
+        $destination = $response->viewData('destination');
+        self::assertIsString($destination);
+        $response->assertSee('content="0;url='.e($destination).'"', false);
+        $response->assertSee('href="'.e($destination).'"', false);
+        $response->assertSee('name="referrer" content="no-referrer"', false);
+
+        return $destination;
+    }
+
     private function issuedCode(): string
     {
-        $location = $this->get($this->authorizeUrl())
-            ->assertRedirect()
-            ->headers->get('Location');
+        $location = $this->handoffDestination($this->authorizeUrl());
         self::assertIsString($location);
         $query = $this->redirectQuery($location);
         self::assertIsString($query['code'] ?? null);

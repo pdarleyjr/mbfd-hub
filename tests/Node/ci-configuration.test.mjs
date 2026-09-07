@@ -168,6 +168,11 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(deployment, /environment:\s*\r?\n\s+name:\s*production/);
   assert.doesNotMatch(deployment, /if:\s*\$\{\{\s*always\(\)\s*\}\}/);
 
+  const watchdog = workflowStep(deployment, "Persist canonical Hermes watchdog configuration");
+  assert.match(watchdog, /VERIFY_WATCHDOG_ONLY: \$\{\{ inputs\.verify_watchdog_only \}\}/);
+  assert.match(watchdog, /if \[\[ "\$VERIFY_WATCHDOG_ONLY" != 'true' \]\]; then\r?\n\s+sudo -n bash .* --apply\r?\n\s+fi\r?\n\s+sudo -n bash .* --check/);
+  assert.doesNotMatch(watchdog, /continue-on-error|\|\| true/);
+
   const sshTarget = workflowStep(deployment, "Configure ephemeral Hub deployment SSH target");
   assert.match(sshTarget, /RUNNER_TEMP/);
   assert.match(sshTarget, /DEPLOY_KNOWN_HOSTS/);
