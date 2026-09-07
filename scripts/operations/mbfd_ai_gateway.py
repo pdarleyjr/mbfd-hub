@@ -93,11 +93,16 @@ REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
 class GatewayError(Exception):
     """An expected boundary failure with a stable machine classification."""
 
-    def __init__(self, status: int, classification: str, message: str):
+    def __init__(
+        self, status: int, classification: str, message: str,
+        *, admission: dict[str, Any] | None = None,
+    ):
         super().__init__(message)
         self.status = status
         self.classification = classification
         self.message = message
+        self.admission = admission
+        self.retry_after_seconds = 30 if status in (429, 503) else None
 
 
 @dataclasses.dataclass(slots=True)
@@ -1139,13 +1144,20 @@ class HeavyLeaseManager:
         if policy.require_production_healthy and not state.production_healthy:
             reasons.append("production health is not approved")
         if reasons:
-            raise GatewayError(503, "admission_denied", "; ".join(reasons))
+            raise GatewayError(
+                503, "admission_denied", "; ".join(reasons),
+                admission={"reasons": reasons, "host": dataclasses.asdict(state)},
+            )
         with self._lock:
             if policy.lease_group in self._leases:
                 raise GatewayError(
                     429,
                     "admission_denied",
                     "Conflicting heavy workload lease is active",
+                    admission={
+                        "reasons": ["Conflicting heavy workload lease is active"],
+                        "host": dataclasses.asdict(state),
+                    },
                 )
             self._leases[policy.lease_group] = workload_id
         return policy.lease_group
@@ -1477,6 +1489,7 @@ class GatewayRequestHandler(http.server.BaseHTTPRequestHandler):
         self._selected_model: str | None = None
         self._retry_count = 0
         self._finished = False
+        self._admission_evidence: dict[str, Any] | None = None
 
     def _finish(self, status: int, classification: str | None = None) -> None:
         if self._finished:
@@ -1507,17 +1520,21 @@ class GatewayRequestHandler(http.server.BaseHTTPRequestHandler):
                 "token_usage": None,
                 "tool_call_count": None,
                 "error_classification": classification,
+                "admission": self._admission_evidence,
             }
         )
 
     def _json(
-        self, status: int, payload: dict[str, Any], *, close: bool = False
+        self, status: int, payload: dict[str, Any], *, close: bool = False,
+        retry_after_seconds: int | None = None,
     ) -> None:
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Request-ID", self._request_id)
+        if retry_after_seconds is not None:
+            self.send_header("Retry-After", str(retry_after_seconds))
         if close:
             self.send_header("Connection", "close")
             self.close_connection = True
@@ -1525,6 +1542,7 @@ class GatewayRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _error(self, error: GatewayError, *, close: bool = False) -> None:
+        self._admission_evidence = error.admission
         self._json(
             error.status,
             {
@@ -1533,9 +1551,12 @@ class GatewayRequestHandler(http.server.BaseHTTPRequestHandler):
                     "type": "mbfd_gateway_error",
                     "classification": error.classification,
                     "request_id": self._request_id,
+                    "admission": error.admission,
+                    "retry_after_seconds": error.retry_after_seconds,
                 }
             },
             close=close,
+            retry_after_seconds=error.retry_after_seconds,
         )
         self._finish(error.status, error.classification)
 
