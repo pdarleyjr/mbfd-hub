@@ -46,7 +46,9 @@ final class EmployeeProfileService
             $linkedId = User::query()->where('employee_profile_id', $employee->getKey())->value('id');
 
             return DB::transaction(function () use ($actor, $employee, $attributes, $linkedId, $currentPassword, $reason): Employee {
-                // Match the identity/security services' deterministic User -> Employee order.
+                // Administrative writers share this guard before participant locks.
+                app(\App\Services\Security\LastCriticalAdministratorGuard::class)->lockActiveCriticalAdministrators();
+                // Then lock participant Users in PK order, followed by Employee.
                 $users = User::query()->whereKey(array_filter([$actor->getKey(), $linkedId]))
                     ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
                 $currentActor = $users->get($actor->getKey());

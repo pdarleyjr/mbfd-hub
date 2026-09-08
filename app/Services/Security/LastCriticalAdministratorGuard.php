@@ -6,11 +6,29 @@ namespace App\Services\Security;
 
 use App\Enums\AccountStatus;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use LogicException;
 
 final class LastCriticalAdministratorGuard
 {
+    // PostgreSQL two-integer advisory namespace: "MBFD", "ADMN".
+    private const LOCK_NAMESPACE = 0x4D424644;
+
+    private const MUTATION_LOCK = 0x41444D4E;
+
     public function lockActiveCriticalAdministrators(): void
     {
+        if (DB::transactionLevel() < 1) {
+            throw new LogicException('Administrative locking requires an active transaction.');
+        }
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            // A changing set of active administrator rows is not a stable mutex:
+            // a queued query can retain its old membership snapshot. Serialize
+            // guarded administrative mutations before taking any participant row
+            // locks. This transaction-scoped lock is never used by read previews
+            // or ordinary login. SQLite serializes writes without this primitive.
+            DB::select('SELECT pg_advisory_xact_lock(?, ?)', [self::LOCK_NAMESPACE, self::MUTATION_LOCK]);
+        }
         User::query()
             ->where('account_status', AccountStatus::Active->value)
             ->whereHas('roles', fn ($query) => $query->whereIn(

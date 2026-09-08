@@ -18,6 +18,11 @@ class EditAccountProfile extends EditRecord
 
     protected static string $resource = AccountProfileResource::class;
 
+    public function getTitle(): string
+    {
+        return $this->getRecord()->name.' — Account profile';
+    }
+
     public function getRecord(): \App\Models\User
     {
         $record = parent::getRecord();

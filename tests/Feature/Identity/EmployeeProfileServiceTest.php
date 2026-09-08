@@ -24,6 +24,26 @@ class EmployeeProfileServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_canonical_transition_synchronizes_raw_profile_for_every_linking_caller(): void
+    {
+        $employee = Employee::query()->create([
+            'employee_id' => '61001', 'name' => 'Authoritative Name', 'rank' => 'Captain',
+            'station' => 'Station 2', 'phone' => '305-555-0101', 'display_name' => 'Captain Example',
+            'password' => 'employee-fixture-password',
+        ]);
+        $user = User::factory()->create(['employee_id' => $employee->employee_id, 'name' => 'Old Account Name', 'rank' => 'Old Rank']);
+        $hash = $user->getRawOriginal('password');
+        $service = app(\App\Services\Identity\AccountSecurityService::class);
+        $result = $service->completeCanonicalLink($user, $employee->id, $employee->employee_id, null, now(), activatePending: false);
+        self::assertTrue($result['changed']);
+        foreach (Employee::PROFILE_FIELDS as $field) {
+            self::assertSame($employee->getAttribute($field), DB::table('users')->where('id', $user->id)->value($field));
+        }
+        self::assertSame($hash, $user->fresh()->getRawOriginal('password'));
+        self::assertSame($employee->id, $user->fresh()->employee_profile_id);
+        self::assertFalse($service->completeCanonicalLink($user, $employee->id, $employee->employee_id, null, now(), activatePending: false)['changed']);
+    }
+
     public function test_manager_updates_authoritative_profile_and_compatibility_without_changing_identity(): void
     {
         [$employee, $user] = $this->member();

@@ -8,6 +8,7 @@ use App\Enums\Security\AccountSecurityAction;
 use App\Exceptions\CurrentPasswordMismatch;
 use App\Filament\Support\EmployeeAccessSchema;
 use App\Models\User;
+use App\Rules\SafeNewPassword;
 use App\Services\Security\AccountSecurityService;
 use App\Services\Security\ApplicationAccessService;
 use App\Support\ApplicationAccessRegistry;
@@ -125,6 +126,7 @@ trait ManagesEmployeeAccess
         ];
         if ($temporaryPassword) {
             $fields[] = Forms\TextInput::make('temporary_password')->label('One-time temporary password')->password()->autocomplete('new-password')->required()->minLength(12)
+                ->rule(new SafeNewPassword)
                 ->helperText('Write-only. Deliver privately to the member; they must replace it at next sign-in. Existing sessions will be revoked.');
         }
 

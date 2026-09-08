@@ -17,11 +17,14 @@ use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Testing\File;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Features\SupportFileUploads\FileUploadConfiguration;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -59,9 +62,19 @@ final class WorkgroupFileUploadTest extends TestCase
         self::assertFalse(Validator::make(['file' => UploadedFile::fake()->create('too-large.pdf', 51201, 'application/pdf')], ['file' => FileUploadConfiguration::rules()])->passes());
     }
 
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function test_admin_resource_stores_pdf_privately_with_original_name_and_size(): void
     {
-        $upload = UploadedFile::fake()->createWithContent('essentials.pdf', "%PDF-1.7\n".str_repeat('x', 20 * 1024 * 1024));
+        // Exercise real large-file I/O without retaining the entire suite or duplicating its payload in memory.
+        $stream = tmpfile();
+        self::assertIsResource($stream);
+        fwrite($stream, "%PDF-1.7\n");
+        for ($megabyte = 0; $megabyte < 20; $megabyte++) {
+            fwrite($stream, str_repeat('x', 1024 * 1024));
+        }
+        $upload = new File('essentials.pdf', $stream);
+        self::assertSame(20 * 1024 * 1024 + 9, $upload->getSize());
         Livewire::test(CreateWorkgroupFile::class)
             ->fillForm(['workgroup_id' => $this->workgroup->id, 'filepath' => $upload])
             ->call('create')

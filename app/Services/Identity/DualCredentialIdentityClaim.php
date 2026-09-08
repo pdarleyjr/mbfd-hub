@@ -24,10 +24,12 @@ final readonly class DualCredentialIdentityClaim
         CarbonInterface $at,
     ): ?User {
         return DB::transaction(function () use ($employeeProfileId, $legacyEmail, $legacyPassword, $at): ?User {
-            /** @var Employee $employee */
-            $employee = Employee::query()->lockForUpdate()->findOrFail($employeeProfileId);
+            // A claim has one existing User participant. Lock it before Employee,
+            // matching profile/security writers without locking unrelated accounts.
             /** @var User|null $user */
             $user = User::query()->where('email', strtolower($legacyEmail))->lockForUpdate()->first();
+            /** @var Employee $employee */
+            $employee = Employee::query()->lockForUpdate()->findOrFail($employeeProfileId);
 
             $dummyHash = Hash::make(Str::random(48));
             $legacyCredentialValid = Hash::check(

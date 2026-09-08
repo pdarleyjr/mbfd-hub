@@ -62,11 +62,9 @@ final class EmployeeIdentityService
                 }
                 $classification = $currentTarget->getRawOriginal('account_classification');
                 $this->identitySecurity->completeCanonicalLink($currentTarget, $currentEmployee->id, $currentEmployee->employee_id, null, now(), activatePending: false);
-                // Canonical transitions deliberately use query writes. Copy the
-                // roster snapshot for legacy readers without changing credentials,
-                // email addresses, local IDs, roles or historical relationships.
+                // Profile compatibility is synchronized by the canonical transition.
+                // Classification and mailbox-proof changes belong to this approved correction.
                 User::query()->whereKey($currentTarget->id)->update([
-                    ...$currentEmployee->only(['name', 'rank', 'station', 'phone', 'display_name']),
                     'email_verified_at' => null,
                     'account_classification' => 'unresolved',
                 ]);

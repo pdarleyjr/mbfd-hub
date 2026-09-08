@@ -28,6 +28,21 @@ final class ApplicationRoleSeparationTest extends TestCase
         self::assertSame([], app(ApplicationAccessRegistry::class)->selectedApplicationAdministrations($target));
     }
 
+    public function test_saved_grant_remains_visible_when_client_is_missing_or_account_is_disabled(): void
+    {
+        [$actor, $target] = $this->members();
+        config(['services.bid.federation_token' => null]);
+        app(ApplicationAccessService::class)->syncApplications($actor, $target, ['bid'], 'Role-test-password!', 'Approved pending access');
+        $registry = app(ApplicationAccessRegistry::class);
+        self::assertSame('Access granted', $registry->states($target)['bid']['grant_status']);
+        self::assertFalse($registry->states($target)['bid']['allowed']);
+        $target->forceFill(['account_status' => 'disabled'])->save();
+        self::assertSame('Access granted', $registry->states($target)['bid']['grant_status']);
+        self::assertFalse($registry->states($target)['bid']['allowed']);
+        self::assertSame('Not granted', $registry->states($target)['media_control']['grant_status']);
+        self::assertSame('Inherited from Super Administrator', $registry->states($actor)['bid']['grant_status']);
+    }
+
     public function test_explicit_administration_is_independent_audited_and_media_downgrade_revokes_the_old_epoch(): void
     {
         [$actor, $target] = $this->members();

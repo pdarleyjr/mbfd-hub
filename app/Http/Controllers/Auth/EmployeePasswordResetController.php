@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\User;
+use App\Rules\SafeNewPassword;
 use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Identity\AccountSecurityService;
 use App\Services\Identity\CityEmailVerificationService;
@@ -96,7 +97,7 @@ final class EmployeePasswordResetController extends Controller
         $validated = $request->validate([
             'employee_id' => ['required', 'string', 'max:64'],
             'token' => ['required', 'string'],
-            'password' => ['required', 'confirmed', PasswordRule::defaults()],
+            'password' => ['required', 'confirmed', PasswordRule::defaults(), new SafeNewPassword],
         ]);
         $employee = Employee::query()->where('employee_id', trim($validated['employee_id']))->first();
         $user = $employee?->user;

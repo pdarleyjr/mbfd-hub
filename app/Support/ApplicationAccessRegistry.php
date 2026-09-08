@@ -105,7 +105,7 @@ final class ApplicationAccessRegistry
         return 'Last remote verification: '.($sync->desired_enabled ? 'enabled' : 'disabled').' at '.$sync->verified_at->utc()->format('Y-m-d H:i:s').' UTC. Reconciliation is periodic, not instantaneous.';
     }
 
-    /** @return array<string, array{allowed: bool, operational: bool, status: string, role: string|null, role_status: string, runtime_status: string}> */
+    /** @return array<string, array{allowed: bool, operational: bool, grant_status: string, status: string, role: string|null, role_status: string, runtime_status: string}> */
     public function states(User $user): array
     {
         $current = $user->fresh();
@@ -125,6 +125,7 @@ final class ApplicationAccessRegistry
             $states[$key] = [
                 'allowed' => $entitled && $active && $operational,
                 'operational' => $operational,
+                'grant_status' => $current?->hasRole('super_admin') ? 'Inherited from Super Administrator' : ($current !== null && $application['permission'] !== null && $current->hasDirectWebPermission($application['permission']) ? 'Access granted' : 'Not granted'),
                 'status' => ! $operational ? 'SSO client not configured or unavailable — access unavailable' : (! $active ? 'Account inactive or password setup required — access blocked' : ($key === 'cloud' && ! $entitled ? 'Cloud grant or approved account link missing' : ($current->hasRole('super_admin') ? 'Inherited from Super Administrator — managed through roles' : ($entitled ? 'Direct Hub access granted' : 'No direct access')))),
                 'role' => $role,
                 'role_status' => match ($key) {

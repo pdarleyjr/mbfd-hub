@@ -21,6 +21,8 @@ class AccountProfileResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Account exceptions';
 
+    protected static ?string $modelLabel = 'Account profile';
+
     protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
@@ -48,7 +50,8 @@ class AccountProfileResource extends Resource
             Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
             Tables\Columns\TextColumn::make('employee_id')->label('Recorded Employee ID')->searchable(),
             Tables\Columns\TextColumn::make('email')->searchable(),
-            Tables\Columns\TextColumn::make('account_classification')->label('Classification')->badge(),
+            Tables\Columns\TextColumn::make('account_classification')->label('Classification')->badge()
+                ->formatStateUsing(fn (?string $state): string => $state === 'approved_nonemployee' ? 'Approved nonemployee' : 'Unresolved account'),
             Tables\Columns\TextColumn::make('account_status')->badge(),
         ])->actions([Tables\Actions\EditAction::make()->label('Open profile')])->bulkActions([]);
     }

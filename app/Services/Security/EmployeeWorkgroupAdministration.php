@@ -24,6 +24,7 @@ final class EmployeeWorkgroupAdministration
     {
         try {
             DB::transaction(function () use ($actor, $target, $memberships, $currentPassword, $reason): void {
+                app(LastCriticalAdministratorGuard::class)->lockActiveCriticalAdministrators();
                 $users = User::query()->whereKey([$actor->id, $target->id])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
                 $currentActor = $users->get($actor->id);
                 $currentTarget = $users->get($target->id);

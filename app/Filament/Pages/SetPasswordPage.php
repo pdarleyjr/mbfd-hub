@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Models\User;
+use App\Rules\SafeNewPassword;
 use App\Services\Identity\AccountSecurityService;
 use App\Services\Identity\CanonicalLoginDestination;
 use App\Services\Identity\CanonicalSessionPolicy;
@@ -63,6 +64,7 @@ class SetPasswordPage extends Page
                             ->confirmed()
                             ->different('current_password')
                             ->rule(Password::default())
+                            ->rule(new SafeNewPassword)
                             ->revealable(),
                         Forms\Components\TextInput::make('password_confirmation')
                             ->label('Confirm New Password')

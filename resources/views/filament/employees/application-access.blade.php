@@ -13,7 +13,7 @@
                     @foreach ($registry->applications() as $key => $application)
                         <tr class="border-b align-top">
                             <th class="p-3 font-medium">{{ $application['label'] }}</th>
-                            <td class="p-3">{{ $states[$key]['status'] }}</td>
+                            <td class="p-3">{{ $states[$key]['grant_status'] }}<p class="mt-1 text-xs text-gray-500">{{ $states[$key]['status'] }}</p></td>
                             <td class="p-3">{{ $states[$key]['role'] ?? ($key === 'admin' ? 'Hub capabilities' : (in_array($key, ['cmd', 'cloud']) ? 'App-managed' : 'Not assigned')) }}<p class="mt-1 text-xs text-gray-500">{{ $states[$key]['role_status'] }}</p></td>
                             <td class="p-3">{{ $states[$key]['runtime_status'] }}@if ($key === 'cloud')<p class="mt-2 text-xs">{{ $registry->cloudEnforcementStatus($account) }}</p>@endif</td>
                         </tr>

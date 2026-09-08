@@ -33,7 +33,18 @@ class UserRoleAssignmentAuthorizationTest extends TestCase
         $target = User::factory()->create(['employee_id' => 'ROLE-TARGET-100']);
 
         $this->actingAs($actor);
-        self::assertFalse(AccountProfileResource::canEdit($target));
+        self::assertTrue(AccountProfileResource::canEdit($target));
+        self::assertFalse(AccountProfileResource::canUpdateProfile($target));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+        $originalName = $target->name;
+        Livewire::test(EditAccountProfile::class, ['record' => $target->getRouteKey()])
+            ->assertFormFieldIsDisabled('name')
+            ->assertFormFieldIsDisabled('display_name')
+            ->assertActionHidden('manageRoles')
+            ->call('save')
+            ->assertForbidden();
+        self::assertSame($originalName, $target->refresh()->name);
         $this->assertSame([], $target->refresh()->getRoleNames()->all());
     }
 

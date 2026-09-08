@@ -29,9 +29,10 @@ final class EmployeeAccountAdministration
     public function createForEmployee(User $actor, Employee $employee, string $temporaryPassword, string $currentPassword, string $reason): User
     {
         try {
-            Validator::make(['temporary_password' => $temporaryPassword, 'reason' => $reason], ['temporary_password' => 'required|string|min:12|max:255', 'reason' => 'required|string|max:500'])->validate();
+            Validator::make(['temporary_password' => $temporaryPassword, 'reason' => $reason], ['temporary_password' => ['required', 'string', 'min:12', 'max:255', new \App\Rules\SafeNewPassword], 'reason' => 'required|string|max:500'])->validate();
 
             return DB::transaction(function () use ($actor, $employee, $temporaryPassword, $currentPassword, $reason): User {
+                app(LastCriticalAdministratorGuard::class)->lockActiveCriticalAdministrators();
                 $actor = User::query()->lockForUpdate()->findOrFail($actor->id);
                 $this->authorize($actor, $currentPassword);
                 $employee = Employee::query()->lockForUpdate()->findOrFail($employee->id);
@@ -71,6 +72,7 @@ final class EmployeeAccountAdministration
         try {
             Validator::make(['reason' => $reason], ['reason' => 'required|string|max:500'])->validate();
             DB::transaction(function () use ($actor, $target, $currentPassword, $reason): void {
+                app(LastCriticalAdministratorGuard::class)->lockActiveCriticalAdministrators();
                 $users = User::query()->whereKey([$actor->id, $target->id])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
                 $actor = $users->get($actor->id);
                 $target = $users->get($target->id);
@@ -93,6 +95,7 @@ final class EmployeeAccountAdministration
             abort_if(array_diff(array_keys($data), ['name', 'display_name', 'phone']) !== [], 403);
 
             return DB::transaction(function () use ($actor, $target, $data): User {
+                app(LastCriticalAdministratorGuard::class)->lockActiveCriticalAdministrators();
                 $users = User::query()->whereKey([$actor->id, $target->id])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
                 $actor = $users->get($actor->id);
                 $target = $users->get($target->id);
@@ -117,6 +120,7 @@ final class EmployeeAccountAdministration
     {
         try {
             return DB::transaction(function () use ($actor, $target, $email, $currentPassword, $reason): User {
+                app(LastCriticalAdministratorGuard::class)->lockActiveCriticalAdministrators();
                 $users = User::query()->whereKey([$actor->id, $target->id])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
                 $actor = $users->get($actor->id);
                 $target = $users->get($target->id);

@@ -82,6 +82,9 @@ final class UnifiedEmployeeAdministrationTest extends TestCase
         $this->get(UserResource::getUrl('edit', ['record' => $user]))->assertRedirect(
             \App\Filament\Resources\AccountProfileResource::getUrl('edit', ['record' => $user]),
         );
+        Livewire::test(\App\Filament\Resources\AccountProfileResource\Pages\EditAccountProfile::class, ['record' => $user->id])
+            ->assertSee($user->name.' — Account profile')
+            ->assertSee('Unresolved account');
     }
 
     public function test_read_only_personnel_administrator_can_inspect_but_cannot_save(): void

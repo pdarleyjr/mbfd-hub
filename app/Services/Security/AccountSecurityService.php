@@ -11,12 +11,14 @@ use App\Exceptions\CurrentPasswordMismatch;
 use App\Models\Employee;
 use App\Models\User;
 use App\Policies\AccountSecurityPolicy;
+use App\Rules\SafeNewPassword;
 use App\Services\Identity\AccountSecurityService as IdentityAccountSecurityService;
 use Carbon\CarbonInterface;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 use Throwable;
 
 final class AccountSecurityService
@@ -105,6 +107,11 @@ final class AccountSecurityService
                     throw new CurrentPasswordMismatch('The current password is incorrect.');
                 }
                 $this->session->put((string) config('security.recent_authentication.session_key'), time());
+                if ($action === AccountSecurityAction::AdministrativeRecovery) {
+                    Validator::make(['temporary_password' => $temporaryPassword], [
+                        'temporary_password' => [new SafeNewPassword],
+                    ])->validate();
+                }
                 if ($action === AccountSecurityAction::AdministrativeRecovery && ($temporaryPassword === null || strlen($temporaryPassword) < 12 || strlen($temporaryPassword) > 255)) {
                     throw new AuthorizationException('A temporary password of 12 to 255 characters is required.');
                 }
