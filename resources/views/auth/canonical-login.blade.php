@@ -22,6 +22,9 @@
 <body>
 <main>
     <h1>MBFD Hub</h1>
+    @if (request()->query('session_expired') === '1')
+        <p role="status">Your session has ended. Please sign in again. Unsaved changes were not submitted. Review the record after signing in.</p>
+    @endif
     <p>Sign in with your Employee ID and MBFD Hub password.</p>
     <form method="POST" action="{{ route('login.store') }}">
         @csrf

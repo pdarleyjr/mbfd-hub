@@ -47,6 +47,15 @@ final readonly class EnsureCanonicalSessionIsCurrent
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
+        // Livewire sends X-Livewire without Accept: application/json. A normal
+        // redirect otherwise gets fetched as login HTML inside its update request.
+        if ($request->headers->has('X-Livewire')) {
+            return response()->json([
+                'message' => 'Your session has ended. Please sign in again.',
+                'code' => 'auth_session_expired',
+            ], 401, ['Cache-Control' => 'no-store, private']);
+        }
+
         if ($request->expectsJson()) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }

@@ -22,7 +22,7 @@ class SecurityHeaders
         // browsers, so we omit it intentionally.
         $cityEmailPage = $request->is('account/city-email', 'account/city-email/*');
         $response->headers->set('Referrer-Policy', $cityEmailPage ? 'no-referrer' : 'strict-origin-when-cross-origin');
-        if ($cityEmailPage) {
+        if ($cityEmailPage || $request->is('login')) {
             $response->headers->set('Cache-Control', 'no-store, private');
         }
         $conferencePath = $request->is('video-conferencing/*')

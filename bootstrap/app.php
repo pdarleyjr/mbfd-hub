@@ -50,6 +50,19 @@ $app = Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        // Missing/expired Laravel sessions can fail panel authentication before
+        // the canonical registry middleware. Keep the same Livewire contract.
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $exception, \Illuminate\Http\Request $request) {
+            if ($request->headers->has('X-Livewire')) {
+                return response()->json([
+                    'message' => 'Your session has ended. Please sign in again.',
+                    'code' => 'auth_session_expired',
+                ], 401, ['Cache-Control' => 'no-store, private']);
+            }
+
+            return null;
+        });
+
         // Render a stable, user-readable JSON contract for Operational Forms API
         // requests (or any JSON request) that exceed the server's request-size
         // limit (HTTP 413). This is thrown by the ValidatePostSize middleware
