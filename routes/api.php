@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\SupportChatProxyController;
 use App\Http\Controllers\Api\TestNotificationController;
 use App\Http\Controllers\Api\TrtInventoryController;
 use App\Http\Controllers\Workgroup\WorkgroupAIController;
+use App\Http\Middleware\PreventPreviousUrlStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -153,7 +154,7 @@ Route::middleware(['web', 'auth', 'throttle:10,1'])->group(function () {
 // authenticates identically to the browser admin. Role check via admin.role
 // middleware AND inline in LookupController (defense-in-depth). Rate limited
 // at 60 req/min per IP to bound abuse if a token leaks.
-Route::middleware(['web', 'auth', 'admin.role:super_admin,admin', 'throttle:60,1'])
+Route::middleware(['web', PreventPreviousUrlStorage::class, 'auth', 'admin.role:super_admin,admin', 'throttle:60,1'])
     ->prefix('admin/lookups')
     ->group(function () {
         Route::get('stations', [\App\Http\Controllers\Api\Admin\LookupController::class, 'stations']);

@@ -30,6 +30,10 @@ $app = Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\ForcePasswordChange::class,
             \App\Http\Middleware\SetCacheHeaders::class,
         ]);
+        $middleware->prependToPriorityList(
+            \Illuminate\Session\Middleware\StartSession::class,
+            \App\Http\Middleware\PreventPreviousUrlStorage::class,
+        );
 
         $middleware->alias([
             'admin.role' => \App\Http\Middleware\EnsureAdminApiRole::class,

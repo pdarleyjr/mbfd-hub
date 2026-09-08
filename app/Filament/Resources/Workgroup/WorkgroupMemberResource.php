@@ -33,13 +33,21 @@ class WorkgroupMemberResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('user_id')
                             ->label('Select Existing User')
-                            ->options(fn () => User::orderBy('name')->pluck('name', 'id'))
+                            ->options(fn () => User::query()
+                                ->orderBy('name')
+                                ->get(['id', 'name', 'email'])
+                                ->mapWithKeys(fn (User $user): array => [
+                                    $user->id => "{$user->name} ({$user->email})",
+                                ]))
                             ->searchable()
+                            ->helperText('Users may belong to multiple workgroups. Create a separate membership for each workgroup.')
+                            ->disabledOn('edit')
                             ->required(),
                         Forms\Components\Select::make('workgroup_id')
                             ->label('Workgroup')
                             ->options(fn () => self::workgroupAccess()->scopeManageWorkgroups(Workgroup::query(), self::currentWorkgroupUser())->orderBy('name')->pluck('name', 'id'))
                             ->searchable()
+                            ->disabledOn('edit')
                             ->required(),
                         Forms\Components\Select::make('role')
                             ->label('Role')

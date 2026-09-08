@@ -101,6 +101,40 @@ test.describe('admin PWA authenticated', () => {
     expect(swReady, 'Admin service worker should be registered on /admin').toBe(true);
   });
 
+  test('background admin requests never become a Cancel destination', async ({ page }) => {
+    await page.goto('/admin/users');
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+
+    const workerRegistration = await page.evaluate(async () => {
+      if (!('serviceWorker' in navigator)) return false;
+      const registration = await navigator.serviceWorker.ready;
+      await registration.update();
+
+      return registration.scope.includes('/admin');
+    });
+    expect(workerRegistration).toBe(true);
+
+    const backgroundStatuses = await page.evaluate(async () => Promise.all([
+      fetch('/__version').then((response) => response.status),
+      fetch('/admin/pulse/queues.json').then((response) => response.status),
+      fetch('/api/admin/lookups/stations', {
+        headers: { Accept: 'application/json' },
+      }).then((response) => response.status),
+    ]));
+    expect(backgroundStatuses).toEqual([200, 200, 200]);
+
+    const directPage = await page.context().newPage();
+    await directPage.goto('/admin/users/create');
+    expect(await directPage.evaluate(() => document.referrer)).toBe('');
+
+    await directPage.getByRole('button', { name: 'Cancel' }).click();
+
+    await expect(directPage).toHaveURL(/\/admin\/users\/?$/);
+    await expect(directPage.locator('body')).not.toContainText("addEventListener('install'");
+    await expect(directPage.locator('body')).not.toContainText('"pending"');
+    await directPage.close();
+  });
+
   test('keyboard shortcuts partial is wired into BODY_END', async ({ page }) => {
     await page.goto('/admin');
     const shortcutsRoot = page.locator('[data-admin-shortcuts-root]').first();

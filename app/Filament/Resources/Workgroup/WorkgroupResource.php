@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Workgroup;
 
 use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
+use App\Models\User;
 use App\Models\Workgroup;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -41,6 +42,20 @@ class WorkgroupResource extends Resource
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),
+                        Forms\Components\Select::make('member_user_ids')
+                            ->label('Initial Members')
+                            ->options(fn () => User::query()
+                                ->orderBy('name')
+                                ->get(['id', 'name', 'email'])
+                                ->mapWithKeys(fn (User $user): array => [
+                                    $user->id => "{$user->name} ({$user->email})",
+                                ]))
+                            ->multiple()
+                            ->searchable()
+                            ->preload()
+                            ->helperText('Select one or more existing users. Users may belong to multiple workgroups.')
+                            ->visibleOn('create')
+                            ->columnSpanFull(),
                     ])
                     ->columns(2),
             ]);

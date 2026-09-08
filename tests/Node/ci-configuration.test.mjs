@@ -678,6 +678,16 @@ test("browser and local-server test harnesses reject production endpoints and in
   }
 });
 
+test("Admin PWA browser acceptance runs with service workers enabled", () => {
+  const config = readFileSync(resolve(root, "playwright.config.ts"), "utf8");
+  const adminProject = config.match(
+    /name:\s*'admin-pwa-desktop',[\s\S]*?testMatch:\s*\/admin-pwa\\\.spec\\\.ts\//,
+  )?.[0];
+
+  assert.ok(adminProject, "playwright config must define the admin-pwa-desktop project");
+  assert.match(adminProject, /serviceWorkers:\s*'allow'/);
+});
+
 test("Daily Checkout browser acceptance uses a mocked isolated loopback build", () => {
   const config = readFileSync(resolve(root, "playwright.daily-checkout.config.ts"), "utf8");
   const dailySpec = readFileSync(resolve(root, "tests/e2e/daily-checkout-inspection.spec.ts"), "utf8");

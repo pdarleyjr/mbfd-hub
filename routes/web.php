@@ -287,7 +287,7 @@ Route::get('/admin/service-worker.js', function () {
 })->middleware(PreventPreviousUrlStorage::class);
 
 Route::get('/admin/pulse/queues.json', QueueStatusController::class)
-    ->middleware(['auth', 'throttle:60,1'])
+    ->middleware(['auth', PreventPreviousUrlStorage::class, 'throttle:60,1'])
     ->name('admin.queue-status');
 
 Route::get('/admin-pwa/service-worker.js', function () {
@@ -318,7 +318,7 @@ Route::get('/__version', function () {
         'git_sha' => $sha,
         'build_time' => $buildTime,
     ]);
-})->middleware('auth');
+})->middleware(['auth', PreventPreviousUrlStorage::class]);
 
 // Station Inventory PDF Download
 Route::get('/inventory-pdf/{submission}', [StationInventoryController::class, 'downloadPdf'])
