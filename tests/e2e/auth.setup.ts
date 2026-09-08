@@ -2,13 +2,13 @@ import { test as setup, expect } from '@playwright/test';
 import { loopbackBaseUrl } from './support/test-environment';
 
 const BASE_URL = loopbackBaseUrl('E2E_BASE_URL', 'http://127.0.0.1:8098', 'PLAYWRIGHT_BASE_URL');
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? '';
+const ADMIN_EMPLOYEE_ID = process.env.E2E_ADMIN_EMPLOYEE_ID ?? '';
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? '';
 const AUTH_FILE = 'tests/e2e/.auth/admin.json';
 
-if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+if (!ADMIN_EMPLOYEE_ID || !ADMIN_PASSWORD) {
   throw new Error(
-    'E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD must be set (see .env.testing.example). ' +
+    'E2E_ADMIN_EMPLOYEE_ID and E2E_ADMIN_PASSWORD must be set (see .env.testing.example). ' +
       'Do NOT hardcode credentials in this file.'
   );
 }
@@ -32,18 +32,16 @@ setup('authenticate as admin', async ({ page }) => {
   await page.goto(`${BASE_URL}/admin/login`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
 
-  await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
+  await page.getByLabel('Employee ID').fill(ADMIN_EMPLOYEE_ID);
   await page.locator('input[type="password"]').fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   
   // Wait for Livewire to process
   await page.waitForTimeout(3000);
   
-  // Server authenticates successfully but Livewire redirect may not fire.
-  // Navigate directly to admin - if auth succeeded, we'll land on dashboard
-  if (page.url().includes('/admin/login')) {
-    await page.goto(`${BASE_URL}/admin`, { waitUntil: 'networkidle' });
-  }
+  // Canonical login intentionally redirects to the Hub home page. Navigate to
+  // Admin explicitly so this setup also proves the account has panel access.
+  await page.goto(`${BASE_URL}/admin`, { waitUntil: 'networkidle' });
   
   // Verify we're on admin (not redirected back to login)
   await page.waitForURL(/\/admin(?!\/login)/, { timeout: 15000 });

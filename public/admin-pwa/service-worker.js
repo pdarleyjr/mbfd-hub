@@ -3,8 +3,8 @@
  *
  * Scope: /admin/*
  * Strategy:
- *   - Network-first for HTML navigations (always reflect latest server state)
- *   - Network-only for authenticated admin HTML / JSON / Livewire payloads
+ *   - Browser-managed network requests for authenticated admin HTML
+ *   - Network-only for authenticated admin JSON / Livewire payloads
  *   - Cache-first for static assets (/build/, /admin-pwa/, /images/, /fonts/)
  *   - Bypass entirely for /admin/login, /admin/logout, and any POST/PUT/PATCH/DELETE
  *
@@ -25,7 +25,7 @@
  * reassignment.
  */
 
-const VERSION = 'mbfd-admin-v2';
+const VERSION = 'mbfd-admin-v3';
 const STATIC_CACHE = `${VERSION}-static`;
 
 const PRECACHE_URLS = [
@@ -101,9 +101,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML navigation under /admin → network-only with offline shell fallback
+  // Do not proxy document navigations through the worker. A worker-originated
+  // fetch makes the worker script URL the request referrer, which can poison
+  // Filament's global Cancel destination on a fresh PWA window.
   if (req.mode === 'navigate' && url.pathname.startsWith('/admin')) {
-    event.respondWith(networkOnlyAdminNavigation(req));
     return;
   }
 
@@ -132,14 +133,6 @@ async function cacheFirst(request) {
   }
 }
 
-async function networkOnlyAdminNavigation(request) {
-  try {
-    return await fetch(request, { cache: 'no-store' });
-  } catch (err) {
-    return offlineShell();
-  }
-}
-
 async function networkOnlyAdminJson(request) {
   try {
     return await fetch(request, { cache: 'no-store' });
@@ -149,21 +142,6 @@ async function networkOnlyAdminJson(request) {
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
     });
   }
-}
-
-function offlineShell() {
-  return new Response(
-    `<!doctype html><meta charset="utf-8"><title>MBFD Admin – Offline</title>
-     <style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;
-     padding:2rem;background:#0f172a;color:#e2e8f0;text-align:center}
-     h1{font-size:1.5rem;margin-bottom:0.5rem}p{color:#94a3b8}</style>
-     <h1>You're offline</h1>
-     <p>The MBFD Admin console will reconnect automatically when the network returns.</p>`,
-    {
-      status: 200,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
-    }
-  );
 }
 
 // ---------------------------------------------------------------------------

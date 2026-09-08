@@ -105,6 +105,7 @@ export default defineConfig({
       use: {
         viewport: { width: 1920, height: 1080 },
         storageState: 'tests/e2e/.auth/admin.json',
+        serviceWorkers: 'allow',
       },
       dependencies: ['setup'],
       testMatch: /admin-pwa\.spec\.ts/,
