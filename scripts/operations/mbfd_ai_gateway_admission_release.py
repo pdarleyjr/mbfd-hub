@@ -144,19 +144,33 @@ def smoke(config) -> None:
         raise ValueError("gateway listener scope changed")
 
 
-def install_atomic(data: bytes, path: Path, *, reader_group: int | None = None) -> None:
+def install_atomic(data: bytes, path: Path) -> None:
     fd, temporary = tempfile.mkstemp(prefix=".admission-release-", dir=path.parent)
     try:
         with os.fdopen(fd, "wb") as handle:
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
-        # Configuration/state are always root-only. Only source code may be
-        # readable by the service group; no caller can request world access.
-        os.chmod(temporary, 0o600 if reader_group is None else 0o640)
-        if reader_group is not None:
-            os.chown(temporary, 0, reader_group)
+        # Configuration/state are always root-only. This API cannot broaden
+        # permissions, regardless of which bytes a caller supplies.
+        os.chmod(temporary, 0o600)
         os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def install_source_atomic(source_path: Path) -> None:
+    """Copy only validated public program source, never diagnostic/config bytes."""
+    if source_path.name != "mbfd_ai_gateway.py":
+        raise ValueError("not the canonical public gateway source")
+    digest(source_path)
+    destination = FILES["mbfd_ai_gateway.py"]
+    fd, temporary = tempfile.mkstemp(prefix=".admission-release-", dir=destination.parent)
+    os.close(fd)
+    try:
+        shutil.copy2(source_path, temporary)
+        os.replace(temporary, destination)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
@@ -188,9 +202,6 @@ def main() -> int:
     args = parser.parse_args()
     if os.geteuid() != 0:
         raise ValueError("root required")
-    import grp
-
-    service_gid = grp.getgrnam("ollama-proxy").gr_gid
     candidate = source.validate_source(
         source_dir=args.source_dir,
         expected_sha=args.expected_sha,
@@ -254,11 +265,7 @@ def main() -> int:
         backup=str(backup),
     )
     try:
-        install_atomic(
-            (args.source_dir / "mbfd_ai_gateway.py").read_bytes(),
-            FILES["mbfd_ai_gateway.py"],
-            reader_group=service_gid,
-        )
+        install_source_atomic(args.source_dir / "mbfd_ai_gateway.py")
         install_atomic(revised_bytes, FILES["mbfd-ai-gateway.json"])
         state["runtime_artifacts"] = {
             name: digest(path) for name, path in FILES.items()
