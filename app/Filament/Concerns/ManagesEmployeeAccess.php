@@ -19,6 +19,20 @@ use Illuminate\Validation\ValidationException;
 
 trait ManagesEmployeeAccess
 {
+    public function getCachedHeaderActions(): array
+    {
+        // Keep the original actions cached/mountable, but render their buttons
+        // next to the relevant profile summary instead of in header menus.
+        return [];
+    }
+
+    public function getCachedFormActions(): array
+    {
+        // Cancel remains available from every tab. The same cached save action
+        // is rendered only in Profile, where its editable fields live.
+        return array_values(array_filter(parent::getCachedFormActions(), fn (Action $action): bool => $action->getName() !== 'save'));
+    }
+
     protected function accountActions(): array
     {
         $actions = [];

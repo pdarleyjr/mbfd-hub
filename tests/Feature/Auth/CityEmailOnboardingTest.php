@@ -219,7 +219,12 @@ final class CityEmailOnboardingTest extends TestCase
                     return false;
                 }
             });
-        $this->post($path, ['confirm_verification' => '1'])->assertStatus(419);
+        $rejected = $this->post($path, ['confirm_verification' => '1']);
+        $rejected->assertStatus(303)->assertRedirect('/login?session_expired=1');
+        self::assertStringContainsString('no-store', (string) $rejected->headers->get('Cache-Control'));
+        self::assertStringNotContainsString($token, $rejected->getContent());
+        self::assertNull(session('_old_input'));
+        self::assertSame($previous, $verification->fresh()->getRawOriginal());
         self::assertNull($verification->fresh()->verified_at);
         $csrf = session()->token();
         $this->post($path, ['_token' => $csrf])->assertSessionHasErrors('confirm_verification');

@@ -30,6 +30,9 @@ class AccountProfileResource extends Resource
         return $form->schema([
             Forms\Tabs::make('Account profile')->persistTabInQueryString()->tabs([
                 Forms\Tabs\Tab::make('Profile')->schema([
+                    EmployeeAccessSchema::controls('profile-identity', 'Account identity', [
+                        'linkEmployee' => 'Link verified employee', 'approveNonemployee' => 'Approve nonemployee',
+                    ], 'Keep this existing account intact. Link only a verified employee record or approve it as a separately managed nonemployee account.'),
                     Forms\Placeholder::make('classification')->label('Identity classification')
                         ->content(fn (?User $record): string => $record?->getRawOriginal('account_classification') === 'approved_nonemployee' ? 'Approved nonemployee — separately managed account; no employee record is created.' : 'Unresolved account — an administrator must verify an exact employee link or approve nonemployee status.'),
                     Forms\TextInput::make('name')->required()->maxLength(255)
@@ -38,6 +41,7 @@ class AccountProfileResource extends Resource
                     Forms\TextInput::make('phone')->tel()->maxLength(255)->disabled(fn (?User $record): bool => ! static::canUpdateProfile($record)),
                     Forms\Placeholder::make('employee_id')->label('Recorded Employee ID')->content(fn (?User $record): string => $record->employee_id ?? 'None — do not invent an Employee ID.'),
                     Forms\Placeholder::make('email')->label('Connected email')->content(fn (?User $record): string => $record->email ?? 'None'),
+                    EmployeeAccessSchema::controls('profile-save', 'Profile changes', ['save' => 'Save profile changes'], 'Save applies only to editable profile fields in this tab. Identity, recovery and access changes use their separate protected controls.'),
                 ]),
                 ...EmployeeAccessSchema::tabs(),
             ])->columnSpanFull(),

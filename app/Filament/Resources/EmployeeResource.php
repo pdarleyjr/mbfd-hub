@@ -38,6 +38,9 @@ class EmployeeResource extends Resource
                 Forms\Components\Tabs::make('Employee profile')->persistTabInQueryString()->tabs([
                     Forms\Components\Tabs\Tab::make('Profile')
                         ->schema([
+                            EmployeeAccessSchema::controls('profile-identity', 'Employee record', [
+                                'correctEmployeeId' => 'Correct Employee ID', 'changeEmploymentStatus' => 'Employment status',
+                            ], 'One verified Employee ID connects this profile, login account, workgroups and history. Identity and employment changes use separate protected controls.'),
                             Forms\Components\TextInput::make('employee_id')
                                 ->label('Employee ID')
                                 ->required()
@@ -67,6 +70,7 @@ class EmployeeResource extends Resource
                             Forms\Components\Placeholder::make('employment_status')->label('Employment status')
                                 ->content(fn (?Employee $record): string => $record->roster_status ?? 'Not recorded')
                                 ->helperText('Use Change employment status to archive an employee and disable linked access without deleting history.'),
+                            EmployeeAccessSchema::controls('profile-save', 'Profile changes', ['save' => 'Save profile changes'], 'Save applies only to editable profile fields in this tab. Roles, login and access changes are saved separately in their protected dialogs.'),
                         ])
                         ->columns(2),
                     ...EmployeeAccessSchema::tabs(),
