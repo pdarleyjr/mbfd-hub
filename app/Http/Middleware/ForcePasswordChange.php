@@ -47,9 +47,10 @@ class ForcePasswordChange
 
         // Preserve the existing recovery path for unlinked legacy administrators.
         if ($user && $user->must_change_password && $request->is('admin/*')) {
-            // Allow access to the My Profile page, login, logout, Livewire requests, and assets
-            if (! $request->routeIs('filament.admin.pages.my-profile') &&
-                ! $request->is('admin/my-profile') &&
+            // The former profile password form is now a safe redirect. Keep the
+            // actual password page reachable for unlinked legacy administrators.
+            if (! $request->routeIs('filament.admin.pages.set-password') &&
+                ! $request->is('admin/set-password') &&
                 ! $request->is('admin/login') &&
                 ! $request->is('admin/logout') &&
                 ! $request->routeIs('filament.admin.auth.login') &&
@@ -58,7 +59,7 @@ class ForcePasswordChange
                 ! $request->is('*/livewire/*') &&
                 ! $request->is('*/filament/assets/*') &&
                 ! $request->routeIs('logout')) {
-                return redirect()->route('filament.admin.pages.my-profile')
+                return redirect()->route('filament.admin.pages.set-password')
                     ->with('warning', 'You must change your password before continuing.');
             }
         }

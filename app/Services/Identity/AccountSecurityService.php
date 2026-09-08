@@ -78,8 +78,9 @@ final class AccountSecurityService
         string $employeeId,
         ?string $passwordHash,
         CarbonInterface $at,
+        bool $activatePending = true,
     ): array {
-        return DB::transaction(function () use ($user, $employeeProfileId, $employeeId, $passwordHash, $at): array {
+        return DB::transaction(function () use ($user, $employeeProfileId, $employeeId, $passwordHash, $at, $activatePending): array {
             /** @var User $lockedUser */
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
             $changes = [];
@@ -92,7 +93,7 @@ final class AccountSecurityService
             if ($lockedUser->employee_id !== $employeeId) {
                 $changes['employee_id'] = $employeeId;
             }
-            if ($lockedUser->getRawOriginal('account_status') === AccountStatus::PendingActivation->value) {
+            if ($activatePending && $lockedUser->getRawOriginal('account_status') === AccountStatus::PendingActivation->value) {
                 $changes['account_status'] = AccountStatus::Active->value;
                 $activated = true;
             }

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
+use App\Enums\AccountStatus;
 use App\Models\Apparatus;
+use App\Models\Employee;
 use App\Models\Room;
 use App\Models\Station;
 use App\Models\StationRequest;
@@ -25,7 +27,7 @@ class AdminCriticalSurfaceSmokeTest extends TestCase
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         $role = Role::create(['name' => 'super_admin', 'guard_name' => 'web']);
-        $admin = User::factory()->create();
+        $admin = User::factory()->create(['account_status' => AccountStatus::Active]);
         $admin->assignRole($role);
         Gate::before(fn (User $user): ?bool => $user->hasRole('super_admin') ? true : null);
         $this->actingAs($admin);
@@ -105,5 +107,22 @@ class AdminCriticalSurfaceSmokeTest extends TestCase
             $response = $this->get($path);
             $this->assertSame(200, $response->status(), "Admin surface failed: {$path}");
         }
+
+        // Old bookmarks remain usable, but must not recreate the retired raw
+        // account form or a second identity-management surface.
+        $employee = Employee::query()->create([
+            'employee_id' => 'SMOKE-PROFILE-001', 'name' => 'Profile Smoke Member',
+            'rank' => 'Firefighter', 'password' => 'unused-smoke-credential',
+        ]);
+        $member = User::factory()->create([
+            'account_status' => AccountStatus::Active,
+            'employee_profile_id' => $employee->id, 'employee_id' => $employee->employee_id,
+        ]);
+        $this->get('/admin/users')->assertRedirect('/admin/employees');
+        $this->get('/admin/users/create')->assertRedirect('/admin/employees/create');
+        $this->get("/admin/users/{$member->id}/edit")->assertRedirect("/admin/employees/{$employee->id}/edit");
+        $this->get("/admin/employees/{$employee->id}/edit")->assertOk();
+        $this->get("/admin/users/{$admin->id}/edit")->assertRedirect("/admin/employees/accounts/{$admin->id}/edit");
+        $this->get("/admin/employees/accounts/{$admin->id}/edit")->assertOk();
     }
 }

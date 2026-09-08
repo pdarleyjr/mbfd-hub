@@ -132,6 +132,38 @@ class User extends Authenticatable implements FilamentUser
 
     protected static function booted(): void
     {
+        static::deleting(function (): never {
+            throw new \LogicException('Accounts cannot be deleted. Use the audited account-disable action.');
+        });
+
+        static::saving(function (self $user): void {
+            if ($user->employee_profile_id === null
+                || ($user->exists && ! $user->isDirty([...Employee::PROFILE_FIELDS, 'employee_profile_id']))) {
+                return;
+            }
+            if ($user->exists && ! $user->isDirty('employee_profile_id')) {
+                // Discard direct profile edits instead of issuing a stale snapshot
+                // UPDATE that could overwrite a concurrent personnel-service save.
+                foreach (Employee::PROFILE_FIELDS as $field) {
+                    if ($user->isDirty($field)) {
+                        $user->setAttribute($field, $user->getRawOriginal($field));
+                    }
+                }
+
+                return;
+            }
+            $employee = Employee::query()->find($user->employee_profile_id);
+            if ($employee === null || $employee->employee_id !== $user->employee_id) {
+                return;
+            }
+            foreach (Employee::PROFILE_FIELDS as $field) {
+                $user->setAttribute($field, $employee->getAttribute($field));
+            }
+            if ($user->relationLoaded('employeeProfile')) {
+                $user->setRelation('employeeProfile', $employee);
+            }
+        });
+
         static::updating(function (self $user): void {
             if ($user->isDirty(['email', 'employee_profile_id'])) {
                 $user->email_verified_at = null;
@@ -142,6 +174,23 @@ class User extends Authenticatable implements FilamentUser
     public function isAuthenticationAllowed(): bool
     {
         return $this->getRawOriginal('account_status') === AccountStatus::Active->value;
+    }
+
+    public function getAttribute($key)
+    {
+        // Never lazy-load per field/user. Eager-loaded personnel is authoritative;
+        // other consumers use the synchronized compatibility snapshot.
+        if (in_array($key, Employee::PROFILE_FIELDS, true)
+            && $this->relationLoaded('employeeProfile')) {
+            $employee = $this->getRelation('employeeProfile');
+            if ($employee instanceof Employee && array_key_exists($key, $employee->getAttributes())
+                && $employee->getKey() === $this->getAttribute('employee_profile_id')
+                && $employee->employee_id === $this->getAttribute('employee_id')) {
+                return $employee->getAttribute($key);
+            }
+        }
+
+        return parent::getAttribute($key);
     }
 
     /** @return BelongsTo<Employee, $this> */

@@ -62,7 +62,7 @@ final class CanonicalAuthorizationTest extends TestCase
                 'subject' => 'hub-user:'.$user->id,
                 'user_id' => $user->id,
                 'display_name' => $user->display_name ?: $user->name,
-                'role' => 'platform_admin',
+                'role' => $role === 'super_admin' ? 'platform_admin' : 'user',
             ])
             ->assertJsonMissingPath('password')
             ->assertJsonMissingPath('password_hash')
@@ -220,7 +220,9 @@ final class CanonicalAuthorizationTest extends TestCase
             'member_id' => $user->employee_profile_id, 'client_id' => 'media-control', 'media_control_security_version' => 0];
         $url = '/api/v2/media-control/auth/revalidate';
         $this->withToken(self::SERVICE_TOKEN)->postJson($url, $data)->assertOk()
-            ->assertJsonPath('subject', 'hub-user:'.$user->id)->assertJsonPath('role', 'platform_admin');
+            ->assertJsonPath('subject', 'hub-user:'.$user->id)->assertJsonPath('role', 'user');
+        $user->givePermissionTo(Permission::findOrCreate('app.media_control.admin', 'web'));
+        $this->withToken(self::SERVICE_TOKEN)->postJson($url, $data)->assertOk()->assertJsonPath('role', 'platform_admin');
         $this->withToken(self::SERVICE_TOKEN)->postJson($url, [...$data, 'member_id' => null])->assertUnauthorized();
         $user->revokePermissionTo('app.media_control.access');
         $this->withToken(self::SERVICE_TOKEN)->postJson($url, $data)->assertUnauthorized();

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\DepartmentUpdates;
 
 use App\Enums\AccountStatus;
-use App\Filament\Resources\UserResource\Pages\CreateUser;
+use App\Filament\Resources\EmployeeResource\Pages\EditEmployee;
 use App\Jobs\SendDepartmentUpdateNotification;
 use App\Models\DepartmentUpdate;
 use App\Models\Employee;
@@ -89,24 +89,28 @@ final class DepartmentUpdateSubscriptionProvisioningTest extends TestCase
 
     public function test_admin_created_user_gets_department_update_defaults(): void
     {
-        $superAdmin = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $superAdmin = User::factory()->create(['account_status' => AccountStatus::Active, 'password' => 'Current-admin-password-2026!']);
         $superAdmin->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($superAdmin);
-        config(['security.employee_bootstrap.secret' => 'test-owner-approved-bootstrap']);
+        $employee = Employee::query()->create([
+            'name' => 'Admin Created Member',
+            'employee_id' => 'ADMIN-DU-001',
+            'rank' => 'Firefighter',
+            'roster_status' => 'active',
+            'password' => Hash::make('Existing-roster-credential'),
+        ]);
 
-        Livewire::test(CreateUser::class)
-            ->fillForm([
-                'name' => 'Admin Created Member',
-                'email' => 'admin-created@example.test',
-                'employee_id' => 'ADMIN-DU-001',
-                'account_status' => AccountStatus::Active->value,
-                'password' => 'temporary-password-123',
-                'notificationSubscriptions' => [],
-            ])
-            ->call('create')
-            ->assertHasNoFormErrors();
+        Livewire::test(EditEmployee::class, ['record' => $employee->id])
+            ->callAction('createLoginAccount', data: [
+                'temporary_password' => 'temporary-password-123',
+                'current_password' => 'Current-admin-password-2026!',
+                'reason' => 'Create the approved employee login account',
+            ])->assertHasNoActionErrors();
 
-        $user = User::query()->where('email', 'admin-created@example.test')->sole();
+        $user = User::query()->where('employee_profile_id', $employee->id)->sole();
+        self::assertSame($employee->employee_id, $user->employee_id);
+        self::assertSame(AccountStatus::Active, $user->account_status);
+        self::assertTrue($user->must_change_password);
         $subscription = $user->notificationSubscriptions()
             ->where('event_key', User::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES)
             ->sole();

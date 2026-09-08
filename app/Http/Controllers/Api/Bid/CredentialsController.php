@@ -41,8 +41,11 @@ class CredentialsController extends Controller
         $user = $employee?->user;
         if ($employee === null
             || ! $user instanceof User
+            || ! $user->isAuthenticationAllowed() || $user->must_change_password
+            || (int) $user->employee_profile_id !== (int) $employee->getKey()
+            || (string) $user->employee_id !== (string) $employee->employee_id
             || ! $user->hasCurrentBidEntitlement()
-            || ! Hash::check($password, $employee->password)) {
+            || ! Hash::check($password, $user->getAuthPassword())) {
             Log::info('bid.legacy_verify_credentials', [
                 'result' => 'failure',
                 'category' => 'invalid_credentials',
@@ -61,32 +64,16 @@ class CredentialsController extends Controller
             'first_name' => $firstName,
             'last_name' => $lastName,
             'rank' => (string) ($employee->rank ?? ''),
-            'role' => self::resolveBidRole((string) $employee->employee_id),
+            'role' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($user, 'bid'),
         ]);
         Log::info('bid.legacy_verify_credentials', [
             'result' => 'success',
             'category' => 'verified',
         ]);
 
+        $response->headers->set('Cache-Control', 'no-store, private');
+
         return $response;
-    }
-
-    /**
-     * Resolve the authoritative Hub Admin Panel entitlement on every fresh
-     * credential exchange. Any unavailable entitlement lookup fails closed to
-     * a member response; Bid never keeps its own administrator roster.
-     */
-    private static function resolveBidRole(string $employeeId): string
-    {
-        try {
-            $user = User::query()
-                ->where('employee_id', $employeeId)
-                ->first();
-
-            return $user?->hasCurrentAdminPanelEntitlement() === true ? 'admin' : 'member';
-        } catch (\Throwable) {
-            return 'member';
-        }
     }
 
     /**

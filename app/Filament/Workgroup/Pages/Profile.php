@@ -41,20 +41,15 @@ class Profile extends Page
                 ->fillForm(function (): array {
                     $user = Auth::user();
 
-                    return $user instanceof User ? ['name' => $user->name, 'email' => $user->email] : [];
+                    return $user instanceof User ? ['display_name' => $user->display_name, 'phone' => $user->phone] : [];
                 })
                 ->form([
-                    \Filament\Forms\Components\TextInput::make('name')
-                        ->label('Name')
-                        ->required()
+                    \Filament\Forms\Components\TextInput::make('display_name')
+                        ->label('Display name')
                         ->maxLength(255),
-                    \Filament\Forms\Components\TextInput::make('email')
-                        ->label('Email')
-                        ->email()
-                        ->disabled(fn (): bool => Auth::user()?->employee_profile_id !== null)
-                        ->dehydrated(fn (): bool => Auth::user()?->employee_profile_id === null)
-                        ->helperText('Linked members manage their city email through City email & verification.')
-                        ->required()
+                    \Filament\Forms\Components\TextInput::make('phone')
+                        ->label('Phone')
+                        ->tel()
                         ->maxLength(255),
                 ])
                 ->action(function (array $data): void {
@@ -84,16 +79,15 @@ class Profile extends Page
     {
         $user = Auth::user();
 
-        if (! $user) {
-            return;
+        abort_unless($user instanceof User, 403);
+        if ($user->employee_profile_id !== null) {
+            $employee = $user->employeeProfile;
+            abort_unless($employee !== null, 409);
+            app(\App\Services\Identity\EmployeeProfileService::class)->update($user, $employee, $data);
+        } else {
+            app(\App\Services\Security\EmployeeAccountAdministration::class)->updateUnlinkedProfile($user, $user, $data);
         }
-
-        $changes = ['name' => $data['name']];
-        if ($user->employee_profile_id === null) {
-            $changes['email'] = $data['email'];
-        }
-
-        $user->update($changes);
+        \Filament\Notifications\Notification::make()->success()->title('Profile saved')->send();
     }
 
     public static function canAccess(): bool

@@ -1,19 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Resources\UserResource\Pages;
 
+use App\Filament\Resources\EmployeeResource;
 use App\Filament\Resources\UserResource;
-use Filament\Actions;
-use Filament\Resources\Pages\ListRecords;
+use Filament\Resources\Pages\Page;
 
-class ListUsers extends ListRecords
+class ListUsers extends Page
 {
     protected static string $resource = UserResource::class;
 
-    protected function getHeaderActions(): array
+    protected static string $view = 'filament.employees.legacy-redirect';
+
+    public function mount(): void
     {
-        return [
-            Actions\CreateAction::make(),
-        ];
+        abort_unless(UserResource::canViewAny(), 403);
+        $this->redirect(EmployeeResource::getUrl());
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Models\User;
 use App\Services\Identity\AccountSecurityService;
 use App\Services\Identity\CanonicalLoginDestination;
 use App\Services\Identity\CanonicalSessionPolicy;
@@ -15,9 +16,11 @@ use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /** @property Form $form */
@@ -80,12 +83,30 @@ class SetPasswordPage extends Page
     ): void {
         $data = $this->form->getState();
 
-        /** @var \App\Models\User $user */
         $user = Auth::user();
+        abort_unless($user instanceof User, 403);
         $hashedPassword = Hash::make($data['password']);
         $changedAt = CarbonImmutable::now();
 
-        $user = $security->changePassword($user, $hashedPassword, $changedAt);
+        $user = DB::transaction(function () use ($user, $data, $security, $hashedPassword, $changedAt): User {
+            $current = User::query()->lockForUpdate()->find($user->id);
+            // Form validation may have used a cached authenticated model. Do not
+            // overwrite a concurrent reset or change a newly disabled account.
+            if ($current === null || ! $current->isAuthenticationAllowed()
+                || ! Hash::check($data['current_password'], $current->getAuthPassword())) {
+                throw ValidationException::withMessages([
+                    'data.current_password' => 'Your account or password has changed. Sign in again before changing your password.',
+                ]);
+            }
+            if (Hash::check($data['password'], $current->getAuthPassword())) {
+                throw ValidationException::withMessages([
+                    'data.password' => 'Choose a password different from your current password.',
+                ]);
+            }
+
+            return $security->changePassword($current, $hashedPassword, $changedAt);
+        });
+        $this->data = [];
         $request = request();
         Auth::guard('web')->login($user, false);
         $request->session()->regenerate(true);

@@ -12,9 +12,9 @@ final class ApplicationAccessRegistry
     public function applications(): array
     {
         return [
-            'admin' => ['label' => 'Hub administration', 'permission' => 'admin.access', 'description' => 'Admin panel access. Individual administration capabilities are managed separately. Bid currently also uses this access to determine its administrator role.'],
-            'bid' => ['label' => 'Bid', 'permission' => 'app.bid.access', 'description' => 'Hub sign-in to Bid. Bid administrator status follows Hub administration access.'],
-            'media_control' => ['label' => 'Media Control administration', 'permission' => 'app.media_control.access', 'description' => 'The current handshake grants platform administrator access to an existing linked Media Control account. Revocation blocks new Hub handoffs; an already-issued Media Control session may remain active for up to 15 minutes.'],
+            'admin' => ['label' => 'Hub administration', 'permission' => 'admin.access', 'description' => 'Admin panel access. Individual administration capabilities and application administrator roles are managed separately.'],
+            'bid' => ['label' => 'Bid', 'permission' => 'app.bid.access', 'description' => 'Member access to Bid. Its administrator role requires a separate explicit grant.'],
+            'media_control' => ['label' => 'Media Control', 'permission' => 'app.media_control.access', 'description' => 'Ordinary access through an existing linked Media Control account. Platform administration requires a separate explicit grant; local workspace roles remain separate.'],
             'cmd' => ['label' => 'CMD — cmd.mbfdhub.com', 'permission' => 'app.cmd.access', 'description' => 'Hub sign-in through the configured CMD client. Current account status and CMD access are checked during use.'],
             'cloud' => ['label' => 'Cloud — cloud.mbfdhub.com', 'permission' => 'app.cloud.access', 'description' => 'Requires a separately approved link to the existing Cloud account. Account and device-token changes synchronize through the audited Cloud lifecycle.'],
         ];
@@ -31,6 +31,19 @@ final class ApplicationAccessRegistry
         }
 
         return $options;
+    }
+
+    /** @return array<string, string> */
+    public function applicationAdministrationOptions(): array
+    {
+        return ['bid' => 'Bid administrator', 'media_control' => 'Media Control platform administrator'];
+    }
+
+    /** @return list<string> */
+    public function selectedApplicationAdministrations(User $user): array
+    {
+        return array_values(array_filter(array_keys($this->applicationAdministrationOptions()),
+            fn (string $application): bool => $user->hasDirectWebPermission('app.'.$application.'.admin')));
     }
 
     /** @return array<string, string> */
@@ -51,7 +64,6 @@ final class ApplicationAccessRegistry
                 $options['admin.'.$key.'.'.$action] = $label.' — '.$actionLabel;
             }
         }
-        $options['admin.members.security'] = 'Members — account security';
         $options['admin.communications.send'] = 'Communications — send email';
 
         return $options;
@@ -93,13 +105,13 @@ final class ApplicationAccessRegistry
         return 'Last remote verification: '.($sync->desired_enabled ? 'enabled' : 'disabled').' at '.$sync->verified_at->utc()->format('Y-m-d H:i:s').' UTC. Reconciliation is periodic, not instantaneous.';
     }
 
-    /** @return array<string, array{allowed: bool, operational: bool, status: string}> */
+    /** @return array<string, array{allowed: bool, operational: bool, status: string, role: string|null, role_status: string, runtime_status: string}> */
     public function states(User $user): array
     {
         $current = $user->fresh();
         $states = [];
         foreach ($this->applications() as $key => $application) {
-            $operational = $application['permission'] !== null && (! in_array($key, ['cmd', 'cloud'], true) || filled(config('oidc.clients.'.$key)));
+            $operational = $this->clientConfigured($key);
             $entitled = $current !== null && match ($key) {
                 'admin' => $current->hasCurrentAdminPanelEntitlement(),
                 'bid' => $current->hasCurrentBidEntitlement(),
@@ -108,14 +120,43 @@ final class ApplicationAccessRegistry
                 'cloud' => app(\App\Services\Oidc\CloudIdentityAccess::class)->forUser($current) !== null,
                 default => false,
             };
-            $active = $current?->isAuthenticationAllowed() === true;
+            $active = $current?->isAuthenticationAllowed() === true && ! $current->must_change_password;
+            $role = $current === null ? null : app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($current, $key);
             $states[$key] = [
                 'allowed' => $entitled && $active && $operational,
                 'operational' => $operational,
-                'status' => ! $operational ? 'SSO client not configured — access unavailable' : (! $active ? 'Account inactive — access blocked' : ($key === 'cloud' && ! $entitled ? 'Cloud grant or approved account link missing' : ($current->hasRole('super_admin') ? 'Inherited from Super Administrator — managed through roles' : ($entitled ? 'Direct access granted' : 'No direct access')))),
+                'status' => ! $operational ? 'SSO client not configured or unavailable — access unavailable' : (! $active ? 'Account inactive or password setup required — access blocked' : ($key === 'cloud' && ! $entitled ? 'Cloud grant or approved account link missing' : ($current->hasRole('super_admin') ? 'Inherited from Super Administrator — managed through roles' : ($entitled ? 'Direct Hub access granted' : 'No direct access')))),
+                'role' => $role,
+                'role_status' => match ($key) {
+                    'bid', 'media_control' => $role === null ? 'No application access — administrator role inactive' : 'Hub application role: '.$role,
+                    'admin' => 'Individual Hub administration capabilities are managed separately.',
+                    default => 'No Hub-managed administrator role is supported. App-local roles are not changed.',
+                },
+                'runtime_status' => $key === 'admin' ? 'Enforced by the Hub.' : (config('application_access.runtime_verified.'.$key) === true
+                    ? 'Consumer enforcement marked verified by deployment configuration; this is not a live health check.'
+                    : 'Consumer runtime enforcement not verified — deployment or activation pending.'),
             ];
         }
 
         return $states;
+    }
+
+    private function clientConfigured(string $application): bool
+    {
+        if ($application === 'admin') {
+            return true;
+        }
+        if ($application === 'bid') {
+            return filled(config('services.bid.federation_token')) && filled(config('services.bid.authorization.clients.bid.callbacks'));
+        }
+        if ($application === 'media_control') {
+            return filled(config('services.media_control.authorization.service_token')) && filled(config('services.media_control.authorization.clients.media-control.callbacks'));
+        }
+        if (! in_array($application, ['cmd', 'cloud'], true) || ! filled($id = config('oidc.clients.'.$application))) {
+            return false;
+        }
+        $client = \Laravel\Passport\Client::query()->find($id);
+
+        return $client !== null && ! $client->revoked && $client->confidential();
     }
 }

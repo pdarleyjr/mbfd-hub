@@ -23,6 +23,8 @@ class Employee extends Authenticatable
 {
     use HasFactory, Notifiable;
 
+    public const PROFILE_FIELDS = ['name', 'rank', 'station', 'phone', 'display_name'];
+
     protected $table = 'employees';
 
     protected $fillable = [
@@ -33,6 +35,9 @@ class Employee extends Authenticatable
         'must_change_password',
         'city_email',
         'roster_status',
+        'station',
+        'phone',
+        'display_name',
     ];
 
     protected $hidden = [
@@ -55,6 +60,20 @@ class Employee extends Authenticatable
 
     protected static function booted(): void
     {
+        static::deleting(function (): never {
+            throw new \LogicException('Personnel records cannot be deleted. Use the audited employment-status action.');
+        });
+
+        static::saved(function (self $employee): void {
+            if (! $employee->wasChanged(self::PROFILE_FIELDS)) {
+                return;
+            }
+            // Legacy SQL consumers read User columns; Employee remains the writer.
+            User::query()->where('employee_profile_id', $employee->getKey())
+                ->where('employee_id', $employee->employee_id)
+                ->update(array_intersect_key($employee->getAttributes(), array_flip(self::PROFILE_FIELDS)));
+        });
+
         static::updating(function (self $employee): void {
             if ($employee->isDirty('city_email')) {
                 User::query()->where('employee_profile_id', $employee->getKey())->update(['email_verified_at' => null]);

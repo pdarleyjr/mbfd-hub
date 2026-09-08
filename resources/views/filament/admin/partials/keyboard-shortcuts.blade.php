@@ -140,7 +140,7 @@
                     const targets = {
                         a: '/admin/apparatus',
                         s: '/admin/stations',
-                        e: '/admin/users',
+                        e: '/admin/employees',
                         d: '/admin',
                         w: '/workgroups',
                         t: '/training',

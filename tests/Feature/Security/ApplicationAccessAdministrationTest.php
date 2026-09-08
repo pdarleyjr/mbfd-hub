@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Security;
 
-use App\Filament\Resources\UserResource;
-use App\Filament\Resources\UserResource\Pages\EditUser;
-use App\Filament\Resources\UserResource\Pages\ListUsers;
+use App\Filament\Resources\AccountProfileResource\Pages\EditAccountProfile;
+use App\Filament\Resources\EmployeeResource;
+use App\Filament\Resources\EmployeeResource\Pages\ListEmployees;
 use App\Models\User;
 use App\Services\Security\ApplicationAccessService;
 use App\Support\ApplicationAccessRegistry;
@@ -151,7 +151,7 @@ final class ApplicationAccessAdministrationTest extends TestCase
         $this->actingAs($actor);
         $this->withoutVite();
         Filament::setCurrentPanel(Filament::getPanel('admin'));
-        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
+        Livewire::test(EditAccountProfile::class, ['record' => $target->getRouteKey()])
             ->assertFormFieldDoesNotExist('permissions')
             ->assertActionExists('manageApplicationAccess')
             ->set('data.permissions', [$permission->id])
@@ -169,7 +169,7 @@ final class ApplicationAccessAdministrationTest extends TestCase
         $this->actingAs($actor);
         $this->withoutVite();
         Filament::setCurrentPanel(Filament::getPanel('admin'));
-        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
+        Livewire::test(EditAccountProfile::class, ['record' => $target->getRouteKey()])
             ->mountAction('manageApplicationAccess')
             ->assertSee('Cloud enforcement status')
             ->assertSee('Cloud enforcement is not activated')
@@ -189,7 +189,7 @@ final class ApplicationAccessAdministrationTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         foreach (['manageApplicationAccess' => ['applications' => ['bid']], 'manageAdministrationCapabilities' => ['capabilities' => ['admin.members.view']]] as $action => $selection) {
             $before = $target->fresh()->permissions()->pluck('id')->all();
-            $component = Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
+            $component = Livewire::test(EditAccountProfile::class, ['record' => $target->getRouteKey()])
                 ->callAction($action, [...$selection, 'current_password' => 'Wrong-password-do-not-retain', 'reason' => 'Approved access'])
                 ->assertHasActionErrors(['current_password'])
                 ->assertSet('mountedActions', [$action])
@@ -227,16 +227,16 @@ final class ApplicationAccessAdministrationTest extends TestCase
         app(ApplicationAccessService::class)->syncApplications($actor, $target, ['bid'], 'Access-test-password!', 'Stale actor');
     }
 
-    public function test_employee_id_links_to_authorized_edit_but_not_self(): void
+    public function test_employee_id_links_to_canonical_profile_including_safe_self_edit(): void
     {
         [$actor, $target] = $this->members();
         $this->actingAs($actor);
         $this->withoutVite();
         Filament::setCurrentPanel(Filament::getPanel('admin'));
-        $component = Livewire::test(ListUsers::class);
+        $employee = \App\Models\Employee::query()->create(['employee_id' => 'DIRECTORY-1', 'name' => 'Directory member', 'password' => Hash::make('test-bootstrap')]);
+        $component = Livewire::test(ListEmployees::class);
         $column = $component->instance()->getTable()->getColumn('employee_id');
-        self::assertSame(UserResource::getUrl('edit', ['record' => $target]), $column->record($target)->getUrl());
-        self::assertNull($column->record($actor)->getUrl());
+        self::assertSame(EmployeeResource::getUrl('edit', ['record' => $employee]), $column->record($employee)->getUrl());
     }
 
     /** @return array{User, User} */

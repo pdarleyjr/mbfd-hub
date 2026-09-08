@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
-use App\Filament\Resources\UserResource;
-use App\Filament\Resources\UserResource\Pages\EditUser;
+use App\Filament\Resources\AccountProfileResource;
+use App\Filament\Resources\AccountProfileResource\Pages\EditAccountProfile;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,7 +24,7 @@ class UserRoleAssignmentAuthorizationTest extends TestCase
         [$adminRole, $roles] = $this->roles();
         $adminRole->givePermissionTo(Permission::findOrCreate('update_user', 'web'));
 
-        $actor = User::factory()->create();
+        $actor = User::factory()->create(['account_status' => 'active']);
         $actor->assignRole($adminRole);
         $actor->givePermissionTo([
             Permission::findOrCreate('admin.access', 'web'),
@@ -33,7 +33,7 @@ class UserRoleAssignmentAuthorizationTest extends TestCase
         $target = User::factory()->create(['employee_id' => 'ROLE-TARGET-100']);
 
         $this->actingAs($actor);
-        self::assertFalse(UserResource::canEdit($target));
+        self::assertFalse(AccountProfileResource::canEdit($target));
         $this->assertSame([], $target->refresh()->getRoleNames()->all());
     }
 
@@ -52,10 +52,14 @@ class UserRoleAssignmentAuthorizationTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->withoutVite();
 
-        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
-            ->fillForm(['roles' => $roles->except('super_admin')->pluck('id')->map(static fn (int $id): string => (string) $id)->all()])
-            ->call('save')
-            ->assertHasNoFormErrors();
+        Livewire::test(EditAccountProfile::class, ['record' => $target->getRouteKey()])
+            ->assertFormFieldDoesNotExist('roles')
+            ->callAction('manageRoles', [
+                'roles' => $roles->except('super_admin')->keys()->all(),
+                'current_password' => 'password',
+                'reason' => 'Approved administrative responsibilities',
+            ])
+            ->assertHasNoActionErrors();
 
         $this->assertSame(
             $roles->except('super_admin')->keys()->sort()->values()->all(),
@@ -72,7 +76,7 @@ class UserRoleAssignmentAuthorizationTest extends TestCase
         $actor->assignRole($adminRole);
 
         $this->actingAs($actor);
-        $this->assertFalse(UserResource::canCreate());
+        $this->assertFalse(AccountProfileResource::canCreate());
         $this->assertDatabaseMissing('users', ['email' => 'new-user@example.test']);
     }
 

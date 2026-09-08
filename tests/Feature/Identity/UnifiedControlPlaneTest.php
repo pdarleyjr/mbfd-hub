@@ -133,7 +133,7 @@ final class UnifiedControlPlaneTest extends TestCase
         ]);
         Permission::findOrCreate('admin.members.security', 'web');
         $superRole = Role::findOrCreate('super_admin', 'web');
-        $actor = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $actor = User::factory()->create(['account_status' => AccountStatus::Active, 'password' => 'Unified-recovery-actor-password!']);
         $actor->assignRole($superRole);
         $target = User::factory()->create([
             'account_status' => AccountStatus::Active,
@@ -148,6 +148,7 @@ final class UnifiedControlPlaneTest extends TestCase
             'temporary-owner-authorized-password',
             'authorized recovery',
             CarbonImmutable::parse('2026-09-04T13:00:00Z'),
+            'Unified-recovery-actor-password!',
         );
 
         $reset = $target->fresh();

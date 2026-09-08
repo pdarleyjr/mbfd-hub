@@ -4,20 +4,23 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api\Bid;
 
+use App\Models\Employee;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 /**
  * Feature tests for the bid Worker credentials bridge.
  * Endpoint: POST /api/v2/verify-credentials
  *
- * These cover the middleware / validation paths (no DB writes). The
- * happy-path "valid creds → 200 with canonical identity" case is
- * verified live on staging after deploy — the test DB infra in this
- * project doesn't currently provision a transactional SQLite DB so
- * RefreshDatabase isn't usable here.
+ * Isolated middleware, validation, and canonical credential regressions.
  */
 class VerifyCredentialsTest extends TestCase
 {
+    use RefreshDatabase;
+
     private const SHARED_TOKEN = 'test-bid-reader-secret-do-not-use-in-prod';
 
     protected function setUp(): void
@@ -104,5 +107,34 @@ class VerifyCredentialsTest extends TestCase
             ]);
 
         $response->assertStatus(422);
+    }
+
+    public function test_legacy_employee_password_cannot_bypass_canonical_replacement_or_password_setup(): void
+    {
+        $employee = Employee::query()->create(['employee_id' => 'BRIDGE-1001', 'name' => 'Bridge Member', 'password' => Hash::make('Original-starter!')]);
+        $user = User::factory()->create(['employee_id' => $employee->employee_id, 'employee_profile_id' => $employee->id,
+            'password' => 'Original-starter!', 'must_change_password' => false, 'account_status' => 'active']);
+        $user->givePermissionTo(Permission::findOrCreate('app.bid.access', 'web'));
+        $request = fn (string $password) => $this->withToken(self::SHARED_TOKEN)->postJson('/api/v2/verify-credentials', ['employee_id' => $employee->employee_id, 'password' => $password]);
+        $request('Original-starter!')->assertOk()->assertJsonPath('role', 'member');
+        app(\App\Services\Identity\AccountSecurityService::class)->changePassword($user, Hash::make('New-canonical-password!'), now());
+        $request('Original-starter!')->assertUnauthorized();
+        $request('New-canonical-password!')->assertOk()->assertJsonPath('member_id', $employee->id);
+        $user->givePermissionTo(Permission::findOrCreate('app.bid.admin', 'web'));
+        $request('New-canonical-password!')->assertOk()->assertJsonPath('role', 'admin');
+        app(\App\Services\Identity\AccountSecurityService::class)->forcePasswordChange($user, now());
+        $request('New-canonical-password!')->assertUnauthorized();
+    }
+
+    public function test_bridge_requires_exact_canonical_employee_binding_and_active_account(): void
+    {
+        $employee = Employee::query()->create(['employee_id' => 'BRIDGE-1002', 'name' => 'Bridge Member', 'password' => Hash::make('Canonical-password!')]);
+        $user = User::factory()->create(['employee_id' => 'DIFFERENT-ID', 'employee_profile_id' => $employee->id,
+            'password' => 'Canonical-password!', 'must_change_password' => false, 'account_status' => 'active']);
+        $user->givePermissionTo(Permission::findOrCreate('app.bid.access', 'web'));
+        $request = fn () => $this->withToken(self::SHARED_TOKEN)->postJson('/api/v2/verify-credentials', ['employee_id' => $employee->employee_id, 'password' => 'Canonical-password!']);
+        $request()->assertUnauthorized();
+        $user->forceFill(['employee_id' => $employee->employee_id, 'account_status' => 'disabled'])->save();
+        $request()->assertUnauthorized();
     }
 }

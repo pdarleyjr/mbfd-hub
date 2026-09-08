@@ -36,6 +36,7 @@ final readonly class DualCredentialIdentityClaim
             );
 
             $eligible = $user instanceof User
+                && $employee->roster_status !== 'departed'
                 && $legacyCredentialValid
                 && $user->getRawOriginal('account_status') === AccountStatus::PendingActivation->value
                 && $user->employee_profile_id === null

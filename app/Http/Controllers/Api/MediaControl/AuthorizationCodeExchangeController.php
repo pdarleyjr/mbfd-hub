@@ -52,7 +52,7 @@ final class AuthorizationCodeExchangeController extends Controller
             'media_control_security_version' => (int) $user->media_control_security_version,
             'member_id' => $user->employee_profile_id === null ? null : (int) $user->employee_profile_id,
             'display_name' => (string) ($user->display_name ?: $user->name),
-            'role' => 'platform_admin',
+            'role' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($user, 'media_control'),
         ]);
         $response->headers->set('Cache-Control', 'no-store, private');
 

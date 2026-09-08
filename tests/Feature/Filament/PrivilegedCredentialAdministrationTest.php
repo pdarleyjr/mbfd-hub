@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
-use App\Filament\Resources\UserResource;
-use App\Filament\Resources\UserResource\Pages\EditUser;
-use App\Filament\Resources\UserResource\Pages\ListUsers;
+use App\Filament\Resources\AccountProfileResource;
+use App\Filament\Resources\AccountProfileResource\Pages\EditAccountProfile;
+use App\Filament\Resources\AccountProfileResource\Pages\ListAccountProfiles;
+use App\Filament\Resources\EmployeeResource;
 use App\Filament\Resources\Workgroup\Pages\CreateWorkgroupMember;
 use App\Filament\Resources\Workgroup\Pages\EditWorkgroupMember;
 use App\Filament\Resources\Workgroup\Pages\ListWorkgroupMembers;
@@ -46,10 +47,15 @@ final class PrivilegedCredentialAdministrationTest extends TestCase
         $this->actingAs($actor);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        Livewire::test(ListUsers::class)
+        Livewire::test(ListAccountProfiles::class)
             ->assertTableActionDoesNotExist('resetPassword', record: $target)
             ->call('mountTableAction', 'resetPassword', (string) $target->getKey())
             ->assertSet('mountedTableActions', []);
+
+        self::assertTrue(Hash::check('original-password', $target->fresh()->password));
+
+        Livewire::test(EditAccountProfile::class, ['record' => $target->getRouteKey()])
+            ->assertForbidden();
 
         self::assertTrue(Hash::check('original-password', $target->fresh()->password));
     }
@@ -65,7 +71,7 @@ final class PrivilegedCredentialAdministrationTest extends TestCase
         $this->actingAs($actor);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
+        Livewire::test(EditAccountProfile::class, ['record' => $target->getRouteKey()])
             ->assertFormFieldDoesNotExist('password')
             ->fillForm([
                 'name' => 'Updated Display Name',
@@ -80,14 +86,16 @@ final class PrivilegedCredentialAdministrationTest extends TestCase
         self::assertTrue(Hash::check('original-password', $target->password));
     }
 
-    public function test_owner_approved_administrative_user_creation_requires_members_manage_permission(): void
+    public function test_personnel_creation_permission_does_not_grant_unprotected_login_creation(): void
     {
         $actor = $this->adminWithUserManagementAccess();
         $actor->givePermissionTo(Permission::findOrCreate('create_user', 'web'));
 
         $this->actingAs($actor);
 
-        self::assertTrue(UserResource::canCreate());
+        self::assertTrue(EmployeeResource::canCreate());
+        self::assertFalse(AccountProfileResource::canCreate());
+        self::assertSame(1, User::query()->count());
     }
 
     public function test_workgroup_manager_cannot_reset_a_same_group_super_admin_by_forging_an_action(): void
@@ -157,7 +165,7 @@ final class PrivilegedCredentialAdministrationTest extends TestCase
             Permission::findOrCreate('update_user', 'web'),
         ]);
 
-        $actor = User::factory()->create();
+        $actor = User::factory()->create(['account_status' => 'active']);
         $actor->assignRole($adminRole);
         $actor->givePermissionTo([
             Permission::findOrCreate('admin.access', 'web'),
@@ -171,7 +179,7 @@ final class PrivilegedCredentialAdministrationTest extends TestCase
     /** @return array{User, WorkgroupMember} */
     private function managedWorkgroupWithPrivilegedTarget(): array
     {
-        $manager = User::factory()->create();
+        $manager = User::factory()->create(['account_status' => 'active']);
         $manager->assignRole(Role::findOrCreate('workgroup_member', 'web'));
 
         $target = User::factory()->create();

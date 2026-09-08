@@ -24,6 +24,7 @@ final class IdentityRevalidationController extends Controller
 
         if (! $user instanceof User
             || ! $user->isAuthenticationAllowed()
+            || $user->must_change_password
             || (int) $user->security_version !== $validated['security_version']
             || ! $employee instanceof Employee
             || (int) $employee->getKey() !== $validated['member_id']) {
@@ -39,7 +40,7 @@ final class IdentityRevalidationController extends Controller
             if (! $user->hasCurrentBidEntitlement()) {
                 return response()->json(['error' => 'invalid_identity'], 401);
             }
-            $role = $user->hasCurrentAdminPanelEntitlement() ? 'admin' : 'member';
+            $role = app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($user, 'bid');
         } catch (Throwable) {
             Log::info('bid.federation.revalidation', [
                 'result' => 'failure',

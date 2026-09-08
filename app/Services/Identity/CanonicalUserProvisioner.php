@@ -29,6 +29,9 @@ final readonly class CanonicalUserProvisioner
         return DB::transaction(function () use ($employeeProfileId, $credentialProvenance, $at): array {
             /** @var Employee $employee */
             $employee = Employee::query()->lockForUpdate()->findOrFail($employeeProfileId);
+            if ($employee->roster_status === 'departed') {
+                throw new RuntimeException('Departed personnel cannot receive or activate a login account.');
+            }
             $email = "employee-{$employee->id}@canonical.mbfdhub.invalid";
             $existing = User::query()->where('employee_profile_id', $employee->id)->lockForUpdate()->first();
             if ($existing !== null) {
@@ -66,7 +69,9 @@ final readonly class CanonicalUserProvisioner
             $status = $copyVerifiedLegacyHash ? AccountStatus::Active : AccountStatus::PendingActivation;
             $userId = DB::table('users')->insertGetId([
                 'name' => $employee->name,
-                'display_name' => $employee->name,
+                'display_name' => $employee->display_name,
+                'station' => $employee->station,
+                'phone' => $employee->phone,
                 'email' => $email,
                 'password' => $copyVerifiedLegacyHash ? $employeeHash : Hash::make(Str::random(64)),
                 'rank' => $employee->rank,

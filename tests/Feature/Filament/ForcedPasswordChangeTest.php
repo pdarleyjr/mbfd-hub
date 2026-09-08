@@ -294,6 +294,68 @@ final class ForcedPasswordChangeTest extends TestCase
         self::assertSame('Livewire update allowed', $response->getContent());
     }
 
+    public function test_unlinked_forced_change_uses_set_password_without_a_profile_redirect_loop(): void
+    {
+        $user = User::factory()->create(['account_status' => AccountStatus::Active, 'must_change_password' => true]);
+        $this->actingAs($user);
+        self::assertNull($user->employee_profile_id);
+
+        $middleware = app(ForcePasswordChange::class);
+        $response = $middleware->handle(Request::create('/admin/my-profile'), fn () => response('protected'));
+        self::assertSame(url('/admin/set-password'), $response->headers->get('Location'));
+        $response = $middleware->handle(Request::create('/admin/set-password'), fn () => response('password form'));
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('password form', $response->getContent());
+    }
+
+    /** @return array<string, array{string}> */
+    public static function concurrentPasswordChanges(): array
+    {
+        return ['password reset' => ['reset'], 'disabled account' => ['disabled'], 'new password already current' => ['same']];
+    }
+
+    #[DataProvider('concurrentPasswordChanges')]
+    public function test_password_change_rechecks_database_state_after_form_validation(string $change): void
+    {
+        $user = User::factory()->create([
+            'account_status' => AccountStatus::Active,
+            'must_change_password' => true,
+            'password' => Hash::make('current-password'),
+            'security_version' => 7,
+        ]);
+        $user->assignRole(Role::findOrCreate('super_admin', 'web'));
+        $this->actingAsCanonicalUser($user);
+        $this->bindCanonicalSessionToLivewireTestRequests();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $newPassword = 'A-longer-replacement-password-2026';
+        $newHash = Hash::make($newPassword);
+        $concurrentHash = Hash::make($change === 'same' ? $newPassword : 'concurrent-reset-password');
+        $before = null;
+        // Deterministically interleave a concurrent change after the form's
+        // cached current-password rule, before the mutation acquires its lock.
+        $hasher = Hash::getFacadeRoot();
+        Hash::swap(\Mockery::mock($hasher)->makePartial());
+        Hash::shouldReceive('make')->with($newPassword)->once()
+            ->andReturnUsing(function () use ($change, $user, $newHash, $concurrentHash, &$before): string {
+                DB::table('users')->where('id', $user->id)->update($change === 'disabled'
+                    ? ['account_status' => AccountStatus::Disabled->value]
+                    : ['password' => $concurrentHash]);
+                $before = (array) DB::table('users')->where('id', $user->id)->first();
+
+                return $newHash;
+            });
+
+        Livewire::test(SetPasswordPage::class)->fillForm([
+            'current_password' => 'current-password',
+            'password' => $newPassword,
+            'password_confirmation' => $newPassword,
+        ])->call('save')->assertHasFormErrors(['current_password']);
+
+        self::assertNotNull($before);
+        self::assertSame($before, (array) DB::table('users')->where('id', $user->id)->first());
+        self::assertSame(1, AuthenticationSession::query()->where('user_id', $user->id)->whereNull('revoked_at')->count());
+    }
+
     #[DataProvider('panelRoutes')]
     public function test_flagged_users_cannot_invoke_a_protected_panel_livewire_update(
         string $role,
@@ -337,6 +399,7 @@ final class ForcedPasswordChangeTest extends TestCase
         string $panelId,
     ): void {
         $user = User::factory()->create([
+            'account_status' => AccountStatus::Active,
             'must_change_password' => true,
             'password' => Hash::make('current-password'),
         ]);

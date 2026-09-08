@@ -142,8 +142,8 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-bell')
                     ->visible(fn (): bool => auth()->user()?->canManageNotificationSettings() ?? false),
                 MenuItem::make()
-                    ->label('Members & Access')
-                    ->url(fn (): string => url('/admin/users'))
+                    ->label('Employees & Access')
+                    ->url(fn (): string => \App\Filament\Resources\EmployeeResource::getUrl())
                     ->icon('heroicon-o-users')
                     ->sort(10)
                     ->visible(fn (): bool => auth()->user()?->can('admin.members.view') ?? false),

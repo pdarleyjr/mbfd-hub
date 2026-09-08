@@ -36,6 +36,6 @@ final class IdentityRevalidationController
             'audience' => 'media-control', 'subject' => 'hub-user:'.$user->id, 'user_id' => (int) $user->id,
             'security_version' => (int) $user->security_version, 'member_id' => $user->employee_profile_id === null ? null : (int) $user->employee_profile_id,
             'media_control_security_version' => (int) $user->media_control_security_version,
-            'role' => 'platform_admin'], 200, ['Cache-Control' => 'no-store, private']);
+            'role' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($user, 'media_control')], 200, ['Cache-Control' => 'no-store, private']);
     }
 }

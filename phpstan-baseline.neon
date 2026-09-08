@@ -163,12 +163,6 @@ parameters:
 			path: app/Filament/Employee/Pages/RequestEquipmentPage.php
 
 		-
-			message: '#^Access to an undefined property App\\Filament\\Pages\\MyProfile\:\:\$form\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Filament/Pages/MyProfile.php
-
-		-
 			message: '#^Access to an undefined property App\\Filament\\Pages\\NotificationSettings\:\:\$form\.$#'
 			identifier: property.notFound
 			count: 2

@@ -41,6 +41,16 @@ final class ApplicationAccessService
         $this->sync($actor, $target, $capabilities, array_combine($keys, $keys), $currentPassword, $reason, 'change_admin_capabilities');
     }
 
+    /** @param array<array-key, mixed> $applications */
+    public function syncApplicationAdministrations(User $actor, User $target, array $applications, string $currentPassword, string $reason): void
+    {
+        $scope = [];
+        foreach (array_keys($this->registry->applicationAdministrationOptions()) as $key) {
+            $scope[$key] = 'app.'.$key.'.admin';
+        }
+        $this->sync($actor, $target, $applications, $scope, $currentPassword, $reason, 'change_application_administration');
+    }
+
     /**
      * @param  array<array-key, mixed>  $selected
      * @param  array<string, string>  $scope
@@ -72,15 +82,36 @@ final class ApplicationAccessService
                 if (! Hash::check($currentPassword, $currentActor->getAuthPassword())) {
                     throw new CurrentPasswordMismatch('The current password is incorrect.');
                 }
+                foreach ($selected as $key) {
+                    if ($action === 'change_application_administration' && ! $currentTarget->hasDirectWebPermission('app.'.$key.'.access')) {
+                        throw \Illuminate\Validation\ValidationException::withMessages(['administrations' => 'Grant application access separately before granting its administrator role.']);
+                    }
+                }
                 $before = $currentTarget->permissions()->where('guard_name', 'web')->whereIn('name', array_values($scope))->orderBy('name')->pluck('name')->all();
                 sort($proposed);
                 $remove = array_values(array_diff($before, $proposed));
                 $add = array_values(array_diff($proposed, $before));
+                $dependentRoles = [];
+                if ($action === 'change_application_access') {
+                    foreach (array_keys($this->registry->applicationAdministrationOptions()) as $application) {
+                        $permission = 'app.'.$application.'.admin';
+                        if (in_array('app.'.$application.'.access', $remove, true) && $currentTarget->hasDirectWebPermission($permission)) {
+                            $dependentRoles[] = $permission;
+                        }
+                    }
+                    $currentTarget->permissions()->detach(Permission::query()->where('guard_name', 'web')->whereIn('name', $dependentRoles)->pluck('id')->all());
+                }
                 $currentTarget->permissions()->detach($known->only($remove)->values()->all());
                 $currentTarget->permissions()->syncWithoutDetaching($known->only($add)->values()->all());
                 $this->permissions->forgetCachedPermissions();
-                if (in_array('app.media_control.access', $remove, true)) {
+                if (array_intersect(['app.media_control.access', 'app.media_control.admin'], [...$remove, ...$dependentRoles]) !== []) {
                     $currentTarget->increment('media_control_security_version');
+                }
+                if (in_array('app.bid.admin', [...$remove, ...$dependentRoles], true)) {
+                    // Bid binds the canonical security version, not a separate
+                    // app epoch. Revoke only this member's sessions permanently.
+                    $currentTarget = app(\App\Services\Identity\AccountSecurityService::class)
+                        ->revokeAll($currentTarget, 'Bid administrator role removed', now());
                 }
                 foreach (['cmd', 'cloud'] as $application) {
                     if (in_array('app.'.$application.'.access', $remove, true)) {
@@ -91,7 +122,7 @@ final class ApplicationAccessService
                     app(\App\Services\Cloud\NextcloudAccountSynchronizer::class)->request($currentTarget);
                 }
                 $this->audit->record($currentActor, $currentTarget, $action, 'allowed', trim($reason), [
-                    'before' => $before, 'after' => $proposed, 'granted' => $add, 'revoked' => $remove,
+                    'before' => $before, 'after' => $proposed, 'granted' => $add, 'revoked' => [...$remove, ...$dependentRoles],
                 ]);
             });
         } catch (AuthorizationException $exception) {
