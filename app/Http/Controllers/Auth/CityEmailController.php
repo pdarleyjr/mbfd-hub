@@ -24,6 +24,7 @@ final class CityEmailController extends Controller
         return response()->view('auth.city-email', [
             'user' => $user,
             'candidate' => $emails->candidate($user),
+            'connectedEmail' => $emails->connectedEmail($user),
             'verification' => $emails->status($user),
             'requiresReview' => $emails->requiresReview($user),
         ]);
@@ -65,7 +66,7 @@ final class CityEmailController extends Controller
             'current_password' => ['required', 'string', 'max:4096', 'current_password:web'],
             'ownership_confirmed' => ['accepted'],
         ]);
-        abort_if($emails->requiresReview($user), 409, 'Confirm your city email before requesting another link.');
+        abort_if($emails->status($user) === null, 409, 'Confirm your city email before requesting another link.');
         try {
             $verification = $emails->issue($user);
         } catch (InvalidArgumentException $exception) {

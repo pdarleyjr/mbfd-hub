@@ -33,6 +33,7 @@ final class CityEmailVerificationTest extends TestCase
         parent::setUp();
         config(['communications.cloudflare.api_token' => 'test-secret', 'communications.cloudflare.account_id' => str_repeat('a', 32)]);
         CloudflareUsageBudget::query()->create([
+            'provider_account_id' => str_repeat('a', 32),
             'cycle_start' => now()->startOfMonth(), 'cycle_end' => now()->addMonth()->startOfMonth(),
             'provider_chargeable_used' => 0, 'provider_daily_quota' => 100, 'provider_daily_used' => 0,
             'hub_safe_ceiling' => 2850, 'worker_request_threshold' => 9000000, 'worker_cpu_ms_threshold' => 27000000,
@@ -63,7 +64,7 @@ final class CityEmailVerificationTest extends TestCase
         self::assertTrue($service->requiresReview($user));
         $service->acknowledge($user, '  Nick.DAlessandro@MiamiBeachFL.gov ');
         self::assertFalse($service->requiresReview($user));
-        self::assertSame('existing@example.test', $user->fresh()->email);
+        self::assertSame('employee-'.$employee->id.'@canonical.mbfdhub.invalid', $user->fresh()->email);
         self::assertNull($employee->fresh()->city_email);
         self::assertSame('queued', $service->issue($user)->delivery_status);
         $token = $this->tokens[0];
@@ -114,7 +115,8 @@ final class CityEmailVerificationTest extends TestCase
         $service->issue($user);
         $employee->update(['city_email' => 'admin.edit@miamibeachfl.gov']);
         self::assertFalse($service->verify($user, $this->tokens[1]));
-        self::assertTrue($service->requiresReview($user));
+        self::assertNull($service->status($user));
+        self::assertFalse($service->requiresReview($user));
     }
 
     public function test_failed_delivery_keeps_acknowledgement_and_authoritative_email_usable(): void
@@ -127,7 +129,7 @@ final class CityEmailVerificationTest extends TestCase
         self::assertSame('failed', $verification->delivery_status);
         self::assertNull($verification->token_hash);
         self::assertFalse($service->requiresReview($user));
-        self::assertSame('existing@example.test', $user->fresh()->email);
+        self::assertSame('employee-'.$employee->id.'@canonical.mbfdhub.invalid', $user->fresh()->email);
         self::assertNull($employee->fresh()->city_email);
     }
 
@@ -137,14 +139,15 @@ final class CityEmailVerificationTest extends TestCase
         app(CanonicalCityEmailService::class)->sync($employee, $user, 'legacy@miamibeachfl.gov');
         $service = app(CityEmailVerificationService::class);
         self::assertSame('legacy@miamibeachfl.gov', $service->candidate($user));
-        self::assertTrue($service->requiresReview($user));
+        self::assertFalse($service->requiresReview($user));
         self::assertNull($user->fresh()->email_verified_at);
         $service->acknowledge($user, 'legacy@miamibeachfl.gov');
         $service->issue($user);
         self::assertTrue($service->verify($user, $this->tokens[0]));
         $user->refresh()->update(['email' => 'changed@miamibeachfl.gov']);
         self::assertNull($user->fresh()->email_verified_at);
-        self::assertTrue($service->requiresReview($user));
+        self::assertNull($service->status($user));
+        self::assertFalse($service->requiresReview($user));
     }
 
     public function test_case_insensitive_collision_at_verification_preserves_both_identities(): void
@@ -156,7 +159,7 @@ final class CityEmailVerificationTest extends TestCase
         $service->issue($user);
         app(CanonicalCityEmailService::class)->sync($otherEmployee, $other, 'CLAIMED@miamibeachfl.gov');
         self::assertFalse($service->verify($user, $this->tokens[0]));
-        self::assertSame('existing@example.test', $user->fresh()->email);
+        self::assertSame('employee-'.$user->employee_profile_id.'@canonical.mbfdhub.invalid', $user->fresh()->email);
         self::assertSame('claimed@miamibeachfl.gov', $other->fresh()->email);
     }
 
@@ -259,14 +262,55 @@ final class CityEmailVerificationTest extends TestCase
         self::assertTrue($service->verify($user, $this->tokens[0]));
         $employee->refresh()->update(['city_email' => 'admin@miamibeachfl.gov']);
         self::assertNull($user->fresh()->email_verified_at);
-        self::assertTrue($service->requiresReview($user));
+        self::assertNull($service->status($user));
+        self::assertFalse($service->requiresReview($user));
+    }
+
+    public function test_connected_email_policy_rejects_internal_reserved_and_unusable_addresses_without_dns_or_mail(): void
+    {
+        [, $user] = $this->identity();
+        $service = app(CityEmailVerificationService::class);
+        foreach ([
+            'employee-1@canonical.mbfdhub.invalid', 'member@example.test', 'member@docs.example',
+            'member@host.localhost', 'member@localhost', 'member@example.com', 'member@example.org',
+            'member@example.net', 'member@[127.0.0.1]', 'not-an-email',
+            'member@staff.example.com', 'member@staff.example.org', 'member@staff.example.net',
+        ] as $email) {
+            $user->forceFill(['email' => $email])->save();
+            self::assertNull($service->connectedEmail($user), $email);
+            self::assertTrue($service->requiresReview($user), $email);
+        }
+        $user->forceFill(['email' => 'member@exampleservices.com'])->save();
+        self::assertSame('member@exampleservices.com', $service->connectedEmail($user));
+        self::assertFalse($service->requiresReview($user));
+        Http::assertNothingSent();
+        self::assertSame(0, CityEmailVerification::query()->count());
+        self::assertNull($user->fresh()->email_verified_at);
+    }
+
+    public function test_existing_roster_address_and_optional_pending_change_are_exempt_without_marking_mailbox_verified(): void
+    {
+        [$employee, $user] = $this->identity();
+        $employee->update(['city_email' => 'existing.roster@outlook.com']);
+        $service = app(CityEmailVerificationService::class);
+        self::assertSame('existing.roster@outlook.com', $service->connectedEmail($user));
+        self::assertFalse($service->requiresReview($user));
+        $service->acknowledge($user, 'replacement@miamibeachfl.gov');
+        self::assertFalse($service->requiresReview($user));
+        self::assertSame('pending', $service->status($user)->delivery_status);
+        self::assertSame('existing.roster@outlook.com', $employee->fresh()->city_email);
+        self::assertNull($user->fresh()->email_verified_at);
+        $user->forceFill(['security_version' => $user->security_version + 1])->save();
+        self::assertNull($service->status($user));
+        self::assertFalse($service->requiresReview($user));
+        Http::assertNothingSent();
     }
 
     /** @return array{Employee, User} */
     private function identity(string $suffix = ''): array
     {
         $employee = Employee::query()->create(['employee_id' => 'test-'.$suffix, 'name' => 'Nicolas D’Alessandro', 'password' => 'employee-fixture', 'must_change_password' => false]);
-        $user = User::factory()->create(['name' => $employee->name, 'employee_id' => $employee->employee_id, 'employee_profile_id' => $employee->id, 'account_status' => AccountStatus::Active, 'email' => 'existing'.$suffix.'@example.test', 'email_verified_at' => null]);
+        $user = User::factory()->create(['name' => $employee->name, 'employee_id' => $employee->employee_id, 'employee_profile_id' => $employee->id, 'account_status' => AccountStatus::Active, 'email' => 'employee-'.$employee->id.'@canonical.mbfdhub.invalid', 'email_verified_at' => null]);
 
         return [$employee, $user];
     }

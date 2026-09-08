@@ -42,6 +42,44 @@ final class CityEmailOnboardingTest extends TestCase
         $this->post('/logout')->assertRedirect('/login');
     }
 
+    public function test_connected_city_and_grandfathered_email_accounts_skip_review_without_becoming_verified_or_sending_mail(): void
+    {
+        Http::fake();
+        $this->withoutVite();
+        foreach (['existingmember@miamibeachfl.gov', 'existing.member@gmail.com'] as $index => $email) {
+            $user = $this->member('-CONNECTED-'.$index);
+            $user->forceFill(['email' => $email, 'email_verified_at' => null])->save();
+            $before = $user->fresh()->getRawOriginal();
+            $this->post('/login', ['employee_id' => $user->employee_id, 'password' => 'city-email-test-password'])->assertRedirect('/');
+            $this->get('/')->assertOk();
+            self::assertFalse(session(EnsureCityEmailReview::SESSION_KEY));
+            $this->get('/account/city-email')->assertOk()->assertSee('Email already connected')->assertSee($email)
+                ->assertDontSee('Confirm your city email')->assertDontSee('Send a new verification link');
+            self::assertNull($user->fresh()->email_verified_at);
+            self::assertNull(app(CityEmailVerificationService::class)->status($user));
+            foreach (['email', 'employee_id', 'employee_profile_id', 'password', 'security_version'] as $field) {
+                self::assertSame($before[$field], $user->fresh()->getRawOriginal($field));
+            }
+            $this->post('/logout')->assertRedirect('/login');
+        }
+        Http::assertNothingSent();
+        $this->assertDatabaseCount('outbound_emails', 0);
+    }
+
+    public function test_employee_connected_address_takes_precedence_without_rewriting_differing_account_email(): void
+    {
+        $user = $this->member('-EMPLOYEE-CONNECTED');
+        $user->forceFill(['email' => 'account.member@gmail.com', 'email_verified_at' => null])->save();
+        $user->employeeProfile->update(['city_email' => 'employeemember@miamibeachfl.gov']);
+        $this->actingAsCanonicalUser($user)->withSession([EnsureCityEmailReview::SESSION_KEY => true]);
+        $this->withoutVite();
+        $this->get('/')->assertOk();
+        $this->get('/account/city-email')->assertSee('Email already connected')->assertSee('employeemember@miamibeachfl.gov');
+        self::assertSame('account.member@gmail.com', $user->fresh()->email);
+        self::assertNull($user->fresh()->email_verified_at);
+        $this->assertDatabaseCount('city_email_verifications', 0);
+    }
+
     public function test_review_is_authenticated_and_pages_do_not_leak_cache_or_referrers(): void
     {
         $this->get('/account/city-email')->assertRedirect('/login');
@@ -236,14 +274,21 @@ final class CityEmailOnboardingTest extends TestCase
         self::assertNotSame($input['email'], $user->fresh()->email);
     }
 
-    public function test_fresh_required_password_session_cannot_bypass_setup_and_real_livewire_save_then_requires_email_review(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('passwordSetupEmailStates')]
+    public function test_fresh_required_password_session_cannot_bypass_setup_and_real_livewire_save_then_requires_email_review(bool $connected, ?string $handoff = null): void
     {
         $user = $this->member();
         $user->forceFill(['must_change_password' => true])->save();
+        if ($connected) {
+            $user->forceFill(['email' => 'setupmember@miamibeachfl.gov'])->save();
+        }
         $this->withoutVite();
-        $this->actingAsCanonicalUser($user)->withSession([EnsureCityEmailReview::SESSION_KEY => true]);
+        $this->actingAsCanonicalUser($user)->withSession([EnsureCityEmailReview::SESSION_KEY => ! $connected]);
         $this->get('/')->assertRedirect('/employee/set-password');
         $this->get('/daily/stations')->assertRedirect('/employee/set-password');
+        if ($handoff !== null) {
+            $this->get($handoff)->assertRedirect('/employee/set-password');
+        }
         $page = $this->get('/employee/set-password')->assertOk();
         preg_match_all('/wire:snapshot="([^"]+)"/', $page->getContent(), $matches);
         $snapshot = collect($matches[1])->map(fn (string $value): string => html_entity_decode($value, ENT_QUOTES))
@@ -257,11 +302,100 @@ final class CityEmailOnboardingTest extends TestCase
                 'data.password_confirmation' => 'new-secure-city-email-password-2026',
             ],
             'calls' => [['path' => '', 'method' => 'save', 'params' => []]],
-        ]]], ['X-Livewire' => 'true'])->assertOk();
+        ]]], ['X-Livewire' => 'true'])->assertOk()
+            ->assertJsonPath('components.0.effects.redirect', $handoff ?? 'http://localhost/employee/dashboard');
         self::assertFalse($user->fresh()->must_change_password);
         self::assertTrue(Hash::check('new-secure-city-email-password-2026', $user->fresh()->password));
         $this->withCookie((string) config('session.cookie'), session()->getId());
-        $this->get('/')->assertRedirect('/account/city-email');
+        if ($handoff !== null) {
+            if (! $connected) {
+                $this->get($handoff)->assertRedirect('/account/city-email');
+                app(CityEmailVerificationService::class)->acknowledge($user->fresh(), 'setupmember@miamibeachfl.gov');
+                $this->post('/account/city-email/continue')->assertRedirect($handoff);
+            }
+            // Preservation never authorizes a callback: its own controller still
+            // rejects these incomplete query parameters before issuing a code.
+            $this->getJson($handoff)->assertUnprocessable();
+        }
+        if ($connected) {
+            $this->get('/')->assertOk();
+        } elseif ($handoff === null) {
+            $this->get('/')->assertRedirect('/account/city-email');
+        }
+        $this->post('/logout')->assertRedirect('/login');
+        $this->post('/login', ['employee_id' => $user->employee_id, 'password' => 'city-email-test-password'])->assertSessionHasErrors('employee_id');
+        $this->assertGuest('web');
+        $this->post('/login', ['employee_id' => $user->employee_id, 'password' => 'new-secure-city-email-password-2026'])->assertRedirect('/');
+    }
+
+    public static function passwordSetupEmailStates(): array
+    {
+        return [
+            'missing email' => [false], 'existing connected email' => [true],
+            'Bid through password and review' => [false, '/auth/bid/authorize?client_id=bid&state=opaque%2Btest%2Fstate'],
+            'Media through password with existing email' => [true, '/auth/media-control/authorize?client_id=media-control&state=opaque%2Btest%2Fstate'],
+        ];
+    }
+
+    public function test_password_gate_rechecks_verified_livewire_component_even_when_outer_update_is_allowed(): void
+    {
+        $user = $this->member('-PERSISTENT-PASSWORD');
+        $user->forceFill(['email' => 'persistentmember@miamibeachfl.gov'])->save();
+        $this->withoutVite();
+        $this->actingAsCanonicalUser($user);
+        $page = $this->get('/employee/dashboard')->assertOk();
+        preg_match_all('/wire:snapshot="([^"]+)"/', $page->getContent(), $matches);
+        $snapshot = collect($matches[1])->map(fn (string $value): string => html_entity_decode($value, ENT_QUOTES))
+            ->first(fn (string $value): bool => str_contains((string) data_get(json_decode($value, true), 'memo.name'), 'employee-dashboard'));
+        self::assertIsString($snapshot);
+        $user->forceFill(['must_change_password' => true])->save();
+        $this->postJson('/livewire/update', ['components' => [[
+            'snapshot' => $snapshot, 'updates' => [],
+            'calls' => [['path' => '', 'method' => '$refresh', 'params' => []]],
+        ]]], ['X-Livewire' => 'true'])->assertRedirect('/employee/set-password');
+        self::assertTrue($user->fresh()->must_change_password);
+    }
+
+    public function test_connected_email_does_not_bypass_required_password_replacement_anywhere(): void
+    {
+        $user = $this->member('-PASSWORD');
+        $user->forceFill(['email' => 'passwordmember@miamibeachfl.gov', 'must_change_password' => true])->save();
+        $this->withoutVite();
+        $this->post('/login', ['employee_id' => $user->employee_id, 'password' => 'city-email-test-password'])->assertRedirect('/');
+        self::assertFalse(session(EnsureCityEmailReview::SESSION_KEY));
+        $this->withCookie((string) config('session.cookie'), session()->getId());
+        foreach (['/', '/daily/stations', '/auth/bid/authorize', '/auth/media-control/authorize', '/account/city-email', '/employee'] as $path) {
+            $this->get($path)->assertRedirect('/employee/set-password');
+        }
+        $this->get('/employee/set-password')->assertOk();
+        $this->get('/admin/service-worker.js')->assertOk();
+        $this->post('/logout')->assertRedirect('/login');
+    }
+
+    public function test_required_password_replacement_cannot_reuse_the_current_password(): void
+    {
+        $user = $this->member('-SAME-PASSWORD');
+        $user->forceFill(['must_change_password' => true])->save();
+        $version = $user->security_version;
+        $this->withoutVite();
+        $this->actingAsCanonicalUser($user);
+        $page = $this->get('/employee/set-password')->assertOk();
+        preg_match_all('/wire:snapshot="([^"]+)"/', $page->getContent(), $matches);
+        $snapshot = collect($matches[1])->map(fn (string $value): string => html_entity_decode($value, ENT_QUOTES))
+            ->first(fn (string $value): bool => str_contains((string) data_get(json_decode($value, true), 'memo.name'), 'set-password'));
+        $response = $this->postJson('/livewire/update', ['components' => [[
+            'snapshot' => $snapshot,
+            'updates' => [
+                'data.current_password' => 'city-email-test-password',
+                'data.password' => 'city-email-test-password',
+                'data.password_confirmation' => 'city-email-test-password',
+            ],
+            'calls' => [['path' => '', 'method' => 'save', 'params' => []]],
+        ]]], ['X-Livewire' => 'true'])->assertOk();
+        $returned = json_decode($response->json('components.0.snapshot'), true);
+        self::assertArrayHasKey('data.password', $returned['memo']['errors']);
+        self::assertTrue($user->fresh()->must_change_password);
+        self::assertSame($version, $user->fresh()->security_version);
     }
 
     private function member(string $suffix = ''): User
@@ -276,6 +410,8 @@ final class CityEmailOnboardingTest extends TestCase
 
         return User::factory()->create([
             'name' => $employee->name,
+            'email' => 'employee-'.$employee->id.'@canonical.mbfdhub.invalid',
+            'email_verified_at' => null,
             'employee_id' => $employee->employee_id,
             'employee_profile_id' => $employee->id,
             'account_status' => AccountStatus::Active,

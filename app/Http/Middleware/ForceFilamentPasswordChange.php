@@ -19,6 +19,10 @@ class ForceFilamentPasswordChange
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
+        if ($user?->employee_profile_id !== null) {
+            return app(ForcePasswordChange::class)->handle($request, $next);
+        }
+
         $panel = Filament::getCurrentPanel();
 
         if (! $user || ! $user->must_change_password || ! $panel) {

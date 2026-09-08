@@ -8,7 +8,9 @@ use App\Enums\AccountStatus;
 use App\Models\AuthenticationSession;
 use App\Models\User;
 use Carbon\CarbonInterface;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
 
 final class AccountSecurityService
 {
@@ -179,6 +181,14 @@ final class AccountSecurityService
 
     private function revokeSessions(User $user, string $reason, CarbonInterface $at): void
     {
+        // Recovery links are credentials too: a security-version transition
+        // invalidates outstanding links along with browser and federated sessions.
+        $broker = Password::broker();
+        if (! $broker instanceof PasswordBroker) {
+            throw new \LogicException('The configured password broker does not support token persistence.');
+        }
+        $broker->deleteToken($user);
+
         AuthenticationSession::query()
             ->where('user_id', $user->id)
             ->whereNull('revoked_at')

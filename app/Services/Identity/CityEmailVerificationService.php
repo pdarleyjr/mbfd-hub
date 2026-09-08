@@ -45,7 +45,35 @@ final class CityEmailVerificationService
             return false;
         }
 
-        return $this->status($user) === null;
+        return $this->connectedEmail($user) === null && $this->status($user) === null;
+    }
+
+    /**
+     * Existing account addresses are grandfathered, not newly mailbox-verified.
+     * This local syntax/reserved-domain policy never performs a DNS lookup.
+     */
+    public function connectedEmail(User $user): ?string
+    {
+        $current = $user->fresh('employeeProfile');
+        foreach ([$current?->employeeProfile?->city_email, $current?->email] as $value) {
+            if (! is_string($value)) {
+                continue;
+            }
+            $email = strtolower(trim($value));
+            if (strlen($email) > 254 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+                continue;
+            }
+            $domain = substr($email, (int) strrpos($email, '@') + 1);
+            if (preg_match('/\.[a-z][a-z0-9-]{1,62}\z/', $domain) !== 1
+                || preg_match('/(?:\A|\.)example\.(com|org|net)\z/', $domain) === 1
+                || preg_match('/\.(invalid|test|example|localhost)\z/', $domain) === 1) {
+                continue;
+            }
+
+            return $email;
+        }
+
+        return null;
     }
 
     public function status(User $user): ?CityEmailVerification

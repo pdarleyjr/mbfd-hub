@@ -39,21 +39,10 @@ final class EnsureCityEmailReview
             return $next($request);
         }
 
-        // A fresh first-login session must complete password setup before review,
-        // including entry through the non-panel homepage or daily application.
+        // The independent password gate runs first, including on each verified
+        // Livewire component. Email review must never obstruct password setup.
         if ($user->must_change_password) {
-            if ($request->routeIs('filament.*.pages.set-password', 'filament.admin.pages.my-profile')) {
-                return $next($request);
-            }
-
-            // Livewire validates each snapshot before re-running this persistent
-            // middleware with that component's actual page route. Do not trust
-            // an unverified originalPath or the first component in a batch here.
-            if ($request->routeIs('*livewire.update')) {
-                return $next($request);
-            }
-
-            return redirect('/employee/set-password');
+            return $next($request);
         }
 
         if ($request->routeIs('city-email.*')) {

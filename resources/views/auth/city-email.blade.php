@@ -22,6 +22,11 @@
         </div>
     @endif
 
+    @if ($connectedEmail && ! $verification?->verified_at)
+        <span class="status">Email already connected</span>
+        <p class="detail"><strong>{{ $connectedEmail }}</strong></p>
+        <p>Your existing email connection is preserved. You can continue using the Hub without the one-time email confirmation. Optional city-email verification or changes are available below.</p>
+    @endif
     @if ($verification)
         <span class="status {{ $verification->verified_at ? 'verified' : '' }}">{{ $verification->verified_at ? 'Verified' : 'Verification pending' }}</span>
         <p class="detail"><strong>{{ $verification->email }}</strong></p>
@@ -30,9 +35,15 @@
         @elseif ($verification->delivery_status === 'failed')
             <p class="notice">The last verification email could not be sent. Your proposed address is saved, but is not verified. You can continue using the Hub and retry below.</p>
         @else
-            <p>Open the verification email in this city mailbox and confirm the link while signed in to this Hub account. Until then, the proposed address is not used for password recovery or account email.</p>
+            <p>Open the verification email in this city mailbox and confirm the link while signed in to this Hub account.
+                @if ($connectedEmail === $verification->email)
+                    Your existing address stays connected while optional mailbox verification is pending.
+                @else
+                    Until then, the proposed address is not used for password recovery or account email.
+                @endif
+            </p>
         @endif
-    @else
+    @elseif (! $connectedEmail)
         <p>We suggest <strong>firstnamelastname@miamibeachfl.gov</strong> from the personnel roster. Names alone cannot prove a mailbox exists. Check the spelling and use your actual city-assigned address if it differs.</p>
     @endif
 
@@ -43,7 +54,7 @@
             @csrf
             <button type="submit">Continue to the Hub</button>
         </form>
-        @if (! $verification?->verified_at)
+        @if ($verification && ! $verification->verified_at)
             <details @if ($errors->has('current_password') || $errors->has('ownership_confirmed')) open @endif>
                 <summary>Send a new verification link</summary>
                 <p>For your security, confirm your Hub password. A new link replaces earlier links.</p>
@@ -58,8 +69,8 @@
             </details>
         @endif
         <details @if ($errors->has('email')) open @endif>
-            <summary>Correct or change my city email</summary>
-            <p>Your existing verified address stays connected until you verify the replacement.</p>
+            <summary>{{ $connectedEmail && ! $verification ? 'Manage city email (optional)' : 'Correct or change my city email' }}</summary>
+            <p>Your existing connected address stays connected until you verify a replacement.</p>
             @include('auth.partials.city-email-form', ['emailValue' => $verification?->email ?? $candidate])
         </details>
     @endif

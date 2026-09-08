@@ -105,7 +105,7 @@ final class CloudflareEmailDispatcher
         ]);
 
         try {
-            $this->costGuard->reserve($email, $now);
+            $email = $this->costGuard->reserve($email, $now);
         } catch (EmailBudgetExhausted $exception) {
             $this->costGuard->releaseBeforeAcceptance($email, 'Email sending safety checks blocked delivery.', $now);
             throw $exception;
@@ -142,7 +142,19 @@ final class CloudflareEmailDispatcher
 
             return $email;
         } catch (Throwable $exception) {
-            $this->costGuard->releaseBeforeAcceptance($email, 'Cloudflare rejected the message before acceptance.', CarbonImmutable::now());
+            // A lost response (or a failed local save) is not evidence that the
+            // provider rejected the message. Keep its budget and never retry here.
+            $this->costGuard->markUncertain($email, CarbonImmutable::now());
+            if ($exception instanceof RequestException && $exception->response->status() === 429) {
+                $retryAfter = $exception->response->header('Retry-After');
+                $now = CarbonImmutable::now();
+                $seconds = filter_var($retryAfter, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+                $date = \DateTimeImmutable::createFromFormat(DATE_RFC7231, $retryAfter);
+                $until = $seconds !== false
+                    ? $now->addSeconds(max(1, $seconds))
+                    : ($date !== false ? CarbonImmutable::instance($date) : $now->addMinute());
+                $this->costGuard->deferUntil($until->isFuture() ? $until : $now->addMinute());
+            }
             throw $exception;
         }
     }

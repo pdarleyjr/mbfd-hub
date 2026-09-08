@@ -9,27 +9,30 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Identity\AccountSecurityService;
+use App\Services\Identity\CityEmailVerificationService;
 use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules\Password as PasswordRule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
 
 final class EmployeePasswordResetController extends Controller
 {
-    private const GENERIC_STATUS = 'If the Employee ID has an active linked account and an authoritative city email, a reset link will be sent.';
+    private const GENERIC_STATUS = 'If the Employee ID has an active linked account and a connected email address, a reset link will be sent.';
 
     public function requestForm(): View
     {
         return view('auth.employee-forgot-password');
     }
 
-    public function requestLink(Request $request, CloudflareEmailDispatcher $dispatcher): RedirectResponse
+    public function requestLink(Request $request, CloudflareEmailDispatcher $dispatcher, CityEmailVerificationService $emails): RedirectResponse
     {
         $validated = $request->validate(['employee_id' => ['required', 'string', 'max:64']]);
         $employeeId = trim((string) $validated['employee_id']);
@@ -42,15 +45,27 @@ final class EmployeePasswordResetController extends Controller
         /** @var Employee|null $employee */
         $employee = Employee::query()->where('employee_id', $employeeId)->first();
         $user = $employee?->user;
-        if ($employee instanceof Employee
-            && $user instanceof User
-            && $user->isAuthenticationAllowed()
-            && filled($employee->city_email)) {
+        if ($user instanceof User) {
             try {
-                $token = $this->passwordBroker()->createToken($user);
-                $url = route('password.reset.form', ['token' => $token, 'employee_id' => $employeeId]);
+                $challenge = DB::transaction(function () use ($user, $emails): ?array {
+                    $current = User::query()->lockForUpdate()->find($user->id);
+                    if (! $current instanceof User || ! $current->isAuthenticationAllowed()
+                        || $current->employee_profile_id !== $user->employee_profile_id || $current->employee_id !== $user->employee_id) {
+                        return null;
+                    }
+                    $recipient = $emails->connectedEmail($current);
+                    if ($recipient === null) {
+                        return null;
+                    }
+
+                    return ['recipient' => $recipient, 'token' => $this->passwordBroker()->createToken($current)];
+                });
+                if ($challenge === null) {
+                    return back()->with('status', self::GENERIC_STATUS);
+                }
+                $url = route('password.reset.form', ['token' => $challenge['token'], 'employee_id' => $employeeId]);
                 $dispatcher->send(
-                    to: [(string) $employee->city_email],
+                    to: [$challenge['recipient']],
                     subject: 'MBFD Hub password reset',
                     text: "A password reset was requested for your MBFD Hub account.\n\nReset your password: {$url}\n\nIf you did not request this, ignore this message.",
                     html: null,
@@ -85,12 +100,26 @@ final class EmployeePasswordResetController extends Controller
         ]);
         $employee = Employee::query()->where('employee_id', trim($validated['employee_id']))->first();
         $user = $employee?->user;
-        if (! $user instanceof User || ! $this->passwordBroker()->tokenExists($user, $validated['token'])) {
+        $reset = $user instanceof User && DB::transaction(function () use ($user, $validated, $security): bool {
+            $current = User::query()->lockForUpdate()->find($user->id);
+            if (! $current instanceof User || ! $current->isAuthenticationAllowed()
+                || $current->employee_profile_id !== $user->employee_profile_id || $current->employee_id !== $user->employee_id
+                || ! $this->passwordBroker()->tokenExists($current, $validated['token'])) {
+                return false;
+            }
+
+            if ($current->must_change_password && Hash::check($validated['password'], $current->getAuthPassword())) {
+                throw ValidationException::withMessages(['password' => 'Choose a password different from your temporary password.']);
+            }
+
+            $security->changePassword($current, Hash::make($validated['password']), now());
+            $this->passwordBroker()->deleteToken($current);
+
+            return true;
+        });
+        if (! $reset) {
             return back()->withErrors(['employee_id' => 'This password reset link is invalid or expired.']);
         }
-
-        $security->changePassword($user, Hash::make($validated['password']), now());
-        $this->passwordBroker()->deleteToken($user);
 
         return redirect()->route('login')->with('status', 'Your password has been reset.');
     }

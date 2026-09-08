@@ -18,12 +18,19 @@ final class CloudflareCostGuardTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config()->set('communications.cloudflare.account_id', str_repeat('a', 32));
+    }
+
     public function test_reservations_cannot_cross_the_safe_ceiling(): void
     {
         config()->set('communications.cloudflare.safe_email_ceiling', 3);
         $cycleStart = CarbonImmutable::parse('2026-09-01T00:00:00Z');
         $cycleEnd = CarbonImmutable::parse('2026-10-01T00:00:00Z');
         CloudflareUsageBudget::query()->create([
+            'provider_account_id' => str_repeat('a', 32),
             'cycle_start' => $cycleStart,
             'cycle_end' => $cycleEnd,
             'provider_chargeable_used' => 1,
@@ -70,6 +77,7 @@ final class CloudflareCostGuardTest extends TestCase
     {
         $now = CarbonImmutable::parse('2026-09-04T12:00:00Z');
         CloudflareUsageBudget::query()->create([
+            'provider_account_id' => str_repeat('a', 32),
             'cycle_start' => $now->startOfMonth(),
             'cycle_end' => $now->addMonth()->startOfMonth(),
             'provider_chargeable_used' => 0,
@@ -114,6 +122,7 @@ final class CloudflareCostGuardTest extends TestCase
         config()->set('communications.cloudflare.api_token', 'test-token-not-persisted');
         config()->set('communications.cloudflare.account_id', str_repeat('a', 32));
         CloudflareUsageBudget::query()->create([
+            'provider_account_id' => str_repeat('a', 32),
             'cycle_start' => $now->startOfMonth(),
             'cycle_end' => $now->addMonth()->startOfMonth(),
             'provider_chargeable_used' => 0,
@@ -215,7 +224,7 @@ final class CloudflareCostGuardTest extends TestCase
 
     /** @param array<string, int|null> $overrides */
     #[DataProvider('providerThresholdProvider')]
-    public function test_daily_and_worker_provider_thresholds_fail_closed(array $overrides): void
+    public function test_daily_provider_thresholds_fail_closed(array $overrides): void
     {
         $now = CarbonImmutable::parse('2026-09-04T12:00:00Z');
         $this->createBudget($now, $overrides);
@@ -230,15 +239,23 @@ final class CloudflareCostGuardTest extends TestCase
         return [
             'missing daily quota' => [['provider_daily_quota' => null]],
             'daily quota reached' => [['provider_daily_quota' => 5, 'provider_daily_used' => 5]],
-            'worker requests reached' => [['worker_requests_used' => 9_000_000]],
-            'worker cpu reached' => [['worker_cpu_ms_used' => 27_000_000]],
         ];
+    }
+
+    public function test_unrelated_worker_usage_does_not_gate_laravel_direct_rest_email(): void
+    {
+        $now = CarbonImmutable::parse('2026-09-04T12:00:00Z');
+        $budget = $this->createBudget($now, ['worker_requests_used' => 9_000_000, 'worker_cpu_ms_used' => 27_000_000]);
+        self::assertSame('reserved', app(CloudflareCostGuard::class)->reserve($this->pendingEmail(), $now)->status);
+        $budget->update(['worker_requests_used' => null, 'worker_cpu_ms_used' => null]);
+        self::assertSame('reserved', app(CloudflareCostGuard::class)->reserve($this->pendingEmail(), $now)->status);
     }
 
     /** @param array<string, mixed> $overrides */
     private function createBudget(CarbonImmutable $now, array $overrides = []): CloudflareUsageBudget
     {
         return CloudflareUsageBudget::query()->create(array_merge([
+            'provider_account_id' => str_repeat('a', 32),
             'cycle_start' => $now->startOfMonth(),
             'cycle_end' => $now->addMonth()->startOfMonth(),
             'provider_chargeable_used' => 0,

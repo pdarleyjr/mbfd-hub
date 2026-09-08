@@ -131,7 +131,7 @@ final class FirstLoginCanonicalizationController extends Controller
             $at->getTimestamp(),
         );
 
-        return redirect()->intended('/');
+        return redirect(app(\App\Services\Identity\CanonicalLoginDestination::class)->resolve($user, $request->session()->pull('url.intended')));
     }
 
     private function denied(string $key, int $decaySeconds, string $reason): RedirectResponse
