@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Oidc;
 
+use DateInterval;
 use DateTimeImmutable;
 use Lcobucci\JWT\Builder;
 use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
@@ -13,6 +14,10 @@ final class IdTokenResponse extends \OpenIDConnect\IdTokenResponse
 {
     protected function getBuilder(AccessTokenEntityInterface $accessToken, IdentityEntityInterface $userEntity): Builder
     {
-        return parent::getBuilder($accessToken, $userEntity)->expiresAt(new DateTimeImmutable('@'.(time() + 300)));
+        $issuedAt = new DateTimeImmutable('@'.time());
+
+        return parent::getBuilder($accessToken, $userEntity)
+            ->issuedAt($issuedAt)
+            ->expiresAt($issuedAt->add(new DateInterval('PT5M')));
     }
 }
