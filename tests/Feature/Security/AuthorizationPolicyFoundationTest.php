@@ -61,6 +61,41 @@ final class AuthorizationPolicyFoundationTest extends TestCase
         ]);
     }
 
+    public function test_role_sync_rejects_an_actor_disabled_after_their_model_was_loaded(): void
+    {
+        $actor = $this->userWithRole('super_admin')->load('roles');
+        $target = $this->userWithRole('workgroup_member');
+        Role::findOrCreate('training_viewer', 'web');
+        User::query()->whereKey($actor->id)->update(['account_status' => 'disabled']);
+
+        try {
+            app(RoleAssignmentService::class)->sync($actor, $target, ['training_viewer']);
+            self::fail('A disabled actor must not delegate through a stale model.');
+        } catch (AuthorizationException) {
+            self::assertSame(['workgroup_member'], $target->fresh()->getRoleNames()->all());
+            $this->assertDatabaseHas('security_action_events', ['actor_user_id' => $actor->id,
+                'target_user_id' => $target->id, 'action' => 'change_role', 'result' => 'denied']);
+        }
+    }
+
+    public function test_role_sync_rejects_an_actor_whose_cached_delegator_role_was_revoked(): void
+    {
+        $actor = $this->userWithRole('super_admin')->load('roles');
+        $target = $this->userWithRole('workgroup_member');
+        Role::findOrCreate('training_viewer', 'web');
+        $actor->fresh()->syncRoles([]);
+        self::assertTrue($actor->hasRole('super_admin'));
+
+        try {
+            app(RoleAssignmentService::class)->sync($actor, $target, ['training_viewer']);
+            self::fail('A revoked delegator role must not authorize through a cached relation.');
+        } catch (AuthorizationException) {
+            self::assertSame(['workgroup_member'], $target->fresh()->getRoleNames()->all());
+            $this->assertDatabaseHas('security_action_events', ['actor_user_id' => $actor->id,
+                'target_user_id' => $target->id, 'action' => 'change_role', 'result' => 'denied']);
+        }
+    }
+
     public function test_unknown_role_assignment_fails_closed_without_creating_or_changing_roles(): void
     {
         $actor = $this->userWithRole('super_admin');
@@ -176,6 +211,50 @@ final class AuthorizationPolicyFoundationTest extends TestCase
             AccountSecurityAction::AdministrativeRecovery,
             'stale authentication test',
         );
+    }
+
+    public function test_interactive_role_assignment_requires_fresh_password_and_a_reason(): void
+    {
+        $actor = $this->userWithRole('super_admin');
+        $actor->forceFill(['password' => 'Role-change-password!'])->save();
+        $target = $this->userWithRole('training_viewer');
+        $service = app(\App\Services\Security\RoleAssignmentService::class);
+        foreach ([['wrong', 'Approved role change'], ['Role-change-password!', ' ']] as [$password, $reason]) {
+            try {
+                $service->syncWithAuthorization($actor, $target, ['super_admin'], $password, $reason);
+                self::fail('Role changes require a current password and reason.');
+            } catch (AuthorizationException) {
+                self::assertSame(['training_viewer'], $target->fresh()->getRoleNames()->all());
+            }
+        }
+        $actor->fresh()->forceFill(['password' => 'Replaced-current-password!'])->save();
+        try {
+            $service->syncWithAuthorization($actor, $target, ['super_admin'], 'Role-change-password!', 'Approved role change');
+            self::fail('A stale password cannot authorize roles.');
+        } catch (AuthorizationException) {
+            self::assertSame(['training_viewer'], $target->fresh()->getRoleNames()->all());
+        }
+        $service->syncWithAuthorization($actor, $target, ['super_admin'], 'Replaced-current-password!', 'Approved role change');
+        self::assertTrue($target->fresh()->hasRole('super_admin'));
+        $this->assertDatabaseHas('security_action_events', ['target_user_id' => $target->id, 'action' => 'change_role', 'result' => 'allowed', 'reason' => 'Approved role change']);
+    }
+
+    public function test_super_admin_demotion_revokes_canonical_sessions_permanently_across_regrant(): void
+    {
+        $actor = $this->userWithRole('super_admin');
+        $target = $this->userWithRole('super_admin');
+        $password = $target->password;
+        $at = CarbonImmutable::now();
+        $session = app(\App\Services\Identity\SessionRegistry::class)->register($target, 'super-admin-demotion-test', \App\Enums\SessionContextClass::UnmanagedBrowser, $at, $at->addHour(), $at->addDay());
+        $service = app(\App\Services\Security\RoleAssignmentService::class);
+        $service->sync($actor, $target, []);
+        self::assertSame(2, $target->fresh()->security_version);
+        self::assertSame(1, $target->fresh()->media_control_security_version);
+        $service->sync($actor, $target, ['super_admin']);
+        self::assertSame(2, $target->fresh()->security_version);
+        self::assertSame($password, $target->fresh()->password);
+        self::assertNotNull($session->fresh()->revoked_at);
+        self::assertFalse(app(\App\Services\Identity\SessionRegistry::class)->isCurrent($target->fresh(), $session->fresh(), $at->addMinute()));
     }
 
     private function userWithRole(string $role): User

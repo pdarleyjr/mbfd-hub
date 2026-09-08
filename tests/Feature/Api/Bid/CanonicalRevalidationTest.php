@@ -51,7 +51,7 @@ final class CanonicalRevalidationTest extends TestCase
             ]);
     }
 
-    public function test_revalidation_reflects_current_explicit_admin_panel_entitlement(): void
+    public function test_revalidation_reflects_only_current_explicit_bid_administration(): void
     {
         Role::findOrCreate('admin', 'web');
         $user = $this->linkedUser();
@@ -60,9 +60,11 @@ final class CanonicalRevalidationTest extends TestCase
 
         $user->assignRole('admin');
         $user->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
+        $this->revalidate($user)->assertOk()->assertJsonPath('role', 'member');
+        $user->givePermissionTo(Permission::findOrCreate('app.bid.admin', 'web'));
         $this->revalidate($user)->assertOk()->assertJsonPath('role', 'admin');
 
-        $user->revokePermissionTo('admin.access');
+        $user->revokePermissionTo('app.bid.admin');
         $this->revalidate($user)->assertOk()->assertJsonPath('role', 'member');
     }
 
@@ -74,7 +76,7 @@ final class CanonicalRevalidationTest extends TestCase
 
         $missing = $this->linkedUser('BID-MISSING');
         $payload = $this->identityPayload($missing);
-        $missing->delete();
+        $payload['hub_user_id'] = (int) User::query()->max('id') + 100;
         $this->postRevalidation($payload)
             ->assertUnauthorized()
             ->assertExactJson(['error' => 'invalid_identity']);
@@ -83,6 +85,10 @@ final class CanonicalRevalidationTest extends TestCase
     public function test_revalidation_denies_security_version_and_member_mismatches(): void
     {
         $user = $this->linkedUser();
+
+        $user->forceFill(['must_change_password' => true])->save();
+        $this->revalidate($user)->assertUnauthorized();
+        $user->forceFill(['must_change_password' => false])->save();
 
         $this->postRevalidation([
             ...$this->identityPayload($user),

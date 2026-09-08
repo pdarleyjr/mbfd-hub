@@ -28,6 +28,9 @@ final class AuthorizationCodeExchangeController extends Controller
 
         if (! $user instanceof User
             || ! $user->isAuthenticationAllowed()
+            || $user->must_change_password
+            || (int) $user->media_control_security_version !== $record['media_control_security_version']
+            || ($user->employee_profile_id === null ? null : (int) $user->employee_profile_id) !== $record['employee_profile_id']
             || (int) $user->security_version !== $record['security_version']) {
             return response()->json(['error' => 'invalid_authorization_code'], 401);
         }
@@ -45,8 +48,11 @@ final class AuthorizationCodeExchangeController extends Controller
             'audience' => $record['audience'],
             'subject' => 'hub-user:'.$user->getKey(),
             'user_id' => (int) $user->getKey(),
+            'security_version' => (int) $user->security_version,
+            'media_control_security_version' => (int) $user->media_control_security_version,
+            'member_id' => $user->employee_profile_id === null ? null : (int) $user->employee_profile_id,
             'display_name' => (string) ($user->display_name ?: $user->name),
-            'role' => 'platform_admin',
+            'role' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($user, 'media_control'),
         ]);
         $response->headers->set('Cache-Control', 'no-store, private');
 

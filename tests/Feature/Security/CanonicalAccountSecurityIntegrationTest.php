@@ -36,7 +36,7 @@ final class CanonicalAccountSecurityIntegrationTest extends TestCase
             $at->addDay(),
         );
 
-        app(AccountSecurityService::class)->disable($actor, $target, 'security incident', $at);
+        app(AccountSecurityService::class)->disable($actor, $target, 'security incident', $at, 'Account-security-password!');
 
         $disabled = $target->fresh();
         self::assertSame(AccountStatus::Disabled, $disabled->account_status);
@@ -52,7 +52,7 @@ final class CanonicalAccountSecurityIntegrationTest extends TestCase
             'reason' => 'security incident',
         ]);
 
-        app(AccountSecurityService::class)->enable($actor, $disabled, 'owner-approved reactivation', $at->addHour());
+        app(AccountSecurityService::class)->enable($actor, $disabled, 'owner-approved reactivation', $at->addHour(), 'Account-security-password!');
 
         $reactivated = $target->fresh();
         self::assertSame(AccountStatus::Active, $reactivated->account_status);
@@ -72,6 +72,7 @@ final class CanonicalAccountSecurityIntegrationTest extends TestCase
             $target,
             'owner-approved default policy',
             CarbonImmutable::parse('2026-08-31T12:00:00Z'),
+            'Account-security-password!',
         );
 
         self::assertSame(AccountStatus::Active, $target->fresh()->account_status);
@@ -108,7 +109,7 @@ final class CanonicalAccountSecurityIntegrationTest extends TestCase
     private function superAdmin(): User
     {
         Role::findOrCreate('super_admin', 'web');
-        $user = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $user = User::factory()->create(['account_status' => AccountStatus::Active, 'password' => 'Account-security-password!']);
         $user->assignRole('super_admin');
 
         return $user;

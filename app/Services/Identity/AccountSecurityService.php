@@ -6,6 +6,7 @@ namespace App\Services\Identity;
 
 use App\Enums\AccountStatus;
 use App\Models\AuthenticationSession;
+use App\Models\Employee;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Auth\Passwords\PasswordBroker;
@@ -78,8 +79,9 @@ final class AccountSecurityService
         string $employeeId,
         ?string $passwordHash,
         CarbonInterface $at,
+        bool $activatePending = true,
     ): array {
-        return DB::transaction(function () use ($user, $employeeProfileId, $employeeId, $passwordHash, $at): array {
+        return DB::transaction(function () use ($user, $employeeProfileId, $employeeId, $passwordHash, $at, $activatePending): array {
             /** @var User $lockedUser */
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
             $changes = [];
@@ -92,7 +94,15 @@ final class AccountSecurityService
             if ($lockedUser->employee_id !== $employeeId) {
                 $changes['employee_id'] = $employeeId;
             }
-            if ($lockedUser->getRawOriginal('account_status') === AccountStatus::PendingActivation->value) {
+            if (isset($changes['employee_profile_id']) || isset($changes['employee_id'])) {
+                // Every canonical linking path must update legacy SQL consumers,
+                // not only the administrator UI. Preserve the User -> Employee lock order.
+                $employee = Employee::query()->where('employee_id', $employeeId)->lockForUpdate()->findOrFail($employeeProfileId);
+                foreach (Employee::PROFILE_FIELDS as $field) {
+                    $changes[$field] = $employee->getAttribute($field);
+                }
+            }
+            if ($activatePending && $lockedUser->getRawOriginal('account_status') === AccountStatus::PendingActivation->value) {
                 $changes['account_status'] = AccountStatus::Active->value;
                 $activated = true;
             }
@@ -188,6 +198,8 @@ final class AccountSecurityService
             throw new \LogicException('The configured password broker does not support token persistence.');
         }
         $broker->deleteToken($user);
+        app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($user);
+        app(\App\Services\Cloud\NextcloudAccountSynchronizer::class)->request($user);
 
         AuthenticationSession::query()
             ->where('user_id', $user->id)

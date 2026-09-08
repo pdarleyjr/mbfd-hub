@@ -39,7 +39,7 @@ final class EmployeePasswordManagementRemovalTest extends TestCase
             'password' => 'retained-compatibility-value',
             'must_change_password' => false,
         ]);
-        $actor = User::factory()->create();
+        $actor = User::factory()->create(['account_status' => 'active']);
         $actor->assignRole(Role::findOrCreate('super_admin', 'web'));
 
         $this->actingAs($actor);
@@ -55,7 +55,7 @@ final class EmployeePasswordManagementRemovalTest extends TestCase
 
     public function test_employee_resource_creates_a_first_login_ready_profile_without_exposing_the_password(): void
     {
-        $actor = User::factory()->create();
+        $actor = User::factory()->create(['account_status' => 'active']);
         $actor->assignRole(Role::findOrCreate('super_admin', 'web'));
 
         $this->actingAs($actor);
@@ -81,7 +81,7 @@ final class EmployeePasswordManagementRemovalTest extends TestCase
     public function test_employee_resource_fails_closed_when_the_protected_bootstrap_secret_is_unavailable(): void
     {
         config(['security.employee_bootstrap.secret' => null]);
-        $actor = User::factory()->create();
+        $actor = User::factory()->create(['account_status' => 'active']);
         $actor->assignRole(Role::findOrCreate('super_admin', 'web'));
 
         $this->actingAs($actor);

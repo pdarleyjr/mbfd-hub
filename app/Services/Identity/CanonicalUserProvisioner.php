@@ -27,10 +27,18 @@ final readonly class CanonicalUserProvisioner
     public function create(int $employeeProfileId, string $credentialProvenance, CarbonInterface $at): array
     {
         return DB::transaction(function () use ($employeeProfileId, $credentialProvenance, $at): array {
+            // Existing User -> Employee, never Employee -> a newly discovered User.
+            // New inserts below are private to this transaction, not existing locks.
+            $existing = User::query()->where('employee_profile_id', $employeeProfileId)->lockForUpdate()->first();
             /** @var Employee $employee */
             $employee = Employee::query()->lockForUpdate()->findOrFail($employeeProfileId);
+            if ($employee->roster_status === 'departed') {
+                throw new RuntimeException('Departed personnel cannot receive or activate a login account.');
+            }
             $email = "employee-{$employee->id}@canonical.mbfdhub.invalid";
-            $existing = User::query()->where('employee_profile_id', $employee->id)->lockForUpdate()->first();
+            if (User::query()->where('employee_profile_id', $employee->id)->value('id') !== $existing?->id) {
+                throw new RuntimeException('The canonical identity changed while acquiring locks. Reload before retrying.');
+            }
             if ($existing !== null) {
                 if ($existing->employee_id !== $employee->employee_id || $existing->email !== $email) {
                     throw new RuntimeException("Employee {$employee->id} is linked to a different canonical User.");
@@ -66,7 +74,9 @@ final readonly class CanonicalUserProvisioner
             $status = $copyVerifiedLegacyHash ? AccountStatus::Active : AccountStatus::PendingActivation;
             $userId = DB::table('users')->insertGetId([
                 'name' => $employee->name,
-                'display_name' => $employee->name,
+                'display_name' => $employee->display_name,
+                'station' => $employee->station,
+                'phone' => $employee->phone,
                 'email' => $email,
                 'password' => $copyVerifiedLegacyHash ? $employeeHash : Hash::make(Str::random(64)),
                 'rank' => $employee->rank,

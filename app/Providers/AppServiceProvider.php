@@ -126,6 +126,12 @@ class AppServiceProvider extends ServiceProvider
 
         $this->registerPushNotificationWidgetAssets();
 
+        // All Filament panels share one session-expiry boundary, including polls.
+        \Filament\Support\Facades\FilamentView::registerRenderHook(
+            \Filament\View\PanelsRenderHook::HEAD_END,
+            fn (): \Illuminate\Contracts\View\View => view('filament.partials.session-expiry'),
+        );
+
         // ─── Submission Notification Triggers ──────────────────────────────
         // Dispatch NewSubmissionNotification (database + web push) when new
         // user-facing forms are submitted across the MBFD Hub platform.

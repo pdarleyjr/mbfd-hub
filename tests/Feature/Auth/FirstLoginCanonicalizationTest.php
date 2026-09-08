@@ -10,6 +10,8 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
+use App\Services\Identity\CanonicalUserProvisioner;
+use App\Services\Identity\DualCredentialIdentityClaim;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -233,6 +235,94 @@ final class FirstLoginCanonicalizationTest extends TestCase
         $this->assertDatabaseCount('users', 0);
         $this->assertFalse(session()->has('auth.canonical_activation_intent'));
         $this->assertGuest('web');
+    }
+
+    public function test_departed_employee_bootstrap_cannot_receive_an_activation_intent(): void
+    {
+        $employee = $this->employee('JIT-DEPARTED-1');
+        $employee->update(['roster_status' => 'departed']);
+
+        $this->from('/login')->post('/login', [
+            'employee_id' => $employee->employee_id, 'password' => 'employee-secret',
+        ])->assertRedirect('/login')
+            ->assertSessionHasErrors(['employee_id' => 'The provided credentials are invalid.']);
+
+        $this->assertFalse(session()->has('auth.canonical_activation_intent'));
+        $this->assertDatabaseCount('users', 0);
+        $this->assertGuest('web');
+    }
+
+    public function test_departure_after_bootstrap_verification_blocks_new_account_activation(): void
+    {
+        $employee = $this->employee('JIT-DEPARTED-2');
+        $this->post('/login', ['employee_id' => $employee->employee_id, 'password' => 'employee-secret'])
+            ->assertRedirect('/activate-account');
+        $nonce = $this->activationNonce();
+        DB::table('employees')->where('id', $employee->id)->update(['roster_status' => 'departed']);
+
+        $this->post('/activate-account', [
+            'nonce' => $nonce, 'path' => 'no_existing_user', 'no_legacy_account_assertion' => '1',
+        ])->assertRedirect('/activate-account')->assertSessionHasErrors(['legacy_email']);
+
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('authentication_sessions', 0);
+        $this->assertGuest('web');
+    }
+
+    public function test_login_rechecks_roster_departure_after_its_initial_lookup(): void
+    {
+        $employee = $this->employee('JIT-DEPARTED-RACE');
+        $changed = false;
+        Employee::retrieved(function (Employee $loaded) use ($employee, &$changed): void {
+            if (! $changed && $loaded->id === $employee->id) {
+                $changed = true;
+                DB::table('employees')->where('id', $employee->id)->update(['roster_status' => 'departed']);
+            }
+        });
+
+        $this->from('/login')->post('/login', [
+            'employee_id' => $employee->employee_id, 'password' => 'employee-secret',
+        ])->assertRedirect('/login')->assertSessionHasErrors(['employee_id']);
+
+        $this->assertTrue($changed);
+        $this->assertFalse(session()->has('auth.canonical_activation_intent'));
+        $this->assertDatabaseCount('users', 0);
+        $this->assertGuest('web');
+    }
+
+    public function test_departure_after_bootstrap_verification_blocks_legacy_dual_claim_without_mutation(): void
+    {
+        $employee = $this->employee('JIT-DEPARTED-3');
+        $user = $this->legacyAdmin('departed-legacy@example.test');
+        $original = $user->fresh()->getRawOriginal();
+        $this->post('/login', ['employee_id' => $employee->employee_id, 'password' => 'employee-secret'])
+            ->assertRedirect('/activate-account');
+        $nonce = $this->activationNonce();
+        DB::table('employees')->where('id', $employee->id)->update(['roster_status' => 'departed']);
+
+        $this->post('/activate-account', [
+            'nonce' => $nonce, 'path' => 'existing_user', 'legacy_email' => $user->email, 'legacy_password' => 'legacy-secret',
+        ])->assertRedirect('/activate-account')->assertSessionHasErrors(['legacy_email']);
+
+        $this->assertSame($original, $user->fresh()->getRawOriginal());
+        $this->assertSame(['admin'], $user->fresh()->getRoleNames()->all());
+        $this->assertDatabaseCount('authentication_sessions', 0);
+        $this->assertGuest('web');
+        $this->assertNull(app(DualCredentialIdentityClaim::class)->claim($employee->id, $user->email, 'legacy-secret', now()));
+    }
+
+    public function test_direct_provisioner_cannot_create_active_or_pending_login_for_departed_employee(): void
+    {
+        $employee = $this->employee('JIT-DEPARTED-4');
+        DB::table('employees')->where('id', $employee->id)->update(['roster_status' => 'departed']);
+        foreach (['LEGACY_HUMAN_BCRYPT_UNCHANGED', 'MISSING_OR_UNSUPPORTED'] as $provenance) {
+            try {
+                app(CanonicalUserProvisioner::class)->create($employee->id, $provenance, now());
+                $this->fail('Departed personnel cannot be provisioned.');
+            } catch (\RuntimeException) {
+                $this->assertDatabaseCount('users', 0);
+            }
+        }
     }
 
     private function activationNonce(): string

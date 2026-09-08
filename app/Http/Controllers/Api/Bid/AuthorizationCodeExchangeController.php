@@ -42,6 +42,7 @@ final class AuthorizationCodeExchangeController extends Controller
 
         if (! $user instanceof User
             || ! $user->isAuthenticationAllowed()
+            || $user->must_change_password
             || (int) $user->security_version !== $record['security_version']
             || ! $employee instanceof Employee
             || (int) $employee->getKey() !== $record['employee_profile_id']) {
@@ -57,7 +58,7 @@ final class AuthorizationCodeExchangeController extends Controller
             if (! $user->hasCurrentBidEntitlement()) {
                 return response()->json(['error' => 'invalid_authorization_code'], 401);
             }
-            $role = $user->hasCurrentAdminPanelEntitlement() ? 'admin' : 'member';
+            $role = app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($user, 'bid');
         } catch (Throwable) {
             Log::info('bid.federation.exchange', [
                 'result' => 'failure',

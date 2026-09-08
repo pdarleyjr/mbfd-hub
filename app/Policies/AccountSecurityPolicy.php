@@ -11,6 +11,10 @@ final class AccountSecurityPolicy
 {
     public function allows(User $actor, User $target, AccountSecurityAction $action): bool
     {
+        if (! $actor->isAuthenticationAllowed()) {
+            return false;
+        }
+
         if ($action === AccountSecurityAction::SelfServicePasswordChange) {
             return $actor->is($target);
         }

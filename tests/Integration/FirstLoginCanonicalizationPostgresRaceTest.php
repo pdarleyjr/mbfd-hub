@@ -18,9 +18,9 @@ use Tests\TestCase;
 
 /**
  * Runs JIT creation and privileged-account claim in separate PHP processes.
- * Both production transitions lock the Employee first, so exactly one can
- * consume an unlinked Employee identity and the loser must leave no partial
- * link or second security transition.
+ * Existing User participants precede Employee locks. Both transitions recheck
+ * the Employee binding under its lock, so exactly one consumes the identity
+ * and the loser leaves no partial link or second security transition.
  */
 #[Group('postgres')]
 final class FirstLoginCanonicalizationPostgresRaceTest extends TestCase

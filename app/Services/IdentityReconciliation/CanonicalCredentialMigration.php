@@ -78,6 +78,24 @@ final readonly class CanonicalCredentialMigration
         }
 
         return DB::transaction(function () use ($ledger): array {
+            app(\App\Services\Security\LastCriticalAdministratorGuard::class)->lockActiveCriticalAdministrators();
+            // A ledger may arrive in any order. Acquire every existing User
+            // participant before any Employee, not User/Employee per ledger row.
+            $employeeIdentifiers = array_map(static fn (OwnerLedgerEntry $entry): ?string => $entry->employeeId, $ledger);
+            $employeeSnapshot = Employee::query()->whereIn('employee_id', $employeeIdentifiers)->get()->keyBy('employee_id');
+            $userIds = array_values(array_filter(array_map(static fn (OwnerLedgerEntry $entry): ?int => $entry->userId, $ledger)));
+            $lockedUsers = User::query()->whereKey($userIds)->orWhereIn('employee_profile_id', $employeeSnapshot->modelKeys())
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $lockedEmployees = Employee::query()->whereKey($employeeSnapshot->modelKeys())->orderBy('id')->lockForUpdate()->get()->keyBy('employee_id');
+            foreach ($employeeIdentifiers as $employeeIdentifier) {
+                if ($lockedEmployees->get($employeeIdentifier)?->id !== $employeeSnapshot->get($employeeIdentifier)?->id
+                    || $lockedEmployees->get($employeeIdentifier) === null) {
+                    throw new RuntimeException('An approved Employee identity changed while acquiring locks. Generate a new preview.');
+                }
+            }
+            if (User::query()->whereIn('employee_profile_id', $lockedEmployees->modelKeys())->whereNotIn('id', $lockedUsers->modelKeys())->exists()) {
+                throw new RuntimeException('An approved canonical link changed while acquiring locks. Generate a new preview.');
+            }
             $linksApplied = 0;
             $credentialHashesCopied = 0;
             $usersCreated = 0;
@@ -87,10 +105,10 @@ final readonly class CanonicalCredentialMigration
 
             foreach ($ledger as $entry) {
                 if ($entry->decision === 'CREATE_USER') {
-                    /** @var Employee $employee */
-                    $employee = Employee::query()
-                        ->where('employee_id', $entry->employeeId)
-                        ->sole();
+                    $employee = $lockedEmployees->get($entry->employeeId);
+                    if (! $employee instanceof Employee) {
+                        throw new RuntimeException('The approved Employee identity is no longer available.');
+                    }
                     $outcome = $this->provisioner->create(
                         $employee->id,
                         (string) $entry->credentialProvenance,
@@ -111,13 +129,14 @@ final readonly class CanonicalCredentialMigration
                     continue;
                 }
 
-                /** @var User $user */
-                $user = User::query()->lockForUpdate()->findOrFail($entry->userId);
-                /** @var Employee $employee */
-                $employee = Employee::query()
-                    ->where('employee_id', $entry->employeeId)
-                    ->lockForUpdate()
-                    ->sole();
+                $user = $lockedUsers->get($entry->userId);
+                if (! $user instanceof User) {
+                    throw new RuntimeException('The approved User identity is no longer available.');
+                }
+                $employee = $lockedEmployees->get($entry->employeeId);
+                if (! $employee instanceof Employee) {
+                    throw new RuntimeException('The approved Employee identity is no longer available.');
+                }
 
                 if ($user->employee_profile_id !== null && $user->employee_profile_id !== $employee->id) {
                     throw new RuntimeException("User {$user->id} is already linked to a different Employee profile.");

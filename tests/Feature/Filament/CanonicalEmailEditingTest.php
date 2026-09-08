@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
-use App\Filament\Resources\UserResource\Pages\EditUser;
-use App\Filament\Workgroup\Pages\Profile;
+use App\Filament\Resources\AccountProfileResource\Pages\EditAccountProfile;
+use App\Filament\Resources\EmployeeResource\Pages\EditEmployee;
 use App\Models\Employee;
 use App\Models\User;
-use App\Models\Workgroup;
-use App\Models\WorkgroupMember;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -20,182 +18,150 @@ final class CanonicalEmailEditingTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_workgroup_profile_ignores_forged_email_for_a_linked_member(): void
-    {
-        [$user, $employee] = $this->linkedMember();
-        $this->actingAs($user);
-        $identity = $user->only(['email', 'employee_id', 'employee_profile_id', 'password']);
-
-        $profile = new class extends Profile
-        {
-            public function saveProfileForTest(array $data): void
-            {
-                $this->updateProfile($data);
-            }
-        };
-        $profile->saveProfileForTest(['name' => 'Updated Display Name', 'email' => 'forged@miamibeachfl.gov']);
-
-        $this->assertSame('Updated Display Name', $user->refresh()->name);
-        $this->assertSame($identity, $user->only(array_keys($identity)));
-        $this->assertSame('canonicalmember@miamibeachfl.gov', $employee->refresh()->city_email);
-    }
-
-    public function test_admin_cannot_desynchronize_linked_email_by_forging_the_raw_field(): void
+    public function test_profile_save_cannot_desynchronize_email_by_forging_fields(): void
     {
         [$target, $employee] = $this->linkedMember();
         $this->admin();
-
-        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
-            ->assertFormFieldIsDisabled('email')
-            ->fillForm(['name' => 'Updated Display Name', 'email' => 'forged@miamibeachfl.gov'])
-            ->call('save')
-            ->assertHasNoFormErrors();
-
-        $this->assertSame('Updated Display Name', $target->refresh()->name);
-        $this->assertSame('canonicalmember@miamibeachfl.gov', $target->email);
-        $this->assertSame($target->email, $employee->refresh()->city_email);
+        Livewire::test(EditEmployee::class, ['record' => $employee->getRouteKey()])
+            ->assertFormFieldIsDisabled('city_email')
+            ->assertFormFieldDoesNotExist('email')
+            ->fillForm(['name' => 'Updated Personnel Name', 'email' => 'forged@miamibeachfl.gov', 'city_email' => 'forged@miamibeachfl.gov'])
+            ->call('save')->assertHasNoFormErrors();
+        self::assertSame('Updated Personnel Name', $employee->fresh()->name);
+        self::assertSame('Updated Personnel Name', $target->fresh()->getRawOriginal('name'));
+        self::assertSame('canonicalmember@miamibeachfl.gov', $target->fresh()->email);
+        self::assertSame($target->fresh()->email, $employee->fresh()->city_email);
     }
 
-    public function test_historical_email_timestamp_does_not_claim_member_mailbox_confirmation(): void
+    public function test_historical_timestamp_does_not_claim_mailbox_confirmation(): void
     {
-        [$target] = $this->linkedMember();
+        [$target, $employee] = $this->linkedMember();
         $target->forceFill(['email_verified_at' => now()])->save();
         $this->admin();
-
-        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
-            ->assertDontSee('Verified by the member')
-            ->assertSee('Mailbox ownership has not been verified through city email confirmation.');
-
-        $this->assertNotNull($target->refresh()->email_verified_at);
+        Livewire::test(EditEmployee::class, ['record' => $employee->getRouteKey()])
+            ->assertDontSee('Mailbox verified')
+            ->assertSee('mailbox ownership is not independently verified');
+        self::assertNotNull($target->fresh()->email_verified_at);
     }
 
-    public function test_admin_save_boundary_discards_raw_email_even_when_city_email_is_not_submitted(): void
+    public function test_protected_city_email_change_updates_both_fields_and_requires_new_proof(): void
     {
-        [$target] = $this->linkedMember();
+        [$target, $employee] = $this->linkedMember();
+        $target->forceFill(['email_verified_at' => now()])->save();
+        $version = $target->security_version;
         $this->admin();
-        $editor = new class extends EditUser
-        {
-            public function sanitizeForTest(User $target, array $data): array
-            {
-                $this->record = $target;
-
-                return $this->mutateFormDataBeforeSave($data);
-            }
-        };
-
-        $data = $editor->sanitizeForTest($target, ['name' => 'Updated', 'email' => 'forged@miamibeachfl.gov']);
-
-        $this->assertArrayNotHasKey('email', $data);
-        $this->assertSame('Updated', $data['name']);
-    }
-
-    public function test_linked_workgroup_profile_offers_the_secure_city_email_flow(): void
-    {
-        [$user] = $this->linkedMember();
-        $workgroup = Workgroup::query()->create(['name' => 'Email testing', 'created_by' => $user->id]);
-        WorkgroupMember::query()->create([
-            'workgroup_id' => $workgroup->id,
-            'user_id' => $user->id,
-            'role' => 'member',
-            'is_active' => true,
-        ]);
-        $this->actingAs($user);
-        $this->withoutVite();
-        Filament::setCurrentPanel(Filament::getPanel('workgroups'));
-
-        Livewire::test(Profile::class)
-            ->assertActionVisible('cityEmail')
-            ->assertActionHasUrl('cityEmail', route('city-email.show'))
-            ->mountAction('editProfile')
-            ->setActionData(['name' => 'Profile Display Name', 'email' => 'forged@miamibeachfl.gov'])
-            ->callMountedAction()
+        Livewire::test(EditEmployee::class, ['record' => $employee->getRouteKey()])
+            ->callAction('changeCityEmail', $this->emailChange('correctedmember@miamibeachfl.gov'))
             ->assertHasNoActionErrors();
-
-        $this->assertSame('Profile Display Name', $user->refresh()->name);
-        $this->assertSame('canonicalmember@miamibeachfl.gov', $user->email);
+        self::assertSame('correctedmember@miamibeachfl.gov', $target->fresh()->email);
+        self::assertSame($target->fresh()->email, $employee->fresh()->city_email);
+        self::assertNull($target->fresh()->email_verified_at);
+        self::assertSame($version + 1, $target->fresh()->security_version);
+        $this->assertDatabaseHas('employee_profile_events', ['employee_id' => $employee->id, 'reason' => 'Approved address correction']);
     }
 
-    public function test_admin_city_email_change_updates_both_fields_and_requires_new_mailbox_proof(): void
+    public function test_unrelated_profile_edit_preserves_existing_email_proof(): void
     {
         [$target, $employee] = $this->linkedMember();
-        $target->forceFill(['email_verified_at' => now()])->save();
-        $this->admin();
-
-        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
-            ->fillForm(['city_email' => 'correctedmember@miamibeachfl.gov'])
-            ->call('save')
-            ->assertHasNoFormErrors();
-
-        $this->assertSame('correctedmember@miamibeachfl.gov', $target->refresh()->email);
-        $this->assertSame($target->email, $employee->refresh()->city_email);
-        $this->assertNull($target->email_verified_at);
-    }
-
-    public function test_admin_unrelated_edit_preserves_existing_city_email_proof(): void
-    {
-        [$target] = $this->linkedMember();
         $target->forceFill(['email_verified_at' => now()])->save();
         $verifiedAt = $target->email_verified_at->toISOString();
         $this->admin();
-
-        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
-            ->fillForm(['name' => 'Updated Display Name'])
-            ->call('save')
-            ->assertHasNoFormErrors();
-
-        $this->assertSame($verifiedAt, $target->refresh()->email_verified_at?->toISOString());
+        Livewire::test(EditEmployee::class, ['record' => $employee->getRouteKey()])
+            ->fillForm(['display_name' => 'Preferred'])->call('save')->assertHasNoFormErrors();
+        self::assertSame($verifiedAt, $target->fresh()->email_verified_at?->toISOString());
+        self::assertSame('Preferred', $employee->fresh()->display_name);
     }
 
-    public function test_admin_city_email_collision_is_a_validation_error_and_rolls_back_other_fields(): void
+    public function test_city_email_collision_is_validation_error_without_persisting_pending_profile_edits(): void
     {
         [$target, $employee] = $this->linkedMember();
         User::factory()->create(['email' => 'occupied@miamibeachfl.gov']);
-        $originalName = $target->name;
         $this->admin();
-
-        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
-            ->fillForm(['name' => 'Must not persist', 'city_email' => 'occupied@miamibeachfl.gov'])
-            ->call('save')
-            ->assertHasFormErrors(['city_email']);
-
-        $this->assertSame($originalName, $target->refresh()->name);
-        $this->assertSame('canonicalmember@miamibeachfl.gov', $target->email);
-        $this->assertSame($target->email, $employee->refresh()->city_email);
+        Livewire::test(EditEmployee::class, ['record' => $employee->getRouteKey()])
+            ->fillForm(['name' => 'Must not persist'])
+            ->callAction('changeCityEmail', $this->emailChange('occupied@miamibeachfl.gov'))
+            ->assertHasActionErrors(['city_email']);
+        self::assertSame('Canonical Member', $employee->fresh()->name);
+        self::assertSame('canonicalmember@miamibeachfl.gov', $target->fresh()->email);
     }
 
-    public function test_admin_city_email_does_not_accept_an_external_domain(): void
+    public function test_city_email_does_not_accept_external_domain(): void
     {
         [$target, $employee] = $this->linkedMember();
         $this->admin();
-
-        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
-            ->fillForm(['city_email' => 'canonicalmember@example.com'])
-            ->call('save')
-            ->assertHasFormErrors(['city_email']);
-
-        $this->assertSame('canonicalmember@miamibeachfl.gov', $target->refresh()->email);
-        $this->assertSame($target->email, $employee->refresh()->city_email);
+        Livewire::test(EditEmployee::class, ['record' => $employee->getRouteKey()])
+            ->callAction('changeCityEmail', $this->emailChange('member@example.com'))
+            ->assertHasActionErrors(['city_email']);
+        self::assertSame('canonicalmember@miamibeachfl.gov', $target->fresh()->email);
     }
 
-    public function test_unlinked_legacy_profile_email_remains_editable(): void
+    public function test_city_email_requires_current_password_and_audit_reason(): void
     {
-        $user = User::factory()->create();
-        $this->actingAs($user);
-        $profile = new class extends Profile
-        {
-            public function saveProfileForTest(array $data): void
-            {
-                $this->updateProfile($data);
-            }
-        };
-        $profile->saveProfileForTest(['name' => 'Legacy Member', 'email' => 'legacy@example.com']);
+        [$target, $employee] = $this->linkedMember();
+        $this->admin();
+        Livewire::test(EditEmployee::class, ['record' => $employee->getRouteKey()])
+            ->callAction('changeCityEmail', [...$this->emailChange('changed@miamibeachfl.gov'), 'current_password' => 'wrong'])
+            ->assertHasActionErrors(['current_password']);
+        Livewire::test(EditEmployee::class, ['record' => $employee->getRouteKey()])
+            ->callAction('changeCityEmail', [...$this->emailChange('changed@miamibeachfl.gov'), 'reason' => ''])
+            ->assertHasActionErrors(['reason']);
+        self::assertSame('canonicalmember@miamibeachfl.gov', $target->fresh()->email);
+    }
 
-        $this->assertSame('legacy@example.com', $user->refresh()->email);
+    public function test_self_profile_can_edit_contact_but_not_identity_or_email(): void
+    {
+        [$target, $employee] = $this->linkedMember();
+        $target->assignRole(Role::findOrCreate('super_admin', 'web'));
+        $this->actingAs($target);
+        $this->withoutVite();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(EditEmployee::class, ['record' => $employee->getRouteKey()])
+            ->assertFormFieldIsDisabled('name')->assertFormFieldIsDisabled('city_email')
+            ->assertActionHidden('changeCityEmail')
+            ->fillForm(['display_name' => 'Preferred', 'phone' => '123', 'name' => 'Forged'])
+            ->call('save')->assertHasNoFormErrors();
+        self::assertSame('Canonical Member', $employee->fresh()->name);
+        self::assertSame('Preferred', $employee->fresh()->display_name);
+        self::assertSame('canonicalmember@miamibeachfl.gov', $target->fresh()->email);
+    }
+
+    public function test_unlinked_account_profile_does_not_offer_an_unprotected_recovery_email_editor(): void
+    {
+        $target = User::factory()->create(['account_status' => 'active']);
+        $this->admin();
+        Livewire::test(EditAccountProfile::class, ['record' => $target->getRouteKey()])
+            ->assertFormFieldDoesNotExist('email')
+            ->fillForm(['display_name' => 'Preferred', 'email' => 'forged@example.com'])
+            ->call('save')->assertHasNoFormErrors();
+        self::assertSame($target->email, $target->fresh()->email);
+        self::assertSame('Preferred', $target->fresh()->display_name);
+    }
+
+    public function test_unlinked_recovery_email_uses_protected_reauthentication_action(): void
+    {
+        $target = User::factory()->create(['account_status' => 'active', 'email' => 'old@miamibeachfl.gov']);
+        $this->admin();
+        Livewire::test(EditAccountProfile::class, ['record' => $target->getRouteKey()])
+            ->callAction('changeRecoveryEmail', ['email' => 'new@miamibeachfl.gov', 'current_password' => 'wrong', 'reason' => 'Approved correction'])
+            ->assertHasActionErrors(['current_password']);
+        self::assertSame('old@miamibeachfl.gov', $target->fresh()->email);
+        Livewire::test(EditAccountProfile::class, ['record' => $target->getRouteKey()])
+            ->callAction('changeRecoveryEmail', ['email' => 'new@miamibeachfl.gov', 'current_password' => 'administrator-password', 'reason' => 'Approved correction'])
+            ->assertHasNoActionErrors();
+        self::assertSame('new@miamibeachfl.gov', $target->fresh()->email);
+        self::assertNull($target->fresh()->email_verified_at);
+        $this->assertDatabaseHas('security_action_events', ['target_user_id' => $target->id, 'action' => 'change_recovery_email', 'result' => 'denied']);
+        $this->assertDatabaseHas('security_action_events', ['target_user_id' => $target->id, 'action' => 'change_recovery_email', 'result' => 'allowed']);
+    }
+
+    private function emailChange(string $email): array
+    {
+        return ['city_email' => $email, 'current_password' => 'administrator-password', 'reason' => 'Approved address correction'];
     }
 
     private function admin(): void
     {
-        $admin = User::factory()->create();
+        $admin = User::factory()->create(['account_status' => 'active', 'password' => 'administrator-password']);
         $admin->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($admin);
         $this->withoutVite();
@@ -206,16 +172,12 @@ final class CanonicalEmailEditingTest extends TestCase
     private function linkedMember(): array
     {
         $employee = Employee::query()->create([
-            'employee_id' => 'EMAIL-EDIT-100',
-            'name' => 'Canonical Member',
-            'city_email' => 'canonicalmember@miamibeachfl.gov',
-            'roster_status' => 'active',
-            'password' => bcrypt('test-employee-password'),
+            'employee_id' => 'EMAIL-EDIT-100', 'name' => 'Canonical Member',
+            'city_email' => 'canonicalmember@miamibeachfl.gov', 'roster_status' => 'active', 'password' => 'test-employee-password',
         ]);
         $user = User::factory()->create([
-            'employee_id' => $employee->employee_id,
-            'employee_profile_id' => $employee->id,
-            'email' => $employee->city_email,
+            'employee_id' => $employee->employee_id, 'employee_profile_id' => $employee->id,
+            'email' => $employee->city_email, 'account_status' => 'active',
         ]);
 
         return [$user, $employee];

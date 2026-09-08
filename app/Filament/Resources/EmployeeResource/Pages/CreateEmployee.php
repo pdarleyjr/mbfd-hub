@@ -22,6 +22,7 @@ class CreateEmployee extends CreateRecord
         try {
             return array_merge(
                 $data,
+                ['roster_status' => 'active'],
                 app(EmployeeBootstrapCredentialProvisioner::class)->attributesForNewEmployee(),
             );
         } catch (RuntimeException) {

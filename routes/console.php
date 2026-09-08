@@ -162,3 +162,8 @@ Schedule::command('mbfd:cloudflare-usage-refresh')
     ->everyFiveMinutes()
     ->withoutOverlapping(2)
     ->onOneServer();
+
+Schedule::command('mbfd:nextcloud-access-sync')
+    ->everyMinute()
+    ->withoutOverlapping(10)
+    ->onOneServer();

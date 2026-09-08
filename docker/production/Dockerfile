@@ -66,6 +66,7 @@ RUN set -eux; \
         curl \
         git \
         gnupg \
+        openssh-client \
         poppler-utils \
         python3 \
         qpdf \

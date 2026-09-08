@@ -283,7 +283,7 @@ final class CanonicalAuthorizationTest extends TestCase
         $this->exchange($expiredCode)->assertUnauthorized();
     }
 
-    public function test_bid_role_is_derived_from_current_explicit_admin_entitlement(): void
+    public function test_bid_role_is_derived_from_current_explicit_application_administration(): void
     {
         Role::findOrCreate('admin', 'web');
         $user = $this->linkedUser();
@@ -292,6 +292,9 @@ final class CanonicalAuthorizationTest extends TestCase
         $code = $this->issuedCode();
         $user->assignRole('admin');
         $user->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
+        $this->exchange($code)->assertOk()->assertJson(['role' => 'member']);
+        $code = $this->issuedCode();
+        $user->givePermissionTo(Permission::findOrCreate('app.bid.admin', 'web'));
         $this->exchange($code)
             ->assertOk()
             ->assertJson(['role' => 'admin']);

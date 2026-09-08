@@ -63,6 +63,15 @@ final class CanonicalLoginController extends Controller
             $user?->getAuthPassword() ?? $employee?->getAuthPassword() ?? $dummyHash,
         );
 
+        // Re-read after credential work: departure must not issue a bootstrap
+        // intent (or admit an old active login whose roster status changed).
+        if ($employee?->fresh()?->roster_status === 'departed') {
+            RateLimiter::hit($throttleKey, $decaySeconds);
+            $activationIntents->invalidate($request->session());
+
+            return $this->denied($request, $employeeId, 'roster_status_denied');
+        }
+
         if ($employee instanceof Employee && $user === null && $passwordMatches) {
             RateLimiter::clear($throttleKey);
             $request->session()->regenerate();

@@ -11,7 +11,7 @@ final class CanonicalLoginDestination
 {
     public const PASSWORD_RETURN_KEY = 'auth.password_return_to';
 
-    private const FEDERATION_PATHS = ['/auth/bid/authorize', '/auth/media-control/authorize'];
+    private const FEDERATION_PATHS = ['/auth/bid/authorize', '/auth/media-control/authorize', '/oauth/authorize'];
 
     public function federation(mixed $candidate): ?string
     {

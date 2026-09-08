@@ -220,6 +220,8 @@ jobs:
         run: npm run build
       - name: Run PHPUnit suite
         run: php artisan test --exclude-group=postgres
+      - name: Test restricted Cloud identity bridge
+        run: python3 -m unittest discover -s tests/Python -p test_nextcloud_identity_bridge.py
       - name: Run PostgreSQL concurrency and integrity tests
         env:
           MBFD_ALLOW_DISPOSABLE_POSTGRES: "1"
@@ -274,6 +276,11 @@ jobs:
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Verify shared panel session-expiry handling
+        # The browser test uses the installed Livewire client from Composer.
+        run: |
+          node --test tests/Node/panel-session-expiry.test.mjs
+          node --test tests/Browser/panel-session-expiry.mjs
       - name: Run Daily Checkout contract and integrity tests
         run: >-
           php artisan test
