@@ -22,6 +22,11 @@ class MembersRelationManager extends RelationManager
 
     protected static ?string $title = 'Members';
 
+    public function isReadOnly(): bool
+    {
+        return ! $this->canManageOwner();
+    }
+
     public function form(Form $form): Form
     {
         return $form

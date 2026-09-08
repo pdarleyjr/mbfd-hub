@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class WorkgroupFile extends Model
 {
@@ -26,6 +27,16 @@ class WorkgroupFile extends Model
 
     protected static function booted(): void
     {
+        static::saving(function (WorkgroupFile $file): void {
+            if ($file->isDirty('filepath') && $file->filepath) {
+                $disk = Storage::disk(config('filesystems.private', 'local'));
+                if ($disk->exists($file->filepath)) {
+                    $file->file_size = $disk->size($file->filepath);
+                    $file->file_type = pathinfo($file->filepath, PATHINFO_EXTENSION);
+                }
+            }
+        });
+
         static::creating(function (WorkgroupFile $file) {
             if (empty($file->uploaded_by) && auth()->check()) {
                 $file->uploaded_by = auth()->id();
@@ -68,7 +79,7 @@ class WorkgroupFile extends Model
      */
     public function getFormattedSizeAttribute(): string
     {
-        if (!$this->file_size) {
+        if (! $this->file_size) {
             return 'Unknown';
         }
 
@@ -81,6 +92,6 @@ class WorkgroupFile extends Model
             $unitIndex++;
         }
 
-        return round($size, 2) . ' ' . $units[$unitIndex];
+        return round($size, 2).' '.$units[$unitIndex];
     }
 }
