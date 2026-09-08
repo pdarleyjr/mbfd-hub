@@ -223,9 +223,13 @@ Route::post('/apparatus-inspections/{inspection}/reject', [ApparatusController::
 // Canonical exchange/revalidation use BID_FEDERATION_TOKEN. The legacy password
 // verifier remains separately gated by BID_READER_TOKEN during the transition.
 // =========================================================================
-Route::prefix('v2')->middleware(['throttle:30,1', 'verify.bid.federation'])->group(function () {
+// Numeric Laravel throttles otherwise share one IP/domain counter across
+// routes and applications. Keep exchange and identity budgets independent.
+Route::prefix('v2')->middleware(['throttle:30,1,bid-exchange:', 'verify.bid.federation'])->group(function () {
     Route::post('/bid/auth/exchange', BidAuthorizationCodeExchangeController::class)
         ->name('api.v2.bid.auth.exchange');
+});
+Route::prefix('v2')->middleware(['throttle:30,1,bid-identity:', 'verify.bid.federation'])->group(function () {
     Route::post('/bid/auth/revalidate', BidIdentityRevalidationController::class)
         ->name('api.v2.bid.auth.revalidate');
 });
@@ -237,16 +241,16 @@ Route::prefix('v2')->middleware(['throttle:30,1', 'verify.bid.reader'])->group(f
         ->name('api.v2.bid.verify-credentials');
 });
 
-Route::prefix('v2')->middleware(['throttle:30,1', 'verify.media-control.token'])->group(function () {
+Route::prefix('v2')->middleware(['throttle:30,1,media-exchange:', 'verify.media-control.token'])->group(function () {
     Route::post('/media-control/auth/exchange', MediaControlAuthorizationCodeExchangeController::class)
         ->name('api.v2.media-control.auth.exchange');
 });
 
 // Dedicated authenticated machine polling budget, independent of code exchange.
 Route::post('/v2/media-control/auth/revalidate', \App\Http\Controllers\Api\MediaControl\IdentityRevalidationController::class)
-    ->middleware(['throttle:6000,1', 'verify.media-control.token', \App\Http\Middleware\ThrottleMediaControlIdentity::class])->name('api.v2.media-control.auth.revalidate');
+    ->middleware(['throttle:6000,1,media-identity:', 'verify.media-control.token', \App\Http\Middleware\ThrottleMediaControlIdentity::class])->name('api.v2.media-control.auth.revalidate');
 Route::post('/v2/media-control/auth/cloud-access', \App\Http\Controllers\Api\MediaControl\CloudAccessController::class)
-    ->middleware(['throttle:6000,1', 'verify.media-control.token', \App\Http\Middleware\ThrottleMediaControlIdentity::class])->name('api.v2.media-control.auth.cloud-access');
+    ->middleware(['throttle:6000,1,media-identity:', 'verify.media-control.token', \App\Http\Middleware\ThrottleMediaControlIdentity::class])->name('api.v2.media-control.auth.cloud-access');
 
 Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
     // PIN verification endpoint (public)
