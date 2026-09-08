@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Bid\AuthorizationController as BidAuthorizationCont
 use App\Http\Controllers\Api\MediaControl\AuthorizationController as MediaControlAuthorizationController;
 use App\Http\Controllers\Api\StationInventoryController;
 use App\Http\Controllers\Auth\CanonicalLoginController;
+use App\Http\Controllers\Auth\CityEmailController;
 use App\Http\Controllers\Auth\EmployeePasswordResetController;
 use App\Http\Controllers\Auth\FirstLoginCanonicalizationController;
 use App\Http\Controllers\DepartmentUpdateController;
@@ -102,6 +103,17 @@ Route::middleware('guest:web')->group(function (): void {
 Route::post('/logout', [CanonicalLoginController::class, 'destroy'])
     ->middleware('auth:web')
     ->name('logout');
+
+Route::prefix('account/city-email')->middleware('auth:web')->name('city-email.')->group(function (): void {
+    Route::get('/', [CityEmailController::class, 'show'])->name('show');
+    Route::post('/', [CityEmailController::class, 'store'])->middleware('throttle:6,1')->name('store');
+    Route::post('/resend', [CityEmailController::class, 'resend'])->middleware('throttle:6,1')->name('resend');
+    Route::post('/continue', [CityEmailController::class, 'continueToHub'])->name('continue');
+    Route::get('/verify/{token}', [CityEmailController::class, 'inspect'])->where('token', '[a-f0-9]{64}')
+        ->middleware(PreventPreviousUrlStorage::class)->name('verify');
+    Route::post('/verify/{token}', [CityEmailController::class, 'verify'])->where('token', '[a-f0-9]{64}')
+        ->middleware('throttle:6,1')->name('verify.store');
+});
 
 Route::get('/auth/bid/authorize', BidAuthorizationController::class)
     ->middleware(['auth:web', 'throttle:30,1'])

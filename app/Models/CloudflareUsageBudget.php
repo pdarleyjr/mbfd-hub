@@ -22,6 +22,10 @@ final class CloudflareUsageBudget extends Model
         'worker_cpu_ms_threshold',
         'reconciled_at',
         'provider_daily_reconciled_at',
+        'provider_backoff_until',
+        'provider_account_id',
+        'provider_usage_source',
+        'provider_billing_measured_through',
     ];
 
     protected function casts(): array
@@ -31,6 +35,8 @@ final class CloudflareUsageBudget extends Model
             'cycle_end' => 'immutable_datetime',
             'reconciled_at' => 'immutable_datetime',
             'provider_daily_reconciled_at' => 'immutable_datetime',
+            'provider_backoff_until' => 'immutable_datetime',
+            'provider_billing_measured_through' => 'immutable_datetime',
         ];
     }
 }

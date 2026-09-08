@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Models\CloudflareUsageBudget;
-use App\Models\OutboundEmail;
+use App\Services\Communications\CloudflareCostGuard;
+use Carbon\CarbonImmutable;
 use Filament\Pages\Page;
 
 final class CommunicationsUsage extends Page
@@ -25,14 +26,21 @@ final class CommunicationsUsage extends Page
 
     public function getBudget(): ?CloudflareUsageBudget
     {
-        return CloudflareUsageBudget::query()->latest('cycle_start')->first();
+        $budgets = CloudflareUsageBudget::query()
+            ->where('cycle_start', '<=', now())
+            ->where('cycle_end', '>', now())
+            ->get();
+        $budget = $budgets->count() === 1 ? $budgets->first() : null;
+
+        return $budget?->provider_account_id === config('communications.cloudflare.account_id') ? $budget : null;
     }
 
     public function getReservedUnits(): int
     {
-        return (int) OutboundEmail::query()
-            ->whereNotNull('budget_reserved_at')
-            ->whereNull('budget_released_at')
-            ->sum('chargeable_budget_units');
+        $budget = $this->getBudget();
+
+        return $budget === null ? 0 : app(CloudflareCostGuard::class)->localReservedOrAcceptedUnits(
+            now(), since: CarbonImmutable::parse($budget->cycle_start), carryUnresolved: true,
+        );
     }
 }

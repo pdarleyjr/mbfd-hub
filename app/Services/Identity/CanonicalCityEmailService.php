@@ -14,11 +14,19 @@ final class CanonicalCityEmailService
     public function sync(Employee $employee, User $user, string $cityEmail): void
     {
         $cityEmail = strtolower(trim($cityEmail));
-        if (filter_var($cityEmail, FILTER_VALIDATE_EMAIL) === false) {
+        if (strlen($cityEmail) > 254 || filter_var($cityEmail, FILTER_VALIDATE_EMAIL) === false
+            || ! str_ends_with($cityEmail, '@miamibeachfl.gov')) {
             throw new InvalidArgumentException('The authoritative city email is invalid.');
         }
 
         DB::transaction(function () use ($employee, $user, $cityEmail): void {
+            $user = User::query()->lockForUpdate()->findOrFail($user->getKey());
+            $employee = Employee::query()->lockForUpdate()->findOrFail($employee->getKey());
+            if ($user->employee_profile_id !== $employee->getKey()
+                || $user->employee_id !== $employee->employee_id) {
+                throw new InvalidArgumentException('The canonical User and Employee do not match.');
+            }
+
             $employeeCollision = Employee::query()
                 ->whereRaw('LOWER(city_email) = ?', [$cityEmail])
                 ->whereKeyNot($employee->getKey())

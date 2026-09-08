@@ -6,8 +6,13 @@ return [
     'cloudflare' => [
         'account_id' => env('CLOUDFLARE_EMAIL_ACCOUNT_ID'),
         'api_token' => env('CLOUDFLARE_EMAIL_API_TOKEN'),
+        // Enable only after the account owner confirms all Email Sending uses
+        // this Hub ledger. Never infer absent billing rows mean zero usage.
+        'sole_sender' => (bool) env('CLOUDFLARE_EMAIL_HUB_SOLE_SENDER', false),
         'from_address' => env('CLOUDFLARE_EMAIL_FROM', 'info@mbfdhub.com'),
         'safe_email_ceiling' => (int) env('CLOUDFLARE_EMAIL_SAFE_CEILING', 2850),
+        // Internal anti-burst limit, independent of Cloudflare's daily quota.
+        'max_recipient_units_per_minute' => (int) env('CLOUDFLARE_EMAIL_MAX_RECIPIENT_UNITS_PER_MINUTE', 5),
         'max_recipients_per_message' => (int) env('CLOUDFLARE_EMAIL_MAX_RECIPIENTS', 10),
         'max_message_bytes' => (int) env('CLOUDFLARE_EMAIL_MAX_BYTES', 4500000),
         'max_attachment_bytes' => (int) env('CLOUDFLARE_EMAIL_MAX_ATTACHMENT_BYTES', 3500000),

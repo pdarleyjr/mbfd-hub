@@ -157,3 +157,8 @@ Schedule::command('video-conferencing:expire-lineup')
     ->everyMinute()
     ->withoutOverlapping()
     ->onOneServer();
+
+Schedule::command('mbfd:cloudflare-usage-refresh')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(2)
+    ->onOneServer();

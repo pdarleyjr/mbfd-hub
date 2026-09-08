@@ -127,6 +127,11 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-cog-6-tooth'),
             ])
             ->userMenuItems([
+                \Filament\Navigation\MenuItem::make()
+                    ->label('City email & verification')
+                    ->url(fn (): string => route('city-email.show'))
+                    ->icon('heroicon-o-envelope')
+                    ->visible(fn (): bool => auth()->user()?->employee_profile_id !== null),
                 MenuItem::make()
                     ->label('Settings')
                     ->url(fn (): string => Settings::getUrl())
@@ -187,11 +192,13 @@ class AdminPanelProvider extends PanelProvider
                 AuthenticateCanonicalPanelUser::class,
                 RedirectTrainingUsers::class,
                 ForceFilamentPasswordChange::class,
+                \App\Http\Middleware\EnsureCityEmailReview::class,
             ])
             ->persistentMiddleware([
                 EnsureCanonicalSessionIsCurrent::class,
                 RedirectTrainingUsers::class,
                 ForceFilamentPasswordChange::class,
+                \App\Http\Middleware\EnsureCityEmailReview::class,
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')

@@ -44,8 +44,11 @@ class UserResource extends Resource
                             ->required()
                             ->maxLength(255),
                         Forms\Components\TextInput::make('email')
-                            ->label('Login email')
+                            ->label('Account email')
                             ->email()
+                            ->disabled(fn (?User $record): bool => $record?->employee_profile_id !== null)
+                            ->dehydrated(fn (?User $record): bool => $record?->employee_profile_id === null)
+                            ->helperText('Linked accounts use Employee ID to sign in. Their city email is managed below; mailbox verification is completed by the member.')
                             ->required()
                             ->unique(ignoreRecord: true)
                             ->maxLength(255),
@@ -59,10 +62,46 @@ class UserResource extends Resource
                             ->required()
                             ->maxLength(20),
                         Forms\Components\TextInput::make('city_email')
-                            ->label('Authoritative city email')
+                            ->label('City email on record')
                             ->email()
+                            ->rules(['regex:/@miamibeachfl\.gov$/i'])
+                            ->helperText('Administrative entry does not verify mailbox ownership. Changing this address clears previous verification; the member must verify the new mailbox.')
                             ->maxLength(255),
+                        Forms\Components\Placeholder::make('city_email_verification_status')
+                            ->label('Mailbox ownership')
+                            ->visible(fn (?User $record): bool => $record?->employee_profile_id !== null)
+                            ->content(function (?User $record): string {
+                                $verification = $record === null ? null : app(\App\Services\Identity\CityEmailVerificationService::class)->status($record);
+
+                                return $verification?->verified_at !== null
+                                    ? 'Verified by the member on '.$verification->verified_at->format('M j, Y g:i A')
+                                    : 'Mailbox ownership has not been verified through city email confirmation.';
+                            }),
+                        Forms\Components\Placeholder::make('city_email_pending_status')
+                            ->label('Member confirmation')
+                            ->visible(fn (?User $record): bool => $record?->employee_profile_id !== null)
+                            ->content(function (?User $record): string {
+                                $pending = $record === null ? null : app(\App\Services\Identity\CityEmailVerificationService::class)->status($record);
+
+                                if ($pending === null) {
+                                    $connected = $record === null ? null : app(\App\Services\Identity\CityEmailVerificationService::class)->connectedEmail($record);
+
+                                    return $connected !== null
+                                        ? 'Email already connected: '.$connected.'. No sign-in confirmation is required.'
+                                        : 'The member will be asked to review their city email when signing in.';
+                                }
+
+                                return $pending->email.' — '.match ($pending->delivery_status) {
+                                    'verified' => 'Mailbox verified',
+                                    'failed' => 'Member confirmed the address; message delivery failed. Not verified.',
+                                    'queued' => 'Verification message submitted; awaiting mailbox verification.',
+                                    default => 'Member confirmed the address; awaiting mailbox verification.',
+                                };
+                            }),
                         Forms\Components\Select::make('account_status')
+                            ->disabledOn('edit')
+                            ->dehydrated(fn (string $operation): bool => $operation === 'create')
+                            ->helperText('Use the protected Enable or Disable account actions to change an existing account status.')
                             ->options([
                                 AccountStatus::PendingActivation->value => 'Pending activation',
                                 AccountStatus::Active->value => 'Active',
@@ -117,22 +156,35 @@ class UserResource extends Resource
                             ->preload(),
                     ]),
 
-                Forms\Components\Section::make('Direct permissions and app entitlements')
-                    ->description('App access is explicit and independent from Admin access.')
+                Forms\Components\Section::make('Application access')
+                    ->description('Use Manage application access to grant or revoke supported access with an audited reason. Profile Save does not change grants.')
+                    ->schema(array_map(
+                        fn (array $application, string $key) => Forms\Components\Placeholder::make('application_access_'.$key)
+                            ->label($application['label'])
+                            ->helperText($application['description'])
+                            ->content(fn (?User $record): string => $record === null ? 'Create the member before managing access.' : app(\App\Support\ApplicationAccessRegistry::class)->states($record)[$key]['status']),
+                        app(\App\Support\ApplicationAccessRegistry::class)->applications(),
+                        array_keys(app(\App\Support\ApplicationAccessRegistry::class)->applications()),
+                    ))
+                    ->columns(2),
+
+                Forms\Components\Section::make('Administration capabilities')
+                    ->description('Capabilities are independent of application access. Use Manage administration capabilities to change direct grants; inherited roles are preserved.')
                     ->schema([
-                        Forms\Components\CheckboxList::make('permissions')
-                            ->relationship('permissions', 'name')
-                            ->options(fn (): array => \Spatie\Permission\Models\Permission::query()
-                                ->where('guard_name', 'web')
-                                ->where(fn ($query) => $query
-                                    ->where('name', 'like', 'admin.%')
-                                    ->orWhere('name', 'like', 'app.%'))
-                                ->orderBy('name')
-                                ->pluck('name', 'id')
-                                ->all())
-                            ->columns(2)
-                            ->bulkToggleable()
-                            ->disabled(fn (): bool => ! static::canManageRoles()),
+                        Forms\Components\Placeholder::make('administration_capabilities')
+                            ->label('Current direct capabilities')
+                            ->content(function (?User $record): string {
+                                if ($record === null) {
+                                    return 'Create the member before managing capabilities.';
+                                }
+                                if ($record->hasRole('super_admin')) {
+                                    return 'All capabilities inherited from Super Administrator.';
+                                }
+                                $labels = app(\App\Support\ApplicationAccessRegistry::class)->capabilityOptions();
+
+                                return $record->permissions()->where('guard_name', 'web')->whereIn('name', array_keys($labels))->pluck('name')
+                                    ->map(fn (string $name): string => $labels[$name])->implode('; ') ?: 'No direct administration capabilities.';
+                            }),
                     ]),
 
                 Forms\Components\Section::make('Notification subscriptions')
@@ -171,6 +223,7 @@ class UserResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('employee_id')
                     ->label('Employee ID')
+                    ->url(fn (User $record): ?string => static::canEdit($record) ? static::getUrl('edit', ['record' => $record]) : null)
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('employeeProfile.city_email')

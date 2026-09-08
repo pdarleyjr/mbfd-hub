@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Services\Identity\AccountSecurityService;
+use App\Services\Identity\CanonicalLoginDestination;
 use App\Services\Identity\CanonicalSessionPolicy;
 use App\Services\Identity\SessionRegistry;
 use Carbon\CarbonImmutable;
@@ -46,19 +47,23 @@ class SetPasswordPage extends Page
                     ->schema([
                         Forms\Components\TextInput::make('current_password')
                             ->label('Current Password')
+                            ->autocomplete('current-password')
                             ->password()
                             ->required()
                             ->currentPassword()
                             ->revealable(),
                         Forms\Components\TextInput::make('password')
                             ->label('New Password')
+                            ->autocomplete('new-password')
                             ->password()
                             ->required()
                             ->confirmed()
+                            ->different('current_password')
                             ->rule(Password::default())
                             ->revealable(),
                         Forms\Components\TextInput::make('password_confirmation')
                             ->label('Confirm New Password')
+                            ->autocomplete('new-password')
                             ->password()
                             ->required()
                             ->revealable(),
@@ -121,6 +126,9 @@ class SetPasswordPage extends Page
             ->title('Password changed successfully')
             ->send();
 
-        $this->redirect(Filament::getCurrentPanel()->getUrl() ?? url(Filament::getCurrentPanel()->getPath()));
+        $handoff = app(CanonicalLoginDestination::class)->federation(
+            $request->session()->pull(CanonicalLoginDestination::PASSWORD_RETURN_KEY),
+        );
+        $this->redirect($handoff ?? (Filament::getCurrentPanel()->getUrl() ?? url(Filament::getCurrentPanel()->getPath())));
     }
 }

@@ -8,9 +8,11 @@ use App\Enums\AccountStatus;
 use App\Models\AuthenticationSession;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\Identity\CityEmailVerificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -114,6 +116,20 @@ final class CanonicalAuthorizationTest extends TestCase
             (string) config('session.cookie'),
             $this->app['session.store']->getId(),
         )->withCredentials();
+
+        // A newly activated member reviews their address before returning to
+        // the exact Bid authorization request. Delivery does not gate app access.
+        Http::fake();
+        config()->set('communications.cloudflare.api_token', '');
+        $this->get($authorizeUrl)->assertRedirect('/account/city-email');
+        $this->post('/account/city-email', [
+            'email' => 'firstloginbidmember@miamibeachfl.gov',
+            'current_password' => 'employee-legacy-password',
+            'ownership_confirmed' => '1',
+        ])->assertRedirect('/account/city-email')->assertSessionHasNoErrors();
+        $this->post('/account/city-email/continue')->assertRedirect($authorizeUrl);
+        self::assertNull($user->fresh()->employeeProfile->city_email);
+        Http::assertNothingSent();
 
         $location = $this->handoffDestination($authorizeUrl);
         self::assertIsString($location);
@@ -363,6 +379,12 @@ final class CanonicalAuthorizationTest extends TestCase
             'security_version' => 1,
         ])->load('employeeProfile');
         $user->givePermissionTo(Permission::findOrCreate('app.bid.access', 'web'));
+        // These federation cases use an existing member who already reviewed
+        // their address. First-time review is exercised through HTTP above.
+        app(CityEmailVerificationService::class)->acknowledge(
+            $user,
+            strtolower($employeeId).'@miamibeachfl.gov',
+        );
 
         return $user;
     }

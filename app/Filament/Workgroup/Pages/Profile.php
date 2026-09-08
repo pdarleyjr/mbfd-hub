@@ -38,6 +38,11 @@ class Profile extends Page
                 ->label('Edit Profile')
                 ->icon('heroicon-o-pencil')
                 ->color('primary')
+                ->fillForm(function (): array {
+                    $user = Auth::user();
+
+                    return $user instanceof User ? ['name' => $user->name, 'email' => $user->email] : [];
+                })
                 ->form([
                     \Filament\Forms\Components\TextInput::make('name')
                         ->label('Name')
@@ -46,6 +51,9 @@ class Profile extends Page
                     \Filament\Forms\Components\TextInput::make('email')
                         ->label('Email')
                         ->email()
+                        ->disabled(fn (): bool => Auth::user()?->employee_profile_id !== null)
+                        ->dehydrated(fn (): bool => Auth::user()?->employee_profile_id === null)
+                        ->helperText('Linked members manage their city email through City email & verification.')
                         ->required()
                         ->maxLength(255),
                 ])
@@ -53,6 +61,11 @@ class Profile extends Page
                     $this->updateProfile($data);
                 })
                 ->modalSubmitActionLabel('Save'),
+            Action::make('cityEmail')
+                ->label('City email & verification')
+                ->icon('heroicon-o-envelope')
+                ->url(fn (): string => route('city-email.show'))
+                ->visible(fn (): bool => Auth::user()?->employee_profile_id !== null),
         ];
     }
 
@@ -75,10 +88,12 @@ class Profile extends Page
             return;
         }
 
-        $user->update([
-            'name' => $data['name'],
-            'email' => $data['email'],
-        ]);
+        $changes = ['name' => $data['name']];
+        if ($user->employee_profile_id === null) {
+            $changes['email'] = $data['email'];
+        }
+
+        $user->update($changes);
     }
 
     public static function canAccess(): bool

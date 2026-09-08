@@ -79,6 +79,11 @@ class EmployeePanelProvider extends PanelProvider
             ->widgets([])
             ->userMenuItems([
                 MenuItem::make()
+                    ->label('City email & verification')
+                    ->url(fn (): string => route('city-email.show'))
+                    ->icon('heroicon-o-envelope')
+                    ->visible(fn (): bool => auth()->user()?->employee_profile_id !== null),
+                MenuItem::make()
                     ->label('My Equipment')
                     ->url(fn (): string => MyEquipmentPage::getUrl(panel: 'employee'))
                     ->icon('heroicon-o-shield-check'),
@@ -118,11 +123,13 @@ class EmployeePanelProvider extends PanelProvider
                 AuthenticateCanonicalPanelUser::class,
                 EnsureCanonicalEmployeeContext::class,
                 ForceFilamentPasswordChange::class,
+                \App\Http\Middleware\EnsureCityEmailReview::class,
             ])
             ->persistentMiddleware([
                 EnsureCanonicalSessionIsCurrent::class,
                 EnsureCanonicalEmployeeContext::class,
                 ForceFilamentPasswordChange::class,
+                \App\Http\Middleware\EnsureCityEmailReview::class,
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('60s')

@@ -169,7 +169,7 @@ final class UnifiedControlPlaneTest extends TestCase
             'name' => 'City Member',
             'password' => 'employee-password',
         ]);
-        $user = User::factory()->create(['employee_profile_id' => $employee->id]);
+        $user = User::factory()->create(['employee_profile_id' => $employee->id, 'employee_id' => $employee->employee_id]);
 
         app(CanonicalCityEmailService::class)->sync($employee, $user, ' City.Member@MiamiBeachFL.gov ');
 

@@ -8,6 +8,7 @@ use App\Enums\AccountStatus;
 use App\Models\AuthenticationSession;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\Identity\CityEmailVerificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -228,13 +229,22 @@ final class CanonicalAuthorizationTest extends TestCase
             'must_change_password' => false,
         ]);
 
-        return User::factory()->create([
+        $user = User::factory()->create([
             'employee_id' => $employeeId,
             'employee_profile_id' => $employee->id,
             'account_status' => AccountStatus::Active,
             'password' => Hash::make('canonical-user-password'),
             'security_version' => 1,
         ])->load('employeeProfile');
+
+        // Federation cases represent members who already reviewed their email.
+        // This acknowledgment does not verify or publish the proposed address.
+        app(CityEmailVerificationService::class)->acknowledge(
+            $user,
+            strtolower($employeeId).'@miamibeachfl.gov',
+        );
+
+        return $user;
     }
 
     private function canonicalLogin(User $user): void

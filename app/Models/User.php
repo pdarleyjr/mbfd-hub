@@ -17,6 +17,7 @@ use Laravel\Sanctum\HasApiTokens;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 use Spatie\Permission\Traits\HasRoles;
 
+/** @property \Carbon\Carbon|null $email_verified_at */
 class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
@@ -126,6 +127,15 @@ class User extends Authenticatable implements FilamentUser
             'notification_preferences' => 'array',
             'last_login_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $user): void {
+            if ($user->isDirty(['email', 'employee_profile_id'])) {
+                $user->email_verified_at = null;
+            }
+        });
     }
 
     public function isAuthenticationAllowed(): bool
