@@ -195,7 +195,7 @@ final class CanonicalEmailEditingTest extends TestCase
 
     private function admin(): void
     {
-        $admin = User::factory()->create();
+        $admin = User::factory()->create(['account_status' => \App\Enums\AccountStatus::Active]);
         $admin->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actingAs($admin);
         $this->withoutVite();
