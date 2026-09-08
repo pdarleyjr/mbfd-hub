@@ -50,6 +50,20 @@ $app = Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        // A rejected HTML form must never be replayed or preserve submitted
+        // secrets. JSON and Livewire retain their existing expiry contracts.
+        $exceptions->respond(function (\Symfony\Component\HttpFoundation\Response $response, \Throwable $exception, \Illuminate\Http\Request $request) {
+            if ($response->getStatusCode() !== 419 || $request->expectsJson() || $request->headers->has('X-Livewire')) {
+                return $response;
+            }
+
+            return new \Symfony\Component\HttpFoundation\RedirectResponse(
+                '/login?session_expired=1',
+                303,
+                ['Cache-Control' => 'no-store, private'],
+            );
+        });
+
         // Missing/expired Laravel sessions can fail panel authentication before
         // the canonical registry middleware. Keep the same Livewire contract.
         $exceptions->render(function (\Illuminate\Auth\AuthenticationException $exception, \Illuminate\Http\Request $request) {
