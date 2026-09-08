@@ -79,6 +79,17 @@ final class ApplicationAccessService
                 $currentTarget->permissions()->detach($known->only($remove)->values()->all());
                 $currentTarget->permissions()->syncWithoutDetaching($known->only($add)->values()->all());
                 $this->permissions->forgetCachedPermissions();
+                if (in_array('app.media_control.access', $remove, true)) {
+                    $currentTarget->increment('media_control_security_version');
+                }
+                foreach (['cmd', 'cloud'] as $application) {
+                    if (in_array('app.'.$application.'.access', $remove, true)) {
+                        app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($currentTarget, $application);
+                    }
+                }
+                if (in_array('app.cloud.access', [...$add, ...$remove], true)) {
+                    app(\App\Services\Cloud\NextcloudAccountSynchronizer::class)->request($currentTarget);
+                }
                 $this->audit->record($currentActor, $currentTarget, $action, 'allowed', trim($reason), [
                     'before' => $before, 'after' => $proposed, 'granted' => $add, 'revoked' => $remove,
                 ]);

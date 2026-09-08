@@ -13,6 +13,7 @@ use App\Support\ApplicationAccessRegistry;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -37,7 +38,10 @@ final class ApplicationAccessAdministrationTest extends TestCase
         self::assertFalse($target->fresh()->hasCurrentMediaControlEntitlement());
         self::assertTrue($target->fresh()->hasDirectWebPermission('training.access'));
         self::assertSame(['training_viewer'], $target->fresh()->getRoleNames()->all());
-        self::assertSame($identity, $target->fresh()->getAttributes());
+        $after = $target->fresh()->getAttributes();
+        self::assertSame(1, $after['media_control_security_version']);
+        unset($identity['media_control_security_version'], $identity['updated_at'], $after['media_control_security_version'], $after['updated_at']);
+        self::assertSame($identity, $after);
         $this->assertDatabaseHas('security_action_events', ['actor_user_id' => $actor->id, 'target_user_id' => $target->id, 'action' => 'change_application_access', 'result' => 'allowed', 'reason' => 'Duties changed']);
     }
 
@@ -55,7 +59,7 @@ final class ApplicationAccessAdministrationTest extends TestCase
     {
         [$actor, $target] = $this->members();
         $this->expectException(AuthorizationException::class);
-        app(ApplicationAccessService::class)->syncApplications($actor, $target, ['cmd'], 'Access-test-password!', 'Forged unsupported request');
+        app(ApplicationAccessService::class)->syncApplications($actor, $target, ['unknown-application'], 'Access-test-password!', 'Forged unsupported request');
     }
 
     public function test_general_member_manager_cannot_delegate_apps_even_with_correct_password(): void
@@ -115,6 +119,30 @@ final class ApplicationAccessAdministrationTest extends TestCase
         self::assertFalse($registry->states($target)['cloud']['operational']);
     }
 
+    public function test_cloud_enforcement_status_distinguishes_disabled_unlinked_pending_verified_and_mapping_conflict(): void
+    {
+        [, $target] = $this->members();
+        $registry = app(ApplicationAccessRegistry::class);
+        config(['nextcloud_identity.enabled' => false]);
+        self::assertStringContainsString('not activated', $registry->cloudEnforcementStatus($target));
+        config(['nextcloud_identity.enabled' => true]);
+        self::assertStringContainsString('No approved Cloud account link', $registry->cloudEnforcementStatus($target));
+        $employee = \App\Models\Employee::query()->create(['name' => 'Cloud status test', 'employee_id' => 'CLOUD-STATUS-1', 'password' => Hash::make('Cloud-status-test!')]);
+        $target->forceFill(['employee_profile_id' => $employee->id, 'employee_id' => $employee->employee_id])->save();
+        $target->givePermissionTo(Permission::findOrCreate('app.cloud.access', 'web'));
+        $link = \App\Models\OidcAccountLink::query()->create(['application' => 'cloud', 'user_id' => $target->id,
+            'employee_profile_id' => $employee->id, 'external_uid' => 'cloud-status-test']);
+        self::assertStringContainsString('Pending', $registry->cloudEnforcementStatus($target));
+        app(\App\Services\Cloud\NextcloudAccountSynchronizer::class)->request($target);
+        $row = \App\Models\NextcloudAccessSync::query()->where('user_id', $target->id)->firstOrFail();
+        $row->forceFill(['applied_revision' => $row->requested_revision, 'verified_at' => now()])->save();
+        self::assertStringContainsString('Last remote verification: enabled', $registry->cloudEnforcementStatus($target));
+        $row->forceFill(['last_error' => 'bridge_unavailable'])->save();
+        self::assertStringContainsString('last attempt failed', $registry->cloudEnforcementStatus($target));
+        $link->forceFill(['external_uid' => 'changed-uid'])->save();
+        self::assertStringContainsString('Mapping conflict', $registry->cloudEnforcementStatus($target));
+    }
+
     public function test_profile_save_cannot_forge_status_or_raw_permissions_and_shows_friendly_access_actions(): void
     {
         [$actor, $target] = $this->members();
@@ -142,6 +170,10 @@ final class ApplicationAccessAdministrationTest extends TestCase
         $this->withoutVite();
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
+            ->mountAction('manageApplicationAccess')
+            ->assertSee('Cloud enforcement status')
+            ->assertSee('Cloud enforcement is not activated')
+            ->unmountAction()
             ->callAction('manageApplicationAccess', ['applications' => ['bid'], 'current_password' => 'Access-test-password!', 'reason' => 'Approved Bid access'])
             ->assertHasNoActionErrors();
         self::assertTrue($target->fresh()->hasCurrentBidEntitlement());

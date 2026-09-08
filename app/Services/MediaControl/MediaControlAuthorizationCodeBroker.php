@@ -24,7 +24,9 @@ final class MediaControlAuthorizationCodeBroker
             'audience' => $clientId,
             'redirect_uri' => $redirectUri,
             'user_id' => (int) $user->getKey(),
+            'employee_profile_id' => $user->employee_profile_id === null ? null : (int) $user->employee_profile_id,
             'security_version' => (int) $user->security_version,
+            'media_control_security_version' => (int) $user->media_control_security_version,
             'issued_at' => $now,
             'expires_at' => $now + $ttl,
         ], $ttl);
@@ -42,7 +44,9 @@ final class MediaControlAuthorizationCodeBroker
      *     audience: string,
      *     redirect_uri: string,
      *     user_id: int,
+     *     employee_profile_id: int|null,
      *     security_version: int,
+     *     media_control_security_version: int,
      *     issued_at: int,
      *     expires_at: int
      * }|null
@@ -83,7 +87,11 @@ final class MediaControlAuthorizationCodeBroker
             && ($record['audience'] ?? null) === $clientId
             && ($record['redirect_uri'] ?? null) === $redirectUri
             && is_int($record['user_id'] ?? null)
+            && array_key_exists('employee_profile_id', $record)
+            && ($record['employee_profile_id'] === null || is_int($record['employee_profile_id']))
             && is_int($record['security_version'] ?? null)
+            && is_int($record['media_control_security_version'] ?? null)
+            && $record['media_control_security_version'] >= 0
             && is_int($record['issued_at'] ?? null)
             && is_int($record['expires_at'] ?? null)
             && $record['expires_at'] >= now()->getTimestamp();

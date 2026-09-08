@@ -242,6 +242,12 @@ Route::prefix('v2')->middleware(['throttle:30,1', 'verify.media-control.token'])
         ->name('api.v2.media-control.auth.exchange');
 });
 
+// Dedicated authenticated machine polling budget, independent of code exchange.
+Route::post('/v2/media-control/auth/revalidate', \App\Http\Controllers\Api\MediaControl\IdentityRevalidationController::class)
+    ->middleware(['throttle:6000,1', 'verify.media-control.token', \App\Http\Middleware\ThrottleMediaControlIdentity::class])->name('api.v2.media-control.auth.revalidate');
+Route::post('/v2/media-control/auth/cloud-access', \App\Http\Controllers\Api\MediaControl\CloudAccessController::class)
+    ->middleware(['throttle:6000,1', 'verify.media-control.token', \App\Http\Middleware\ThrottleMediaControlIdentity::class])->name('api.v2.media-control.auth.cloud-access');
+
 Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
     // PIN verification endpoint (public)
     Route::post('/station-inventory/verify-pin', [StationInventoryV2Controller::class, 'verifyPin'])->middleware('auth:sanctum');

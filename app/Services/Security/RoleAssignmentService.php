@@ -30,12 +30,24 @@ final class RoleAssignmentService
         try {
             DB::transaction(function () use ($actor, $target, $proposedRoleNames): void {
                 $this->lastCriticalAdministratorGuard->lockActiveCriticalAdministrators();
-                $lockedTarget = User::query()->lockForUpdate()->findOrFail($target->getKey());
-                $this->authorize($actor, $lockedTarget, $proposedRoleNames);
+                $lockedUsers = User::query()->whereKey([$actor->getKey(), $target->getKey()])
+                    ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+                $lockedActor = $lockedUsers->get($actor->getKey());
+                $lockedTarget = $lockedUsers->get($target->getKey());
+                if (! $lockedActor instanceof User || ! $lockedTarget instanceof User || ! $lockedActor->isAuthenticationAllowed()) {
+                    throw new AuthorizationException('An active, currently authorized actor is required for role assignment.');
+                }
+                $this->authorize($lockedActor, $lockedTarget, $proposedRoleNames);
 
+                $wasSuperAdministrator = $lockedTarget->hasRole('super_admin');
                 $lockedTarget->syncRoles($proposedRoleNames);
                 $this->permissionRegistrar->forgetCachedPermissions();
-                $this->auditRecorder->record($actor, $lockedTarget, 'change_role', 'allowed', null, [
+                if ($wasSuperAdministrator && ! in_array('super_admin', $proposedRoleNames, true)) {
+                    $lockedTarget->increment('media_control_security_version');
+                    app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($lockedTarget);
+                    app(\App\Services\Cloud\NextcloudAccountSynchronizer::class)->request($lockedTarget);
+                }
+                $this->auditRecorder->record($lockedActor, $lockedTarget, 'change_role', 'allowed', null, [
                     'roles' => $proposedRoleNames,
                 ]);
             });

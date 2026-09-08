@@ -220,6 +220,8 @@ jobs:
         run: npm run build
       - name: Run PHPUnit suite
         run: php artisan test --exclude-group=postgres
+      - name: Test restricted Cloud identity bridge
+        run: python3 -m unittest discover -s tests/Python -p test_nextcloud_identity_bridge.py
       - name: Run PostgreSQL concurrency and integrity tests
         env:
           MBFD_ALLOW_DISPOSABLE_POSTGRES: "1"

@@ -123,6 +123,7 @@ class User extends Authenticatable implements FilamentUser
             'password' => 'hashed',
             'password_changed_at' => 'datetime',
             'security_version' => 'integer',
+            'media_control_security_version' => 'integer',
             'must_change_password' => 'boolean',
             'notification_preferences' => 'array',
             'last_login_at' => 'datetime',

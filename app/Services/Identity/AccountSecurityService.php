@@ -188,6 +188,8 @@ final class AccountSecurityService
             throw new \LogicException('The configured password broker does not support token persistence.');
         }
         $broker->deleteToken($user);
+        app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($user);
+        app(\App\Services\Cloud\NextcloudAccountSynchronizer::class)->request($user);
 
         AuthenticationSession::query()
             ->where('user_id', $user->id)

@@ -210,6 +210,91 @@ final class CanonicalAuthorizationTest extends TestCase
         $this->exchange($roleCode)->assertForbidden();
     }
 
+    public function test_revalidation_binds_current_identity_and_direct_access_without_relying_on_old_roles(): void
+    {
+        $user = $this->authorizedUser();
+        $this->canonicalLogin($user);
+        $this->exchange($this->issuedCode())->assertOk()->assertJsonPath('security_version', (int) $user->security_version)
+            ->assertJsonPath('member_id', $user->employee_profile_id);
+        $data = ['hub_user_id' => $user->id, 'security_version' => (int) $user->security_version,
+            'member_id' => $user->employee_profile_id, 'client_id' => 'media-control', 'media_control_security_version' => 0];
+        $url = '/api/v2/media-control/auth/revalidate';
+        $this->withToken(self::SERVICE_TOKEN)->postJson($url, $data)->assertOk()
+            ->assertJsonPath('subject', 'hub-user:'.$user->id)->assertJsonPath('role', 'platform_admin');
+        $this->withToken(self::SERVICE_TOKEN)->postJson($url, [...$data, 'member_id' => null])->assertUnauthorized();
+        $user->revokePermissionTo('app.media_control.access');
+        $this->withToken(self::SERVICE_TOKEN)->postJson($url, $data)->assertUnauthorized();
+    }
+
+    public function test_revalidation_preserves_unlinked_admin_but_rejects_password_setup_and_stale_version(): void
+    {
+        $user = $this->authorizedUser();
+        $user->forceFill(['employee_profile_id' => null])->save();
+        $data = ['hub_user_id' => $user->id, 'security_version' => (int) $user->security_version, 'member_id' => null, 'client_id' => 'media-control', 'media_control_security_version' => 0];
+        $url = '/api/v2/media-control/auth/revalidate';
+        $this->withToken(self::SERVICE_TOKEN)->postJson($url, $data)->assertOk()->assertJsonPath('member_id', null);
+        $user->forceFill(['must_change_password' => true])->save();
+        $this->withToken(self::SERVICE_TOKEN)->postJson($url, $data)->assertUnauthorized();
+        $user->forceFill(['must_change_password' => false, 'security_version' => $user->security_version + 1])->save();
+        $this->withToken(self::SERVICE_TOKEN)->postJson($url, $data)->assertUnauthorized();
+        $this->withToken('incorrect')->postJson($url, $data)->assertUnauthorized();
+    }
+
+    public function test_cloud_gate_requires_its_own_grant_and_approved_mapping_not_media_admin(): void
+    {
+        $user = $this->authorizedUser();
+        $url = '/api/v2/media-control/auth/cloud-access';
+        $data = ['hub_user_id' => $user->id, 'client_id' => 'media-control'];
+        $this->withToken(self::SERVICE_TOKEN)->postJson($url, $data)->assertOk()->assertJsonPath('has_cloud_access', false)->assertJsonPath('nextcloud_uid', null);
+        $user->givePermissionTo(Permission::findOrCreate('app.cloud.access', 'web'));
+        $this->postJson($url, $data)->assertOk()->assertJsonPath('has_cloud_access', false);
+        \App\Models\OidcAccountLink::query()->create(['application' => 'cloud', 'user_id' => $user->id,
+            'employee_profile_id' => $user->employee_profile_id, 'external_uid' => 'existing-local-uid']);
+        $this->postJson($url, $data)->assertOk()->assertJsonPath('has_cloud_access', true)->assertJsonPath('nextcloud_uid', 'existing-local-uid');
+        $user->revokePermissionTo('app.media_control.access');
+        $this->postJson($url, $data)->assertOk()->assertJsonPath('has_cloud_access', true);
+        $user->revokePermissionTo('app.cloud.access');
+        $this->postJson($url, $data)->assertOk()->assertJsonPath('has_cloud_access', false)->assertJsonPath('nextcloud_uid', null);
+    }
+
+    public function test_machine_identity_checks_share_authenticated_client_budget_without_counting_bad_credentials(): void
+    {
+        $user = $this->authorizedUser();
+        $data = ['hub_user_id' => $user->id, 'client_id' => 'media-control'];
+        $key = 'federation-identity-client:media-control';
+        $this->withToken('incorrect')->postJson('/api/v2/media-control/auth/cloud-access', $data)->assertUnauthorized();
+        self::assertSame(0, \Illuminate\Support\Facades\RateLimiter::attempts($key));
+        for ($attempt = 0; $attempt < 6000; $attempt++) {
+            \Illuminate\Support\Facades\RateLimiter::hit($key, 60);
+        }
+        $this->withToken(self::SERVICE_TOKEN)->postJson('/api/v2/media-control/auth/cloud-access', $data)->assertStatus(429)->assertHeader('Retry-After');
+        $this->postJson('/api/v2/media-control/auth/revalidate', [...$data, 'member_id' => $user->employee_profile_id,
+            'security_version' => (int) $user->security_version])->assertStatus(429);
+        \Illuminate\Support\Facades\RateLimiter::clear($key);
+        $this->postJson('/api/v2/media-control/auth/cloud-access', $data)->assertOk();
+    }
+
+    public function test_media_revoke_and_regrant_cannot_resurrect_old_code_or_session(): void
+    {
+        $user = $this->authorizedUser();
+        $actor = User::factory()->create(['account_status' => 'active', 'password' => Hash::make('Media-admin-test!')]);
+        $actor->assignRole(Role::findOrCreate('super_admin', 'web'));
+        $broker = app(\App\Services\MediaControl\MediaControlAuthorizationCodeBroker::class);
+        $oldCode = $broker->issue($user, 'media-control', self::CALLBACK);
+        $service = app(\App\Services\Security\ApplicationAccessService::class);
+        $service->syncApplications($actor, $user, [], 'Media-admin-test!', 'Revoke Media access');
+        $service->syncApplications($actor, $user, ['media_control'], 'Media-admin-test!', 'Restore Media access');
+        self::assertSame(1, $user->fresh()->media_control_security_version);
+        self::assertSame((int) $user->security_version, (int) $user->fresh()->security_version);
+        $this->exchange($oldCode)->assertUnauthorized();
+        $data = ['hub_user_id' => $user->id, 'security_version' => (int) $user->security_version,
+            'member_id' => $user->employee_profile_id, 'client_id' => 'media-control', 'media_control_security_version' => 0];
+        $this->withToken(self::SERVICE_TOKEN)->postJson('/api/v2/media-control/auth/revalidate', $data)->assertUnauthorized();
+        $this->postJson('/api/v2/media-control/auth/revalidate', [...$data, 'media_control_security_version' => 1])->assertOk();
+        $this->exchange($broker->issue($user->fresh(), 'media-control', self::CALLBACK))->assertOk()
+            ->assertJsonPath('media_control_security_version', 1);
+    }
+
     private function authorizedUser(string $employeeId = 'MEDIA-1001'): User
     {
         $user = $this->linkedUser($employeeId);

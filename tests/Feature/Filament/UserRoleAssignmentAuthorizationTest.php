@@ -44,7 +44,7 @@ class UserRoleAssignmentAuthorizationTest extends TestCase
         $adminRole->givePermissionTo($updateUser);
         $roles['super_admin']->givePermissionTo($updateUser);
 
-        $actor = User::factory()->create();
+        $actor = User::factory()->create(['account_status' => \App\Enums\AccountStatus::Active]);
         $actor->assignRole($roles['super_admin']);
         $target = User::factory()->create(['employee_id' => 'ROLE-TARGET-200']);
 

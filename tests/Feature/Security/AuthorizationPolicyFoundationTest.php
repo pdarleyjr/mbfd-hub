@@ -61,6 +61,41 @@ final class AuthorizationPolicyFoundationTest extends TestCase
         ]);
     }
 
+    public function test_role_sync_rejects_an_actor_disabled_after_their_model_was_loaded(): void
+    {
+        $actor = $this->userWithRole('super_admin')->load('roles');
+        $target = $this->userWithRole('workgroup_member');
+        Role::findOrCreate('training_viewer', 'web');
+        User::query()->whereKey($actor->id)->update(['account_status' => 'disabled']);
+
+        try {
+            app(RoleAssignmentService::class)->sync($actor, $target, ['training_viewer']);
+            self::fail('A disabled actor must not delegate through a stale model.');
+        } catch (AuthorizationException) {
+            self::assertSame(['workgroup_member'], $target->fresh()->getRoleNames()->all());
+            $this->assertDatabaseHas('security_action_events', ['actor_user_id' => $actor->id,
+                'target_user_id' => $target->id, 'action' => 'change_role', 'result' => 'denied']);
+        }
+    }
+
+    public function test_role_sync_rejects_an_actor_whose_cached_delegator_role_was_revoked(): void
+    {
+        $actor = $this->userWithRole('super_admin')->load('roles');
+        $target = $this->userWithRole('workgroup_member');
+        Role::findOrCreate('training_viewer', 'web');
+        $actor->fresh()->syncRoles([]);
+        self::assertTrue($actor->hasRole('super_admin'));
+
+        try {
+            app(RoleAssignmentService::class)->sync($actor, $target, ['training_viewer']);
+            self::fail('A revoked delegator role must not authorize through a cached relation.');
+        } catch (AuthorizationException) {
+            self::assertSame(['workgroup_member'], $target->fresh()->getRoleNames()->all());
+            $this->assertDatabaseHas('security_action_events', ['actor_user_id' => $actor->id,
+                'target_user_id' => $target->id, 'action' => 'change_role', 'result' => 'denied']);
+        }
+    }
+
     public function test_unknown_role_assignment_fails_closed_without_creating_or_changing_roles(): void
     {
         $actor = $this->userWithRole('super_admin');

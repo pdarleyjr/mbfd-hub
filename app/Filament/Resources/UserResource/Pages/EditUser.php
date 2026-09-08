@@ -32,7 +32,10 @@ class EditUser extends EditRecord
                 ->form([
                     Forms\Components\CheckboxList::make('applications')
                         ->options(app(\App\Support\ApplicationAccessRegistry::class)->applicationOptions())
-                        ->helperText('Media Control grants administrator access to an existing linked account. Revocation blocks new handoffs; an existing session may last up to 15 minutes. CMD and Cloud are not integrated and cannot be granted here.'),
+                        ->helperText('Each application has independent access. Cloud also requires an approved existing-account link. Media Control grants administrator access; older sessions may last up to 15 minutes until the revalidating consumer is deployed.'),
+                    Forms\Components\Placeholder::make('cloudEnforcementStatus')
+                        ->label('Cloud enforcement status')
+                        ->content(fn (): string => app(\App\Support\ApplicationAccessRegistry::class)->cloudEnforcementStatus($this->targetUser())),
                     ...$this->securityForm(),
                 ])
                 ->action(function (array $data): void {
