@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Workgroup\RelationManagers;
 
 use App\Filament\Resources\Workgroup\RelationManagers\Concerns\AuthorizesWorkgroupOwner;
+use App\Filament\Resources\Workgroup\WorkgroupFileResource;
 use App\Models\Workgroup;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -19,22 +20,20 @@ class FilesRelationManager extends RelationManager
 
     protected static ?string $title = 'Files';
 
+    public function isReadOnly(): bool
+    {
+        return ! $this->canManageOwner();
+    }
+
     public function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\FileUpload::make('filepath')
-                    ->label('File')
-                    ->directory('workgroup-files')
-                    ->visibility('private')
-                    ->required(),
+                WorkgroupFileResource::fileUpload(),
                 Forms\Components\Select::make('workgroup_session_id')
                     ->label('Session')
                     ->options(fn () => $this->getWorkgroupOwner()->sessions()->orderBy('name')->pluck('name', 'id'))
                     ->searchable(),
-                Forms\Components\TextInput::make('file_type')
-                    ->label('File Type')
-                    ->maxLength(255),
             ]);
     }
 

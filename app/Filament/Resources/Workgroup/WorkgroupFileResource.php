@@ -12,6 +12,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Symfony\Component\Mime\MimeTypes;
 
 class WorkgroupFileResource extends Resource
 {
@@ -31,14 +32,7 @@ class WorkgroupFileResource extends Resource
             ->schema([
                 Forms\Components\Section::make('File Information')
                     ->schema([
-                        Forms\Components\FileUpload::make('filepath')
-                            ->label('File')
-                            ->directory('workgroup-files')
-                            ->visibility('private')
-                            ->required()
-                            ->storeFileNamesIn('filename')
-                            ->acceptedFileTypes(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/*'])
-                            ->maxSize(51200),
+                        self::fileUpload(),
                     ]),
                 Forms\Components\Section::make('Association')
                     ->schema([
@@ -66,6 +60,35 @@ class WorkgroupFileResource extends Resource
                     ])
                     ->columns(2),
             ]);
+    }
+
+    public static function fileUpload(): Forms\Components\FileUpload
+    {
+        return Forms\Components\FileUpload::make('filepath')
+            ->label('File')
+            ->disk(fn (): string => (string) config('filesystems.private', 'local'))
+            ->directory('workgroup-files')
+            ->visibility('private')
+            ->required()
+            ->storeFileNamesIn('filename')
+            ->acceptedFileTypes(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/*'])
+            ->maxSize(51200)
+            ->helperText('PDF, Office documents, and images up to 50 MB.')
+            // Existing files may still be on a legacy disk. Keep their saved path
+            // and use the authorized download route instead of a public asset URL.
+            ->fetchFileInformation(false)
+            ->getUploadedFileUsing(static function (string $file, ?WorkgroupFile $record): ?array {
+                if (! $record || $record->filepath !== $file) {
+                    return null;
+                }
+
+                return [
+                    'name' => $record->filename,
+                    'size' => $record->file_size ?? 0,
+                    'type' => MimeTypes::getDefault()->getMimeTypes($record->file_type ?? '')[0] ?? 'application/octet-stream',
+                    'url' => route('workgroup.file.download', $record),
+                ];
+            });
     }
 
     public static function table(Table $table): Table

@@ -21,8 +21,8 @@ class FileDownloadController extends Controller
     {
         $this->workgroupAccess->requireFile($this->currentUser(), $file);
 
-        // Try multiple storage disks
-        foreach (['local', 'public'] as $disk) {
+        // Preserve access to legacy files while new uploads use private storage.
+        foreach (array_unique([config('filesystems.private', 'local'), 'local', 'public', config('filesystems.default')]) as $disk) {
             if (Storage::disk($disk)->exists($file->filepath)) {
                 return Storage::disk($disk)->download($file->filepath, $file->filename);
             }
@@ -58,7 +58,7 @@ class FileDownloadController extends Controller
     {
         $this->workgroupAccess->requireFile($this->currentUser(), $file);
 
-        foreach (['local', 'public'] as $disk) {
+        foreach (array_unique([config('filesystems.private', 'local'), 'local', 'public', config('filesystems.default')]) as $disk) {
             if (Storage::disk($disk)->exists($file->filepath)) {
                 $mimeType = Storage::disk($disk)->mimeType($file->filepath);
 
