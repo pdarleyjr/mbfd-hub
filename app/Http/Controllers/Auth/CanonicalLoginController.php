@@ -113,6 +113,10 @@ final class CanonicalLoginController extends Controller
         $request->session()->put('auth.canonical_session_id', $registered->id);
         $user->forceFill(['last_login_at' => $issuedAt])->save();
         $request->session()->put(
+            \App\Http\Middleware\EnsureCityEmailReview::SESSION_KEY,
+            app(\App\Services\Identity\CityEmailVerificationService::class)->requiresReview($user),
+        );
+        $request->session()->put(
             (string) config('security.recent_authentication.session_key'),
             $issuedAt->getTimestamp(),
         );
@@ -195,6 +199,10 @@ final class CanonicalLoginController extends Controller
         $path = parse_url($destination, PHP_URL_PATH);
 
         if ($path === '/auth/bid/authorize') {
+            return $destination;
+        }
+
+        if ($path === '/account/city-email' || preg_match('#\A/account/city-email/verify/[a-f0-9]{64}\z#', (string) $path) === 1) {
             return $destination;
         }
 

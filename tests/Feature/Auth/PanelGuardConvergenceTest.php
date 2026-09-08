@@ -63,6 +63,13 @@ final class PanelGuardConvergenceTest extends TestCase
 
         $this->assertAuthenticatedAs($user, 'web');
         $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
+        $this->get('/employee')->assertRedirect('/account/city-email');
+        $this->post('/account/city-email', [
+            'email' => 'panelmember@miamibeachfl.gov',
+            'current_password' => 'correct-password',
+            'ownership_confirmed' => '1',
+        ])->assertRedirect('/account/city-email');
+        $this->post('/account/city-email/continue')->assertRedirect('/employee');
         $this->get('/employee')->assertRedirect('/employee/dashboard');
         $this->assertTrue(
             app(\App\Services\Identity\AuthenticatedMemberContextResolver::class)
@@ -142,6 +149,7 @@ final class PanelGuardConvergenceTest extends TestCase
 
         return User::factory()->create([
             'account_status' => AccountStatus::Active,
+            'employee_id' => $employee->employee_id,
             'employee_profile_id' => $employee->id,
             'password' => Hash::make('correct-password'),
         ])->load('employeeProfile');

@@ -8,8 +8,11 @@ use App\Models\User;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use LogicException;
 
 class EditUser extends EditRecord
@@ -94,6 +97,9 @@ class EditUser extends EditRecord
             : null;
         unset($data['city_email']);
         $target = $this->targetUser();
+        if ($target->employee_profile_id !== null) {
+            unset($data['email']);
+        }
 
         if (isset($data['employee_id']) && $data['employee_id'] !== $target->employee_id) {
             $employee = Employee::query()->where('employee_id', $data['employee_id'])->first();
@@ -122,13 +128,26 @@ class EditUser extends EditRecord
         return $data;
     }
 
-    protected function afterSave(): void
+    protected function handleRecordUpdate(Model $record, array $data): Model
     {
-        $target = $this->targetUser();
-        $employee = $target->employeeProfile;
-        if ($employee !== null && $this->cityEmail !== null) {
-            app(\App\Services\Identity\CanonicalCityEmailService::class)
-                ->sync($employee, $target, $this->cityEmail);
+        try {
+            return DB::transaction(function () use ($record, $data): Model {
+                $target = parent::handleRecordUpdate($record, $data);
+                if (! $target instanceof User) {
+                    throw new LogicException('The user record is unavailable.');
+                }
+                $target->unsetRelation('employeeProfile');
+                $employee = $target->employeeProfile;
+                if ($employee !== null && $this->cityEmail !== null) {
+                    app(\App\Services\Identity\CanonicalCityEmailService::class)
+                        ->sync($employee, $target, $this->cityEmail);
+                    $target->refresh();
+                }
+
+                return $target;
+            });
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages(['data.city_email' => $exception->getMessage()]);
         }
     }
 

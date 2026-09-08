@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Communications;
 
+use App\Exceptions\EmailBudgetExhausted;
 use App\Models\OutboundEmail;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -80,6 +81,9 @@ final class CloudflareEmailDispatcher
         }
 
         $now = CarbonImmutable::now();
+        // The provider receives the original message, but communications viewers
+        // must never be able to retrieve account-security bearer tokens.
+        $sensitive = in_array($sourceType, ['password_reset', 'city_email_verification', 'city_email_changed'], true);
         $email = OutboundEmail::query()->create([
             'provider' => 'cloudflare',
             'initiated_by_user_id' => $actor?->getKey(),
@@ -91,8 +95,8 @@ final class CloudflareEmailDispatcher
             'cc_recipients' => $cc,
             'bcc_recipients' => $bcc,
             'subject' => $subject,
-            'text_body' => $text,
-            'html_body' => $html,
+            'text_body' => $sensitive ? '[Sensitive account-security message omitted]' : $text,
+            'html_body' => $sensitive ? null : $html,
             'attachment_metadata' => $attachmentMetadata,
             'recipient_count' => count($recipients),
             'chargeable_budget_units' => count($recipients),
@@ -100,7 +104,12 @@ final class CloudflareEmailDispatcher
             'queued_at' => $now,
         ]);
 
-        $this->costGuard->reserve($email, $now);
+        try {
+            $this->costGuard->reserve($email, $now);
+        } catch (EmailBudgetExhausted $exception) {
+            $this->costGuard->releaseBeforeAcceptance($email, 'Email sending safety checks blocked delivery.', $now);
+            throw $exception;
+        }
         $endpoint = "https://api.cloudflare.com/client/v4/accounts/{$accountId}/email/sending/send";
 
         try {

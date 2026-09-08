@@ -105,6 +105,11 @@ class WorkgroupPanelProvider extends PanelProvider
             ])
             ->userMenuItems([
                 MenuItem::make()
+                    ->label('City email & verification')
+                    ->url(fn (): string => route('city-email.show'))
+                    ->icon('heroicon-o-envelope')
+                    ->visible(fn (): bool => auth()->user()?->employee_profile_id !== null),
+                MenuItem::make()
                     ->label('Settings')
                     ->url(fn (): string => Profile::getUrl())
                     ->icon('heroicon-o-cog-6-tooth'),
@@ -135,11 +140,13 @@ class WorkgroupPanelProvider extends PanelProvider
                 AuthenticateCanonicalPanelUser::class,
                 EnsureWorkgroupPanelAccess::class,
                 ForceFilamentPasswordChange::class,
+                \App\Http\Middleware\EnsureCityEmailReview::class,
             ])
             ->persistentMiddleware([
                 EnsureCanonicalSessionIsCurrent::class,
                 EnsureWorkgroupPanelAccess::class,
                 ForceFilamentPasswordChange::class,
+                \App\Http\Middleware\EnsureCityEmailReview::class,
             ])
             ->sidebarCollapsibleOnDesktop()
             ->renderHook(

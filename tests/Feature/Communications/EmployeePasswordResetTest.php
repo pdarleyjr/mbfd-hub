@@ -85,8 +85,11 @@ final class EmployeePasswordResetTest extends TestCase
         $email = OutboundEmail::query()->sole();
         self::assertSame(['member@miamibeachfl.gov'], $email->to_recipients);
         self::assertSame('delivered', $email->status);
-        self::assertMatchesRegularExpression('#/reset-password/[^?]+\?employee_id=RESET-100#', (string) $email->text_body);
-        preg_match('#/reset-password/([^?]+)#', (string) $email->text_body, $matches);
+        self::assertSame('[Sensitive account-security message omitted]', $email->text_body);
+        self::assertNull($email->html_body);
+        $providerRequest = Http::recorded()->sole()[0];
+        self::assertMatchesRegularExpression('#/reset-password/[^?]+\?employee_id=RESET-100#', (string) $providerRequest['text']);
+        preg_match('#/reset-password/([^?]+)#', (string) $providerRequest['text'], $matches);
         self::assertArrayHasKey(1, $matches);
 
         $this->post('/reset-password', [

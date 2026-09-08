@@ -44,8 +44,11 @@ class UserResource extends Resource
                             ->required()
                             ->maxLength(255),
                         Forms\Components\TextInput::make('email')
-                            ->label('Login email')
+                            ->label('Account email')
                             ->email()
+                            ->disabled(fn (?User $record): bool => $record?->employee_profile_id !== null)
+                            ->dehydrated(fn (?User $record): bool => $record?->employee_profile_id === null)
+                            ->helperText('Linked accounts use Employee ID to sign in. Their city email is managed below; mailbox verification is completed by the member.')
                             ->required()
                             ->unique(ignoreRecord: true)
                             ->maxLength(255),
@@ -59,9 +62,38 @@ class UserResource extends Resource
                             ->required()
                             ->maxLength(20),
                         Forms\Components\TextInput::make('city_email')
-                            ->label('Authoritative city email')
+                            ->label('City email on record')
                             ->email()
+                            ->rules(['regex:/@miamibeachfl\.gov$/i'])
+                            ->helperText('Administrative entry does not verify mailbox ownership. Changing this address clears previous verification; the member must verify the new mailbox.')
                             ->maxLength(255),
+                        Forms\Components\Placeholder::make('city_email_verification_status')
+                            ->label('Mailbox ownership')
+                            ->visible(fn (?User $record): bool => $record?->employee_profile_id !== null)
+                            ->content(function (?User $record): string {
+                                $verification = $record === null ? null : app(\App\Services\Identity\CityEmailVerificationService::class)->status($record);
+
+                                return $verification?->verified_at !== null
+                                    ? 'Verified by the member on '.$verification->verified_at->format('M j, Y g:i A')
+                                    : 'Mailbox ownership has not been verified through city email confirmation.';
+                            }),
+                        Forms\Components\Placeholder::make('city_email_pending_status')
+                            ->label('Member confirmation')
+                            ->visible(fn (?User $record): bool => $record?->employee_profile_id !== null)
+                            ->content(function (?User $record): string {
+                                $pending = $record === null ? null : app(\App\Services\Identity\CityEmailVerificationService::class)->status($record);
+
+                                if ($pending === null) {
+                                    return 'The member will be asked to review their city email when signing in.';
+                                }
+
+                                return $pending->email.' — '.match ($pending->delivery_status) {
+                                    'verified' => 'Mailbox verified',
+                                    'failed' => 'Member confirmed the address; message delivery failed. Not verified.',
+                                    'queued' => 'Verification message submitted; awaiting mailbox verification.',
+                                    default => 'Member confirmed the address; awaiting mailbox verification.',
+                                };
+                            }),
                         Forms\Components\Select::make('account_status')
                             ->options([
                                 AccountStatus::PendingActivation->value => 'Pending activation',

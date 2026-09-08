@@ -28,6 +28,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\AddBuildHeaders::class,
             \App\Http\Middleware\EnsureCanonicalSessionIsCurrent::class,
             \App\Http\Middleware\ForcePasswordChange::class,
+            \App\Http\Middleware\EnsureCityEmailReview::class,
             \App\Http\Middleware\SetCacheHeaders::class,
         ]);
         $middleware->prependToPriorityList(

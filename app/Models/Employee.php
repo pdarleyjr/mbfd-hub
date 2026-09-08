@@ -55,6 +55,12 @@ class Employee extends Authenticatable
 
     protected static function booted(): void
     {
+        static::updating(function (self $employee): void {
+            if ($employee->isDirty('city_email')) {
+                User::query()->where('employee_profile_id', $employee->getKey())->update(['email_verified_at' => null]);
+            }
+        });
+
         static::creating(function (self $employee): void {
             if (($employee->getAttributes()['password'] ?? null) !== null) {
                 return;

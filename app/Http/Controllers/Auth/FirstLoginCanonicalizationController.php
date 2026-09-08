@@ -123,6 +123,10 @@ final class FirstLoginCanonicalizationController extends Controller
 
         $request->session()->put('auth.canonical_session_id', $registered->id);
         $request->session()->put(
+            \App\Http\Middleware\EnsureCityEmailReview::SESSION_KEY,
+            app(\App\Services\Identity\CityEmailVerificationService::class)->requiresReview($user),
+        );
+        $request->session()->put(
             (string) config('security.recent_authentication.session_key'),
             $at->getTimestamp(),
         );

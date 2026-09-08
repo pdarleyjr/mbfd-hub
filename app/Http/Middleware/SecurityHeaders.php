@@ -20,7 +20,11 @@ class SecurityHeaders
         // express "self + cloud.mbfdhub.com". The CSP `frame-ancestors` directive
         // below covers the same use case and supersedes this header in all modern
         // browsers, so we omit it intentionally.
-        $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
+        $cityEmailPage = $request->is('account/city-email', 'account/city-email/*');
+        $response->headers->set('Referrer-Policy', $cityEmailPage ? 'no-referrer' : 'strict-origin-when-cross-origin');
+        if ($cityEmailPage) {
+            $response->headers->set('Cache-Control', 'no-store, private');
+        }
         $conferencePath = $request->is('video-conferencing/*')
             || $request->is('employee/video-conferencing')
             || $request->is('employee/video-conferencing/*');
@@ -87,8 +91,10 @@ class SecurityHeaders
             // (report-to + Report-To header) is more powerful but adds a second
             // header and isn't supported by Safari yet; report-uri is enough for
             // an enforcement CSP.
-            'report-uri /_csp-report',
         ];
+        if (! $cityEmailPage) {
+            $cspParts[] = 'report-uri /_csp-report';
+        }
         if ($request->secure()) {
             $cspParts[] = 'upgrade-insecure-requests';
         }

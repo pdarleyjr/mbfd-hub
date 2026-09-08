@@ -75,6 +75,11 @@ class TrainingPanelProvider extends PanelProvider
             ])
             ->userMenuItems([
                 MenuItem::make()
+                    ->label('City email & verification')
+                    ->url(fn (): string => route('city-email.show'))
+                    ->icon('heroicon-o-envelope')
+                    ->visible(fn (): bool => auth()->user()?->employee_profile_id !== null),
+                MenuItem::make()
                     ->label('Return to Home')
                     ->icon('heroicon-o-home')
                     ->url('/'),
@@ -105,11 +110,13 @@ class TrainingPanelProvider extends PanelProvider
                 AuthenticateCanonicalPanelUser::class,
                 EnsureTrainingPanelAccess::class,
                 ForceFilamentPasswordChange::class,
+                \App\Http\Middleware\EnsureCityEmailReview::class,
             ])
             ->persistentMiddleware([
                 EnsureCanonicalSessionIsCurrent::class,
                 EnsureTrainingPanelAccess::class,
                 ForceFilamentPasswordChange::class,
+                \App\Http\Middleware\EnsureCityEmailReview::class,
             ])
             ->sidebarCollapsibleOnDesktop()
             ->renderHook(

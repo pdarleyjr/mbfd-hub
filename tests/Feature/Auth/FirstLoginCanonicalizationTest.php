@@ -51,6 +51,12 @@ final class FirstLoginCanonicalizationTest extends TestCase
         $this->assertSame(['member'], $user->getRoleNames()->all());
         $this->assertAuthenticatedAs($user, 'web');
         $this->assertDatabaseCount('authentication_sessions', 1);
+        $this->get('/daily/stations')->assertRedirect('/account/city-email');
+        $this->post('/account/city-email', [
+            'email' => 'firstloginmember@miamibeachfl.gov',
+            'current_password' => 'employee-secret',
+            'ownership_confirmed' => '1',
+        ])->assertRedirect('/account/city-email');
         $this->get('/daily/stations')->assertOk();
 
         $userId = $user->id;
