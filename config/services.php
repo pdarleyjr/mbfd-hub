@@ -48,49 +48,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Cloudflare Workers AI Configuration
+    | Cloudflare Worker Integration
     |--------------------------------------------------------------------------
     |
-    | Configuration for Cloudflare Workers AI integration for intelligent
-    | capital project prioritization and analysis.
-    |
-    | To obtain your Account ID:
-    | 1. Log in to https://dash.cloudflare.com
-    | 2. Select your account
-    | 3. Go to Workers & Pages
-    | 4. Your Account ID is displayed in the right sidebar
+    | The support worker remains a separate bounded HTTP integration. Hub
+    | generation is configured only under cloudflare.ai.gateway.
     |
     */
 
     'cloudflare' => [
-        // Legacy worker configuration (keep for compatibility)
         'worker_url' => env('CLOUDFLARE_WORKER_URL', 'https://mbfd-support-ai.pdarleyjr.workers.dev'),
         'api_secret' => env('CLOUDFLARE_API_SECRET'),
-
-        // Workers AI configuration
-        'ai' => [
-            'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
-            'api_token' => env('CLOUDFLARE_API_TOKEN'),
-            'enabled' => env('AI_ANALYSIS_ENABLED', false),
-
-            'models' => [
-                'default' => '@cf/meta/llama-3-8b-instruct',
-                'fallback' => '@cf/meta/llama-2-7b-chat-int8',
-                'alternative' => '@hf/meta-llama/meta-llama-3-8b-instruct',
-            ],
-
-            'rate_limit' => [
-                'daily_neurons' => 9900, // Stay under 10k free tier limit
-                'retry_attempts' => 3,
-                'retry_delay' => 1000, // milliseconds
-                'cache_key' => 'cloudflare_ai_requests',
-            ],
-
-            'timeouts' => [
-                'connect' => 10,
-                'request' => 30,
-            ],
-        ],
     ],
 
     /*

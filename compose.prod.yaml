@@ -20,6 +20,7 @@ services:
     volumes:
       - ".:/var/www/html"
       - "${GOOGLE_SA_PATH:-/dev/null}:/run/secrets/google_service_account.json:ro"
+      - "${HUB_AI_GATEWAY_CREDENTIAL_SOURCE_FILE:?HUB_AI_GATEWAY_CREDENTIAL_SOURCE_FILE must point to the protected Hub gateway credential}:/run/secrets/mbfd-hub-ai-gateway-token:ro"
       - "./docker/supervisor/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf:ro"
     networks:
       - mbfd-net

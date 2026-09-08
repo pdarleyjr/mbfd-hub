@@ -1,0 +1,1 @@
+mbfd-coding ALL=(root) NOPASSWD: /usr/bin/systemctl is-active mbfd-hermes-bounded-summary.timer, /usr/bin/systemctl stop mbfd-hermes-bounded-summary.timer, /usr/bin/systemctl start mbfd-hermes-bounded-summary.timer

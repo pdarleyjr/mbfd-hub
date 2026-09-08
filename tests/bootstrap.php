@@ -29,7 +29,7 @@ if ($allowDisposablePostgres
 $testEnvironment = [
     'ABLY_KEY' => '',
     'AI_ANALYSIS_ENABLED' => 'false',
-    'AI_DRIVER' => 'local',
+    'AI_GATEWAY_ENABLED' => 'false',
     'APP_ENV' => 'testing',
     'APP_KEY' => 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
     'APP_MAINTENANCE_DRIVER' => 'file',
@@ -78,7 +78,8 @@ $testEnvironment = [
     'MAIL_URL' => '',
     'OH_DEAR_HEALTH_CHECK_SECRET' => '',
     'OH_DEAR_HEALTH_CHECK_URL' => '',
-    'OLLAMA_URL' => '',
+    'AI_GATEWAY_CREDENTIAL_FILE' => '',
+    'AI_GATEWAY_URL' => '',
     'POSTMARK_TOKEN' => '',
     'PRIVATE_FILESYSTEM_DISK' => 'local',
     'PULSE_ENABLED' => 'false',

@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Log;
  * Regenerates the Command Center AI brief in the background — dispatched by
  * CommandCenterAiService::ensureFresh() ONLY when the operational-data
  * fingerprint changed. Running async keeps the dashboard responsive and only
- * loads the local LLM (qwen3.6) when there is genuinely new info to summarize.
+ * requests gateway-routed generation only when there is genuinely new info to summarize.
  */
 class GenerateCommandCenterSummaryJob implements ShouldQueue
 {

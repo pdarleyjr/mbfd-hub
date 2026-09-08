@@ -5,8 +5,10 @@
   "main": "src/index.ts",
   "scripts": {
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev"
+    "dev": "wrangler dev",
+    "test": "node --test --experimental-strip-types test/*.test.mjs"
   },
+  "type": "module",
   "keywords": [],
   "author": "",
   "license": "MIT",

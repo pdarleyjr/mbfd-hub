@@ -1,6 +1,6 @@
 [Unit]
 Description=MBFD bounded tool-free operational interpretation
-After=network-online.target docker.service ollama-eoc.service
+After=network-online.target ollama-ai-proxy.service
 Wants=network-online.target
 
 [Service]
@@ -11,6 +11,7 @@ WorkingDirectory=/opt/mbfd/hermes
 Environment=HOME=/var/lib/mbfd-aiops
 Environment=HERMES_HOME=/opt/mbfd/hermes/home
 Environment=PATH=/var/lib/mbfd-aiops/.local/bin:/opt/mbfd/hermes/home/node/bin:/opt/mbfd/hermes/home/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+LoadCredential=ai-gateway-api-key:/etc/ollama-ai-proxy/hermes-api-key
 ExecStart=/usr/bin/timeout --signal=TERM --kill-after=5s 60s /opt/mbfd/hermes/run-hermes-bounded-summary.sh
 Nice=10
 IOSchedulingClass=best-effort

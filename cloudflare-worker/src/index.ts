@@ -4,10 +4,7 @@ interface Env {
   RATE_LIMIT_KV?: KVNamespace;
   ALLOWED_ORIGIN: string;
   AI_GATEWAY_URL?: string;
-  // Local-LLM bridge (Ollama OpenAI-compatible, fronted by office-ai.mbfdhub.com)
-  BRIDGE_URL?: string;     // var: e.g. https://office-ai.mbfdhub.com/v1
-  BRIDGE_TOKEN?: string;   // secret: bearer for the bridge
-  BRIDGE_MODEL?: string;   // var: e.g. qwen3.6:35b
+  AI_GATEWAY_TOKEN?: string; // unique mbfd-support-ai secret binding
   // Shared secret required for write endpoints (/ingest, /delete)
   INGEST_SECRET?: string;  // secret: matches the Hub's CLOUDFLARE_WORKER_API_SECRET
 }
@@ -23,7 +20,8 @@ interface ConversationMessage {
 }
 
 const EMBEDDING_MODEL = '@cf/baai/bge-large-en-v1.5';
-const DEFAULT_BRIDGE_MODEL = 'qwen3.6:35b';
+const GENERATION_CAPABILITY = 'mbfd-general';
+const DEFAULT_GATEWAY_URL = 'https://ai-portal.mbfdhub.com';
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
@@ -116,7 +114,7 @@ function sanitizeId(source: string): string {
   return source.replace(/[^a-zA-Z0-9]/g, '_');
 }
 
-/** Translate the bridge's OpenAI-style SSE into the CF-style SSE the landing
+/** Translate the gateway's OpenAI-style SSE into the CF-style SSE the landing
  *  page expects: `data: {"response":"<token>"}`. Buffers across chunk
  *  boundaries; emits a final `data: [DONE]`. */
 function openaiToCfStream(upstream: ReadableStream): ReadableStream {
@@ -155,21 +153,28 @@ function openaiToCfStream(upstream: ReadableStream): ReadableStream {
   });
 }
 
-/** Call the local-Ollama bridge (OpenAI-compatible). */
-function callBridge(env: Env, messages: any[], stream: boolean): Promise<Response> {
-  const base = (env.BRIDGE_URL || 'https://office-ai.mbfdhub.com/v1').replace(/\/$/, '');
-  return fetch(`${base}/chat/completions`, {
+/** Call the private MBFD AI Gateway using the support worker's own identity. */
+export async function callGateway(env: Env, messages: any[], stream: boolean): Promise<Response> {
+  const credential = env.AI_GATEWAY_TOKEN?.trim();
+  if (!credential) {
+    throw new Error('AI gateway credential is unavailable');
+  }
+
+  const base = (env.AI_GATEWAY_URL || DEFAULT_GATEWAY_URL).replace(/\/$/, '');
+  return fetch(`${base}/v1/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${env.BRIDGE_TOKEN || ''}`,
+      Authorization: `Bearer ${credential}`,
+      'X-MBFD-Capability': GENERATION_CAPABILITY,
+      'X-Request-ID': crypto.randomUUID(),
     },
     body: JSON.stringify({
-      model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL,
+      model: GENERATION_CAPABILITY,
       messages,
       max_tokens: 1024,
       temperature: 0.3,
-      reasoning_effort: 'none', // qwen3.6 is a thinking model; keep answers direct
+      reasoning_effort: 'none',
       stream,
     }),
   });
@@ -192,8 +197,8 @@ export default {
       return json({
         status: 'ok',
         worker: 'mbfd-support-ai',
-        model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL,
-        llm_backend: 'local-ollama-bridge',
+        model: GENERATION_CAPABILITY,
+        llm_backend: 'mbfd-ai-gateway',
         embeddings: EMBEDDING_MODEL,
         timestamp: new Date().toISOString(),
       });
@@ -255,7 +260,7 @@ export default {
       }
     }
 
-    // ── RAG Chat (landing page) — Vectorize retrieval + LOCAL qwen3.6 answer ──
+    // ── RAG Chat (landing page) — Vectorize retrieval + gateway generation ──
     if (url.pathname === '/chat' && request.method === 'POST') {
       const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
       if (!checkRateLimit(clientIp)) {
@@ -303,15 +308,14 @@ export default {
           { role: 'user', content: `CONTEXT DOCUMENTS:\n${context}\n\nUSER QUESTION: ${userMessage}` },
         ];
 
-        // Step 5: generate with LOCAL qwen3.6 via the bridge
+        // Step 5: generate through the private MBFD AI Gateway.
         if (enableStreaming) {
-          const bridgeResp = await callBridge(env, messages, true);
-          if (!bridgeResp.ok || !bridgeResp.body) {
-            const detail = await bridgeResp.text().catch(() => '');
-            console.error('Bridge stream error', bridgeResp.status, detail);
+          const gatewayResp = await callGateway(env, messages, true);
+          if (!gatewayResp.ok || !gatewayResp.body) {
+            console.error('AI gateway stream error', gatewayResp.status);
             return json({ error: 'AI backend unavailable.' }, 502);
           }
-          return new Response(openaiToCfStream(bridgeResp.body), {
+          return new Response(openaiToCfStream(gatewayResp.body), {
             headers: {
               ...corsHeaders,
               'Content-Type': 'text/event-stream',
@@ -322,15 +326,14 @@ export default {
           });
         }
 
-        const bridgeResp = await callBridge(env, messages, false);
-        if (!bridgeResp.ok) {
-          const detail = await bridgeResp.text().catch(() => '');
-          console.error('Bridge error', bridgeResp.status, detail);
+        const gatewayResp = await callGateway(env, messages, false);
+        if (!gatewayResp.ok) {
+          console.error('AI gateway error', gatewayResp.status);
           return json({ error: 'AI backend unavailable.' }, 502);
         }
-        const aiJson: any = await bridgeResp.json();
+        const aiJson: any = await gatewayResp.json();
         const answer = aiJson.choices?.[0]?.message?.content || '';
-        return json({ response: answer, sources, model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL });
+        return json({ response: answer, sources, model: GENERATION_CAPABILITY });
       } catch (error: any) {
         console.error('Chat error:', error);
         return json({ error: 'An error occurred processing your request. Please try again.' }, 500);

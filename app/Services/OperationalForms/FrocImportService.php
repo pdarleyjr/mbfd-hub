@@ -51,7 +51,7 @@ final class FrocImportService
                 throw new RuntimeException('The AI response contained no valid source-linked labor rows.');
             }
             $fallback['labor'] = $labor;
-            $fallback['engine'] = $this->ai instanceof LocalAIService ? 'qwen3.6:35b (GMKtec Ollama)' : 'Cloudflare Workers AI';
+            $fallback['engine'] = $this->ai instanceof LocalAIService ? 'mbfd-general (MBFD AI Gateway)' : 'Cloudflare Workers AI';
             $fallback['fallback_reason'] = null;
             $fallback['warning'] = 'AI suggestions must be reviewed. Estimated end times are marked and every field remains editable.'.$truncationNote;
         } catch (Throwable $exception) {
@@ -63,7 +63,7 @@ final class FrocImportService
                 'source_sha256' => $sourceSha256,
                 'source_type' => $sourceType,
                 'matched_message_count' => count($messages),
-                'engine' => $this->ai instanceof LocalAIService ? 'qwen3.6:35b' : 'cloudflare-workers-ai',
+                'engine' => $this->ai instanceof LocalAIService ? 'mbfd-general' : 'cloudflare-workers-ai',
                 'duration_ms' => (int) ((hrtime(true) - $startedAt) / 1_000_000),
                 'failure_code' => $failureCode,
                 'exception' => $exception::class,

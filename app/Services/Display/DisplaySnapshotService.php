@@ -704,8 +704,7 @@ final class DisplaySnapshotService
     {
         return [
             'hub_up' => true,
-            'ai_available' => (bool) config('cloudflare.ai.enabled', false)
-                || config('cloudflare.ai.driver') === 'local',
+            'ai_available' => (bool) config('cloudflare.ai.enabled', true),
             'incidents_worker_up' => Cache::has('pulsepoint_incidents'),
             'last_deploy_sha' => $this->lastDeploySha(),
             'snapshot_age_seconds' => 0,
