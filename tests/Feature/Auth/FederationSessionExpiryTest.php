@@ -57,7 +57,7 @@ final class FederationSessionExpiryTest extends TestCase
             'version' => $user->forceFill(['security_version' => $user->security_version + 1])->save(),
         };
 
-        $this->get($handoff)->assertRedirect('/login');
+        $login = $this->captureFederationLogin($this->get($handoff));
 
         $this->assertGuest('web');
         self::assertNotSame($oldSessionId, $this->app['session.store']->getId());
@@ -67,7 +67,7 @@ final class FederationSessionExpiryTest extends TestCase
         self::assertNotNull($registered->fresh()->revoked_at);
         $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
 
-        $this->post('/login', ['employee_id' => $employee->employee_id, 'password' => 'correct-password'])
+        $this->post($login, ['employee_id' => $employee->employee_id, 'password' => 'correct-password'])
             ->assertRedirect($handoff);
 
         $this->assertAuthenticatedAs($user, 'web');

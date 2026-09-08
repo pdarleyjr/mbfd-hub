@@ -11,6 +11,7 @@ use App\Services\Identity\CanonicalActivationIntent;
 use App\Services\Identity\CanonicalLoginDestination;
 use App\Services\Identity\CanonicalSessionPolicy;
 use App\Services\Identity\CanonicalUserResolver;
+use App\Services\Identity\FederationLoginAttempt;
 use App\Services\Identity\SessionRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -19,17 +20,29 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 final class CanonicalLoginController extends Controller
 {
     private const FAILURE_MESSAGE = 'The provided credentials are invalid.';
 
-    public function create(): View
+    public function create(Request $request, FederationLoginAttempt $attempts): View|Response
     {
-        return view('auth.canonical-login');
+        if ($attempts->requested($request) && $attempts->current($request) === null) {
+            return $attempts->unavailable();
+        }
+        if ($request->user('web') instanceof User) {
+            return $attempts->requested($request) ? $attempts->complete($request) : redirect('/');
+        }
+
+        return view('auth.canonical-login', [
+            'loginAction' => $attempts->requested($request) ? $attempts->loginUrl($request) : route('login.store'),
+            'applicationLabel' => $attempts->requested($request) ? $attempts->applicationLabel($request) : null,
+        ]);
     }
 
     public function store(
@@ -38,11 +51,22 @@ final class CanonicalLoginController extends Controller
         CanonicalActivationIntent $activationIntents,
         CanonicalSessionPolicy $sessionPolicy,
         SessionRegistry $sessions,
-    ): RedirectResponse {
-        $credentials = $request->validate([
+    ): Response {
+        $attempts = app(FederationLoginAttempt::class);
+        if ($attempts->requested($request) && $attempts->current($request) === null) {
+            return $attempts->unavailable();
+        }
+        if ($request->user('web') instanceof User) {
+            return $attempts->requested($request) ? $attempts->complete($request) : redirect('/');
+        }
+        $validator = Validator::make($request->all(), [
             'employee_id' => ['required', 'string', 'max:64'],
             'password' => ['required', 'string', 'max:4096'],
         ]);
+        if ($attempts->requested($request) && $validator->fails()) {
+            return redirect($attempts->loginUrl($request))->withErrors($validator);
+        }
+        $credentials = $validator->validate();
         $employeeId = trim($credentials['employee_id']);
         $throttleKey = $this->throttleKey($employeeId, (string) $request->ip());
         $maxAttempts = max(1, (int) config('security.canonical_login.max_attempts', 5));
@@ -81,7 +105,8 @@ final class CanonicalLoginController extends Controller
                 'source_fingerprint' => hash_hmac('sha256', (string) $request->ip(), (string) config('app.key')),
             ]);
 
-            return redirect('/activate-account');
+            return redirect('/activate-account'.($attempts->requested($request)
+                ? '?'.http_build_query(['login_attempt' => $request->query('login_attempt')]) : ''));
         }
 
         $denialReason = $this->denialReason($user, $passwordMatches);
@@ -137,7 +162,8 @@ final class CanonicalLoginController extends Controller
             'context_class' => $policy['context_class']->value,
         ]);
 
-        return redirect(app(CanonicalLoginDestination::class)->resolve($user, $request->session()->pull('url.intended')));
+        return $attempts->requested($request) ? $attempts->complete($request)
+            : redirect(app(CanonicalLoginDestination::class)->resolve($user, $request->session()->pull('url.intended')));
     }
 
     public function destroy(Request $request, SessionRegistry $sessions): RedirectResponse
@@ -183,7 +209,9 @@ final class CanonicalLoginController extends Controller
             'source_fingerprint' => hash_hmac('sha256', (string) $request->ip(), (string) config('app.key')),
         ]);
 
-        return back()
+        $attempts = app(FederationLoginAttempt::class);
+
+        return ($attempts->requested($request) ? redirect($attempts->loginUrl($request)) : back())
             ->withErrors(['employee_id' => self::FAILURE_MESSAGE])
             ->withInput($request->only('employee_id'));
     }

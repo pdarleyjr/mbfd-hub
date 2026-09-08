@@ -57,8 +57,17 @@ $app = Application::configure(basePath: dirname(__DIR__))
                 return $response;
             }
 
+            $attempts = app(\App\Services\Identity\FederationLoginAttempt::class);
+            // Only a server-issued, browser-cookie-bound query context survives.
+            // Never inspect or replay a rejected POST body or trust its Referer.
+            $login = $request->is('login', 'activate-account') && $attempts->current($request) !== null
+                ? $attempts->loginUrl($request, expired: true) : '/login?session_expired=1';
+            if ($request->is('login', 'activate-account') && $attempts->requested($request) && $attempts->current($request) === null) {
+                $login = '/login?login_attempt=expired&session_expired=1';
+            }
+
             return new \Symfony\Component\HttpFoundation\RedirectResponse(
-                '/login?session_expired=1',
+                $login,
                 303,
                 ['Cache-Control' => 'no-store, private'],
             );
@@ -72,6 +81,13 @@ $app = Application::configure(basePath: dirname(__DIR__))
                     'message' => 'Your session has ended. Please sign in again.',
                     'code' => 'auth_session_expired',
                 ], 401, ['Cache-Control' => 'no-store, private']);
+            }
+
+            if ($request->isMethod('GET') && ! $request->expectsJson()) {
+                $destination = app(\App\Services\Identity\CanonicalLoginDestination::class)->federation($request->getRequestUri());
+                if ($destination !== null) {
+                    return app(\App\Services\Identity\FederationLoginAttempt::class)->begin($request, $destination);
+                }
             }
 
             return null;

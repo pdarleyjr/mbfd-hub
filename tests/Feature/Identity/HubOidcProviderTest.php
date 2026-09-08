@@ -200,12 +200,13 @@ final class HubOidcProviderTest extends TestCase
         [$user, $client] = $this->fixture();
         $user->forceFill(['password' => bcrypt('Canonical-oidc-login-only!')])->save();
         $url = '/oauth/authorize?'.http_build_query($this->authorizationQuery($client));
-        $this->get($url)->assertRedirect(route('login'));
-        $login = $this->post('/login', ['employee_id' => $user->employee_id, 'password' => 'Canonical-oidc-login-only!'])->assertRedirect();
+        $loginUrl = $this->federationLogin($url);
+        $login = $this->post($loginUrl, ['employee_id' => $user->employee_id, 'password' => 'Canonical-oidc-login-only!'])->assertRedirect();
         self::assertSame('/oauth/authorize', parse_url($login->headers->get('Location'), PHP_URL_PATH));
         parse_str((string) parse_url($login->headers->get('Location'), PHP_URL_QUERY), $returned);
         self::assertEquals($this->authorizationQuery($client), $returned);
         $this->assertAuthenticatedAs($user, 'web');
+        $this->withCookie((string) config('session.cookie'), session()->getId());
         $this->get($url)->assertRedirect();
         $this->assertDatabaseCount('oidc_sessions', 1);
     }

@@ -121,14 +121,14 @@ final class CanonicalAuthorizationTest extends TestCase
         $disabled = $this->authorizedUser('MEDIA-DISABLED');
         $this->canonicalLogin($disabled);
         $disabled->forceFill(['account_status' => AccountStatus::Disabled])->save();
-        $this->get($this->authorizeUrl())->assertRedirect('/login');
+        $this->federationLogin($this->authorizeUrl());
 
         $revoked = $this->authorizedUser('MEDIA-REVOKED');
         $this->canonicalLogin($revoked);
         AuthenticationSession::query()
             ->where('user_id', $revoked->id)
             ->update(['revoked_at' => now()]);
-        $this->get($this->authorizeUrl())->assertRedirect('/login');
+        $this->federationLogin($this->authorizeUrl());
     }
 
     public function test_callback_state_audience_expiry_tamper_and_replay_are_enforced(): void

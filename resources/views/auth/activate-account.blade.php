@@ -29,7 +29,7 @@
 
     <h2>I previously had separate Hub access</h2>
     <p>Choose this for any prior Admin, Training, Workgroups, or other MBFD Hub account. Verifying that account preserves its access and history.</p>
-    <form method="POST" action="{{ route('activate-account.store') }}">
+    <form method="POST" action="{{ route('activate-account.store', isset($loginAttempt) ? ['login_attempt' => $loginAttempt] : []) }}">
         @csrf
         <input type="hidden" name="nonce" value="{{ $nonce }}">
         <input type="hidden" name="path" value="existing_user">
@@ -42,7 +42,7 @@
 
     <h2>I never had a separate Hub account</h2>
     <p class="warning">If you previously had Admin, Training, Workgroups, or other separate Hub access, use the existing-account path above or those privileges will not be attached.</p>
-    <form method="POST" action="{{ route('activate-account.store') }}">
+    <form method="POST" action="{{ route('activate-account.store', isset($loginAttempt) ? ['login_attempt' => $loginAttempt] : []) }}">
         @csrf
         <input type="hidden" name="nonce" value="{{ $nonce }}">
         <input type="hidden" name="path" value="no_existing_user">
