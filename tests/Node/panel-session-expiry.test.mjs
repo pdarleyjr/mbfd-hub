@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 
 const path = new URL('../../resources/views/filament/partials/session-expiry.blade.php', import.meta.url);
-const source = existsSync(path) ? readFileSync(path, 'utf8').match(/<script[^>]*>([\s\S]*?)<\/script>/)[1] : '';
+const source = existsSync(path) ? readFileSync(path, 'utf8').match(/<script[^>]*>([\s\S]*?)<\/script>/i)[1] : '';
 
 function fixture() {
     const listeners = {};
