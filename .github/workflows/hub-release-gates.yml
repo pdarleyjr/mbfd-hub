@@ -549,6 +549,7 @@ jobs:
           python3 -m compileall -q \
             scripts/operations/mbfd_ai_gateway.py \
             scripts/operations/mbfd_ai_gateway_release.py \
+            scripts/operations/mbfd_ai_gateway_admission_release.py \
             scripts/operations/mbfd-ai-gateway-smoke.py \
             tests/security/mbfd_ai_gateway_predeploy_smoke.py \
             tests/security/test_mbfd_ai_gateway.py \
@@ -556,6 +557,8 @@ jobs:
           python3 -m unittest \
             tests.security.test_mbfd_ai_gateway \
             tests.security.test_mbfd_ai_gateway_release \
+            tests.security.test_gateway_swap_rate \
+            tests.security.test_gateway_admission_release \
             -v
           credential_directory="$(mktemp -d)"
           trap 'rm -rf -- "${credential_directory}"' EXIT

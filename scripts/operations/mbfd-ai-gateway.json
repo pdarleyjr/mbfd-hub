@@ -297,7 +297,7 @@
       "mem_available_floor_mb": 8192,
       "declared_model_allocation_mb": 8192,
       "memory_psi_avg10_max": 1.0,
-      "max_swap_activity_pages": 4096,
+      "max_swap_pages_per_second": 64,
       "deny_on_recent_oom": true,
       "deny_on_recent_gpu_reset": true,
       "require_production_healthy": true

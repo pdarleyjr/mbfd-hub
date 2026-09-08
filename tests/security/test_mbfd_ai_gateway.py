@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import http.client
 import http.server
 import importlib.util
@@ -962,7 +963,9 @@ class TestModelReadiness(unittest.TestCase):
         self.addCleanup(fixture.close)
         log_stream = io.StringIO()
         app = gateway.GatewayApplication(
-            gateway.load_config(fixture.path), telemetry_stream=log_stream
+            gateway.load_config(fixture.path),
+            telemetry_stream=log_stream,
+            host_probe=FakeProbe(),
         )
         return app, log_stream
 
@@ -1020,6 +1023,36 @@ class TestModelReadiness(unittest.TestCase):
 
 
 class TestHTTPGateway(unittest.TestCase):
+    def test_swap_denial_telemetry_has_rate_window_and_retry_without_credentials(self):
+        def rate_policy(config):
+            policy = config["heavy_workloads"]["primary-ollama-large"]
+            policy.pop("max_swap_activity_pages", None)
+            policy["max_swap_pages_per_second"] = 64
+
+        _, server, log, _ = self.make_servers(
+            {"available": ["mbfd-general"], "loaded": ["mbfd-general"]}, rate_policy
+        )
+        snapshot = dataclasses.replace(
+            FakeProbe().snapshot(),
+            swap_activity_pages=4000,
+            swap_window_seconds=1,
+            swap_pages_per_second=4000,
+        )
+        server.application.heavy_leases.probe = mock.Mock(snapshot=lambda: snapshot)
+        status, headers, body = request(
+            server,
+            "POST",
+            "/api/chat",
+            payload={"model": "mbfd-general", "messages": []},
+        )
+        self.assertEqual(status, 503)
+        self.assertEqual(headers["Retry-After"], "30")
+        error = json.loads(body)["error"]
+        self.assertEqual(error["admission"]["host"]["swap_pages_per_second"], 4000)
+        self.assertEqual(error["admission"]["host"]["swap_window_seconds"], 1)
+        self.assertEqual(error["admission"]["max_swap_pages_per_second"], 64)
+        self.assertNotIn("Bearer", log.getvalue())
+
     def make_servers(self, script, mutate=None):
         backend = ScriptedBackend(script)
         backend_thread = threading.Thread(target=backend.serve_forever, daemon=True)
@@ -1028,7 +1061,9 @@ class TestHTTPGateway(unittest.TestCase):
         fixture = ConfigFixture(mutate, url)
         log_stream = io.StringIO()
         app = gateway.GatewayApplication(
-            gateway.load_config(fixture.path), telemetry_stream=log_stream
+            gateway.load_config(fixture.path),
+            telemetry_stream=log_stream,
+            host_probe=FakeProbe(),
         )
         server = gateway.GatewayHTTPServer(
             ("127.0.0.1", 0), gateway.GatewayRequestHandler, app

@@ -8,6 +8,10 @@ fi
 
 readonly SOURCE_DIR="${1:?source directory is required}"
 readonly EXPECTED_SOURCE_SHA="${2:?exact 40-character source SHA is required}"
+if [[ ${3:-} == --admission-only ]]; then
+    exec /usr/bin/python3 "${SOURCE_DIR}/mbfd_ai_gateway_admission_release.py" \
+        "${SOURCE_DIR}" "${EXPECTED_SOURCE_SHA}" --verify-only
+fi
 readonly PROTECTED_REF="refs/remotes/origin/main"
 readonly CREDENTIAL_DIR="/etc/ollama-ai-proxy"
 readonly CREDENTIAL_FILE="${CREDENTIAL_DIR}/api-key"
