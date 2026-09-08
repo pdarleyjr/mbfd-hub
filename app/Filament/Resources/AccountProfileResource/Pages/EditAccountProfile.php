@@ -74,6 +74,7 @@ class EditAccountProfile extends EditRecord
 
     protected function getSaveFormAction(): \Filament\Actions\Action
     {
-        return parent::getSaveFormAction()->visible(fn (): bool => AccountProfileResource::canUpdateProfile($this->getRecord()));
+        return parent::getSaveFormAction()->label('Save profile changes')->keyBindings([])
+            ->visible(fn (): bool => AccountProfileResource::canUpdateProfile($this->getRecord()));
     }
 }

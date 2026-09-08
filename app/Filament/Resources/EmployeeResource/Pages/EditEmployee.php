@@ -71,7 +71,8 @@ class EditEmployee extends EditRecord
 
     protected function getSaveFormAction(): \Filament\Actions\Action
     {
-        return parent::getSaveFormAction()->visible(fn (): bool => EmployeeResource::canUpdateProfile($this->getRecord()));
+        return parent::getSaveFormAction()->label('Save profile changes')->keyBindings([])
+            ->visible(fn (): bool => EmployeeResource::canUpdateProfile($this->getRecord()));
     }
 
     protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): \Illuminate\Database\Eloquent\Model
