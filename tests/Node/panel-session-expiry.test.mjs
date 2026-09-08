@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 
 const path = new URL('../../resources/views/filament/partials/session-expiry.blade.php', import.meta.url);
-const source = existsSync(path) ? readFileSync(path, 'utf8').match(/<script[^>]*>([\s\S]*?)<\/script>/i)[1] : '';
+// This is a fixed repository fixture contract, not an HTML parser or sanitizer.
+const template = readFileSync(path, 'utf8').trim();
+const opening = '<script data-mbfd-session-expiry>';
+const closing = '</script>';
+assert.ok(template.startsWith(opening));
+assert.ok(template.endsWith(closing));
+const source = template.slice(opening.length, -closing.length);
 
 function fixture() {
     const listeners = {};
