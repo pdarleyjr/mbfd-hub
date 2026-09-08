@@ -144,14 +144,18 @@ def smoke(config) -> None:
         raise ValueError("gateway listener scope changed")
 
 
-def install_atomic(data: bytes, path: Path, mode: int) -> None:
+def install_atomic(data: bytes, path: Path, *, reader_group: int | None = None) -> None:
     fd, temporary = tempfile.mkstemp(prefix=".admission-release-", dir=path.parent)
     try:
         with os.fdopen(fd, "wb") as handle:
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
-        os.chmod(temporary, mode)
+        # Configuration/state are always root-only. Only source code may be
+        # readable by the service group; no caller can request world access.
+        os.chmod(temporary, 0o600 if reader_group is None else 0o640)
+        if reader_group is not None:
+            os.chown(temporary, 0, reader_group)
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):
@@ -161,7 +165,17 @@ def install_atomic(data: bytes, path: Path, mode: int) -> None:
 def restore_previous(backup: Path) -> None:
     for name, live in {**FILES, "deployment-source.json": STATE}.items():
         saved = backup / name
-        install_atomic(saved.read_bytes(), live, saved.stat().st_mode & 0o777)
+        digest(saved)
+        fd, temporary = tempfile.mkstemp(prefix=".admission-release-", dir=live.parent)
+        os.close(fd)
+        try:
+            # Restore the protected backup's original permissions as well as
+            # bytes. New secret files never use this restoration-only path.
+            shutil.copy2(saved, temporary)
+            os.replace(temporary, live)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
     subprocess.run(["systemctl", "restart", "ollama-ai-proxy.service"], check=True)
 
 
@@ -174,6 +188,9 @@ def main() -> int:
     args = parser.parse_args()
     if os.geteuid() != 0:
         raise ValueError("root required")
+    import grp
+
+    service_gid = grp.getgrnam("ollama-proxy").gr_gid
     candidate = source.validate_source(
         source_dir=args.source_dir,
         expected_sha=args.expected_sha,
@@ -240,14 +257,14 @@ def main() -> int:
         install_atomic(
             (args.source_dir / "mbfd_ai_gateway.py").read_bytes(),
             FILES["mbfd_ai_gateway.py"],
-            0o755,
+            reader_group=service_gid,
         )
-        install_atomic(revised_bytes, FILES["mbfd-ai-gateway.json"], 0o600)
+        install_atomic(revised_bytes, FILES["mbfd-ai-gateway.json"])
         state["runtime_artifacts"] = {
             name: digest(path) for name, path in FILES.items()
         }
         install_atomic(
-            (json.dumps(state, sort_keys=True) + "\n").encode(), STATE, 0o600
+            (json.dumps(state, sort_keys=True) + "\n").encode(), STATE
         )
         verify_live(candidate, state)
         subprocess.run(["systemctl", "restart", "ollama-ai-proxy.service"], check=True)
