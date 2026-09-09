@@ -38,6 +38,13 @@ require_root() {
 
 validate_source() {
   bash -n "${OPERATIONS_DIR}/mbfd-site-error-monitor.sh"
+  python3 - "${OPERATIONS_DIR}/mbfd_site_auth_probe.py" <<'PY'
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1])
+compile(source.read_bytes(), str(source), "exec")
+PY
   bash -n "${SOURCE_DIR}/run-hermes-bounded-summary.sh"
   python3 - "${SOURCE_DIR}/mbfd-eoc-watchdog.py" <<'PY'
 from pathlib import Path
@@ -56,6 +63,7 @@ PY
 
 compare_managed_files() {
   cmp -s "${OPERATIONS_DIR}/mbfd-site-error-monitor.sh" /opt/mbfd/runbooks/mbfd-site-error-monitor.sh
+  cmp -s "${OPERATIONS_DIR}/mbfd_site_auth_probe.py" /opt/mbfd/runbooks/mbfd_site_auth_probe.py
   cmp -s "${SOURCE_DIR}/mbfd-eoc-watchdog.py" /opt/mbfd/hermes/mbfd-eoc-watchdog.py
   cmp -s "${SOURCE_DIR}/run-hermes-bounded-summary.sh" /opt/mbfd/hermes/run-hermes-bounded-summary.sh
   local unit
@@ -92,6 +100,7 @@ apply_managed_files() {
   install -d -m 0750 "${backup_dir}"
 
   backup_if_present /opt/mbfd/runbooks/mbfd-site-error-monitor.sh "${backup_dir}"
+  backup_if_present /opt/mbfd/runbooks/mbfd_site_auth_probe.py "${backup_dir}"
   backup_if_present /opt/mbfd/hermes/mbfd-eoc-watchdog.py "${backup_dir}"
   backup_if_present /opt/mbfd/hermes/run-hermes-bounded-summary.sh "${backup_dir}"
   for unit in "${UNIT_FILES[@]}"; do
@@ -100,6 +109,7 @@ apply_managed_files() {
   backup_if_present "${JOBS_FILE}" "${backup_dir}"
 
   install -o root -g root -m 0755 "${OPERATIONS_DIR}/mbfd-site-error-monitor.sh" /opt/mbfd/runbooks/mbfd-site-error-monitor.sh
+  install -o root -g root -m 0755 "${OPERATIONS_DIR}/mbfd_site_auth_probe.py" /opt/mbfd/runbooks/mbfd_site_auth_probe.py
   install -o root -g mbfd-aiops -m 0750 "${SOURCE_DIR}/mbfd-eoc-watchdog.py" /opt/mbfd/hermes/mbfd-eoc-watchdog.py
   install -o root -g mbfd-aiops -m 0750 "${SOURCE_DIR}/run-hermes-bounded-summary.sh" /opt/mbfd/hermes/run-hermes-bounded-summary.sh
   for unit in "${UNIT_FILES[@]}"; do

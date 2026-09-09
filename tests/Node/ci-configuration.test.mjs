@@ -90,6 +90,27 @@ test("missing PHPStan exclude paths are explicitly optional", () => {
   assert.deepEqual(invalid, []);
 });
 
+test("Hub application AI uses only the authenticated logical gateway contract", () => {
+  const applicationFiles = [
+    "app/Services/LocalAIService.php",
+    "app/Providers/AppServiceProvider.php",
+    "app/Jobs/GenerateDisplayAiSnapshotJob.php",
+    "app/Services/OperationalForms/FrocImportService.php",
+    "config/cloudflare.php",
+    ".env.example",
+  ];
+  const source = applicationFiles
+    .map((path) => readFileSync(resolve(root, path), "utf8"))
+    .join("\n");
+
+  assert.doesNotMatch(source, /11438|OLLAMA_(?:URL|MODEL)|qwen\d/i);
+  assert.match(source, /AI_GATEWAY_URL/);
+  assert.match(source, /AI_GATEWAY_CREDENTIAL/);
+  assert.match(source, /X-MBFD-Capability/);
+  assert.match(source, /X-Request-ID/);
+  assert.match(source, /mbfd-general/);
+});
+
 test("Actionlint failures fail the static-analysis job", () => {
   const workflow = readFileSync(resolve(root, ".github/workflows/06-static-analysis.yml"), "utf8");
 
@@ -240,6 +261,12 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(immutableImage, /IMAGE_REF="\$IMAGE_REPOSITORY@\$FINAL_IMAGE_DIGEST"/);
 
   const maintenance = workflowStep(deployment, "Enter maintenance mode and verify queue safety");
+  assert.match(maintenance, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
+  assert.match(maintenance, /\/run\/mbfd-maintenance\/mbfd-hub\.json/);
+  assert.match(maintenance, /STARTED_AT_EPOCH/);
+  assert.match(maintenance, /EXPIRES_AT_EPOCH="\$\(\(STARTED_AT_EPOCH \+ 900\)\)"/);
+  assert.match(maintenance, /schema_version:1/);
+  assert.match(maintenance, /install -o root -g root -m 0644/);
   assert.match(maintenance, /php artisan down --render=errors::503/);
   assert.match(maintenance, /APP_MAINTENANCE_DRIVER/);
   assert.match(maintenance, /storage\/framework\/down/);
@@ -317,6 +344,7 @@ test("production activation is manual, main-only, and blocked by every Hub relea
 
   const leaveMaintenance = workflowStep(deployment, "Leave maintenance mode and verify internal health");
   assert.match(leaveMaintenance, /php artisan up/);
+  assert.match(leaveMaintenance, /rm -f -- \/run\/mbfd-maintenance\/mbfd-hub\.json/);
   assert.match(leaveMaintenance, /http:\/\/localhost:8081\/up/);
   assert.doesNotMatch(leaveMaintenance, /http:\/\/localhost\/up/);
 

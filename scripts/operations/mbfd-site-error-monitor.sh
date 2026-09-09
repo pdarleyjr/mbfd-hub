@@ -8,6 +8,7 @@ readonly STATE=${BASE}/state.env
 readonly REPORT_DIR=${BASE}/reports
 readonly LARAVEL_LOG=/opt/mbfd/mbfd-hub/storage/logs/laravel.log
 readonly LARAVEL_EVENT_FILTER=/opt/mbfd/runbooks/filter_laravel_monitor_events.py
+readonly SITE_AUTH_PROBE=/opt/mbfd/runbooks/mbfd_site_auth_probe.py
 readonly ALERT_COOLDOWN_SECONDS=900
 readonly HERMES_ENV="HOME=/var/lib/mbfd-aiops HERMES_HOME=/opt/mbfd/hermes/home PATH=/var/lib/mbfd-aiops/.local/bin:/opt/mbfd/hermes/home/node/bin:/opt/mbfd/hermes/home/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -64,39 +65,11 @@ STATE
 }
 
 probe_sites() {
-    python3 - <<'PY'
-import urllib.error
-import urllib.request
-
-checks = [
-    ('main', 'https://mbfdhub.com/', {200}),
-    ('www', 'https://www.mbfdhub.com/', {200}),
-    ('admin', 'https://www.mbfdhub.com/admin', {302}),
-    ('admin-login', 'https://www.mbfdhub.com/admin/login', {200}),
-]
-
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, request, response, code, message, headers, new_url):
-        return None
-
-opener = urllib.request.build_opener(NoRedirect)
-for name, url, expected in checks:
-    request = urllib.request.Request(url, method='HEAD', headers={'User-Agent': 'MBFD-Site-Monitor/2.0'})
-    try:
-        response = opener.open(request, timeout=12)
-        code = response.status
-        location = response.headers.get('location', '')
-    except urllib.error.HTTPError as error:
-        code = error.code
-        location = error.headers.get('location', '')
-    except Exception as error:
-        print(f'ISSUE http_probe name={name} error={type(error).__name__}')
-        continue
-    if code not in expected:
-        print(f'ISSUE http_probe name={name} expected={sorted(expected)} actual={code}')
-    else:
-        print(f'OK http_probe name={name} actual={code} location={location}')
-PY
+    if [[ ! -r "${SITE_AUTH_PROBE}" ]]; then
+        echo "ISSUE http_probe source_unavailable"
+        return
+    fi
+    python3 "${SITE_AUTH_PROBE}"
 }
 
 probe_runtime() {
@@ -245,7 +218,7 @@ Historical state: ${CURRENT_STATE}
 Recovery time: $(date -Is)
 Correlation ID: ${correlation_id}
 User impact: No current impact; all synthetic probes pass.
-Evidence: main=200, www=200, admin=302, admin-login=200
+Evidence: application-up=200, canonical-login=200, main=302-to-login, www=302-to-login, admin=302-to-login, admin-login=302-to-login
 Recovery state: ${recovery_state}
 RECOVERY
     chmod 0640 "${assessment}"

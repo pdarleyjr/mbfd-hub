@@ -1,10 +1,12 @@
 import importlib.util
 import json
 import sys
+import stat
 import unittest
 from datetime import datetime
 from pathlib import Path
 from unittest import mock
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -96,6 +98,31 @@ class OriginMonitorTest(unittest.TestCase):
         self.assertIn("tonor_microphone", probe.evidence)
         self.assertIn("program_audio", probe.evidence)
         self.assertIn("sync", probe.evidence)
+
+    def test_maintenance_marker_is_root_owned_regular_and_expires(self) -> None:
+        valid = SimpleNamespace(
+            st_mode=stat.S_IFREG | 0o644,
+            st_uid=0,
+            st_mtime=1_000,
+        )
+        self.assertTrue(MONITOR.maintenance_metadata_valid(valid, 1_900))
+
+        for metadata, now_epoch in (
+            (SimpleNamespace(st_mode=stat.S_IFREG | 0o666, st_uid=0, st_mtime=1_000), 1_100),
+            (SimpleNamespace(st_mode=stat.S_IFREG | 0o644, st_uid=1000, st_mtime=1_000), 1_100),
+            (SimpleNamespace(st_mode=stat.S_IFDIR | 0o755, st_uid=0, st_mtime=1_000), 1_100),
+            (valid, 1_901),
+            (valid, 999),
+        ):
+            with self.subTest(metadata=metadata, now_epoch=now_epoch):
+                self.assertFalse(
+                    MONITOR.maintenance_metadata_valid(metadata, now_epoch)
+                )
+
+    def test_maintenance_marker_is_limited_to_known_services(self) -> None:
+        with mock.patch.object(MONITOR.Path, "lstat") as lstat:
+            self.assertFalse(MONITOR.maintenance_active("unknown-service"))
+            lstat.assert_not_called()
 
 
 if __name__ == "__main__":

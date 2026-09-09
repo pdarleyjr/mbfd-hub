@@ -44,7 +44,10 @@ class HermesWatchdogPersistenceTests(unittest.TestCase):
         self.assertIn("install-hermes-watchdog.sh --check", workflow)
 
     def test_no_obsolete_full_agent_invocation_in_deployable_source(self):
-        deployable = [ROOT / "scripts" / "operations" / "mbfd-site-error-monitor.sh"]
+        deployable = [
+            ROOT / "scripts" / "operations" / "mbfd-site-error-monitor.sh",
+            ROOT / "scripts" / "operations" / "mbfd_site_auth_probe.py",
+        ]
         deployable.extend(
             path
             for path in WATCHDOG.rglob("*")

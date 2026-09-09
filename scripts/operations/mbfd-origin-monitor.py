@@ -8,6 +8,7 @@ import http.cookiejar
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import time
@@ -27,6 +28,7 @@ STATUS_FILE = STATE_DIR / "status.json"
 EVENT_FILE = LOG_DIR / "events.jsonl"
 MAINTENANCE_DIR = Path("/run/mbfd-maintenance")
 COOLDOWN_SECONDS = 900
+MAX_MAINTENANCE_SECONDS = 900
 
 
 class LoopbackCookiePolicy(http.cookiejar.DefaultCookiePolicy):
@@ -74,6 +76,29 @@ def load_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
         return value if isinstance(value, dict) else default
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return default
+
+
+def maintenance_metadata_valid(metadata: os.stat_result, now_epoch: int) -> bool:
+    age = now_epoch - int(metadata.st_mtime)
+    return (
+        stat.S_ISREG(metadata.st_mode)
+        and metadata.st_uid == 0
+        and not metadata.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
+        and 0 <= age <= MAX_MAINTENANCE_SECONDS
+    )
+
+
+def maintenance_active(service: str, now_epoch: int | None = None) -> bool:
+    if service not in {"media-control", "camera-hls"}:
+        return False
+    try:
+        metadata = (MAINTENANCE_DIR / service).lstat()
+    except OSError:
+        return False
+    return maintenance_metadata_valid(
+        metadata,
+        int(time.time()) if now_epoch is None else now_epoch,
+    )
 
 
 def atomic_json(path: Path, value: dict[str, Any]) -> None:
@@ -271,7 +296,7 @@ def service_state(
     previous: dict[str, Any],
 ) -> dict[str, Any]:
     failed = [probe for probe in probes if not probe.ok]
-    maintenance = (MAINTENANCE_DIR / service).exists()
+    maintenance = maintenance_active(service)
     previous_failures = int(previous.get("consecutive_failures", 0))
     consecutive_failures = previous_failures + 1 if failed else 0
     actionable = int(signals.get("actionable", 0))

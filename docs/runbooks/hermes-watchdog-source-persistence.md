@@ -8,6 +8,7 @@ Hermes scripts, cron state, or systemd units.
 The canonical deployable artifacts are:
 
 - `scripts/operations/mbfd-site-error-monitor.sh`
+- `scripts/operations/mbfd_site_auth_probe.py`
 - `scripts/operations/hermes-watchdog/mbfd-eoc-watchdog.py`
 - `scripts/operations/hermes-watchdog/run-hermes-bounded-summary.sh`
 - `scripts/operations/hermes-watchdog/systemd/*.service`
