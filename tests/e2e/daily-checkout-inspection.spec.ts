@@ -1377,6 +1377,16 @@ test('a security-version change quarantines captured work without discarding it'
 
 test('generic offline records enforce ownership per record on a shared device', async ({ page }) => {
   const api = await mockInspectionApi(page);
+  // Keep mount-time synchronization behind a fixture barrier while both
+  // owners' records are seeded; an online User A must not replay during setup.
+  let releaseIdentity!: () => void;
+  const identityBarrier = new Promise<void>((resolve) => {
+    releaseIdentity = resolve;
+  });
+  await page.route('**/api/me/context', async (route) => {
+    await identityBarrier;
+    await route.fallback();
+  });
   await page.goto('/daily/stations');
 
   await addGenericQueuedSubmission(page, {
@@ -1400,8 +1410,9 @@ test('generic offline records enforce ownership per record on a shared device', 
     ownershipState: 'owned',
   });
 
+  expect(api.genericSubmissions).toHaveLength(0);
   api.setIdentity(202, 1);
-  await page.reload();
+  releaseIdentity();
 
   await expect.poll(() => api.genericSubmissions.length).toBe(1);
   await expect.poll(async () => (await genericQueuedSubmissions(page)).length).toBe(1);
