@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -113,6 +114,36 @@ final class FederationLoginAttemptTest extends TestCase
             $this->begin('/auth/media-control/authorize?state=attempt-'.$i);
         }
         $this->get('/auth/media-control/authorize?state=ninth')->assertStatus(409)->assertSee('Return to the application');
+    }
+
+    public function test_attempt_issuance_stays_host_only_with_parent_domain_session_configuration(): void
+    {
+        config(['session.domain' => '.mbfdhub.com']);
+        Cookie::setDefaultPathAndDomain('/', '.mbfdhub.com', true, 'lax');
+
+        $this->begin('/auth/media-control/authorize?state=host-only-issuance');
+        self::assertSame('.mbfdhub.com', Cookie::make('ordinary-cookie', 'ordinary')->getDomain());
+    }
+
+    public function test_attempt_deletion_stays_host_only_with_parent_domain_session_configuration(): void
+    {
+        $user = $this->member();
+        $handoff = '/auth/media-control/authorize?state=host-only-deletion';
+        $login = $this->begin($handoff);
+        config(['session.domain' => '.mbfdhub.com']);
+        Cookie::setDefaultPathAndDomain('/', '.mbfdhub.com', true, 'lax');
+        $this->get($login)->assertOk();
+
+        $response = $this->post($login, [
+            '_token' => session()->token(), 'employee_id' => $user->employee_id, 'password' => 'correct-password',
+        ])->assertRedirect($handoff);
+        $cookies = array_values(array_filter($response->headers->getCookies(),
+            static fn ($cookie): bool => str_starts_with($cookie->getName(), 'hub_login_attempt_')));
+        self::assertCount(1, $cookies);
+        self::assertNull($cookies[0]->getDomain());
+        self::assertSame('/', $cookies[0]->getPath());
+        self::assertLessThan(time(), $cookies[0]->getExpiresTime());
+        self::assertSame('.mbfdhub.com', $response->getCookie((string) config('session.cookie'))->getDomain());
     }
 
     public function test_destination_copy_is_fixed_and_never_reflects_client_supplied_names(): void

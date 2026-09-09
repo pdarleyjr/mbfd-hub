@@ -51,7 +51,7 @@ final class FederationLoginAttempt
 
         return (new RedirectResponse('/login?login_attempt='.$id, 302, ['Cache-Control' => 'no-store, private']))
             ->withCookie(Cookie::make(self::PREFIX.$id, $binding, 5, '/', null,
-                $request->isSecure() || app()->environment('production'), true, false, 'lax'));
+                $request->isSecure() || app()->environment('production'), true, false, 'lax')->withDomain(null));
     }
 
     public function current(Request $request): ?string
@@ -111,7 +111,7 @@ final class FederationLoginAttempt
         }
 
         return (new RedirectResponse($destination, 302, ['Cache-Control' => 'no-store, private']))
-            ->withCookie(Cookie::forget(self::PREFIX.$id, '/', null));
+            ->withCookie(Cookie::forget(self::PREFIX.$id, '/', null)->withDomain(null));
     }
 
     public function unavailable(): Response
