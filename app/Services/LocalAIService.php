@@ -9,30 +9,37 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
- * Local Ollama-backed AI service — a drop-in replacement for
- * {@see CloudflareAIService} that routes all generation to the on-prem
- * qwen3.6:35b model via Ollama's OpenAI-compatible endpoint.
+ * Compatibility-named AI service that routes generation through the
+ * authenticated MBFD AI Gateway. Applications request only a logical
+ * capability; the gateway exclusively owns backend and physical-model choice.
  *
  * It normalizes Ollama responses into the Cloudflare Workers-AI
  * ['result' => ['response' => ...]] shape, so every inherited method
  * (generateAdminBulletSummary, prioritizeProjects, analyzeProject,
  * generateWeeklySummary, parseAIResponse, extractTextFromResponse) keeps
- * working unchanged. Bound over CloudflareAIService in AppServiceProvider
- * when cloudflare.ai.driver === 'local'.
+ * working unchanged. Bound over CloudflareAIService in AppServiceProvider for
+ * the gateway driver and its temporary legacy local alias.
  */
 class LocalAIService extends CloudflareAIService
 {
     protected string $baseUrl;
 
-    protected string $localModel;
+    protected string $capability;
+
+    protected string $credential;
+
+    protected int $gatewayTimeout;
 
     public function __construct()
     {
         parent::__construct();
-        $this->baseUrl = rtrim((string) config('cloudflare.ai.local.url', 'http://host.docker.internal:11434'), '/');
-        $this->localModel = (string) config('cloudflare.ai.local.model', 'qwen3.6:35b');
+        $this->baseUrl = rtrim((string) config('cloudflare.ai.gateway.url', ''), '/');
+        $this->capability = trim((string) config('cloudflare.ai.gateway.capability', ''));
+        $this->credential = trim((string) config('cloudflare.ai.gateway.credential', ''));
+        $this->gatewayTimeout = (int) config('cloudflare.ai.gateway.timeout', 360);
     }
 
     public function isEnabled(): bool
@@ -41,126 +48,118 @@ class LocalAIService extends CloudflareAIService
     }
 
     /**
-     * Perform a bounded, cached capability check without loading a model.
+     * Perform a bounded, authenticated gateway readiness check without loading
+     * a model. A successful request proves the configured consumer credential
+     * is accepted; generation separately proves its capability admission.
      *
      * @return array{
      *     configured: bool,
      *     reachable: bool,
-     *     model_exists: bool,
+     *     authenticated: bool,
+     *     capability: string|null,
      *     available: bool,
      *     error: string|null
      * }
      */
     public function checkHealth(): array
     {
-        $cacheKey = 'local_ai_health:'.md5($this->baseUrl.':'.$this->localModel);
+        $cacheKey = 'mbfd_ai_gateway_health:'.md5($this->baseUrl.':'.$this->capability.':'.($this->credential !== '' ? 'configured' : 'missing'));
 
         return Cache::remember($cacheKey, now()->addSeconds(60), function (): array {
-            if ($this->baseUrl === '' || $this->localModel === '') {
+            if (! $this->isConfigured()) {
                 return [
                     'configured' => false,
                     'reachable' => false,
-                    'model_exists' => false,
+                    'authenticated' => false,
+                    'capability' => $this->capability !== '' ? $this->capability : null,
                     'available' => false,
-                    'error' => 'Ollama URL or model not configured',
+                    'error' => 'MBFD AI gateway is not configured',
                 ];
             }
 
             try {
-                $response = Http::connectTimeout(3)
+                $response = $this->gatewayRequest($this->requestId())
+                    ->connectTimeout(3)
                     ->timeout(5)
-                    ->get("{$this->baseUrl}/api/tags");
+                    ->get("{$this->baseUrl}/health/ready");
             } catch (ConnectionException $exception) {
-                Log::warning('Local AI health check: Ollama unreachable', [
-                    'error' => $exception->getMessage(),
+                Log::warning('MBFD AI gateway health check failed', [
+                    'exception_type' => $exception::class,
                 ]);
 
                 return [
                     'configured' => true,
                     'reachable' => false,
-                    'model_exists' => false,
+                    'authenticated' => false,
+                    'capability' => $this->capability,
                     'available' => false,
-                    'error' => 'Ollama unreachable: '.$exception->getMessage(),
+                    'error' => 'MBFD AI gateway is unreachable',
                 ];
             }
 
             if (! $response->successful()) {
-                Log::warning('Local AI health check: Ollama returned non-200', [
+                $authenticated = ! in_array($response->status(), [401, 403], true);
+                Log::warning('MBFD AI gateway health check returned non-200', [
                     'status' => $response->status(),
+                    'request_id' => $response->header('X-Request-ID'),
                 ]);
 
                 return [
                     'configured' => true,
-                    'reachable' => false,
-                    'model_exists' => false,
+                    'reachable' => true,
+                    'authenticated' => $authenticated,
+                    'capability' => $this->capability,
                     'available' => false,
-                    'error' => "Ollama returned HTTP {$response->status()}",
+                    'error' => $authenticated
+                        ? "MBFD AI gateway returned HTTP {$response->status()}"
+                        : 'MBFD AI gateway rejected the consumer credential',
                 ];
             }
 
             try {
-                $inventory = json_decode($response->body(), true, 512, JSON_THROW_ON_ERROR);
+                $readiness = json_decode($response->body(), true, 512, JSON_THROW_ON_ERROR);
             } catch (\JsonException) {
-                $inventory = null;
+                $readiness = null;
             }
 
-            if (! is_array($inventory) || ! isset($inventory['models']) || ! is_array($inventory['models'])) {
-                Log::warning('Local AI health check: Ollama returned malformed model inventory');
+            if (! is_array($readiness) || ($readiness['status'] ?? null) !== 'ready') {
+                Log::warning('MBFD AI gateway returned malformed readiness');
 
                 return [
                     'configured' => true,
                     'reachable' => true,
-                    'model_exists' => false,
+                    'authenticated' => true,
+                    'capability' => $this->capability,
                     'available' => false,
-                    'error' => 'Ollama returned malformed model inventory',
-                ];
-            }
-
-            $models = collect($inventory['models'])
-                ->pluck('name')
-                ->filter(fn (mixed $name): bool => is_string($name) && $name !== '')
-                ->map(fn (string $name): string => $this->normalizeModelName($name))
-                ->values()
-                ->all();
-            $modelExists = in_array($this->normalizeModelName($this->localModel), $models, true);
-
-            if (! $modelExists) {
-                Log::warning('Local AI health check: configured model not found', [
-                    'model' => $this->localModel,
-                    'available_models' => array_slice($models, 0, 10),
-                ]);
-
-                return [
-                    'configured' => true,
-                    'reachable' => true,
-                    'model_exists' => false,
-                    'available' => false,
-                    'error' => "Model '{$this->localModel}' not found in Ollama",
+                    'error' => 'MBFD AI gateway returned malformed readiness',
                 ];
             }
 
             return [
                 'configured' => true,
                 'reachable' => true,
-                'model_exists' => true,
+                'authenticated' => true,
+                'capability' => $this->capability,
                 'available' => true,
                 'error' => null,
             ];
         });
     }
 
-    private function normalizeModelName(string $model): string
+    private function isConfigured(): bool
     {
-        $model = trim($model);
+        if ($this->baseUrl === '' || $this->capability === '' || $this->credential === '') {
+            return false;
+        }
 
-        return str_ends_with($model, ':latest')
-            ? substr($model, 0, -strlen(':latest'))
-            : $model;
+        $scheme = parse_url($this->baseUrl, PHP_URL_SCHEME);
+
+        return in_array($scheme, ['http', 'https'], true);
     }
 
     public function checkRateLimit(): bool
     {
-        // No neuron budget when running locally.
+        // Gateway admission policy owns per-consumer rate limiting.
         return true;
     }
 
@@ -170,18 +169,22 @@ class LocalAIService extends CloudflareAIService
     }
 
     /**
-     * Run the local model and return a Cloudflare-shaped response array.
+     * Run the logical gateway capability and return a Cloudflare-shaped array.
      *
-     * @param  string  $model  Ignored (callers pass @cf/... ids); always uses the local model.
+     * @param  string  $model  Ignored; physical model selection is gateway-owned.
      * @param  array<int, array{role: string, content: string}>  $messages
      * @param  array<string, mixed>  $options
      * @return array{result: array{response: string}}
      */
     public function runModel(string $model, array $messages, array $options = []): array
     {
+        if (! $this->isConfigured()) {
+            throw new \RuntimeException('MBFD AI gateway is not configured');
+        }
+
         // Interactive browser requests may use a shorter ceiling than the
         // global cold-load timeout. Never forward this transport option.
-        $requestTimeout = (int) ($options['request_timeout'] ?? config('cloudflare.ai.local.timeout', 120));
+        $requestTimeout = (int) ($options['request_timeout'] ?? $this->gatewayTimeout);
         $responseSchema = $options['response_schema'] ?? null;
         unset($options['request_timeout']);
         unset($options['response_schema']);
@@ -190,7 +193,7 @@ class LocalAIService extends CloudflareAIService
             $temperature = (float) ($options['temperature'] ?? 0.1);
             $maxTokens = (int) ($options['max_tokens'] ?? 2048);
             $response = $this->postWithBoundedRetry("{$this->baseUrl}/api/chat", [
-                'model' => $this->localModel,
+                'model' => $this->capability,
                 'messages' => $messages,
                 'stream' => false,
                 'think' => false,
@@ -210,10 +213,7 @@ class LocalAIService extends CloudflareAIService
             'temperature' => 0.3,
             'max_tokens' => 2048,
         ], $options, [
-            // qwen3.6 is a thinking model; reasoning_effort:none keeps replies
-            // fast and guarantees non-empty `content`. Force the local model id
-            // regardless of any @cf/... id the caller passed.
-            'model' => $this->localModel,
+            'model' => $this->capability,
             'messages' => $messages,
             'reasoning_effort' => 'none',
         ]);
@@ -239,12 +239,14 @@ class LocalAIService extends CloudflareAIService
     private function postWithBoundedRetry(string $url, array $payload, int $timeout): Response
     {
         $attempt = 0;
+        $requestId = $this->requestId();
 
         while (true) {
             $attempt++;
 
             try {
-                $response = Http::timeout($timeout)
+                $response = $this->gatewayRequest($requestId)
+                    ->timeout($timeout)
                     ->connectTimeout(10)
                     ->post($url, $payload);
             } catch (ConnectionException $exception) {
@@ -269,12 +271,28 @@ class LocalAIService extends CloudflareAIService
                     'status' => $response->status(),
                     'response_bytes' => strlen($response->body()),
                     'attempts' => $attempt,
+                    'request_id' => $response->header('X-Request-ID') ?: $requestId,
                 ]);
                 throw new \RuntimeException("Local AI request failed: {$response->status()}");
             }
 
             return $response;
         }
+    }
+
+    private function gatewayRequest(string $requestId): \Illuminate\Http\Client\PendingRequest
+    {
+        return Http::withToken($this->credential)
+            ->acceptJson()
+            ->withHeaders([
+                'X-MBFD-Capability' => $this->capability,
+                'X-Request-ID' => $requestId,
+            ]);
+    }
+
+    private function requestId(): string
+    {
+        return (string) Str::uuid();
     }
 
     /**
@@ -297,7 +315,7 @@ class LocalAIService extends CloudflareAIService
             ],
         ];
 
-        $result = $this->runModel($this->localModel, $messages);
+        $result = $this->runModel($this->capability, $messages);
 
         return [
             'message' => $result['result']['response'] ?? '',

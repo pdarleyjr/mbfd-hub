@@ -233,11 +233,25 @@ jobs:
           REMOTE
 
       - name: Enter maintenance mode and verify queue safety
+        env:
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          test -n "$RELEASE_SHA"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
+          MAINTENANCE_MARKER=/run/mbfd-maintenance/mbfd-hub.json
+          MARKER_TEMP="$(mktemp)"
+          trap 'rm -f -- "$MARKER_TEMP"' EXIT
+          STARTED_AT_EPOCH="$(date +%s)"
+          EXPIRES_AT_EPOCH="$((STARTED_AT_EPOCH + 900))"
+          jq -n --arg service mbfd-hub --arg release_sha "$RELEASE_SHA" \
+            --argjson started_at_epoch "$STARTED_AT_EPOCH" --argjson expires_at_epoch "$EXPIRES_AT_EPOCH" \
+            '{schema_version:1,service:$service,release_sha:$release_sha,started_at_epoch:$started_at_epoch,expires_at_epoch:$expires_at_epoch}' \
+            > "$MARKER_TEMP"
+          sudo -n install -d -o root -g root -m 0755 /run/mbfd-maintenance
+          sudo -n install -o root -g root -m 0644 "$MARKER_TEMP" "$MAINTENANCE_MARKER"
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan down --render=errors::503
           MAINTENANCE_DRIVER="$(docker exec -u sail "$HUB_APP_CONTAINER" printenv APP_MAINTENANCE_DRIVER || true)"
           test -z "$MAINTENANCE_DRIVER" || test "$MAINTENANCE_DRIVER" = 'file'
@@ -390,6 +404,7 @@ jobs:
           HUB_APP_CONTAINER=mbfd-hub-laravel
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan up
           test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost:8081/up)" = '200'
+          sudo -n rm -f -- /run/mbfd-maintenance/mbfd-hub.json
           REMOTE
 
       - name: Persist canonical Hermes watchdog configuration

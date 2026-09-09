@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
  * Gathers operational metrics (shared by the dashboard widget and the
  * background job) and manages a cached AI summary that is regenerated ONLY
  * when the underlying data changes — detected via a fingerprint of the
- * metrics. This keeps the local LLM (qwen3.6) idle (and out of RAM) unless
+ * metrics. This keeps the gateway-owned model idle unless
  * there is genuinely new information to summarize.
  *
  * Flow: the widget polls every ~2 min and calls ensureFresh(), which is
@@ -30,8 +30,11 @@ use Illuminate\Support\Facades\Log;
 class CommandCenterAiService
 {
     public const CACHE_KEY = 'command_center_ai_summary';   // ['fp','summary','at']
+
     public const PENDING_KEY = 'command_center_ai_pending'; // fingerprint currently being generated
+
     public const CACHE_TTL = 86400;                          // 24h
+
     public const PENDING_TTL = 600;                          // 10m guard against stuck jobs
 
     /**
@@ -73,7 +76,7 @@ class CommandCenterAiService
             Cache::put(self::PENDING_KEY, $fp, self::PENDING_TTL);
             GenerateCommandCenterSummaryJob::dispatch($fp);
         } catch (\Throwable $e) {
-            Log::debug('[CommandCenter] ensureFresh skipped: ' . $e->getMessage());
+            Log::debug('[CommandCenter] ensureFresh skipped: '.$e->getMessage());
         }
     }
 
@@ -131,7 +134,7 @@ class CommandCenterAiService
                 ])->values()->toArray(),
             ];
         } catch (\Exception $e) {
-            Log::debug('Equipment metrics unavailable: ' . $e->getMessage());
+            Log::debug('Equipment metrics unavailable: '.$e->getMessage());
         }
 
         $capitalProjects = CapitalProject::with(['milestones', 'updates'])

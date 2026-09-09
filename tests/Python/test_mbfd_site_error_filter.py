@@ -138,6 +138,10 @@ class SiteErrorMonitorIntegrationTest(unittest.TestCase):
         self.assertIn("filter_laravel_monitor_events.py", self.monitor)
         self.assertNotIn("| grep -E '^[\\[]", self.monitor)
 
+    def test_monitor_uses_the_status_and_destination_auth_contract_probe(self):
+        self.assertIn("mbfd_site_auth_probe.py", self.monitor)
+        self.assertNotIn("('main', 'https://mbfdhub.com/', {200})", self.monitor)
+
     def test_monitor_supplies_current_runtime_evidence(self):
         self.assertIn("===== RUNTIME PROBES =====", self.monitor)
         for container in (

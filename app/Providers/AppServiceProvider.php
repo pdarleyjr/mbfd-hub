@@ -41,14 +41,15 @@ class AppServiceProvider extends ServiceProvider
             \App\Http\Responses\LoginResponse::class,
         );
 
-        // Route command-center / capital-project AI to the on-prem Ollama
-        // (qwen3.6:35b) when AI_DRIVER=local. All callers resolve
-        // CloudflareAIService via the container, so this one binding repoints
-        // SmartUpdatesWidget, CapitalProject analysis, and the summary commands.
+        // Route application AI through the authenticated logical gateway.
+        // The legacy "local" driver name is retained only as a non-raw alias
+        // during configuration migration; both names resolve the same gateway.
         $this->app->bind(\App\Services\CloudflareAIService::class, function () {
-            return config('cloudflare.ai.driver') === 'local'
-                ? new \App\Services\LocalAIService
-                : new \App\Services\CloudflareAIService;
+            return match (config('cloudflare.ai.driver')) {
+                'gateway', 'local' => new \App\Services\LocalAIService,
+                'cloudflare' => new \App\Services\CloudflareAIService,
+                default => throw new \RuntimeException('Unsupported AI driver.'),
+            };
         });
 
     }
