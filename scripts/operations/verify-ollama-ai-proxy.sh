@@ -61,7 +61,7 @@ done
 
 systemctl is-active --quiet ollama-ai-proxy.service
 systemctl is-enabled --quiet ollama-ai-proxy.service
-expected_listeners=$'127.0.0.1:11440\n172.20.0.1:11440'
+expected_listeners=$'127.0.0.1:11440\n172.17.0.1:11440\n172.20.0.1:11440'
 actual_listeners=""
 listener_attempt=0
 for ((listener_attempt = 1; listener_attempt <= LISTENER_WAIT_ATTEMPTS; listener_attempt++)); do
@@ -99,5 +99,5 @@ printf 'UNAUTHENTICATED_HEALTH_STATUS=%s\n' "${unauthenticated_status}"
 CREDENTIALS_DIRECTORY="${CREDENTIAL_DIR}" \
     /usr/bin/python3 "${SOURCE_SMOKE}"
 
-printf 'GATEWAY_LISTENERS=127.0.0.1:11440,172.20.0.1:11440\n'
+printf 'GATEWAY_LISTENERS=127.0.0.1:11440,172.17.0.1:11440,172.20.0.1:11440\n'
 printf 'GATEWAY_CANONICAL_SOURCE=PASS\n'
