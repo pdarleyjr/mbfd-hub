@@ -276,6 +276,7 @@ class User extends Authenticatable implements FilamentUser
             'apparatus_service_ticket' => self::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS,
             'evaluation_submission' => self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS,
             'station_inventory_submission' => self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS,
+            'station_supply_request' => self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS,
             default => null,
         };
     }

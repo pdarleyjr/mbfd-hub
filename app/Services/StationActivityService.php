@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusServiceTicketUpdate;
+use App\Models\PersonnelRequest;
 use App\Models\Station;
 use App\Models\StationInspection;
 use App\Models\StationInventorySubmission;
@@ -49,8 +50,8 @@ class StationActivityService
             ->get()
             ->map(fn (StationInspection $inspection): array => [
                 'type' => 'station_inspection',
-                'label' => 'Station inspection — '.str($inspection->inspection_type ?: 'inspection')->replace('_', ' ')->title(),
-                'status' => $inspection->overall_status,
+                'label' => 'Station inspection — '.str($inspection->inspection_type ?: 'inspection')->replace('_', ' ')->title().' ('.str($inspection->overall_status)->replace('_', ' ')->title().')',
+                'status' => $inspection->review_status,
                 'occurred_at' => $inspection->created_at,
             ]);
 
@@ -76,6 +77,20 @@ class StationActivityService
                 'label' => 'Supply request',
                 'status' => $supply->status,
                 'occurred_at' => $supply->created_at,
+            ]);
+
+        $personnelRequests = PersonnelRequest::query()
+            ->where('originating_station_id', $station->id)
+            ->where('type', 'equipment')
+            ->latest('created_at')
+            ->limit($limit)
+            ->get()
+            ->map(fn (PersonnelRequest $request): array => [
+                'type' => 'personnel_request',
+                'label' => "{$request->request_number} — Personnel PPE request",
+                'status' => $request->status->value,
+                'request_number' => $request->request_number,
+                'occurred_at' => $request->created_at,
             ]);
 
         $stationRequests = StationRequest::query()
@@ -116,6 +131,7 @@ class StationActivityService
             ->concat($stationInspections)
             ->concat($inventory)
             ->concat($supplyRequests)
+            ->concat($personnelRequests)
             ->concat($stationRequests)
             ->concat($apparatusServiceTicketUpdates)
             ->sortByDesc('occurred_at')

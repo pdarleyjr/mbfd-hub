@@ -198,7 +198,7 @@ class StationInventoryV2SignedUrlTest extends TestCase
             'station_id' => $station->id,
             'actor_name' => 'Canonical Inventory Actor',
             'actor_shift' => 'B-Day',
-            'action' => 'note_added',
+            'action' => 'supply_request_created',
         ]);
     }
 

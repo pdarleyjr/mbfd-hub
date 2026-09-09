@@ -3,8 +3,9 @@
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
 use App\Models\ApparatusInspection;
+use App\Models\User;
+use App\Services\ApparatusInspectionApprovalService;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -15,35 +16,6 @@ class InspectionsRelationManager extends RelationManager
 
     protected static ?string $title = 'Vehicle Inspections';
 
-    public function form(Form $form): Form
-    {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('operator_name')
-                    ->label('Operator Name')
-                    ->required()
-                    ->maxLength(255),
-
-                Forms\Components\TextInput::make('rank')
-                    ->maxLength(50),
-
-                Forms\Components\Select::make('shift')
-                    ->options([
-                        'A' => 'A Shift',
-                        'B' => 'B Shift',
-                        'C' => 'C Shift',
-                    ])
-                    ->required(),
-
-                Forms\Components\TextInput::make('unit_number')
-                    ->maxLength(50),
-
-                Forms\Components\DateTimePicker::make('completed_at')
-                    ->label('Completed At')
-                    ->default(now()),
-            ]);
-    }
-
     public function table(Table $table): Table
     {
         return $table
@@ -53,6 +25,11 @@ class InspectionsRelationManager extends RelationManager
                     ->label('Date')
                     ->dateTime('M j, Y g:i A')
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('inspection_reference')
+                    ->label('Inspection')
+                    ->searchable()
+                    ->copyable(),
 
                 Tables\Columns\TextColumn::make('current_designation')
                     ->label('Designation')
@@ -71,6 +48,16 @@ class InspectionsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('rank')
                     ->label('Rank'),
 
+                Tables\Columns\TextColumn::make('engine_hours')
+                    ->label('Engine Hours')
+                    ->numeric(decimalPlaces: 1)
+                    ->placeholder('—'),
+
+                Tables\Columns\TextColumn::make('miles')
+                    ->label('Mileage')
+                    ->numeric()
+                    ->placeholder('—'),
+
                 Tables\Columns\TextColumn::make('shift')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -86,6 +73,7 @@ class InspectionsRelationManager extends RelationManager
                     ->color(fn (string $state): string => match ($state) {
                         'pending_review' => 'warning',
                         'approved' => 'success',
+                        'rejected' => 'danger',
                         default => 'gray',
                     }),
 
@@ -103,9 +91,7 @@ class InspectionsRelationManager extends RelationManager
                         'C' => 'C Shift',
                     ]),
             ])
-            ->headerActions([
-                Tables\Actions\CreateAction::make(),
-            ])
+            ->headerActions([])
             ->actions([
                 Tables\Actions\Action::make('view_results')
                     ->label('View Results')
@@ -116,14 +102,37 @@ class InspectionsRelationManager extends RelationManager
                         'inspection' => $record->id,
                     ]))
                     ->openUrlInNewTab(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\Action::make('approveInspection')
+                    ->label('Approve')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->visible(fn (ApparatusInspection $record): bool => $record->review_status === 'pending_review'
+                        && (auth()->user()?->can('approve', $record) ?? false))
+                    ->action(function (ApparatusInspection $record, ApparatusInspectionApprovalService $approvalService): void {
+                        $reviewer = auth()->user();
+                        abort_unless($reviewer instanceof User && $reviewer->can('approve', $record), 403);
+                        $approvalService->approve((int) $record->getKey(), $reviewer);
+                    }),
+                Tables\Actions\Action::make('rejectInspection')
+                    ->label('Reject')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->form([
+                        Forms\Components\Textarea::make('review_notes')
+                            ->label('Review note')
+                            ->required()
+                            ->maxLength(2000),
+                    ])
+                    ->visible(fn (ApparatusInspection $record): bool => $record->review_status === 'pending_review'
+                        && (auth()->user()?->can('reject', $record) ?? false))
+                    ->action(function (ApparatusInspection $record, array $data, ApparatusInspectionApprovalService $approvalService): void {
+                        $reviewer = auth()->user();
+                        abort_unless($reviewer instanceof User && $reviewer->can('reject', $record), 403);
+                        $approvalService->reject((int) $record->getKey(), $reviewer, trim($data['review_notes']));
+                    }),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ])
+            ->bulkActions([])
             ->defaultSort('completed_at', 'desc');
     }
 }

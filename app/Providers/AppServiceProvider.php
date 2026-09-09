@@ -8,6 +8,7 @@ use App\Models\ApparatusInspection;
 use App\Models\EvaluationSubmission;
 use App\Models\StationInspection;
 use App\Models\StationInventorySubmission;
+use App\Models\StationSupplyRequest;
 use App\Models\Todo;
 use App\Models\Training\TrainingTodo;
 use App\Models\User;
@@ -21,6 +22,8 @@ use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
@@ -145,6 +148,12 @@ class AppServiceProvider extends ServiceProvider
                 "A station inspection for {$stationName} has been submitted.",
                 '/admin/station-inspections/'.$inspection->id,
             );
+            DB::afterCommit(static function () use ($inspection): void {
+                Cache::forget(\App\Services\Display\DisplaySnapshotService::SNAPSHOT_CACHE_KEY);
+                Cache::forget(\App\Services\Display\DisplaySnapshotService::STATIONS_CACHE_KEY);
+                Cache::forget("station.{$inspection->station_id}.detail");
+                Cache::forget("station.{$inspection->station_id}.activity");
+            });
         });
 
         EvaluationSubmission::created(function (EvaluationSubmission $submission) {
@@ -179,8 +188,32 @@ class AppServiceProvider extends ServiceProvider
                 'station_inventory_submission',
                 'New Station Inventory Submission',
                 "Station {$stationName} submitted an inventory alert for {$shift} shift by {$employeeName}.",
-                '/admin/stations/'.$submission->station_id.'?activeRelationManager=inventoryItems',
+                '/admin/station-inventory-submissions/'.$submission->id,
             );
+            DB::afterCommit(static function () use ($submission): void {
+                Cache::forget(\App\Services\Display\DisplaySnapshotService::SNAPSHOT_CACHE_KEY);
+                Cache::forget(\App\Services\Display\DisplaySnapshotService::STATIONS_CACHE_KEY);
+                Cache::forget("station.{$submission->station_id}.detail");
+                Cache::forget("station.{$submission->station_id}.activity");
+                Cache::forget("station.{$submission->station_id}.inventory");
+            });
+        });
+
+        StationSupplyRequest::created(function (StationSupplyRequest $supplyRequest): void {
+            DB::afterCommit(function () use ($supplyRequest): void {
+                Cache::forget(\App\Services\Display\DisplaySnapshotService::SNAPSHOT_CACHE_KEY);
+                Cache::forget(\App\Services\Display\DisplaySnapshotService::STATIONS_CACHE_KEY);
+                Cache::forget("station.{$supplyRequest->station_id}.detail");
+                Cache::forget("station.{$supplyRequest->station_id}.activity");
+                Cache::forget("station.{$supplyRequest->station_id}.inventory");
+
+                $this->notifySubmissionRoles(
+                    'station_supply_request',
+                    'New Station Supply Request',
+                    "A supply request for Station {$supplyRequest->station_id} is ready for review.",
+                    '/admin/stations/'.$supplyRequest->station_id,
+                );
+            });
         });
     }
 

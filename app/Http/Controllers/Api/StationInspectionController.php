@@ -27,69 +27,6 @@ class StationInspectionController extends Controller
         return response()->json($query->latest()->paginate($request->get('per_page', 15)));
     }
 
-    public function store(Request $request, AuthenticatedMemberContextResolver $memberContextResolver): JsonResponse
-    {
-        $actor = $memberContextResolver->resolve($request)->actor();
-        $actor->requireEmployee();
-        $validated = $request->validate([
-            'client_submission_id' => 'nullable|uuid',
-            'station_id' => 'required|exists:stations,id',
-            'inspector_id' => 'required|exists:users,id',
-            'inspection_date' => 'required|date',
-            'inspection_type' => 'required|string|max:255',
-            'form_data' => 'required|array',
-            'overall_status' => 'required|in:pass,fail,needs_attention',
-            'inspector_signature' => 'nullable|string',
-            'reviewer_signature' => 'nullable|string',
-            'reviewed_by' => 'nullable|exists:users,id',
-            'reviewed_at' => 'nullable|date',
-            'notes' => 'nullable|string',
-            'form_data.checklist.*.failImage' => 'nullable|string|max:7000000',
-        ]);
-        $validated['inspector_id'] = $actor->userId();
-        if (isset($validated['client_submission_id'])) {
-            $existing = StationInspection::query()
-                ->where('client_submission_id', $validated['client_submission_id'])
-                ->first();
-            if ($existing instanceof StationInspection) {
-                return $this->idempotentResponse($existing, $actor->userId());
-            }
-        }
-
-        // Process fail images in checklist items
-        $formData = $validated['form_data'];
-        $checklist = $formData['checklist'] ?? $formData;
-        $timestamp = now()->format('Ymd_His');
-
-        if (is_array($checklist)) {
-            foreach ($checklist as $index => &$item) {
-                if (! is_array($item)) {
-                    continue;
-                }
-                $status = $item['status'] ?? null;
-                $failImage = $item['failImage'] ?? null;
-
-                if (strtolower($status ?? '') === 'fail' && ! empty($failImage) && str_contains($failImage, 'base64')) {
-                    $area = Str::slug($item['category'] ?? $item['area'] ?? 'general');
-                    $itemId = Str::slug($item['id'] ?? $item['label'] ?? $index);
-                    $item['failImage'] = $this->storeFailImageOrFail($failImage, "si_{$area}_{$itemId}_{$timestamp}");
-                }
-            }
-            unset($item);
-
-            if (isset($formData['checklist'])) {
-                $formData['checklist'] = $checklist;
-            } else {
-                $formData = $checklist;
-            }
-            $validated['form_data'] = $formData;
-        }
-
-        $record = StationInspection::create($validated);
-
-        return response()->json($record->load(['station', 'inspector']), 201);
-    }
-
     /**
      * Public endpoint for the React SPA station inspection form.
      * Accepts the frontend payload shape and transforms it for storage.
@@ -176,32 +113,6 @@ class StationInspectionController extends Controller
         return response()->json(
             $stationInspection->load(['station', 'inspector', 'reviewer'])
         );
-    }
-
-    public function update(Request $request, StationInspection $stationInspection): JsonResponse
-    {
-        $validated = $request->validate([
-            'inspection_date' => 'sometimes|date',
-            'inspection_type' => 'sometimes|string|max:255',
-            'form_data' => 'sometimes|array',
-            'overall_status' => 'sometimes|in:pass,fail,needs_attention',
-            'inspector_signature' => 'nullable|string',
-            'reviewer_signature' => 'nullable|string',
-            'reviewed_by' => 'nullable|exists:users,id',
-            'reviewed_at' => 'nullable|date',
-            'notes' => 'nullable|string',
-        ]);
-
-        $stationInspection->update($validated);
-
-        return response()->json($stationInspection->load(['station', 'inspector', 'reviewer']));
-    }
-
-    public function destroy(StationInspection $stationInspection): JsonResponse
-    {
-        $stationInspection->delete();
-
-        return response()->json(null, 204);
     }
 
     private function storeFailImageOrFail(string $payload, string $prefix): string

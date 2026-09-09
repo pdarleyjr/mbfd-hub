@@ -79,9 +79,15 @@ final class ApparatusInspectionApprovalService
                 ]);
 
                 $apparatusId = (int) $inspection->apparatus_id;
-                DB::afterCommit(function () use ($inspectionId, $apparatusId, $previousHealth, $shouldDispatchPmAlert, $hasSnipeItAsset): void {
+                $stationId = (int) ($apparatus->station_id ?? 0);
+                DB::afterCommit(function () use ($inspectionId, $apparatusId, $stationId, $previousHealth, $shouldDispatchPmAlert, $hasSnipeItAsset): void {
                     Cache::forget(DisplaySnapshotService::SNAPSHOT_CACHE_KEY);
                     Cache::forget(DisplaySnapshotService::STATIONS_CACHE_KEY);
+                    if ($stationId > 0) {
+                        Cache::forget("station.{$stationId}.detail");
+                        Cache::forget("station.{$stationId}.activity");
+                        Cache::forget("station.{$stationId}.apparatus-inspections");
+                    }
 
                     if ($shouldDispatchPmAlert) {
                         PmAlertNotificationJob::dispatch($apparatusId, $previousHealth);
@@ -116,9 +122,15 @@ final class ApparatusInspectionApprovalService
                 $this->recordReviewEvent($inspection, $reviewer, 'rejected', $reviewNotes);
                 $inspection->update(['review_status' => 'rejected']);
 
-                DB::afterCommit(static function (): void {
+                $stationId = (int) ($inspection->apparatus->station_id ?? 0);
+                DB::afterCommit(static function () use ($stationId): void {
                     Cache::forget(DisplaySnapshotService::SNAPSHOT_CACHE_KEY);
                     Cache::forget(DisplaySnapshotService::STATIONS_CACHE_KEY);
+                    if ($stationId > 0) {
+                        Cache::forget("station.{$stationId}.detail");
+                        Cache::forget("station.{$stationId}.activity");
+                        Cache::forget("station.{$stationId}.apparatus-inspections");
+                    }
                 });
 
                 return $inspection;

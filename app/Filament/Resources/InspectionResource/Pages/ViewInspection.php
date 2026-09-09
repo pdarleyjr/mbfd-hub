@@ -36,7 +36,6 @@ class ViewInspection extends ViewRecord
                         && $apparatus instanceof Apparatus
                         && ApparatusResource::canView($apparatus);
                 }),
-            Actions\DeleteAction::make(),
         ];
     }
 

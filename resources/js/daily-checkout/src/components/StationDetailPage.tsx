@@ -5,7 +5,11 @@ import {
   Apparatus,
   DailyCheckoutMatrixRow,
   DailyCheckoutSummary,
+  ApparatusInspectionSummary,
   StationInspectionSummary,
+  PersonnelEquipmentRequestSummary,
+  StationInventorySubmissionSummary,
+  StationSupplyRequestSummary,
   StationRequestSummary,
   ApparatusServiceTicketSummary,
   StationActivityEntry,
@@ -14,8 +18,15 @@ import {
 import { ApiClient } from '../utils/api';
 import PreviousPageButton from './PreviousPageButton';
 import { groupRoomsByArea, stationComplement } from '../utils/stationRoomBlueprint';
+import { formatDateOnly, formatTimestampDate, formatTimestampTime } from '../utils/dateTime';
 
-type TabId = 'requests' | 'service-repair' | 'overview' | 'rooms' | 'apparatus' | 'gas-meters' | 'inspections' | 'activity';
+type TabId = 'requests' | 'service-repair' | 'overview' | 'rooms' | 'apparatus' | 'gas-meters' | 'inspections' | 'inventory' | 'activity';
+
+type DomainLoadState = { loading: boolean; error: string };
+
+const formatStatusLabel = (status: string): string => (
+  status.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
+);
 
 export default function StationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -27,13 +38,20 @@ export default function StationDetailPage() {
 
   // Tab data (lazy loaded)
   const [stationInspections, setStationInspections] = useState<StationInspectionSummary[]>([]);
+  const [apparatusInspections, setApparatusInspections] = useState<ApparatusInspectionSummary[]>([]);
+  const [stationInspectionState, setStationInspectionState] = useState<DomainLoadState>({ loading: false, error: '' });
+  const [apparatusInspectionState, setApparatusInspectionState] = useState<DomainLoadState>({ loading: false, error: '' });
   const [stationRequests, setStationRequests] = useState<StationRequestSummary[]>([]);
+  const [personnelEquipmentRequests, setPersonnelEquipmentRequests] = useState<PersonnelEquipmentRequestSummary[]>([]);
+  const [personnelEquipmentError, setPersonnelEquipmentError] = useState('');
   const [requestScope, setRequestScope] = useState<'open' | 'all'>('open');
   const [serviceTickets, setServiceTickets] = useState<ApparatusServiceTicketSummary[]>([]);
   const [serviceTicketScope, setServiceTicketScope] = useState<'open' | 'all'>('open');
   const [openServiceTicketCount, setOpenServiceTicketCount] = useState(0);
   const [activity, setActivity] = useState<StationActivityEntry[]>([]);
   const [gasMeters, setGasMeters] = useState<SingleGasMeterSummary[]>([]);
+  const [inventorySubmissions, setInventorySubmissions] = useState<StationInventorySubmissionSummary[]>([]);
+  const [supplyRequests, setSupplyRequests] = useState<StationSupplyRequestSummary[]>([]);
   const [tabDataLoaded, setTabDataLoaded] = useState<Record<string, boolean>>({});
   const [tabDataLoading, setTabDataLoading] = useState<Record<string, boolean>>({});
   const [tabDataError, setTabDataError] = useState<Record<string, string>>({});
@@ -51,6 +69,7 @@ export default function StationDetailPage() {
     { id: 'apparatus', label: 'Apparatus' },
     { id: 'gas-meters', label: 'Gas Meters' },
     { id: 'inspections', label: 'Inspections' },
+    { id: 'inventory', label: 'Inventory' },
     { id: 'activity', label: 'Activity' },
   ];
 
@@ -117,13 +136,45 @@ export default function StationDetailPage() {
       try {
         switch (activeTab) {
           case 'inspections': {
-            const data = await ApiClient.getStationInspections(stationId);
-            setStationInspections(data);
+            setStationInspectionState({ loading: true, error: '' });
+            setApparatusInspectionState({ loading: true, error: '' });
+            const [stationResult, apparatusResult] = await Promise.allSettled([
+              ApiClient.getStationInspections(stationId),
+              ApiClient.getStationApparatusInspections(stationId),
+            ]);
+            if (stationResult.status === 'fulfilled') {
+              setStationInspections(stationResult.value);
+              setStationInspectionState({ loading: false, error: '' });
+            } else {
+              setStationInspectionState({ loading: false, error: stationResult.reason instanceof Error ? stationResult.reason.message : 'Station inspections could not be loaded.' });
+            }
+            if (apparatusResult.status === 'fulfilled') {
+              setApparatusInspections(apparatusResult.value);
+              setApparatusInspectionState({ loading: false, error: '' });
+            } else {
+              setApparatusInspectionState({ loading: false, error: apparatusResult.reason instanceof Error ? apparatusResult.reason.message : 'Apparatus inspections could not be loaded.' });
+            }
             break;
           }
           case 'requests': {
-            const data = await ApiClient.getStationRequests(stationId, 'all');
-            setStationRequests(data);
+            const [stationResult, personnelResult] = await Promise.allSettled([
+              ApiClient.getStationRequests(stationId, 'all'),
+              ApiClient.getStationPersonnelEquipmentRequests(stationId),
+            ]);
+            if (stationResult.status === 'rejected') throw stationResult.reason;
+            setStationRequests(stationResult.value);
+            if (personnelResult.status === 'fulfilled') {
+              setPersonnelEquipmentRequests(personnelResult.value);
+              setPersonnelEquipmentError('');
+            } else {
+              setPersonnelEquipmentError(personnelResult.reason instanceof Error ? personnelResult.reason.message : 'Personnel PPE requests could not be loaded.');
+            }
+            break;
+          }
+          case 'inventory': {
+            const data = await ApiClient.getStationInventoryActivity(stationId);
+            setInventorySubmissions(data.submissions);
+            setSupplyRequests(data.supply_requests);
             break;
           }
           case 'service-repair': {
@@ -154,7 +205,7 @@ export default function StationDetailPage() {
       }
     };
 
-    if (['inspections', 'requests', 'service-repair', 'gas-meters', 'activity'].includes(activeTab)) {
+    if (['inspections', 'requests', 'service-repair', 'gas-meters', 'inventory', 'activity'].includes(activeTab)) {
       loadTabData();
     }
   }, [activeTab, id, tabDataLoaded]);
@@ -164,13 +215,34 @@ export default function StationDetailPage() {
     setTabDataLoaded(prev => ({ ...prev, [tab]: false }));
   };
 
+  const retryInspectionDomain = async (domain: 'station' | 'apparatus') => {
+    if (!id) return;
+    const stationId = parseInt(id);
+    const setState = domain === 'station' ? setStationInspectionState : setApparatusInspectionState;
+    setState({ loading: true, error: '' });
+    try {
+      if (domain === 'station') {
+        setStationInspections(await ApiClient.getStationInspections(stationId));
+      } else {
+        setApparatusInspections(await ApiClient.getStationApparatusInspections(stationId));
+      }
+      setState({ loading: false, error: '' });
+    } catch (reason) {
+      setState({ loading: false, error: reason instanceof Error ? reason.message : 'This inspection history could not be loaded.' });
+    }
+  };
+
   const getStatusBadgeClass = (status: string): string => {
     const map: Record<string, string> = {
       pass: 'bg-green-100 text-green-800',
       fail: 'bg-red-100 text-red-800',
       needs_attention: 'bg-amber-100 text-amber-800',
       pending: 'bg-blue-100 text-blue-800',
+      pending_review: 'bg-amber-100 text-amber-900',
+      reviewed: 'bg-green-100 text-green-800',
+      needs_follow_up: 'bg-red-100 text-red-800',
       approved: 'bg-green-100 text-green-800',
+      rejected: 'bg-red-100 text-red-800',
       denied: 'bg-red-100 text-red-800',
       fulfilled: 'bg-teal-100 text-teal-800',
       acknowledged: 'bg-amber-100 text-amber-800',
@@ -184,6 +256,8 @@ export default function StationDetailPage() {
       awaiting_vendor: 'bg-stone-100 text-stone-700',
       on_hold: 'bg-stone-100 text-stone-700',
       completed: 'bg-green-100 text-green-800',
+      open: 'bg-amber-100 text-amber-900',
+      replenished: 'bg-green-100 text-green-800',
       cancelled: 'bg-red-100 text-red-800',
       low: 'bg-neutral-100 text-neutral-700',
       medium: 'bg-blue-100 text-blue-800',
@@ -194,16 +268,6 @@ export default function StationDetailPage() {
       urgent: 'bg-red-100 text-red-800',
     };
     return map[status] ?? 'bg-neutral-100 text-neutral-700';
-  };
-
-  const formatDate = (dateStr: string): string => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  const formatTime = (dateStr: string): string => {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
 
   if (loading) {
@@ -583,7 +647,7 @@ export default function StationDetailPage() {
                         <p className="font-semibold text-neutral-800">S/N: {meter.serial_number}</p>
                         <p className="text-sm text-neutral-600">Assigned to: {meter.apparatus_name}</p>
                         <p className="text-sm text-neutral-500">
-                          Activated: {formatDate(meter.activation_date)} &middot; Expires: {formatDate(meter.expiration_date)}
+                          Activated: {formatDateOnly(meter.activation_date)} &middot; Expires: {formatDateOnly(meter.expiration_date)}
                         </p>
                       </div>
                       <div className="text-right">
@@ -647,15 +711,45 @@ export default function StationDetailPage() {
                       </div>
                       {req.current_public_response && <div className="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-900"><span className="font-semibold">Latest response:</span> {req.current_public_response}</div>}
                       <p className="mt-3 text-xs text-neutral-500">
-                        {req.room?.name || req.room_name_snapshot || 'Station-wide'} &middot; Submitted {formatDate(req.created_at)}
+                        {req.room?.name || req.room_name_snapshot || 'Station-wide'} &middot; Submitted {formatTimestampDate(req.created_at)}
                       </p>
-                      {req.updates && req.updates.length > 1 && <details className="mt-3"><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-blue-800">View {req.updates.length} updates</summary><ol className="mt-2 space-y-2 border-l-2 border-blue-100 pl-4">{req.updates.map((update) => <li key={update.id} className="text-sm text-neutral-600"><span className="font-semibold text-neutral-800">{update.status.replaceAll('_', ' ')}</span> · {formatDate(update.created_at)}{update.public_note && <p className="mt-0.5">{update.public_note}</p>}</li>)}</ol></details>}
+                      {req.updates && req.updates.length > 1 && <details className="mt-3"><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-blue-800">View {req.updates.length} updates</summary><ol className="mt-2 space-y-2 border-l-2 border-blue-100 pl-4">{req.updates.map((update) => <li key={update.id} className="text-sm text-neutral-600"><span className="font-semibold text-neutral-800">{update.status.replaceAll('_', ' ')}</span> · {formatTimestampDate(update.created_at)}{update.public_note && <p className="mt-0.5">{update.public_note}</p>}</li>)}</ol></details>}
                     </div>
                   ))}
                 </div>
               ) : (
                 <EmptyState icon="request" title={requestScope === 'open' ? 'No open station requests' : 'No station request history'} subtitle="New repair, service, and equipment requests will appear here." />
               )}
+
+              <section aria-labelledby="personnel-ppe-heading" className="mt-8 border-t border-neutral-200 pt-6">
+                <div className="mb-4">
+                  <h3 id="personnel-ppe-heading" className="font-heading text-lg font-bold text-neutral-900">Personnel / PPE requests</h3>
+                  <p className="text-sm text-neutral-500">Station-originated personnel equipment requests. Employee identity and signatures remain private.</p>
+                </div>
+                {personnelEquipmentError ? (
+                  <TabLoadError message={personnelEquipmentError} onRetry={() => retryTabData('requests')} />
+                ) : tabDataLoading.requests ? (
+                  <TabSkeleton />
+                ) : personnelEquipmentRequests.length > 0 ? (
+                  <div className="space-y-3">
+                    {personnelEquipmentRequests.map((request) => (
+                      <article key={request.id} className="rounded-xl border border-neutral-200 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-mono text-xs font-semibold text-neutral-500">{request.request_number}</p>
+                            <p className="mt-1 font-semibold text-neutral-900">{request.item_count} PPE item{request.item_count === 1 ? '' : 's'}</p>
+                            <p className="mt-1 text-sm text-neutral-600">{request.items.map((item) => `${item.quantity}× ${item.item_name}`).join(', ')}</p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(request.status)}`}>{request.status.replaceAll('_', ' ')}</span>
+                        </div>
+                        <p className="mt-3 text-xs text-neutral-500">Submitted {formatTimestampDate(request.created_at)}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState icon="request" title="No station-originated PPE requests" subtitle="Officer-submitted personnel equipment requests for this station will appear here." />
+                )}
+              </section>
             </div>
           )}
 
@@ -692,12 +786,12 @@ export default function StationDetailPage() {
                       </div>
                       {ticket.current_public_response && <p className="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-950"><strong>Latest update:</strong> {ticket.current_public_response}</p>}
                       <p className="mt-3 text-xs text-neutral-500">
-                        {ticket.service_type || ticket.category.replaceAll('_', ' ')} · Submitted {formatDate(ticket.created_at)}
-                        {ticket.scheduled_for ? ` · Scheduled ${formatDate(ticket.scheduled_for)} at ${formatTime(ticket.scheduled_for)}` : ''}
+                        {ticket.service_type || ticket.category.replaceAll('_', ' ')} · Submitted {formatTimestampDate(ticket.created_at)}
+                        {ticket.scheduled_for ? ` · Scheduled ${formatTimestampDate(ticket.scheduled_for)} at ${formatTimestampTime(ticket.scheduled_for)}` : ''}
                         {ticket.scheduled_location ? ` · ${ticket.scheduled_location}` : ''}
-                        {ticket.expected_return_at ? ` · Expected return ${formatDate(ticket.expected_return_at)} at ${formatTime(ticket.expected_return_at)}` : ''}
+                        {ticket.expected_return_at ? ` · Expected return ${formatTimestampDate(ticket.expected_return_at)} at ${formatTimestampTime(ticket.expected_return_at)}` : ''}
                       </p>
-                      {ticket.updates && ticket.updates.length > 1 && <details className="mt-3"><summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold text-blue-800">View {ticket.updates.length} public updates</summary><ol className="space-y-2 border-l-2 border-blue-100 pl-4">{ticket.updates.map((update) => <li key={update.id} className="text-sm text-neutral-600"><strong className="text-neutral-800">{update.status.replaceAll('_', ' ')}</strong> · {formatDate(update.created_at)}{update.public_note && <p className="mt-0.5">{update.public_note}</p>}</li>)}</ol></details>}
+                      {ticket.updates && ticket.updates.length > 1 && <details className="mt-3"><summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold text-blue-800">View {ticket.updates.length} public updates</summary><ol className="space-y-2 border-l-2 border-blue-100 pl-4">{ticket.updates.map((update) => <li key={update.id} className="text-sm text-neutral-600"><strong className="text-neutral-800">{update.status.replaceAll('_', ' ')}</strong> · {formatTimestampDate(update.created_at)}{update.public_note && <p className="mt-0.5">{update.public_note}</p>}</li>)}</ol></details>}
                     </article>
                   ))}
                 </div>
@@ -707,42 +801,113 @@ export default function StationDetailPage() {
             </div>
           )}
 
-          {/* ========== STATION INSPECTIONS TAB ========== */}
+          {/* ========== STATION + APPARATUS INSPECTIONS TAB ========== */}
           {activeTab === 'inspections' && (
-            <div>
-              {tabDataError.inspections ? (
-                <TabLoadError message={tabDataError.inspections} onRetry={() => retryTabData('inspections')} />
-              ) : tabDataLoading['inspections'] ? (
-                <TabSkeleton />
-              ) : stationInspections.length > 0 ? (
-                <div className="space-y-3 stagger-list">
-                  {stationInspections.map((inspection) => (
-                    <div
-                      key={inspection.id}
-                      className="p-4 border border-neutral-200 rounded-lg"
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <p className="font-semibold text-neutral-800">
-                            {inspection.inspection_type || 'Station Inspection'}
-                          </p>
-                          <p className="text-sm text-neutral-600">
-                            Inspector: {inspection.inspector_name}
-                          </p>
+            <div className="space-y-8">
+              <section aria-labelledby="station-inspections-heading">
+                <h3 id="station-inspections-heading" className="mb-1 font-heading text-lg font-bold text-neutral-900">Station inspections</h3>
+                <p className="mb-4 text-sm text-neutral-500">Signed station condition evidence with safe review status.</p>
+                {stationInspectionState.error ? (
+                  <TabLoadError message={stationInspectionState.error} onRetry={() => void retryInspectionDomain('station')} />
+                ) : stationInspectionState.loading ? (
+                  <TabSkeleton />
+                ) : stationInspections.length > 0 ? (
+                  <div className="space-y-3 stagger-list">
+                    {stationInspections.map((inspection) => (
+                      <article key={inspection.id} className="rounded-lg border border-neutral-200 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-neutral-800">{inspection.inspection_type || 'Station Inspection'}</p>
+                            <p className="mt-1 text-xs text-neutral-500">{formatDateOnly(inspection.inspection_date)}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(inspection.overall_status)}`}>{formatStatusLabel(inspection.overall_status)}</span>
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(inspection.review_status)}`}>{formatStatusLabel(inspection.review_status)}</span>
+                          </div>
                         </div>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(inspection.overall_status)}`}>
-                          {(inspection.overall_status || '').replace('_', ' ')}
-                        </span>
-                      </div>
-                      <p className="text-xs text-neutral-500">
-                        {formatDate(inspection.inspection_date)}
-                        {inspection.notes && ` \u2022 ${inspection.notes.substring(0, 100)}${inspection.notes.length > 100 ? '...' : ''}`}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState icon="inspection" title="No station inspections" subtitle="Station inspection records will appear here when submitted." />
+                )}
+              </section>
+
+              <section aria-labelledby="apparatus-inspections-heading" className="border-t border-neutral-200 pt-6">
+                <h3 id="apparatus-inspections-heading" className="mb-1 font-heading text-lg font-bold text-neutral-900">Apparatus / Daily Checkout inspections</h3>
+                <p className="mb-4 text-sm text-neutral-500">Today’s submitted evidence. Pending Review does not count as a completed Daily Checkout.</p>
+                {apparatusInspectionState.error ? (
+                  <TabLoadError message={apparatusInspectionState.error} onRetry={() => void retryInspectionDomain('apparatus')} />
+                ) : apparatusInspectionState.loading ? (
+                  <TabSkeleton />
+                ) : apparatusInspections.length > 0 ? (
+                  <div className="space-y-3">
+                    {apparatusInspections.map((inspection) => (
+                      <article key={inspection.id} className="rounded-xl border border-neutral-200 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-neutral-900">{inspection.apparatus_name}</p>
+                            <p className="font-mono text-xs text-neutral-500">{inspection.inspection_reference}</p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(inspection.review_status)}`}>{formatStatusLabel(inspection.review_status)}</span>
+                        </div>
+                        <p className="mt-3 text-xs text-neutral-500">Submitted {formatTimestampDate(inspection.completed_at)} at {formatTimestampTime(inspection.completed_at)}{inspection.shift ? ` · ${inspection.shift} Shift` : ''} · {inspection.defect_count} issue{inspection.defect_count === 1 ? '' : 's'}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState icon="apparatus" title="No apparatus inspections today" subtitle="Pending, approved, and rejected Daily Checkout submissions will appear here." />
+                )}
+              </section>
+            </div>
+          )}
+
+          {/* ========== STATION INVENTORY TAB ========== */}
+          {activeTab === 'inventory' && (
+            <div>
+              {tabDataError.inventory ? (
+                <TabLoadError message={tabDataError.inventory} onRetry={() => retryTabData('inventory')} />
+              ) : tabDataLoading.inventory ? (
+                <TabSkeleton />
               ) : (
-                <EmptyState icon="inspection" title="No station inspections" subtitle="Station inspection records will appear here when submitted." />
+                <div className="space-y-8">
+                  <section aria-labelledby="inventory-submissions-heading">
+                    <h3 id="inventory-submissions-heading" className="mb-1 font-heading text-lg font-bold text-neutral-900">Inventory submissions</h3>
+                    <p className="mb-4 text-sm text-neutral-500">Recent canonical station inventory snapshots. PDFs and submitter identity remain Admin-only.</p>
+                    {inventorySubmissions.length > 0 ? (
+                      <div className="space-y-3">
+                        {inventorySubmissions.map((submission) => (
+                          <article key={submission.id} className="rounded-xl border border-neutral-200 p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="font-semibold text-neutral-900">Inventory submission #{submission.id}</p>
+                              <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">Submitted</span>
+                            </div>
+                            <p className="mt-2 text-sm text-neutral-600">{submission.item_count} reported item{submission.item_count === 1 ? '' : 's'}{submission.shift ? ` · ${submission.shift} Shift` : ''}</p>
+                            <p className="mt-1 text-xs text-neutral-500">{formatTimestampDate(submission.submitted_at)} at {formatTimestampTime(submission.submitted_at)}</p>
+                          </article>
+                        ))}
+                      </div>
+                    ) : <EmptyState icon="request" title="No inventory submissions" subtitle="Recent station inventory submissions will appear here." />}
+                  </section>
+
+                  <section aria-labelledby="supply-follow-up-heading" className="border-t border-neutral-200 pt-6">
+                    <h3 id="supply-follow-up-heading" className="mb-1 font-heading text-lg font-bold text-neutral-900">Supply follow-up</h3>
+                    <p className="mb-4 text-sm text-neutral-500">Station supply requests and their current fulfillment state.</p>
+                    {supplyRequests.length > 0 ? (
+                      <div className="space-y-3">
+                        {supplyRequests.map((request) => (
+                          <article key={request.id} className="rounded-xl border border-neutral-200 p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <p className="font-semibold text-neutral-900">{request.request_text}</p>
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(request.status)}`}>{request.status.replaceAll('_', ' ')}</span>
+                            </div>
+                            <p className="mt-2 text-xs text-neutral-500">Requested {formatTimestampDate(request.created_at)}{request.shift ? ` · ${request.shift} Shift` : ''}</p>
+                          </article>
+                        ))}
+                      </div>
+                    ) : <EmptyState icon="request" title="No supply requests" subtitle="Inventory follow-up requests will appear here." />}
+                  </section>
+                </div>
               )}
             </div>
           )}
@@ -760,7 +925,7 @@ export default function StationDetailPage() {
                           <p className="font-semibold text-neutral-900">{entry.label}</p>
                           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(entry.status)}`}>{entry.status.replaceAll('_', ' ')}</span>
                         </div>
-                        <p className="mt-1 text-xs uppercase tracking-wide text-neutral-500">{entry.type.replaceAll('_', ' ')} · {formatDate(entry.occurred_at)}</p>
+                        <p className="mt-1 text-xs uppercase tracking-wide text-neutral-500">{entry.type.replaceAll('_', ' ')} · {formatTimestampDate(entry.occurred_at)}</p>
                       </div>
                     </li>
                   ))}

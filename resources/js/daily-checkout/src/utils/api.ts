@@ -3,7 +3,7 @@ import {
   Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData,
   StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse,
   InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
-  StationInspectionSummary, FireEquipmentRequestSummary,
+  StationInspectionSummary, ApparatusInspectionSummary, FireEquipmentRequestSummary, PersonnelEquipmentRequestSummary, StationInventoryActivitySummary,
   SingleGasMeterSummary, StationRequestSummary, ApparatusServiceTicketSummary, StationActivityEntry, RoomProfile,
 } from '../types';
 
@@ -637,6 +637,45 @@ export class ApiClient {
     }
     const data = await response.json();
     return data.inspections || [];
+  }
+
+  static async getStationApparatusInspections(stationId: number): Promise<ApparatusInspectionSummary[]> {
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/apparatus-inspections`, {
+      cache: 'no-store',
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch apparatus inspection history');
+    }
+    const data = await response.json();
+    return data.inspections || [];
+  }
+
+  static async getStationPersonnelEquipmentRequests(stationId: number): Promise<PersonnelEquipmentRequestSummary[]> {
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/personnel-equipment-requests`, {
+      cache: 'no-store',
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch personnel PPE requests');
+    }
+    const data = await response.json();
+    return data.requests || [];
+  }
+
+  static async getStationInventoryActivity(stationId: number): Promise<StationInventoryActivitySummary> {
+    const response = await fetch(`${API_BASE}/public/stations/${stationId}/inventory`, {
+      cache: 'no-store',
+      headers: { ...DEFAULT_HEADERS },
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch station inventory activity');
+    }
+    const data = await response.json();
+    return {
+      submissions: data.submissions || [],
+      supply_requests: data.supply_requests || [],
+    };
   }
 
   static async getEquipmentRequests(stationId: number): Promise<FireEquipmentRequestSummary[]> {

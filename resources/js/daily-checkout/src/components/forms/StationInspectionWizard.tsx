@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { submitOrQueue, type SubmissionOutcome } from '../../lib/sync';
 import PreviousPageButton from '../PreviousPageButton';
+import { todayDateOnly } from '../../utils/dateTime';
 
 const STATIONS = [
   'Station 1',
@@ -67,7 +68,7 @@ export default function StationInspectionWizard() {
 
   const [form, setForm] = useState<FormData>({
     station: '',
-    date: new Date().toISOString().split('T')[0],
+    date: todayDateOnly(),
     checklist: DEFAULT_CHECKLIST.map((item) => ({ ...item, status: null, failNotes: '', failImage: '' })),
     extinguishingSystemDate: '',
     notes: '',

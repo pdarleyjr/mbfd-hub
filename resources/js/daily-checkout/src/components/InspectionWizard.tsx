@@ -12,6 +12,7 @@ import MeterStep from './MeterStep';
 import CompartmentStep from './CompartmentStep';
 import SubmitStep from './SubmitStep';
 import PreviousPageButton from './PreviousPageButton';
+import { todayDateOnly } from '../utils/dateTime';
 
 type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'submit';
 
@@ -21,19 +22,7 @@ const inspectionSessionIsExpired = (session: InspectionData['inspectionSession']
   return !Number.isFinite(expiresAt) || expiresAt <= Date.now();
 };
 
-const easternDutyDate = (): string => {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date(Date.now()));
-  const part = (type: Intl.DateTimeFormatPartTypes): string => (
-    parts.find((entry) => entry.type === type)?.value ?? ''
-  );
-
-  return `${part('year')}-${part('month')}-${part('day')}`;
-};
+const easternDutyDate = (): string => todayDateOnly();
 
 const restoreIssuedFireBoatChecklist = (saved: InspectionData | null): ChecklistData | null => {
   const session = saved?.inspectionSession;

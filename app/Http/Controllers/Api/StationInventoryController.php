@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Station;
 use App\Models\StationInventorySubmission;
+use App\Models\User;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -215,6 +217,13 @@ class StationInventoryController extends Controller
      */
     public function downloadPdf(StationInventorySubmission $submission): Response|JsonResponse
     {
+        $user = auth()->user();
+        abort_unless(
+            Gate::allows('view', $submission)
+                || ($user instanceof User && $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin'])),
+            403,
+        );
+
         // Prefer the private disk; fall back to the legacy public disk so files
         // generated before this hardening (and not yet migrated) still download.
         $disk = $this->resolveDiskFor($submission->pdf_path);

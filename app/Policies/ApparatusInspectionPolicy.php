@@ -31,7 +31,7 @@ class ApparatusInspectionPolicy
      */
     public function create(User $user): bool
     {
-        return $user->can('create_inspection');
+        return false;
     }
 
     /**
@@ -39,7 +39,7 @@ class ApparatusInspectionPolicy
      */
     public function update(User $user, ApparatusInspection $apparatusInspection): bool
     {
-        return $user->can('update_inspection');
+        return false;
     }
 
     /**
@@ -64,7 +64,7 @@ class ApparatusInspectionPolicy
      */
     public function delete(User $user, ApparatusInspection $apparatusInspection): bool
     {
-        return $user->can('delete_inspection') && ! $apparatusInspection->reviewEvents()->exists();
+        return false;
     }
 
     /**
@@ -72,7 +72,7 @@ class ApparatusInspectionPolicy
      */
     public function deleteAny(User $user): bool
     {
-        return $user->can('delete_any_inspection');
+        return false;
     }
 
     /**
@@ -80,7 +80,7 @@ class ApparatusInspectionPolicy
      */
     public function forceDelete(User $user, ApparatusInspection $apparatusInspection): bool
     {
-        return $user->can('force_delete_inspection');
+        return false;
     }
 
     /**
@@ -88,7 +88,7 @@ class ApparatusInspectionPolicy
      */
     public function forceDeleteAny(User $user): bool
     {
-        return $user->can('force_delete_any_inspection');
+        return false;
     }
 
     /**
@@ -96,7 +96,7 @@ class ApparatusInspectionPolicy
      */
     public function restore(User $user, ApparatusInspection $apparatusInspection): bool
     {
-        return $user->can('restore_inspection');
+        return false;
     }
 
     /**
@@ -104,7 +104,7 @@ class ApparatusInspectionPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('restore_any_inspection');
+        return false;
     }
 
     /**
@@ -112,7 +112,7 @@ class ApparatusInspectionPolicy
      */
     public function replicate(User $user, ApparatusInspection $apparatusInspection): bool
     {
-        return $user->can('replicate_inspection');
+        return false;
     }
 
     /**
@@ -120,6 +120,6 @@ class ApparatusInspectionPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('reorder_inspection');
+        return false;
     }
 }

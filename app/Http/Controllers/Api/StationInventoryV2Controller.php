@@ -10,6 +10,7 @@ use App\Models\StationSupplyRequest;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
@@ -305,32 +306,35 @@ class StationInventoryV2Controller extends Controller
             ], 422);
         }
 
-        // Create supply request
-        $supplyRequest = StationSupplyRequest::create([
-            'station_id' => $stationId,
-            'actor_user_id' => $actor->userId(),
-            'actor_employee_id' => $employee->getKey(),
-            'request_text' => $request->request_text,
-            'status' => 'open',
-            'created_by_name' => $employee->name,
-            'created_by_shift' => $this->signedShift($request),
-        ]);
-
-        // Create audit log
-        StationInventoryAudit::create([
-            'station_id' => $stationId,
-            'inventory_item_id' => null,
-            'actor_user_id' => $actor->userId(),
-            'actor_employee_id' => $employee->getKey(),
-            'actor_name' => $employee->name,
-            'actor_shift' => $this->signedShift($request),
-            'action' => 'note_added',
-            'from_value' => null,
-            'to_value' => [
+        $supplyRequest = DB::transaction(function () use ($stationId, $actor, $employee, $request): StationSupplyRequest {
+            $supplyRequest = StationSupplyRequest::create([
+                'station_id' => $stationId,
+                'actor_user_id' => $actor->userId(),
+                'actor_employee_id' => $employee->getKey(),
                 'request_text' => $request->request_text,
-                'request_id' => $supplyRequest->id,
-            ],
-        ]);
+                'status' => 'open',
+                'created_by_name' => $employee->name,
+                'created_by_shift' => $this->signedShift($request),
+            ]);
+
+            StationInventoryAudit::create([
+                'station_id' => $stationId,
+                'inventory_item_id' => null,
+                'actor_user_id' => $actor->userId(),
+                'actor_employee_id' => $employee->getKey(),
+                'actor_name' => $employee->name,
+                'actor_shift' => $this->signedShift($request),
+                'action' => 'supply_request_created',
+                'from_value' => null,
+                'to_value' => [
+                    'request_text' => $request->request_text,
+                    'request_id' => $supplyRequest->id,
+                    'status' => 'open',
+                ],
+            ]);
+
+            return $supplyRequest;
+        }, 3);
 
         return response()->json([
             'success' => true,

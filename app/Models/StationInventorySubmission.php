@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 
 class StationInventorySubmission extends Model
 {
@@ -26,6 +29,17 @@ class StationInventorySubmission extends Model
         'items' => 'array',
         'submitted_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(static function (): never {
+            throw new LogicException('Submitted station inventory evidence is immutable.');
+        });
+
+        static::deleting(static function (): never {
+            throw new LogicException('Submitted station inventory evidence cannot be deleted.');
+        });
+    }
 
     /**
      * Get the station that owns the submission.

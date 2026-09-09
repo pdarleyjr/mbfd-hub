@@ -255,9 +255,57 @@ export interface StationInspectionSummary {
   inspection_date: string;
   inspection_type: string;
   overall_status: string;
-  inspector_name: string;
-  notes?: string;
+  review_status: 'pending_review' | 'reviewed' | 'needs_follow_up';
   created_at: string;
+}
+
+export interface ApparatusInspectionSummary {
+  id: number;
+  inspection_reference: string;
+  apparatus_name: string;
+  shift?: string | null;
+  completed_at: string;
+  defect_count: number;
+  review_status: 'pending_review' | 'approved' | 'rejected';
+}
+
+export interface PersonnelEquipmentRequestSummary {
+  id: number;
+  public_id: string;
+  request_number: string;
+  status: string;
+  item_count: number;
+  items: Array<{
+    id: number;
+    item_name: string;
+    quantity: number;
+    reason?: string | null;
+  }>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StationInventorySubmissionSummary {
+  id: number;
+  station_id: number;
+  shift?: string | null;
+  item_count: number;
+  submitted_at: string;
+}
+
+export interface StationSupplyRequestSummary {
+  id: number;
+  station_id: number;
+  request_text: string;
+  status: 'open' | 'ordered' | 'replenished' | 'denied';
+  shift?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StationInventoryActivitySummary {
+  submissions: StationInventorySubmissionSummary[];
+  supply_requests: StationSupplyRequestSummary[];
 }
 
 export interface FireEquipmentRequestSummary {
@@ -350,7 +398,7 @@ export interface ApparatusServiceTicketSummary {
 }
 
 export interface StationActivityEntry {
-  type: 'apparatus_inspection' | 'station_inspection' | 'inventory_submission' | 'supply_request' | 'station_request' | 'apparatus_service_ticket';
+  type: 'apparatus_inspection' | 'station_inspection' | 'inventory_submission' | 'supply_request' | 'station_request' | 'apparatus_service_ticket' | 'personnel_request';
   label: string;
   status: string;
   occurred_at: string;

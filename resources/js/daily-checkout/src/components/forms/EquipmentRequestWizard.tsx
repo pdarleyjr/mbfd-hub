@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { submitOrQueue, type SubmissionOutcome } from '../../lib/sync';
+import { todayDateOnly } from '../../utils/dateTime';
 import PreviousPageButton from '../PreviousPageButton';
 
 const STATIONS = [
@@ -55,7 +56,7 @@ export default function EquipmentRequestWizard() {
 
   const [form, setForm] = useState<FormData>({
     station: '',
-    date: new Date().toISOString().split('T')[0],
+    date: todayDateOnly(),
     requestedBy: '',
     items: [createItem()],
     explanation: '',

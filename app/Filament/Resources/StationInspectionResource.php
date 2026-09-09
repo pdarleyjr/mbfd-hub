@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\StationInspectionResource\Pages;
 use App\Models\StationInspection;
 use Filament\Infolists;
@@ -11,7 +12,6 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Storage;
 
-use App\Filament\Concerns\EnterpriseTable;
 class StationInspectionResource extends Resource
 {
     use EnterpriseTable;
@@ -19,8 +19,11 @@ class StationInspectionResource extends Resource
     protected static ?string $model = StationInspection::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
+
     protected static ?string $navigationGroup = 'Station Management';
+
     protected static ?int $navigationSort = 3;
+
     protected static ?string $navigationLabel = 'Station Inspections';
 
     public static function table(Table $table): Table
@@ -49,6 +52,16 @@ class StationInspectionResource extends Resource
                         'partial', 'needs_attention', 'warning' => 'warning',
                         'pending', 'in_progress' => 'info',
                         default => 'gray',
+                    })
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('review_status')
+                    ->label('Review')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => str($state)->replace('_', ' ')->title()->toString())
+                    ->color(fn (string $state): string => match ($state) {
+                        'reviewed' => 'success',
+                        'needs_follow_up' => 'danger',
+                        default => 'warning',
                     })
                     ->sortable(),
                 Tables\Columns\IconColumn::make('sog_mandate_acknowledged')
@@ -108,6 +121,11 @@ class StationInspectionResource extends Resource
                         Infolists\Components\TextEntry::make('inspector.name')->label('Inspector'),
                         Infolists\Components\TextEntry::make('reviewer.name')->label('Reviewed By'),
                         Infolists\Components\TextEntry::make('reviewed_at')->label('Reviewed At')->dateTime(),
+                        Infolists\Components\TextEntry::make('review_status')
+                            ->label('Review Status')
+                            ->badge()
+                            ->formatStateUsing(fn (string $state): string => str($state)->replace('_', ' ')->title()->toString()),
+                        Infolists\Components\TextEntry::make('review_note')->label('Review Note')->placeholder('—'),
                         Infolists\Components\TextEntry::make('notes'),
                         Infolists\Components\TextEntry::make('created_at')->dateTime(),
                         Infolists\Components\TextEntry::make('updated_at')->dateTime(),
@@ -122,13 +140,13 @@ class StationInspectionResource extends Resource
                                     return 'No checklist data';
                                 }
                                 $data = is_array($state) ? $state : json_decode($state, true);
-                                if (!is_array($data)) {
+                                if (! is_array($data)) {
                                     return (string) $state;
                                 }
 
                                 // Check if this is the new PDF-aligned checklist format
                                 $checklist = $data['checklist'] ?? $data;
-                                if (!is_array($checklist)) {
+                                if (! is_array($checklist)) {
                                     return (string) json_encode($data);
                                 }
 
@@ -153,13 +171,14 @@ class StationInspectionResource extends Resource
                                     foreach ($checklist as $key => $value) {
                                         $label = is_string($key) ? str_replace('_', ' ', ucfirst($key)) : '';
                                         if (is_array($value)) {
-                                            $html .= "<div><strong>{$label}:</strong> " . json_encode($value) . '</div>';
+                                            $html .= "<div><strong>{$label}:</strong> ".json_encode($value).'</div>';
                                         } else {
                                             $icon = is_bool($value) ? ($value ? '✅' : '❌') : '';
                                             $html .= "<div>{$icon} <strong>{$label}</strong> {$value}</div>";
                                         }
                                     }
                                     $html .= '</div>';
+
                                     return $html;
                                 }
 
@@ -176,21 +195,22 @@ class StationInspectionResource extends Resource
 
                                         // Show fail details
                                         if (strtolower($item['status'] ?? '') === 'fail') {
-                                            if (!empty($item['failNotes'])) {
+                                            if (! empty($item['failNotes'])) {
                                                 $notes = e($item['failNotes']);
                                                 $html .= "<br><span style='margin-left: 24px; color: #dc2626; font-size: 0.875rem;'>Notes: {$notes}</span>";
                                             }
-                                            if (!empty($item['failImage']) && !str_contains($item['failImage'], 'base64')) {
+                                            if (! empty($item['failImage']) && ! str_contains($item['failImage'], 'base64')) {
                                                 $url = Storage::url($item['failImage']);
                                                 $html .= "<br><img src=\"{$url}\" alt=\"Fail photo\" style=\"margin-left: 24px; max-width: 300px; max-height: 200px; border: 1px solid #fca5a5; border-radius: 6px; margin-top: 4px;\" />";
                                             }
                                         }
 
-                                        $html .= "</div>";
+                                        $html .= '</div>';
                                     }
 
                                     $html .= '</div></div>';
                                 }
+
                                 return $html;
                             })
                             ->html()
@@ -204,6 +224,7 @@ class StationInspectionResource extends Resource
                                 if (empty($state)) {
                                     return 'No signature';
                                 }
+
                                 return "<img src=\"{$state}\" alt=\"Inspector Signature\" style=\"max-width: 400px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px;\" />";
                             })
                             ->html(),
@@ -213,6 +234,7 @@ class StationInspectionResource extends Resource
                                 if (empty($state)) {
                                     return 'No signature';
                                 }
+
                                 return "<img src=\"{$state}\" alt=\"Reviewer Signature\" style=\"max-width: 400px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px;\" />";
                             })
                             ->html(),
