@@ -123,6 +123,67 @@ def http_probe(name: str, service: str, url: str) -> Probe:
     )
 
 
+def camera_program_probe(url: str) -> Probe:
+    code, body, latency, error = fetch(url)
+    failures: list[str] = []
+    value: dict[str, Any] = {}
+    if code == 200 and body:
+        try:
+            parsed = json.loads(body)
+            if isinstance(parsed, dict):
+                value = parsed
+            else:
+                failures.append("invalid_payload")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            failures.append("invalid_json")
+    else:
+        failures.append("status")
+
+    sources = value.get("sources", {})
+    anpviz = sources.get("anpviz", {}) if isinstance(sources, dict) else {}
+    if not isinstance(anpviz, dict):
+        anpviz = {}
+    required = {
+        "camera": value.get("camera_online") is True,
+        "preview": value.get("preview_online") is True,
+        "camera_audio": value.get("camera_audio_online") is True,
+        "program_video": anpviz.get("video_online") is True,
+        "tonor_microphone": anpviz.get("microphone_connected") is True,
+        "program_audio": anpviz.get("audio_online") is True,
+        "sync": anpviz.get("synchronization_status") == "locked",
+        "audio_probe": anpviz.get("audio_level_probe_healthy") is True,
+    }
+    failures.extend(name for name, present in required.items() if not present)
+
+    now = datetime.now().astimezone()
+    for field in ("last_update", "last_audio_frame_at"):
+        raw = anpviz.get(field)
+        try:
+            observed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            if abs((now - observed).total_seconds()) > 30:
+                failures.append(field + "_stale")
+        except (TypeError, ValueError):
+            failures.append(field + "_missing")
+
+    ok = not failures
+    return Probe(
+        name="camera-program",
+        service="camera-hls",
+        ok=ok,
+        status="Healthy" if ok else "Failed",
+        latency_ms=latency,
+        source="camera_api",
+        evidence=(
+            f"status={code} camera={str(required['camera']).lower()} "
+            f"video={str(required['program_video']).lower()} "
+            f"tonor={str(required['tonor_microphone']).lower()} "
+            f"audio={str(required['program_audio']).lower()} "
+            f"sync={str(required['sync']).lower()} "
+            f"failures={','.join(failures) or 'none'} error={error or 'none'}"
+        ),
+    )
+
+
 def playlist_marker(body: bytes) -> tuple[str, str]:
     text = body.decode("utf-8", errors="replace")
     part = re.findall(r'#EXT-X-PRELOAD-HINT:TYPE=PART,URI="([^"]+)"', text)
@@ -131,7 +192,7 @@ def playlist_marker(body: bytes) -> tuple[str, str]:
     return marker, segment[-1] if segment else ""
 
 
-def playlist_probe(name: str, path: str) -> tuple[Probe, dict[str, Any]]:
+def playlist_probe(name: str, service: str, path: str) -> tuple[Probe, dict[str, Any]]:
     base = "http://127.0.0.1:8120"
     code1, body1, latency1, error1 = fetch(base + path)
     marker1, segment1 = playlist_marker(body1)
@@ -156,7 +217,7 @@ def playlist_probe(name: str, path: str) -> tuple[Probe, dict[str, Any]]:
     return (
         Probe(
             name=name,
-            service="camera-hls",
+            service=service,
             ok=ok,
             status="Healthy" if ok else "Failed",
             latency_ms=max(latency1, latency2),
@@ -294,6 +355,64 @@ def service_state(
     }
 
 
+def optional_publisher_state(
+    service: str,
+    probes: list[Probe],
+    previous: dict[str, Any],
+) -> dict[str, Any]:
+    passed = [probe for probe in probes if probe.ok]
+    if len(passed) == len(probes):
+        current = "Available"
+        severity = "informational"
+        impact = "Optional publisher is available"
+    elif not passed:
+        current = "Inactive"
+        severity = "informational"
+        impact = "Optional publisher is not active; canonical camera service is unaffected"
+    else:
+        current = "Degraded"
+        severity = "warning"
+        impact = "Optional publisher is partially available or unhealthy"
+
+    prior_state = previous.get("current_state", "Unknown")
+    recovery = current in ("Available", "Inactive") and prior_state == "Degraded"
+    incident_id = previous.get("correlation_id")
+    if current == "Degraded" and prior_state != "Degraded":
+        incident_id = str(uuid.uuid4())
+    if not incident_id:
+        incident_id = str(uuid.uuid4())
+
+    now = iso_now()
+    last_notification = previous.get("last_notification_time")
+    notify = recovery or (current == "Degraded" and current != prior_state)
+    return {
+        "event_occurrence_time": now,
+        "collection_time": now,
+        "report_generation_time": now,
+        "time_zone": datetime.now().astimezone().tzname(),
+        "current_state": current,
+        "historical_state": prior_state,
+        "recovery_time": now if recovery else previous.get("recovery_time"),
+        "data_source": sorted({probe.source for probe in probes}),
+        "data_completeness": "complete",
+        "confidence": "high",
+        "severity": severity,
+        "affected_service": service,
+        "user_impact": impact,
+        "correlation_id": incident_id,
+        "deduplication_key": f"origin:{service}",
+        "suppression_key": f"origin:{service}:{current.lower()}",
+        "notification_disposition": "send" if notify else "deduplicated",
+        "recovery_notification": recovery,
+        "consecutive_failures": 1 if current == "Degraded" else 0,
+        "benign_hls_cancellations": 0,
+        "actionable_origin_errors": 0,
+        "evidence": [f"{probe.name}: {probe.evidence}" for probe in probes],
+        "runbook": "/opt/mbfd/runbooks/mbfd-origin-monitor-status.sh",
+        "last_notification_time": now if notify else last_notification,
+    }
+
+
 def run() -> int:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -306,23 +425,37 @@ def run() -> int:
         http_probe("media-cloudflare", "media-control", "https://media.mbfdhub.com/api/version"),
     ]
 
-    camera_probes: list[Probe] = []
+    # Only anpviz-main is the required camera program. The guest publisher is
+    # optional and receives its own Available/Inactive/Degraded state below.
+    camera_probes: list[Probe] = [
+        http_probe(
+            "anpviz-master",
+            "camera-hls",
+            "http://127.0.0.1:8120/hls/anpviz-main/index.m3u8",
+        ),
+        camera_program_probe("http://127.0.0.1:8120/api/status"),
+    ]
+    guest_probes: list[Probe] = [
+        http_probe(
+            "guest-master",
+            "guest-computer",
+            "http://127.0.0.1:8120/hls/guest-computer/index.m3u8",
+        ),
+    ]
     playlist_state: dict[str, Any] = {}
-    for name, url in (
-        ("anpviz-master", "http://127.0.0.1:8120/hls/anpviz-main/index.m3u8"),
-        ("guest-master", "http://127.0.0.1:8120/hls/guest-computer/index.m3u8"),
-    ):
-        # The master request establishes MediaMTX's path-scoped HLS cookies
-        # before the advancing video and audio playlists are inspected.
-        camera_probes.append(http_probe(name, "camera-hls", url))
     for name, path in (
         ("anpviz-video", "/hls/anpviz-main/video1_stream.m3u8"),
         ("anpviz-audio", "/hls/anpviz-main/audio2_stream.m3u8"),
+    ):
+        probe, marker = playlist_probe(name, "camera-hls", path)
+        camera_probes.append(probe)
+        playlist_state[name] = marker
+    for name, path in (
         ("guest-video", "/hls/guest-computer/video1_stream.m3u8"),
         ("guest-audio", "/hls/guest-computer/audio2_stream.m3u8"),
     ):
-        probe, marker = playlist_probe(name, path)
-        camera_probes.append(probe)
+        probe, marker = playlist_probe(name, "guest-computer", path)
+        guest_probes.append(probe)
         playlist_state[name] = marker
     camera_probes.append(
         http_probe(
@@ -346,6 +479,11 @@ def run() -> int:
             {"complete": signals.get("complete", False), **signal_services.get("camera-hls", {})},
             services.get("camera-hls", {}),
         ),
+        optional_publisher_state(
+            "guest-computer",
+            guest_probes,
+            services.get("guest-computer", {}),
+        ),
     ]
 
     for event in events:
@@ -354,12 +492,21 @@ def run() -> int:
     state["last_run"] = iso_now()
     atomic_json(STATE_FILE, state)
 
-    current_states = {event["current_state"] for event in events}
-    if "Failed" in current_states:
+    required_states = {
+        event["current_state"]
+        for event in events
+        if event["affected_service"] in ("media-control", "camera-hls")
+    }
+    guest_state = next(
+        event["current_state"]
+        for event in events
+        if event["affected_service"] == "guest-computer"
+    )
+    if "Failed" in required_states:
         monitor_state = "Failed"
-    elif "Degraded" in current_states:
+    elif "Degraded" in required_states or guest_state == "Degraded":
         monitor_state = "Degraded"
-    elif "Recovered" in current_states:
+    elif "Recovered" in required_states:
         monitor_state = "Recovered"
     else:
         monitor_state = "Healthy"
@@ -376,9 +523,9 @@ def run() -> int:
             stream.write(serialized + "\n")
             print(serialized)
 
-    if "Failed" in current_states:
+    if "Failed" in required_states:
         return 2
-    if current_states & {"Degraded", "Recovered", "Unknown"}:
+    if required_states & {"Degraded", "Recovered", "Unknown"} or guest_state == "Degraded":
         return 1
     return 0
 
@@ -392,6 +539,22 @@ def self_test() -> int:
         b'#EXT-X-PRELOAD-HINT:TYPE=PART,URI="part2.mp4"\n'
     )
     assert marker == "part2.mp4" and segment == "segment1.mp4"
+    inactive = optional_publisher_state(
+        "guest-computer",
+        [Probe("guest-master", "guest-computer", False, "Failed", 1, "test", "absent")],
+        {},
+    )
+    assert inactive["current_state"] == "Inactive"
+    assert inactive["severity"] == "informational"
+    degraded = optional_publisher_state(
+        "guest-computer",
+        [
+            Probe("guest-master", "guest-computer", True, "Healthy", 1, "test", "ready"),
+            Probe("guest-audio", "guest-computer", False, "Failed", 1, "test", "missing"),
+        ],
+        {},
+    )
+    assert degraded["current_state"] == "Degraded"
     print("origin_monitor_self_test=pass")
     return 0
 
