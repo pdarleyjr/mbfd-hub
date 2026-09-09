@@ -285,7 +285,10 @@ class TestConfiguration(unittest.TestCase):
             path = root / "gateway.json"
             path.write_text(json.dumps(deployment), encoding="utf-8")
             config = gateway.load_config(path, {"CREDENTIALS_DIRECTORY": str(root)})
-        self.assertEqual(config.listeners, ("127.0.0.1", "172.20.0.1"))
+        self.assertEqual(
+            config.listeners,
+            ("127.0.0.1", "172.17.0.1", "172.20.0.1"),
+        )
         expected_consumers = {
             "legacy-11440",
             "sports-intelligence",

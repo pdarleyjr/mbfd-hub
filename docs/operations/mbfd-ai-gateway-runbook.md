@@ -70,10 +70,14 @@ The general capability permits 180 seconds for the first cold response byte and
 cold start without forcing application timeouts below the retained Hub/TS
 six-minute boundary; it is not a license for unbounded retries or substitution.
 
-The two private listeners are `127.0.0.1:11440` and
-`172.20.0.1:11440`. The latter is the retained `mbfd-ai` bridge gateway and
-replaces the legacy bridge-owned `172.20.11.1` address so retirement of ports
-11435/11438 cannot remove the gateway's container ingress.
+The private listeners are `127.0.0.1:11440`, `172.17.0.1:11440`, and
+`172.20.0.1:11440`. The `172.17.0.1` listener is Docker's fail-closed
+`host-gateway` target used by Hub's `host.docker.internal` mapping; the
+`172.20.0.1` listener retains the dedicated `mbfd-ai` bridge ingress. Both
+container-facing listeners still require a registered per-consumer credential
+and exact capability/model parity. This replaces the legacy bridge-owned
+`172.20.11.1` address so retirement of ports 11435/11438 cannot remove the
+gateway's authenticated container ingress.
 
 ## Candidate gate
 

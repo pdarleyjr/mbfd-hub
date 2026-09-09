@@ -308,6 +308,7 @@ class TestPersistedReleaseSurface(unittest.TestCase):
             "mbfd-ai-gateway-smoke.py",
             "UNAUTHENTICATED_HEALTH_STATUS",
             "127.0.0.1:11440",
+            "172.17.0.1:11440",
             "172.20.0.1:11440",
             "GATEWAY_CANONICAL_SOURCE=PASS",
             "LISTENER_WAIT_ATTEMPTS",
