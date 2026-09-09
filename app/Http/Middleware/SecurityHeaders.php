@@ -21,8 +21,9 @@ class SecurityHeaders
         // below covers the same use case and supersedes this header in all modern
         // browsers, so we omit it intentionally.
         $cityEmailPage = $request->is('account/city-email', 'account/city-email/*');
-        $response->headers->set('Referrer-Policy', $cityEmailPage ? 'no-referrer' : 'strict-origin-when-cross-origin');
-        if ($cityEmailPage || $request->is('login')) {
+        $loginPage = $request->is('login', 'activate-account');
+        $response->headers->set('Referrer-Policy', $cityEmailPage || $loginPage ? 'no-referrer' : 'strict-origin-when-cross-origin');
+        if ($cityEmailPage || $loginPage) {
             $response->headers->set('Cache-Control', 'no-store, private');
         }
         $conferencePath = $request->is('video-conferencing/*')

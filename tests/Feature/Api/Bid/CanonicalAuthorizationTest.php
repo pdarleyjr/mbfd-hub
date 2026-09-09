@@ -46,8 +46,7 @@ final class CanonicalAuthorizationTest extends TestCase
 
     public function test_unauthenticated_authorization_uses_the_canonical_login_flow(): void
     {
-        $this->get($this->authorizeUrl())
-            ->assertRedirect('/login');
+        $this->federationLogin($this->authorizeUrl());
     }
 
     public function test_existing_canonical_user_resumes_the_exact_bid_authorize_destination_after_login(): void
@@ -55,8 +54,8 @@ final class CanonicalAuthorizationTest extends TestCase
         $authorizeUrl = $this->authorizeUrl();
         $user = $this->linkedUser();
 
-        $this->get($authorizeUrl)->assertRedirect('/login');
-        $loginLocation = $this->post('/login', [
+        $login = $this->federationLogin($authorizeUrl);
+        $loginLocation = $this->post($login, [
             'employee_id' => $user->employeeProfile->employee_id,
             'password' => 'canonical-user-password',
         ])->assertRedirect()->headers->get('Location');
@@ -92,16 +91,19 @@ final class CanonicalAuthorizationTest extends TestCase
             'must_change_password' => false,
         ]);
 
-        $this->get($authorizeUrl)->assertRedirect('/login');
-        $this->post('/login', [
+        $login = $this->federationLogin($authorizeUrl);
+        $activationUrl = $this->post($login, [
             'employee_id' => $employee->employee_id,
             'password' => 'employee-legacy-password',
-        ])->assertRedirect('/activate-account');
+        ])->assertRedirect()->headers->get('Location');
+        self::assertIsString($activationUrl);
+        self::assertSame('/activate-account', parse_url($activationUrl, PHP_URL_PATH));
+        $this->withCookie((string) config('session.cookie'), session()->getId());
 
-        $activation = $this->get('/activate-account')->assertOk();
+        $activation = $this->get($activationUrl)->assertOk();
         $nonce = $activation->viewData('nonce');
         self::assertIsString($nonce);
-        $this->post('/activate-account', [
+        $this->post($activationUrl, [
             'nonce' => $nonce,
             'path' => 'no_existing_user',
             'no_legacy_account_assertion' => '1',
@@ -183,8 +185,7 @@ final class CanonicalAuthorizationTest extends TestCase
         $this->canonicalLogin($disabled);
         $disabled->forceFill(['account_status' => AccountStatus::Disabled])->save();
 
-        $this->get($this->authorizeUrl())
-            ->assertRedirect('/login');
+        $this->federationLogin($this->authorizeUrl());
 
         $revoked = $this->linkedUser('REVOKED');
         $this->canonicalLogin($revoked);
@@ -192,8 +193,7 @@ final class CanonicalAuthorizationTest extends TestCase
             ->where('user_id', $revoked->id)
             ->update(['revoked_at' => now()]);
 
-        $this->get($this->authorizeUrl())
-            ->assertRedirect('/login');
+        $this->federationLogin($this->authorizeUrl());
     }
 
     public function test_production_callback_uses_the_same_guarded_handoff(): void

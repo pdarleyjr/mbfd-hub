@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Livewire\Livewire;
 
 abstract class TestCase extends BaseTestCase
@@ -131,6 +132,27 @@ abstract class TestCase extends BaseTestCase
         Auth::forgetGuards();
         $this->flushSession();
         $this->defaultCookies = [];
+    }
+
+    protected function federationLogin(string $destination): string
+    {
+        return $this->captureFederationLogin($this->get($destination));
+    }
+
+    /** Carry the same encrypted cookies a browser receives on the redirect. */
+    protected function captureFederationLogin(TestResponse $response): string
+    {
+        $response->assertRedirect();
+        $location = (string) $response->headers->get('Location');
+        self::assertMatchesRegularExpression('#^/login\?login_attempt=[a-f0-9]{64}$#', $location);
+        foreach ($response->headers->getCookies() as $cookie) {
+            if (str_starts_with($cookie->getName(), 'hub_login_attempt_')) {
+                $this->withCookie($cookie->getName(), $response->getCookie($cookie->getName())->getValue());
+            }
+        }
+        $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId())->withCredentials();
+
+        return $location;
     }
 
     /**

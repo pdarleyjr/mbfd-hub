@@ -6,6 +6,8 @@ namespace App\Http\Middleware;
 
 use App\Models\AuthenticationSession;
 use App\Models\User;
+use App\Services\Identity\CanonicalLoginDestination;
+use App\Services\Identity\FederationLoginAttempt;
 use App\Services\Identity\SessionRegistry;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -43,6 +45,11 @@ final readonly class EnsureCanonicalSessionIsCurrent
         if ($user instanceof User && $registered instanceof AuthenticationSession) {
             $this->sessions->revoke($user, $registryId, 'canonical session no longer current', CarbonImmutable::now());
         }
+        // Retain only this navigation's allowlisted federation GET. Invalidation
+        // still discards old intended URLs, form data, and authentication state.
+        $federation = $request->isMethod('GET') && ! $request->expectsJson() && ! $request->headers->has('X-Livewire')
+            ? app(CanonicalLoginDestination::class)->federation($request->getRequestUri())
+            : null;
         Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
@@ -58,6 +65,15 @@ final readonly class EnsureCanonicalSessionIsCurrent
 
         if ($request->expectsJson()) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        $attempts = app(FederationLoginAttempt::class);
+        if ($federation !== null) {
+            return $attempts->begin($request, $federation);
+        }
+        if ($request->is('login') && $attempts->requested($request)) {
+            return $attempts->current($request) !== null
+                ? redirect($attempts->loginUrl($request, expired: true)) : $attempts->unavailable();
         }
 
         return redirect('/login');

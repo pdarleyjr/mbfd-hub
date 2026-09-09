@@ -25,8 +25,11 @@
     @if (request()->query('session_expired') === '1')
         <p role="status">Your session has ended. Please sign in again. Unsaved changes were not submitted. Review the record after signing in.</p>
     @endif
+    @if ($applicationLabel ?? null)
+        <p>Sign in to continue to {{ $applicationLabel }}.</p>
+    @endif
     <p>Sign in with your Employee ID and MBFD Hub password.</p>
-    <form method="POST" action="{{ route('login.store') }}">
+    <form method="POST" action="{{ $loginAction ?? route('login.store') }}">
         @csrf
         <label for="employee_id">Employee ID</label>
         <input id="employee_id" name="employee_id" type="text" maxlength="64" autocomplete="username" value="{{ old('employee_id') }}" required autofocus @error('employee_id') aria-invalid="true" aria-describedby="employee_id-error" @enderror>

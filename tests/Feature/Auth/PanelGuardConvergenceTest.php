@@ -46,16 +46,15 @@ final class PanelGuardConvergenceTest extends TestCase
     {
         self::assertTrue(Route::has('bid.auth.authorize'), 'Test base path: '.base_path());
 
-        $this->get('/auth/bid/authorize?client_id=bid&redirect_uri=https%3A%2F%2Fstaging.bid.mbfdhub.com%2Fapi%2Fauth%2Fcallback&state=uQxS6x3Mki8aUHsi_vB1m2zY9kt_P4DSxMZ0nNfw2-I')
-            ->assertRedirect('/login');
+        $this->federationLogin('/auth/bid/authorize?client_id=bid&redirect_uri=https%3A%2F%2Fstaging.bid.mbfdhub.com%2Fapi%2Fauth%2Fcallback&state=uQxS6x3Mki8aUHsi_vB1m2zY9kt_P4DSxMZ0nNfw2-I');
     }
 
     public function test_canonical_login_preserves_the_existing_media_control_handoff_exactly(): void
     {
         $user = $this->linkedActiveUser('MEDIA-HANDOFF');
         $handoff = '/auth/media-control/authorize?client_id=media-control&state=opaque%2Bstate%2Fvalue';
-        $this->get($handoff)->assertRedirect('/login');
-        $this->post('/login', ['employee_id' => $user->employee_id, 'password' => 'correct-password'])
+        $login = $this->federationLogin($handoff);
+        $this->post($login, ['employee_id' => $user->employee_id, 'password' => 'correct-password'])
             ->assertRedirect($handoff);
     }
 

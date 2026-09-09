@@ -84,9 +84,11 @@ Route::post('/_csp-report', [\App\Http\Controllers\CspReportController::class, '
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
     ->name('csp.report');
 
+// The controller resumes a tab's verified attempt for an already-signed-in user;
+// generic guest middleware would discard that context and redirect to Hub home.
+Route::get('/login', [CanonicalLoginController::class, 'create'])->name('login');
+Route::post('/login', [CanonicalLoginController::class, 'store'])->name('login.store');
 Route::middleware('guest:web')->group(function (): void {
-    Route::get('/login', [CanonicalLoginController::class, 'create'])->name('login');
-    Route::post('/login', [CanonicalLoginController::class, 'store'])->name('login.store');
     Route::get('/activate-account', [FirstLoginCanonicalizationController::class, 'create'])
         ->name('activate-account.create');
     Route::post('/activate-account', [FirstLoginCanonicalizationController::class, 'store'])

@@ -10,6 +10,7 @@ use App\Services\Identity\CanonicalActivationIntent;
 use App\Services\Identity\CanonicalSessionPolicy;
 use App\Services\Identity\CanonicalUserProvisioner;
 use App\Services\Identity\DualCredentialIdentityClaim;
+use App\Services\Identity\FederationLoginAttempt;
 use App\Services\Identity\SessionRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -17,21 +18,31 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 final class FirstLoginCanonicalizationController extends Controller
 {
     private const FAILURE_MESSAGE = 'The provided credentials are invalid.';
 
-    public function create(Request $request, CanonicalActivationIntent $intents): View|RedirectResponse
+    public function create(Request $request, CanonicalActivationIntent $intents): View|Response
     {
+        $attempts = app(FederationLoginAttempt::class);
+        if ($attempts->requested($request) && $attempts->current($request) === null) {
+            return $attempts->unavailable();
+        }
         $nonce = $intents->present($request->session(), CarbonImmutable::now());
         if ($nonce === null) {
-            return redirect('/login')->withErrors(['employee_id' => self::FAILURE_MESSAGE]);
+            return redirect($attempts->requested($request) ? $attempts->loginUrl($request) : '/login')
+                ->withErrors(['employee_id' => self::FAILURE_MESSAGE]);
         }
 
-        return view('auth.activate-account', ['nonce' => $nonce]);
+        return view('auth.activate-account', [
+            'nonce' => $nonce,
+            'loginAttempt' => $attempts->requested($request) ? $request->query('login_attempt') : null,
+        ]);
     }
 
     public function store(
@@ -41,20 +52,30 @@ final class FirstLoginCanonicalizationController extends Controller
         DualCredentialIdentityClaim $claims,
         CanonicalSessionPolicy $sessionPolicy,
         SessionRegistry $sessions,
-    ): RedirectResponse {
-        $input = $request->validate([
+    ): Response {
+        $attempts = app(FederationLoginAttempt::class);
+        if ($attempts->requested($request) && $attempts->current($request) === null) {
+            return $attempts->unavailable();
+        }
+        $validator = Validator::make($request->all(), [
             'nonce' => ['required', 'string', 'size:64'],
             'path' => ['required', 'string', 'in:existing_user,no_existing_user'],
             'legacy_email' => ['nullable', 'required_if:path,existing_user', 'string', 'email:rfc', 'max:255'],
             'legacy_password' => ['nullable', 'required_if:path,existing_user', 'string', 'max:4096'],
             'no_legacy_account_assertion' => ['nullable', 'accepted_if:path,no_existing_user'],
         ]);
+        if ($attempts->requested($request) && $validator->fails()) {
+            return redirect('/activate-account?'.http_build_query(['login_attempt' => $request->query('login_attempt')]))
+                ->withErrors($validator);
+        }
+        $input = $validator->validate();
         $at = CarbonImmutable::now();
         $employeeProfileId = $intents->consumeNonce($request->session(), $input['nonce'], $at);
         if ($employeeProfileId === null) {
             $intents->invalidate($request->session());
 
-            return redirect('/login')->withErrors(['employee_id' => self::FAILURE_MESSAGE]);
+            return redirect($attempts->requested($request) ? $attempts->loginUrl($request) : '/login')
+                ->withErrors(['employee_id' => self::FAILURE_MESSAGE]);
         }
 
         $legacyEmail = strtolower(trim((string) ($input['legacy_email'] ?? '')));
@@ -62,7 +83,7 @@ final class FirstLoginCanonicalizationController extends Controller
         $maxAttempts = max(1, (int) config('security.identity_recovery.max_attempts', 3));
         $decaySeconds = max(1, (int) config('security.identity_recovery.decay_seconds', 900));
         if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
-            return $this->denied($key, $decaySeconds, 'rate_limited');
+            return $this->denied($request, $key, $decaySeconds, 'rate_limited');
         }
 
         try {
@@ -87,11 +108,11 @@ final class FirstLoginCanonicalizationController extends Controller
                 'exception_class' => $exception::class,
             ]);
 
-            return $this->denied($key, $decaySeconds, 'collision_or_transition_denied');
+            return $this->denied($request, $key, $decaySeconds, 'collision_or_transition_denied');
         }
 
         if (! $user instanceof User || ! $user->isAuthenticationAllowed()) {
-            return $this->denied($key, $decaySeconds, 'credential_or_eligibility_denied');
+            return $this->denied($request, $key, $decaySeconds, 'credential_or_eligibility_denied');
         }
 
         RateLimiter::clear($key);
@@ -118,7 +139,8 @@ final class FirstLoginCanonicalizationController extends Controller
                 'exception_class' => $exception::class,
             ]);
 
-            return redirect('/login')->withErrors(['employee_id' => self::FAILURE_MESSAGE]);
+            return redirect($attempts->requested($request) ? $attempts->loginUrl($request) : '/login')
+                ->withErrors(['employee_id' => self::FAILURE_MESSAGE]);
         }
 
         $request->session()->put('auth.canonical_session_id', $registered->id);
@@ -131,10 +153,11 @@ final class FirstLoginCanonicalizationController extends Controller
             $at->getTimestamp(),
         );
 
-        return redirect(app(\App\Services\Identity\CanonicalLoginDestination::class)->resolve($user, $request->session()->pull('url.intended')));
+        return $attempts->requested($request) ? $attempts->complete($request)
+            : redirect(app(\App\Services\Identity\CanonicalLoginDestination::class)->resolve($user, $request->session()->pull('url.intended')));
     }
 
-    private function denied(string $key, int $decaySeconds, string $reason): RedirectResponse
+    private function denied(Request $request, string $key, int $decaySeconds, string $reason): RedirectResponse
     {
         RateLimiter::hit($key, $decaySeconds);
         Log::notice('canonical_first_login_transition_denied', [
@@ -142,7 +165,9 @@ final class FirstLoginCanonicalizationController extends Controller
             'claim_fingerprint' => substr($key, strlen('canonical-first-login:')),
         ]);
 
-        return redirect('/activate-account')->withErrors(['legacy_email' => self::FAILURE_MESSAGE]);
+        return redirect('/activate-account'.(app(FederationLoginAttempt::class)->requested($request)
+            ? '?'.http_build_query(['login_attempt' => $request->query('login_attempt')]) : ''))
+            ->withErrors(['legacy_email' => self::FAILURE_MESSAGE]);
     }
 
     private function throttleKey(int $employeeProfileId, string $legacyEmail, string $ip): string
