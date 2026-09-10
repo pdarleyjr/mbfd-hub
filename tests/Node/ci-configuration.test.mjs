@@ -162,6 +162,7 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(deploy, /confirm_production_activation:/);
   assert.match(deploy, /final_release_sha:/);
   assert.match(deploy, /final_image_digest:/);
+  assert.match(deploy, /bootstrap_cohort_manifest:/);
   assert.match(deploy, /FINAL_RELEASE_SHA/);
   assert.match(deploy, /FINAL_IMAGE_DIGEST/);
   assert.match(
@@ -176,6 +177,8 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(assertMain, /inputs\.confirm_production_activation/);
   assert.match(assertMain, /inputs\.final_release_sha/);
   assert.match(assertMain, /inputs\.final_image_digest/);
+  assert.match(assertMain, /inputs\.bootstrap_cohort_manifest/);
+  assert.match(assertMain, /mbfd-member-bootstrap-cohort-/);
   assert.match(assertMain, /sha256:/);
 
   const releaseGateCaller = workflowJob(deploy, "release-gates");
@@ -259,6 +262,10 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(identityBaseline, /identity_conflicts/);
   assert.match(identityBaseline, /test "\$IDENTITY_CONFLICTS" = '0'/);
   assert.match(identityBaseline, /chmod 600/);
+  assert.match(identityBaseline, /source_backup_file/);
+  assert.match(identityBaseline, /source_backup_sha256/);
+  assert.match(identityBaseline, /sha256sum/);
+  assert.match(identityBaseline, /stat -c '%a'/);
   assert.doesNotMatch(identityBaseline, /--apply/);
 
   const immutableImage = workflowStep(deployment, "Pull and verify immutable Hub image");
@@ -298,6 +305,12 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(identityProvisioning, /identity:provision-universal-accounts --format=json/);
   assert.match(identityProvisioning, /identity:provision-universal-accounts --apply --confirm=PROVISION_ACTIVE_EMPLOYEE_ACCOUNTS --format=json/);
   assert.match(identityProvisioning, /identity:established-account-integrity/);
+  assert.match(identityProvisioning, /identity:initialize-member-bootstrap-cohort/);
+  assert.match(identityProvisioning, /INITIALIZE_PROVEN_MEMBER_BOOTSTRAP_COHORT/);
+  assert.match(identityProvisioning, /--bootstrap-cohort-manifest/);
+  assert.match(identityProvisioning, /ESTABLISHED_ALLOWED_BOOTSTRAP_COHORT_TRANSITIONS/);
+  assert.match(identityProvisioning, /source_backup_sha256/);
+  assert.match(identityProvisioning, /sha256sum/);
   assert.match(identityProvisioning, /PRE_SNAPSHOT_NAME="mbfd-hub-established-pre-/);
   assert.match(identityProvisioning, /--compare="\/evidence\/\$5"/);
   assert.match(identityProvisioning, /active_employees_without_canonical_user/);
