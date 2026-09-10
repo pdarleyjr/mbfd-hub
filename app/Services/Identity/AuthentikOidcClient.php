@@ -138,7 +138,7 @@ final class AuthentikOidcClient
         if (($claims['iss'] ?? null) !== $this->issuer()
             || ! in_array($this->clientId(), $audiences, true)
             || ! is_string($claims['sub'] ?? null)
-            || ($claims['sub'] ?? '') === ''
+            || $claims['sub'] === ''
             || ! is_string($claims['nonce'] ?? null)
             || ! hash_equals($nonce, $claims['nonce'])
             || (int) ($claims['exp'] ?? 0) < $now - $skew

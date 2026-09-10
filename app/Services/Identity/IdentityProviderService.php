@@ -7,6 +7,7 @@ namespace App\Services\Identity;
 use App\Contracts\Identity\IdentityProvider;
 use App\Models\User;
 use App\Models\UserIdentityLink;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use RuntimeException;
@@ -56,7 +57,11 @@ final class IdentityProviderService
         });
 
         $this->synchronizations->request($current);
-        Password::broker()->deleteToken($current);
+        $broker = Password::broker();
+        if (! $broker instanceof PasswordBroker) {
+            throw new RuntimeException('The configured password broker cannot revoke legacy reset tokens.');
+        }
+        $broker->deleteToken($current);
 
         return $link;
     }

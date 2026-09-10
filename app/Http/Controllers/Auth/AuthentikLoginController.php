@@ -18,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 final class AuthentikLoginController extends Controller
@@ -44,7 +45,7 @@ final class AuthentikLoginController extends Controller
         CanonicalSessionIssuer $sessions,
         FederationLoginAttempt $federation,
         AccountSecurityService $security,
-    ): RedirectResponse {
+    ): Response {
         try {
             $result = $oidc->complete($request);
             $claims = $result['claims'];

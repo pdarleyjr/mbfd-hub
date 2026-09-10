@@ -77,7 +77,7 @@ final class AuthentikIdentityProvider implements IdentityProvider
     {
         $this->assertLink($user, $link);
         foreach ($this->sessions($link) as $session) {
-            $sessionId = is_array($session) ? ($session['uuid'] ?? null) : null;
+            $sessionId = $session['uuid'] ?? null;
             if (! is_string($sessionId) || preg_match('/^[0-9a-f-]{36}$/iD', $sessionId) !== 1) {
                 throw new RuntimeException('The identity provider returned an invalid session identifier.');
             }

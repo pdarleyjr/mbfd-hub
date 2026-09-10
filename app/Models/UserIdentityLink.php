@@ -7,6 +7,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property array<string, mixed>|null $security_state
+ * @property \Carbon\CarbonImmutable|null $last_synced_at
+ * @property \Carbon\CarbonImmutable|null $last_verified_at
+ */
 final class UserIdentityLink extends Model
 {
     protected $fillable = [
