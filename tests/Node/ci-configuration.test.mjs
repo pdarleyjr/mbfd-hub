@@ -251,6 +251,16 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(databaseBackup, /BACKUP_FILE="\$HUB_BACKUP_DIR\//);
   assert.doesNotMatch(databaseBackup, /BACKUP_DIR=\/var\/lib\/postgresql\/data/);
 
+  const identityBaseline = workflowStep(deployment, "Inventory identities and snapshot established accounts");
+  assert.match(identityBaseline, /identity:provision-universal-accounts --format=json/);
+  assert.match(identityBaseline, /identity:established-account-integrity/);
+  assert.match(identityBaseline, /SNAPSHOT_NAME="mbfd-hub-established-pre-/);
+  assert.match(identityBaseline, /--write="\/evidence\/\$2"/);
+  assert.match(identityBaseline, /identity_conflicts/);
+  assert.match(identityBaseline, /test "\$IDENTITY_CONFLICTS" = '0'/);
+  assert.match(identityBaseline, /chmod 600/);
+  assert.doesNotMatch(identityBaseline, /--apply/);
+
   const immutableImage = workflowStep(deployment, "Pull and verify immutable Hub image");
   assert.match(immutableImage, /docker pull/);
   assert.match(immutableImage, /ghcr\.io\//);
@@ -277,11 +287,33 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(activation, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
   assert.match(activation, /test -n "\$RELEASE_SHA"/);
   assert.match(activation, /RELEASE_SHA='\$RELEASE_SHA'.*bash -s/);
+  assert.match(activation, /identity:member-bootstrap-status --require-available --no-interaction/);
 
   const applicationHealth = workflowStep(deployment, "Verify Hub application health");
   assert.match(applicationHealth, /\.State\.Health\.Status/);
   assert.match(applicationHealth, /http:\/\/localhost:8081\/up/);
   assert.doesNotMatch(applicationHealth, /localhost:80\/up/);
+
+  const identityProvisioning = workflowStep(deployment, "Provision bootstrap cohort and prove established-account integrity");
+  assert.match(identityProvisioning, /identity:provision-universal-accounts --format=json/);
+  assert.match(identityProvisioning, /identity:provision-universal-accounts --apply --confirm=PROVISION_ACTIVE_EMPLOYEE_ACCOUNTS --format=json/);
+  assert.match(identityProvisioning, /identity:established-account-integrity/);
+  assert.match(identityProvisioning, /PRE_SNAPSHOT_NAME="mbfd-hub-established-pre-/);
+  assert.match(identityProvisioning, /--compare="\/evidence\/\$5"/);
+  assert.match(identityProvisioning, /active_employees_without_canonical_user/);
+  assert.match(identityProvisioning, /identity_conflicts/);
+  assert.match(identityProvisioning, /test "\$IDENTITY_CONFLICTS" = '0'/);
+  assert.match(identityProvisioning, /test "\$WITHOUT_CANONICAL" = '0'/);
+  assert.match(identityProvisioning, /ESTABLISHED_ACCOUNT_UNEXPECTED_CHANGES=0/);
+  assert.match(identityProvisioning, /chmod 600/);
+  assert.doesNotMatch(identityProvisioning, /reset-all-employee-passwords|reset-all|UPDATE users/i);
+
+  const baselineIndex = deployment.indexOf("Inventory identities and snapshot established accounts");
+  const migrationStepIndex = deployment.indexOf("Migrate and activate prebuilt Hub image");
+  const provisionIndex = deployment.indexOf("Provision bootstrap cohort and prove established-account integrity");
+  const leaveMaintenanceIndex = deployment.indexOf("Leave maintenance mode and verify internal health");
+  assert.ok(baselineIndex >= 0 && baselineIndex < migrationStepIndex);
+  assert.ok(provisionIndex > migrationStepIndex && provisionIndex < leaveMaintenanceIndex);
   assert.match(activation, /test "\$\(git rev-parse HEAD\)" = "\$RELEASE_SHA"/);
   assert.match(activation, /php artisan migrate:status/);
   assert.match(activation, /compose\.prod\.image\.yaml/);

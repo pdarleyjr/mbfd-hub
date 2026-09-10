@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Identity;
 
 use App\Enums\AccountStatus;
+use App\Exceptions\MemberBootstrapStateChanged;
 use App\Models\AuthenticationSession;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\Security\SecurityAuditRecorder;
 use Carbon\CarbonInterface;
 use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +17,58 @@ use Illuminate\Support\Facades\Password;
 
 final class AccountSecurityService
 {
+    public function completeMemberBootstrap(
+        int $userId,
+        int $employeeProfileId,
+        int $expectedSecurityVersion,
+        string $cityEmail,
+        string $passwordHash,
+        CarbonInterface $at,
+    ): User {
+        return DB::transaction(function () use ($userId, $employeeProfileId, $expectedSecurityVersion, $cityEmail, $passwordHash, $at): User {
+            /** @var User|null $lockedUser */
+            $lockedUser = User::query()->lockForUpdate()->find($userId);
+            /** @var Employee|null $lockedEmployee */
+            $lockedEmployee = Employee::query()->lockForUpdate()->find($employeeProfileId);
+            if (! $lockedUser instanceof User || ! $lockedEmployee instanceof Employee
+                || $lockedUser->employee_profile_id !== $lockedEmployee->getKey()
+                || $lockedUser->employee_id !== $lockedEmployee->employee_id
+                || $lockedEmployee->roster_status !== 'active'
+                || $lockedUser->getRawOriginal('account_status') !== AccountStatus::PendingActivation->value
+                || ! $lockedUser->bootstrap_onboarding_eligible
+                || $lockedUser->bootstrap_onboarding_completed_at !== null
+                || $lockedUser->security_version !== $expectedSecurityVersion
+                || ! app(MemberBootstrapCredential::class)->available()) {
+                throw new MemberBootstrapStateChanged('The onboarding authorization is no longer current.');
+            }
+
+            app(CanonicalCityEmailService::class)->sync($lockedEmployee, $lockedUser, $cityEmail);
+            DB::table('users')->where('id', $lockedUser->id)->update([
+                'password' => $passwordHash,
+                'temporary_credential_fingerprint' => null,
+                'account_status' => AccountStatus::Active->value,
+                'must_change_password' => false,
+                'password_changed_at' => $at,
+                'bootstrap_onboarding_eligible' => false,
+                'bootstrap_onboarding_completed_at' => $at,
+                'security_version' => $lockedUser->security_version + 1,
+                'updated_at' => $at,
+            ]);
+            $lockedUser = $lockedUser->fresh('employeeProfile');
+            $this->revokeSessions($lockedUser, 'member bootstrap completed', $at);
+            app(SecurityAuditRecorder::class)->record(
+                $lockedUser,
+                $lockedUser,
+                'complete_member_bootstrap',
+                'allowed',
+                null,
+                ['employee_profile_id' => $lockedEmployee->id, 'city_email_reviewed' => true],
+            );
+
+            return $lockedUser;
+        }, 3);
+    }
+
     public function setAdministrativeRecoveryPassword(User $user, string $passwordHash, string $fingerprint, CarbonInterface $at): User
     {
         return DB::transaction(function () use ($user, $passwordHash, $fingerprint, $at): User {
@@ -25,6 +79,7 @@ final class AccountSecurityService
                 'temporary_credential_fingerprint' => $fingerprint,
                 'must_change_password' => true,
                 'password_changed_at' => $at,
+                'bootstrap_onboarding_eligible' => false,
                 'security_version' => $lockedUser->security_version + 1,
                 'updated_at' => $at,
             ]);
@@ -49,6 +104,7 @@ final class AccountSecurityService
                 'account_status' => AccountStatus::Active->value,
                 'must_change_password' => true,
                 'password_changed_at' => $at,
+                'bootstrap_onboarding_eligible' => false,
                 'security_version' => $lockedUser->security_version + 1,
                 'updated_at' => $at,
             ]);
@@ -66,6 +122,7 @@ final class AccountSecurityService
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
             $lockedUser->forceFill([
                 'must_change_password' => true,
+                'bootstrap_onboarding_eligible' => false,
                 'security_version' => $lockedUser->security_version + 1,
             ])->save();
             $this->revokeSessions($lockedUser, 'password change required', $at);
@@ -84,6 +141,7 @@ final class AccountSecurityService
                 'temporary_credential_fingerprint' => null,
                 'must_change_password' => false,
                 'password_changed_at' => $at,
+                'bootstrap_onboarding_eligible' => false,
                 'security_version' => $lockedUser->security_version + 1,
                 'updated_at' => $at,
             ]);
@@ -138,6 +196,9 @@ final class AccountSecurityService
                 $changes['must_change_password'] = true;
                 $passwordChanged = true;
             }
+            if ($lockedUser->bootstrap_onboarding_eligible) {
+                $changes['bootstrap_onboarding_eligible'] = false;
+            }
 
             if ($changes === []) {
                 return [
@@ -175,6 +236,7 @@ final class AccountSecurityService
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
             $lockedUser->forceFill([
                 'account_status' => $status,
+                'bootstrap_onboarding_eligible' => false,
                 'security_version' => $lockedUser->security_version + 1,
             ])->save();
 
@@ -207,6 +269,7 @@ final class AccountSecurityService
             $lockedUser->forceFill([
                 'password_changed_at' => $at,
                 'temporary_credential_fingerprint' => null,
+                'bootstrap_onboarding_eligible' => false,
                 'security_version' => $lockedUser->security_version + 1,
             ])->save();
 

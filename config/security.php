@@ -40,6 +40,12 @@ return [
         'decay_seconds' => 60,
     ],
 
+    'member_bootstrap' => [
+        'max_attempts' => 5,
+        'global_max_attempts' => 30,
+        'decay_seconds' => 60,
+    ],
+
     'identity_recovery' => [
         'max_attempts' => 3,
         'decay_seconds' => 900,

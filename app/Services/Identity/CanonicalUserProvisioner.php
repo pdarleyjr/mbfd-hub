@@ -44,16 +44,12 @@ final readonly class CanonicalUserProvisioner
                     throw new RuntimeException("Employee {$employee->id} is linked to a different canonical User.");
                 }
 
-                UserNotificationSubscription::ensureDepartmentUpdatesForUser($existing->id);
-                $memberRoleAdded = ! $existing->hasRole('member');
-                $existing->assignRole(Role::findOrCreate('member', 'web'));
-
                 return [
                     'user' => $existing,
                     'created' => false,
                     'credential_hash_copied' => false,
                     'activated' => false,
-                    'member_role_added' => $memberRoleAdded,
+                    'member_role_added' => false,
                 ];
             }
             if (User::query()->where('employee_id', $employee->employee_id)->orWhere('email', $email)->exists()) {
@@ -89,6 +85,9 @@ final readonly class CanonicalUserProvisioner
                 'account_status' => $status->value,
                 'security_version' => 1,
                 'password_changed_at' => $copyVerifiedLegacyHash ? $at : null,
+                'bootstrap_onboarding_eligible' => ! $copyVerifiedLegacyHash,
+                'bootstrap_onboarding_eligible_at' => $copyVerifiedLegacyHash ? null : $at,
+                'bootstrap_onboarding_completed_at' => null,
                 'created_at' => $at,
                 'updated_at' => $at,
             ]);

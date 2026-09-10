@@ -13,6 +13,7 @@ use App\Http\Controllers\Auth\AuthentikLoginController;
 use App\Http\Controllers\Auth\CanonicalLoginController;
 use App\Http\Controllers\Auth\CityEmailController;
 use App\Http\Controllers\Auth\EmployeePasswordResetController;
+use App\Http\Controllers\Auth\MemberBootstrapOnboardingController;
 use App\Http\Controllers\DepartmentUpdateController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
@@ -89,6 +90,12 @@ Route::post('/_csp-report', [\App\Http\Controllers\CspReportController::class, '
 // generic guest middleware would discard that context and redirect to Hub home.
 Route::get('/login', [CanonicalLoginController::class, 'create'])->name('login');
 Route::post('/login', [CanonicalLoginController::class, 'store'])->name('login.store');
+Route::prefix('member-onboarding')->name('member-onboarding.')->group(function (): void {
+    Route::get('/', [MemberBootstrapOnboardingController::class, 'show'])->name('show');
+    Route::post('/', [MemberBootstrapOnboardingController::class, 'store'])
+        ->middleware('throttle:6,1')->name('store');
+    Route::post('/cancel', [MemberBootstrapOnboardingController::class, 'cancel'])->name('cancel');
+});
 Route::get('/auth/identity', [AuthentikLoginController::class, 'redirect'])
     ->middleware('throttle:30,1')
     ->name('identity.redirect');

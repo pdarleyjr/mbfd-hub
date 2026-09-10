@@ -9,8 +9,14 @@ return [
     'credential_authority' => env('MBFD_CREDENTIAL_AUTHORITY', 'local'),
     'provider' => 'authentik',
     'local_login_enabled' => env('MBFD_LOCAL_LOGIN_ENABLED', true),
-    // The shared Employee credential claim flow is permanently retired.
+    // The retired Employee principal remains disabled. Member bootstrap is a
+    // separate restricted flow that never authenticates the Employee guard.
     'employee_bootstrap_login_enabled' => false,
+    'member_bootstrap' => [
+        'enabled' => env('MBFD_MEMBER_BOOTSTRAP_ENABLED', false),
+        'password_hash' => env('MBFD_MEMBER_BOOTSTRAP_PASSWORD_HASH'),
+        'session_ttl_seconds' => 900,
+    ],
     'canary_user_ids' => array_values(array_filter(array_map(
         static fn (string $value): ?int => ctype_digit(trim($value)) ? (int) trim($value) : null,
         explode(',', (string) env('MBFD_AUTHENTIK_CANARY_USER_IDS', '')),

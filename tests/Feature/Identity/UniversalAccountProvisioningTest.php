@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Tests\Feature\Identity;
 
 use App\Enums\AccountStatus;
+use App\Models\AuthenticationSession;
 use App\Models\Employee;
 use App\Models\User;
+use App\Models\UserIdentityLink;
 use App\Models\UserNotificationSubscription;
 use App\Services\Identity\UniversalAccountInventory;
 use App\Services\Security\EmployeeAccountAdministration;
@@ -51,7 +53,7 @@ final class UniversalAccountProvisioningTest extends TestCase
         self::assertSame($service->id, collect($report['rows'])->firstWhere('classification', 'NONEMPLOYEE/SERVICE')['canonical_user_id']);
     }
 
-    public function test_apply_preserves_existing_identity_and_credentials_links_exact_legacy_and_preprovisions_roster_only_idempotently(): void
+    public function test_apply_preserves_every_established_identity_field_and_preprovisions_only_roster_only_members_idempotently(): void
     {
         $member = Role::findOrCreate('member', 'web');
         $admin = Role::findOrCreate('admin', 'web');
@@ -64,6 +66,8 @@ final class UniversalAccountProvisioningTest extends TestCase
             'account_status' => AccountStatus::Active,
             'password' => Hash::make('existing-password-2026'),
             'must_change_password' => false,
+            'email' => 'established@miamibeachfl.gov',
+            'email_verified_at' => now(),
         ]);
         $canonical->assignRole($admin);
         $canonical->givePermissionTo($permission);
@@ -74,19 +78,19 @@ final class UniversalAccountProvisioningTest extends TestCase
             'webpush_enabled' => false,
             'email_enabled' => true,
         ]);
-        $canonicalBefore = $canonical->fresh()->only(['id', 'password', 'account_status', 'must_change_password']);
-        $subscriptionBefore = UserNotificationSubscription::query()->where('user_id', $canonical->id)->firstOrFail()->getRawOriginal();
-
-        $legacyEmployee = $this->employee('UA-201');
-        $legacy = User::factory()->create([
-            'employee_id' => $legacyEmployee->employee_id,
-            'employee_profile_id' => null,
-            'account_status' => AccountStatus::Active,
-            'password' => Hash::make('legacy-password-2026'),
-            'must_change_password' => false,
+        UserIdentityLink::query()->create([
+            'user_id' => $canonical->id,
+            'provider' => 'authentik',
+            'subject' => 'established-subject',
+            'provider_user_id' => 'established-provider-user',
+            'status' => 'active',
+            'security_state' => ['mfa' => true],
         ]);
-        $legacy->assignRole($admin);
-        $legacyBefore = $legacy->fresh()->only(['id', 'password', 'account_status', 'must_change_password']);
+        AuthenticationSession::factory()->for($canonical)->create([
+            'security_version' => $canonical->security_version,
+        ]);
+        $canonicalBefore = $this->establishedSnapshot($canonical);
+        $subscriptionBefore = UserNotificationSubscription::query()->where('user_id', $canonical->id)->firstOrFail()->getRawOriginal();
 
         $newEmployee = $this->employee('UA-202');
         $departed = $this->employee('UA-203', 'departed');
@@ -97,32 +101,68 @@ final class UniversalAccountProvisioningTest extends TestCase
             '--format' => 'json',
         ]), Artisan::output());
 
-        self::assertSame($canonicalBefore, $canonical->fresh()->only(array_keys($canonicalBefore)));
-        self::assertTrue($canonical->fresh()->hasAllRoles([$admin, $member]));
+        self::assertSame($canonicalBefore, $this->establishedSnapshot($canonical));
+        self::assertTrue($canonical->fresh()->hasRole($admin));
+        self::assertFalse($canonical->fresh()->hasRole($member));
         self::assertTrue($canonical->fresh()->hasDirectPermission($permission));
         self::assertSame($subscriptionBefore, UserNotificationSubscription::query()->where('user_id', $canonical->id)->firstOrFail()->getRawOriginal());
-        self::assertSame($legacyBefore, $legacy->fresh()->only(array_keys($legacyBefore)));
-        self::assertSame($legacyEmployee->id, $legacy->fresh()->employee_profile_id);
-        self::assertTrue($legacy->fresh()->hasAllRoles([$admin, $member]));
 
         $created = $newEmployee->user()->sole();
         self::assertSame(AccountStatus::PendingActivation, $created->account_status);
         self::assertTrue($created->must_change_password);
+        self::assertTrue($created->bootstrap_onboarding_eligible);
+        self::assertNotNull($created->bootstrap_onboarding_eligible_at);
         self::assertTrue($created->hasRole('member'));
         self::assertFalse(Hash::check((string) $newEmployee->getAuthPassword(), $created->getAuthPassword()));
         self::assertNull($departed->user);
-        $createdBefore = $created->fresh()->only(['id', 'password', 'account_status', 'must_change_password', 'security_version']);
+        $createdBefore = $this->pendingSnapshot($created);
 
         self::assertSame(Command::SUCCESS, Artisan::call('identity:provision-universal-accounts', [
             '--apply' => true,
             '--confirm' => 'PROVISION_ACTIVE_EMPLOYEE_ACCOUNTS',
             '--format' => 'json',
         ]), Artisan::output());
-        self::assertSame($createdBefore, $created->fresh()->only(array_keys($createdBefore)));
-        self::assertSame(3, User::query()->count());
+        self::assertSame($createdBefore, $this->pendingSnapshot($created));
+        self::assertSame(2, User::query()->count());
         $after = app(UniversalAccountInventory::class)->report();
         self::assertSame(0, $after['summary']['active_employees_without_canonical_user']);
-        self::assertSame(3, $after['summary']['EXISTING_CANONICAL_USER']);
+        self::assertSame(2, $after['summary']['EXISTING_CANONICAL_USER']);
+        self::assertSame(1, $after['summary']['bootstrap_eligible_users']);
+    }
+
+    public function test_exact_legacy_account_requires_separate_review_without_any_bulk_mutation(): void
+    {
+        $employee = $this->employee('UA-201');
+        $legacy = User::factory()->create([
+            'employee_id' => $employee->employee_id,
+            'employee_profile_id' => null,
+            'account_status' => AccountStatus::Active,
+            'password' => Hash::make('legacy-password-2026'),
+            'must_change_password' => false,
+            'bootstrap_onboarding_eligible' => false,
+        ]);
+        $legacy->assignRole(Role::findOrCreate('admin', 'web'));
+        $before = $this->establishedSnapshot($legacy);
+
+        self::assertSame(Command::FAILURE, Artisan::call('identity:provision-universal-accounts', [
+            '--apply' => true,
+            '--confirm' => 'PROVISION_ACTIVE_EMPLOYEE_ACCOUNTS',
+            '--format' => 'json',
+        ]));
+
+        self::assertSame($before, $this->establishedSnapshot($legacy));
+        self::assertNull($legacy->fresh()->employee_profile_id);
+        self::assertFalse($legacy->fresh()->bootstrap_onboarding_eligible);
+    }
+
+    public function test_existing_active_and_pending_users_default_to_not_bootstrap_eligible(): void
+    {
+        $active = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $pending = User::factory()->create(['account_status' => AccountStatus::PendingActivation]);
+
+        self::assertFalse($active->fresh()->bootstrap_onboarding_eligible);
+        self::assertFalse($pending->fresh()->bootstrap_onboarding_eligible);
+        self::assertFalse($pending->fresh()->isBootstrapOnboardingPending());
     }
 
     public function test_apply_refuses_conflicting_exact_links_without_mutation(): void
@@ -149,6 +189,7 @@ final class UniversalAccountProvisioningTest extends TestCase
 
     public function test_admin_issued_temporary_password_blocks_hub_api_and_federation_until_password_change(): void
     {
+        $this->withoutVite();
         $actor = User::factory()->create(['account_status' => AccountStatus::Active, 'password' => 'admin-password']);
         $actor->assignRole(Role::findOrCreate('super_admin', 'web'));
         $employee = $this->employee('UA-400');
@@ -161,6 +202,7 @@ final class UniversalAccountProvisioningTest extends TestCase
             $actor, $employee, 'controlled-temporary-password-2026', 'admin-password', 'Controlled live-flow rehearsal',
         );
         self::assertSame($pending->id, $issued->id);
+        self::assertFalse($issued->bootstrap_onboarding_eligible);
 
         $this->post('/login', [
             'employee_id' => $employee->employee_id,
@@ -186,5 +228,56 @@ final class UniversalAccountProvisioningTest extends TestCase
             'roster_status' => $status,
             'password' => 'unusable-test-roster-password',
         ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function pendingSnapshot(User $user): array
+    {
+        $user = $user->fresh();
+
+        return [
+            'id' => $user->id,
+            'password_hash_fingerprint' => hash('sha256', (string) $user->getRawOriginal('password')),
+            'account_status' => $user->getRawOriginal('account_status'),
+            'must_change_password' => $user->must_change_password,
+            'security_version' => $user->security_version,
+            'bootstrap_onboarding_eligible' => $user->bootstrap_onboarding_eligible,
+            'bootstrap_onboarding_eligible_at' => $user->bootstrap_onboarding_eligible_at?->toIso8601String(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function establishedSnapshot(User $user): array
+    {
+        $user = $user->fresh(['employeeProfile', 'roles', 'permissions', 'identityLinks']);
+
+        return [
+            'user_id' => $user->id,
+            'employee_id' => $user->employee_id,
+            'employee_profile_id' => $user->employee_profile_id,
+            'password_hash_fingerprint' => hash('sha256', (string) $user->getRawOriginal('password')),
+            'account_status' => $user->getRawOriginal('account_status'),
+            'must_change_password' => $user->must_change_password,
+            'security_version' => $user->security_version,
+            'email' => $user->email,
+            'email_verified_at' => $user->email_verified_at?->toIso8601String(),
+            'employee_city_email' => $user->employeeProfile?->city_email,
+            'bootstrap_onboarding_eligible' => $user->bootstrap_onboarding_eligible,
+            'roles' => $user->roles->pluck('name')->sort()->values()->all(),
+            'direct_permissions' => $user->permissions->pluck('name')->sort()->values()->all(),
+            'identity_links' => $user->identityLinks->map(fn (UserIdentityLink $link): array => [
+                'provider' => $link->provider,
+                'subject' => $link->subject,
+                'provider_user_id' => $link->provider_user_id,
+                'status' => $link->status,
+                'security_state' => $link->security_state,
+            ])->sortBy('subject')->values()->all(),
+            'authentication_sessions' => AuthenticationSession::query()
+                ->where('user_id', $user->id)
+                ->orderBy('id')
+                ->get(['id', 'security_version', 'revoked_at', 'revoked_reason'])
+                ->map(fn (AuthenticationSession $session): array => $session->getAttributes())
+                ->all(),
+        ];
     }
 }

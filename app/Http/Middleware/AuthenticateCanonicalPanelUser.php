@@ -14,9 +14,12 @@ final class AuthenticateCanonicalPanelUser extends Authenticate
     public function handle($request, Closure $next, ...$guards): Response
     {
         /** @var Request $request */
-        return app(EnsureCanonicalSessionIsCurrent::class)->handle(
+        return app(EnforceMemberBootstrapBoundary::class)->handle(
             $request,
-            fn (Request $request): Response => parent::handle($request, $next, ...$guards),
+            fn (Request $request): Response => app(EnsureCanonicalSessionIsCurrent::class)->handle(
+                $request,
+                fn (Request $request): Response => parent::handle($request, $next, ...$guards),
+            ),
         );
     }
 

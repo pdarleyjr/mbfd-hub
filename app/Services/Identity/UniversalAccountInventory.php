@@ -60,6 +60,9 @@ final readonly class UniversalAccountInventory
         }
         $conflicts = array_values(array_filter($rows, static fn (array $row): bool => in_array($row['classification'], [
             'DUPLICATE_EMPLOYEE_ID', 'MULTIPLE_USERS_FOR_EMPLOYEE', 'CONFLICTING_LINK',
+            // An exact legacy identifier is not sufficient authority to mutate
+            // an established account link or revoke its sessions in a bulk run.
+            'EXACT_LEGACY_USER_NEEDS_LINK',
         ], true)));
 
         return [
@@ -69,6 +72,7 @@ final readonly class UniversalAccountInventory
                 'existing_canonical_users' => $users->whereNotNull('employee_profile_id')->count(),
                 'pending_activation_users' => $users->filter(static fn (User $user): bool => $user->getRawOriginal('account_status') === 'pending_activation')->count(),
                 'active_must_change_users' => $users->filter(static fn (User $user): bool => $user->getRawOriginal('account_status') === 'active' && $user->must_change_password)->count(),
+                'bootstrap_eligible_users' => $users->filter(static fn (User $user): bool => $user->isBootstrapOnboardingPending())->count(),
                 // Existing rows cannot safely be backfilled because plaintext
                 // credentials are unavailable. This is a conservative count:
                 // it may include policy-only forced-change accounts.

@@ -26,6 +26,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
         $middleware->web(append: [
             \App\Http\Middleware\AddBuildHeaders::class,
+            \App\Http\Middleware\EnforceMemberBootstrapBoundary::class,
             \App\Http\Middleware\EnsureCanonicalSessionIsCurrent::class,
             \App\Http\Middleware\ForcePasswordChange::class,
             \App\Http\Middleware\EnsureCityEmailReview::class,
@@ -35,8 +36,13 @@ $app = Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Session\Middleware\StartSession::class,
             \App\Http\Middleware\PreventPreviousUrlStorage::class,
         );
+        $middleware->prependToPriorityList(
+            \Illuminate\Auth\Middleware\Authenticate::class,
+            \App\Http\Middleware\EnforceMemberBootstrapBoundary::class,
+        );
 
         $middleware->alias([
+            'auth' => \App\Http\Middleware\AuthenticateOutsideMemberBootstrap::class,
             'admin.role' => \App\Http\Middleware\EnsureAdminApiRole::class,
             'admin.capability' => \App\Http\Middleware\EnsureAdminCapability::class,
             'canonical.api' => \App\Http\Middleware\EnsureCanonicalMemberApiSession::class,
