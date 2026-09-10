@@ -166,13 +166,7 @@ class User extends Authenticatable implements FilamentUser
                 return;
             }
             $employee = Employee::query()->find($user->employee_profile_id);
-            if ($employee === null) {
-                return;
-            }
-            if ($user->employee_id === null && (! $user->exists || $user->isDirty('employee_profile_id'))) {
-                $user->employee_id = $employee->employee_id;
-            }
-            if ($employee->employee_id !== $user->employee_id) {
+            if ($employee === null || $employee->employee_id !== $user->employee_id) {
                 return;
             }
             foreach (Employee::PROFILE_FIELDS as $field) {
