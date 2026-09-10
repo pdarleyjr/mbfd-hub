@@ -42,12 +42,6 @@ api_write() {
     --data-binary "@$body" "$api$path"
 }
 
-flow_id() {
-  local slug="$1"
-  api_get '/flows/instances/?page_size=100' | jq -er --arg slug "$slug" \
-    '[.results[] | select(.slug == $slug)] | if length == 1 then .[0].pk else error("required flow is missing or ambiguous") end'
-}
-
 wait_for_flow_id() {
   local slug="$1" value=''
   for _ in $(seq 1 60); do
@@ -60,9 +54,9 @@ wait_for_flow_id() {
   exit 1
 }
 
-authentication_flow="$(flow_id default-authentication-flow)"
-authorization_flow="$(flow_id default-provider-authorization-implicit-consent)"
-invalidation_flow="$(flow_id default-provider-invalidation-flow)"
+authentication_flow="$(wait_for_flow_id default-authentication-flow)"
+authorization_flow="$(wait_for_flow_id default-provider-authorization-implicit-consent)"
+invalidation_flow="$(wait_for_flow_id default-provider-invalidation-flow)"
 recovery_flow="$(wait_for_flow_id mbfd-identity-recovery)"
 signing_key="$(api_get '/crypto/certificatekeypairs/?page_size=100' | jq -er \
   '[.results[] | select(.has_key == true or .name == "authentik Self-signed Certificate")] | if length >= 1 then .[0].pk else error("signing key missing") end')"
