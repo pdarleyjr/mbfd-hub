@@ -18,7 +18,13 @@ final class SensitiveEmailRedactionTest extends TestCase
 
     public static function sensitiveSources(): array
     {
-        return [['city_email_verification'], ['password_reset'], ['city_email_changed']];
+        return [
+            ['city_email_verification'],
+            ['password_reset'],
+            ['city_email_changed'],
+            ['identity_recovery'],
+            ['identity_administrative_recovery'],
+        ];
     }
 
     #[DataProvider('sensitiveSources')]

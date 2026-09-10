@@ -83,7 +83,13 @@ final class CloudflareEmailDispatcher
         $now = CarbonImmutable::now();
         // The provider receives the original message, but communications viewers
         // must never be able to retrieve account-security bearer tokens.
-        $sensitive = in_array($sourceType, ['password_reset', 'city_email_verification', 'city_email_changed'], true);
+        $sensitive = in_array($sourceType, [
+            'password_reset',
+            'city_email_verification',
+            'city_email_changed',
+            'identity_recovery',
+            'identity_administrative_recovery',
+        ], true);
         $email = OutboundEmail::query()->create([
             'provider' => 'cloudflare',
             'initiated_by_user_id' => $actor?->getKey(),
