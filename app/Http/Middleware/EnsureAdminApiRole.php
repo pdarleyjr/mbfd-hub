@@ -20,7 +20,7 @@ final class EnsureAdminApiRole
 
         $roles = $roles !== [] ? $roles : ['super_admin', 'admin', 'logistics_admin'];
 
-        if (method_exists($user, 'hasAnyRole') && $user->hasAnyRole($roles)) {
+        if ($user->hasAnyRole($roles)) {
             return $next($request);
         }
 

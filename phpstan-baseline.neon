@@ -121,12 +121,6 @@ parameters:
 			path: app/Filament/Admin/Pages/BidAccessPin.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$email\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Filament/Admin/Pages/BidAccessPin.php
-
-		-
 			message: '#^Using nullsafe property access "\?\-\>email" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
@@ -385,19 +379,19 @@ parameters:
 			path: app/Filament/Resources/StationResource/RelationManagers/Under25kProjectsRelationManager.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$role\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Filament/Resources/TodoResource/Pages/ViewTodo.php
-
-		-
 			message: '#^Cannot access property \$id on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
 			identifier: property.nonObject
 			count: 1
 			path: app/Filament/Resources/TodoResource/Pages/ViewTodo.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$isAdmin\.$#'
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$role\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/TodoResource/Pages/ViewTodo.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$isAdmin\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Filament/Resources/Under25kProjectResource.php
@@ -415,7 +409,7 @@ parameters:
 			path: app/Filament/Resources/Under25kProjectResource.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$isAdmin\.$#'
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$isAdmin\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Filament/Resources/Under25kProjectResource/RelationManagers/UpdatesRelationManager.php
@@ -749,12 +743,6 @@ parameters:
 			identifier: nullsafe.neverNull
 			count: 2
 			path: app/Filament/Workgroup/Pages/Notes.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Employee\|App\\Models\\User\:\:\$email\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Filament/Workgroup/Pages/Profile.php
 
 		-
 			message: '#^Anonymous function should return non\-empty\-array but returns non\-empty\-array\.$#'
