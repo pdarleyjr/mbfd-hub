@@ -7,20 +7,20 @@ on:
   workflow_dispatch:
     inputs:
       final_release_sha:
-        description: 'Exact 40-character main SHA represented by the immutable image.'
+        description: "Exact 40-character main SHA represented by the immutable image."
         required: true
         type: string
       final_image_digest:
-        description: 'Exact GHCR image digest in sha256:<64 lowercase hex> form.'
+        description: "Exact GHCR image digest in sha256:<64 lowercase hex> form."
         required: true
         type: string
       confirm_production_activation:
-        description: 'I confirm this approved main candidate may activate the MBFD Hub production runtime.'
+        description: "I confirm this approved main candidate may activate the MBFD Hub production runtime."
         required: true
         type: boolean
         default: false
       verify_watchdog_only:
-        description: 'Verify existing watchdog configuration without reinstalling host services (fails on drift).'
+        description: "Verify existing watchdog configuration without reinstalling host services (fails on drift)."
         required: false
         type: boolean
         default: false
@@ -232,6 +232,57 @@ jobs:
           echo "Verified Hub backup: $BACKUP_FILE sha256=$BACKUP_SHA256"
           REMOTE
 
+      - name: Inventory identities and snapshot established accounts
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          FINAL_IMAGE_DIGEST: ${{ inputs.final_image_digest }}
+          HUB_IMAGE_RUNTIME_ENV: ${{ vars.MBFD_HUB_IMAGE_RUNTIME_ENV }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_SHA"
+          test -n "$FINAL_IMAGE_DIGEST"
+          test -n "$HUB_IMAGE_RUNTIME_ENV"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_RUN_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HUB_CHECKOUT=/opt/mbfd/mbfd-hub
+          EVIDENCE_ID="$HUB_ACTIVATION_RUN_ID-$RELEASE_SHA"
+          INVENTORY_NAME="mbfd-hub-identity-pre-$EVIDENCE_ID.json"
+          SNAPSHOT_NAME="mbfd-hub-established-pre-$EVIDENCE_ID.json"
+
+          case "$HUB_IMAGE_RUNTIME_ENV" in /*) ;; *) exit 1 ;; esac
+          case "$HUB_BACKUP_DIR" in /mnt/*) ;; *) exit 1 ;; esac
+          test -f "$HUB_IMAGE_RUNTIME_ENV"
+          test -d "$HUB_BACKUP_DIR"
+          test -w "$HUB_BACKUP_DIR"
+          cd "$HUB_CHECKOUT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          IMAGE_REPOSITORY="$(head -n 1 docker/production/image-repository)"
+          test "$IMAGE_REPOSITORY" = 'ghcr.io/pdarleyjr/mbfd-hub'
+          IMAGE_REF="$IMAGE_REPOSITORY@$FINAL_IMAGE_DIGEST"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_REF")" = "$RELEASE_SHA"
+
+          umask 077
+          HUB_IMAGE_REF="$IMAGE_REF" docker compose --env-file "$HUB_IMAGE_RUNTIME_ENV" -f compose.prod.image.yaml run --interactive=false --rm --no-deps --pull never \
+            --volume "$HUB_BACKUP_DIR:/evidence" --entrypoint bash laravel.test -lc '
+              set -euo pipefail
+              php artisan identity:provision-universal-accounts --format=json > "/evidence/$1"
+              php artisan identity:established-account-integrity --write="/evidence/$2" --no-interaction
+            ' bash "$INVENTORY_NAME" "$SNAPSHOT_NAME"
+          chmod 600 "$HUB_BACKUP_DIR/$INVENTORY_NAME" "$HUB_BACKUP_DIR/$SNAPSHOT_NAME"
+          test -s "$HUB_BACKUP_DIR/$INVENTORY_NAME"
+          test -s "$HUB_BACKUP_DIR/$SNAPSHOT_NAME"
+          IDENTITY_CONFLICTS="$(jq -er '.summary.identity_conflicts | numbers' "$HUB_BACKUP_DIR/$INVENTORY_NAME")"
+          ACTIVE_EMPLOYEES="$(jq -er '.summary.active_employees | numbers' "$HUB_BACKUP_DIR/$INVENTORY_NAME")"
+          ESTABLISHED_ACCOUNTS="$(jq -er '.established_account_count | numbers' "$HUB_BACKUP_DIR/$SNAPSHOT_NAME")"
+          test "$IDENTITY_CONFLICTS" = '0'
+          printf 'ACTIVE_EMPLOYEES=%s\nESTABLISHED_ACCOUNTS=%s\nIDENTITY_CONFLICTS=%s\n' \
+            "$ACTIVE_EMPLOYEES" "$ESTABLISHED_ACCOUNTS" "$IDENTITY_CONFLICTS"
+          REMOTE
+
       - name: Enter maintenance mode and verify queue safety
         env:
           RELEASE_SHA: ${{ github.sha }}
@@ -296,6 +347,7 @@ jobs:
 
           HUB_IMAGE_REF="$IMAGE_REF" docker compose --env-file "$HUB_IMAGE_RUNTIME_ENV" -f compose.prod.image.yaml run --interactive=false --rm --no-deps --pull never --name "$HUB_MIGRATION_CONTAINER" -e RELEASE_SHA="$RELEASE_SHA" --entrypoint bash laravel.test -lc '
               set -euo pipefail
+              php artisan identity:member-bootstrap-status --require-available --no-interaction
               php artisan migrate:status --no-ansi
               php artisan migrate --force
               php artisan daily-checkout:apply-approved-policy --confirm=APPLY_APPROVED_FRONTLINE_DAILY_POLICY --no-interaction
@@ -351,6 +403,73 @@ jobs:
           done
           echo 'MBFD Hub application did not become healthy after activation.' >&2
           exit 1
+          REMOTE
+
+      - name: Provision bootstrap cohort and prove established-account integrity
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          FINAL_IMAGE_DIGEST: ${{ inputs.final_image_digest }}
+          HUB_IMAGE_RUNTIME_ENV: ${{ vars.MBFD_HUB_IMAGE_RUNTIME_ENV }}
+          HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          HUB_ACTIVATION_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_SHA"
+          test -n "$FINAL_IMAGE_DIGEST"
+          test -n "$HUB_IMAGE_RUNTIME_ENV"
+          test -n "$HUB_BACKUP_DIR"
+          test -n "$HUB_ACTIVATION_RUN_ID"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HUB_CHECKOUT=/opt/mbfd/mbfd-hub
+          EVIDENCE_ID="$HUB_ACTIVATION_RUN_ID-$RELEASE_SHA"
+          PRE_SNAPSHOT_NAME="mbfd-hub-established-pre-$EVIDENCE_ID.json"
+          PRE_APPLY_NAME="mbfd-hub-identity-pre-apply-$EVIDENCE_ID.json"
+          APPLY_NAME="mbfd-hub-identity-apply-$EVIDENCE_ID.json"
+          POST_INVENTORY_NAME="mbfd-hub-identity-post-$EVIDENCE_ID.json"
+          POST_SNAPSHOT_NAME="mbfd-hub-established-post-$EVIDENCE_ID.json"
+
+          case "$HUB_IMAGE_RUNTIME_ENV" in /*) ;; *) exit 1 ;; esac
+          case "$HUB_BACKUP_DIR" in /mnt/*) ;; *) exit 1 ;; esac
+          test -f "$HUB_IMAGE_RUNTIME_ENV"
+          test -d "$HUB_BACKUP_DIR"
+          test -s "$HUB_BACKUP_DIR/$PRE_SNAPSHOT_NAME"
+          cd "$HUB_CHECKOUT"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          IMAGE_REPOSITORY="$(head -n 1 docker/production/image-repository)"
+          test "$IMAGE_REPOSITORY" = 'ghcr.io/pdarleyjr/mbfd-hub'
+          IMAGE_REF="$IMAGE_REPOSITORY@$FINAL_IMAGE_DIGEST"
+
+          umask 077
+          HUB_IMAGE_REF="$IMAGE_REF" docker compose --env-file "$HUB_IMAGE_RUNTIME_ENV" -f compose.prod.image.yaml run --interactive=false --rm --no-deps --pull never \
+            --volume "$HUB_BACKUP_DIR:/evidence" --entrypoint bash laravel.test -lc '
+              set -euo pipefail
+              php artisan identity:member-bootstrap-status --require-available --no-interaction
+              php artisan identity:provision-universal-accounts --format=json > "/evidence/$1"
+              php artisan identity:provision-universal-accounts --apply --confirm=PROVISION_ACTIVE_EMPLOYEE_ACCOUNTS --format=json > "/evidence/$2"
+              php artisan identity:provision-universal-accounts --format=json > "/evidence/$3"
+              php artisan identity:established-account-integrity --write="/evidence/$4" --compare="/evidence/$5" --no-interaction \
+                | tee /tmp/established-account-integrity.txt
+              grep -Fx "ESTABLISHED_PASSWORD_HASHES_CHANGED=0" /tmp/established-account-integrity.txt
+              grep -Fx "ESTABLISHED_ACCOUNT_STATUS_CHANGED=0" /tmp/established-account-integrity.txt
+              grep -Fx "ESTABLISHED_MUST_CHANGE_STATE_CHANGED=0" /tmp/established-account-integrity.txt
+              grep -Fx "ESTABLISHED_ROLE_PERMISSION_CHANGES=0" /tmp/established-account-integrity.txt
+              grep -Fx "ESTABLISHED_EMAIL_CHANGES=0" /tmp/established-account-integrity.txt
+              grep -Fx "ESTABLISHED_ACCOUNT_UNEXPECTED_CHANGES=0" /tmp/established-account-integrity.txt
+            ' bash "$PRE_APPLY_NAME" "$APPLY_NAME" "$POST_INVENTORY_NAME" "$POST_SNAPSHOT_NAME" "$PRE_SNAPSHOT_NAME"
+          chmod 600 "$HUB_BACKUP_DIR/$PRE_APPLY_NAME" "$HUB_BACKUP_DIR/$APPLY_NAME" "$HUB_BACKUP_DIR/$POST_INVENTORY_NAME" "$HUB_BACKUP_DIR/$POST_SNAPSHOT_NAME"
+          test -s "$HUB_BACKUP_DIR/$PRE_APPLY_NAME"
+          test -s "$HUB_BACKUP_DIR/$APPLY_NAME"
+          test -s "$HUB_BACKUP_DIR/$POST_INVENTORY_NAME"
+          test -s "$HUB_BACKUP_DIR/$POST_SNAPSHOT_NAME"
+          ACTIVE_EMPLOYEES="$(jq -er '.summary.active_employees | numbers' "$HUB_BACKUP_DIR/$POST_INVENTORY_NAME")"
+          BOOTSTRAP_ELIGIBLE_ACCOUNTS="$(jq -er '.summary.bootstrap_eligible_users | numbers' "$HUB_BACKUP_DIR/$POST_INVENTORY_NAME")"
+          IDENTITY_CONFLICTS="$(jq -er '.summary.identity_conflicts | numbers' "$HUB_BACKUP_DIR/$POST_INVENTORY_NAME")"
+          WITHOUT_CANONICAL="$(jq -er '.summary.active_employees_without_canonical_user | numbers' "$HUB_BACKUP_DIR/$POST_INVENTORY_NAME")"
+          test "$IDENTITY_CONFLICTS" = '0'
+          test "$WITHOUT_CANONICAL" = '0'
+          printf 'ACTIVE_EMPLOYEES=%s\nBOOTSTRAP_ELIGIBLE_ACCOUNTS=%s\nIDENTITY_CONFLICTS=%s\nPOST_CUTOVER_ACTIVE_EMPLOYEES_WITHOUT_CANONICAL_USER=%s\n' \
+            "$ACTIVE_EMPLOYEES" "$BOOTSTRAP_ELIGIBLE_ACCOUNTS" "$IDENTITY_CONFLICTS" "$WITHOUT_CANONICAL"
           REMOTE
 
       - name: Restart Hub queues and verify background services

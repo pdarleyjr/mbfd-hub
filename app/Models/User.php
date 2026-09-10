@@ -111,6 +111,9 @@ class User extends Authenticatable implements FilamentUser
         'employee_profile_id',
         'account_status',
         'last_login_at',
+        'bootstrap_onboarding_eligible',
+        'bootstrap_onboarding_eligible_at',
+        'bootstrap_onboarding_completed_at',
     ];
 
     /**
@@ -141,6 +144,9 @@ class User extends Authenticatable implements FilamentUser
             'must_change_password' => 'boolean',
             'notification_preferences' => 'array',
             'last_login_at' => 'datetime',
+            'bootstrap_onboarding_eligible' => 'boolean',
+            'bootstrap_onboarding_eligible_at' => 'datetime',
+            'bootstrap_onboarding_completed_at' => 'datetime',
         ];
     }
 
@@ -196,6 +202,22 @@ class User extends Authenticatable implements FilamentUser
         }
 
         return $this->hasCurrentPersonnelIdentity();
+    }
+
+    public function isBootstrapOnboardingPending(): bool
+    {
+        if (! $this->bootstrap_onboarding_eligible
+            || $this->getRawOriginal('account_status') !== AccountStatus::PendingActivation->value
+            || $this->bootstrap_onboarding_completed_at !== null
+            || $this->employee_profile_id === null) {
+            return false;
+        }
+
+        return Employee::query()
+            ->whereKey($this->employee_profile_id)
+            ->where('employee_id', $this->employee_id)
+            ->where('roster_status', 'active')
+            ->exists();
     }
 
     public function isUpstreamIdentityEnabled(): bool

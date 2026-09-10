@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Employee;
-use App\Models\User;
-use App\Services\Identity\AccountSecurityService;
 use App\Services\Identity\CanonicalUserProvisioner;
 use App\Services\Identity\UniversalAccountInventory;
 use Illuminate\Console\Command;
-use Spatie\Permission\Models\Role;
 use Throwable;
 
 final class ProvisionUniversalEmployeeAccounts extends Command
@@ -22,12 +19,14 @@ final class ProvisionUniversalEmployeeAccounts extends Command
 
     protected $description = 'Inventory or idempotently provision one canonical User for every eligible active Employee.';
 
-    public function handle(UniversalAccountInventory $inventory, CanonicalUserProvisioner $provisioner, AccountSecurityService $security): int
+    public function handle(UniversalAccountInventory $inventory, CanonicalUserProvisioner $provisioner): int
     {
         $before = $inventory->report();
         if (! $this->option('apply')) {
             $this->render($before);
-            $this->warn('DRY RUN ONLY. No users, credentials, roles, permissions, or links were changed.');
+            if ($this->option('format') !== 'json') {
+                $this->warn('DRY RUN ONLY. No users, credentials, roles, permissions, or links were changed.');
+            }
 
             return self::SUCCESS;
         }
@@ -44,7 +43,6 @@ final class ProvisionUniversalEmployeeAccounts extends Command
         }
 
         $created = 0;
-        $reconciled = 0;
         $memberRolesAdded = 0;
         try {
             foreach ($before['rows'] as $row) {
@@ -60,26 +58,7 @@ final class ProvisionUniversalEmployeeAccounts extends Command
 
                     continue;
                 }
-                if ($row['classification'] === 'EXACT_LEGACY_USER_NEEDS_LINK') {
-                    /** @var User $user */
-                    $user = User::query()->findOrFail($row['canonical_user_id']);
-                    $security->completeCanonicalLink($user, $employee->id, $employee->employee_id, null, now(), false);
-                    if (! $user->fresh()->hasRole('member')) {
-                        $user->assignRole(Role::findOrCreate('member', 'web'));
-                        $memberRolesAdded++;
-                    }
-                    $reconciled++;
-
-                    continue;
-                }
-                if ($row['classification'] === 'EXISTING_CANONICAL_USER') {
-                    /** @var User $user */
-                    $user = User::query()->findOrFail($row['canonical_user_id']);
-                    if (! $user->hasRole('member')) {
-                        $user->assignRole(Role::findOrCreate('member', 'web'));
-                        $memberRolesAdded++;
-                    }
-                }
+                // Every pre-existing User is immutable in this operation.
             }
         } catch (Throwable $exception) {
             report($exception);
@@ -89,7 +68,7 @@ final class ProvisionUniversalEmployeeAccounts extends Command
         }
 
         $after = $inventory->report();
-        $after['apply'] = compact('created', 'reconciled', 'memberRolesAdded');
+        $after['apply'] = compact('created', 'memberRolesAdded');
         $this->render($after);
 
         return ($after['summary']['identity_conflicts'] ?? 0) === 0
