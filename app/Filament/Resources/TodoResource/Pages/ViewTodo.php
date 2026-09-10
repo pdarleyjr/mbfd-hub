@@ -55,7 +55,7 @@ class ViewTodo extends ViewRecord
         }
 
         // Check if user can delete (owner or admin)
-        if (auth()->id() !== $update->user_id && ! auth()->user()->hasAnyRole(['super_admin', 'admin'])) {
+        if (auth()->id() !== $update->user_id && auth()->user()->role !== 'admin') {
             Notification::make()
                 ->title('Permission denied')
                 ->danger()

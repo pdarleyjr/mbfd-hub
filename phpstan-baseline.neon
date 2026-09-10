@@ -385,10 +385,40 @@ parameters:
 			path: app/Filament/Resources/TodoResource/Pages/ViewTodo.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$role\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/TodoResource/Pages/ViewTodo.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$isAdmin\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>isAdmin" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/Under25kProjectResource.php
+
+		-
 			message: '#^Using nullsafe property access "\?\-\>value" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 4
 			path: app/Filament/Resources/Under25kProjectResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$isAdmin\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/Under25kProjectResource/RelationManagers/UpdatesRelationManager.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>isAdmin" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/Under25kProjectResource/RelationManagers/UpdatesRelationManager.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$workgroup_id\.$#'
