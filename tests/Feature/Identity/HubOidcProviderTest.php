@@ -188,7 +188,7 @@ final class HubOidcProviderTest extends TestCase
         $user->forceFill(['must_change_password' => true])->save();
         $this->actingAs($user)->get($url)->assertRedirect('/employee/set-password');
         self::assertSame($url, session(\App\Services\Identity\CanonicalLoginDestination::PASSWORD_RETURN_KEY));
-        self::assertSame($url, app(\App\Services\Identity\CanonicalLoginDestination::class)->resolve($user, $url));
+        self::assertSame('/employee/set-password', app(\App\Services\Identity\CanonicalLoginDestination::class)->resolve($user, $url));
         $user->forceFill(['must_change_password' => false, 'email' => 'employee-99001@canonical.mbfdhub.invalid'])->save();
         $user->employeeProfile->forceFill(['city_email' => null])->save();
         $this->actingAsCanonicalUser($user);

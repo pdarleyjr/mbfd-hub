@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Exceptions\PasswordChangeRequired;
 use App\Models\AuthenticationSession;
 use App\Models\User;
 use App\Services\Identity\SessionRegistry;
@@ -41,6 +42,10 @@ final readonly class EnsureCanonicalMemberApiSession
             }
 
             return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        if ($user->must_change_password) {
+            throw new PasswordChangeRequired;
         }
 
         return $next($request);

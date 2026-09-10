@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Employee;
-use App\Services\Identity\EmployeeBootstrapCredentialProvisioner;
+use App\Services\Identity\EmployeeAccountLifecycle;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -17,7 +17,7 @@ class ImportPersonnel extends Command
 
     protected $description = 'Import fire department personnel into the operational employee profile table';
 
-    public function handle(EmployeeBootstrapCredentialProvisioner $bootstrap): int
+    public function handle(EmployeeAccountLifecycle $lifecycle): int
     {
         $filePath = $this->argument('file');
         $isDryRun = $this->option('dry-run');
@@ -89,20 +89,20 @@ class ImportPersonnel extends Command
                         'name' => $data['name'],
                         'rank' => $data['rank'] ?: $existing->rank,
                     ]);
+                    $lifecycle->ensureActive($existing, now());
                     $updated++;
                     $this->line("Updated Employee DB ID: {$existing->id}; compatibility hash unchanged");
 
                     continue;
                 }
 
-                $employee = Employee::create([
+                $employee = $lifecycle->createActive([
                     'name' => $data['name'],
                     'employee_id' => $data['employeeId'],
                     'rank' => $data['rank'],
-                    ...$bootstrap->attributesForNewEmployee(),
-                ]);
+                ], now());
                 $created++;
-                $this->line("Created first-login-ready Employee DB ID: {$employee->id}");
+                $this->line("Created Employee DB ID {$employee->id} with a pending canonical account");
             }
 
             DB::commit();

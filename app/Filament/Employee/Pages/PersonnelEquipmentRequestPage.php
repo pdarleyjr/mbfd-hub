@@ -7,6 +7,7 @@ namespace App\Filament\Employee\Pages;
 use App\Concerns\ResolvesCanonicalEmployee;
 use App\Models\Employee;
 use App\Models\Station;
+use App\Models\User;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
 use App\Services\PersonnelRequests\OfficerAuthorizationService;
 use App\Services\PersonnelRequests\PersonnelCatalog;
@@ -49,6 +50,11 @@ class PersonnelEquipmentRequestPage extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
+        $user = auth('web')->user();
+        if (! $user instanceof User || $user->must_change_password) {
+            return false;
+        }
+
         $employee = app(AuthenticatedMemberContextResolver::class)
             ->resolve(request())
             ->actor()

@@ -66,6 +66,14 @@ final readonly class UniversalAccountInventory
             'generated_at' => now()->toIso8601String(),
             'summary' => [
                 'active_employees' => $employees->where('roster_status', 'active')->count(),
+                'existing_canonical_users' => $users->whereNotNull('employee_profile_id')->count(),
+                'pending_activation_users' => $users->filter(static fn (User $user): bool => $user->getRawOriginal('account_status') === 'pending_activation')->count(),
+                'active_must_change_users' => $users->filter(static fn (User $user): bool => $user->getRawOriginal('account_status') === 'active' && $user->must_change_password)->count(),
+                // Existing rows cannot safely be backfilled because plaintext
+                // credentials are unavailable. This is a conservative count:
+                // it may include policy-only forced-change accounts.
+                'legacy_unfingerprinted_active_temp_credentials' => $users->filter(static fn (User $user): bool => $user->getRawOriginal('account_status') === 'active'
+                    && $user->must_change_password && $user->getRawOriginal('temporary_credential_fingerprint') === null)->count(),
                 ...$counts,
                 'identity_conflicts' => count($conflicts),
                 'active_employees_without_canonical_user' => count(array_filter($rows, static fn (array $row): bool => $row['roster_status'] === 'active'

@@ -19,9 +19,11 @@ use App\Services\Identity\IdentityProviderService;
 use Carbon\CarbonInterface;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 final class AccountSecurityService
@@ -36,6 +38,7 @@ final class AccountSecurityService
         private readonly IdentityProviderService $identityProvider,
         private readonly CityEmailVerificationService $recoveryEmails,
         private readonly CloudflareEmailDispatcher $emailDispatcher,
+        private readonly TemporaryCredentialFingerprint $temporaryCredentials,
     ) {}
 
     public function disable(User $actor, User $target, string $reason, CarbonInterface $at, ?string $currentPassword = null): User
@@ -181,15 +184,26 @@ final class AccountSecurityService
                 if ($action === AccountSecurityAction::AdministrativeRecovery && ($temporaryPassword === null || strlen($temporaryPassword) < 12 || strlen($temporaryPassword) > 255)) {
                     throw new AuthorizationException('A temporary password of 12 to 255 characters is required.');
                 }
-                $updated = match ($action) {
-                    AccountSecurityAction::Disable => $this->identityAccountSecurity->disable($currentTarget, trim($reason), $at),
-                    AccountSecurityAction::Enable => $this->identityAccountSecurity->changeStatus($currentTarget, AccountStatus::Active, trim($reason), $at),
-                    AccountSecurityAction::AdministrativeRecovery => $this->identityAccountSecurity->setAdministrativeRecoveryPassword($currentTarget, Hash::make((string) $temporaryPassword), $at),
-                    AccountSecurityAction::ForcePasswordChange => $this->identityAccountSecurity->forcePasswordChange($currentTarget, $at),
-                    AccountSecurityAction::RevokeSessions => $this->identityAccountSecurity->revokeAll($currentTarget, trim($reason), $at),
-                    AccountSecurityAction::ResetSecurityState => $this->identityAccountSecurity->revokeAll($currentTarget, trim($reason), $at),
-                    default => throw new AuthorizationException('Unsupported administrative action.'),
-                };
+                try {
+                    $updated = match ($action) {
+                        AccountSecurityAction::Disable => $this->identityAccountSecurity->disable($currentTarget, trim($reason), $at),
+                        AccountSecurityAction::Enable => $this->identityAccountSecurity->changeStatus($currentTarget, AccountStatus::Active, trim($reason), $at),
+                        AccountSecurityAction::AdministrativeRecovery => $this->identityAccountSecurity->setAdministrativeRecoveryPassword(
+                            $currentTarget,
+                            Hash::make((string) $temporaryPassword),
+                            $this->temporaryCredentials->forPassword((string) $temporaryPassword),
+                            $at,
+                        ),
+                        AccountSecurityAction::ForcePasswordChange => $this->identityAccountSecurity->forcePasswordChange($currentTarget, $at),
+                        AccountSecurityAction::RevokeSessions => $this->identityAccountSecurity->revokeAll($currentTarget, trim($reason), $at),
+                        AccountSecurityAction::ResetSecurityState => $this->identityAccountSecurity->revokeAll($currentTarget, trim($reason), $at),
+                        default => throw new AuthorizationException('Unsupported administrative action.'),
+                    };
+                } catch (UniqueConstraintViolationException) {
+                    throw ValidationException::withMessages([
+                        'temporary_password' => 'Choose a temporary password unique to this employee.',
+                    ]);
+                }
                 $this->auditRecorder->record($currentActor, $updated, $action->value, 'allowed', trim($reason));
 
                 return $updated;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Identity;
 
+use App\Exceptions\PasswordChangeRequired;
 use App\Models\AuthenticationSession;
 use App\Models\User;
 use App\Models\Workgroup;
@@ -42,6 +43,10 @@ final readonly class AuthenticatedMemberContextResolver
         if (! $session instanceof AuthenticationSession
             || ! $this->sessionRegistry->isCurrent($user, $session, CarbonImmutable::now())) {
             $this->unauthenticated();
+        }
+
+        if ($user->must_change_password) {
+            throw new PasswordChangeRequired;
         }
 
         $user->loadMissing('employeeProfile:id,employee_id,name,rank');

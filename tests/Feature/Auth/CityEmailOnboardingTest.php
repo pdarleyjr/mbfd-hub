@@ -366,7 +366,7 @@ final class CityEmailOnboardingTest extends TestCase
         $user = $this->member('-PASSWORD');
         $user->forceFill(['email' => 'passwordmember@miamibeachfl.gov', 'must_change_password' => true])->save();
         $this->withoutVite();
-        $this->post('/login', ['employee_id' => $user->employee_id, 'password' => 'city-email-test-password'])->assertRedirect('/');
+        $this->post('/login', ['employee_id' => $user->employee_id, 'password' => 'city-email-test-password'])->assertRedirect('/employee/set-password');
         self::assertFalse(session(EnsureCityEmailReview::SESSION_KEY));
         $this->withCookie((string) config('session.cookie'), session()->getId());
         foreach (['/', '/daily/stations', '/auth/bid/authorize', '/auth/media-control/authorize', '/account/city-email', '/employee'] as $path) {

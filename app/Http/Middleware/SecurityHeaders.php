@@ -21,7 +21,7 @@ class SecurityHeaders
         // below covers the same use case and supersedes this header in all modern
         // browsers, so we omit it intentionally.
         $cityEmailPage = $request->is('account/city-email', 'account/city-email/*');
-        $loginPage = $request->is('login', 'activate-account');
+        $loginPage = $request->is('login');
         $response->headers->set('Referrer-Policy', $cityEmailPage || $loginPage ? 'no-referrer' : 'strict-origin-when-cross-origin');
         if ($cityEmailPage || $loginPage) {
             $response->headers->set('Cache-Control', 'no-store, private');

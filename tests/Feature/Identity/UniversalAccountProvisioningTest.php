@@ -165,14 +165,17 @@ final class UniversalAccountProvisioningTest extends TestCase
         $this->post('/login', [
             'employee_id' => $employee->employee_id,
             'password' => 'controlled-temporary-password-2026',
-        ])->assertRedirect('/');
+        ])->assertRedirect('/employee/set-password');
         $this->assertAuthenticatedAs($issued, 'web');
         $this->withCookie((string) config('session.cookie'), session()->getId());
         foreach (['/', '/employee', '/auth/bid/authorize', '/auth/media-control/authorize'] as $path) {
             $this->get($path)->assertRedirect('/employee/set-password');
         }
         $this->get('/employee/set-password')->assertOk()->assertSee('Password Change Required');
-        $this->getJson('/api/me/context')->assertUnauthorized();
+        $this->withCredentials()->getJson('/api/me/context', [
+            'Origin' => (string) config('app.url'),
+            'Referer' => rtrim((string) config('app.url'), '/').'/',
+        ])->assertForbidden()->assertJsonPath('code', 'password_change_required');
     }
 
     private function employee(string $employeeId, string $status = 'active'): Employee

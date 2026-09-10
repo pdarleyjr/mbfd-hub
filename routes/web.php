@@ -13,7 +13,6 @@ use App\Http\Controllers\Auth\AuthentikLoginController;
 use App\Http\Controllers\Auth\CanonicalLoginController;
 use App\Http\Controllers\Auth\CityEmailController;
 use App\Http\Controllers\Auth\EmployeePasswordResetController;
-use App\Http\Controllers\Auth\FirstLoginCanonicalizationController;
 use App\Http\Controllers\DepartmentUpdateController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
@@ -97,10 +96,6 @@ Route::get('/auth/identity/callback', [AuthentikLoginController::class, 'callbac
     ->middleware('throttle:30,1')
     ->name('identity.callback');
 Route::middleware('guest:web')->group(function (): void {
-    Route::get('/activate-account', [FirstLoginCanonicalizationController::class, 'create'])
-        ->name('activate-account.create');
-    Route::post('/activate-account', [FirstLoginCanonicalizationController::class, 'store'])
-        ->name('activate-account.store');
     Route::get('/forgot-password', [EmployeePasswordResetController::class, 'requestForm'])
         ->name('password.request');
     Route::post('/forgot-password', [EmployeePasswordResetController::class, 'requestLink'])

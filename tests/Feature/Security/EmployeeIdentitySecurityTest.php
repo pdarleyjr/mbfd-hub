@@ -147,6 +147,27 @@ final class EmployeeIdentitySecurityTest extends TestCase
         self::assertSame(AccountStatus::Disabled, $target->fresh()->account_status);
     }
 
+    public function test_reactivating_a_roster_only_employee_creates_a_pending_member_without_a_human_credential(): void
+    {
+        $actor = $this->actor();
+        $employee = $this->employee('16002');
+        $employee->forceFill(['roster_status' => 'departed'])->save();
+
+        app(EmployeeIdentityService::class)->changeEmploymentStatus(
+            $actor,
+            $employee,
+            'active',
+            self::PASSWORD,
+            'Authoritative roster return',
+        );
+
+        $user = $employee->fresh()->user()->sole();
+        self::assertSame(AccountStatus::PendingActivation, $user->account_status);
+        self::assertTrue($user->must_change_password);
+        self::assertSame(['member'], $user->getRoleNames()->all());
+        self::assertNull($user->temporary_credential_fingerprint);
+    }
+
     public function test_self_identity_changes_and_unsupported_employment_status_are_denied(): void
     {
         $actor = $this->actor();
@@ -209,7 +230,7 @@ final class EmployeeIdentitySecurityTest extends TestCase
             self::assertNull($target->fresh()->employee_profile_id);
             self::assertSame('approved_nonemployee', $target->fresh()->getRawOriginal('account_classification'));
         }
-        $service->changeEmploymentStatus($actor, $employee, 'active', self::PASSWORD, 'Approved employment return');
+        $employee->forceFill(['roster_status' => 'active'])->save();
         $service->link($actor, $target, $employee, self::PASSWORD, 'Explicit conversion review');
         self::assertSame('unresolved', $target->fresh()->getRawOriginal('account_classification'));
         $event = \App\Models\EmployeeProfileEvent::query()->where('action', 'link_employee')->where('result', 'allowed')->firstOrFail();

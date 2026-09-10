@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
 use App\Models\User;
 use App\Services\Identity\AuthentikOidcClient;
-use App\Services\Identity\CanonicalActivationIntent;
 use App\Services\Identity\CanonicalLoginDestination;
 use App\Services\Identity\CanonicalSessionIssuer;
 use App\Services\Identity\CanonicalUserResolver;
@@ -57,7 +55,6 @@ final class CanonicalLoginController extends Controller
     public function store(
         Request $request,
         CanonicalUserResolver $users,
-        CanonicalActivationIntent $activationIntents,
         CanonicalSessionIssuer $sessionIssuer,
     ): Response {
         abort_unless((bool) config('identity.local_login_enabled'), 404);
@@ -85,39 +82,14 @@ final class CanonicalLoginController extends Controller
             return $this->denied($request, $employeeId, 'rate_limited');
         }
 
-        /** @var Employee|null $employee */
-        $employee = Employee::query()->where('employee_id', $employeeId)->first();
         $user = $users->byEmployeeId($employeeId);
         // Generate the same-cost throwaway hash for every attempt so the
         // externally generic response does not gain an obvious lookup timing path.
         $dummyHash = Hash::make(Str::random(48));
         $passwordMatches = Hash::check(
             $credentials['password'],
-            $user?->getAuthPassword() ?? $employee?->getAuthPassword() ?? $dummyHash,
+            $user?->getAuthPassword() ?? $dummyHash,
         );
-
-        // Re-read after credential work: departure must not issue a bootstrap
-        // intent (or admit an old active login whose roster status changed).
-        if ($employee?->fresh()?->roster_status === 'departed') {
-            RateLimiter::hit($throttleKey, $decaySeconds);
-            $activationIntents->invalidate($request->session());
-
-            return $this->denied($request, $employeeId, 'roster_status_denied');
-        }
-
-        if ((bool) config('identity.employee_bootstrap_login_enabled')
-            && $employee instanceof Employee && $user === null && $passwordMatches) {
-            RateLimiter::clear($throttleKey);
-            $request->session()->regenerate();
-            $activationIntents->issue($request->session(), $employee, CarbonImmutable::now());
-            Log::info('canonical_first_login_employee_verified', [
-                'employee_profile_id' => $employee->id,
-                'source_fingerprint' => hash_hmac('sha256', (string) $request->ip(), (string) config('app.key')),
-            ]);
-
-            return redirect('/activate-account'.($attempts->requested($request)
-                ? '?'.http_build_query(['login_attempt' => $request->query('login_attempt')]) : ''));
-        }
 
         $denialReason = $this->denialReason($user, $passwordMatches);
         if ($denialReason !== null) {
@@ -165,7 +137,6 @@ final class CanonicalLoginController extends Controller
 
         $endSessionEndpoint = $request->session()->pull('auth.authentik_end_session_endpoint');
         Auth::guard('web')->logout();
-        $request->session()->forget(CanonicalActivationIntent::SESSION_KEY);
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

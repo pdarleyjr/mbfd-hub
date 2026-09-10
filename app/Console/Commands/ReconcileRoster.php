@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Employee;
+use App\Services\Identity\EmployeeAccountLifecycle;
+use App\Services\Identity\UniversalAccountInventory;
 use App\Services\Roster\RosterHtmlParser;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 final class ReconcileRoster extends Command
@@ -20,7 +21,7 @@ final class ReconcileRoster extends Command
 
     protected $description = 'Preview or apply an exact Employee ID roster reconciliation without deleting records';
 
-    public function handle(RosterHtmlParser $parser): int
+    public function handle(RosterHtmlParser $parser, EmployeeAccountLifecycle $lifecycle, UniversalAccountInventory $inventory): int
     {
         $path = (string) $this->argument('file');
         if (! is_file($path) || ! is_readable($path)) {
@@ -83,30 +84,34 @@ final class ReconcileRoster extends Command
             return self::SUCCESS;
         }
 
-        DB::transaction(function () use ($rows, $incomingIds): void {
+        DB::transaction(function () use ($rows, $incomingIds, $lifecycle): void {
             foreach ($rows as $row) {
-                $employee = Employee::query()->firstOrCreate(
-                    ['employee_id' => $row['employee_id']],
-                    [
+                $employee = Employee::query()->where('employee_id', $row['employee_id'])->first();
+                if (! $employee instanceof Employee) {
+                    $lifecycle->createActive([
+                        'employee_id' => $row['employee_id'],
                         'name' => $row['name'],
                         'rank' => $row['rank'],
-                        'roster_status' => 'active',
-                        // Roster sync creates an operational profile, not an issued human credential.
-                        'password' => Str::random(64),
-                        'must_change_password' => false,
-                    ],
-                );
-                if (! $employee->wasRecentlyCreated && $employee->roster_status !== 'active') {
-                    $employee->update(['roster_status' => 'active']);
+                    ], now());
+
+                    continue;
                 }
+
+                $lifecycle->ensureActive($employee, now());
             }
-            Employee::query()->whereNotIn('employee_id', $incomingIds)->update(['roster_status' => 'departed']);
+            Employee::query()->whereNotIn('employee_id', $incomingIds)->orderBy('id')->get()
+                ->each(fn (Employee $employee) => $lifecycle->depart($employee, now()));
         });
+        $activeWithoutCanonicalUser = (int) $inventory->report()['summary']['active_employees_without_canonical_user'];
+        if ($activeWithoutCanonicalUser !== 0) {
+            throw new RuntimeException('Roster reconciliation left an active Employee without a canonical User.');
+        }
+        $report['active_employees_without_canonical_user'] = $activeWithoutCanonicalUser;
         if ($this->option('json')) {
             $report['applied'] = true;
             $this->line((string) json_encode($report, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
         } else {
-            $this->info('Applied exact Employee ID reconciliation. No records were deleted, no human credential was issued, and no city email was fabricated.');
+            $this->info('Applied exact Employee ID reconciliation. Canonical accounts were preserved or provisioned pending activation; no human credential was issued and no records were deleted.');
         }
 
         return self::SUCCESS;

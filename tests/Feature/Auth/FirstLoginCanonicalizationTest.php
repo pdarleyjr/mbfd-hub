@@ -5,20 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Auth;
 
 use App\Enums\AccountStatus;
-use App\Models\AuthenticationSession;
 use App\Models\Employee;
 use App\Models\User;
-use App\Models\Workgroup;
-use App\Models\WorkgroupMember;
 use App\Services\Identity\CanonicalUserProvisioner;
-use App\Services\Identity\DualCredentialIdentityClaim;
-use Filament\Facades\Filament;
+use App\Services\Security\EmployeeAccountAdministration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -26,340 +18,96 @@ final class FirstLoginCanonicalizationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_ordinary_employee_is_created_just_in_time_then_uses_normal_login(): void
+    public function test_roster_only_employee_cannot_claim_an_account_with_employee_credential(): void
     {
-        $employee = $this->employee('JIT-100');
-        $employeeHash = $employee->getRawOriginal('password');
-        $before = User::query()->count();
+        $employee = Employee::query()->create([
+            'employee_id' => 'RETIRED-CLAIM-1',
+            'name' => 'Roster Only Employee',
+            'password' => 'legacy-employee-password',
+            'roster_status' => 'active',
+        ]);
 
-        $this->post('/login', [
+        $this->from('/login')->post('/login', [
             'employee_id' => $employee->employee_id,
-            'password' => 'employee-secret',
-        ])->assertRedirect('/activate-account');
+            'password' => 'legacy-employee-password',
+        ])->assertRedirect('/login')->assertSessionHasErrors('employee_id');
 
-        $nonce = $this->activationNonce();
-        $this->post('/activate-account', [
-            'nonce' => $nonce,
-            'path' => 'no_existing_user',
-            'no_legacy_account_assertion' => '1',
-        ])->assertRedirect('/');
-
-        $this->assertSame($before + 1, User::query()->count());
-        $user = User::query()->where('employee_profile_id', $employee->id)->sole();
-        $this->assertSame("employee-{$employee->id}@canonical.mbfdhub.invalid", $user->email);
-        $this->assertSame($employee->employee_id, $user->employee_id);
-        $this->assertSame($employeeHash, $user->getRawOriginal('password'));
-        $this->assertSame(AccountStatus::Active, $user->account_status);
-        $this->assertSame(['member'], $user->getRoleNames()->all());
-        $this->assertAuthenticatedAs($user, 'web');
-        $this->assertDatabaseCount('authentication_sessions', 1);
-        $this->get('/daily/stations')->assertRedirect('/account/city-email');
-        $this->post('/account/city-email', [
-            'email' => 'firstloginmember@miamibeachfl.gov',
-            'current_password' => 'employee-secret',
-            'ownership_confirmed' => '1',
-        ])->assertRedirect('/account/city-email');
-        $this->get('/daily/stations')->assertOk();
-
-        $userId = $user->id;
-        $this->post('/logout')->assertRedirect('/login');
-        $this->post('/login', [
-            'employee_id' => $employee->employee_id,
-            'password' => 'employee-secret',
-        ])->assertRedirect('/');
-        $this->assertSame($before + 1, User::query()->count());
-        $this->assertAuthenticatedAs(User::query()->findOrFail($userId), 'web');
+        self::assertSame(0, User::query()->count());
+        self::assertFalse(session()->has('auth.canonical_activation_intent'));
     }
 
-    public function test_privileged_employee_claims_existing_user_and_preserves_authorization_relationships(): void
+    public function test_pending_canonical_user_cannot_sign_in_before_an_administrator_issues_a_temporary_password(): void
     {
-        $employee = $this->employee('JIT-200');
-        $user = User::factory()->create([
-            'email' => 'legacy-admin@example.test',
-            'employee_id' => null,
-            'employee_profile_id' => null,
-            'account_status' => AccountStatus::PendingActivation,
-            'password' => Hash::make('legacy-secret'),
-        ]);
-        $role = Role::findOrCreate('admin', 'web');
-        $permission = Permission::findOrCreate('view_any_user', 'web');
-        $adminAccess = Permission::findOrCreate('admin.access', 'web');
-        $user->assignRole($role);
-        $user->givePermissionTo([$permission, $adminAccess]);
-        $workgroup = Workgroup::query()->create(['name' => 'Recovery Workgroup', 'created_by' => $user->id]);
-        WorkgroupMember::query()->create([
-            'workgroup_id' => $workgroup->id,
-            'user_id' => $user->id,
-            'role' => 'member',
-            'is_active' => true,
-        ]);
-        $notificationId = (string) Str::uuid();
-        DB::table('notifications')->insert([
-            'id' => $notificationId,
-            'type' => 'Tests\\Fixtures\\CanonicalRecoveryNotification',
-            'notifiable_type' => $user->getMorphClass(),
-            'notifiable_id' => $user->id,
-            'data' => '{}',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $pushSubscription = $user->pushSubscriptions()->create([
-            'endpoint' => 'https://push.example.test/canonical-recovery',
-            'public_key' => 'test-public-key',
-            'auth_token' => 'test-auth-token',
-            'content_encoding' => 'aesgcm',
-        ]);
-        $staleSessionId = (string) Str::uuid();
-        DB::table('authentication_sessions')->insert([
-            'id' => $staleSessionId,
-            'user_id' => $user->id,
-            'session_id_hash' => hash('sha256', 'pre-canonical-claim-session'),
-            'security_version' => $user->security_version,
-            'context_class' => 'unmanaged_browser',
-            'issued_at' => now(),
-            'last_activity_at' => now(),
-            'idle_expires_at' => now()->addHour(),
-            'absolute_expires_at' => now()->addDay(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $staleSession = AuthenticationSession::query()->findOrFail($staleSessionId);
-        $userId = $user->id;
-        $securityVersion = $user->security_version;
+        $employee = $this->employee('PENDING-LOGIN-1');
+        $pending = app(CanonicalUserProvisioner::class)
+            ->create($employee->id, 'MISSING_OR_UNSUPPORTED', now())['user'];
+        self::assertSame(AccountStatus::PendingActivation, $pending->account_status);
 
-        $this->post('/login', [
+        $this->from('/login')->post('/login', [
             'employee_id' => $employee->employee_id,
-            'password' => 'employee-secret',
-        ])->assertRedirect('/activate-account');
-        $this->post('/activate-account', [
-            'nonce' => $this->activationNonce(),
-            'path' => 'existing_user',
-            'legacy_email' => $user->email,
-            'legacy_password' => 'legacy-secret',
-        ])->assertRedirect('/');
+            'password' => 'legacy-employee-password',
+        ])->assertRedirect('/login')->assertSessionHasErrors('employee_id');
 
-        $user->refresh();
-        $this->assertSame($userId, $user->id);
-        $this->assertSame($employee->id, $user->employee_profile_id);
-        $this->assertSame($employee->employee_id, $user->employee_id);
-        $this->assertSame($employee->getRawOriginal('password'), $user->getRawOriginal('password'));
-        $this->assertSame(AccountStatus::Active, $user->account_status);
-        $this->assertSame($securityVersion + 1, $user->security_version);
-        $this->assertTrue($user->hasRole('admin'));
-        $this->assertTrue($user->hasDirectPermission('view_any_user'));
-        $this->assertDatabaseHas('workgroup_members', ['workgroup_id' => $workgroup->id, 'user_id' => $userId]);
-        $this->assertDatabaseHas('notifications', ['id' => $notificationId, 'notifiable_id' => $userId]);
-        $this->assertDatabaseHas('push_subscriptions', ['id' => $pushSubscription->id, 'subscribable_id' => $userId]);
-        $this->assertNotNull($staleSession->fresh()->revoked_at);
-        $this->assertSame(1, User::query()->count());
-        $this->assertAuthenticatedAs($user, 'web');
-        $this->assertTrue($user->canAccessPanel(Filament::getPanel('admin')));
-
-        $this->post('/logout');
-        $this->post('/login', [
-            'employee_id' => $employee->employee_id,
-            'password' => 'employee-secret',
-        ])->assertRedirect('/');
-        $this->assertSame(1, User::query()->count());
-        $this->assertSame($securityVersion + 1, $user->fresh()->security_version);
+        $this->assertGuest('web');
+        self::assertSame($pending->id, $employee->user()->sole()->id);
     }
 
-    public function test_bad_legacy_claim_fails_closed_and_rotates_the_nonce_without_consuming_the_intent(): void
+    public function test_admin_issued_unique_temporary_password_starts_only_a_restricted_session(): void
     {
-        $employee = $this->employee('JIT-300');
-        $user = $this->legacyAdmin('legacy-bad@example.test');
-        $before = (array) DB::table('users')->where('id', $user->id)->first();
-        $throttleKey = 'canonical-first-login:'.hash_hmac(
-            'sha256',
-            $employee->id.'|'.$user->email.'|127.0.0.1',
-            (string) config('app.key'),
+        $actor = User::factory()->create([
+            'account_status' => AccountStatus::Active,
+            'password' => 'admin-password',
+        ]);
+        $actor->assignRole(Role::findOrCreate('super_admin', 'web'));
+        $employee = $this->employee('TEMP-LOGIN-1');
+        $pending = app(CanonicalUserProvisioner::class)
+            ->create($employee->id, 'MISSING_OR_UNSUPPORTED', now())['user'];
+        $issued = app(EmployeeAccountAdministration::class)->createForEmployee(
+            $actor,
+            $employee,
+            'individual-temporary-password-2026',
+            'admin-password',
+            'Controlled first login',
         );
+        self::assertSame($pending->id, $issued->id);
 
         $this->post('/login', [
             'employee_id' => $employee->employee_id,
-            'password' => 'employee-secret',
-        ])->assertRedirect('/activate-account');
-        $nonce = $this->activationNonce();
-        $this->from('/activate-account')->post('/activate-account', [
-            'nonce' => $nonce,
-            'path' => 'existing_user',
-            'legacy_email' => $user->email,
-            'legacy_password' => 'wrong-secret',
-        ])->assertRedirect('/activate-account')
-            ->assertSessionHasErrors(['legacy_email' => 'The provided credentials are invalid.']);
+            'password' => 'individual-temporary-password-2026',
+        ])->assertRedirect('/employee/set-password');
 
-        $this->assertSame($before, (array) DB::table('users')->where('id', $user->id)->first());
-        $this->assertNull($employee->fresh()->user);
-        $this->assertGuest('web');
-        $this->assertNotSame($nonce, $this->activationNonce());
-        $this->assertSame(1, RateLimiter::attempts($throttleKey));
+        $this->assertAuthenticatedAs($issued, 'web');
+        self::assertTrue($issued->fresh()->must_change_password);
+        self::assertTrue(Hash::check('individual-temporary-password-2026', $issued->fresh()->getAuthPassword()));
+        $this->get('/employee/dashboard')->assertRedirect('/employee/set-password');
     }
 
-    public function test_service_identity_cannot_be_claimed_as_a_legacy_human_user(): void
+    public function test_departed_employee_cannot_use_an_existing_canonical_password(): void
     {
-        $employee = $this->employee('JIT-400');
-        $user = $this->legacyAdmin('froc-service@example.test');
-        $user->forceFill(['employee_id' => 'FROC-TEST-RECOVERY'])->save();
-
-        $this->post('/login', [
+        $employee = $this->employee('DEPARTED-LOGIN-1');
+        $employee->forceFill(['roster_status' => 'departed'])->save();
+        User::factory()->create([
+            'employee_profile_id' => $employee->id,
             'employee_id' => $employee->employee_id,
-            'password' => 'employee-secret',
-        ])->assertRedirect('/activate-account');
-        $this->from('/activate-account')->post('/activate-account', [
-            'nonce' => $this->activationNonce(),
-            'path' => 'existing_user',
-            'legacy_email' => $user->email,
-            'legacy_password' => 'legacy-secret',
-        ])->assertSessionHasErrors(['legacy_email' => 'The provided credentials are invalid.']);
-
-        $this->assertNull($user->fresh()->employee_profile_id);
-        $this->assertNull($employee->fresh()->user);
-    }
-
-    public function test_activation_intent_expires_and_cannot_be_replayed(): void
-    {
-        $employee = $this->employee('JIT-500');
-        $this->post('/login', [
-            'employee_id' => $employee->employee_id,
-            'password' => 'employee-secret',
-        ])->assertRedirect('/activate-account');
-        $nonce = $this->activationNonce();
-
-        $this->travel(11)->minutes();
-        $this->post('/activate-account', [
-            'nonce' => $nonce,
-            'path' => 'no_existing_user',
-            'no_legacy_account_assertion' => '1',
-        ])->assertRedirect('/login');
-
-        $this->assertDatabaseCount('users', 0);
-        $this->assertFalse(session()->has('auth.canonical_activation_intent'));
-        $this->assertGuest('web');
-    }
-
-    public function test_departed_employee_bootstrap_cannot_receive_an_activation_intent(): void
-    {
-        $employee = $this->employee('JIT-DEPARTED-1');
-        $employee->update(['roster_status' => 'departed']);
+            'account_status' => AccountStatus::Active,
+            'password' => 'existing-private-password',
+        ]);
 
         $this->from('/login')->post('/login', [
-            'employee_id' => $employee->employee_id, 'password' => 'employee-secret',
-        ])->assertRedirect('/login')
-            ->assertSessionHasErrors(['employee_id' => 'The provided credentials are invalid.']);
+            'employee_id' => $employee->employee_id,
+            'password' => 'existing-private-password',
+        ])->assertRedirect('/login')->assertSessionHasErrors('employee_id');
 
-        $this->assertFalse(session()->has('auth.canonical_activation_intent'));
-        $this->assertDatabaseCount('users', 0);
         $this->assertGuest('web');
-    }
-
-    public function test_departure_after_bootstrap_verification_blocks_new_account_activation(): void
-    {
-        $employee = $this->employee('JIT-DEPARTED-2');
-        $this->post('/login', ['employee_id' => $employee->employee_id, 'password' => 'employee-secret'])
-            ->assertRedirect('/activate-account');
-        $nonce = $this->activationNonce();
-        DB::table('employees')->where('id', $employee->id)->update(['roster_status' => 'departed']);
-
-        $this->post('/activate-account', [
-            'nonce' => $nonce, 'path' => 'no_existing_user', 'no_legacy_account_assertion' => '1',
-        ])->assertRedirect('/activate-account')->assertSessionHasErrors(['legacy_email']);
-
-        $this->assertDatabaseCount('users', 0);
-        $this->assertDatabaseCount('authentication_sessions', 0);
-        $this->assertGuest('web');
-    }
-
-    public function test_login_rechecks_roster_departure_after_its_initial_lookup(): void
-    {
-        $employee = $this->employee('JIT-DEPARTED-RACE');
-        $changed = false;
-        Employee::retrieved(function (Employee $loaded) use ($employee, &$changed): void {
-            if (! $changed && $loaded->id === $employee->id) {
-                $changed = true;
-                DB::table('employees')->where('id', $employee->id)->update(['roster_status' => 'departed']);
-            }
-        });
-
-        $this->from('/login')->post('/login', [
-            'employee_id' => $employee->employee_id, 'password' => 'employee-secret',
-        ])->assertRedirect('/login')->assertSessionHasErrors(['employee_id']);
-
-        $this->assertTrue($changed);
-        $this->assertFalse(session()->has('auth.canonical_activation_intent'));
-        $this->assertDatabaseCount('users', 0);
-        $this->assertGuest('web');
-    }
-
-    public function test_departure_after_bootstrap_verification_blocks_legacy_dual_claim_without_mutation(): void
-    {
-        $employee = $this->employee('JIT-DEPARTED-3');
-        $user = $this->legacyAdmin('departed-legacy@example.test');
-        $original = $user->fresh()->getRawOriginal();
-        $this->post('/login', ['employee_id' => $employee->employee_id, 'password' => 'employee-secret'])
-            ->assertRedirect('/activate-account');
-        $nonce = $this->activationNonce();
-        DB::table('employees')->where('id', $employee->id)->update(['roster_status' => 'departed']);
-
-        $this->post('/activate-account', [
-            'nonce' => $nonce, 'path' => 'existing_user', 'legacy_email' => $user->email, 'legacy_password' => 'legacy-secret',
-        ])->assertRedirect('/activate-account')->assertSessionHasErrors(['legacy_email']);
-
-        $this->assertSame($original, $user->fresh()->getRawOriginal());
-        $this->assertSame(['admin'], $user->fresh()->getRoleNames()->all());
-        $this->assertDatabaseCount('authentication_sessions', 0);
-        $this->assertGuest('web');
-        $this->assertNull(app(DualCredentialIdentityClaim::class)->claim($employee->id, $user->email, 'legacy-secret', now()));
-    }
-
-    public function test_direct_provisioner_cannot_create_active_or_pending_login_for_departed_employee(): void
-    {
-        $employee = $this->employee('JIT-DEPARTED-4');
-        DB::table('employees')->where('id', $employee->id)->update(['roster_status' => 'departed']);
-        foreach (['LEGACY_HUMAN_BCRYPT_UNCHANGED', 'MISSING_OR_UNSUPPORTED'] as $provenance) {
-            try {
-                app(CanonicalUserProvisioner::class)->create($employee->id, $provenance, now());
-                $this->fail('Departed personnel cannot be provisioned.');
-            } catch (\RuntimeException) {
-                $this->assertDatabaseCount('users', 0);
-            }
-        }
-    }
-
-    private function activationNonce(): string
-    {
-        $response = $this->get('/activate-account')->assertOk();
-        $nonce = $response->viewData('nonce');
-        $this->assertIsString($nonce);
-        $this->assertNotSame('', $nonce);
-
-        return $nonce;
     }
 
     private function employee(string $employeeId): Employee
     {
-        $employee = Employee::query()->create([
+        return Employee::query()->create([
             'employee_id' => $employeeId,
-            'name' => 'First Login Employee',
-            'rank' => 'Firefighter',
-            'password' => 'employee-secret',
-            'must_change_password' => false,
+            'name' => 'First Login Member',
+            'password' => 'legacy-employee-password',
+            'roster_status' => 'active',
         ]);
-        $this->assertTrue(Hash::check('employee-secret', $employee->getAuthPassword()));
-
-        return $employee;
-    }
-
-    private function legacyAdmin(string $email): User
-    {
-        $user = User::factory()->create([
-            'email' => $email,
-            'employee_id' => null,
-            'employee_profile_id' => null,
-            'account_status' => AccountStatus::PendingActivation,
-            'password' => Hash::make('legacy-secret'),
-        ]);
-        $user->assignRole(Role::findOrCreate('admin', 'web'));
-
-        return $user;
     }
 }

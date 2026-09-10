@@ -54,16 +54,16 @@ final class EmployeeAccountAdministration
                     || $user->getRawOriginal('account_status') !== \App\Enums\AccountStatus::PendingActivation->value) {
                     throw ValidationException::withMessages(['temporary_password' => 'This login account is not awaiting activation. Use the established-account recovery controls instead.']);
                 }
-                $temporaryCredentialReused = User::query()
-                    ->whereKeyNot($user->id)
-                    ->where('must_change_password', true)
-                    ->lockForUpdate()
-                    ->get()
-                    ->contains(fn (User $candidate): bool => Hash::check($temporaryPassword, $candidate->getAuthPassword()));
-                if ($temporaryCredentialReused) {
+                try {
+                    $user = app(IdentityAccountSecurityService::class)->activateWithTemporaryPassword(
+                        $user,
+                        Hash::make($temporaryPassword),
+                        app(TemporaryCredentialFingerprint::class)->forPassword($temporaryPassword),
+                        now(),
+                    );
+                } catch (UniqueConstraintViolationException) {
                     throw ValidationException::withMessages(['temporary_password' => 'Choose a temporary password unique to this employee.']);
                 }
-                $user = app(IdentityAccountSecurityService::class)->activateWithTemporaryPassword($user, Hash::make($temporaryPassword), now());
                 $user->assignRole(Role::findOrCreate('member', 'web'));
                 if (filled($employee->city_email)) {
                     app(CanonicalCityEmailService::class)->sync($employee, $user, $employee->city_email);

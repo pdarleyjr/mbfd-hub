@@ -26,7 +26,6 @@ final class EmployeePasswordManagementRemovalTest extends TestCase
         parent::setUp();
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
-        config(['security.employee_bootstrap.secret' => 'test-owner-approved-bootstrap']);
         $this->withoutVite();
     }
 
@@ -74,11 +73,17 @@ final class EmployeePasswordManagementRemovalTest extends TestCase
 
         $employee = Employee::query()->where('employee_id', 'D03-NEW-PROFILE')->sole();
 
-        self::assertTrue(Hash::check('test-owner-approved-bootstrap', $employee->getAuthPassword()));
+        self::assertFalse(Hash::check('test-owner-approved-bootstrap', $employee->getAuthPassword()));
         self::assertTrue($employee->must_change_password);
+        $user = $employee->user()->sole();
+        self::assertSame('pending_activation', $user->getRawOriginal('account_status'));
+        self::assertTrue($user->must_change_password);
+        self::assertTrue($user->hasRole('member'));
+        self::assertSame(['member'], $user->getRoleNames()->all());
+        self::assertNull($user->temporary_credential_fingerprint);
     }
 
-    public function test_employee_resource_fails_closed_when_the_protected_bootstrap_secret_is_unavailable(): void
+    public function test_employee_resource_does_not_depend_on_a_shared_bootstrap_secret(): void
     {
         config(['security.employee_bootstrap.secret' => null]);
         $actor = User::factory()->create(['account_status' => 'active']);
@@ -94,9 +99,10 @@ final class EmployeePasswordManagementRemovalTest extends TestCase
                 'rank' => 'Firefighter',
             ])
             ->call('create')
-            ->assertHasFormErrors(['employee_id']);
+            ->assertHasNoFormErrors();
 
-        self::assertFalse(Employee::query()->where('employee_id', 'D03-NO-SECRET')->exists());
+        $employee = Employee::query()->where('employee_id', 'D03-NO-SECRET')->sole();
+        self::assertSame('pending_activation', $employee->user()->sole()->getRawOriginal('account_status'));
     }
 
     public function test_every_new_employee_without_an_explicit_credential_is_first_login_ready(): void
@@ -107,7 +113,7 @@ final class EmployeePasswordManagementRemovalTest extends TestCase
             'rank' => 'Firefighter',
         ]);
 
-        self::assertTrue(Hash::check('test-owner-approved-bootstrap', $employee->getAuthPassword()));
+        self::assertFalse(Hash::check('test-owner-approved-bootstrap', $employee->getAuthPassword()));
         self::assertTrue($employee->must_change_password);
     }
 }

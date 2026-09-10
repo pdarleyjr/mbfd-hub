@@ -11,6 +11,7 @@ use App\Models\EmployeeProfileEvent;
 use App\Models\User;
 use App\Policies\AccountSecurityPolicy;
 use App\Services\Identity\AccountSecurityService as IdentitySecurity;
+use App\Services\Identity\CanonicalUserProvisioner;
 use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,7 @@ final class EmployeeIdentityService
         private readonly IdentitySecurity $identitySecurity,
         private readonly SecurityAuditRecorder $audit,
         private readonly AccountSecurityPolicy $securityPolicy,
+        private readonly CanonicalUserProvisioner $canonicalUsers,
     ) {}
 
     public function correctEmployeeId(User $actor, Employee $employee, string $newEmployeeId, string $currentPassword, string $reason): Employee
@@ -92,6 +94,9 @@ final class EmployeeIdentityService
                 }
                 $before = $currentEmployee->roster_status;
                 $currentEmployee->forceFill(['roster_status' => $status])->save();
+                if ($status === 'active' && $currentTarget === null) {
+                    $this->canonicalUsers->create($currentEmployee->id, 'MISSING_OR_UNSUPPORTED', now());
+                }
 
                 return ['before_status' => $before, 'after_status' => $status];
             });
