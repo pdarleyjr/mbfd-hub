@@ -24,6 +24,11 @@ on:
         required: false
         type: boolean
         default: false
+      bootstrap_cohort_manifest:
+        description: "Protected backup-derived cohort manifest basename for the one-time member bootstrap initialization."
+        required: false
+        type: string
+        default: ""
 
 concurrency:
   group: production-deployment
@@ -43,6 +48,7 @@ jobs:
         env:
           FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
           FINAL_IMAGE_DIGEST: ${{ inputs.final_image_digest }}
+          BOOTSTRAP_COHORT_MANIFEST: ${{ inputs.bootstrap_cohort_manifest }}
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/main"
@@ -53,6 +59,12 @@ jobs:
             echo 'final_image_digest must be a lowercase sha256 digest.' >&2
             exit 1
           }
+          if test -n "$BOOTSTRAP_COHORT_MANIFEST"; then
+            [[ "$BOOTSTRAP_COHORT_MANIFEST" =~ ^mbfd-member-bootstrap-cohort-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{40}\.json$ ]] || {
+              echo 'bootstrap_cohort_manifest must be a protected manifest basename.' >&2
+              exit 1
+            }
+          fi
   release-gates:
     needs: assert-main
     uses: ./.github/workflows/hub-release-gates.yml
@@ -239,6 +251,7 @@ jobs:
           HUB_IMAGE_RUNTIME_ENV: ${{ vars.MBFD_HUB_IMAGE_RUNTIME_ENV }}
           HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
           HUB_ACTIVATION_RUN_ID: ${{ github.run_id }}
+          BOOTSTRAP_COHORT_MANIFEST: ${{ inputs.bootstrap_cohort_manifest }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
@@ -246,7 +259,10 @@ jobs:
           test -n "$HUB_IMAGE_RUNTIME_ENV"
           test -n "$HUB_BACKUP_DIR"
           test -n "$HUB_ACTIVATION_RUN_ID"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' bash -s" <<'REMOTE'
+          if test -n "$BOOTSTRAP_COHORT_MANIFEST"; then
+            [[ "$BOOTSTRAP_COHORT_MANIFEST" =~ ^mbfd-member-bootstrap-cohort-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{40}\.json$ ]]
+          fi
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' BOOTSTRAP_COHORT_MANIFEST='$BOOTSTRAP_COHORT_MANIFEST' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_CHECKOUT=/opt/mbfd/mbfd-hub
           EVIDENCE_ID="$HUB_ACTIVATION_RUN_ID-$RELEASE_SHA"
@@ -258,6 +274,21 @@ jobs:
           test -f "$HUB_IMAGE_RUNTIME_ENV"
           test -d "$HUB_BACKUP_DIR"
           test -w "$HUB_BACKUP_DIR"
+          if test -n "$BOOTSTRAP_COHORT_MANIFEST"; then
+            MANIFEST_PATH="$HUB_BACKUP_DIR/$BOOTSTRAP_COHORT_MANIFEST"
+            test -f "$MANIFEST_PATH"
+            test "$(stat -c '%a' "$MANIFEST_PATH")" = '600'
+            test "$(jq -er '.schema' "$MANIFEST_PATH")" = 'mbfd-member-bootstrap-cohort-v1'
+            EXPECTED_COUNT="$(jq -er '.expected_count | numbers' "$MANIFEST_PATH")"
+            test "$EXPECTED_COUNT" -ge 1
+            test "$(jq -er '.members | length' "$MANIFEST_PATH")" = "$EXPECTED_COUNT"
+            SOURCE_BACKUP_FILE="$(jq -er '.source_backup_file' "$MANIFEST_PATH")"
+            SOURCE_BACKUP_SHA256="$(jq -er '.source_backup_sha256' "$MANIFEST_PATH")"
+            [[ "$SOURCE_BACKUP_FILE" =~ ^mbfd-hub-pre-activation-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{40}\.dump$ ]]
+            [[ "$SOURCE_BACKUP_SHA256" =~ ^[0-9a-f]{64}$ ]]
+            test -f "$HUB_BACKUP_DIR/$SOURCE_BACKUP_FILE"
+            test "$(sha256sum "$HUB_BACKUP_DIR/$SOURCE_BACKUP_FILE" | awk '{print $1}')" = "$SOURCE_BACKUP_SHA256"
+          fi
           cd "$HUB_CHECKOUT"
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
           IMAGE_REPOSITORY="$(head -n 1 docker/production/image-repository)"
@@ -412,6 +443,7 @@ jobs:
           HUB_IMAGE_RUNTIME_ENV: ${{ vars.MBFD_HUB_IMAGE_RUNTIME_ENV }}
           HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
           HUB_ACTIVATION_RUN_ID: ${{ github.run_id }}
+          BOOTSTRAP_COHORT_MANIFEST: ${{ inputs.bootstrap_cohort_manifest }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
@@ -419,7 +451,10 @@ jobs:
           test -n "$HUB_IMAGE_RUNTIME_ENV"
           test -n "$HUB_BACKUP_DIR"
           test -n "$HUB_ACTIVATION_RUN_ID"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' bash -s" <<'REMOTE'
+          if test -n "$BOOTSTRAP_COHORT_MANIFEST"; then
+            [[ "$BOOTSTRAP_COHORT_MANIFEST" =~ ^mbfd-member-bootstrap-cohort-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{40}\.json$ ]]
+          fi
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' BOOTSTRAP_COHORT_MANIFEST='$BOOTSTRAP_COHORT_MANIFEST' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_CHECKOUT=/opt/mbfd/mbfd-hub
           EVIDENCE_ID="$HUB_ACTIVATION_RUN_ID-$RELEASE_SHA"
@@ -428,12 +463,25 @@ jobs:
           APPLY_NAME="mbfd-hub-identity-apply-$EVIDENCE_ID.json"
           POST_INVENTORY_NAME="mbfd-hub-identity-post-$EVIDENCE_ID.json"
           POST_SNAPSHOT_NAME="mbfd-hub-established-post-$EVIDENCE_ID.json"
+          COHORT_INITIALIZATION_NAME="mbfd-hub-cohort-initialization-$EVIDENCE_ID.txt"
 
           case "$HUB_IMAGE_RUNTIME_ENV" in /*) ;; *) exit 1 ;; esac
           case "$HUB_BACKUP_DIR" in /mnt/*) ;; *) exit 1 ;; esac
           test -f "$HUB_IMAGE_RUNTIME_ENV"
           test -d "$HUB_BACKUP_DIR"
           test -s "$HUB_BACKUP_DIR/$PRE_SNAPSHOT_NAME"
+          EXPECTED_COHORT_COUNT=0
+          if test -n "$BOOTSTRAP_COHORT_MANIFEST"; then
+            MANIFEST_PATH="$HUB_BACKUP_DIR/$BOOTSTRAP_COHORT_MANIFEST"
+            test -f "$MANIFEST_PATH"
+            test "$(stat -c '%a' "$MANIFEST_PATH")" = '600'
+            EXPECTED_COHORT_COUNT="$(jq -er '.expected_count | numbers' "$MANIFEST_PATH")"
+            SOURCE_BACKUP_FILE="$(jq -er '.source_backup_file' "$MANIFEST_PATH")"
+            SOURCE_BACKUP_SHA256="$(jq -er '.source_backup_sha256' "$MANIFEST_PATH")"
+            [[ "$SOURCE_BACKUP_FILE" =~ ^mbfd-hub-pre-activation-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{40}\.dump$ ]]
+            [[ "$SOURCE_BACKUP_SHA256" =~ ^[0-9a-f]{64}$ ]]
+            test "$(sha256sum "$HUB_BACKUP_DIR/$SOURCE_BACKUP_FILE" | awk '{print $1}')" = "$SOURCE_BACKUP_SHA256"
+          fi
           cd "$HUB_CHECKOUT"
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
           IMAGE_REPOSITORY="$(head -n 1 docker/production/image-repository)"
@@ -445,29 +493,45 @@ jobs:
             --volume "$HUB_BACKUP_DIR:/evidence" --entrypoint bash laravel.test -lc '
               set -euo pipefail
               php artisan identity:member-bootstrap-status --require-available --no-interaction
+              INTEGRITY_MANIFEST_OPTION=()
+              if test -n "$6"; then
+                php artisan identity:initialize-member-bootstrap-cohort --manifest="/evidence/$6" --confirm=INITIALIZE_PROVEN_MEMBER_BOOTSTRAP_COHORT --no-interaction \
+                  | tee "/evidence/$7"
+                INTEGRITY_MANIFEST_OPTION=(--bootstrap-cohort-manifest="/evidence/$6")
+              fi
               php artisan identity:provision-universal-accounts --format=json > "/evidence/$1"
               php artisan identity:provision-universal-accounts --apply --confirm=PROVISION_ACTIVE_EMPLOYEE_ACCOUNTS --format=json > "/evidence/$2"
               php artisan identity:provision-universal-accounts --format=json > "/evidence/$3"
-              php artisan identity:established-account-integrity --write="/evidence/$4" --compare="/evidence/$5" --no-interaction \
+              php artisan identity:established-account-integrity --write="/evidence/$4" --compare="/evidence/$5" "${INTEGRITY_MANIFEST_OPTION[@]}" --no-interaction \
                 | tee /tmp/established-account-integrity.txt
+              grep -Fx "ESTABLISHED_ALLOWED_BOOTSTRAP_COHORT_TRANSITIONS=$8" /tmp/established-account-integrity.txt
               grep -Fx "ESTABLISHED_PASSWORD_HASHES_CHANGED=0" /tmp/established-account-integrity.txt
               grep -Fx "ESTABLISHED_ACCOUNT_STATUS_CHANGED=0" /tmp/established-account-integrity.txt
               grep -Fx "ESTABLISHED_MUST_CHANGE_STATE_CHANGED=0" /tmp/established-account-integrity.txt
               grep -Fx "ESTABLISHED_ROLE_PERMISSION_CHANGES=0" /tmp/established-account-integrity.txt
               grep -Fx "ESTABLISHED_EMAIL_CHANGES=0" /tmp/established-account-integrity.txt
               grep -Fx "ESTABLISHED_ACCOUNT_UNEXPECTED_CHANGES=0" /tmp/established-account-integrity.txt
-            ' bash "$PRE_APPLY_NAME" "$APPLY_NAME" "$POST_INVENTORY_NAME" "$POST_SNAPSHOT_NAME" "$PRE_SNAPSHOT_NAME"
+            ' bash "$PRE_APPLY_NAME" "$APPLY_NAME" "$POST_INVENTORY_NAME" "$POST_SNAPSHOT_NAME" "$PRE_SNAPSHOT_NAME" "$BOOTSTRAP_COHORT_MANIFEST" "$COHORT_INITIALIZATION_NAME" "$EXPECTED_COHORT_COUNT"
           chmod 600 "$HUB_BACKUP_DIR/$PRE_APPLY_NAME" "$HUB_BACKUP_DIR/$APPLY_NAME" "$HUB_BACKUP_DIR/$POST_INVENTORY_NAME" "$HUB_BACKUP_DIR/$POST_SNAPSHOT_NAME"
           test -s "$HUB_BACKUP_DIR/$PRE_APPLY_NAME"
           test -s "$HUB_BACKUP_DIR/$APPLY_NAME"
           test -s "$HUB_BACKUP_DIR/$POST_INVENTORY_NAME"
           test -s "$HUB_BACKUP_DIR/$POST_SNAPSHOT_NAME"
+          if test -n "$BOOTSTRAP_COHORT_MANIFEST"; then
+            chmod 600 "$HUB_BACKUP_DIR/$COHORT_INITIALIZATION_NAME"
+            test -s "$HUB_BACKUP_DIR/$COHORT_INITIALIZATION_NAME"
+            test "$(sed -n 's/^BOOTSTRAP_COHORT_COUNT=//p' "$HUB_BACKUP_DIR/$COHORT_INITIALIZATION_NAME")" = "$EXPECTED_COHORT_COUNT"
+            INITIALIZED_COUNT="$(sed -n 's/^BOOTSTRAP_COHORT_INITIALIZED=//p' "$HUB_BACKUP_DIR/$COHORT_INITIALIZATION_NAME")"
+            ALREADY_ELIGIBLE_COUNT="$(sed -n 's/^BOOTSTRAP_COHORT_ALREADY_ELIGIBLE=//p' "$HUB_BACKUP_DIR/$COHORT_INITIALIZATION_NAME")"
+            test "$((INITIALIZED_COUNT + ALREADY_ELIGIBLE_COUNT))" = "$EXPECTED_COHORT_COUNT"
+          fi
           ACTIVE_EMPLOYEES="$(jq -er '.summary.active_employees | numbers' "$HUB_BACKUP_DIR/$POST_INVENTORY_NAME")"
           BOOTSTRAP_ELIGIBLE_ACCOUNTS="$(jq -er '.summary.bootstrap_eligible_users | numbers' "$HUB_BACKUP_DIR/$POST_INVENTORY_NAME")"
           IDENTITY_CONFLICTS="$(jq -er '.summary.identity_conflicts | numbers' "$HUB_BACKUP_DIR/$POST_INVENTORY_NAME")"
           WITHOUT_CANONICAL="$(jq -er '.summary.active_employees_without_canonical_user | numbers' "$HUB_BACKUP_DIR/$POST_INVENTORY_NAME")"
           test "$IDENTITY_CONFLICTS" = '0'
           test "$WITHOUT_CANONICAL" = '0'
+          test "$BOOTSTRAP_ELIGIBLE_ACCOUNTS" -ge "$EXPECTED_COHORT_COUNT"
           printf 'ACTIVE_EMPLOYEES=%s\nBOOTSTRAP_ELIGIBLE_ACCOUNTS=%s\nIDENTITY_CONFLICTS=%s\nPOST_CUTOVER_ACTIVE_EMPLOYEES_WITHOUT_CANONICAL_USER=%s\n' \
             "$ACTIVE_EMPLOYEES" "$BOOTSTRAP_ELIGIBLE_ACCOUNTS" "$IDENTITY_CONFLICTS" "$WITHOUT_CANONICAL"
           REMOTE

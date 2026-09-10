@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Services\Identity\EstablishedAccountIntegritySnapshot;
+use App\Services\Identity\MemberBootstrapCohortManifest;
 use Illuminate\Console\Command;
 use RuntimeException;
 use Throwable;
@@ -13,11 +14,12 @@ final class EstablishedAccountIntegrity extends Command
 {
     protected $signature = 'identity:established-account-integrity
                             {--write= : New exclusive JSON snapshot path}
-                            {--compare= : Existing baseline JSON snapshot path}';
+                            {--compare= : Existing baseline JSON snapshot path}
+                            {--bootstrap-cohort-manifest= : Manifest whose proven pending cohort may leave the established snapshot}';
 
     protected $description = 'Write and optionally compare a redacted established-account integrity snapshot.';
 
-    public function handle(EstablishedAccountIntegritySnapshot $snapshots): int
+    public function handle(EstablishedAccountIntegritySnapshot $snapshots, MemberBootstrapCohortManifest $manifests): int
     {
         $writePath = trim((string) $this->option('write'));
         $comparePath = trim((string) $this->option('compare'));
@@ -38,7 +40,12 @@ final class EstablishedAccountIntegrity extends Command
             }
 
             $baseline = $this->readSnapshot($comparePath);
-            $comparison = $snapshots->compare($baseline, $current);
+            $manifestPath = trim((string) $this->option('bootstrap-cohort-manifest'));
+            $allowedCohortUserIds = $manifestPath === ''
+                ? []
+                : array_column($manifests->load($manifestPath)['members'], 'user_id');
+            $comparison = $snapshots->compare($baseline, $current, $allowedCohortUserIds);
+            $this->line('ESTABLISHED_ALLOWED_BOOTSTRAP_COHORT_TRANSITIONS='.$comparison['allowed_bootstrap_cohort_transitions']);
             $this->line('ESTABLISHED_PASSWORD_HASHES_CHANGED='.$comparison['password_hashes_changed']);
             $this->line('ESTABLISHED_ACCOUNT_STATUS_CHANGED='.$comparison['account_status_changed']);
             $this->line('ESTABLISHED_MUST_CHANGE_STATE_CHANGED='.$comparison['must_change_state_changed']);

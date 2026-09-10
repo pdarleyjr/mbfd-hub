@@ -45,22 +45,30 @@ final class EstablishedAccountIntegritySnapshot
     /**
      * @param  array{accounts:list<array<string,mixed>>}  $before
      * @param  array{accounts:list<array<string,mixed>>}  $after
+     * @param  list<int>  $allowedBootstrapCohortUserIds
      * @return array<string, mixed>
      */
-    public function compare(array $before, array $after): array
+    public function compare(array $before, array $after, array $allowedBootstrapCohortUserIds = []): array
     {
         $beforeById = collect($before['accounts'])->keyBy('user_id');
         $afterById = collect($after['accounts'])->keyBy('user_id');
+        $allowedBootstrapCohort = array_fill_keys($allowedBootstrapCohortUserIds, true);
         $changedUserIds = [];
         $passwordChanges = 0;
         $statusChanges = 0;
         $mustChangeChanges = 0;
         $rolePermissionChanges = 0;
         $emailChanges = 0;
+        $allowedBootstrapCohortTransitions = 0;
 
         foreach ($beforeById as $userId => $baseline) {
             $current = $afterById->get($userId);
             if (! is_array($current)) {
+                if (isset($allowedBootstrapCohort[(int) $userId])) {
+                    $allowedBootstrapCohortTransitions++;
+
+                    continue;
+                }
                 $changedUserIds[] = (int) $userId;
 
                 continue;
@@ -91,6 +99,7 @@ final class EstablishedAccountIntegritySnapshot
             'baseline_accounts' => $beforeById->count(),
             'current_accounts' => $afterById->count(),
             'newly_established_accounts' => $afterById->keys()->diff($beforeById->keys())->count(),
+            'allowed_bootstrap_cohort_transitions' => $allowedBootstrapCohortTransitions,
             'unexpected_changes' => count(array_unique($changedUserIds)),
             'password_hashes_changed' => $passwordChanges,
             'account_status_changed' => $statusChanges,
