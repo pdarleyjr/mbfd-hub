@@ -174,7 +174,12 @@ final class EmployeePasswordResetTest extends TestCase
             'disable' => $security->disable($user, 'test disable', now()),
             'revoke' => $security->revokeAll($user, 'test revoke', now()),
             'require password' => $security->forcePasswordChange($user, now()),
-            'admin recovery' => $security->setAdministrativeRecoveryPassword($user, Hash::make('admin-recovery-test-password'), now()),
+            'admin recovery' => $security->setAdministrativeRecoveryPassword(
+                $user,
+                Hash::make('admin-recovery-test-password'),
+                app(\App\Services\Security\TemporaryCredentialFingerprint::class)->forPassword('admin-recovery-test-password'),
+                now(),
+            ),
         };
         $before = $user->fresh()->getRawOriginal();
         $this->post('/reset-password', [

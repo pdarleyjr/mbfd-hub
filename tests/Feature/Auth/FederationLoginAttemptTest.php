@@ -222,7 +222,7 @@ final class FederationLoginAttemptTest extends TestCase
         self::assertNull(session('_old_input.profile'));
     }
 
-    public function test_first_login_retains_attempt_through_activation_and_validation_does_not_flash_credentials(): void
+    public function test_roster_only_credentials_cannot_claim_an_account_or_consume_the_bound_attempt(): void
     {
         Employee::query()->create([
             'employee_id' => 'NEW-ATTEMPT', 'name' => 'New Attempt Member', 'rank' => 'Firefighter',
@@ -231,39 +231,23 @@ final class FederationLoginAttemptTest extends TestCase
         $handoff = '/auth/media-control/authorize?state=first-login';
         $login = $this->begin($handoff);
         $this->get($login)->assertOk();
-        $activation = $this->post($login, ['_token' => session()->token(), 'employee_id' => 'NEW-ATTEMPT', 'password' => 'legacy-password'])
-            ->assertRedirect()->headers->get('Location');
-        self::assertIsString($activation);
-        self::assertStringContainsString('/activate-account?login_attempt=', $activation);
-        $this->withCookie((string) config('session.cookie'), session()->getId());
-        $page = $this->get($activation)->assertOk();
-        $this->from('https://attacker.invalid/return')->post($activation, [
-            '_token' => session()->token(), 'nonce' => $page->viewData('nonce'), 'path' => 'invalid',
-            'legacy_password' => 'never-retain-legacy', 'profile' => 'private-profile',
-        ])->assertRedirect($activation)->assertSessionHasErrors('path');
-        self::assertNull(session('_old_input.legacy_password'));
-        self::assertNull(session('_old_input.profile'));
-        $page = $this->get($activation)->assertOk();
-        $this->post($activation, [
-            '_token' => session()->token(), 'nonce' => $page->viewData('nonce'),
-            'path' => 'no_existing_user', 'no_legacy_account_assertion' => '1',
-        ])->assertRedirect($handoff);
-        self::assertSame(1, User::query()->where('employee_id', 'NEW-ATTEMPT')->count());
+        $this->post($login, [
+            '_token' => session()->token(),
+            'employee_id' => 'NEW-ATTEMPT',
+            'password' => 'legacy-password',
+        ])->assertRedirect($login)->assertSessionHasErrors('employee_id');
+        self::assertSame(0, User::query()->where('employee_id', 'NEW-ATTEMPT')->count());
+
+        $this->get($login)->assertOk();
     }
 
-    public function test_activation_session_loss_requires_fresh_credentials_without_losing_its_bound_attempt(): void
+    public function test_retired_activation_route_is_unreachable_without_consuming_a_bound_attempt(): void
     {
         $login = $this->begin('/auth/media-control/authorize?state=activation-retry');
-        $activation = str_replace('/login?', '/activate-account?', $login);
-        $this->get($activation)->assertRedirect($login);
-        $this->post($activation, ['_token' => 'stale', 'legacy_password' => 'never-retain'])
-            ->assertStatus(303)->assertRedirect($login.'&session_expired=1');
-        self::assertNull(session('_old_input'));
-        $this->post($activation, [
-            '_token' => session()->token(), 'nonce' => str_repeat('a', 64),
-            'path' => 'no_existing_user', 'no_legacy_account_assertion' => '1',
-        ])->assertRedirect($login);
+        $this->get('/activate-account')->assertNotFound();
+        $this->post('/activate-account', ['legacy_password' => 'never-retain'])->assertNotFound();
         self::assertSame(0, User::query()->count());
+        $this->get($login)->assertOk();
     }
 
     public function test_revocation_while_login_tab_is_open_preserves_only_its_bound_context(): void

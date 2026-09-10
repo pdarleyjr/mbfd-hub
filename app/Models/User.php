@@ -121,6 +121,7 @@ class User extends Authenticatable implements FilamentUser
     protected $hidden = [
         'password',
         'remember_token',
+        'temporary_credential_fingerprint',
     ];
 
     /**

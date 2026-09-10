@@ -180,7 +180,7 @@ final class CanonicalHumanAuthenticationTest extends TestCase
         $this->assertGuest('web');
     }
 
-    public function test_legacy_employee_id_field_without_canonical_profile_link_cannot_authenticate_that_user(): void
+    public function test_legacy_employee_id_field_without_canonical_profile_link_cannot_authenticate_or_claim_that_user(): void
     {
         $employee = $this->employee('10010', 'legacy-password');
         User::factory()->create([
@@ -195,9 +195,10 @@ final class CanonicalHumanAuthenticationTest extends TestCase
             'password' => 'legacy-password',
         ]);
 
-        $response->assertRedirect('/activate-account');
+        $response->assertRedirect('/login');
+        $response->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
         $this->assertGuest('web');
-        $this->assertTrue(session()->has('auth.canonical_activation_intent'));
+        $this->assertFalse(session()->has('auth.canonical_activation_intent'));
         $this->assertDatabaseCount('authentication_sessions', 0);
     }
 

@@ -40,10 +40,6 @@ return [
         'decay_seconds' => 60,
     ],
 
-    'employee_bootstrap' => [
-        'secret' => env('MBFD_EMPLOYEE_BOOTSTRAP_PASSWORD'),
-    ],
-
     'identity_recovery' => [
         'max_attempts' => 3,
         'decay_seconds' => 900,

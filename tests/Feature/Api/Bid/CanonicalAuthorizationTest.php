@@ -80,7 +80,7 @@ final class CanonicalAuthorizationTest extends TestCase
         $this->exchange($query['code'])->assertOk();
     }
 
-    public function test_first_login_canonicalization_preserves_the_bid_authorize_destination_through_activation(): void
+    public function test_roster_only_credentials_cannot_claim_bid_access(): void
     {
         $authorizeUrl = $this->authorizeUrl();
         $employee = Employee::query()->create([
@@ -92,55 +92,13 @@ final class CanonicalAuthorizationTest extends TestCase
         ]);
 
         $login = $this->federationLogin($authorizeUrl);
-        $activationUrl = $this->post($login, [
+        $this->post($login, [
             'employee_id' => $employee->employee_id,
             'password' => 'employee-legacy-password',
-        ])->assertRedirect()->headers->get('Location');
-        self::assertIsString($activationUrl);
-        self::assertSame('/activate-account', parse_url($activationUrl, PHP_URL_PATH));
-        $this->withCookie((string) config('session.cookie'), session()->getId());
+        ])->assertRedirect($login)->assertSessionHasErrors('employee_id');
 
-        $activation = $this->get($activationUrl)->assertOk();
-        $nonce = $activation->viewData('nonce');
-        self::assertIsString($nonce);
-        $this->post($activationUrl, [
-            'nonce' => $nonce,
-            'path' => 'no_existing_user',
-            'no_legacy_account_assertion' => '1',
-        ])->assertRedirect($authorizeUrl);
-
-        $user = $employee->fresh()->user;
-        self::assertInstanceOf(User::class, $user);
-        $user->givePermissionTo(Permission::findOrCreate('app.bid.access', 'web'));
-        $this->assertAuthenticatedAs($user, 'web');
-        $this->assertDatabaseHas('authentication_sessions', ['user_id' => $user->id]);
-        $this->withCookie(
-            (string) config('session.cookie'),
-            $this->app['session.store']->getId(),
-        )->withCredentials();
-
-        // A newly activated member reviews their address before returning to
-        // the exact Bid authorization request. Delivery does not gate app access.
-        Http::fake();
-        config()->set('communications.cloudflare.api_token', '');
-        $this->get($authorizeUrl)->assertRedirect('/account/city-email');
-        $this->post('/account/city-email', [
-            'email' => 'firstloginbidmember@miamibeachfl.gov',
-            'current_password' => 'employee-legacy-password',
-            'ownership_confirmed' => '1',
-        ])->assertRedirect('/account/city-email')->assertSessionHasNoErrors();
-        $this->post('/account/city-email/continue')->assertRedirect($authorizeUrl);
-        self::assertNull($user->fresh()->employeeProfile->city_email);
-        Http::assertNothingSent();
-
-        $location = $this->handoffDestination($authorizeUrl);
-        self::assertIsString($location);
-        self::assertStringStartsWith(self::CALLBACK.'?', $location);
-
-        $query = $this->redirectQuery($location);
-        self::assertSame(self::STATE, $query['state'] ?? null);
-        self::assertIsString($query['code'] ?? null);
-        $this->exchange($query['code'])->assertOk();
+        $this->assertGuest('web');
+        self::assertNull($employee->fresh()->user);
     }
 
     public function test_active_canonical_user_with_linked_employee_receives_and_redeems_an_opaque_code(): void

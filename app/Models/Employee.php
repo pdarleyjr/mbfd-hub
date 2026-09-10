@@ -13,8 +13,8 @@ use Illuminate\Notifications\Notifiable;
 /**
  * Operational personnel profile linked from the canonical User model.
  *
- * Employee records retain historical domain data and the transitional
- * first-login credential used to create or claim a canonical User.
+ * Employee records retain historical domain data. Their compatibility password
+ * is random and unusable for human authentication; User is the sole principal.
  *
  * @property string|null $city_email
  * @property string|null $roster_status

@@ -9,7 +9,8 @@ return [
     'credential_authority' => env('MBFD_CREDENTIAL_AUTHORITY', 'local'),
     'provider' => 'authentik',
     'local_login_enabled' => env('MBFD_LOCAL_LOGIN_ENABLED', true),
-    'employee_bootstrap_login_enabled' => env('MBFD_EMPLOYEE_BOOTSTRAP_LOGIN_ENABLED', true),
+    // The shared Employee credential claim flow is permanently retired.
+    'employee_bootstrap_login_enabled' => false,
     'canary_user_ids' => array_values(array_filter(array_map(
         static fn (string $value): ?int => ctype_digit(trim($value)) ? (int) trim($value) : null,
         explode(',', (string) env('MBFD_AUTHENTIK_CANARY_USER_IDS', '')),

@@ -62,9 +62,9 @@ $app = Application::configure(basePath: dirname(__DIR__))
             $attempts = app(\App\Services\Identity\FederationLoginAttempt::class);
             // Only a server-issued, browser-cookie-bound query context survives.
             // Never inspect or replay a rejected POST body or trust its Referer.
-            $login = $request->is('login', 'activate-account') && $attempts->current($request) !== null
+            $login = $request->is('login') && $attempts->current($request) !== null
                 ? $attempts->loginUrl($request, expired: true) : '/login?session_expired=1';
-            if ($request->is('login', 'activate-account') && $attempts->requested($request) && $attempts->current($request) === null) {
+            if ($request->is('login') && $attempts->requested($request) && $attempts->current($request) === null) {
                 $login = '/login?login_attempt=expired&session_expired=1';
             }
 

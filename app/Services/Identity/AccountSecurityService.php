@@ -15,13 +15,14 @@ use Illuminate\Support\Facades\Password;
 
 final class AccountSecurityService
 {
-    public function setAdministrativeRecoveryPassword(User $user, string $passwordHash, CarbonInterface $at): User
+    public function setAdministrativeRecoveryPassword(User $user, string $passwordHash, string $fingerprint, CarbonInterface $at): User
     {
-        return DB::transaction(function () use ($user, $passwordHash, $at): User {
+        return DB::transaction(function () use ($user, $passwordHash, $fingerprint, $at): User {
             /** @var User $lockedUser */
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
             DB::table('users')->where('id', $lockedUser->id)->update([
                 'password' => $passwordHash,
+                'temporary_credential_fingerprint' => $fingerprint,
                 'must_change_password' => true,
                 'password_changed_at' => $at,
                 'security_version' => $lockedUser->security_version + 1,
@@ -34,9 +35,9 @@ final class AccountSecurityService
         });
     }
 
-    public function activateWithTemporaryPassword(User $user, string $passwordHash, CarbonInterface $at): User
+    public function activateWithTemporaryPassword(User $user, string $passwordHash, string $fingerprint, CarbonInterface $at): User
     {
-        return DB::transaction(function () use ($user, $passwordHash, $at): User {
+        return DB::transaction(function () use ($user, $passwordHash, $fingerprint, $at): User {
             /** @var User $lockedUser */
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
             if ($lockedUser->getRawOriginal('account_status') !== AccountStatus::PendingActivation->value) {
@@ -44,6 +45,7 @@ final class AccountSecurityService
             }
             DB::table('users')->where('id', $lockedUser->id)->update([
                 'password' => $passwordHash,
+                'temporary_credential_fingerprint' => $fingerprint,
                 'account_status' => AccountStatus::Active->value,
                 'must_change_password' => true,
                 'password_changed_at' => $at,
@@ -79,6 +81,7 @@ final class AccountSecurityService
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
             DB::table('users')->where('id', $lockedUser->id)->update([
                 'password' => $passwordHash,
+                'temporary_credential_fingerprint' => null,
                 'must_change_password' => false,
                 'password_changed_at' => $at,
                 'security_version' => $lockedUser->security_version + 1,
@@ -203,6 +206,7 @@ final class AccountSecurityService
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
             $lockedUser->forceFill([
                 'password_changed_at' => $at,
+                'temporary_credential_fingerprint' => null,
                 'security_version' => $lockedUser->security_version + 1,
             ])->save();
 

@@ -4,22 +4,21 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Enums\AccountStatus;
+use App\Enums\SessionContextClass;
 use App\Models\Employee;
+use App\Models\User;
+use App\Services\Identity\SessionRegistry;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 final class ReconcileRosterTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        config(['security.employee_bootstrap.secret' => 'test-owner-approved-bootstrap']);
-    }
 
     public function test_apply_creates_only_missing_ids_and_preserves_existing_profile_fields(): void
     {
@@ -36,6 +35,20 @@ final class ReconcileRosterTest extends TestCase
             'roster_status' => 'active',
             'password' => 'existing-historical-password',
         ]);
+        $historicalUser = User::factory()->create([
+            'employee_id' => $historical->employee_id,
+            'employee_profile_id' => $historical->id,
+            'account_status' => AccountStatus::Active,
+        ]);
+        $at = CarbonImmutable::now();
+        $historicalSession = app(SessionRegistry::class)->register(
+            $historicalUser,
+            'roster-departure-session',
+            SessionContextClass::UnmanagedBrowser,
+            $at,
+            $at->addHour(),
+            $at->addDay(),
+        );
         $path = $this->rosterFile();
 
         try {
@@ -51,7 +64,11 @@ final class ReconcileRosterTest extends TestCase
             $createdHash = $created->getRawOriginal('password');
             $this->assertNotSame('', $createdHash);
             $this->assertFalse(Hash::check('test-owner-approved-bootstrap', $created->getAuthPassword()));
-            $this->assertFalse($created->must_change_password);
+            $this->assertTrue($created->must_change_password);
+            $createdUser = $created->user()->sole();
+            $this->assertSame(AccountStatus::PendingActivation, $createdUser->account_status);
+            $this->assertSame(['member'], $createdUser->getRoleNames()->all());
+            $this->assertNull($createdUser->temporary_credential_fingerprint);
 
             $this->artisan('mbfd:roster-reconcile', ['file' => $path, '--apply' => true])
                 ->assertSuccessful();
@@ -64,7 +81,10 @@ final class ReconcileRosterTest extends TestCase
         $this->assertSame('Existing Display Name', $current->name);
         $this->assertSame('Existing Rank', $current->rank);
         $this->assertSame('active', $current->roster_status);
+        $this->assertSame(AccountStatus::PendingActivation, $current->user()->sole()->account_status);
         $this->assertSame('departed', $historical->refresh()->roster_status);
+        $this->assertSame(AccountStatus::Disabled, $historicalUser->fresh()->account_status);
+        $this->assertNotNull($historicalSession->fresh()->revoked_at);
         $this->assertDatabaseHas('employees', [
             'employee_id' => '54321',
             'name' => 'New Person',
@@ -72,6 +92,33 @@ final class ReconcileRosterTest extends TestCase
             'roster_status' => 'active',
         ]);
         $this->assertSame(3, Employee::query()->count());
+    }
+
+    public function test_reactivation_preserves_a_disabled_canonical_user_without_enabling_or_escalating_it(): void
+    {
+        $employee = Employee::query()->create([
+            'employee_id' => '12345',
+            'name' => 'Returning Person',
+            'roster_status' => 'departed',
+        ]);
+        $user = User::factory()->create([
+            'employee_id' => $employee->employee_id,
+            'employee_profile_id' => $employee->id,
+            'account_status' => AccountStatus::Disabled,
+        ]);
+        $user->assignRole(Role::findOrCreate('member', 'web'));
+        $before = [$user->id, $user->password, $user->security_version, $user->getRoleNames()->all()];
+        $path = $this->rosterFile();
+
+        try {
+            $this->artisan('mbfd:roster-reconcile', ['file' => $path, '--apply' => true])->assertSuccessful();
+        } finally {
+            @unlink($path);
+        }
+
+        $this->assertSame('active', $employee->fresh()->roster_status);
+        $this->assertSame(AccountStatus::Disabled, $user->fresh()->account_status);
+        $this->assertSame($before, [$user->id, $user->fresh()->password, $user->fresh()->security_version, $user->fresh()->getRoleNames()->all()]);
     }
 
     public function test_json_dry_run_reports_exact_set_differences_without_mutation(): void

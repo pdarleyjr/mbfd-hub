@@ -23,6 +23,12 @@ final class CanonicalLoginDestination
 
     public function resolve(User $user, mixed $candidate): string
     {
+        if ($user->must_change_password) {
+            return $user->employee_profile_id !== null
+                ? '/employee/set-password'
+                : '/admin/set-password';
+        }
+
         $destination = $this->normalizeInternalPath($candidate);
 
         if ($destination === null) {

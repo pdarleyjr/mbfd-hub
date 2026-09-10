@@ -14,7 +14,7 @@ final class ProvisionEmployeeBootstrapCredential extends Command
                             {employee_ids* : Exact Employee database primary keys}
                             {--dry-run : Inspect the exact targets without changing credentials}';
 
-    protected $description = 'Provision the protected first-login bootstrap credential for exact eligible unlinked Employee profiles.';
+    protected $description = 'Retired: shared Employee bootstrap credentials are no longer provisioned.';
 
     public function handle(EmployeeBootstrapCredentialProvisioner $provisioner): int
     {
