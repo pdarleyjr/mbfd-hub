@@ -49,7 +49,10 @@ class StationRequestApiTest extends TestCase
             'password' => Hash::make('test-password-only'),
             'must_change_password' => false,
         ]);
-        $this->canonicalActor = User::factory()->create(['employee_profile_id' => $this->employee->id]);
+        $this->canonicalActor = User::factory()->create([
+            'employee_id' => $this->employee->employee_id,
+            'employee_profile_id' => $this->employee->id,
+        ]);
         $this->actingAsCanonicalUser($this->canonicalActor);
         $this->room = Room::query()->create([
             'station_id' => $this->station->id,
