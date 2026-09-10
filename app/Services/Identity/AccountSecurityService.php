@@ -34,6 +34,29 @@ final class AccountSecurityService
         });
     }
 
+    public function activateWithTemporaryPassword(User $user, string $passwordHash, CarbonInterface $at): User
+    {
+        return DB::transaction(function () use ($user, $passwordHash, $at): User {
+            /** @var User $lockedUser */
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+            if ($lockedUser->getRawOriginal('account_status') !== AccountStatus::PendingActivation->value) {
+                throw new \RuntimeException('Only an account awaiting activation may use the first-login temporary-password action.');
+            }
+            DB::table('users')->where('id', $lockedUser->id)->update([
+                'password' => $passwordHash,
+                'account_status' => AccountStatus::Active->value,
+                'must_change_password' => true,
+                'password_changed_at' => $at,
+                'security_version' => $lockedUser->security_version + 1,
+                'updated_at' => $at,
+            ]);
+            $lockedUser = $lockedUser->fresh();
+            $this->revokeSessions($lockedUser, 'temporary password issued', $at);
+
+            return $lockedUser;
+        });
+    }
+
     public function forcePasswordChange(User $user, CarbonInterface $at): User
     {
         return DB::transaction(function () use ($user, $at): User {

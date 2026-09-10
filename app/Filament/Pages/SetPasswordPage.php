@@ -31,7 +31,7 @@ class SetPasswordPage extends Page
 
     protected static string $view = 'filament.pages.set-password';
 
-    protected static ?string $title = 'Set Your Password';
+    protected static ?string $title = 'Change Your Password';
 
     protected static bool $shouldRegisterNavigation = false;
 
@@ -46,8 +46,10 @@ class SetPasswordPage extends Page
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Password Change Required')
-                    ->description('Set a new password before continuing to use this panel.')
+                Forms\Components\Section::make(fn (): string => auth()->user()?->must_change_password ? 'Password Change Required' : 'Change Password')
+                    ->description(fn (): string => auth()->user()?->must_change_password
+                        ? 'Set a private password before continuing to use MBFD Hub.'
+                        : 'Enter your current password, then choose a new private password.')
                     ->schema([
                         Forms\Components\TextInput::make('current_password')
                             ->label('Current Password')

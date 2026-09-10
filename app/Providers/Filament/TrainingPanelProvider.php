@@ -74,6 +74,8 @@ class TrainingPanelProvider extends PanelProvider
                     ->collapsible(false),
             ])
             ->userMenuItems([
+                MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
+                MenuItem::make()->label('Change Password')->url(fn (): string => SetPasswordPage::getUrl(panel: 'training'))->icon('heroicon-o-key'),
                 MenuItem::make()
                     ->label('City email & verification')
                     ->url(fn (): string => route('city-email.show'))

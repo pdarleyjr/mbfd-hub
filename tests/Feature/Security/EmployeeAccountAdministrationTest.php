@@ -79,7 +79,7 @@ final class EmployeeAccountAdministrationTest extends TestCase
             self::assertSame(1, EmployeeProfileEvent::query()->count());
         }
         $employee->update(['roster_status' => 'active']);
-        $existing = User::factory()->create(['employee_profile_id' => $employee->id, 'employee_id' => $employee->employee_id]);
+        $existing = User::factory()->create(['employee_profile_id' => $employee->id, 'employee_id' => $employee->employee_id, 'account_status' => 'active']);
         $original = $existing->fresh()->getRawOriginal();
         try {
             app(EmployeeAccountAdministration::class)->createForEmployee($actor, $employee, 'temporary-password', 'admin-password', 'Reviewed duplicate');
@@ -89,6 +89,51 @@ final class EmployeeAccountAdministrationTest extends TestCase
             self::assertSame(2, User::query()->count());
             self::assertSame(2, EmployeeProfileEvent::query()->count());
         }
+    }
+
+    public function test_pending_preprovisioned_account_receives_unique_temporary_password_without_replacement_or_email(): void
+    {
+        Http::fake();
+        $actor = $this->administrator();
+        $employee = $this->employee();
+        $pending = app(\App\Services\Identity\CanonicalUserProvisioner::class)
+            ->create($employee->id, 'MISSING_OR_UNSUPPORTED', now())['user'];
+        $pendingId = $pending->id;
+        $internalHash = $pending->getRawOriginal('password');
+        self::assertSame('pending_activation', $pending->getRawOriginal('account_status'));
+
+        $issued = app(EmployeeAccountAdministration::class)->createForEmployee(
+            $actor,
+            $employee,
+            'unique-temporary-password-2026',
+            'admin-password',
+            'Controlled first-login handoff',
+        );
+
+        self::assertSame($pendingId, $issued->id);
+        self::assertNotSame($internalHash, $issued->getRawOriginal('password'));
+        self::assertTrue(Hash::check('unique-temporary-password-2026', $issued->getAuthPassword()));
+        self::assertSame('active', $issued->getRawOriginal('account_status'));
+        self::assertTrue($issued->must_change_password);
+        self::assertTrue($issued->hasRole('member'));
+        self::assertSame('allowed', SecurityActionEvent::query()->where('target_user_id', $pendingId)->sole()->result);
+        self::assertStringNotContainsString('unique-temporary-password-2026', SecurityActionEvent::query()->sole()->toJson());
+        Http::assertNothingSent();
+    }
+
+    public function test_temporary_password_cannot_be_reused_for_another_employee(): void
+    {
+        $actor = $this->administrator();
+        $first = $this->employee();
+        $second = Employee::query()->create(['employee_id' => 'TEST-9912', 'name' => 'Second Roster Member', 'roster_status' => 'active', 'password' => 'second-employee-source-password']);
+        app(EmployeeAccountAdministration::class)->createForEmployee(
+            $actor, $first, 'unique-department-handoff-2026', 'admin-password', 'First handoff',
+        );
+
+        $this->expectException(ValidationException::class);
+        app(EmployeeAccountAdministration::class)->createForEmployee(
+            $actor, $second, 'unique-department-handoff-2026', 'admin-password', 'Second handoff',
+        );
     }
 
     public function test_nonemployee_approval_preserves_account_grants_and_records_denial_and_success(): void

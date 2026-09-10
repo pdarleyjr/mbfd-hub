@@ -55,7 +55,7 @@ final class EmployeePasswordResetController extends Controller
         $user = $employee?->user;
         if (! $user instanceof User
             && $employee instanceof Employee
-            && config('identity.mode') === 'authentik') {
+            && config('identity.credential_authority') === 'authentik') {
             try {
                 $user = $provisioner->create(
                     (int) $employee->getKey(),
@@ -68,7 +68,8 @@ final class EmployeePasswordResetController extends Controller
         }
         if ($user instanceof User) {
             try {
-                if ($identities->enabledFor($user)) {
+                if (config('identity.credential_authority') === 'authentik'
+                    && $identities->enabledFor($user)) {
                     $recipient = $emails->connectedEmail($user);
                     if ($recipient === null || ! $user->isUpstreamIdentityEnabled()) {
                         return back()->with('status', self::GENERIC_STATUS);

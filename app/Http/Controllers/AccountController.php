@@ -29,13 +29,16 @@ final class AccountController extends Controller
         $maskedEmail = $email === null ? null : $this->maskEmail($email);
         $securityState = $link instanceof UserIdentityLink && is_array($link->security_state)
             ? $link->security_state : [];
+        $localCredentials = config('identity.credential_authority') === 'local';
 
         return view('account.show', [
             'user' => $user->fresh('employeeProfile'),
             'identityLink' => $link,
             'maskedRecoveryEmail' => $maskedEmail,
             'securityState' => $securityState,
-            'enrollmentUrls' => $link instanceof UserIdentityLink && $identities->enabledFor($user)
+            'localCredentials' => $localCredentials,
+            'changePasswordUrl' => $user->employee_profile_id !== null ? '/employee/set-password' : '/admin/set-password',
+            'enrollmentUrls' => ! $localCredentials && $link instanceof UserIdentityLink && $identities->enabledFor($user)
                 ? $identities->enrollmentUrls($user) : null,
             'activeSessionCount' => AuthenticationSession::query()
                 ->where('user_id', $user->getKey())->whereNull('revoked_at')->count(),

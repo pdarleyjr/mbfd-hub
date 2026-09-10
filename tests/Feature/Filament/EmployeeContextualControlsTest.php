@@ -100,6 +100,12 @@ final class EmployeeContextualControlsTest extends TestCase
         $this->assertContextContains($page->html(), 'hub-roles', ['Create a login account in Login & recovery before assigning roles, access or workgroups.']);
         $page->assertDontSee('Read-only with your current access.');
         $page->assertDontSee('Edit Hub roles')->assertDontSee('Manage workgroups');
+        $pending = app(\App\Services\Identity\CanonicalUserProvisioner::class)
+            ->create($employee->id, 'MISSING_OR_UNSUPPORTED', now())['user'];
+        self::assertSame('pending_activation', $pending->getRawOriginal('account_status'));
+        $pendingPage = Livewire::test(EditEmployee::class, ['record' => $employee->id]);
+        $this->assertContextContains($pendingPage->html(), 'login-recovery', ['Issue temporary password']);
+        $pendingPage->assertSee('Awaiting activation');
         $target = User::factory()->create(['account_status' => 'active']);
         $page = Livewire::test(EditAccountProfile::class, ['record' => $target->id]);
         $this->assertContextContains($page->html(), 'profile-identity', ['Link verified employee', 'Approve nonemployee']);

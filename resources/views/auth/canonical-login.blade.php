@@ -28,6 +28,7 @@
 <main>
     <div class="identity-strip">MBFD Identity · Secure access</div>
     <h1>MBFD Hub</h1>
+    <p>Sign in with your Employee ID and Hub password.</p>
     @if (request()->query('session_expired') === '1')
         <p role="status">Your session has ended. Please sign in again. Unsaved changes were not submitted. Review the record after signing in.</p>
     @endif
@@ -38,8 +39,6 @@
         <p>Use MBFD Identity for secure department access.</p>
         <a class="identity-button" href="{{ $identityLoginUrl }}">Continue with MBFD Identity</a>
         <div class="divider" aria-hidden="true">Transition access</div>
-    @else
-        <p>Sign in with your Employee ID and MBFD Hub password.</p>
     @endif
     <form method="POST" action="{{ $loginAction ?? route('login.store') }}">
         @csrf
@@ -58,6 +57,7 @@
         <button type="submit">Sign in</button>
     </form>
     <a class="help" href="{{ route('password.request') }}">Forgot your password?</a>
+    <p class="help">First time signing in? Use the temporary password provided by MBFD. You will choose a private password immediately.</p>
 </main>
 </body>
 </html>

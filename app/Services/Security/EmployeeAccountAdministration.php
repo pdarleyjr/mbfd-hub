@@ -36,20 +36,39 @@ final class EmployeeAccountAdministration
                 $actor = User::query()->lockForUpdate()->findOrFail($actor->id);
                 $this->authorize($actor, $currentPassword);
                 $employee = Employee::query()->lockForUpdate()->findOrFail($employee->id);
-                if ($employee->roster_status !== 'active' || $employee->user()->exists()
-                    || User::query()->where('employee_id', $employee->employee_id)->exists()) {
-                    throw ValidationException::withMessages(['temporary_password' => 'This employee is not active or already has a matching account. Review the existing identity; no duplicate account was created.']);
+                if ($employee->roster_status !== 'active') {
+                    throw ValidationException::withMessages(['temporary_password' => 'Only an active employee can receive a first-login temporary password.']);
                 }
-                $result = app(CanonicalUserProvisioner::class)->create($employee->id, 'MISSING_OR_UNSUPPORTED', now());
-                $user = $result['user'];
-                app(IdentityAccountSecurityService::class)->completeCanonicalLink($user, $employee->id, $employee->employee_id, Hash::make($temporaryPassword), now());
-                $user->refresh();
-                $user->forceFill(['must_change_password' => true])->save();
+                $user = User::query()->where('employee_profile_id', $employee->id)->lockForUpdate()->first();
+                $exact = User::query()->where('employee_id', $employee->employee_id)->lockForUpdate()->get();
+                if ($exact->count() > 1 || ($user instanceof User && ! $exact->contains(fn (User $candidate): bool => $candidate->is($user)))) {
+                    throw ValidationException::withMessages(['temporary_password' => 'This Employee ID has a conflicting account link. Review identity reconciliation before issuing a credential.']);
+                }
+                if (! $user instanceof User) {
+                    if ($exact->isNotEmpty()) {
+                        throw ValidationException::withMessages(['temporary_password' => 'An exact legacy account must be reconciled before issuing a credential.']);
+                    }
+                    $user = app(CanonicalUserProvisioner::class)->create($employee->id, 'MISSING_OR_UNSUPPORTED', now())['user'];
+                }
+                if ($user->employee_id !== $employee->employee_id
+                    || $user->getRawOriginal('account_status') !== \App\Enums\AccountStatus::PendingActivation->value) {
+                    throw ValidationException::withMessages(['temporary_password' => 'This login account is not awaiting activation. Use the established-account recovery controls instead.']);
+                }
+                $temporaryCredentialReused = User::query()
+                    ->whereKeyNot($user->id)
+                    ->where('must_change_password', true)
+                    ->lockForUpdate()
+                    ->get()
+                    ->contains(fn (User $candidate): bool => Hash::check($temporaryPassword, $candidate->getAuthPassword()));
+                if ($temporaryCredentialReused) {
+                    throw ValidationException::withMessages(['temporary_password' => 'Choose a temporary password unique to this employee.']);
+                }
+                $user = app(IdentityAccountSecurityService::class)->activateWithTemporaryPassword($user, Hash::make($temporaryPassword), now());
                 $user->assignRole(Role::findOrCreate('member', 'web'));
                 if (filled($employee->city_email)) {
                     app(CanonicalCityEmailService::class)->sync($employee, $user, $employee->city_email);
                 }
-                app(SecurityAuditRecorder::class)->record($actor, $user, 'create_employee_account', 'allowed', trim($reason), ['employee_profile_id' => $employee->id]);
+                app(SecurityAuditRecorder::class)->record($actor, $user, 'issue_first_login_temporary_password', 'allowed', trim($reason), ['employee_profile_id' => $employee->id]);
 
                 return $user->fresh();
             });
@@ -59,7 +78,7 @@ final class EmployeeAccountAdministration
                 'employee_id' => $employee->id,
                 'actor_user_id' => $actor->id,
                 'target_user_id' => null,
-                'action' => 'create_employee_account',
+                'action' => 'issue_first_login_temporary_password',
                 'result' => $this->failureResult($exception),
                 'reason' => mb_substr(trim($reason), 0, 500),
             ]);

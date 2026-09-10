@@ -78,6 +78,8 @@ class EmployeePanelProvider extends PanelProvider
             ])
             ->widgets([])
             ->userMenuItems([
+                MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
+                MenuItem::make()->label('Change Password')->url(fn (): string => SetPasswordPage::getUrl(panel: 'employee'))->icon('heroicon-o-key'),
                 MenuItem::make()
                     ->label('City email & verification')
                     ->url(fn (): string => route('city-email.show'))
