@@ -191,6 +191,7 @@ final class HubOidcProviderTest extends TestCase
         self::assertSame($url, app(\App\Services\Identity\CanonicalLoginDestination::class)->resolve($user, $url));
         $user->forceFill(['must_change_password' => false, 'email' => 'employee-99001@canonical.mbfdhub.invalid'])->save();
         $user->employeeProfile->forceFill(['city_email' => null])->save();
+        $this->actingAsCanonicalUser($user);
         $this->withSession([\App\Http\Middleware\EnsureCityEmailReview::SESSION_KEY => true])->get($url)->assertRedirect(route('city-email.show'));
         self::assertSame($url, session(\App\Http\Middleware\EnsureCityEmailReview::RETURN_KEY));
     }
@@ -198,6 +199,7 @@ final class HubOidcProviderTest extends TestCase
     public function test_anonymous_oidc_request_uses_existing_employee_id_login_and_returns_to_authorization(): void
     {
         [$user, $client] = $this->fixture();
+        $this->logoutCanonicalSession();
         $user->forceFill(['password' => bcrypt('Canonical-oidc-login-only!')])->save();
         $url = '/oauth/authorize?'.http_build_query($this->authorizationQuery($client));
         $loginUrl = $this->federationLogin($url);
@@ -306,6 +308,8 @@ final class HubOidcProviderTest extends TestCase
         $client = Client::query()->create(['name' => 'CMD test', 'secret' => 'test-client-secret', 'provider' => 'users',
             'redirect_uris' => ['https://cmd.mbfdhub.com/auth/callback'], 'grant_types' => ['authorization_code'], 'revoked' => false]);
         config(['oidc.clients.cmd' => $client->id]);
+
+        $this->actingAsCanonicalUser($user);
 
         return [$user, $client];
     }

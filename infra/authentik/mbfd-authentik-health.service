@@ -1,0 +1,8 @@
+[Unit]
+Description=Verify MBFD authentik health
+After=docker.service mbfd-authentik.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/mbfd/authentik.env
+ExecStart=/opt/mbfd/authentik/healthcheck.sh

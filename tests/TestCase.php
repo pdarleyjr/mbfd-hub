@@ -33,6 +33,10 @@ abstract class TestCase extends BaseTestCase
             return $this->actingAsCanonicalEmployee($user);
         }
 
+        if ($user instanceof User && $guard === null) {
+            return $this->actingAsCanonicalUser($user);
+        }
+
         if ($user instanceof User && $guard === 'web') {
             $this->flushSession();
             Auth::forgetGuards();
@@ -68,6 +72,7 @@ abstract class TestCase extends BaseTestCase
             $user = User::factory()->create([
                 'account_status' => AccountStatus::Active,
                 'employee_profile_id' => $employee->id,
+                'employee_id' => $employee->employee_id,
             ]);
         }
 
@@ -120,6 +125,7 @@ abstract class TestCase extends BaseTestCase
         $user = User::factory()->create([
             'account_status' => AccountStatus::Active,
             'employee_profile_id' => $employee->id,
+            'employee_id' => $employee->employee_id,
         ]);
         $this->actingAsCanonicalUser($user);
 

@@ -7,9 +7,10 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\Identity\AuthentikOidcClient;
 use App\Services\Identity\CanonicalActivationIntent;
 use App\Services\Identity\CanonicalLoginDestination;
-use App\Services\Identity\CanonicalSessionPolicy;
+use App\Services\Identity\CanonicalSessionIssuer;
 use App\Services\Identity\CanonicalUserResolver;
 use App\Services\Identity\FederationLoginAttempt;
 use App\Services\Identity\SessionRegistry;
@@ -39,9 +40,16 @@ final class CanonicalLoginController extends Controller
             return $attempts->requested($request) ? $attempts->complete($request) : redirect('/');
         }
 
+        if (! (bool) config('identity.local_login_enabled')) {
+            return redirect()->route('identity.redirect', $request->only('login_attempt'));
+        }
+
         return view('auth.canonical-login', [
             'loginAction' => $attempts->requested($request) ? $attempts->loginUrl($request) : route('login.store'),
             'applicationLabel' => $attempts->requested($request) ? $attempts->applicationLabel($request) : null,
+            'identityLoginUrl' => in_array(config('identity.mode'), ['hybrid', 'authentik'], true)
+                ? route('identity.redirect', $request->only('login_attempt'))
+                : null,
         ]);
     }
 
@@ -49,9 +57,9 @@ final class CanonicalLoginController extends Controller
         Request $request,
         CanonicalUserResolver $users,
         CanonicalActivationIntent $activationIntents,
-        CanonicalSessionPolicy $sessionPolicy,
-        SessionRegistry $sessions,
+        CanonicalSessionIssuer $sessionIssuer,
     ): Response {
+        abort_unless((bool) config('identity.local_login_enabled'), 404);
         $attempts = app(FederationLoginAttempt::class);
         if ($attempts->requested($request) && $attempts->current($request) === null) {
             return $attempts->unavailable();
@@ -96,7 +104,8 @@ final class CanonicalLoginController extends Controller
             return $this->denied($request, $employeeId, 'roster_status_denied');
         }
 
-        if ($employee instanceof Employee && $user === null && $passwordMatches) {
+        if ((bool) config('identity.employee_bootstrap_login_enabled')
+            && $employee instanceof Employee && $user === null && $passwordMatches) {
             RateLimiter::clear($throttleKey);
             $request->session()->regenerate();
             $activationIntents->issue($request->session(), $employee, CarbonImmutable::now());
@@ -118,24 +127,10 @@ final class CanonicalLoginController extends Controller
         assert($user instanceof User);
 
         RateLimiter::clear($throttleKey);
-        Auth::guard('web')->login($user, false);
-        $request->session()->regenerate();
-        $issuedAt = CarbonImmutable::now();
-        $policy = $sessionPolicy->resolve($request, $issuedAt);
-
         try {
-            $registered = $sessions->register(
-                $user,
-                $request->session()->getId(),
-                $policy['context_class'],
-                $issuedAt,
-                $policy['idle_expires_at'],
-                $policy['absolute_expires_at'],
-            );
+            $registeredId = $sessionIssuer->issue($request, $user);
         } catch (Throwable $exception) {
-            Auth::guard('web')->logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
+            $sessionIssuer->reject($request);
             Log::error('canonical_authentication_session_registration_failed', [
                 'user_id' => $user->id,
                 'exception_class' => $exception::class,
@@ -144,29 +139,18 @@ final class CanonicalLoginController extends Controller
             return $this->denied($request, $employeeId, 'session_registration_failed');
         }
 
-        $request->session()->put('auth.canonical_session_id', $registered->id);
-        $user->forceFill(['last_login_at' => $issuedAt])->save();
-        $request->session()->put(
-            \App\Http\Middleware\EnsureCityEmailReview::SESSION_KEY,
-            app(\App\Services\Identity\CityEmailVerificationService::class)->requiresReview($user),
-        );
-        $request->session()->put(
-            (string) config('security.recent_authentication.session_key'),
-            $issuedAt->getTimestamp(),
-        );
-
         Log::info('canonical_authentication_succeeded', [
             'user_id' => $user->id,
             'employee_profile_id' => $user->employee_profile_id,
-            'authentication_session_id' => $registered->id,
-            'context_class' => $policy['context_class']->value,
+            'authentication_session_id' => $registeredId,
+            'authentication_method' => 'local',
         ]);
 
         return $attempts->requested($request) ? $attempts->complete($request)
             : redirect(app(CanonicalLoginDestination::class)->resolve($user, $request->session()->pull('url.intended')));
     }
 
-    public function destroy(Request $request, SessionRegistry $sessions): RedirectResponse
+    public function destroy(Request $request, SessionRegistry $sessions, AuthentikOidcClient $oidc): RedirectResponse
     {
         $user = $request->user('web');
         $registryId = $request->session()->get('auth.canonical_session_id');
@@ -178,12 +162,15 @@ final class CanonicalLoginController extends Controller
             ]);
         }
 
+        $endSessionEndpoint = $request->session()->pull('auth.authentik_end_session_endpoint');
         Auth::guard('web')->logout();
         $request->session()->forget(CanonicalActivationIntent::SESSION_KEY);
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/login');
+        $endSessionUrl = is_string($endSessionEndpoint) ? $oidc->endSessionUrl($endSessionEndpoint) : null;
+
+        return $endSessionUrl !== null ? redirect()->away($endSessionUrl) : redirect('/login');
     }
 
     private function denialReason(?User $user, bool $passwordMatches): ?string

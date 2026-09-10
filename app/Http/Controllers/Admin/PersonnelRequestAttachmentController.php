@@ -13,7 +13,9 @@ class PersonnelRequestAttachmentController extends Controller
 {
     public function __invoke(PersonnelRequestAttachment $attachment): StreamedResponse
     {
-        abort_unless(auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']), 403);
+        $user = auth()->user();
+        abort_unless($user?->isAuthenticationAllowed() && $user->hasCurrentAdminPanelEntitlement()
+            && ($user->hasRole('super_admin') || $user->can('admin.personnel.view')), 403);
         abort_unless(Storage::disk($attachment->disk)->exists($attachment->storage_path), 404);
 
         return response()->streamDownload(

@@ -16,6 +16,13 @@ final class EmployeeBootstrapCredentialProvisioner
     /** @return array{password: string, must_change_password: true} */
     public function attributesForNewEmployee(): array
     {
+        if (! (bool) config('identity.employee_bootstrap_login_enabled')) {
+            return [
+                'password' => Hash::make(bin2hex(random_bytes(48))),
+                'must_change_password' => true,
+            ];
+        }
+
         return [
             'password' => Hash::make($this->secret()),
             'must_change_password' => true,
@@ -28,6 +35,10 @@ final class EmployeeBootstrapCredentialProvisioner
      */
     public function provision(array $employeeIds, bool $dryRun): array
     {
+        if (! (bool) config('identity.employee_bootstrap_login_enabled')) {
+            throw new RuntimeException('EMPLOYEE_BOOTSTRAP_LOGIN_DISABLED');
+        }
+
         $secret = $this->secret();
         $employeeIds = array_values(array_unique($employeeIds));
         sort($employeeIds, SORT_NUMERIC);

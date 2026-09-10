@@ -384,6 +384,7 @@ final class DepartmentUpdateNotificationTest extends TestCase
 
         $user = User::factory()->create([
             'account_status' => $status,
+            'employee_id' => $employee->employee_id,
             'employee_profile_id' => $employee->id,
         ]);
 

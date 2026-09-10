@@ -13,8 +13,8 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use Laravel\Sanctum\Sanctum;
 use LogicException;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -49,7 +49,10 @@ class StationRequestApiTest extends TestCase
             'password' => Hash::make('test-password-only'),
             'must_change_password' => false,
         ]);
-        $this->canonicalActor = User::factory()->create(['employee_profile_id' => $this->employee->id]);
+        $this->canonicalActor = User::factory()->create([
+            'employee_id' => $this->employee->employee_id,
+            'employee_profile_id' => $this->employee->id,
+        ]);
         $this->actingAsCanonicalUser($this->canonicalActor);
         $this->room = Room::query()->create([
             'station_id' => $this->station->id,
@@ -155,7 +158,7 @@ class StationRequestApiTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('items.0.item_name');
 
-        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+        $this->actingAsCanonicalUser($this->makeAdmin('logistics_admin'));
         $this->postJson('/api/admin/fire-equipment-requests', [
             'station_id' => $this->station->id,
             'equipment_type' => 'Radio',
@@ -276,7 +279,7 @@ class StationRequestApiTest extends TestCase
         $request = StationRequest::query()->with('items')->sole();
         $requestItem = $request->items->sole();
         $admin = $this->makeAdmin('logistics_admin');
-        Sanctum::actingAs($admin);
+        $this->actingAsCanonicalUser($admin);
 
         $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
             'status' => 'acknowledged',
@@ -327,7 +330,7 @@ class StationRequestApiTest extends TestCase
         $this->postJson('/api/public/station_request', $this->equipmentPayload())->assertCreated();
         $request = StationRequest::query()->with('items')->sole();
         $requestItem = $request->items->sole();
-        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+        $this->actingAsCanonicalUser($this->makeAdmin('logistics_admin'));
         $operation = [
             'operation' => 'create',
             'station_request_item_id' => $requestItem->id,
@@ -365,7 +368,7 @@ class StationRequestApiTest extends TestCase
         $otherPayload['client_submission_id'] = 'f0ec0e60-19f5-4379-a0b8-96b2c35a2485';
         $this->postJson('/api/public/station_request', $otherPayload)->assertCreated();
         $otherItem = StationRequest::query()->whereKeyNot($request->id)->firstOrFail()->items()->sole();
-        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+        $this->actingAsCanonicalUser($this->makeAdmin('logistics_admin'));
 
         $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
             'status' => 'completed',
@@ -386,7 +389,7 @@ class StationRequestApiTest extends TestCase
         $this->postJson('/api/public/station_request', $this->equipmentPayload())->assertCreated();
         $request = StationRequest::query()->with('items')->sole();
         $item = $request->items->sole();
-        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+        $this->actingAsCanonicalUser($this->makeAdmin('logistics_admin'));
 
         $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
             'status' => 'completed',
@@ -416,7 +419,7 @@ class StationRequestApiTest extends TestCase
         $this->postJson('/api/public/station_request', $this->equipmentPayload())->assertCreated();
         $request = StationRequest::query()->with('items')->sole();
         $item = $request->items->sole();
-        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+        $this->actingAsCanonicalUser($this->makeAdmin('logistics_admin'));
 
         $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
             'status' => 'completed',
@@ -450,7 +453,7 @@ class StationRequestApiTest extends TestCase
         $this->postJson('/api/public/station_request', $payload)->assertCreated();
         $request = StationRequest::query()->with('items')->sole();
         $item = $request->items->sole();
-        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+        $this->actingAsCanonicalUser($this->makeAdmin('logistics_admin'));
 
         $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
             'status' => 'completed',
@@ -478,7 +481,7 @@ class StationRequestApiTest extends TestCase
         $this->postJson('/api/public/station_request', $this->equipmentPayload())->assertCreated();
         $request = StationRequest::query()->sole();
         $trainingUser = $this->makeAdmin('training_admin');
-        Sanctum::actingAs($trainingUser);
+        $this->actingAsCanonicalUser($trainingUser);
 
         $this->patchJson("/api/admin/station-requests/{$request->id}/transition", [
             'status' => 'acknowledged',
@@ -495,7 +498,7 @@ class StationRequestApiTest extends TestCase
             'status' => 'denied',
         ])->assertUnauthorized();
 
-        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+        $this->actingAsCanonicalUser($this->makeAdmin('logistics_admin'));
         $this->patchJson("/api/admin/station-requests/{$denied->id}/transition", [
             'status' => 'denied',
         ])->assertOk();
@@ -506,7 +509,7 @@ class StationRequestApiTest extends TestCase
         $this->actingAsCanonicalUser($this->canonicalActor);
         $this->postJson('/api/public/station_request', $payload)->assertCreated();
         $cancelled = StationRequest::query()->where('status', 'pending')->sole();
-        Sanctum::actingAs($this->makeAdmin('logistics_admin'));
+        $this->actingAsCanonicalUser($this->makeAdmin('logistics_admin'));
         $this->patchJson("/api/admin/station-requests/{$cancelled->id}/transition", [
             'status' => 'cancelled',
         ])->assertOk();
@@ -580,6 +583,13 @@ class StationRequestApiTest extends TestCase
         $role = Role::query()->firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
         $user = User::factory()->create();
         $user->assignRole($role);
+        $user->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
+        if ($roleName === 'logistics_admin') {
+            $user->givePermissionTo([
+                Permission::findOrCreate('admin.stations.view', 'web'),
+                Permission::findOrCreate('admin.stations.manage', 'web'),
+            ]);
+        }
 
         return $user;
     }

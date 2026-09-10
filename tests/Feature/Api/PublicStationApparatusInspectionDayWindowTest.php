@@ -67,6 +67,7 @@ final class PublicStationApparatusInspectionDayWindowTest extends TestCase
         $now = CarbonImmutable::parse('2026-08-25 12:00:00', self::OPERATIONAL_TIMEZONE);
         Carbon::setTestNow($now);
         CarbonImmutable::setTestNow($now);
+        $this->actingAsCanonicalFixture('DAY-WINDOW-1');
 
         $included = $this->createInspection(
             completedAt: $this->newYorkTime('2026-08-25 00:00:00'),
@@ -99,6 +100,7 @@ final class PublicStationApparatusInspectionDayWindowTest extends TestCase
         $now = CarbonImmutable::parse('2026-08-25 12:00:00', self::OPERATIONAL_TIMEZONE);
         Carbon::setTestNow($now);
         CarbonImmutable::setTestNow($now);
+        $this->actingAsCanonicalFixture('DAY-WINDOW-2');
 
         $approved = $this->createInspection(
             completedAt: $this->newYorkTime('2026-08-25 08:00:00'),

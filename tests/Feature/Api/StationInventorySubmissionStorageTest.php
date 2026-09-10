@@ -37,6 +37,7 @@ class StationInventorySubmissionStorageTest extends TestCase
         ]);
         $user = User::factory()->create([
             'account_status' => AccountStatus::Active,
+            'employee_id' => $employee->employee_id,
             'employee_profile_id' => $employee->id,
         ]);
         $this->actingAsCanonicalUser($user);

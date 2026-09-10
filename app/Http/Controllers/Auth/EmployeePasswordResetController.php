@@ -10,7 +10,9 @@ use App\Models\User;
 use App\Rules\SafeNewPassword;
 use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Identity\AccountSecurityService;
+use App\Services\Identity\CanonicalUserProvisioner;
 use App\Services\Identity\CityEmailVerificationService;
+use App\Services\Identity\IdentityProviderService;
 use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,15 +28,20 @@ use Throwable;
 
 final class EmployeePasswordResetController extends Controller
 {
-    private const GENERIC_STATUS = 'If the Employee ID has an active linked account and a connected email address, a reset link will be sent.';
+    private const GENERIC_STATUS = 'If the Employee ID has an active linked account and an authoritative recovery address, account recovery instructions will be sent.';
 
     public function requestForm(): View
     {
         return view('auth.employee-forgot-password');
     }
 
-    public function requestLink(Request $request, CloudflareEmailDispatcher $dispatcher, CityEmailVerificationService $emails): RedirectResponse
-    {
+    public function requestLink(
+        Request $request,
+        CloudflareEmailDispatcher $dispatcher,
+        CityEmailVerificationService $emails,
+        IdentityProviderService $identities,
+        CanonicalUserProvisioner $provisioner,
+    ): RedirectResponse {
         $validated = $request->validate(['employee_id' => ['required', 'string', 'max:64']]);
         $employeeId = trim((string) $validated['employee_id']);
         $key = 'employee-password-reset:'.hash_hmac('sha256', $employeeId.'|'.$request->ip(), (string) config('app.key'));
@@ -46,8 +53,38 @@ final class EmployeePasswordResetController extends Controller
         /** @var Employee|null $employee */
         $employee = Employee::query()->where('employee_id', $employeeId)->first();
         $user = $employee?->user;
+        if (! $user instanceof User
+            && $employee instanceof Employee
+            && config('identity.mode') === 'authentik') {
+            try {
+                $user = $provisioner->create(
+                    (int) $employee->getKey(),
+                    'MISSING_OR_UNSUPPORTED',
+                    now(),
+                )['user'];
+            } catch (Throwable) {
+                $user = null;
+            }
+        }
         if ($user instanceof User) {
             try {
+                if ($identities->enabledFor($user)) {
+                    $recipient = $emails->connectedEmail($user);
+                    if ($recipient === null || ! $user->isUpstreamIdentityEnabled()) {
+                        return back()->with('status', self::GENERIC_STATUS);
+                    }
+                    $url = $identities->recoveryLink($user);
+                    $dispatcher->send(
+                        to: [$recipient],
+                        subject: 'MBFD Identity account recovery',
+                        text: "Account recovery was requested for your MBFD Identity account.\n\nContinue securely: {$url}\n\nThis one-time link expires shortly. If you did not request it, ignore this message and contact an administrator.",
+                        html: null,
+                        sourceType: 'identity_recovery',
+                        sourceId: (string) $user->getKey(),
+                    );
+
+                    return back()->with('status', self::GENERIC_STATUS);
+                }
                 $challenge = DB::transaction(function () use ($user, $emails): ?array {
                     $current = User::query()->lockForUpdate()->find($user->id);
                     if (! $current instanceof User || ! $current->isAuthenticationAllowed()

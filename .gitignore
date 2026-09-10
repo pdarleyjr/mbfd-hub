@@ -112,6 +112,7 @@ Homestead.yaml
 !/scripts/operations/*.sh
 !/infra/backup/*.sh
 !/infra/cloudflared-watchdog/*.sh
+!/infra/authentik/*.sh
 
 # ---------------------------------------------------------------------------
 # 8. Documentation with Sensitive Content

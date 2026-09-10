@@ -141,7 +141,7 @@ final class EmployeeContextualControlsTest extends TestCase
             'hub-roles', 'hub-capabilities' => 'administration',
             'ecosystem' => 'ecosystem-access',
             'workgroups' => 'workgroups-history',
-            default => 'login-recovery',
+            default => 'identity-security',
         };
         $panel = $xpath->query('ancestor::*[@role="tabpanel"]', $nodes->item(0));
         self::assertSame(1, $panel->length);

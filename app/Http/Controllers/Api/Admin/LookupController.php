@@ -37,6 +37,7 @@ use Illuminate\Support\Facades\Schema;
 class LookupController extends Controller
 {
     private const LOOKUP_LIMIT = 500;
+
     private const CACHE_TTL_SECONDS = 300;
 
     public function stations(Request $request): JsonResponse
@@ -188,7 +189,8 @@ class LookupController extends Controller
             return response()->json(['error' => 'Unauthenticated.'], 401);
         }
 
-        if (! ($user->hasAnyRole(['super_admin', 'admin']) ?? false)) {
+        if (! $user->isAuthenticationAllowed() || ! $user->hasCurrentAdminPanelEntitlement()
+            || (! $user->hasRole('super_admin') && ! $user->can('admin.system.view'))) {
             return response()->json(['error' => 'Forbidden.'], 403);
         }
 

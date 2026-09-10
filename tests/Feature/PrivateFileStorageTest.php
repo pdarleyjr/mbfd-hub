@@ -13,7 +13,7 @@ use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
-use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -99,10 +99,14 @@ class PrivateFileStorageTest extends TestCase
         $role = Role::findOrCreate('logistics_admin', 'web');
         $user = User::factory()->create();
         $user->assignRole($role);
+        $user->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.stations.view', 'web'),
+        ]);
         $station = $this->makeStation();
         $submission = $this->seedInventorySubmission($user, $station);
 
-        Sanctum::actingAs($user);
+        $this->actingAsCanonicalUser($user);
         $response = $this->get(route('download-inventory-pdf', $submission));
 
         $response->assertStatus(200);
@@ -115,7 +119,7 @@ class PrivateFileStorageTest extends TestCase
         $station = $this->makeStation();
         $submission = $this->seedInventorySubmission($user, $station);
 
-        Sanctum::actingAs($user);
+        $this->actingAsCanonicalUser($user);
 
         $this->get(route('download-inventory-pdf', $submission))->assertForbidden();
     }

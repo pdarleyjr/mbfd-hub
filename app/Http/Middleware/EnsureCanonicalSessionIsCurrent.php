@@ -25,10 +25,12 @@ final readonly class EnsureCanonicalSessionIsCurrent
             ? $request->session()->get('auth.canonical_session_id')
             : null;
 
-        // D03 has not converted legacy panel sessions yet. Only sessions
-        // explicitly issued by D01 carry this marker and are enforced here.
         if (! is_string($registryId) || $registryId === '') {
-            return $next($request);
+            if (! $request->user('web') instanceof User) {
+                return $next($request);
+            }
+
+            return $this->reject($request, null, null, 'authenticated session is not registered');
         }
 
         $authenticated = $request->user('web');
@@ -42,8 +44,17 @@ final readonly class EnsureCanonicalSessionIsCurrent
             return $next($request);
         }
 
+        return $this->reject($request, $user, $registered, 'canonical session no longer current');
+    }
+
+    private function reject(
+        Request $request,
+        ?User $user,
+        ?AuthenticationSession $registered,
+        string $reason,
+    ): Response {
         if ($user instanceof User && $registered instanceof AuthenticationSession) {
-            $this->sessions->revoke($user, $registryId, 'canonical session no longer current', CarbonImmutable::now());
+            $this->sessions->revoke($user, (string) $registered->getKey(), $reason, CarbonImmutable::now());
         }
         // Retain only this navigation's allowlisted federation GET. Invalidation
         // still discards old intended URLs, form data, and authentication state.

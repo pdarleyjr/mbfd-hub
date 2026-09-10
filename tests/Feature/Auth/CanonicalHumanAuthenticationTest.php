@@ -312,6 +312,7 @@ final class CanonicalHumanAuthenticationTest extends TestCase
 
         return User::factory()->create([
             'employee_profile_id' => $employee->id,
+            'employee_id' => $employee->employee_id,
             'account_status' => $status,
             'password' => Hash::make($password),
         ])->load('employeeProfile');

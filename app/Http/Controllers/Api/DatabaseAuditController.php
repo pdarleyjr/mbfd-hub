@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Database Audit Controller
- * 
+ *
  * Provides secure access to user and employee account data for administrative auditing.
  * Only accessible to super_admin and admin roles.
  */
@@ -23,15 +23,16 @@ class DatabaseAuditController extends Controller
     {
         $this->middleware(function ($request, $next) {
             $user = $request->user();
-            
-            if (!$user) {
+
+            if (! $user) {
                 return response()->json(['error' => 'Unauthenticated'], 401);
             }
-            
-            if (!$user->hasAnyRole(['super_admin', 'admin'])) {
+
+            if (! $user->isAuthenticationAllowed() || ! $user->hasCurrentAdminPanelEntitlement()
+                || (! $user->hasRole('super_admin') && ! $user->can('admin.system.view'))) {
                 return response()->json(['error' => 'Unauthorized - Admin access required'], 403);
             }
-            
+
             return $next($request);
         });
     }
@@ -54,7 +55,7 @@ class DatabaseAuditController extends Controller
                 'must_change_password',
                 'notification_preferences',
                 'created_at',
-                'updated_at'
+                'updated_at',
             ])
             ->orderBy('id')
             ->get()
@@ -93,14 +94,14 @@ class DatabaseAuditController extends Controller
     public function getEmployees(): JsonResponse
     {
         $employees = Employee::select([
-                'id',
-                'employee_id',
-                'name',
-                'rank',
-                'must_change_password',
-                'created_at',
-                'updated_at'
-            ])
+            'id',
+            'employee_id',
+            'name',
+            'rank',
+            'must_change_password',
+            'created_at',
+            'updated_at',
+        ])
             ->orderBy('id')
             ->get()
             ->map(function ($employee) {
@@ -141,8 +142,8 @@ class DatabaseAuditController extends Controller
 
         $grouped = [];
         foreach ($roles as $row) {
-            $roleKey = $row->role_name . ' (' . $row->role_guard . ')';
-            if (!isset($grouped[$roleKey])) {
+            $roleKey = $row->role_name.' ('.$row->role_guard.')';
+            if (! isset($grouped[$roleKey])) {
                 $grouped[$roleKey] = [
                     'id' => $row->role_id,
                     'name' => $row->role_name,
@@ -245,7 +246,7 @@ class DatabaseAuditController extends Controller
     {
         // Check for exact match
         $exactMatch = User::where('email', $email)->first();
-        
+
         // Check for case-insensitive match
         $caseInsensitiveMatch = User::whereRaw('LOWER(email) = ?', [strtolower($email)])
             ->where('email', '!=', $email)
@@ -275,7 +276,7 @@ class DatabaseAuditController extends Controller
     {
         // Check for exact match
         $exactMatch = Employee::where('employee_id', $employeeId)->first();
-        
+
         // Check for case-insensitive match (employee_id is typically numeric, but check anyway)
         $caseInsensitiveMatch = Employee::whereRaw('LOWER(employee_id::text) = ?', [strtolower($employeeId)])
             ->where('employee_id', '!=', $employeeId)

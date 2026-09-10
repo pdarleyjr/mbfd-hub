@@ -13,7 +13,7 @@ use App\Models\User;
 use App\Services\DailyCheckoutChecklistResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -596,7 +596,11 @@ class DailyCheckoutIntegrityTest extends TestCase
         $user = User::factory()->create();
         $user->assignRole($role);
 
-        Sanctum::actingAs($user);
+        $user->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.fleet.manage', 'web'),
+        ]);
+        $this->actingAsCanonicalUser($user);
 
         return $user;
     }

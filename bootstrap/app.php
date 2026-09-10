@@ -38,6 +38,8 @@ $app = Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin.role' => \App\Http\Middleware\EnsureAdminApiRole::class,
+            'admin.capability' => \App\Http\Middleware\EnsureAdminCapability::class,
+            'canonical.api' => \App\Http\Middleware\EnsureCanonicalMemberApiSession::class,
             'workgroup.access' => \App\Http\Middleware\EnsureWorkgroupPanelAccess::class,
             'workgroup.global' => \App\Http\Middleware\EnsureGlobalWorkgroupAccess::class,
             'verify.bid.reader' => \App\Http\Middleware\VerifyBidReaderToken::class,
