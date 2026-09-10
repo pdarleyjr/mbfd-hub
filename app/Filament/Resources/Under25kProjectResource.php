@@ -336,7 +336,7 @@ class Under25kProjectResource extends Resource
                         Infolists\Components\TextEntry::make('internal_notes')
                             ->columnSpanFull()
                             ->label('Internal Notes')
-                            ->visible(fn () => auth()->user()?->isAdmin ?? false),
+                            ->visible(fn () => auth()->user()->hasAnyRole(['super_admin', 'admin'])),
                     ])
                     ->columns(1),
                     

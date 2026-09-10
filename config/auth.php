@@ -44,11 +44,6 @@ return [
             'driver' => 'sanctum',
             'provider' => 'users',
         ],
-        // Employee Portal — completely separate guard using employees table
-        'employee' => [
-            'driver'   => 'session',
-            'provider' => 'employees',
-        ],
     ],
 
     /*
@@ -71,12 +66,7 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
-        ],
-        // Employee Portal provider — uses Employee model, authenticates by employee_id
-        'employees' => [
-            'driver' => 'eloquent',
-            'model'  => App\Models\Employee::class,
+            'model' => App\Models\User::class,
         ],
 
         // 'users' => [

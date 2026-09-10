@@ -81,7 +81,7 @@ class OperationalFormUploadTest extends TestCase
             ->where('form_record_id', $upload->json('record.id'))
             ->sole();
 
-        auth('employee')->logout();
+        $this->logoutCanonicalSession();
 
         $this->actingAs($other, 'employee')
             ->get('/employee/forms/api/documents/'.$document->id.'/preview')

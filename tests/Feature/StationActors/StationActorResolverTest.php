@@ -89,7 +89,7 @@ class StationActorResolverTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->actingAs($user, 'employee');
+        $this->actingAs($user);
 
         $resolver = app(StationActorResolver::class);
 
