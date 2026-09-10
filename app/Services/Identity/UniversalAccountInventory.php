@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\ApplicationAccessRegistry;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use stdClass;
 
 final readonly class UniversalAccountInventory
 {
@@ -97,7 +98,7 @@ final readonly class UniversalAccountInventory
             $linked = $profileUsers->first();
 
             return $linked instanceof User && $linked->employee_id === $employee->employee_id
-                && ($identifierUsers->isEmpty() || $identifierUsers->first()?->is($linked))
+                && ($identifierUsers->isEmpty() || $identifierUsers->first()->is($linked))
                 ? 'EXISTING_CANONICAL_USER' : 'CONFLICTING_LINK';
         }
         if ($identifierUsers->count() === 1) {
@@ -124,7 +125,7 @@ final readonly class UniversalAccountInventory
         return $identifier instanceof User ? $identifier : null;
     }
 
-    /** @param Collection<int, object> $workgroups
+    /** @param Collection<int, stdClass> $workgroups
      * @return array<string, mixed>
      */
     private function employeeRow(Employee $employee, ?User $user, string $classification, Collection $workgroups): array
@@ -139,7 +140,7 @@ final readonly class UniversalAccountInventory
         ];
     }
 
-    /** @param Collection<int, object> $workgroups
+    /** @param Collection<int, stdClass> $workgroups
      * @return array<string, mixed>
      */
     private function userRow(User $user, Collection $workgroups): array
@@ -154,7 +155,7 @@ final readonly class UniversalAccountInventory
         ];
     }
 
-    /** @param Collection<int, object> $workgroups
+    /** @param Collection<int, stdClass> $workgroups
      * @return array<string, mixed>
      */
     private function authorizationState(?User $user, Collection $workgroups): array
@@ -168,11 +169,11 @@ final readonly class UniversalAccountInventory
             ];
         }
         $applicationStates = $this->applications->states($user);
-        $allowedApplications = array_keys(array_filter($applicationStates, static fn (array $state): bool => (bool) ($state['allowed'] ?? false)));
+        $allowedApplications = array_keys(array_filter($applicationStates, static fn (array $state): bool => $state['allowed']));
         sort($allowedApplications, SORT_STRING);
         $roles = $user->roles->pluck('name')->sort()->values()->all();
         $permissions = $user->permissions->pluck('name')->sort()->values()->all();
-        $workgroupState = $workgroups->map(static fn (object $membership): array => [
+        $workgroupState = $workgroups->map(static fn (stdClass $membership): array => [
             'id' => $membership->id,
             'workgroup_id' => $membership->workgroup_id,
             'role' => $membership->role,
