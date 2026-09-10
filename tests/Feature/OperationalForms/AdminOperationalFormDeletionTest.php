@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -36,7 +37,7 @@ class AdminOperationalFormDeletionTest extends TestCase
             $admin = $this->admin($roleName);
             [$record, $document] = $this->recordWithDocument('record-'.$index);
 
-            $this->actingAs($admin, 'web')
+            $this->actingAsCanonicalUser($admin)
                 ->delete('/admin/operational-forms/records/'.$record->id)
                 ->assertNoContent();
 
@@ -56,7 +57,7 @@ class AdminOperationalFormDeletionTest extends TestCase
             'revision' => 1,
         ]);
 
-        $this->actingAs($this->admin('admin'), 'web')
+        $this->actingAsCanonicalUser($this->admin('admin'))
             ->delete('/admin/operational-forms/records/'.$draft->id)
             ->assertNoContent();
         $this->assertDatabaseMissing('operational_form_records', ['id' => $draft->id]);
@@ -67,7 +68,7 @@ class AdminOperationalFormDeletionTest extends TestCase
         [$record, $document] = $this->recordWithDocument();
         $user = User::factory()->create();
 
-        $this->actingAs($user, 'web')
+        $this->actingAsCanonicalUser($user)
             ->delete('/admin/operational-forms/records/'.$record->id)
             ->assertForbidden();
         $this->delete('/admin/operational-forms/documents/'.$document->id)
@@ -84,7 +85,7 @@ class AdminOperationalFormDeletionTest extends TestCase
         $second = $this->document($record, 2);
         $record->update(['latest_pdf_version' => 2, 'status' => 'completed', 'completed_at' => now()]);
 
-        $this->actingAs($admin, 'web')
+        $this->actingAsCanonicalUser($admin)
             ->delete('/admin/operational-forms/documents/'.$second->id)
             ->assertNoContent();
 
@@ -161,6 +162,10 @@ class AdminOperationalFormDeletionTest extends TestCase
         $role = Role::query()->firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
         $user = User::factory()->create();
         $user->assignRole($role);
+        $user->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.forms.manage', 'web'),
+        ]);
 
         return $user;
     }

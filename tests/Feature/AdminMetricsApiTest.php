@@ -7,7 +7,7 @@ use App\Models\ApparatusInspection;
 use App\Models\Station;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -181,8 +181,14 @@ class AdminMetricsApiTest extends TestCase
         $role = Role::create(['name' => 'admin', 'guard_name' => 'web']);
         $user = User::factory()->create();
         $user->assignRole($role);
+        $user->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.system.view', 'web'),
+        ]);
+        self::assertTrue($user->fresh()->hasCurrentAdminPanelEntitlement());
+        self::assertTrue($user->fresh()->hasPermissionTo('admin.system.view', 'web'));
 
-        Sanctum::actingAs($user);
+        $this->actingAsCanonicalUser($user);
 
         return $user;
     }

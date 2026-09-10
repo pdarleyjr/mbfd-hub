@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Admin\OperationalFormDeletionController;
 use App\Http\Controllers\Admin\OperationalFormDocumentController;
 use App\Http\Controllers\Admin\PersonnelRequestAttachmentController as AdminPersonnelRequestAttachmentController;
@@ -8,6 +9,7 @@ use App\Http\Controllers\Admin\VideoConferenceHealthController;
 use App\Http\Controllers\Api\Bid\AuthorizationController as BidAuthorizationController;
 use App\Http\Controllers\Api\MediaControl\AuthorizationController as MediaControlAuthorizationController;
 use App\Http\Controllers\Api\StationInventoryController;
+use App\Http\Controllers\Auth\AuthentikLoginController;
 use App\Http\Controllers\Auth\CanonicalLoginController;
 use App\Http\Controllers\Auth\CityEmailController;
 use App\Http\Controllers\Auth\EmployeePasswordResetController;
@@ -51,7 +53,6 @@ use App\Http\Controllers\Webhooks\LiveKitWebhookController;
 use App\Http\Controllers\Workgroup\FileDownloadController;
 use App\Http\Controllers\Workgroup\WorkgroupReportController;
 use App\Http\Middleware\EnsureEmployeeAuthenticated;
-use App\Http\Middleware\EnsureVideoConferenceHealthAccess;
 use App\Http\Middleware\PreventPreviousUrlStorage;
 use App\Support\Workgroups\WorkgroupReportSessionResolver;
 use Illuminate\Http\Request;
@@ -60,6 +61,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', HomeController::class)->middleware('auth:web');
 
 Route::middleware('auth:web')->group(function (): void {
+    Route::get('/account', AccountController::class)->name('account.show');
     Route::get('/updates', [DepartmentUpdateController::class, 'index'])->name('updates.index');
     Route::get('/updates/{departmentUpdate}/image', [DepartmentUpdateController::class, 'image'])->name('updates.image');
     Route::get('/updates/{departmentUpdate}/attachment', [DepartmentUpdateController::class, 'attachment'])->name('updates.attachment');
@@ -88,6 +90,12 @@ Route::post('/_csp-report', [\App\Http\Controllers\CspReportController::class, '
 // generic guest middleware would discard that context and redirect to Hub home.
 Route::get('/login', [CanonicalLoginController::class, 'create'])->name('login');
 Route::post('/login', [CanonicalLoginController::class, 'store'])->name('login.store');
+Route::get('/auth/identity', [AuthentikLoginController::class, 'redirect'])
+    ->middleware('throttle:30,1')
+    ->name('identity.redirect');
+Route::get('/auth/identity/callback', [AuthentikLoginController::class, 'callback'])
+    ->middleware('throttle:30,1')
+    ->name('identity.callback');
 Route::middleware('guest:web')->group(function (): void {
     Route::get('/activate-account', [FirstLoginCanonicalizationController::class, 'create'])
         ->name('activate-account.create');
@@ -201,11 +209,11 @@ Route::prefix('employee')
     });
 
 Route::get('/admin/video-conferencing/health', VideoConferenceHealthController::class)
-    ->middleware(['auth:web', EnsureVideoConferenceHealthAccess::class, 'throttle:30,1'])
+    ->middleware(['auth:web', 'admin.capability:admin.system.view', 'throttle:30,1'])
     ->name('admin.video-conferencing.health');
 
 Route::get('/admin/personnel-request-attachments/{attachment}', AdminPersonnelRequestAttachmentController::class)
-    ->middleware(['auth:web', 'throttle:30,1'])
+    ->middleware(['auth:web', 'admin.capability:admin.personnel.view', 'throttle:30,1'])
     ->name('admin.personnel-request-attachments.download');
 
 Route::prefix('employee/forms/api')
@@ -248,16 +256,19 @@ Route::prefix('employee/forms/api')
     });
 
 Route::prefix('admin/operational-forms/documents')
-    ->middleware('auth:web')
+    ->middleware(['auth:web', 'admin.capability:admin.forms.view'])
     ->name('admin.operational-forms.documents.')
     ->group(function (): void {
         Route::get('/{document}/preview', [OperationalFormDocumentController::class, 'preview'])->name('preview');
         Route::get('/{document}/download', [OperationalFormDocumentController::class, 'download'])->name('download');
-        Route::delete('/{document}', [OperationalFormDeletionController::class, 'document'])->name('destroy');
     });
 
+Route::delete('/admin/operational-forms/documents/{document}', [OperationalFormDeletionController::class, 'document'])
+    ->middleware(['auth:web', 'admin.capability:admin.forms.manage'])
+    ->name('admin.operational-forms.documents.destroy');
+
 Route::delete('/admin/operational-forms/records/{record}', [OperationalFormDeletionController::class, 'record'])
-    ->middleware('auth:web')
+    ->middleware(['auth:web', 'admin.capability:admin.forms.manage'])
     ->name('admin.operational-forms.records.destroy');
 
 Route::view('/pump-simulator', 'pump-simulator')
@@ -337,7 +348,7 @@ Route::get('/__version', function () {
 // Station Inventory PDF Download
 Route::get('/inventory-pdf/{submission}', [StationInventoryController::class, 'downloadPdf'])
     ->name('download-inventory-pdf')
-    ->middleware(['auth', 'admin.role:super_admin,admin,logistics_admin']);
+    ->middleware(['auth', 'admin.capability:admin.stations.view']);
 
 // Workgroup File Downloads & Preview
 Route::get('/workgroup/file/{file}/download', [FileDownloadController::class, 'downloadFile'])

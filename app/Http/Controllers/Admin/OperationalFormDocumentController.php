@@ -31,7 +31,9 @@ class OperationalFormDocumentController extends Controller
 
     private function authorizeAdmin(Request $request): void
     {
-        abort_unless($request->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']), 403);
+        $user = $request->user();
+        abort_unless($user?->isAuthenticationAllowed() && $user->hasCurrentAdminPanelEntitlement()
+            && ($user->hasRole('super_admin') || $user->can('admin.forms.view')), 403);
     }
 
     private function audit(Request $request, OperationalFormDocument $document, string $event): void

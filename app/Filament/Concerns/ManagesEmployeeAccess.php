@@ -80,8 +80,10 @@ trait ManagesEmployeeAccess
         $actions = [];
         foreach ([
             'resetPassword' => ['Issue temporary password', AccountSecurityAction::AdministrativeRecovery, 'resetPassword'],
+            'sendIdentityRecovery' => ['Send MBFD Identity activation / recovery', AccountSecurityAction::AdministrativeRecovery, 'sendIdentityRecovery'],
             'forcePasswordChange' => ['Require password change', AccountSecurityAction::ForcePasswordChange, 'forcePasswordChange'],
             'revokeSessions' => ['Revoke sessions', AccountSecurityAction::RevokeSessions, 'revokeSessions'],
+            'resetMfa' => ['Reset MFA / passkeys', AccountSecurityAction::ResetSecurityState, 'resetMfa'],
             'disableAccount' => ['Disable account', AccountSecurityAction::Disable, 'disable'],
             'enableAccount' => ['Enable account', AccountSecurityAction::Enable, 'enable'],
         ] as $name => [$label, $permission, $method]) {
@@ -96,6 +98,9 @@ trait ManagesEmployeeAccess
                     return match ($method) {
                         'disable' => $target->getRawOriginal('account_status') !== 'disabled',
                         'enable' => $target->getRawOriginal('account_status') === 'disabled',
+                        'resetPassword', 'forcePasswordChange' => ! $target->identityLinks()->where('provider', 'authentik')->exists(),
+                        'sendIdentityRecovery' => app(\App\Services\Identity\IdentityProviderService::class)->enabledFor($target),
+                        'resetMfa' => $target->identityLinks()->where('provider', 'authentik')->exists(),
                         default => true,
                     };
                 })
@@ -104,6 +109,8 @@ trait ManagesEmployeeAccess
                     $service = app(AccountSecurityService::class);
                     if ($method === 'resetPassword') {
                         $service->resetPassword($this->actor(), $this->targetAccount(), $data['temporary_password'], $data['reason'], now(), $data['current_password']);
+                    } elseif ($method === 'sendIdentityRecovery') {
+                        $service->sendIdentityRecovery($this->actor(), $this->targetAccount(), $data['reason'], $data['current_password']);
                     } else {
                         $service->$method($this->actor(), $this->targetAccount(), $data['reason'], now(), $data['current_password']);
                     }

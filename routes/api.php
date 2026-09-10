@@ -34,17 +34,17 @@ Route::post('/v2/email/inbound', \App\Http\Controllers\Api\InboundEmailControlle
     ->name('api.v2.email.inbound');
 
 Route::get('/me/context', AuthenticatedMemberContextController::class)
-    ->middleware(['auth:sanctum', 'throttle:120,1'])
+    ->middleware(['auth:sanctum', 'canonical.api', 'throttle:120,1'])
     ->name('api.me.context');
 
 Route::get('/user', function (Request $request) {
     return $request->user();
-})->middleware('auth:sanctum');
+})->middleware(['auth:sanctum', 'canonical.api']);
 
 // =========================================================================
 // Database Audit Routes (Admin only - requires authentication)
 // =========================================================================
-Route::prefix('admin/audit')->middleware(['web', 'auth', 'admin.role:super_admin,admin', 'throttle:30,1'])->group(function () {
+Route::prefix('admin/audit')->middleware(['web', 'auth', 'admin.capability:admin.system.view', 'throttle:30,1'])->group(function () {
     Route::get('/users', [DatabaseAuditController::class, 'getUsers']);
     Route::get('/employees', [DatabaseAuditController::class, 'getEmployees']);
     Route::get('/roles', [DatabaseAuditController::class, 'getRolesAndPermissions']);
@@ -53,13 +53,13 @@ Route::prefix('admin/audit')->middleware(['web', 'auth', 'admin.role:super_admin
     Route::get('/check-employee-id/{employeeId}', [DatabaseAuditController::class, 'checkEmployeeIdCase']);
 });
 
-Route::prefix('public')->middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:60,1'])->group(function () {
     Route::get('apparatuses', [ApparatusController::class, 'index']);
     Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class, 'checklist']);
-    Route::post('apparatuses/{apparatus}/inspection-sessions', [ApparatusController::class, 'startInspectionSession'])->middleware(['auth:sanctum', 'throttle:30,1']);
-    Route::post('apparatuses/{apparatus}/inspection-sessions/{session}/abandon', [ApparatusController::class, 'abandonInspectionSession'])->middleware(['auth:sanctum', 'throttle:30,1']);
+    Route::post('apparatuses/{apparatus}/inspection-sessions', [ApparatusController::class, 'startInspectionSession'])->middleware(['throttle:30,1']);
+    Route::post('apparatuses/{apparatus}/inspection-sessions/{session}/abandon', [ApparatusController::class, 'abandonInspectionSession'])->middleware(['throttle:30,1']);
     Route::get('apparatuses/{apparatus}/service-notices', [PublicApparatusServiceTicketController::class, 'apparatusNotices']);
-    Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection'])->middleware('auth:sanctum');
+    Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
     Route::get('employees/list', [ApparatusController::class, 'employees']);
 
     // Public Station Routes for Daily Checkout SPA
@@ -113,12 +113,12 @@ Route::prefix('display')->middleware(['display.token', 'display.readonly', 'thro
 
 // The support worker can answer from admin-managed knowledge-base documents.
 // Require a canonical member session even though the legacy URL contains /public/.
-Route::prefix('public')->middleware(['auth:sanctum', 'throttle:10,1'])->group(function () {
+Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:10,1'])->group(function () {
     Route::post('support-chat', [SupportChatProxyController::class, 'chat']);
 });
 
 // Daily public-path submissions require a canonical member session.
-Route::prefix('public')->middleware(['auth:sanctum', 'throttle:10,1'])->group(function () {
+Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:10,1'])->group(function () {
     Route::post('station_inspection', [StationInspectionController::class, 'storePublic']);
     Route::post('fire_equipment_request', [FireEquipmentRequestController::class, 'storePublic']);
     Route::post('station_request', [PublicStationRequestController::class, 'store']);
@@ -130,12 +130,12 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
 });
 
 // TRT public-path write requires a canonical member session.
-Route::prefix('public')->middleware(['auth:sanctum', 'throttle:10,1'])->group(function () {
+Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:10,1'])->group(function () {
     Route::post('trt-inventory/submit', [TrtInventoryController::class, 'submit']);
 });
 
 // TRT Trailer Inventory (admin)
-Route::prefix('admin/trt-inventory')->middleware(['web', 'auth', 'admin.role:super_admin,admin,logistics_admin'])->group(function () {
+Route::prefix('admin/trt-inventory')->middleware(['web', 'auth', 'admin.capability:admin.equipment.view'])->group(function () {
     Route::get('sessions', [TrtInventoryController::class, 'sessions']);
     Route::get('sessions/{id}', [TrtInventoryController::class, 'sessionDetail']);
 });
@@ -151,10 +151,10 @@ Route::middleware(['web', 'auth', 'throttle:10,1'])->group(function () {
 
 // Admin lookup endpoints — powers the desktop-PWA Dexie prefetch + future typeahead.
 // Uses the Filament admin cookie session (web + auth) so the installed PWA
-// authenticates identically to the browser admin. Role check via admin.role
-// middleware AND inline in LookupController (defense-in-depth). Rate limited
+// authenticates identically to the browser admin. Canonical entitlement and
+// scoped capability are enforced at the route and controller boundaries.
 // at 60 req/min per IP to bound abuse if a token leaks.
-Route::middleware(['web', PreventPreviousUrlStorage::class, 'auth', 'admin.role:super_admin,admin', 'throttle:60,1'])
+Route::middleware(['web', PreventPreviousUrlStorage::class, 'auth', 'admin.capability:admin.system.view', 'throttle:60,1'])
     ->prefix('admin/lookups')
     ->group(function () {
         Route::get('stations', [\App\Http\Controllers\Api\Admin\LookupController::class, 'stations']);
@@ -162,59 +162,63 @@ Route::middleware(['web', PreventPreviousUrlStorage::class, 'auth', 'admin.role:
         Route::get('personnel', [\App\Http\Controllers\Api\Admin\LookupController::class, 'personnel']);
     });
 
-Route::prefix('admin')->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:60,1'])->group(function () {
-    Route::get('metrics', [AdminMetricsController::class, 'index']);
-    Route::get('smart-updates', [SmartUpdatesController::class, 'index'])->name('api.smart-updates');
-    Route::get('station-requests', [AdminStationRequestController::class, 'index']);
-    Route::get('station-requests/{stationRequest}', [AdminStationRequestController::class, 'show']);
-    Route::patch('station-requests/{stationRequest}/transition', [AdminStationRequestController::class, 'transition']);
-
-    // NEW: Inventory Chat Assistant
-    Route::post('ai/inventory-chat', [InventoryChatController::class, 'chat']);
-    Route::post('ai/inventory-execute', [InventoryChatController::class, 'executeAction']);
-
-    // NEW: Station Management Routes
-    Route::apiResource('stations', \App\Http\Controllers\Api\StationController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
-    Route::get('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class, 'rooms']);
-    Route::post('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class, 'storeRoom']);
-    Route::get('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class, 'roomAssets']);
-    Route::post('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class, 'storeRoomAsset']);
-    Route::get('stations/{station}/rooms/{room}/audits', [\App\Http\Controllers\Api\StationController::class, 'roomAudits']);
-    Route::post('stations/{station}/rooms/{room}/audits', [\App\Http\Controllers\Api\StationController::class, 'storeRoomAudit']);
-    Route::post('stations/{station}/rooms/{room}/audits/{audit}/complete', [\App\Http\Controllers\Api\StationController::class, 'completeAudit']);
-    Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class, 'apparatus']);
-    Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class, 'projects']);
-
-    // Phase 5: Fire Equipment Requests & Station Inspections
-    Route::apiResource('fire-equipment-requests', FireEquipmentRequestController::class);
-    Route::apiResource('station-inspections', StationInspectionController::class);
-
+Route::prefix('admin')->middleware(['auth:sanctum', 'canonical.api', 'throttle:60,1'])->group(function () {
+    Route::middleware('admin.capability:admin.system.view')->group(function (): void {
+        Route::get('metrics', [AdminMetricsController::class, 'index']);
+        Route::get('smart-updates', [SmartUpdatesController::class, 'index'])->name('api.smart-updates');
+    });
+    Route::middleware('admin.capability:admin.stations.view')->group(function (): void {
+        Route::get('station-requests', [AdminStationRequestController::class, 'index']);
+        Route::get('station-requests/{stationRequest}', [AdminStationRequestController::class, 'show']);
+        Route::apiResource('stations', \App\Http\Controllers\Api\StationController::class)->only(['index', 'show']);
+        Route::get('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class, 'rooms']);
+        Route::get('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class, 'roomAssets']);
+        Route::get('stations/{station}/rooms/{room}/audits', [\App\Http\Controllers\Api\StationController::class, 'roomAudits']);
+        Route::get('stations/{station}/apparatus', [\App\Http\Controllers\Api\StationController::class, 'apparatus']);
+        Route::get('stations/{station}/projects', [\App\Http\Controllers\Api\StationController::class, 'projects']);
+        Route::apiResource('fire-equipment-requests', FireEquipmentRequestController::class)->only(['index', 'show']);
+        Route::apiResource('station-inspections', StationInspectionController::class)->only(['index', 'show']);
+    });
+    Route::middleware('admin.capability:admin.stations.manage')->group(function (): void {
+        Route::patch('station-requests/{stationRequest}/transition', [AdminStationRequestController::class, 'transition']);
+        Route::apiResource('stations', \App\Http\Controllers\Api\StationController::class)->only(['store', 'update', 'destroy']);
+        Route::post('stations/{station}/rooms', [\App\Http\Controllers\Api\StationController::class, 'storeRoom']);
+        Route::post('stations/{station}/rooms/{room}/assets', [\App\Http\Controllers\Api\StationController::class, 'storeRoomAsset']);
+        Route::post('stations/{station}/rooms/{room}/audits', [\App\Http\Controllers\Api\StationController::class, 'storeRoomAudit']);
+        Route::post('stations/{station}/rooms/{room}/audits/{audit}/complete', [\App\Http\Controllers\Api\StationController::class, 'completeAudit']);
+        Route::apiResource('fire-equipment-requests', FireEquipmentRequestController::class)->only(['store', 'update', 'destroy']);
+        Route::apiResource('station-inspections', StationInspectionController::class)->only(['store', 'update', 'destroy']);
+    });
+    Route::middleware('admin.capability:admin.equipment.manage')->group(function (): void {
+        Route::post('ai/inventory-chat', [InventoryChatController::class, 'chat']);
+        Route::post('ai/inventory-execute', [InventoryChatController::class, 'executeAction']);
+    });
 });
 
 // Big Ticket Requests
 Route::middleware('throttle:60,1')->group(function () {
-    Route::post('/big-ticket-requests', [BigTicketRequestController::class, 'store'])->middleware('auth:sanctum');
+    Route::post('/big-ticket-requests', [BigTicketRequestController::class, 'store'])->middleware(['auth:sanctum', 'canonical.api']);
 
     // Station Inventory (v1 - legacy)
     Route::get('/station-inventory/categories', [StationInventoryController::class, 'categories']);
-    Route::post('/station-inventory-submissions', [StationInventoryController::class, 'store'])->middleware('auth:sanctum');
+    Route::post('/station-inventory-submissions', [StationInventoryController::class, 'store'])->middleware(['auth:sanctum', 'canonical.api']);
 });
 
-Route::middleware(['web', 'auth', 'admin.role:super_admin,admin,logistics_admin', 'throttle:60,1'])->group(function () {
+Route::middleware(['web', 'auth', 'admin.capability:admin.stations.view', 'throttle:60,1'])->group(function () {
     Route::get('/stations/{station}/big-ticket-requests', [BigTicketRequestController::class, 'index']);
     Route::get('/stations/{station}/station-inventory-submissions', [StationInventoryController::class, 'index']);
     Route::get('/station-inventory-submissions/{submission}/pdf', [StationInventoryController::class, 'downloadPdf']);
 });
 
 Route::delete('/big-ticket-requests/{bigTicketRequest}', [BigTicketRequestController::class, 'destroy'])
-    ->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:30,1']);
+    ->middleware(['auth:sanctum', 'canonical.api', 'admin.capability:admin.stations.manage', 'throttle:30,1']);
 
 // SECURITY (H-01): approving a pending-review apparatus inspection is the only
 // path that may flip an apparatus Out of Service. Authenticated + authorized only.
 Route::post('/apparatus-inspections/{inspection}/approve', [ApparatusController::class, 'approveInspection'])
-    ->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:30,1']);
+    ->middleware(['auth:sanctum', 'canonical.api', 'admin.capability:admin.fleet.manage', 'throttle:30,1']);
 Route::post('/apparatus-inspections/{inspection}/reject', [ApparatusController::class, 'rejectInspection'])
-    ->middleware(['auth:sanctum', 'admin.role:super_admin,admin,logistics_admin', 'throttle:30,1']);
+    ->middleware(['auth:sanctum', 'canonical.api', 'admin.capability:admin.fleet.manage', 'throttle:30,1']);
 
 // Station Inventory V2 (PIN-protected, real-time inventory management)
 // =========================================================================
@@ -254,7 +258,7 @@ Route::post('/v2/media-control/auth/cloud-access', \App\Http\Controllers\Api\Med
 
 Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
     // PIN verification endpoint (public)
-    Route::post('/station-inventory/verify-pin', [StationInventoryV2Controller::class, 'verifyPin'])->middleware('auth:sanctum');
+    Route::post('/station-inventory/verify-pin', [StationInventoryV2Controller::class, 'verifyPin'])->middleware(['auth:sanctum', 'canonical.api']);
 
     // Every protected endpoint validates the PIN-issued base URL in the shared
     // guard. Nested operations reuse that signature, so Laravel's exact-URL
@@ -265,12 +269,12 @@ Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
             ->name('access');
 
         // Update item count
-        Route::put('/station-inventory/{stationId}/item/{itemId}', [StationInventoryV2Controller::class, 'updateItem'])->middleware('auth:sanctum');
+        Route::put('/station-inventory/{stationId}/item/{itemId}', [StationInventoryV2Controller::class, 'updateItem'])->middleware(['auth:sanctum', 'canonical.api']);
 
         // Supply requests
         Route::get('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'getSupplyRequests'])
             ->name('supply-requests');
-        Route::post('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'createSupplyRequest'])->middleware('auth:sanctum');
+        Route::post('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'createSupplyRequest'])->middleware(['auth:sanctum', 'canonical.api']);
     });
 });
 

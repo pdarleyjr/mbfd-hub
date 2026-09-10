@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\AccountStatus;
 use App\Support\Workgroups\WorkgroupAccess;
+use DateTimeInterface;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -22,6 +23,18 @@ class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, HasPushSubscriptions, HasRoles, Notifiable;
+
+    /**
+     * Hub users authenticate through canonical browser sessions or the
+     * dedicated federation protocols. General-purpose Sanctum PAT issuance is
+     * deliberately unavailable.
+     *
+     * @param  list<string>  $abilities
+     */
+    public function createToken(string $name, array $abilities = ['*'], ?DateTimeInterface $expiresAt = null): never
+    {
+        throw new \LogicException('Personal access token issuance is disabled for Hub users.');
+    }
 
     public const NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS = 'vehicle_inspections';
 
@@ -153,7 +166,13 @@ class User extends Authenticatable implements FilamentUser
                 return;
             }
             $employee = Employee::query()->find($user->employee_profile_id);
-            if ($employee === null || $employee->employee_id !== $user->employee_id) {
+            if ($employee === null) {
+                return;
+            }
+            if ($user->employee_id === null && (! $user->exists || $user->isDirty('employee_profile_id'))) {
+                $user->employee_id = $employee->employee_id;
+            }
+            if ($employee->employee_id !== $user->employee_id) {
                 return;
             }
             foreach (Employee::PROFILE_FIELDS as $field) {
@@ -173,7 +192,38 @@ class User extends Authenticatable implements FilamentUser
 
     public function isAuthenticationAllowed(): bool
     {
-        return $this->getRawOriginal('account_status') === AccountStatus::Active->value;
+        if ($this->getRawOriginal('account_status') !== AccountStatus::Active->value) {
+            return false;
+        }
+
+        if ($this->employee_profile_id === null) {
+            return true;
+        }
+
+        return $this->hasCurrentPersonnelIdentity();
+    }
+
+    public function isUpstreamIdentityEnabled(): bool
+    {
+        if (! in_array($this->getRawOriginal('account_status'), [
+            AccountStatus::Active->value,
+            AccountStatus::PendingActivation->value,
+        ], true) || $this->employee_profile_id === null) {
+            return false;
+        }
+
+        return $this->hasCurrentPersonnelIdentity();
+    }
+
+    private function hasCurrentPersonnelIdentity(): bool
+    {
+        return Employee::query()
+            ->whereKey($this->employee_profile_id)
+            ->where('employee_id', $this->employee_id)
+            ->where(function ($query): void {
+                $query->whereNull('roster_status')->orWhere('roster_status', '!=', 'departed');
+            })
+            ->exists();
     }
 
     public function getAttribute($key)
@@ -203,6 +253,18 @@ class User extends Authenticatable implements FilamentUser
     public function authenticationSessions(): HasMany
     {
         return $this->hasMany(AuthenticationSession::class);
+    }
+
+    /** @return HasMany<UserIdentityLink, $this> */
+    public function identityLinks(): HasMany
+    {
+        return $this->hasMany(UserIdentityLink::class);
+    }
+
+    /** @return HasMany<IdentitySynchronization, $this> */
+    public function identitySynchronizations(): HasMany
+    {
+        return $this->hasMany(IdentitySynchronization::class);
     }
 
     /** @return HasMany<PersistentLoginCredential, $this> */
@@ -309,6 +371,10 @@ class User extends Authenticatable implements FilamentUser
      */
     public function canAccessPanel(Panel $panel): bool
     {
+        if (! $this->isAuthenticationAllowed()) {
+            return false;
+        }
+
         if ($panel->getId() === 'employee') {
             return $this->employeeProfile()->exists();
         }

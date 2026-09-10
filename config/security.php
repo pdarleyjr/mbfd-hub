@@ -19,6 +19,7 @@ return [
             'administrative_recovery',
             'force_password_change',
             'revoke_sessions',
+            'reset_security_state',
             'disable',
             'enable',
         ],

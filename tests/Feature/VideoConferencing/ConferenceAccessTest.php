@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Mockery;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\Fakes\FakeConferenceProvider;
 use Tests\TestCase;
@@ -173,17 +174,21 @@ class ConferenceAccessTest extends TestCase
         $this->app->instance(ConferenceProvider::class, $provider);
 
         $this->getJson('/admin/video-conferencing/health')->assertUnauthorized();
-        $this->actingAs(User::factory()->create(), 'web')
+        $this->actingAsCanonicalUser(User::factory()->create())
             ->getJson('/admin/video-conferencing/health')
             ->assertForbidden();
         $trainingUser = User::factory()->create();
         $trainingUser->assignRole(Role::findOrCreate('training_admin', 'web'));
-        $this->actingAs($trainingUser, 'web')
+        $this->actingAsCanonicalUser($trainingUser)
             ->getJson('/admin/video-conferencing/health')
             ->assertForbidden();
         $admin = User::factory()->create();
         $admin->assignRole(Role::findOrCreate('admin', 'web'));
-        $this->actingAs($admin, 'web')
+        $admin->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.system.view', 'web'),
+        ]);
+        $this->actingAsCanonicalUser($admin)
             ->getJson('/admin/video-conferencing/health')
             ->assertOk()
             ->assertJsonPath('status', 'disabled');
@@ -215,7 +220,11 @@ class ConferenceAccessTest extends TestCase
 
         $admin = User::factory()->create();
         $admin->assignRole(Role::findOrCreate('admin', 'web'));
-        $this->actingAs($admin, 'web')
+        $admin->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.system.view', 'web'),
+        ]);
+        $this->actingAsCanonicalUser($admin)
             ->getJson('/admin/video-conferencing/health')
             ->assertOk()
             ->assertJsonPath('status', 'degraded')

@@ -19,7 +19,11 @@ class HomeNavigationTest extends TestCase
         $this->withoutVite();
         $user = $this->actingAsCanonicalFixture();
         $user->assignRole(Role::findOrCreate('admin', 'web'));
-        $user->givePermissionTo(Permission::findOrCreate('app.media_control.access', 'web'));
+        $user->givePermissionTo([
+            Permission::findOrCreate('app.media_control.access', 'web'),
+            Permission::findOrCreate('admin.workgroups.view', 'web'),
+        ]);
+        config(['services.media_control.authorization.service_token' => 'test-media-control-token']);
 
         $response = $this->get('/');
 

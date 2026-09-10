@@ -1,0 +1,18 @@
+[Unit]
+Description=MBFD authentik identity provider
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/mbfd/authentik
+EnvironmentFile=/etc/mbfd/authentik.env
+ExecStart=/usr/bin/docker compose -f compose.yaml up -d --remove-orphans
+ExecStartPost=/opt/mbfd/authentik/healthcheck.sh
+ExecStop=/usr/bin/docker compose -f compose.yaml down
+TimeoutStartSec=10min
+
+[Install]
+WantedBy=multi-user.target

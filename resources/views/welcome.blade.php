@@ -22,6 +22,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         body { font-family: 'Source Sans 3', system-ui, sans-serif; }
+        [x-cloak] { display: none !important; }
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes incidentIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
@@ -61,10 +62,12 @@
 <body class="antialiased bg-neutral-50 text-neutral-800 min-h-screen">
     @php
         $currentUser = auth('web')->user();
-        $showAdminPanel = $currentUser instanceof \App\Models\User
-            && $currentUser->hasCurrentAdminPanelEntitlement();
-        $showMediaControl = $currentUser instanceof \App\Models\User
-            && $currentUser->hasCurrentMediaControlEntitlement();
+        $showAdminPanel = $applicationStates['admin']['allowed'] ?? false;
+        $showMediaControl = $applicationStates['media_control']['allowed'] ?? false;
+        $showEmployeePortal = $currentUser instanceof \App\Models\User
+            && $currentUser->employeeProfile()->exists();
+        $showWorkgroups = $currentUser instanceof \App\Models\User
+            && app(\App\Support\Workgroups\WorkgroupAccess::class)->canEnterPanel($currentUser);
         $quickAccessItems = [
             [
                 'title' => 'Station / Vehicles / Equipment',
@@ -78,7 +81,7 @@
                 'hoverIcon' => 'group-hover:text-purple-500',
                 'icon' => 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2m-6 9 2 2 4-4',
                 'external' => false,
-                'visible' => true,
+                'visible' => $showEmployeePortal,
             ],
             [
                 'title' => 'Employee Portal',
@@ -92,7 +95,7 @@
                 'hoverIcon' => 'group-hover:text-emerald-500',
                 'icon' => 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7Z',
                 'external' => false,
-                'visible' => true,
+                'visible' => $showEmployeePortal,
             ],
             [
                 'title' => 'ICS Forms',
@@ -106,7 +109,7 @@
                 'hoverIcon' => 'group-hover:text-blue-500',
                 'icon' => 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2m-6 0a3 3 0 0 1 6 0m-6 0a3 3 0 0 0 6 0M9 12h6m-6 4h4',
                 'external' => false,
-                'visible' => true,
+                'visible' => $showEmployeePortal,
             ],
             [
                 'title' => 'Workgroup Dashboard',
@@ -120,7 +123,7 @@
                 'hoverIcon' => 'group-hover:text-indigo-500',
                 'icon' => 'M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2Zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2Z',
                 'external' => false,
-                'visible' => true,
+                'visible' => $showWorkgroups,
             ],
             [
                 'title' => 'Pump Panel',
@@ -179,13 +182,25 @@
         </div>
 
         <!-- Right: Utility Actions -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2" x-data="{ accountOpen: false }" @keydown.escape.window="accountOpen = false">
             @if($showAdminPanel)
                 <a href="{{ url('/admin') }}" data-important-target class="min-h-[44px] px-3 sm:px-4 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 transition-colors flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065Z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"></path></svg>
                     <span>Admin Panel</span>
                 </a>
             @endif
+            <div class="relative">
+                <button type="button" @click="accountOpen = !accountOpen" :aria-expanded="accountOpen.toString()" aria-haspopup="menu" class="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-white hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-red-700" aria-hidden="true">{{ strtoupper(substr((string) $currentUser?->name, 0, 1)) }}</span>
+                    <span class="hidden max-w-40 truncate sm:inline">{{ $currentUser?->display_name ?: $currentUser?->name }}</span>
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7"/></svg>
+                </button>
+                <div x-cloak x-show="accountOpen" @click.outside="accountOpen = false" role="menu" class="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl border border-neutral-200 bg-white py-1 text-neutral-900 shadow-xl">
+                    <div class="border-b border-neutral-100 px-4 py-3"><p class="text-xs font-bold uppercase tracking-wide text-red-800">MBFD Identity</p><p class="mt-1 truncate text-sm text-neutral-600">Employee ID {{ $currentUser?->employee_id ?: 'not linked' }}</p></div>
+                    <a role="menuitem" href="{{ route('account.show') }}" class="flex min-h-11 items-center px-4 py-2 text-sm font-semibold hover:bg-neutral-50 focus:bg-neutral-50 focus:outline-none">My account</a>
+                    <form method="POST" action="{{ route('logout') }}">@csrf<button role="menuitem" type="submit" class="flex min-h-11 w-full items-center px-4 py-2 text-left text-sm font-semibold text-red-800 hover:bg-red-50 focus:bg-red-50 focus:outline-none">Sign out</button></form>
+                </div>
+            </div>
         </div>
     </header>
 

@@ -201,6 +201,11 @@ final class AccountSecurityService
         app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($user);
         app(\App\Services\Cloud\NextcloudAccountSynchronizer::class)->request($user);
 
+        DB::table('personal_access_tokens')
+            ->where('tokenable_type', User::class)
+            ->where('tokenable_id', $user->id)
+            ->delete();
+
         AuthenticationSession::query()
             ->where('user_id', $user->id)
             ->whereNull('revoked_at')

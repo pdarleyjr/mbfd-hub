@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -58,14 +59,18 @@ class DocumentAuthorizationTest extends TestCase
         $admin = User::factory()->create();
         $adminRole = Role::query()->create(['name' => 'admin', 'guard_name' => 'web']);
         $admin->assignRole($adminRole);
+        $admin->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.forms.view', 'web'),
+        ]);
 
-        $this->actingAs($admin, 'web')
+        $this->actingAsCanonicalUser($admin)
             ->get('/admin/operational-forms/documents/'.$document->id.'/preview')
             ->assertOk();
 
         auth('web')->logout();
         $unauthorized = User::factory()->create();
-        $this->actingAs($unauthorized, 'web')
+        $this->actingAsCanonicalUser($unauthorized)
             ->get('/admin/operational-forms/documents/'.$document->id.'/download')
             ->assertForbidden();
     }

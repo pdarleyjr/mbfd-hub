@@ -1,0 +1,181 @@
+version: 1
+metadata:
+  name: MBFD Identity recovery
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+entries:
+  - identifiers:
+      slug: mbfd-identity-recovery
+    id: flow
+    model: authentik_flows.flow
+    attrs:
+      name: MBFD Identity recovery
+      title: Reset your MBFD Identity password
+      designation: recovery
+      authentication: require_unauthenticated
+  - identifiers:
+      name: mbfd-identity-recovery-password-policy
+    id: password-policy
+    model: authentik_policies_password.passwordpolicy
+    attrs:
+      check_static_rules: true
+      check_zxcvbn: true
+      length_min: 12
+      password_field: password
+      zxcvbn_score_threshold: 3
+      error_message: Use at least 12 characters and avoid common or compromised passwords.
+  - identifiers:
+      name: mbfd-identity-recovery-field-password
+    id: prompt-field-password
+    model: authentik_stages_prompt.prompt
+    attrs:
+      field_key: password
+      label: New password
+      type: password
+      required: true
+      placeholder: New password
+      order: 0
+      placeholder_expression: false
+  - identifiers:
+      name: mbfd-identity-recovery-field-password-repeat
+    id: prompt-field-password-repeat
+    model: authentik_stages_prompt.prompt
+    attrs:
+      field_key: password_repeat
+      label: Confirm new password
+      type: password
+      required: true
+      placeholder: Confirm new password
+      order: 1
+      placeholder_expression: false
+  - identifiers:
+      name: mbfd-identity-recovery-skip-if-restored
+    id: skip-if-restored
+    model: authentik_policies_expression.expressionpolicy
+    attrs:
+      expression: |
+        return bool(request.context.get("is_restored", True))
+  - identifiers:
+      name: mbfd-identity-recovery-email
+    id: recovery-email
+    model: authentik_stages_email.emailstage
+    attrs:
+      use_global_settings: true
+      token_expiry: minutes=15
+      subject: MBFD Identity account recovery
+      template: email/password_reset.html
+      activate_user_on_success: true
+      recovery_max_attempts: 5
+      recovery_cache_timeout: minutes=15
+  - identifiers:
+      name: mbfd-identity-recovery-mfa
+    id: recovery-mfa
+    model: authentik_stages_authenticator_validate.authenticatorvalidatestage
+  - identifiers:
+      name: mbfd-identity-recovery-write
+    id: recovery-write
+    model: authentik_stages_user_write.userwritestage
+    attrs:
+      user_creation_mode: never_create
+  - identifiers:
+      name: mbfd-identity-recovery-identification
+    id: recovery-identification
+    model: authentik_stages_identification.identificationstage
+    attrs:
+      user_fields:
+        - username
+  - identifiers:
+      name: mbfd-identity-recovery-login
+    id: recovery-login
+    model: authentik_stages_user_login.userloginstage
+  - identifiers:
+      name: mbfd-identity-recovery-password
+    id: recovery-password
+    model: authentik_stages_prompt.promptstage
+    attrs:
+      fields:
+        - !KeyOf prompt-field-password
+        - !KeyOf prompt-field-password-repeat
+      validation_policies:
+        - !KeyOf password-policy
+  - identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf recovery-identification
+      order: 10
+    id: identification-binding
+    model: authentik_flows.flowstagebinding
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: true
+      policy_engine_mode: any
+      invalid_response_action: retry
+  - identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf recovery-email
+      order: 20
+    id: email-binding
+    model: authentik_flows.flowstagebinding
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: true
+      policy_engine_mode: any
+      invalid_response_action: retry
+  - identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf recovery-mfa
+      order: 21
+    model: authentik_flows.flowstagebinding
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: true
+      policy_engine_mode: any
+      invalid_response_action: retry
+  - identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf recovery-password
+      order: 30
+    model: authentik_flows.flowstagebinding
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+      policy_engine_mode: any
+      invalid_response_action: retry
+  - identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf recovery-write
+      order: 40
+    model: authentik_flows.flowstagebinding
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+      policy_engine_mode: any
+      invalid_response_action: retry
+  - identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf recovery-login
+      order: 100
+    model: authentik_flows.flowstagebinding
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+      policy_engine_mode: any
+      invalid_response_action: retry
+  - identifiers:
+      policy: !KeyOf skip-if-restored
+      target: !KeyOf identification-binding
+      order: 0
+    model: authentik_policies.policybinding
+    attrs:
+      negate: false
+      enabled: true
+      timeout: 30
+  - identifiers:
+      policy: !KeyOf skip-if-restored
+      target: !KeyOf email-binding
+      order: 0
+    state: absent
+    model: authentik_policies.policybinding
+    attrs:
+      negate: false
+      enabled: true
+      timeout: 30

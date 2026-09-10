@@ -62,7 +62,7 @@ class SecurityHardeningRoutesTest extends TestCase
         }
     }
 
-    public function test_admin_audit_routes_have_route_level_admin_role_and_throttle(): void
+    public function test_admin_audit_routes_have_route_level_admin_capability_and_throttle(): void
     {
         $routes = collect(Route::getRoutes())->filter(
             fn ($route) => str_starts_with($route->uri(), 'api/admin/audit/')
@@ -74,7 +74,7 @@ class SecurityHardeningRoutesTest extends TestCase
             $middleware = $route->gatherMiddleware();
 
             $this->assertContains('auth', $middleware, "Route [{$route->uri()}] should require auth.");
-            $this->assertContains('admin.role:super_admin,admin', $middleware, "Route [{$route->uri()}] should require an admin role.");
+            $this->assertContains('admin.capability:admin.system.view', $middleware, "Route [{$route->uri()}] should require the system-view capability.");
             $this->assertContains('throttle:30,1', $middleware, "Route [{$route->uri()}] should be throttled.");
         }
     }

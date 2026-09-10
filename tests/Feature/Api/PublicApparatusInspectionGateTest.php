@@ -14,7 +14,7 @@ use App\Models\User;
 use App\Services\DailyCheckoutChecklistResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -295,8 +295,12 @@ class PublicApparatusInspectionGateTest extends TestCase
         $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
         $user = User::factory()->create();
         $user->assignRole($role);
+        $user->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
+        if ($roleName === 'admin') {
+            $user->givePermissionTo(Permission::findOrCreate('admin.fleet.manage', 'web'));
+        }
 
-        Sanctum::actingAs($user);
+        $this->actingAsCanonicalUser($user);
 
         return $user;
     }

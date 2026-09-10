@@ -41,6 +41,7 @@ final class AuthenticatedMemberContextTest extends TestCase
         $user = User::factory()->create([
             'account_status' => AccountStatus::Active,
             'employee_profile_id' => $employee->id,
+            'employee_id' => $employee->employee_id,
             'email' => 'context-secret@example.test',
             'password' => 'not-for-the-api',
             'remember_token' => 'remember-token-not-for-the-api',
@@ -299,6 +300,7 @@ final class AuthenticatedMemberContextTest extends TestCase
             $registeredAt->addHour(),
             $registeredAt->addDay(),
         );
+        $this->withSession(['auth.canonical_session_id' => $registered->id]);
 
         return $registered;
     }
@@ -318,7 +320,7 @@ final class AuthenticatedMemberContextTest extends TestCase
         $this->withCredentials();
 
         $registeredAt = CarbonImmutable::now();
-        app(SessionRegistry::class)->register(
+        $registered = app(SessionRegistry::class)->register(
             $user,
             $rawSessionId,
             SessionContextClass::UnmanagedBrowser,
@@ -326,6 +328,8 @@ final class AuthenticatedMemberContextTest extends TestCase
             $registeredAt->addHour(),
             $registeredAt->addDay(),
         );
+        $sessionStore->put('auth.canonical_session_id', $registered->id);
+        $sessionStore->save();
 
         $sessionStore->setId(Str::random(40));
         Auth::forgetGuards();

@@ -16,6 +16,7 @@ use App\Notifications\NewSubmissionNotification;
 use App\Observers\ApparatusObserver;
 use App\Observers\TodoObserver;
 use App\Observers\TrainingTodoObserver;
+use App\Observers\UpstreamIdentityObserver;
 use App\Observers\WorkgroupSharedUploadObserver;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
@@ -34,6 +35,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(
+            \App\Contracts\Identity\IdentityProvider::class,
+            \App\Services\Identity\AuthentikIdentityProvider::class,
+        );
         $this->app->bind(ConferenceProvider::class, \App\Services\VideoConferencing\LiveKitConferenceProvider::class);
 
         $this->app->bind(
@@ -112,6 +117,7 @@ class AppServiceProvider extends ServiceProvider
         Todo::observe(TodoObserver::class);
         TrainingTodo::observe(TrainingTodoObserver::class);
         Apparatus::observe(ApparatusObserver::class);
+        User::observe(UpstreamIdentityObserver::class);
 
         // Auto-vectorize uploaded workgroup files (PDFs, DOCX, etc.) into workgroup-specs index
         WorkgroupSharedUpload::observe(WorkgroupSharedUploadObserver::class);
