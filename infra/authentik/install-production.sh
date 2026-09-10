@@ -15,7 +15,8 @@ hub_environment=/etc/mbfd/authentik-hub.env
 install -d -m 0750 -o root -g mbfd /etc/mbfd "$root" "$root/backups" "$root/blueprints" \
   "$root/custom-templates" "$root/state"
 install -d -m 0750 -o 1000 -g 1000 "$root/certs" "$root/state/data"
-install -d -m 0700 -o 70 -g 70 "$root/state/postgresql"
+install -d -m 0700 "$root/state/postgresql"
+chown 70:70 "$root/state/postgresql"
 install -m 0644 "$source_dir/compose.yaml" "$root/compose.yaml"
 install -m 0644 "$source_dir/blueprints/mbfd-identity-recovery.yaml" "$root/blueprints/mbfd-identity-recovery.yaml"
 for script in backup.sh configure-tenant.sh healthcheck.sh restore-drill.sh; do
