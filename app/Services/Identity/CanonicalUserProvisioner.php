@@ -22,7 +22,7 @@ final readonly class CanonicalUserProvisioner
     public function __construct(private CredentialInspector $credentials) {}
 
     /**
-     * @return array{user: User, created: bool, credential_hash_copied: bool, activated: bool}
+     * @return array{user: User, created: bool, credential_hash_copied: bool, activated: bool, member_role_added: bool}
      */
     public function create(int $employeeProfileId, string $credentialProvenance, CarbonInterface $at): array
     {
@@ -40,17 +40,20 @@ final readonly class CanonicalUserProvisioner
                 throw new RuntimeException('The canonical identity changed while acquiring locks. Reload before retrying.');
             }
             if ($existing !== null) {
-                if ($existing->employee_id !== $employee->employee_id || $existing->email !== $email) {
+                if ($existing->employee_id !== $employee->employee_id) {
                     throw new RuntimeException("Employee {$employee->id} is linked to a different canonical User.");
                 }
 
                 UserNotificationSubscription::ensureDepartmentUpdatesForUser($existing->id);
+                $memberRoleAdded = ! $existing->hasRole('member');
+                $existing->assignRole(Role::findOrCreate('member', 'web'));
 
                 return [
                     'user' => $existing,
                     'created' => false,
                     'credential_hash_copied' => false,
                     'activated' => false,
+                    'member_role_added' => $memberRoleAdded,
                 ];
             }
             if (User::query()->where('employee_id', $employee->employee_id)->orWhere('email', $email)->exists()) {
@@ -89,12 +92,9 @@ final readonly class CanonicalUserProvisioner
                 'created_at' => $at,
                 'updated_at' => $at,
             ]);
-            UserNotificationSubscription::ensureDepartmentUpdatesForUser($userId);
-            /** @var User $user */
             $user = User::query()->findOrFail($userId);
-            if ($copyVerifiedLegacyHash) {
-                $user->assignRole(Role::findOrCreate('member', 'web'));
-            }
+            $user->assignRole(Role::findOrCreate('member', 'web'));
+            UserNotificationSubscription::ensureDepartmentUpdatesForUser($userId);
 
             Log::notice('canonical_identity_user_created', [
                 'user_id' => $user->id,
@@ -109,6 +109,7 @@ final readonly class CanonicalUserProvisioner
                 'created' => true,
                 'credential_hash_copied' => $copyVerifiedLegacyHash,
                 'activated' => $copyVerifiedLegacyHash,
+                'member_role_added' => true,
             ];
         }, 3);
     }

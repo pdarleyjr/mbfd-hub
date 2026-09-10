@@ -6,6 +6,7 @@ $issuer = trim((string) env('AUTHENTIK_ISSUER', ''));
 
 return [
     'mode' => env('MBFD_IDENTITY_MODE', 'local'),
+    'credential_authority' => env('MBFD_CREDENTIAL_AUTHORITY', 'local'),
     'provider' => 'authentik',
     'local_login_enabled' => env('MBFD_LOCAL_LOGIN_ENABLED', true),
     'employee_bootstrap_login_enabled' => env('MBFD_EMPLOYEE_BOOTSTRAP_LOGIN_ENABLED', true),

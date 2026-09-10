@@ -47,7 +47,8 @@ final class CanonicalLoginController extends Controller
         return view('auth.canonical-login', [
             'loginAction' => $attempts->requested($request) ? $attempts->loginUrl($request) : route('login.store'),
             'applicationLabel' => $attempts->requested($request) ? $attempts->applicationLabel($request) : null,
-            'identityLoginUrl' => in_array(config('identity.mode'), ['hybrid', 'authentik'], true)
+            'identityLoginUrl' => config('identity.credential_authority') === 'authentik'
+                && in_array(config('identity.mode'), ['hybrid', 'authentik'], true)
                 ? route('identity.redirect', $request->only('login_attempt'))
                 : null,
         ]);

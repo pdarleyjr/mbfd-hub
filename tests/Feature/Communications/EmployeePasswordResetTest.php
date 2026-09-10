@@ -84,6 +84,14 @@ final class EmployeePasswordResetTest extends TestCase
             'password' => Hash::make('old-canonical-password'),
             'security_version' => 3,
         ]);
+        config()->set('identity.mode', 'hybrid');
+        config()->set('identity.credential_authority', 'local');
+        $user->identityLinks()->create([
+            'provider' => 'authentik',
+            'subject' => 'password-reset-local-authority-subject',
+            'provider_user_id' => 'password-reset-local-authority-user',
+            'status' => 'active',
+        ]);
         $originalSession = AuthenticationSession::factory()->create(['user_id' => $user->id, 'security_version' => 3]);
         app(CityEmailVerificationService::class)->acknowledge($user, 'pendingreplacement@miamibeachfl.gov');
 

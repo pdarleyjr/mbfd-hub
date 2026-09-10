@@ -22,13 +22,21 @@ final class EmployeeAccessSchema
         return [
             Forms\Tabs\Tab::make('Identity & Security')->schema([
                 self::controls('login-recovery', 'Identity & security controls', [
-                    'createLoginAccount' => 'Create login account', 'changeOwnPassword' => 'Change my password',
+                    'createLoginAccount' => 'Create login account', 'issuePendingTemporaryPassword' => 'Issue temporary password', 'changeOwnPassword' => 'Change my password',
                     'changeCityEmail' => 'Change city email', 'changeRecoveryEmail' => 'Change recovery email',
                     'resetPassword' => 'Issue temporary password', 'forcePasswordChange' => 'Require password change',
                     'revokeSessions' => 'Revoke sessions', 'disableAccount' => 'Disable account', 'enableAccount' => 'Enable account',
                 ], 'Current login and recovery settings are shown below. Protected changes require your current password and a reason.'),
                 Forms\Placeholder::make('account_status_summary')->label('Login account')
-                    ->content(fn (?Model $record): string => self::account($record)?->getRawOriginal('account_status') ?? 'Awaiting account — personnel record retained; first-login provisioning is separate.'),
+                    ->content(function (?Model $record): string {
+                        $status = self::account($record)?->getRawOriginal('account_status');
+
+                        return match ($status) {
+                            'pending_activation' => 'Awaiting activation — issue a unique temporary password when the member is ready to onboard.',
+                            null => 'Awaiting account — personnel record retained; account provisioning is required.',
+                            default => ucfirst(str_replace('_', ' ', $status)),
+                        };
+                    }),
                 Forms\Placeholder::make('identity_provider_status')->label('Identity provider')
                     ->content(function (?Model $record): string {
                         $link = self::account($record)?->identityLinks()->where('provider', 'authentik')->first();

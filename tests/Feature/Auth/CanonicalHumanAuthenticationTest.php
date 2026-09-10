@@ -303,6 +303,49 @@ final class CanonicalHumanAuthenticationTest extends TestCase
         $this->assertTrue(app('router')->has('filament.employee.auth.login'));
     }
 
+    public function test_hybrid_connectivity_does_not_advertise_authentik_when_hub_is_credential_authority(): void
+    {
+        config()->set('identity.mode', 'hybrid');
+        config()->set('identity.credential_authority', 'local');
+
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('First time signing in?')
+            ->assertDontSee('Continue with MBFD Identity');
+
+        config()->set('identity.credential_authority', 'authentik');
+        $this->get('/login')->assertSee('Continue with MBFD Identity');
+    }
+
+    public function test_established_member_account_page_exposes_normal_password_and_account_management(): void
+    {
+        $this->withoutVite();
+        $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
+
+        $this->actingAsCanonicalUser($user)
+            ->get('/account')
+            ->assertOk()
+            ->assertSee('My account')
+            ->assertSee('Change password')
+            ->assertSee('City email & recovery', false)
+            ->assertSee('Employee Portal')
+            ->assertSee('Application access')
+            ->assertSee('Sign out')
+            ->assertDontSee('transition access');
+    }
+
+    public function test_established_member_can_open_the_voluntary_password_change_page(): void
+    {
+        $this->withoutVite();
+        $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
+
+        $this->actingAsCanonicalUser($user)
+            ->get('/employee/set-password')
+            ->assertOk()
+            ->assertSee('Change Password')
+            ->assertSee('Enter your current password, then choose a new private password.');
+    }
+
     private function linkedUser(
         AccountStatus $status,
         string $password,

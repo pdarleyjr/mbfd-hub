@@ -127,6 +127,8 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-cog-6-tooth'),
             ])
             ->userMenuItems([
+                MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
+                MenuItem::make()->label('Change Password')->url(fn (): string => \App\Filament\Pages\SetPasswordPage::getUrl(panel: 'admin'))->icon('heroicon-o-key'),
                 \Filament\Navigation\MenuItem::make()
                     ->label('City email & verification')
                     ->url(fn (): string => route('city-email.show'))

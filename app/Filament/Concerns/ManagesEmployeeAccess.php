@@ -98,8 +98,13 @@ trait ManagesEmployeeAccess
                     return match ($method) {
                         'disable' => $target->getRawOriginal('account_status') !== 'disabled',
                         'enable' => $target->getRawOriginal('account_status') === 'disabled',
-                        'resetPassword', 'forcePasswordChange' => ! $target->identityLinks()->where('provider', 'authentik')->exists(),
-                        'sendIdentityRecovery' => app(\App\Services\Identity\IdentityProviderService::class)->enabledFor($target),
+                        'resetPassword' => $target->getRawOriginal('account_status') === 'active'
+                            && (config('identity.credential_authority') === 'local'
+                                || ! $target->identityLinks()->where('provider', 'authentik')->exists()),
+                        'forcePasswordChange' => config('identity.credential_authority') === 'local'
+                            || ! $target->identityLinks()->where('provider', 'authentik')->exists(),
+                        'sendIdentityRecovery' => config('identity.credential_authority') === 'authentik'
+                            && app(\App\Services\Identity\IdentityProviderService::class)->enabledFor($target),
                         'resetMfa' => $target->identityLinks()->where('provider', 'authentik')->exists(),
                         default => true,
                     };

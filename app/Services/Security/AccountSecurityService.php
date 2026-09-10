@@ -163,6 +163,7 @@ final class AccountSecurityService
                     throw new AuthorizationException('A departed or inconsistent employee identity cannot be enabled. Review the employment status first.');
                 }
                 if (in_array($action, [AccountSecurityAction::AdministrativeRecovery, AccountSecurityAction::ForcePasswordChange], true)
+                    && config('identity.credential_authority') === 'authentik'
                     && $currentTarget->identityLinks()->where('provider', 'authentik')->exists()) {
                     throw new AuthorizationException('MBFD Identity accounts use individual recovery links, not administrator-set passwords.');
                 }

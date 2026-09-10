@@ -29,6 +29,12 @@ class EditEmployee extends EditRecord
                 ->visible(fn (): bool => $this->canCorrectIdentity() && $this->accountOrNull() === null && $this->getRecord()->roster_status === 'active')
                 ->form($this->securityFields(true))
                 ->action(fn (array $data) => $this->runProtected(fn () => app(\App\Services\Security\EmployeeAccountAdministration::class)->createForEmployee($this->actor(), $this->getRecord(), $data['temporary_password'], $data['current_password'], $data['reason']))),
+            Actions\Action::make('issuePendingTemporaryPassword')->label('Issue temporary password')
+                ->visible(fn (): bool => $this->canCorrectIdentity()
+                    && $this->accountOrNull()?->getRawOriginal('account_status') === 'pending_activation'
+                    && $this->getRecord()->roster_status === 'active')
+                ->form($this->securityFields(true))
+                ->action(fn (array $data) => $this->runProtected(fn () => app(\App\Services\Security\EmployeeAccountAdministration::class)->createForEmployee($this->actor(), $this->getRecord(), $data['temporary_password'], $data['current_password'], $data['reason']))),
             Actions\Action::make('changeCityEmail')->label('Change city email')
                 ->visible(fn (): bool => $this->canCorrectIdentity())
                 ->form([

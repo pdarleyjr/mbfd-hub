@@ -12,7 +12,7 @@
         <div class="mx-auto flex min-h-16 max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
             <div class="flex items-center gap-3">
                 <img src="/images/mbfd_logo-256.png" alt="" class="h-10 w-10 object-contain">
-                <div><p class="text-xs font-bold uppercase tracking-[.16em] text-amber-200">MBFD Identity</p><h1 class="text-lg font-semibold">My account</h1></div>
+                <div><p class="text-xs font-bold uppercase tracking-[.16em] text-amber-200">MBFD Hub</p><h1 class="text-lg font-semibold">My account</h1></div>
             </div>
             <a href="/" class="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">Back to Hub</a>
         </div>
@@ -23,18 +23,23 @@
             <dl class="grid gap-px bg-neutral-200 sm:grid-cols-2">
                 <div class="bg-white p-5"><dt class="text-xs font-bold uppercase tracking-wide text-neutral-500">Name</dt><dd class="mt-1 font-semibold">{{ $user->name }}</dd></div>
                 <div class="bg-white p-5"><dt class="text-xs font-bold uppercase tracking-wide text-neutral-500">Employee ID</dt><dd class="mt-1 font-mono font-semibold">{{ $user->employee_id ?: 'Not linked' }}</dd></div>
-                <div class="bg-white p-5"><dt class="text-xs font-bold uppercase tracking-wide text-neutral-500">Identity provider</dt><dd class="mt-1 font-semibold">{{ $identityLink ? 'MBFD Identity · connected' : 'Hub local · transition access' }}</dd></div>
+                <div class="bg-white p-5"><dt class="text-xs font-bold uppercase tracking-wide text-neutral-500">Password</dt><dd class="mt-1 font-semibold">{{ $localCredentials ? 'Hub local credential' : 'MBFD Identity credential' }}</dd></div>
                 <div class="bg-white p-5"><dt class="text-xs font-bold uppercase tracking-wide text-neutral-500">Recovery readiness</dt><dd class="mt-1 font-semibold">{{ $maskedRecoveryEmail ? 'Ready · '.$maskedRecoveryEmail : 'Needs administrator review' }}</dd></div>
                 <div class="bg-white p-5"><dt class="text-xs font-bold uppercase tracking-wide text-neutral-500">Active Hub sessions</dt><dd class="mt-1 font-semibold">{{ $activeSessionCount }}</dd></div>
-                <div class="bg-white p-5"><dt class="text-xs font-bold uppercase tracking-wide text-neutral-500">MFA / passkeys</dt><dd class="mt-1 font-semibold">{{ ($securityState['mfa_enrolled'] ?? false) ? 'MFA enrolled' : 'Not enrolled for this pilot' }}{{ ($securityState['passkey_count'] ?? 0) > 0 ? ' · '.$securityState['passkey_count'].' passkey(s)' : '' }}</dd></div>
+                <div class="bg-white p-5"><dt class="text-xs font-bold uppercase tracking-wide text-neutral-500">Account status</dt><dd class="mt-1 font-semibold">{{ ucfirst(str_replace('_', ' ', $user->getRawOriginal('account_status'))) }}</dd></div>
             </dl>
             <div class="flex flex-wrap gap-3 border-t border-neutral-200 px-5 py-4">
-                <a href="{{ route('password.request') }}" class="inline-flex min-h-11 items-center rounded-lg bg-red-800 px-4 py-2 text-sm font-bold text-white hover:bg-red-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2">Account recovery</a>
-                <a href="{{ route('city-email.show') }}" class="inline-flex min-h-11 items-center rounded-lg border border-neutral-300 px-4 py-2 text-sm font-bold hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700">Review city email</a>
+                <a href="{{ $changePasswordUrl }}" class="inline-flex min-h-11 items-center rounded-lg bg-red-800 px-4 py-2 text-sm font-bold text-white hover:bg-red-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2">Change password</a>
+                <a href="{{ route('city-email.show') }}" class="inline-flex min-h-11 items-center rounded-lg border border-neutral-300 px-4 py-2 text-sm font-bold hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700">City email & recovery</a>
+                <a href="/employee" class="inline-flex min-h-11 items-center rounded-lg border border-neutral-300 px-4 py-2 text-sm font-bold hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700">Employee Portal</a>
+                @if($user->hasCurrentAdminPanelEntitlement())
+                    <a href="/admin" class="inline-flex min-h-11 items-center rounded-lg border border-neutral-300 px-4 py-2 text-sm font-bold hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700">Admin Panel</a>
+                @endif
                 @if($enrollmentUrls)
                     <a href="{{ $enrollmentUrls['passkey'] }}" class="inline-flex min-h-11 items-center rounded-lg border border-neutral-300 px-4 py-2 text-sm font-bold hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700">Add a passkey</a>
                     <a href="{{ $enrollmentUrls['totp'] }}" class="inline-flex min-h-11 items-center rounded-lg border border-neutral-300 px-4 py-2 text-sm font-bold hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700">Add authenticator app</a>
                 @endif
+                <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="inline-flex min-h-11 items-center rounded-lg border border-neutral-300 px-4 py-2 text-sm font-bold hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700">Sign out</button></form>
             </div>
         </section>
 
