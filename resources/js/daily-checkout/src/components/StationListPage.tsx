@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Station } from '../types';
-import { ApiClient } from '../utils/api';
+import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../utils/api';
 import StationCard from './StationCard';
 
 export default function StationListPage() {
@@ -18,6 +18,10 @@ export default function StationListPage() {
       setStations(data);
       setError(null);
     } catch (err) {
+      if (isApiAuthenticationError(err)) {
+        redirectToLoginAfterSessionExpiry();
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to load stations');
     } finally {
       setLoading(false);

@@ -51,6 +51,25 @@ export class ApiRequestError extends Error {
   }
 }
 
+let sessionExpiryRedirectStarted = false;
+
+export function isApiAuthenticationError(error: unknown): error is ApiRequestError {
+  return error instanceof ApiRequestError && error.status === 401;
+}
+
+export function redirectToLoginAfterSessionExpiry(): void {
+  if (
+    typeof window === 'undefined'
+    || sessionExpiryRedirectStarted
+    || window.location.pathname === '/login'
+  ) {
+    return;
+  }
+
+  sessionExpiryRedirectStarted = true;
+  window.location.replace('/login?session_expired=1');
+}
+
 export const isChecklistVersion = (value: unknown): value is string => (
   typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)
 );
@@ -348,7 +367,7 @@ export class ApiClient {
       cache: 'no-store',
     });
     if (!response.ok) {
-      throw new Error('Failed to fetch stations');
+      throw new ApiRequestError(await responseMessage(response, 'Failed to fetch stations'), response.status);
     }
     const data = await response.json();
     return data.stations || data; // Extract stations array from response
@@ -360,7 +379,7 @@ export class ApiClient {
       cache: 'no-store',
     });
     if (!response.ok) {
-      throw new Error('Failed to fetch station');
+      throw new ApiRequestError(await responseMessage(response, 'Failed to fetch station'), response.status);
     }
     return response.json();
   }

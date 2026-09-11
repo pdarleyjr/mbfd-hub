@@ -11,7 +11,7 @@ import {
   StationActivityEntry,
   SingleGasMeterSummary,
 } from '../types';
-import { ApiClient } from '../utils/api';
+import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../utils/api';
 import PreviousPageButton from './PreviousPageButton';
 import { groupRoomsByArea, stationComplement } from '../utils/stationRoomBlueprint';
 
@@ -86,6 +86,10 @@ export default function StationDetailPage() {
         setStation(data);
         setError(null);
       } catch (err) {
+        if (isApiAuthenticationError(err)) {
+          redirectToLoginAfterSessionExpiry();
+          return;
+        }
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load station');
       } finally {
         if (!cancelled) setLoading(false);
