@@ -22,7 +22,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
@@ -93,31 +92,26 @@ final class CanonicalLoginController extends Controller
         $bootstrapAvailable = $bootstrapCredential->available();
 
         if ($employeeId === ''
-            || RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)
-            || ($bootstrapAvailable && RateLimiter::tooManyAttempts($bootstrapThrottleKey, $bootstrapMaxAttempts))) {
+            || RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
             return $this->denied($request, $employeeId, 'rate_limited');
-        }
-        if ($bootstrapAvailable) {
-            RateLimiter::hit(
-                $bootstrapThrottleKey,
-                max(1, (int) config('security.member_bootstrap.decay_seconds', $decaySeconds)),
-            );
         }
 
         $user = $users->byEmployeeId($employeeId);
-        // Generate the same-cost throwaway hash for every attempt so the
-        // externally generic response does not gain an obvious lookup timing path.
-        $dummyHash = Hash::make(Str::random(48));
         $passwordMatches = Hash::check(
             $credentials['password'],
-            $user?->getAuthPassword() ?? $dummyHash,
+            $user?->getAuthPassword() ?? (string) config('identity.canonical_login_dummy_password_hash'),
         );
         $bootstrapMatches = $bootstrapCredential->matches($credentials['password']);
-
-        if (! $attempts->requested($request)
+        $bootstrapCandidate = ! $attempts->requested($request)
             && $user instanceof User
             && $user->isBootstrapOnboardingPending()
-            && $bootstrapMatches) {
+            && $bootstrapAvailable;
+
+        if ($bootstrapCandidate && RateLimiter::tooManyAttempts($bootstrapThrottleKey, $bootstrapMaxAttempts)) {
+            return $this->denied($request, $employeeId, 'rate_limited');
+        }
+
+        if ($bootstrapCandidate && $bootstrapMatches) {
             RateLimiter::clear($throttleKey);
             $bootstrapSessions->begin($request, $user);
             Log::info('member_bootstrap_authentication_succeeded', [
@@ -127,6 +121,12 @@ final class CanonicalLoginController extends Controller
             ]);
 
             return redirect()->route('member-onboarding.show');
+        }
+        if ($bootstrapCandidate) {
+            RateLimiter::hit(
+                $bootstrapThrottleKey,
+                max(1, (int) config('security.member_bootstrap.decay_seconds', $decaySeconds)),
+            );
         }
 
         $denialReason = $this->denialReason($user, $passwordMatches);
