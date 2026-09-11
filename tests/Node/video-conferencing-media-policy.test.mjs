@@ -21,6 +21,16 @@ test('conference mount prepares media once and exposes an explicit retry and dev
   assert.match(app, /createLocalTracks\(\{ audio: true, video: false \}\)/);
 });
 
+test('300 PIN authorization does not depend on local microphone readiness', () => {
+  const start = app.indexOf('className="vc-command-login"');
+  const end = app.indexOf('</form>}', start);
+  const commandLogin = app.slice(start, end);
+
+  assert.ok(start >= 0 && end > start, '300 command login form is present');
+  assert.match(commandLogin, /disabled=\{!commandPinReady \|\| actionBusy !== null\}/);
+  assert.doesNotMatch(commandLogin, /disabled=\{[^}]*!microphoneReady/);
+});
+
 test('focused videos request HIGH and thumbnails request LOW with adaptive delivery enabled', () => {
   assert.match(app, /adaptiveStream: true/);
   assert.match(app, /dynacast: true/);
