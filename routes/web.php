@@ -337,7 +337,7 @@ Route::get('/daily/{path?}', function () {
         JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
     ).';</script>';
 
-    return response(str_replace('</head>', $runtimeConfig.'</head>', $index, 1), 200, [
+    return response(str_replace('</head>', $runtimeConfig.'</head>', $index), 200, [
         'Content-Type' => 'text/html; charset=UTF-8',
         'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
         'Pragma' => 'no-cache',
