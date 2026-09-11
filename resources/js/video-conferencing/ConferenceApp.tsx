@@ -971,7 +971,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                         {bootstrap.entry_mode === 'command' && !commandAuthorized && <form className="vc-command-login" onSubmit={(event) => { event.preventDefault(); void authorizeCommand(); }}>
                             <div className="vc-room-summary"><ShieldCheck size={22} /><div><strong>Employee session confirmed</strong><span>Enter the 300 PIN to unlock command controls. Your existing login is reused.</span></div></div>
                             <label className="vc-field">300 command PIN<input type="password" inputMode="numeric" autoComplete="off" pattern="[0-9]{4,8}" minLength={4} maxLength={8} value={commandPin} onChange={(event) => setCommandPin(event.target.value.replace(/\D/g, '').slice(0, 8))} /></label>
-                            <button className="vc-button vc-button--primary" type="submit" disabled={!commandPinReady || actionBusy !== null || !microphoneReady}>{actionBusy === 'authorize' ? <LoaderCircle size={19} className="vc-spin" /> : <ShieldCheck size={19} />} Continue as 300</button>
+                            <button className="vc-button vc-button--primary" type="submit" disabled={!commandPinReady || actionBusy !== null}>{actionBusy === 'authorize' ? <LoaderCircle size={19} className="vc-spin" /> : <ShieldCheck size={19} />} Continue as 300</button>
                         </form>}
 
                         {bootstrap.entry_mode === 'command' && commandAuthorized && <div className="vc-ready-dashboard">
