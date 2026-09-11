@@ -1,4 +1,5 @@
 import { db } from './db';
+import { redirectToLoginAfterSessionExpiry } from '../utils/api';
 
 const CACHE_KEY = 'authenticated-offline-identity-v1';
 
@@ -28,6 +29,9 @@ export async function refreshOfflineIdentity(): Promise<OfflineIdentity> {
     credentials: 'same-origin',
     headers: { Accept: 'application/json' },
   });
+  if (response.status === 401 && (typeof navigator === 'undefined' || navigator.onLine)) {
+    redirectToLoginAfterSessionExpiry();
+  }
   if (!response.ok) {
     throw new Error('The signed-in member could not be verified for offline synchronization.');
   }

@@ -328,12 +328,25 @@ Route::get('/admin-pwa/service-worker.js', function () {
 
 // Daily Checkout SPA - catch-all for React Router
 Route::get('/daily/{path?}', function () {
-    return response()->file(public_path('daily/index.html'), [
+    $index = file_get_contents(public_path('daily/index.html'));
+    abort_unless(is_string($index), 404);
+
+    $canonicalOrigin = rtrim((string) config('app.url'), '/');
+    $runtimeConfig = '<script>window.__MBFD_CANONICAL_ORIGIN__ = '.json_encode(
+        $canonicalOrigin,
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
+    ).';</script>';
+
+    return response(str_replace('</head>', $runtimeConfig.'</head>', $index, 1), 200, [
+        'Content-Type' => 'text/html; charset=UTF-8',
         'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
         'Pragma' => 'no-cache',
         'Expires' => '0',
     ]);
-})->where('path', '.+')->middleware('auth:web');
+})->where('path', '.+')->middleware([
+    \App\Http\Middleware\CanonicalHostRedirect::class,
+    'auth:web',
+]);
 
 Route::get('/__version', function () {
     $shaFile = base_path('.git-sha');

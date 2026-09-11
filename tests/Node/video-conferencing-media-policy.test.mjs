@@ -31,6 +31,17 @@ test('300 PIN authorization does not depend on local microphone readiness', () =
   assert.doesNotMatch(commandLogin, /disabled=\{[^}]*!microphoneReady/);
 });
 
+test('browser-neutral 300 authorization remains interactive before media is ready', () => {
+  const start = app.indexOf('const authorizeCommand = async () =>');
+  const end = app.indexOf('const startLineup = async', start);
+  const authorizeCommand = app.slice(start, end);
+
+  assert.ok(start >= 0 && end > start, '300 authorization handler is present');
+  assert.match(authorizeCommand, /postJson\(bootstrap\.endpoints\.command_authorize/);
+  assert.match(authorizeCommand, /setCommandAuthorized\(true\)/);
+  assert.doesNotMatch(authorizeCommand, /microphoneReady/);
+});
+
 test('focused videos request HIGH and thumbnails request LOW with adaptive delivery enabled', () => {
   assert.match(app, /adaptiveStream: true/);
   assert.match(app, /dynacast: true/);

@@ -9,6 +9,12 @@ import {
 
 const API_BASE = '/api';
 
+declare global {
+  interface Window {
+    __MBFD_CANONICAL_ORIGIN__?: string;
+  }
+}
+
 // Default headers for all API requests
 const DEFAULT_HEADERS = {
   'Accept': 'application/json',
@@ -67,7 +73,19 @@ export function redirectToLoginAfterSessionExpiry(): void {
   }
 
   sessionExpiryRedirectStarted = true;
-  window.location.replace('/login?session_expired=1');
+  const configuredOrigin = window.__MBFD_CANONICAL_ORIGIN__;
+  let loginUrl = new URL('/login', window.location.origin);
+
+  if (typeof configuredOrigin === 'string' && configuredOrigin.trim() !== '') {
+    try {
+      loginUrl = new URL('/login', configuredOrigin);
+    } catch {
+      // Fall back to the current origin when runtime configuration is absent or invalid.
+    }
+  }
+
+  loginUrl.searchParams.set('session_expired', '1');
+  window.location.replace(loginUrl.toString());
 }
 
 export const isChecklistVersion = (value: unknown): value is string => (
