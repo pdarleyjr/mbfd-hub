@@ -9,6 +9,9 @@ return [
     'credential_authority' => env('MBFD_CREDENTIAL_AUTHORITY', 'local'),
     'provider' => 'authentik',
     'local_login_enabled' => env('MBFD_LOCAL_LOGIN_ENABLED', true),
+    // bcrypt cost 12; generated once from discarded random input. It can never
+    // authenticate and avoids generating a new timing-equalization hash per request.
+    'canonical_login_dummy_password_hash' => '$2y$12$OcYMvqtWBKLbTVruW3WIDOVrJmPa7FCVZDXFuvZ443vuZkY.6mRpq',
     // The retired Employee principal remains disabled. Member bootstrap is a
     // separate restricted flow that never authenticates the Employee guard.
     'employee_bootstrap_login_enabled' => false,

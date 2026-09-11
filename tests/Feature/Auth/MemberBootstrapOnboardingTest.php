@@ -10,6 +10,7 @@ use App\Models\SecurityActionEvent;
 use App\Models\User;
 use App\Services\Identity\CityEmailVerificationService;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -25,18 +26,24 @@ final class MemberBootstrapOnboardingTest extends TestCase
 
     private const FAILURE_MESSAGE = 'The provided credentials are invalid.';
 
+    private const TEST_SOURCE_IP = '203.0.113.25';
+
     protected function setUp(): void
     {
         parent::setUp();
 
         config()->set('identity.local_login_enabled', true);
+        config()->set(
+            'identity.canonical_login_dummy_password_hash',
+            '$2y$04$yXUP9UMe6agMm.ynDn8sZew4kgNTtoSKbwk49v4OrnqckhzwA3SRC',
+        );
         config()->set('identity.member_bootstrap.enabled', true);
         config()->set('identity.member_bootstrap.password_hash', Hash::make(self::BOOTSTRAP_PASSWORD));
         config()->set('identity.member_bootstrap.session_ttl_seconds', 900);
         config()->set('security.member_bootstrap.max_attempts', 5);
         config()->set('security.member_bootstrap.global_max_attempts', 30);
         config()->set('security.member_bootstrap.decay_seconds', 60);
-        RateLimiter::clear('member-bootstrap-source:test');
+        RateLimiter::clear($this->bootstrapThrottleKey(self::TEST_SOURCE_IP));
     }
 
     public function test_only_explicit_bootstrap_pending_member_enters_restricted_onboarding_with_session_rotation(): void
@@ -57,6 +64,141 @@ final class MemberBootstrapOnboardingTest extends TestCase
         $this->assertIsArray(session('auth.member_bootstrap'));
         $this->assertDatabaseCount('authentication_sessions', 0);
         $this->assertSame($passwordHashBefore, $pending->fresh()->getAuthPassword());
+        $this->assertSame(0, RateLimiter::attempts($this->bootstrapThrottleKey(self::TEST_SOURCE_IP)));
+    }
+
+    public function test_distinct_established_users_from_one_source_never_consume_bootstrap_capacity(): void
+    {
+        config()->set('security.member_bootstrap.global_max_attempts', 2);
+        $users = [
+            $this->linkedUser(AccountStatus::Active, false, 'ESTABLISHED-SOURCE-100', 'private-password-100'),
+            $this->linkedUser(AccountStatus::Active, false, 'ESTABLISHED-SOURCE-200', 'private-password-200'),
+            $this->linkedUser(AccountStatus::Active, false, 'ESTABLISHED-SOURCE-300', 'private-password-300'),
+        ];
+
+        foreach ($users as $index => $user) {
+            $response = $this->withServerVariables(['REMOTE_ADDR' => self::TEST_SOURCE_IP])
+                ->from('/login')
+                ->post('/login', [
+                    'employee_id' => $user->employee_id,
+                    'password' => 'private-password-'.(($index + 1) * 100),
+                ]);
+            $this->assertSame(url('/'), $response->headers->get('Location'), $user->employee_id);
+            $this->assertAuthenticatedAs($user, 'web');
+            $this->post('/logout')->assertRedirect('/login');
+        }
+
+        $this->assertSame(0, RateLimiter::attempts($this->bootstrapThrottleKey(self::TEST_SOURCE_IP)));
+    }
+
+    public function test_successful_bootstrap_logins_do_not_consume_the_failure_bucket(): void
+    {
+        config()->set('security.member_bootstrap.global_max_attempts', 2);
+        $users = [
+            $this->linkedUser(AccountStatus::PendingActivation, true, 'BOOTSTRAP-SOURCE-100'),
+            $this->linkedUser(AccountStatus::PendingActivation, true, 'BOOTSTRAP-SOURCE-200'),
+            $this->linkedUser(AccountStatus::PendingActivation, true, 'BOOTSTRAP-SOURCE-300'),
+        ];
+
+        foreach ($users as $user) {
+            $this->bootstrapLogin($user);
+            $this->post('/member-onboarding/cancel')->assertRedirect('/login');
+        }
+
+        $this->assertSame(0, RateLimiter::attempts($this->bootstrapThrottleKey(self::TEST_SOURCE_IP)));
+    }
+
+    public function test_established_login_succeeds_after_bootstrap_source_limit_is_exhausted(): void
+    {
+        config()->set('security.member_bootstrap.global_max_attempts', 2);
+        $firstPending = $this->linkedUser(AccountStatus::PendingActivation, true, 'EXHAUST-BOOTSTRAP-100');
+        $secondPending = $this->linkedUser(AccountStatus::PendingActivation, true, 'EXHAUST-BOOTSTRAP-200');
+        $thirdPending = $this->linkedUser(AccountStatus::PendingActivation, true, 'EXHAUST-BOOTSTRAP-300');
+        $established = $this->linkedUser(
+            AccountStatus::Active,
+            false,
+            'ESTABLISHED-AFTER-EXHAUSTION',
+            'established-private-password',
+        );
+
+        foreach ([$firstPending, $secondPending] as $pending) {
+            $this->withServerVariables(['REMOTE_ADDR' => self::TEST_SOURCE_IP])
+                ->from('/login')
+                ->post('/login', [
+                    'employee_id' => $pending->employee_id,
+                    'password' => 'wrong-bootstrap-password',
+                ])->assertRedirect('/login')
+                ->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
+        }
+
+        $bootstrapKey = $this->bootstrapThrottleKey(self::TEST_SOURCE_IP);
+        $this->assertTrue(RateLimiter::tooManyAttempts($bootstrapKey, 2));
+        $this->withServerVariables(['REMOTE_ADDR' => self::TEST_SOURCE_IP])
+            ->from('/login')
+            ->post('/login', [
+                'employee_id' => $thirdPending->employee_id,
+                'password' => self::BOOTSTRAP_PASSWORD,
+            ])->assertRedirect('/login')
+            ->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
+
+        $this->withServerVariables(['REMOTE_ADDR' => self::TEST_SOURCE_IP])
+            ->post('/login', [
+                'employee_id' => $established->employee_id,
+                'password' => 'established-private-password',
+            ])->assertRedirect('/');
+        $this->assertAuthenticatedAs($established, 'web');
+    }
+
+    public function test_unknown_login_uses_dummy_verification_without_generating_a_password_hash(): void
+    {
+        $dummyHashInfo = password_get_info((string) config('identity.canonical_login_dummy_password_hash'));
+        $this->assertSame('bcrypt', $dummyHashInfo['algoName']);
+        $this->assertSame((int) env('BCRYPT_ROUNDS', 12), $dummyHashInfo['options']['cost']);
+
+        $instrumentedHasher = new class(Hash::driver()) implements Hasher
+        {
+            public int $checkCalls = 0;
+
+            public int $makeCalls = 0;
+
+            public function __construct(private readonly Hasher $inner) {}
+
+            public function info($hashedValue): array
+            {
+                return $this->inner->info($hashedValue);
+            }
+
+            public function make(#[\SensitiveParameter] $value, array $options = []): string
+            {
+                $this->makeCalls++;
+
+                return $this->inner->make($value, $options);
+            }
+
+            public function check(#[\SensitiveParameter] $value, $hashedValue, array $options = []): bool
+            {
+                $this->checkCalls++;
+
+                return $this->inner->check($value, $hashedValue, $options);
+            }
+
+            public function needsRehash($hashedValue, array $options = []): bool
+            {
+                return $this->inner->needsRehash($hashedValue, $options);
+            }
+        };
+        $this->app->instance('hash', $instrumentedHasher);
+        Hash::clearResolvedInstance('hash');
+
+        $this->from('/login')->post('/login', [
+            'employee_id' => 'UNKNOWN-DUMMY-HASH-100',
+            'password' => 'wrong-password',
+        ])->assertRedirect('/login')
+            ->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
+
+        $this->assertGuest('web');
+        $this->assertSame(0, $instrumentedHasher->makeCalls);
+        $this->assertSame(2, $instrumentedHasher->checkCalls);
     }
 
     public function test_wrong_unknown_ineligible_established_and_admin_attempts_share_generic_denial(): void
@@ -326,10 +468,11 @@ final class MemberBootstrapOnboardingTest extends TestCase
 
     private function bootstrapLogin(User $user): void
     {
-        $this->post('/login', [
-            'employee_id' => $user->employee_id,
-            'password' => self::BOOTSTRAP_PASSWORD,
-        ])->assertRedirect('/member-onboarding');
+        $this->withServerVariables(['REMOTE_ADDR' => self::TEST_SOURCE_IP])
+            ->post('/login', [
+                'employee_id' => $user->employee_id,
+                'password' => self::BOOTSTRAP_PASSWORD,
+            ])->assertRedirect('/member-onboarding');
         $this->withSession([
             'auth.member_bootstrap' => session('auth.member_bootstrap'),
         ]);
@@ -346,5 +489,10 @@ final class MemberBootstrapOnboardingTest extends TestCase
             'password' => $password,
             'password_confirmation' => $password,
         ];
+    }
+
+    private function bootstrapThrottleKey(string $ip): string
+    {
+        return 'member-bootstrap-source:'.hash_hmac('sha256', $ip, (string) config('app.key'));
     }
 }
