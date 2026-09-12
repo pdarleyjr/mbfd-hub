@@ -130,6 +130,26 @@ class SurveyPlatformTest extends TestCase
         $this->assertSame(15, $survey->questions()->count());
     }
 
+    public function test_back_to_basics_blueprint_preserves_the_required_question_contract(): void
+    {
+        $questions = BackToBasicsSurveyBlueprint::questions();
+
+        $this->assertSame(range(1, 15), array_column($questions, 'position'));
+        $this->assertArrayNotHasKey('score', $questions[0]['configuration']['options'][5]);
+        $this->assertSame(3, $questions[1]['configuration']['max_selections']);
+        $this->assertTrue($questions[1]['configuration']['allow_other_text']);
+        $this->assertSame('None — state certification should remain sufficient', $this->optionLabelForKey($questions[3]['configuration']['options'], $questions[3]['configuration']['exclusive_option']));
+        $this->assertArrayNotHasKey('score', $questions[4]['configuration']['options'][0]);
+        $this->assertSame('matrix', $questions[8]['type']);
+        $this->assertCount(5, $questions[8]['configuration']['rows']);
+        $this->assertSame('compound', $questions[9]['type']);
+        $this->assertCount(2, $questions[9]['configuration']['parts']);
+        $this->assertSame(['Very Confident', 'Confident'], array_column(array_filter($questions[11]['configuration']['options'], fn (array $option): bool => (bool) ($option['favorable'] ?? false)), 'label'));
+        $this->assertArrayNotHasKey('score', $questions[13]['configuration']['options'][5]);
+        $this->assertSame(3, $questions[14]['configuration']['min_selections']);
+        $this->assertSame(3, $questions[14]['configuration']['max_selections']);
+    }
+
     public function test_a_new_revision_retains_a_parent_link_and_cannot_rewrite_submitted_content(): void
     {
         [$user, $survey] = $this->makeSurvey();
@@ -192,5 +212,19 @@ class SurveyPlatformTest extends TestCase
         WorkgroupMember::create(['workgroup_id' => $workgroup->id, 'user_id' => $user->id, 'role' => 'member', 'is_active' => true, 'count_evaluations' => $countEvaluations]);
 
         return $user;
+    }
+
+    /** @param array<int, array<string, mixed>> $options */
+    private function optionLabelForKey(array $options, ?string $key): ?string
+    {
+        foreach ($options as $option) {
+            if (($option['key'] ?? null) === $key) {
+                $label = $option['label'] ?? null;
+
+                return is_string($label) ? $label : null;
+            }
+        }
+
+        return null;
     }
 }
