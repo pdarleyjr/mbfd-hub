@@ -12,6 +12,9 @@ use App\Models\WorkgroupFile;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
+use App\Models\WorkgroupSurvey;
+use App\Models\WorkgroupSurveyParticipant;
+use App\Models\WorkgroupSurveyResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
@@ -124,6 +127,29 @@ final class WorkgroupAccess
         return $workgroup instanceof Workgroup && $this->canManageWorkgroup($user, $workgroup);
     }
 
+    public function canViewSurvey(User $user, WorkgroupSurvey $survey): bool
+    {
+        $survey->loadMissing('workgroup');
+
+        return $survey->workgroup instanceof Workgroup && $this->canViewWorkgroup($user, $survey->workgroup);
+    }
+
+    public function canManageSurvey(User $user, WorkgroupSurvey $survey): bool
+    {
+        $survey->loadMissing('workgroup');
+
+        return $survey->workgroup instanceof Workgroup && $this->canManageWorkgroup($user, $survey->workgroup);
+    }
+
+    public function canViewSurveyResponse(User $user, WorkgroupSurveyResponse $response): bool
+    {
+        $response->loadMissing('survey.workgroup');
+
+        return $response->survey instanceof WorkgroupSurvey
+            && ! $response->survey->is_anonymous
+            && $this->canManageSurvey($user, $response->survey);
+    }
+
     public function requireWorkgroup(User $user, Workgroup $workgroup): void
     {
         abort_unless($this->canViewWorkgroup($user, $workgroup), 404);
@@ -162,6 +188,16 @@ final class WorkgroupAccess
     public function requireManageUpload(User $user, WorkgroupSharedUpload $upload): void
     {
         abort_unless($this->canManageUpload($user, $upload), 404);
+    }
+
+    public function requireSurvey(User $user, WorkgroupSurvey $survey): void
+    {
+        abort_unless($this->canViewSurvey($user, $survey), 404);
+    }
+
+    public function requireManageSurvey(User $user, WorkgroupSurvey $survey): void
+    {
+        abort_unless($this->canManageSurvey($user, $survey), 404);
     }
 
     /**
@@ -249,6 +285,46 @@ final class WorkgroupAccess
             /** @var Builder<WorkgroupSession> $sessions */
             return $this->scopeSessions($sessions, $user);
         });
+    }
+
+    /** @param Builder<WorkgroupSurvey> $query @return Builder<WorkgroupSurvey> */
+    public function scopeSurveys(Builder $query, ?User $user): Builder
+    {
+        return $this->scopeByWorkgroupColumn($query, $user, 'workgroup_id');
+    }
+
+    /** @param Builder<WorkgroupSurvey> $query @return Builder<WorkgroupSurvey> */
+    public function scopeManageSurveys(Builder $query, ?User $user): Builder
+    {
+        return $this->scopeByManagedWorkgroupColumn($query, $user, 'workgroup_id');
+    }
+
+    /** @param Builder<WorkgroupSurveyParticipant> $query @return Builder<WorkgroupSurveyParticipant> */
+    public function scopeSurveyParticipants(Builder $query, ?User $user): Builder
+    {
+        if ($user === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->hasRole('super_admin') || $user->can('admin.workgroups.manage')) {
+            return $query;
+        }
+
+        return $query->whereHas('survey', fn (Builder $surveys): Builder => $this->scopeManageSurveys($surveys, $user));
+    }
+
+    /** @param Builder<WorkgroupSurveyResponse> $query @return Builder<WorkgroupSurveyResponse> */
+    public function scopeSurveyResponses(Builder $query, ?User $user): Builder
+    {
+        if ($user === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->hasRole('super_admin') || $user->can('admin.workgroups.manage')) {
+            return $query;
+        }
+
+        return $query->whereHas('survey', fn (Builder $surveys): Builder => $this->scopeManageSurveys($surveys, $user));
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Filament\Pages\NotificationSettings;
 use App\Filament\Pages\SetPasswordPage;
 use App\Filament\Resources\Workgroup\CandidateProductResource;
 use App\Filament\Resources\Workgroup\EvaluationCategoryResource;
+use App\Filament\Resources\Workgroup\SurveyResource;
 use App\Filament\Workgroup\Pages\Dashboard;
 use App\Filament\Workgroup\Pages\EvaluationFormPage;
 use App\Filament\Workgroup\Pages\Evaluations;
@@ -15,6 +16,9 @@ use App\Filament\Workgroup\Pages\Notes;
 use App\Filament\Workgroup\Pages\Profile;
 use App\Filament\Workgroup\Pages\SessionResultsPage;
 use App\Filament\Workgroup\Pages\SharedUploads;
+use App\Filament\Workgroup\Pages\SurveyFormPage;
+use App\Filament\Workgroup\Pages\SurveyResultsPage;
+use App\Filament\Workgroup\Pages\Surveys;
 use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
 use App\Http\Middleware\AuthenticateCanonicalPanelUser;
 use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
@@ -65,14 +69,18 @@ class WorkgroupPanelProvider extends PanelProvider
             ->resources([
                 EvaluationCategoryResource::class,
                 CandidateProductResource::class,
+                SurveyResource::class,
             ])
             ->pages([
                 Dashboard::class,
                 Files::class,
                 Notes::class,
                 Evaluations::class,
+                Surveys::class,
                 SharedUploads::class,
                 EvaluationFormPage::class,
+                SurveyFormPage::class,
+                SurveyResultsPage::class,
                 Profile::class,
                 SessionResultsPage::class,
                 NotificationSettings::class,
@@ -91,7 +99,7 @@ class WorkgroupPanelProvider extends PanelProvider
                     ->icon('heroicon-o-users')
                     ->collapsible(false),
                 NavigationGroup::make()
-                    ->label('Evaluations')
+                    ->label('Evaluations / Surveys')
                     ->icon('heroicon-o-clipboard-document-check')
                     ->collapsible(false),
                 NavigationGroup::make()
