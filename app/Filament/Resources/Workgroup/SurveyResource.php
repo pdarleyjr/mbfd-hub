@@ -64,6 +64,7 @@ class SurveyResource extends Resource
     {
         return $table->columns([
             Tables\Columns\TextColumn::make('title')->searchable()->wrap(),
+            Tables\Columns\TextColumn::make('revision')->label('Revision'),
             Tables\Columns\TextColumn::make('status')->badge(),
             Tables\Columns\IconColumn::make('is_anonymous')->boolean()->label('De-identified'),
             Tables\Columns\TextColumn::make('responses_count')->counts('responses')->label('Responses'),
@@ -77,6 +78,7 @@ class SurveyResource extends Resource
                         $copy = $record->replicate(['created_at', 'updated_at']);
                         $copy->forceFill([
                             'title' => $record->title.' (copy)',
+                            'parent_survey_id' => $record->id,
                             'status' => 'draft',
                             'revision' => $record->revision + 1,
                             'created_by' => auth()->id(),

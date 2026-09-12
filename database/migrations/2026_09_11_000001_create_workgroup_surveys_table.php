@@ -12,6 +12,7 @@ return new class extends Migration
     {
         Schema::create('workgroup_surveys', function (Blueprint $table): void {
             $table->id();
+            $table->foreignId('parent_survey_id')->nullable()->constrained('workgroup_surveys')->nullOnDelete();
             $table->foreignId('workgroup_id')->constrained()->restrictOnDelete();
             $table->foreignId('workgroup_session_id')->nullable()->constrained()->nullOnDelete();
             $table->string('title');
@@ -110,4 +111,3 @@ return new class extends Migration
         Schema::dropIfExists('workgroup_surveys');
     }
 };
-

@@ -102,6 +102,22 @@ class SurveyPlatformTest extends TestCase
         $this->assertSame(15, $survey->questions()->count());
     }
 
+    public function test_a_new_revision_retains_a_parent_link_and_cannot_rewrite_submitted_content(): void
+    {
+        [$user, $survey] = $this->makeSurvey();
+        app(SurveyResponseService::class)->submit($survey, $user, [(string) $survey->questions->first()->id => 'excellent']);
+        $revision = $survey->replicate(['created_at', 'updated_at']);
+        $revision->forceFill([
+            'parent_survey_id' => $survey->id,
+            'revision' => $survey->revision + 1,
+            'status' => 'draft',
+        ])->save();
+
+        $this->assertTrue($revision->parentSurvey->is($survey));
+        $this->assertSame(1, $survey->responses()->whereNotNull('submitted_at')->count());
+        $this->assertSame(0, $revision->responses()->count());
+    }
+
     /** @return array{0: User, 1: WorkgroupSurvey, 2: WorkgroupMember} */
     private function makeSurvey(bool $countEvaluations = true): array
     {
@@ -129,4 +145,3 @@ class SurveyPlatformTest extends TestCase
         return $user;
     }
 }
-
