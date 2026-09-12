@@ -213,6 +213,15 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(preconditions, /php artisan migrate:status/);
   assert.doesNotMatch(preconditions, /git reset|git clean/);
 
+  const previousProduction = workflowStep(deployment, "Capture previous production identity");
+  assert.match(previousProduction, /id:\s*previous-production/);
+  assert.match(previousProduction, /org\.opencontainers\.image\.revision/);
+  assert.match(previousProduction, /\/var\/www\/html\/\.git-sha/);
+  assert.match(previousProduction, /deploy-marker\.json/);
+  assert.match(previousProduction, /PREVIOUS_PRODUCTION_SHA/);
+  assert.match(previousProduction, /GITHUB_OUTPUT/);
+  assert.doesNotMatch(previousProduction, /git rev-parse HEAD/);
+
   const exactCandidate = workflowStep(deployment, "Checkout exact approved candidate");
   assert.match(exactCandidate, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
   assert.match(exactCandidate, /test -n "\$RELEASE_SHA"/);
@@ -253,6 +262,9 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(databaseBackup, /sha256sum/);
   assert.match(databaseBackup, /BACKUP_FILE="\$HUB_BACKUP_DIR\//);
   assert.doesNotMatch(databaseBackup, /BACKUP_DIR=\/var\/lib\/postgresql\/data/);
+  assert.match(databaseBackup, /PREVIOUS_PRODUCTION_SHA/);
+  assert.match(databaseBackup, /previous_production_sha=%s/);
+  assert.doesNotMatch(databaseBackup, /PREVIOUS_SHA="\$\(git rev-parse HEAD\)"/);
 
   const identityBaseline = workflowStep(deployment, "Inventory identities and snapshot established accounts");
   assert.match(identityBaseline, /identity:provision-universal-accounts --format=json/);
@@ -276,6 +288,24 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(immutableImage, /FINAL_IMAGE_DIGEST/);
   assert.match(immutableImage, /IMAGE_REPOSITORY/);
   assert.match(immutableImage, /IMAGE_REF="\$IMAGE_REPOSITORY@\$FINAL_IMAGE_DIGEST"/);
+
+  const canonicalRuntime = workflowStep(deployment, "Verify canonical production runtime configuration");
+  assert.match(canonicalRuntime, /HUB_IMAGE_RUNTIME_ENV/);
+  assert.match(canonicalRuntime, /HUB_IMAGE_REF="\$IMAGE_REF" docker compose/);
+  assert.match(canonicalRuntime, /--env-file "\$HUB_IMAGE_RUNTIME_ENV"/);
+  assert.match(canonicalRuntime, /-f compose\.prod\.image\.yaml/);
+  assert.match(canonicalRuntime, /config --format json/);
+  assert.match(canonicalRuntime, /\.services\["laravel\.test"\]\.image/);
+  assert.match(canonicalRuntime, /\.target == "\/var\/www\/html\/\.env"/);
+  assert.match(canonicalRuntime, /\.read_only == true/);
+  assert.match(canonicalRuntime, /test "\$CONFIGURED_IMAGE" = "\$IMAGE_REF"/);
+  assert.match(canonicalRuntime, /--mount type=bind,src="\$APP_ENV_SOURCE",dst=\/var\/www\/html\/\.env,readonly/);
+  assert.match(canonicalRuntime, /docker run --rm --network none --pull never/);
+  assert.match(canonicalRuntime, /\/var\/www\/html\/bootstrap\/app\.php/);
+  assert.match(canonicalRuntime, /config\("app\.url"\)/);
+  assert.match(canonicalRuntime, /test "\$RUNTIME_APP_URL" = 'https:\/\/www\.mbfdhub\.com'/);
+  assert.doesNotMatch(canonicalRuntime, /docker run[^\r\n]*--env-file/);
+  assert.doesNotMatch(canonicalRuntime, /cat .*\.env|grep .*APP_URL/);
 
   const maintenance = workflowStep(deployment, "Enter maintenance mode and verify queue safety");
   assert.match(maintenance, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
@@ -402,6 +432,7 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(successfulActivation, /org\.opencontainers\.image\.revision/);
   assert.match(successfulActivation, /\/var\/www\/html\/\.git-sha/);
   assert.match(successfulActivation, /"image_digest":"%s"/);
+  assert.match(successfulActivation, /"previous_production_sha":"%s"/);
   assert.match(successfulActivation, /"container_id":"%s"/);
   assert.match(successfulActivation, /deploy-marker\.json/);
   assert.match(successfulActivation, /docker exec -u sail "\$HUB_APP_CONTAINER" sh -c/);
@@ -415,7 +446,10 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(publicSmoke, /RELEASE_SHA:\s*\$\{\{ github\.sha \}\}/);
   assert.match(publicSmoke, /deploy-marker\.json/);
   assert.match(publicSmoke, /jq -er '\.sha'/);
-  assert.match(publicSmoke, /https:\/\/www\.mbfdhub\.com\/daily\/stations\/6[^\r\n]*\)" = '302'/);
+  assert.match(publicSmoke, /https:\/\/mbfdhub\.com\/daily\/stations\?foo=bar/);
+  assert.match(publicSmoke, /test "\$APEX_STATUS" = '308'/);
+  assert.match(publicSmoke, /test "\$APEX_LOCATION" = 'https:\/\/www\.mbfdhub\.com\/daily\/stations\?foo=bar'/);
+  assert.match(publicSmoke, /https:\/\/www\.mbfdhub\.com\/daily\/stations[^\r\n]*\)" = '302'/);
   assert.match(publicSmoke, /https:\/\/www\.mbfdhub\.com\/api\/public\/stations[^\r\n]*\)" = '302'/);
 
   assert.doesNotMatch(deploy, /docker compose[^\r\n]*--build/);
@@ -429,11 +463,20 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(imageCompose, /HUB_IMAGE_REF must be an immutable image digest/);
 
   const checkoutIndex = deployment.indexOf("Checkout exact approved candidate");
+  const previousProductionIndex = deployment.indexOf("Capture previous production identity");
   const pullIndex = deployment.indexOf("Pull and verify immutable Hub image");
+  const canonicalRuntimeIndex = deployment.indexOf("Verify canonical production runtime configuration");
   const backupIndex = deployment.indexOf("Verify targeted Hub database backup");
   const maintenanceIndex = deployment.indexOf("Enter maintenance mode and verify queue safety");
   const healthIndex = deployment.indexOf("Verify Hub application health");
-  assert.ok(checkoutIndex >= 0 && pullIndex > checkoutIndex && backupIndex > pullIndex && maintenanceIndex > backupIndex);
+  assert.ok(previousProductionIndex >= 0 && previousProductionIndex < checkoutIndex);
+  assert.ok(
+    checkoutIndex >= 0 &&
+      pullIndex > checkoutIndex &&
+      canonicalRuntimeIndex > pullIndex &&
+      backupIndex > canonicalRuntimeIndex &&
+      maintenanceIndex > backupIndex,
+  );
   assert.ok(healthIndex > maintenanceIndex);
 
   assert.match(prepare, /^on:\r?\n  workflow_dispatch:/m);
