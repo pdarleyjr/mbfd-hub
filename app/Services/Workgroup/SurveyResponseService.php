@@ -106,6 +106,11 @@ final class SurveyResponseService
     /** @param array<int|string, mixed> $answers */
     private function validateAnswers(WorkgroupSurvey $survey, array $answers, bool $requireComplete): void
     {
+        // Form pages can retain a loaded relation while an authorized draft is
+        // edited. Validate against the current revision definitions, not a
+        // stale in-memory question collection.
+        $survey->load('questions');
+
         foreach ($survey->questions as $question) {
             $value = Arr::get($answers, (string) $question->id, Arr::get($answers, $question->id));
             if ($value === null || $value === '' || $value === []) {
