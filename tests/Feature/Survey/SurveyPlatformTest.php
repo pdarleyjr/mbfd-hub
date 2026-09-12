@@ -26,13 +26,13 @@ class SurveyPlatformTest extends TestCase
     {
         [$user, $survey, $member] = $this->makeSurvey();
         $service = app(SurveyResponseService::class);
-        $response = $service->submit($survey, $user, [(string) $survey->questions->first()->id => 'yes']);
+        $response = $service->submit($survey, $user, [(string) $survey->questions->first()->id => 'excellent']);
 
         $this->assertNull($response->workgroup_member_id);
         $this->assertSame(1, WorkgroupSurveyParticipant::query()->where('survey_id', $survey->id)->whereNotNull('submitted_at')->count());
         $this->assertFalse(app(WorkgroupAccess::class)->canViewSurveyResponse($user, $response));
         $this->expectExceptionMessage('already been submitted');
-        $service->submit($survey, $user, [(string) $survey->questions->first()->id => 'yes']);
+        $service->submit($survey, $user, [(string) $survey->questions->first()->id => 'excellent']);
     }
 
     public function test_identified_surveys_retain_the_respondent_link(): void
