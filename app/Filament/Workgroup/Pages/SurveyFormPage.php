@@ -28,7 +28,9 @@ class SurveyFormPage extends Page
         $this->surveyId = (int) request()->integer('surveyId');
         $user = auth()->user();
         abort_unless($user instanceof User && $this->surveyId > 0, 404);
-        $this->survey = app(WorkgroupAccess::class)->scopeSurveys(WorkgroupSurvey::with('questions'), $user)->find($this->surveyId);
+        /** @var WorkgroupSurvey|null $survey */
+        $survey = app(WorkgroupAccess::class)->scopeSurveys(WorkgroupSurvey::query()->with('questions'), $user)->find($this->surveyId);
+        $this->survey = $survey;
         abort_unless($this->survey instanceof WorkgroupSurvey, 404);
         $response = app(SurveyResponseService::class)->draftFor($this->survey, $user)->load('answers');
         $this->submitted = $response->submitted_at !== null;
