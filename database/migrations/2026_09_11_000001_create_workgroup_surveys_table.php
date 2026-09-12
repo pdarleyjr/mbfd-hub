@@ -65,6 +65,9 @@ return new class extends Migration
         Schema::create('workgroup_survey_responses', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('survey_id')->constrained('workgroup_surveys')->cascadeOnDelete();
+            // Identified surveys retain their respondent only when that mode was
+            // selected. Anonymous responses remain deliberately unlinked.
+            $table->foreignId('workgroup_member_id')->nullable()->constrained()->nullOnDelete();
             $table->unsignedInteger('survey_revision');
             $table->uuid('participant_token')->unique();
             $table->json('demographics')->nullable();
@@ -72,6 +75,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['survey_id', 'submitted_at']);
+            $table->index(['survey_id', 'workgroup_member_id']);
         });
 
         Schema::create('workgroup_survey_answers', function (Blueprint $table): void {

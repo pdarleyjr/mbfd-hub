@@ -57,7 +57,7 @@ class SurveyFormPage extends Page
     {
         $this->responseService()->submit($this->requiredSurvey(), $this->user(), $this->answers, $this->demographics);
         $this->submitted = true;
-        Notification::make()->success()->title('Survey submitted')->body('Thank you. Your answers are de-identified in reporting.')->send();
+        Notification::make()->success()->title('Survey submitted')->body($this->requiredSurvey()->is_anonymous ? 'Thank you. Your answers are de-identified in reporting.' : 'Thank you. Your response has been recorded.')->send();
     }
 
     private function requiredSurvey(): WorkgroupSurvey

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Filament\Workgroup\Pages;
 
 use App\Models\User;
+use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSurvey;
+use App\Models\WorkgroupSurveyParticipant;
 use App\Models\WorkgroupSurveyReport;
 use App\Services\Workgroup\SurveyAnalyticsService;
 use App\Services\Workgroup\SurveyExecutiveNarrativeService;
@@ -31,6 +33,9 @@ class SurveyResultsPage extends Page
 
     public ?WorkgroupSurveyReport $report = null;
 
+    /** @var list<array{id: int, name: string, eligible: bool, submitted: bool, included: bool}> */
+    public array $roster = [];
+
     public function mount(): void
     {
         $this->surveyId = (int) request()->integer('surveyId');
@@ -41,6 +46,7 @@ class SurveyResultsPage extends Page
         $this->survey = $survey;
         abort_unless($this->survey instanceof WorkgroupSurvey, 404);
         $this->analytics = app(SurveyAnalyticsService::class)->calculate($this->survey);
+        $this->refreshRoster();
     }
 
     /** Explicit action only; no page-load AI invocation. */
@@ -80,6 +86,38 @@ class SurveyResultsPage extends Page
         ])->setPaper('letter', 'portrait')->download('workgroup-survey-'.$survey->id.'-'.now()->format('Y-m-d').'.pdf');
     }
 
+    public function synchronizeRoster(): void
+    {
+        $survey = $this->requiredSurvey();
+        app(WorkgroupAccess::class)->requireManageSurvey($this->user(), $survey);
+        WorkgroupMember::query()->where('workgroup_id', $survey->workgroup_id)->where('is_active', true)->each(function (WorkgroupMember $member) use ($survey): void {
+            WorkgroupSurveyParticipant::query()->firstOrCreate(
+                ['survey_id' => $survey->id, 'workgroup_member_id' => $member->id],
+                ['is_eligible' => true, 'include_in_analysis' => $member->count_evaluations],
+            );
+        });
+        $this->refreshRoster();
+        $this->refreshAnalytics();
+        Notification::make()->success()->title('Participant roster synchronized')->send();
+    }
+
+    public function toggleEligibility(int $participantId): void
+    {
+        $participant = $this->requiredParticipant($participantId);
+        $participant->update(['is_eligible' => ! $participant->is_eligible]);
+        $this->refreshRoster();
+        $this->refreshAnalytics();
+    }
+
+    public function toggleAnalysisInclusion(int $participantId): void
+    {
+        $participant = $this->requiredParticipant($participantId);
+        app(WorkgroupAccess::class)->requireManageSurvey($this->user(), $this->requiredSurvey());
+        $participant->update(['include_in_analysis' => ! $participant->include_in_analysis]);
+        $this->refreshRoster();
+        $this->refreshAnalytics();
+    }
+
     private function requiredSurvey(): WorkgroupSurvey
     {
         abort_unless($this->survey instanceof WorkgroupSurvey, 404);
@@ -93,5 +131,35 @@ class SurveyResultsPage extends Page
         abort_unless($user instanceof User, 404);
 
         return $user;
+    }
+
+    private function requiredParticipant(int $participantId): WorkgroupSurveyParticipant
+    {
+        app(WorkgroupAccess::class)->requireManageSurvey($this->user(), $this->requiredSurvey());
+        /** @var WorkgroupSurveyParticipant|null $participant */
+        $participant = $this->requiredSurvey()->participants()->find($participantId);
+        abort_unless($participant instanceof WorkgroupSurveyParticipant, 404);
+
+        return $participant;
+    }
+
+    private function refreshAnalytics(): void
+    {
+        $survey = $this->requiredSurvey()->fresh();
+        abort_unless($survey instanceof WorkgroupSurvey, 404);
+        $this->survey = $survey;
+        $this->analytics = app(SurveyAnalyticsService::class)->calculate($survey);
+    }
+
+    private function refreshRoster(): void
+    {
+        $this->roster = $this->requiredSurvey()->participants()->with('member.user')->orderBy('id')->get()
+            ->map(fn (WorkgroupSurveyParticipant $participant): array => [
+                'id' => $participant->id,
+                'name' => $participant->member->name,
+                'eligible' => $participant->is_eligible,
+                'submitted' => $participant->submitted_at !== null,
+                'included' => $participant->include_in_analysis,
+            ])->all();
     }
 }

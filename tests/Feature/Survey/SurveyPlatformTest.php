@@ -24,15 +24,27 @@ class SurveyPlatformTest extends TestCase
 
     public function test_submission_separates_anonymous_content_from_participation_and_is_immutable(): void
     {
-        [$user, $survey] = $this->makeSurvey();
+        [$user, $survey, $member] = $this->makeSurvey();
         $service = app(SurveyResponseService::class);
         $response = $service->submit($survey, $user, [(string) $survey->questions->first()->id => 'yes']);
 
-        $this->assertArrayNotHasKey('workgroup_member_id', $response->getAttributes());
+        $this->assertNull($response->workgroup_member_id);
         $this->assertSame(1, WorkgroupSurveyParticipant::query()->where('survey_id', $survey->id)->whereNotNull('submitted_at')->count());
         $this->assertFalse(app(WorkgroupAccess::class)->canViewSurveyResponse($user, $response));
         $this->expectExceptionMessage('already been submitted');
         $service->submit($survey, $user, [(string) $survey->questions->first()->id => 'yes']);
+    }
+
+    public function test_identified_surveys_retain_the_respondent_link(): void
+    {
+        [$user, $survey, $member] = $this->makeSurvey();
+        $survey->update(['is_anonymous' => false]);
+
+        $response = app(SurveyResponseService::class)->submit($survey, $user, [(string) $survey->questions->first()->id => 'excellent']);
+
+        $this->assertSame($member->id, $response->workgroup_member_id);
+        $this->assertTrue($response->member->is($member));
+        $this->assertTrue(app(WorkgroupAccess::class)->canViewSurveyResponse($user, $response));
     }
 
     public function test_per_survey_inclusion_defaults_once_from_evaluations_and_is_independent_afterwards(): void

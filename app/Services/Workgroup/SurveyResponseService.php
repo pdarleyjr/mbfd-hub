@@ -43,10 +43,21 @@ final class SurveyResponseService
             $participant->forceFill(['response_token' => (string) Str::uuid()])->save();
         }
 
-        return WorkgroupSurveyResponse::query()->firstOrCreate(
+        $response = WorkgroupSurveyResponse::query()->firstOrCreate(
             ['participant_token' => $participant->response_token],
-            ['survey_id' => $survey->id, 'survey_revision' => $survey->revision],
+            [
+                'survey_id' => $survey->id,
+                'workgroup_member_id' => $survey->is_anonymous ? null : $participant->workgroup_member_id,
+                'survey_revision' => $survey->revision,
+            ],
         );
+
+        $memberId = $survey->is_anonymous ? null : $participant->workgroup_member_id;
+        if ($response->workgroup_member_id !== $memberId) {
+            $response->update(['workgroup_member_id' => $memberId]);
+        }
+
+        return $response;
     }
 
     /** @param array<int|string, mixed> $answers @param array<string, mixed> $demographics */
