@@ -12,6 +12,7 @@ use App\Models\WorkgroupSurveyParticipant;
 use App\Services\Workgroup\SurveyAnalyticsService;
 use App\Services\Workgroup\SurveyResponseService;
 use App\Support\Workgroups\BackToBasicsSurveyBlueprint;
+use App\Support\Workgroups\WorkgroupAccess;
 use App\Support\Workgroups\WorkgroupContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -29,6 +30,7 @@ class SurveyPlatformTest extends TestCase
 
         $this->assertArrayNotHasKey('workgroup_member_id', $response->getAttributes());
         $this->assertSame(1, WorkgroupSurveyParticipant::query()->where('survey_id', $survey->id)->whereNotNull('submitted_at')->count());
+        $this->assertFalse(app(WorkgroupAccess::class)->canViewSurveyResponse($user, $response));
         $this->expectExceptionMessage('already been submitted');
         $service->submit($survey, $user, [(string) $survey->questions->first()->id => 'yes']);
     }

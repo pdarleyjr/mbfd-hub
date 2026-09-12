@@ -320,6 +320,8 @@ final class WorkgroupAccess
             return $query->whereRaw('1 = 0');
         }
 
+        $query->whereHas('survey', fn (Builder $surveys): Builder => $surveys->where('is_anonymous', false));
+
         if ($user->hasRole('super_admin') || $user->can('admin.workgroups.manage')) {
             return $query;
         }
