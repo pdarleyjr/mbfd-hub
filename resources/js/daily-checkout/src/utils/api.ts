@@ -9,6 +9,12 @@ import {
 
 const API_BASE = '/api';
 
+declare global {
+  interface Window {
+    __MBFD_CANONICAL_ORIGIN__?: string;
+  }
+}
+
 // Default headers for all API requests
 const DEFAULT_HEADERS = {
   'Accept': 'application/json',
@@ -49,6 +55,37 @@ export class ApiRequestError extends Error {
     super(message);
     this.name = 'ApiRequestError';
   }
+}
+
+let sessionExpiryRedirectStarted = false;
+
+export function isApiAuthenticationError(error: unknown): error is ApiRequestError {
+  return error instanceof ApiRequestError && error.status === 401;
+}
+
+export function redirectToLoginAfterSessionExpiry(): void {
+  if (
+    typeof window === 'undefined'
+    || sessionExpiryRedirectStarted
+    || window.location.pathname === '/login'
+  ) {
+    return;
+  }
+
+  sessionExpiryRedirectStarted = true;
+  const configuredOrigin = window.__MBFD_CANONICAL_ORIGIN__;
+  let loginUrl = new URL('/login', window.location.origin);
+
+  if (typeof configuredOrigin === 'string' && configuredOrigin.trim() !== '') {
+    try {
+      loginUrl = new URL('/login', configuredOrigin);
+    } catch {
+      // Fall back to the current origin when runtime configuration is absent or invalid.
+    }
+  }
+
+  loginUrl.searchParams.set('session_expired', '1');
+  window.location.replace(loginUrl.toString());
 }
 
 export const isChecklistVersion = (value: unknown): value is string => (
@@ -348,7 +385,7 @@ export class ApiClient {
       cache: 'no-store',
     });
     if (!response.ok) {
-      throw new Error('Failed to fetch stations');
+      throw new ApiRequestError(await responseMessage(response, 'Failed to fetch stations'), response.status);
     }
     const data = await response.json();
     return data.stations || data; // Extract stations array from response
@@ -360,7 +397,7 @@ export class ApiClient {
       cache: 'no-store',
     });
     if (!response.ok) {
-      throw new Error('Failed to fetch station');
+      throw new ApiRequestError(await responseMessage(response, 'Failed to fetch station'), response.status);
     }
     return response.json();
   }
