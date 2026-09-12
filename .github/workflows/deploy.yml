@@ -76,6 +76,8 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: self-hosted
     timeout-minutes: 60
+    outputs:
+      previous_production_sha: ${{ steps.previous-production.outputs.sha }}
     environment:
       name: production
       url: https://www.mbfdhub.com
@@ -141,6 +143,31 @@ jobs:
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan migrate:status --no-ansi
           REMOTE
 
+      - name: Capture previous production identity
+        id: previous-production
+        run: |
+          set -euo pipefail
+          PREVIOUS_PRODUCTION_SHA="$(ssh -F "$HUB_SSH_CONFIG" deploy-target 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          RUNNING_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$HUB_APP_CONTAINER")"
+          OCI_REVISION="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$RUNNING_IMAGE_ID")"
+          EMBEDDED_GIT_SHA="$(docker exec -u sail "$HUB_APP_CONTAINER" cat /var/www/html/.git-sha)"
+          MARKER_SHA="$(docker exec -u sail "$HUB_APP_CONTAINER" php -r '
+          $marker = json_decode(file_get_contents("/var/www/html/public/deploy-marker.json"), true, flags: JSON_THROW_ON_ERROR);
+          echo $marker["sha"];
+          ')"
+          test "$OCI_REVISION" = "$EMBEDDED_GIT_SHA"
+          test "$OCI_REVISION" = "$MARKER_SHA"
+          printf '%s\n' "$OCI_REVISION"
+          REMOTE
+          )"
+          [[ "$PREVIOUS_PRODUCTION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          printf 'PREVIOUS_PRODUCTION_SHA=%s\n' "$PREVIOUS_PRODUCTION_SHA"
+          printf 'PREVIOUS_PRODUCTION_SHA=%s\n' "$PREVIOUS_PRODUCTION_SHA" >> "$GITHUB_ENV"
+          printf 'sha=%s\n' "$PREVIOUS_PRODUCTION_SHA" >> "$GITHUB_OUTPUT"
+          printf 'PREVIOUS_PRODUCTION_SHA=%s\n' "$PREVIOUS_PRODUCTION_SHA" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Checkout exact approved candidate
         env:
           RELEASE_SHA: ${{ github.sha }}
@@ -173,15 +200,44 @@ jobs:
           test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_REF")" = "$FINAL_RELEASE_SHA"
           REMOTE
 
+      - name: Verify canonical production runtime configuration
+        env:
+          FINAL_IMAGE_DIGEST: ${{ inputs.final_image_digest }}
+          HUB_IMAGE_RUNTIME_ENV: ${{ vars.MBFD_HUB_IMAGE_RUNTIME_ENV }}
+        run: |
+          set -euo pipefail
+          test -n "$FINAL_IMAGE_DIGEST"
+          test -n "$HUB_IMAGE_RUNTIME_ENV"
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' bash -s" <<'REMOTE'
+          set -euo pipefail
+          case "$HUB_IMAGE_RUNTIME_ENV" in /*) ;; *) exit 1 ;; esac
+          test -f "$HUB_IMAGE_RUNTIME_ENV"
+          cd /opt/mbfd/mbfd-hub
+          IMAGE_REPOSITORY="$(head -n 1 docker/production/image-repository)"
+          test "$IMAGE_REPOSITORY" = 'ghcr.io/pdarleyjr/mbfd-hub'
+          IMAGE_REF="$IMAGE_REPOSITORY@$FINAL_IMAGE_DIGEST"
+          RUNTIME_APP_URL="$(docker run --rm --network none --pull never \
+            --env-file "$HUB_IMAGE_RUNTIME_ENV" --entrypoint php "$IMAGE_REF" -r '
+            require "/var/www/html/vendor/autoload.php";
+            $app = require "/var/www/html/bootstrap/app.php";
+            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+            echo config("app.url");
+            ')"
+          test "$RUNTIME_APP_URL" = 'https://www.mbfdhub.com'
+          printf 'RUNTIME_APP_URL=%s\n' "$RUNTIME_APP_URL"
+          REMOTE
+
       - name: Verify targeted Hub database backup
         env:
           RELEASE_SHA: ${{ github.sha }}
           HUB_BACKUP_DIR: ${{ vars.MBFD_HUB_BACKUP_DIR }}
+          PREVIOUS_PRODUCTION_SHA: ${{ env.PREVIOUS_PRODUCTION_SHA }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
           test -n "$HUB_BACKUP_DIR"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' bash -s" <<'REMOTE'
+          [[ "$PREVIOUS_PRODUCTION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' PREVIOUS_PRODUCTION_SHA='$PREVIOUS_PRODUCTION_SHA' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_CHECKOUT=/opt/mbfd/mbfd-hub
           HUB_PG_CONTAINER=mbfd-hub-pgsql
@@ -231,7 +287,6 @@ jobs:
            test -w "$HUB_BACKUP_DIR"
 
            cd "$HUB_CHECKOUT"
-           PREVIOUS_SHA="$(git rev-parse HEAD)"
            BACKUP_ID="mbfd-hub-pre-activation-$(date -u +%Y%m%dT%H%M%SZ)-$RELEASE_SHA"
            BACKUP_FILE="$HUB_BACKUP_DIR/$BACKUP_ID.dump"
           umask 077
@@ -239,8 +294,8 @@ jobs:
           test -s "$BACKUP_FILE"
           docker exec -i "$HUB_PG_CONTAINER" pg_restore --list < "$BACKUP_FILE" > /dev/null
            BACKUP_SHA256="$(sha256sum "$BACKUP_FILE" | awk '{print $1}')"
-           printf 'release_sha=%s\nprevious_sha=%s\ncreated_at=%s\nbackup_file=%s\nsha256=%s\n' \
-             "$RELEASE_SHA" "$PREVIOUS_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BACKUP_FILE" "$BACKUP_SHA256" > "$HUB_BACKUP_DIR/$BACKUP_ID.metadata"
+           printf 'release_sha=%s\nprevious_production_sha=%s\nprevious_sha=%s\ncreated_at=%s\nbackup_file=%s\nsha256=%s\n' \
+             "$RELEASE_SHA" "$PREVIOUS_PRODUCTION_SHA" "$PREVIOUS_PRODUCTION_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$BACKUP_FILE" "$BACKUP_SHA256" > "$HUB_BACKUP_DIR/$BACKUP_ID.metadata"
           echo "Verified Hub backup: $BACKUP_FILE sha256=$BACKUP_SHA256"
           REMOTE
 
@@ -610,11 +665,13 @@ jobs:
         env:
           RELEASE_SHA: ${{ github.sha }}
           FINAL_IMAGE_DIGEST: ${{ inputs.final_image_digest }}
+          PREVIOUS_PRODUCTION_SHA: ${{ env.PREVIOUS_PRODUCTION_SHA }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
           test -n "$FINAL_IMAGE_DIGEST"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' bash -s" <<'REMOTE'
+          [[ "$PREVIOUS_PRODUCTION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' PREVIOUS_PRODUCTION_SHA='$PREVIOUS_PRODUCTION_SHA' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
           test "$(docker inspect --format '{{.State.Running}}' "$HUB_APP_CONTAINER")" = 'true'
@@ -633,7 +690,7 @@ jobs:
           test "$RUNNING_OCI_REVISION" = "$RELEASE_SHA"
           RUNNING_GIT_SHA="$(docker exec -u sail "$HUB_APP_CONTAINER" cat /var/www/html/.git-sha)"
           test "$RUNNING_GIT_SHA" = "$RELEASE_SHA"
-          DEPLOY_MARKER="$(printf '{"sha":"%s","image_digest":"%s","image_id":"%s","oci_revision":"%s","embedded_git_sha":"%s","container_id":"%s","deployed_at":"%s"}' "$RUNNING_GIT_SHA" "$RUNNING_IMAGE_DIGEST" "$RUNNING_IMAGE_ID" "$RUNNING_OCI_REVISION" "$RUNNING_GIT_SHA" "$RUNNING_CONTAINER_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")"
+          DEPLOY_MARKER="$(printf '{"sha":"%s","previous_production_sha":"%s","image_digest":"%s","image_id":"%s","oci_revision":"%s","embedded_git_sha":"%s","container_id":"%s","deployed_at":"%s"}' "$RUNNING_GIT_SHA" "$PREVIOUS_PRODUCTION_SHA" "$RUNNING_IMAGE_DIGEST" "$RUNNING_IMAGE_ID" "$RUNNING_OCI_REVISION" "$RUNNING_GIT_SHA" "$RUNNING_CONTAINER_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")"
           docker exec -u sail "$HUB_APP_CONTAINER" sh -c "printf '%s\n' '$DEPLOY_MARKER' > /var/www/html/public/deploy-marker.json"
           printf '%s\n' "$DEPLOY_MARKER" > /opt/mbfd/mbfd-hub/public/deploy-marker.json
           REMOTE
@@ -643,9 +700,15 @@ jobs:
           RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+          APEX_HEADERS="$(mktemp)"
+          trap 'rm -f -- "$APEX_HEADERS"' EXIT
           curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 15 https://www.mbfdhub.com/up > /dev/null
           test "$(curl --silent --show-error --location --max-time 15 --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/)" = '200'
-          test "$(curl --silent --show-error --max-time 15 --header 'Cookie:' --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/daily/stations/6)" = '302'
+          APEX_STATUS="$(curl --silent --show-error --max-time 15 --header 'Cookie:' --dump-header "$APEX_HEADERS" --output /dev/null --write-out '%{http_code}' 'https://mbfdhub.com/daily/stations?foo=bar')"
+          test "$APEX_STATUS" = '308'
+          APEX_LOCATION="$(awk 'tolower($1) == "location:" { $1=""; sub(/^ /, ""); sub(/\r$/, ""); print }' "$APEX_HEADERS" | tail -n 1)"
+          test "$APEX_LOCATION" = 'https://www.mbfdhub.com/daily/stations?foo=bar'
+          test "$(curl --silent --show-error --max-time 15 --header 'Cookie:' --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/daily/stations)" = '302'
           test "$(curl --silent --show-error --max-time 15 --header 'Cookie:' --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/api/public/stations)" = '302'
           MARKER_SHA="$(curl --fail --silent --show-error --retry 3 --retry-delay 2 --max-time 15 https://www.mbfdhub.com/deploy-marker.json | jq -er '.sha')"
           test "$MARKER_SHA" = "$RELEASE_SHA"

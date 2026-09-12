@@ -40,6 +40,10 @@ $app = Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Auth\Middleware\Authenticate::class,
             \App\Http\Middleware\EnforceMemberBootstrapBoundary::class,
         );
+        $middleware->prependToPriorityList(
+            \App\Http\Middleware\AuthenticateOutsideMemberBootstrap::class,
+            \App\Http\Middleware\CanonicalHostRedirect::class,
+        );
 
         $middleware->alias([
             'auth' => \App\Http\Middleware\AuthenticateOutsideMemberBootstrap::class,
