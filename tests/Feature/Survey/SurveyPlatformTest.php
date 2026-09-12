@@ -400,6 +400,22 @@ class SurveyPlatformTest extends TestCase
         $survey->delete();
     }
 
+    public function test_pdf_export_is_delivered_through_livewire_as_a_download(): void
+    {
+        [$user, $survey] = $this->makeSurvey();
+        $this->actingAs($user);
+        Filament::setCurrentPanel(Filament::getPanel('workgroups'));
+
+        Livewire::withQueryParams(['surveyId' => $survey->id])
+            ->test(SurveyResultsPage::class)
+            ->call('downloadPdf')
+            ->assertFileDownloaded(
+                'workgroup-survey-'.$survey->id.'-'.now()->format('Y-m-d').'.pdf',
+                null,
+                'application/pdf',
+            );
+    }
+
     public function test_anonymous_csv_pdf_print_and_ai_payloads_do_not_contain_member_identity_or_other_text(): void
     {
         [$user, $survey] = $this->makeSurvey();
@@ -427,7 +443,8 @@ class SurveyPlatformTest extends TestCase
         $page->survey = $survey;
         $csv = $this->streamedContent($page->exportCsv());
         $printable = $this->streamedContent($page->downloadPrintableHtml());
-        $pdf = (string) $page->downloadPdf()->getContent();
+        $pdf = $this->streamedContent($page->downloadPdf());
+        $this->assertStringStartsWith('%PDF-', $pdf);
         foreach ([$csv, $printable, $pdf] as $artifact) {
             $this->assertStringNotContainsString('Sensitive Respondent Name', $artifact);
         }

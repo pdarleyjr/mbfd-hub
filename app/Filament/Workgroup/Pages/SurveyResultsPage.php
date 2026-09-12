@@ -84,10 +84,16 @@ class SurveyResultsPage extends Page
         $survey = $this->requiredSurvey();
         $analytics = app(SurveyAnalyticsService::class)->calculate($survey);
 
-        return Pdf::loadView('filament-workgroup.pages.survey-results-pdf', [
+        $pdf = Pdf::loadView('filament-workgroup.pages.survey-results-pdf', [
             'survey' => $survey,
             'analytics' => $analytics,
-        ])->setPaper('letter', 'portrait')->download('workgroup-survey-'.$survey->id.'-'.now()->format('Y-m-d').'.pdf');
+        ])->setPaper('letter', 'portrait');
+
+        return response()->streamDownload(
+            static fn () => print $pdf->output(),
+            'workgroup-survey-'.$survey->id.'-'.now()->format('Y-m-d').'.pdf',
+            ['Content-Type' => 'application/pdf'],
+        );
     }
 
     public function downloadPrintableHtml()
