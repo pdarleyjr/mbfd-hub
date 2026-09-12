@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 /**
  * @property int $id
@@ -39,6 +40,24 @@ class WorkgroupSurvey extends Model
             'opens_at' => 'datetime',
             'closes_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $survey): void {
+            if (! $survey->hasResponses()) {
+                return;
+            }
+
+            $structuralFields = [
+                'parent_survey_id', 'workgroup_id', 'workgroup_session_id', 'title', 'description',
+                'is_anonymous', 'eligibility_mode', 'demographic_fields', 'minimum_subgroup_size', 'revision',
+            ];
+
+            if ($survey->isDirty($structuralFields)) {
+                throw new LogicException('Submitted survey revisions are structurally immutable. Duplicate the survey to create a new revision.');
+            }
+        });
     }
 
     /** @return BelongsTo<Workgroup, $this> */

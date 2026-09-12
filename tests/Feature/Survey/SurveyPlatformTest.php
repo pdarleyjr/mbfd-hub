@@ -108,7 +108,28 @@ class SurveyPlatformTest extends TestCase
     public function test_a_new_revision_retains_a_parent_link_and_cannot_rewrite_submitted_content(): void
     {
         [$user, $survey] = $this->makeSurvey();
-        app(SurveyResponseService::class)->submit($survey, $user, [(string) $survey->questions->first()->id => 'excellent']);
+        $question = $survey->questions->first();
+        app(SurveyResponseService::class)->submit($survey, $user, [(string) $question->id => 'excellent']);
+
+        $this->expectException(\LogicException::class);
+        $question->update(['prompt' => 'Reinterpreted question']);
+    }
+
+    public function test_submitted_answers_use_their_schema_snapshot_even_if_storage_is_tampered_with(): void
+    {
+        [$user, $survey] = $this->makeSurvey();
+        $question = $survey->questions->first();
+        app(SurveyResponseService::class)->submit($survey, $user, [(string) $question->id => 'excellent']);
+
+        $question->forceFill([
+            'prompt' => 'Tampered question',
+            'configuration' => ['options' => [['key' => 'excellent', 'label' => 'Excellent', 'score' => 1]]],
+        ])->saveQuietly();
+
+        $analytics = app(SurveyAnalyticsService::class)->calculate($survey->fresh());
+        $this->assertSame('Rate it', $analytics['questions'][0]['prompt']);
+        $this->assertSame(5.0, $analytics['questions'][0]['metrics']['mean']);
+
         $revision = $survey->replicate(['created_at', 'updated_at']);
         $revision->forceFill([
             'parent_survey_id' => $survey->id,

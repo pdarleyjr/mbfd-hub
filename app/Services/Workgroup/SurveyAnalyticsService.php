@@ -29,11 +29,12 @@ final class SurveyAnalyticsService
         foreach ($survey->questions as $question) {
             $answers = $responses->map(fn (WorkgroupSurveyResponse $response) => $response->answers->firstWhere('survey_question_id', $question->id))
                 ->filter(fn ($answer) => $answer instanceof WorkgroupSurveyAnswer);
+            $definition = $this->definitionFor($question, $answers);
             $questions[] = [
-                'position' => $question->position,
-                'prompt' => $question->prompt,
-                'type' => $question->type,
-                'metrics' => $this->questionMetrics($question->type, $question->configurationData(), $answers),
+                'position' => $definition['position'],
+                'prompt' => $definition['prompt'],
+                'type' => $definition['type'],
+                'metrics' => $this->questionMetrics($definition['type'], $definition['configuration'], $answers),
             ];
         }
 
@@ -55,6 +56,19 @@ final class SurveyAnalyticsService
                 'minimum_subgroup_size' => $survey->minimum_subgroup_size,
                 'non_scored_options' => 'Non-scored options remain in distributions and are excluded from numeric denominators.',
             ],
+        ];
+    }
+
+    /** @param Collection<int, WorkgroupSurveyAnswer> $answers @return array{position: int, prompt: string, type: string, configuration: array<string, mixed>} */
+    private function definitionFor(\App\Models\WorkgroupSurveyQuestion $question, Collection $answers): array
+    {
+        $snapshot = $answers->first()?->questionSnapshotData() ?? [];
+
+        return [
+            'position' => is_int($snapshot['position'] ?? null) ? $snapshot['position'] : $question->position,
+            'prompt' => is_string($snapshot['prompt'] ?? null) ? $snapshot['prompt'] : $question->prompt,
+            'type' => is_string($snapshot['type'] ?? null) ? $snapshot['type'] : $question->type,
+            'configuration' => is_array($snapshot['configuration'] ?? null) ? $snapshot['configuration'] : $question->configurationData(),
         ];
     }
 

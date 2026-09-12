@@ -24,6 +24,14 @@ class WorkgroupSurveyAnswer extends Model
         return is_array($answer) ? ($answer['value'] ?? null) : null;
     }
 
+    /** @return array<string, mixed> */
+    public function questionSnapshotData(): array
+    {
+        $snapshot = $this->getAttribute('question_snapshot');
+
+        return is_array($snapshot) ? $snapshot : [];
+    }
+
     /** @return BelongsTo<WorkgroupSurveyResponse, $this> */
     public function response(): BelongsTo
     {
