@@ -12,7 +12,7 @@ final class CanonicalHostRedirectTest extends TestCase
     {
         config(['app.url' => 'https://www.mbfdhub.com']);
 
-        $this->withServerVariables(['HTTP_HOST' => 'mbfdhub.com'])
+        $this->withHeader('Host', 'mbfdhub.com')
             ->get('/daily/stations?foo=bar')
             ->assertStatus(308)
             ->assertHeader('Location', 'https://www.mbfdhub.com/daily/stations?foo=bar');
@@ -22,7 +22,7 @@ final class CanonicalHostRedirectTest extends TestCase
     {
         config(['app.url' => 'https://www.mbfdhub.com']);
 
-        $response = $this->withServerVariables(['HTTP_HOST' => 'www.mbfdhub.com'])
+        $response = $this->withHeader('Host', 'www.mbfdhub.com')
             ->get('/daily/stations?foo=bar');
 
         $response->assertStatus(302);
@@ -33,7 +33,7 @@ final class CanonicalHostRedirectTest extends TestCase
     {
         config(['app.url' => 'https://www.mbfdhub.com']);
 
-        $this->withServerVariables(['HTTP_HOST' => 'localhost'])
+        $this->withHeader('Host', 'localhost')
             ->get('/daily/stations?foo=bar')
             ->assertRedirect('/login');
     }
