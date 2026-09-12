@@ -12,6 +12,7 @@ use App\Models\WorkgroupSurveyReport;
 use App\Services\Workgroup\SurveyAnalyticsService;
 use App\Services\Workgroup\SurveyExecutiveNarrativeService;
 use App\Support\Workgroups\WorkgroupAccess;
+use App\Support\Workgroups\WorkgroupContext;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -41,8 +42,11 @@ class SurveyResultsPage extends Page
         $this->surveyId = (int) request()->integer('surveyId');
         $user = auth()->user();
         abort_unless($user instanceof User && $this->surveyId > 0, 404);
+        $current = app(WorkgroupContext::class)->requireCurrent($user);
         /** @var WorkgroupSurvey|null $survey */
-        $survey = app(WorkgroupAccess::class)->scopeManageSurveys(WorkgroupSurvey::query()->with('questions'), $user)->find($this->surveyId);
+        $survey = app(WorkgroupAccess::class)->scopeManageSurveys(WorkgroupSurvey::query()->with('questions'), $user)
+            ->where('workgroup_id', $current->id)
+            ->find($this->surveyId);
         $this->survey = $survey;
         abort_unless($this->survey instanceof WorkgroupSurvey, 404);
         $this->analytics = app(SurveyAnalyticsService::class)->calculate($this->survey);
@@ -86,6 +90,21 @@ class SurveyResultsPage extends Page
         ])->setPaper('letter', 'portrait')->download('workgroup-survey-'.$survey->id.'-'.now()->format('Y-m-d').'.pdf');
     }
 
+    public function downloadPrintableHtml()
+    {
+        $survey = $this->requiredSurvey();
+        $html = view('filament-workgroup.pages.survey-results-pdf', [
+            'survey' => $survey,
+            'analytics' => app(SurveyAnalyticsService::class)->calculate($survey),
+        ])->render();
+
+        return response()->streamDownload(
+            static fn () => print $html,
+            'workgroup-survey-'.$survey->id.'-'.now()->format('Y-m-d').'.html',
+            ['Content-Type' => 'text/html; charset=UTF-8'],
+        );
+    }
+
     public function synchronizeRoster(): void
     {
         $survey = $this->requiredSurvey();
@@ -121,6 +140,9 @@ class SurveyResultsPage extends Page
     private function requiredSurvey(): WorkgroupSurvey
     {
         abort_unless($this->survey instanceof WorkgroupSurvey, 404);
+        app(WorkgroupAccess::class)->requireManageSurvey($this->user(), $this->survey);
+        $current = app(WorkgroupContext::class)->requireCurrent($this->user());
+        abort_unless($current->id === $this->survey->workgroup_id, 404);
 
         return $this->survey;
     }

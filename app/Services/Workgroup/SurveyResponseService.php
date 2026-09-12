@@ -22,6 +22,7 @@ final class SurveyResponseService
     public function participantFor(WorkgroupSurvey $survey, User $user): WorkgroupSurveyParticipant
     {
         $this->requireCurrentSurveyContext($survey, $user);
+        abort_unless($survey->isOpen(), 422, 'This survey is not open.');
         $member = app(WorkgroupContext::class)->requireMember($user);
 
         return WorkgroupSurveyParticipant::query()->firstOrCreate(
@@ -34,9 +35,33 @@ final class SurveyResponseService
         );
     }
 
+    public function existingParticipantFor(WorkgroupSurvey $survey, User $user): ?WorkgroupSurveyParticipant
+    {
+        $this->requireCurrentSurveyContext($survey, $user);
+        $member = app(WorkgroupContext::class)->requireMember($user);
+
+        return WorkgroupSurveyParticipant::query()
+            ->where('survey_id', $survey->id)
+            ->where('workgroup_member_id', $member->id)
+            ->first();
+    }
+
     public function draftFor(WorkgroupSurvey $survey, User $user): WorkgroupSurveyResponse
     {
-        $participant = $this->participantFor($survey, $user);
+        $participant = $this->existingParticipantFor($survey, $user);
+        if ($participant?->submitted_at !== null && $participant->response_token !== null) {
+            $submitted = WorkgroupSurveyResponse::query()
+                ->where('survey_id', $survey->id)
+                ->where('participant_token', $participant->response_token)
+                ->whereNotNull('submitted_at')
+                ->first();
+            if ($submitted instanceof WorkgroupSurveyResponse) {
+                return $submitted;
+            }
+        }
+
+        abort_unless($survey->isOpen(), 422, 'This survey is not open.');
+        $participant ??= $this->participantFor($survey, $user);
         abort_unless($participant->is_eligible, 404);
 
         if ($participant->response_token === null) {
@@ -110,10 +135,16 @@ final class SurveyResponseService
         // edited. Validate against the current revision definitions, not a
         // stale in-memory question collection.
         $survey->load('questions');
+        $questionIds = $survey->questions->pluck('id')->map(fn (int $id): string => (string) $id)->all();
+        foreach (array_keys($answers) as $key) {
+            if (! in_array((string) $key, $questionIds, true)) {
+                throw ValidationException::withMessages(["answers.{$key}" => 'Unexpected survey question.']);
+            }
+        }
 
         foreach ($survey->questions as $question) {
             $value = Arr::get($answers, (string) $question->id, Arr::get($answers, $question->id));
-            if ($value === null || $value === '' || $value === []) {
+            if ($this->isEmptyAnswer($value)) {
                 if ($requireComplete && $question->is_required) {
                     throw ValidationException::withMessages(["answers.{$question->id}" => 'This question is required.']);
                 }
@@ -144,23 +175,24 @@ final class SurveyResponseService
     /** @param array<string, mixed> $config */
     private function validateMulti(int $questionId, mixed $value, array $config, bool $enforceMinimum): void
     {
-        if (! is_array($value) || ! array_is_list($value) || count($value) !== count(array_unique($value))) {
+        $selections = $this->multiSelections($questionId, $value, $config);
+        if (count($selections) !== count(array_unique($selections))) {
             throw ValidationException::withMessages(["answers.{$questionId}" => 'Choose valid, non-duplicate options.']);
         }
         $keys = array_column($config['options'] ?? [], 'key');
-        if (array_diff($value, $keys) !== []) {
+        if (array_diff($selections, $keys) !== []) {
             throw ValidationException::withMessages(["answers.{$questionId}" => 'Choose only supplied options.']);
         }
         $limit = $config['max_selections'] ?? null;
-        if (is_int($limit) && count($value) > $limit) {
+        if (is_int($limit) && count($selections) > $limit) {
             throw ValidationException::withMessages(["answers.{$questionId}" => "Select no more than {$limit} options."]);
         }
         $minimum = $config['min_selections'] ?? null;
-        if ($enforceMinimum && is_int($minimum) && count($value) < $minimum) {
+        if ($enforceMinimum && is_int($minimum) && count($selections) < $minimum) {
             throw ValidationException::withMessages(["answers.{$questionId}" => "Select at least {$minimum} options."]);
         }
         $exclusive = $config['exclusive_option'] ?? null;
-        if (is_string($exclusive) && in_array($exclusive, $value, true) && count($value) !== 1) {
+        if (is_string($exclusive) && in_array($exclusive, $selections, true) && count($selections) !== 1) {
             throw ValidationException::withMessages(["answers.{$questionId}" => 'The None option cannot be combined with another option.']);
         }
     }
@@ -212,24 +244,109 @@ final class SurveyResponseService
     {
         foreach ($survey->questions as $question) {
             $value = Arr::get($answers, (string) $question->id, Arr::get($answers, $question->id));
-            if ($value === null || $value === '' || $value === []) {
+            if ($this->isEmptyAnswer($value)) {
                 $response->answers()->where('survey_question_id', $question->id)->delete();
 
                 continue;
             }
+            $storedValue = $question->type === 'multi'
+                ? $this->canonicalMultiValue($question->id, $value, $question->configurationData())
+                : $value;
             WorkgroupSurveyAnswer::query()->updateOrCreate(
                 ['survey_response_id' => $response->id, 'survey_question_id' => $question->id],
-                ['answer' => ['value' => $value], 'question_snapshot' => $question->only(['position', 'type', 'prompt', 'help_text', 'configuration'])],
+                ['answer' => ['value' => $storedValue], 'question_snapshot' => $question->only(['position', 'type', 'prompt', 'help_text', 'configuration'])],
             );
         }
+    }
+
+    private function isEmptyAnswer(mixed $value): bool
+    {
+        return $value === null || $value === '' || $value === []
+            || (is_array($value) && array_key_exists('selections', $value) && $value['selections'] === [] && ($value['other_text'] ?? '') === '');
+    }
+
+    /** @param array<string, mixed> $config @return array<int, string> */
+    private function multiSelections(int $questionId, mixed $value, array $config): array
+    {
+        $canonical = $this->canonicalMultiValue($questionId, $value, $config);
+
+        return array_is_list($canonical) ? $canonical : $canonical['selections'];
+    }
+
+    /** @param array<string, mixed> $config @return array<int, string>|array{selections: array<int, string>, other_text: string} */
+    private function canonicalMultiValue(int $questionId, mixed $value, array $config): array
+    {
+        if (! is_array($value)) {
+            throw ValidationException::withMessages(["answers.{$questionId}" => 'Choose valid, non-duplicate options.']);
+        }
+
+        if (! ($config['allow_other_text'] ?? false)) {
+            if (! array_is_list($value) || ! collect($value)->every(fn (mixed $selection): bool => is_string($selection))) {
+                throw ValidationException::withMessages(["answers.{$questionId}" => 'Choose valid, non-duplicate options.']);
+            }
+
+            return $value;
+        }
+
+        $otherKey = collect($config['options'] ?? [])->first(fn (mixed $option): bool => is_array($option) && ($option['label'] ?? null) === 'Other')['key'] ?? null;
+        if (array_is_list($value)) {
+            if (! collect($value)->every(fn (mixed $selection): bool => is_string($selection))) {
+                throw ValidationException::withMessages(["answers.{$questionId}" => 'Choose valid, non-duplicate options.']);
+            }
+            if (is_string($otherKey) && in_array($otherKey, $value, true)) {
+                throw ValidationException::withMessages(["answers.{$questionId}.other_text" => 'Provide an explanation for Other.']);
+            }
+
+            return $value;
+        }
+        if (array_diff(array_keys($value), ['selections', 'other_text']) !== [] || ! array_key_exists('selections', $value) || ! is_array($value['selections']) || ! array_is_list($value['selections']) || ! collect($value['selections'])->every(fn (mixed $selection): bool => is_string($selection))) {
+            throw ValidationException::withMessages(["answers.{$questionId}" => 'Unexpected auxiliary answer data.']);
+        }
+
+        $otherText = $value['other_text'] ?? '';
+        if (! is_string($otherText)) {
+            throw ValidationException::withMessages(["answers.{$questionId}.other_text" => 'Other explanation must be text.']);
+        }
+        $otherSelected = is_string($otherKey) && in_array($otherKey, $value['selections'], true);
+        if (! $otherSelected && $otherText !== '') {
+            throw ValidationException::withMessages(["answers.{$questionId}.other_text" => 'Only provide an Other explanation when Other is selected.']);
+        }
+        if ($otherSelected && trim($otherText) === '') {
+            throw ValidationException::withMessages(["answers.{$questionId}.other_text" => 'Provide an explanation for Other.']);
+        }
+        if (mb_strlen($otherText) > 1000) {
+            throw ValidationException::withMessages(["answers.{$questionId}.other_text" => 'Other explanation must be 1000 characters or fewer.']);
+        }
+
+        return ['selections' => $value['selections'], 'other_text' => trim($otherText)];
     }
 
     /** @param array<string, mixed> $demographics @return array<string, string> */
     private function allowedDemographics(WorkgroupSurvey $survey, array $demographics): array
     {
-        $allowed = array_column($survey->demographic_fields ?? [], 'key');
+        $fields = collect($survey->demographic_fields ?? [])
+            ->filter(fn (array $field): bool => is_string($field['key'] ?? null))
+            ->keyBy('key');
+        $validated = [];
 
-        return array_filter(Arr::only($demographics, $allowed), 'is_string');
+        foreach ($demographics as $key => $value) {
+            if (! $fields->has($key)) {
+                throw ValidationException::withMessages(['demographics' => 'Unexpected demographic field.']);
+            }
+            if ($value === '') {
+                continue;
+            }
+            if (! is_string($value)) {
+                throw ValidationException::withMessages(["demographics.{$key}" => 'Choose one of the supplied demographic options.']);
+            }
+            $options = $fields->get($key)['options'] ?? [];
+            if (! is_array($options) || ! in_array($value, $options, true)) {
+                throw ValidationException::withMessages(["demographics.{$key}" => 'Choose one of the supplied demographic options.']);
+            }
+            $validated[$key] = $value;
+        }
+
+        return $validated;
     }
 
     private function requireCurrentSurveyContext(WorkgroupSurvey $survey, User $user): void

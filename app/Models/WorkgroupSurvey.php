@@ -58,6 +58,12 @@ class WorkgroupSurvey extends Model
                 throw new LogicException('Submitted survey revisions are structurally immutable. Duplicate the survey to create a new revision.');
             }
         });
+
+        static::deleting(function (self $survey): void {
+            if ($survey->hasResponses()) {
+                throw new LogicException('Submitted survey revisions cannot be deleted. Duplicate the survey to create a new revision.');
+            }
+        });
     }
 
     /** @return BelongsTo<Workgroup, $this> */

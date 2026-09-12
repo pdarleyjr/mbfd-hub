@@ -20,6 +20,10 @@ class WorkgroupSurveyQuestion extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (self $question): void {
+            self::ensureRevisionCanChange($question);
+        });
+
         static::updating(function (self $question): void {
             self::ensureRevisionCanChange($question);
         });
@@ -45,7 +49,14 @@ class WorkgroupSurveyQuestion extends Model
 
     private static function ensureRevisionCanChange(self $question): void
     {
-        if ($question->survey->hasResponses()) {
+        $surveyIds = collect([
+            $question->getOriginal('survey_id'),
+            $question->survey_id,
+        ])->filter(fn (mixed $id): bool => is_int($id) || ctype_digit((string) $id))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique();
+
+        if ($surveyIds->isNotEmpty() && WorkgroupSurvey::query()->whereIn('id', $surveyIds)->whereHas('responses', fn ($query) => $query->whereNotNull('submitted_at'))->exists()) {
             throw new LogicException('Questions with submitted responses are immutable. Duplicate the survey to create a new revision.');
         }
     }

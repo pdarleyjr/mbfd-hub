@@ -42,9 +42,9 @@ class Surveys extends Page implements HasTable
                     if (! $user instanceof User) {
                         return 'Unavailable';
                     }
-                    $participant = app(SurveyResponseService::class)->participantFor($survey, $user);
+                    $participant = app(SurveyResponseService::class)->existingParticipantFor($survey, $user);
 
-                    return $participant->submitted_at === null ? 'Not submitted' : 'Submitted';
+                    return $participant?->submitted_at === null ? 'Not submitted' : 'Submitted';
                 }),
             ])
             ->actions([

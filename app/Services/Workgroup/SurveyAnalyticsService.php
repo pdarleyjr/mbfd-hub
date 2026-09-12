@@ -17,6 +17,8 @@ final class SurveyAnalyticsService
     {
         $survey->loadMissing('questions');
         $participants = $survey->participants()->get();
+        $eligibleParticipants = $participants->where('is_eligible', true);
+        $eligibleSubmittedParticipants = $eligibleParticipants->whereNotNull('submitted_at');
         $includedTokens = $participants->whereNotNull('submitted_at')->where('is_eligible', true)->where('include_in_analysis', true)->pluck('response_token');
         $responses = WorkgroupSurveyResponse::query()
             ->where('survey_id', $survey->id)
@@ -44,11 +46,11 @@ final class SurveyAnalyticsService
             'survey_id' => $survey->id,
             'revision' => $survey->revision,
             'summary' => [
-                'eligible_participants' => $participants->where('is_eligible', true)->count(),
+                'eligible_participants' => $eligibleParticipants->count(),
                 'submitted_participants' => $participants->whereNotNull('submitted_at')->count(),
                 'included_in_analysis' => $responses->count(),
                 'excluded_from_analysis' => $participants->whereNotNull('submitted_at')->where(fn ($p) => ! $p->is_eligible || ! $p->include_in_analysis)->count(),
-                'response_rate' => $participants->where('is_eligible', true)->count() === 0 ? null : round(($participants->whereNotNull('submitted_at')->count() / $participants->where('is_eligible', true)->count()) * 100, 1),
+                'response_rate' => $eligibleParticipants->isEmpty() ? null : round(($eligibleSubmittedParticipants->count() / $eligibleParticipants->count()) * 100, 1),
             ],
             'questions' => $questions,
             'demographics' => $this->demographics($survey, $responses),
@@ -102,7 +104,8 @@ final class SurveyAnalyticsService
     private function multiQuestionMetrics(Collection $answers, array $config): array
     {
         $values = $answers->map(fn (WorkgroupSurveyAnswer $answer): mixed => $answer->value())
-            ->filter(fn (mixed $value): bool => is_array($value))
+            ->map(fn (mixed $value): mixed => is_array($value) && ! array_is_list($value) ? ($value['selections'] ?? null) : $value)
+            ->filter(fn (mixed $value): bool => is_array($value) && array_is_list($value))
             ->values();
         /** @var Collection<int, array<int, string>> $values */
 

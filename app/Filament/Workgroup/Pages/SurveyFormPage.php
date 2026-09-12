@@ -42,8 +42,21 @@ class SurveyFormPage extends Page
         $response = app(SurveyResponseService::class)->draftFor($this->survey, $user)->load('answers');
         $this->submitted = $response->submitted_at !== null;
         $this->answers = $response->answers->mapWithKeys(function (WorkgroupSurveyAnswer $answer): array {
-            return [(string) $answer->survey_question_id => $answer->value()];
+            $value = $answer->value();
+            $question = $this->survey?->questions->firstWhere('id', $answer->survey_question_id);
+            if ($question?->type === 'multi' && ($question->configurationData()['allow_other_text'] ?? false) && is_array($value) && array_is_list($value)) {
+                $value = ['selections' => $value, 'other_text' => ''];
+            }
+
+            return [(string) $answer->survey_question_id => $value];
         })->all();
+        foreach ($this->survey->questions as $question) {
+            if ($question->type === 'multi' && ! array_key_exists((string) $question->id, $this->answers)) {
+                $this->answers[(string) $question->id] = ($question->configurationData()['allow_other_text'] ?? false)
+                    ? ['selections' => [], 'other_text' => '']
+                    : [];
+            }
+        }
         $this->demographics = $response->demographics ?? [];
     }
 
@@ -58,6 +71,19 @@ class SurveyFormPage extends Page
         $this->responseService()->submit($this->requiredSurvey(), $this->user(), $this->answers, $this->demographics);
         $this->submitted = true;
         Notification::make()->success()->title('Survey submitted')->body($this->requiredSurvey()->is_anonymous ? 'Thank you. Your answers are de-identified in reporting.' : 'Thank you. Your response has been recorded.')->send();
+    }
+
+    public function answeredQuestionCount(): int
+    {
+        return collect($this->answers)->filter(function (mixed $value): bool {
+            return $value !== null && $value !== '' && $value !== []
+                && (! is_array($value) || ! array_key_exists('selections', $value) || $value['selections'] !== []);
+        })->count();
+    }
+
+    public function questionCount(): int
+    {
+        return $this->requiredSurvey()->questions->count();
     }
 
     private function requiredSurvey(): WorkgroupSurvey
