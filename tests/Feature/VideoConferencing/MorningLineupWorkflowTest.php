@@ -160,7 +160,7 @@ class MorningLineupWorkflowTest extends TestCase
             'join_as' => 'sta4',
         ])->assertOk()
             ->assertJsonPath('participant.identity', 'mbfd:sta1')
-            ->assertJsonPath('participant.name', 'Station 1')
+            ->assertJsonPath('participant.name', 'Captain Taylor Morgan — Station 1')
             ->assertJsonPath('server_url', 'wss://cloud.video.test.example');
 
         $this->assertSame('mbfd:sta1', $this->provider->issuedTokens[1]['identity']);
