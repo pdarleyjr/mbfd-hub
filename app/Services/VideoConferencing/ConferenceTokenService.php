@@ -57,6 +57,9 @@ class ConferenceTokenService
             ConferenceJoinRole::Command => $this->identities->displayName($employee).' — 300',
             default => $role->label(),
         };
+        if ($role->isStation() && $employee !== null) {
+            $displayName = $this->identities->displayName($employee).' — '.$role->label();
+        }
 
         try {
             $participation = DB::transaction(fn (): VideoConferenceParticipation => VideoConferenceParticipation::query()->create([
