@@ -109,6 +109,7 @@ class SurveyPlatformTest extends TestCase
 
         $metrics = app(SurveyAnalyticsService::class)->calculate($survey->fresh());
         $questionMetrics = $metrics['questions'][0]['metrics'];
+        $this->assertSame('Current Condition', $metrics['questions'][0]['section']);
         $this->assertSame(2, $questionMetrics['response_n']);
         $this->assertSame(1, $questionMetrics['scored_n']);
         $this->assertSame(5.0, $questionMetrics['mean']);

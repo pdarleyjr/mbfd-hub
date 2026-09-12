@@ -32,6 +32,7 @@ final class SurveyAnalyticsService
             $definition = $this->definitionFor($question, $answers);
             $questions[] = [
                 'position' => $definition['position'],
+                'section' => $this->sectionForPosition($definition['position']),
                 'prompt' => $definition['prompt'],
                 'type' => $definition['type'],
                 'metrics' => $this->questionMetrics($definition['type'], $definition['configuration'], $answers),
@@ -57,6 +58,19 @@ final class SurveyAnalyticsService
                 'non_scored_options' => 'Non-scored options remain in distributions and are excluded from numeric denominators.',
             ],
         ];
+    }
+
+    private function sectionForPosition(int $position): string
+    {
+        return match (true) {
+            $position <= 2 => 'Current Condition',
+            $position <= 8 => 'Qualification / Accountability',
+            $position <= 10 => 'Officer / Tactical',
+            $position <= 12 => 'Back to Basics Program',
+            $position === 13 => 'Leadership',
+            $position === 14 => 'Mid-Mount Equipment',
+            default => 'Future Priorities',
+        };
     }
 
     /** @param Collection<int, WorkgroupSurveyAnswer> $answers @return array{position: int, prompt: string, type: string, configuration: array<string, mixed>} */

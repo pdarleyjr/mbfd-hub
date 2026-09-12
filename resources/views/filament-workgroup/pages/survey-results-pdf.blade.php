@@ -7,7 +7,10 @@
     <h2>Summary</h2>
     <table><tbody>@foreach($analytics['summary'] as $label => $value)<tr><th>{{ str_replace('_', ' ', $label) }}</th><td>{{ $value ?? '—' }}@if($label === 'response_rate' && $value !== null)%@endif</td></tr>@endforeach</tbody></table>
     @foreach($analytics['questions'] as $question)
-        <h2>{{ $question['position'] }}. {{ $question['prompt'] }}</h2>
+        @if($loop->first || $analytics['questions'][$loop->index - 1]['section'] !== $question['section'])
+            <h2>{{ $question['section'] }}</h2>
+        @endif
+        <h3>{{ $question['position'] }}. {{ $question['prompt'] }}</h3>
         @if(isset($question['metrics']['distribution']))
             <table><thead><tr><th>Response</th><th>Count</th><th>Percent</th></tr></thead><tbody>@foreach($question['metrics']['distribution'] as $item)<tr><td>{{ $item['label'] }}</td><td>{{ $item['count'] }}</td><td>{{ $item['percentage'] ?? '—' }}@if($item['percentage'] !== null)%@endif</td></tr>@endforeach</tbody></table>
             <p class="metric">Answer N: {{ $question['metrics']['response_n'] }} · Scored N: {{ $question['metrics']['scored_n'] }}@if($question['metrics']['scored_n'] > 0) · Mean: {{ $question['metrics']['mean'] }} · Favorable: {{ $question['metrics']['favorable_percentage'] }}%@endif</p>
