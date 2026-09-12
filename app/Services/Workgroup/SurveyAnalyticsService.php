@@ -33,7 +33,7 @@ final class SurveyAnalyticsService
                 'position' => $question->position,
                 'prompt' => $question->prompt,
                 'type' => $question->type,
-                'metrics' => $this->questionMetrics($question->type, is_array($question->configuration) ? $question->configuration : [], $answers),
+                'metrics' => $this->questionMetrics($question->type, $question->configurationData(), $answers),
             ];
         }
 
@@ -62,11 +62,7 @@ final class SurveyAnalyticsService
     private function questionMetrics(string $type, array $config, Collection $answers): array
     {
         return match ($type) {
-            'single' => $this->choiceMetrics($answers->map(function (WorkgroupSurveyAnswer $answer): mixed {
-                $value = $answer->answer;
-
-                return is_array($value) ? ($value['value'] ?? null) : null;
-            })->filter(), $config['options'] ?? []),
+            'single' => $this->choiceMetrics($answers->map(fn (WorkgroupSurveyAnswer $answer): mixed => $answer->value())->filter(), $config['options'] ?? []),
             'multi' => $this->multiQuestionMetrics($answers, $config),
             'matrix' => $this->matrixMetrics($answers, $config),
             'compound' => $this->compoundMetrics($answers, $config),
@@ -77,11 +73,7 @@ final class SurveyAnalyticsService
     /** @param Collection<int, WorkgroupSurveyAnswer> $answers @param array<string, mixed> $config @return array<string, mixed> */
     private function multiQuestionMetrics(Collection $answers, array $config): array
     {
-        $values = $answers->map(function (WorkgroupSurveyAnswer $answer): mixed {
-            $value = $answer->answer;
-
-            return is_array($value) ? ($value['value'] ?? null) : null;
-        })
+        $values = $answers->map(fn (WorkgroupSurveyAnswer $answer): mixed => $answer->value())
             ->filter(fn (mixed $value): bool => is_array($value))
             ->values();
         /** @var Collection<int, array<int, string>> $values */
@@ -132,9 +124,9 @@ final class SurveyAnalyticsService
         $rows = [];
         foreach ($config['rows'] ?? [] as $row) {
             $values = $answers->map(function (WorkgroupSurveyAnswer $answer) use ($row): mixed {
-                $value = $answer->answer;
+                $value = $answer->value();
 
-                return is_array($value) && is_array($value['value'] ?? null) ? ($value['value'][$row['key']] ?? null) : null;
+                return is_array($value) ? ($value[$row['key']] ?? null) : null;
             })->filter();
             $rows[] = ['key' => $row['key'], 'label' => $row['label'], 'metrics' => $this->choiceMetrics($values, $config['options'] ?? [])];
         }
@@ -148,9 +140,9 @@ final class SurveyAnalyticsService
         $parts = [];
         foreach ($config['parts'] ?? [] as $part) {
             $values = $answers->map(function (WorkgroupSurveyAnswer $answer) use ($part): mixed {
-                $value = $answer->answer;
+                $value = $answer->value();
 
-                return is_array($value) && is_array($value['value'] ?? null) ? ($value['value'][$part['key']] ?? null) : null;
+                return is_array($value) ? ($value[$part['key']] ?? null) : null;
             })->filter();
             $parts[] = ['key' => $part['key'], 'label' => $part['label'], 'metrics' => $this->choiceMetrics($values, $part['options'] ?? [])];
         }
@@ -162,7 +154,7 @@ final class SurveyAnalyticsService
     private function demographics(WorkgroupSurvey $survey, Collection $responses): array
     {
         return collect($survey->demographic_fields ?? [])->map(function (array $field) use ($responses, $survey): array {
-            $counts = $responses->map(fn (WorkgroupSurveyResponse $response): mixed => $response->demographics[$field['key']] ?? null)->filter()->countBy();
+            $counts = $responses->map(fn (WorkgroupSurveyResponse $response): mixed => $response->demographicValue($field['key']))->filter()->countBy();
             $items = $counts->map(function (int $count, string $value) use ($survey): array {
                 if ($count < $survey->minimum_subgroup_size) {
                     // Do not retain small-cell category or count in the analytics

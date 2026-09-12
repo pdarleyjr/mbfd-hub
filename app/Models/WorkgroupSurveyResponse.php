@@ -15,6 +15,14 @@ class WorkgroupSurveyResponse extends Model
     protected $fillable = ['survey_id', 'survey_revision', 'participant_token', 'demographics', 'submitted_at'];
     protected $hidden = ['participant_token'];
     protected function casts(): array { return ['demographics' => 'array', 'submitted_at' => 'datetime']; }
+
+    public function demographicValue(string $key): mixed
+    {
+        $demographics = $this->getAttribute('demographics');
+
+        return is_array($demographics) ? ($demographics[$key] ?? null) : null;
+    }
+
     /** @return BelongsTo<WorkgroupSurvey, $this> */
     public function survey(): BelongsTo { return $this->belongsTo(WorkgroupSurvey::class, 'survey_id'); }
     /** @return HasMany<WorkgroupSurveyAnswer, $this> */

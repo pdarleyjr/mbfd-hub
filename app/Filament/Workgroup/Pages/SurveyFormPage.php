@@ -36,9 +36,7 @@ class SurveyFormPage extends Page
         $response = app(SurveyResponseService::class)->draftFor($this->survey, $user)->load('answers');
         $this->submitted = $response->submitted_at !== null;
         $this->answers = $response->answers->mapWithKeys(function (WorkgroupSurveyAnswer $answer): array {
-            $answerValue = $answer->answer;
-
-            return [(string) $answer->survey_question_id => is_array($answerValue) ? ($answerValue['value'] ?? null) : null];
+            return [(string) $answer->survey_question_id => $answer->value()];
         })->all();
         $this->demographics = $response->demographics ?? [];
     }

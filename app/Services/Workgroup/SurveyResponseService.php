@@ -106,7 +106,7 @@ final class SurveyResponseService
                 continue;
             }
 
-            $config = is_array($question->configuration) ? $question->configuration : [];
+            $config = $question->configurationData();
             match ($question->type) {
                 'single' => $this->validateSingle($question->id, $value, $config),
                 'multi' => $this->validateMulti($question->id, $value, $config, $requireComplete),
