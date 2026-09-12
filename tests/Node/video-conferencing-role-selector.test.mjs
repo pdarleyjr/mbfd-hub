@@ -7,6 +7,7 @@ import test from "node:test";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const css = readFileSync(resolve(root, "resources/js/video-conferencing/video-conferencing.css"), "utf8");
 const app = readFileSync(resolve(root, "resources/js/video-conferencing/ConferenceApp.tsx"), "utf8");
+const participantTile = readFileSync(resolve(root, "resources/js/video-conferencing/ParticipantTile.tsx"), "utf8");
 const stationDetail = readFileSync(resolve(root, "resources/js/daily-checkout/src/components/StationDetailPage.tsx"), "utf8");
 
 test("conference entry mode is server-bound and all controls remain touch safe", () => {
@@ -15,6 +16,11 @@ test("conference entry mode is server-bound and all controls remain touch safe",
   assert.match(app, /bootstrap\.join_as/);
   assert.match(css, /\.vc-shell button,[\s\S]*?\.vc-shell input\s*\{[^}]*min-height:\s*48px;/s);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
+});
+
+test("command entry uses the Admin presentation label and participant tiles render issued names", () => {
+  assert.match(app, /bootstrap\.entry_mode === 'command' \? 'Admin' : 'Employee Portal'/);
+  assert.match(participantTile, /vc-tile__name">\{participant\.name \|\| 'MBFD participant'\}/);
 });
 
 test("station polling and Reverb events share a single token request in flight", () => {

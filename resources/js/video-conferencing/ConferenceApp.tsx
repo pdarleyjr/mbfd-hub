@@ -959,7 +959,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                     </section>
 
                     <section className="vc-card vc-entry-card" aria-labelledby="entry-title">
-                        <div className="vc-section-heading"><div><span>{bootstrap.entry_mode === 'station' ? 'Morning Lineup' : bootstrap.entry_mode === 'command' ? '300 command' : 'Employee Portal'}</span><h2 id="entry-title">{bootstrap.display_name}</h2></div></div>
+                        <div className="vc-section-heading"><div><span>{bootstrap.entry_mode === 'station' ? 'Morning Lineup' : bootstrap.entry_mode === 'command' ? 'Admin' : 'Employee Portal'}</span><h2 id="entry-title">{bootstrap.display_name}</h2></div></div>
 
                         {bootstrap.entry_mode === 'station' && <div className="vc-standby" data-ready={phase === 'standing_by'}>
                             <Radio size={34} />

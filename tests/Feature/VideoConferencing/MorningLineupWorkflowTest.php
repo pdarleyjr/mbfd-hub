@@ -4,6 +4,7 @@ namespace Tests\Feature\VideoConferencing;
 
 use App\Contracts\VideoConferencing\ConferenceProvider;
 use App\Models\Employee;
+use App\Models\User;
 use App\Models\VideoConferenceParticipation;
 use App\Models\VideoConferenceSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -163,6 +164,37 @@ class MorningLineupWorkflowTest extends TestCase
             ->assertJsonPath('server_url', 'wss://cloud.video.test.example');
 
         $this->assertSame('mbfd:sta1', $this->provider->issuedTokens[1]['identity']);
+    }
+
+    public function test_authenticated_station_participant_displays_employee_name_and_fixed_station_label(): void
+    {
+        $this->withoutVite();
+        $user = User::factory()->create([
+            'employee_id' => $this->employee->employee_id,
+            'employee_profile_id' => $this->employee->id,
+        ]);
+        $this->get('/video-conferencing/stations/1')->assertOk();
+        $launchContext = $this->latestLaunchContext();
+        $this->postJson('/video-conferencing/api/lineup/ready', [
+            'launch_context' => $launchContext,
+            'camera_ready' => true,
+            'microphone_ready' => true,
+        ])->assertOk();
+        $this->authorizeCommand();
+        $this->actingAs($this->employee, 'employee')
+            ->postJson('/employee/video-conferencing/api/lineup/start')
+            ->assertOk();
+
+        $response = $this->actingAs($user)
+            ->postJson('/video-conferencing/api/lineup/token', ['launch_context' => $launchContext])
+            ->assertOk()
+            ->assertJsonPath('participant.identity', 'mbfd:sta1')
+            ->assertJsonPath('participant.name', 'Captain Taylor Morgan — Station 1');
+
+        $this->assertStringNotContainsString(
+            $this->employee->employee_id,
+            json_encode($response->json(), JSON_THROW_ON_ERROR),
+        );
     }
 
     public function test_end_closes_room_clears_readiness_and_disconnects_lineup(): void
