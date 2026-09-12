@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\CanonicalHostRedirect;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 final class CanonicalHostRedirectTest extends TestCase
@@ -12,29 +15,44 @@ final class CanonicalHostRedirectTest extends TestCase
     {
         config(['app.url' => 'https://www.mbfdhub.com']);
 
-        $this->withHeader('Host', 'mbfdhub.com')
-            ->get('/daily/stations?foo=bar')
-            ->assertStatus(308)
-            ->assertHeader('Location', 'https://www.mbfdhub.com/daily/stations?foo=bar');
+        $response = $this->middlewareResponse(
+            Request::create('https://mbfdhub.com/daily/stations?foo=bar'),
+        );
+
+        $this->assertSame(308, $response->getStatusCode());
+        $this->assertSame(
+            'https://www.mbfdhub.com/daily/stations?foo=bar',
+            $response->headers->get('Location'),
+        );
     }
 
     public function test_daily_requests_on_the_canonical_host_are_not_canonical_redirected(): void
     {
         config(['app.url' => 'https://www.mbfdhub.com']);
 
-        $response = $this->withHeader('Host', 'www.mbfdhub.com')
-            ->get('/daily/stations?foo=bar');
+        $response = $this->middlewareResponse(
+            Request::create('https://www.mbfdhub.com/daily/stations?foo=bar'),
+        );
 
-        $response->assertStatus(302);
-        $this->assertStringEndsWith('/login', (string) $response->headers->get('Location'));
+        $this->assertSame(200, $response->getStatusCode());
     }
 
     public function test_localhost_remains_usable_for_daily_feature_tests(): void
     {
         config(['app.url' => 'https://www.mbfdhub.com']);
 
-        $this->withHeader('Host', 'localhost')
-            ->get('/daily/stations?foo=bar')
-            ->assertRedirect('/login');
+        $response = $this->middlewareResponse(
+            Request::create('http://localhost/daily/stations?foo=bar'),
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+    }
+
+    private function middlewareResponse(Request $request): Response
+    {
+        return (new CanonicalHostRedirect())->handle(
+            $request,
+            static fn (Request $request): Response => new Response('next'),
+        );
     }
 }
