@@ -82,6 +82,12 @@ class Workgroup extends Model
         return $this->hasMany(WorkgroupSharedUpload::class);
     }
 
+    /** Distinct questionnaire domain; product evaluations remain separate. */
+    public function surveys(): HasMany
+    {
+        return $this->hasMany(WorkgroupSurvey::class, 'workgroup_id');
+    }
+
     /**
      * Scope to get only active workgroups.
      */
