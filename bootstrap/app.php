@@ -41,7 +41,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\EnforceMemberBootstrapBoundary::class,
         );
         $middleware->prependToPriorityList(
-            \App\Http\Middleware\AuthenticateOutsideMemberBootstrap::class,
+            \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
             \App\Http\Middleware\CanonicalHostRedirect::class,
         );
 
