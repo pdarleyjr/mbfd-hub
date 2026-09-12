@@ -16,4 +16,3 @@ class WorkgroupSurveyParticipant extends Model
     public function survey(): BelongsTo { return $this->belongsTo(WorkgroupSurvey::class, 'survey_id'); }
     public function member(): BelongsTo { return $this->belongsTo(WorkgroupMember::class, 'workgroup_member_id'); }
 }
-

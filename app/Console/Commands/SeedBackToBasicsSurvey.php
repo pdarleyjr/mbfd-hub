@@ -50,4 +50,3 @@ class SeedBackToBasicsSurvey extends Command
         return self::SUCCESS;
     }
 }
-

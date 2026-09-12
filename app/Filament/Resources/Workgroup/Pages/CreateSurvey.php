@@ -25,4 +25,3 @@ class CreateSurvey extends CreateRecord
         return $data;
     }
 }
-

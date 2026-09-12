@@ -53,4 +53,3 @@ class SurveyFormPage extends Page
     private function user(): User { $user = auth()->user(); abort_unless($user instanceof User, 404); return $user; }
     private function responseService(): SurveyResponseService { return app(SurveyResponseService::class); }
 }
-

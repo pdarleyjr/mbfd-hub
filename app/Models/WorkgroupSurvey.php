@@ -43,4 +43,3 @@ class WorkgroupSurvey extends Model
 
     public function hasResponses(): bool { return $this->responses()->whereNotNull('submitted_at')->exists(); }
 }
-

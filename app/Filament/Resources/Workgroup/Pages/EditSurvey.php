@@ -11,4 +11,3 @@ class EditSurvey extends EditRecord
 {
     protected static string $resource = SurveyResource::class;
 }
-

@@ -14,4 +14,3 @@ class WorkgroupSurveyQuestion extends Model
     protected function casts(): array { return ['is_required' => 'boolean', 'configuration' => 'array']; }
     public function survey(): BelongsTo { return $this->belongsTo(WorkgroupSurvey::class, 'survey_id'); }
 }
-

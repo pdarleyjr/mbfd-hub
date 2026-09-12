@@ -46,4 +46,3 @@ class SurveyResultsPage extends Page
     private function requiredSurvey(): WorkgroupSurvey { abort_unless($this->survey instanceof WorkgroupSurvey, 404); return $this->survey; }
     private function user(): User { $user = auth()->user(); abort_unless($user instanceof User, 404); return $user; }
 }
-

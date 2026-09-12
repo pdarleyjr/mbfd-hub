@@ -11,4 +11,3 @@ class ListSurveys extends ListRecords
 {
     protected static string $resource = SurveyResource::class;
 }
-

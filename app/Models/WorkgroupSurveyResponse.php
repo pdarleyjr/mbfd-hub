@@ -17,4 +17,3 @@ class WorkgroupSurveyResponse extends Model
     public function survey(): BelongsTo { return $this->belongsTo(WorkgroupSurvey::class, 'survey_id'); }
     public function answers(): HasMany { return $this->hasMany(WorkgroupSurveyAnswer::class, 'survey_response_id'); }
 }
-

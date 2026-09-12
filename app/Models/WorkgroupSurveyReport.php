@@ -14,4 +14,3 @@ class WorkgroupSurveyReport extends Model
     public function survey(): BelongsTo { return $this->belongsTo(WorkgroupSurvey::class, 'survey_id'); }
     public function generator(): BelongsTo { return $this->belongsTo(User::class, 'generated_by'); }
 }
-

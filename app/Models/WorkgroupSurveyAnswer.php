@@ -14,4 +14,3 @@ class WorkgroupSurveyAnswer extends Model
     public function response(): BelongsTo { return $this->belongsTo(WorkgroupSurveyResponse::class, 'survey_response_id'); }
     public function question(): BelongsTo { return $this->belongsTo(WorkgroupSurveyQuestion::class, 'survey_question_id'); }
 }
-
