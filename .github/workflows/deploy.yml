@@ -216,8 +216,22 @@ jobs:
           IMAGE_REPOSITORY="$(head -n 1 docker/production/image-repository)"
           test "$IMAGE_REPOSITORY" = 'ghcr.io/pdarleyjr/mbfd-hub'
           IMAGE_REF="$IMAGE_REPOSITORY@$FINAL_IMAGE_DIGEST"
+          COMPOSE_CONFIG="$(HUB_IMAGE_REF="$IMAGE_REF" docker compose \
+            --env-file "$HUB_IMAGE_RUNTIME_ENV" \
+            -f compose.prod.image.yaml \
+            config --format json)"
+          CONFIGURED_IMAGE="$(printf '%s' "$COMPOSE_CONFIG" | jq -er '.services["laravel.test"].image')"
+          APP_ENV_SOURCE="$(printf '%s' "$COMPOSE_CONFIG" | jq -er '
+            .services["laravel.test"].volumes[]
+            | select(.type == "bind" and .target == "/var/www/html/.env" and .read_only == true)
+            | .source
+          ')"
+          unset COMPOSE_CONFIG
+          test "$CONFIGURED_IMAGE" = "$IMAGE_REF"
+          test -f "$APP_ENV_SOURCE"
           RUNTIME_APP_URL="$(docker run --rm --network none --pull never \
-            --env-file "$HUB_IMAGE_RUNTIME_ENV" --entrypoint php "$IMAGE_REF" -r '
+            --mount type=bind,src="$APP_ENV_SOURCE",dst=/var/www/html/.env,readonly \
+            --entrypoint php "$IMAGE_REF" -r '
             require "/var/www/html/vendor/autoload.php";
             $app = require "/var/www/html/bootstrap/app.php";
             $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();

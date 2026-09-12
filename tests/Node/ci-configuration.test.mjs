@@ -291,10 +291,20 @@ test("production activation is manual, main-only, and blocked by every Hub relea
 
   const canonicalRuntime = workflowStep(deployment, "Verify canonical production runtime configuration");
   assert.match(canonicalRuntime, /HUB_IMAGE_RUNTIME_ENV/);
+  assert.match(canonicalRuntime, /HUB_IMAGE_REF="\$IMAGE_REF" docker compose/);
+  assert.match(canonicalRuntime, /--env-file "\$HUB_IMAGE_RUNTIME_ENV"/);
+  assert.match(canonicalRuntime, /-f compose\.prod\.image\.yaml/);
+  assert.match(canonicalRuntime, /config --format json/);
+  assert.match(canonicalRuntime, /\.services\["laravel\.test"\]\.image/);
+  assert.match(canonicalRuntime, /\.target == "\/var\/www\/html\/\.env"/);
+  assert.match(canonicalRuntime, /\.read_only == true/);
+  assert.match(canonicalRuntime, /test "\$CONFIGURED_IMAGE" = "\$IMAGE_REF"/);
+  assert.match(canonicalRuntime, /--mount type=bind,src="\$APP_ENV_SOURCE",dst=\/var\/www\/html\/\.env,readonly/);
   assert.match(canonicalRuntime, /docker run --rm --network none --pull never/);
   assert.match(canonicalRuntime, /\/var\/www\/html\/bootstrap\/app\.php/);
   assert.match(canonicalRuntime, /config\("app\.url"\)/);
   assert.match(canonicalRuntime, /test "\$RUNTIME_APP_URL" = 'https:\/\/www\.mbfdhub\.com'/);
+  assert.doesNotMatch(canonicalRuntime, /docker run[^\r\n]*--env-file/);
   assert.doesNotMatch(canonicalRuntime, /cat .*\.env|grep .*APP_URL/);
 
   const maintenance = workflowStep(deployment, "Enter maintenance mode and verify queue safety");
