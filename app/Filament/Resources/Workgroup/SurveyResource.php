@@ -20,8 +20,11 @@ class SurveyResource extends Resource
     use ResolvesWorkgroupAccess;
 
     protected static ?string $model = WorkgroupSurvey::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+
     protected static ?string $navigationGroup = 'Evaluations / Surveys';
+
     protected static ?string $navigationLabel = 'Manage surveys';
 
     public static function form(Form $form): Form
@@ -96,14 +99,32 @@ class SurveyResource extends Resource
         return ['index' => Pages\ListSurveys::route('/'), 'create' => Pages\CreateSurvey::route('/create'), 'edit' => Pages\EditSurvey::route('/{record}/edit')];
     }
 
-    public static function canViewAny(): bool { return self::currentUserCanManageAny(); }
-    public static function canCreate(): bool { return self::currentUserCanManageAny(); }
-    public static function canEdit($record): bool { $user = self::currentWorkgroupUser(); return $user instanceof User && $record instanceof WorkgroupSurvey && self::workgroupAccess()->canManageSurvey($user, $record); }
-    public static function getEloquentQuery(): Builder { return self::workgroupAccess()->scopeManageSurveys(parent::getEloquentQuery(), self::currentWorkgroupUser()); }
+    public static function canViewAny(): bool
+    {
+        return self::currentUserCanManageAny();
+    }
+
+    public static function canCreate(): bool
+    {
+        return self::currentUserCanManageAny();
+    }
+
+    public static function canEdit($record): bool
+    {
+        $user = self::currentWorkgroupUser();
+
+        return $user instanceof User && $record instanceof WorkgroupSurvey && self::workgroupAccess()->canManageSurvey($user, $record);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return self::workgroupAccess()->scopeManageSurveys(parent::getEloquentQuery(), self::currentWorkgroupUser());
+    }
 
     private static function currentUserCanManageAny(): bool
     {
         $user = self::currentWorkgroupUser();
+
         return $user instanceof User && self::workgroupAccess()->canManageAnyWorkgroup($user);
     }
 }

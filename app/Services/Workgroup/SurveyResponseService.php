@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Workgroup;
 
 use App\Models\User;
-use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSurvey;
 use App\Models\WorkgroupSurveyAnswer;
 use App\Models\WorkgroupSurveyParticipant;

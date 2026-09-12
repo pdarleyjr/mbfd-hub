@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 class SeedBackToBasicsSurvey extends Command
 {
     protected $signature = 'workgroup-surveys:seed-back-to-basics';
+
     protected $description = 'Create the Back to Basics survey once as a draft after an exact workgroup lookup.';
 
     public function handle(): int

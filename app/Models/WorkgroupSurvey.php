@@ -42,23 +42,58 @@ class WorkgroupSurvey extends Model
     }
 
     /** @return BelongsTo<Workgroup, $this> */
-    public function workgroup(): BelongsTo { return $this->belongsTo(Workgroup::class); }
+    public function workgroup(): BelongsTo
+    {
+        return $this->belongsTo(Workgroup::class);
+    }
+
     /** @return BelongsTo<self, $this> */
-    public function parentSurvey(): BelongsTo { return $this->belongsTo(self::class, 'parent_survey_id'); }
+    public function parentSurvey(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_survey_id');
+    }
+
     /** @return BelongsTo<WorkgroupSession, $this> */
-    public function session(): BelongsTo { return $this->belongsTo(WorkgroupSession::class, 'workgroup_session_id'); }
+    public function session(): BelongsTo
+    {
+        return $this->belongsTo(WorkgroupSession::class, 'workgroup_session_id');
+    }
+
     /** @return BelongsTo<User, $this> */
-    public function creator(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
     /** @return HasMany<WorkgroupSurveyQuestion, $this> */
-    public function questions(): HasMany { return $this->hasMany(WorkgroupSurveyQuestion::class, 'survey_id')->orderBy('position'); }
+    public function questions(): HasMany
+    {
+        return $this->hasMany(WorkgroupSurveyQuestion::class, 'survey_id')->orderBy('position');
+    }
+
     /** @return HasMany<WorkgroupSurveyParticipant, $this> */
-    public function participants(): HasMany { return $this->hasMany(WorkgroupSurveyParticipant::class, 'survey_id'); }
+    public function participants(): HasMany
+    {
+        return $this->hasMany(WorkgroupSurveyParticipant::class, 'survey_id');
+    }
+
     /** @return HasMany<WorkgroupSurveyResponse, $this> */
-    public function responses(): HasMany { return $this->hasMany(WorkgroupSurveyResponse::class, 'survey_id'); }
+    public function responses(): HasMany
+    {
+        return $this->hasMany(WorkgroupSurveyResponse::class, 'survey_id');
+    }
+
     /** @return HasMany<WorkgroupSurveyReport, $this> */
-    public function reports(): HasMany { return $this->hasMany(WorkgroupSurveyReport::class, 'survey_id'); }
+    public function reports(): HasMany
+    {
+        return $this->hasMany(WorkgroupSurveyReport::class, 'survey_id');
+    }
+
     /** @return HasMany<self, $this> */
-    public function revisions(): HasMany { return $this->hasMany(self::class, 'parent_survey_id'); }
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_survey_id');
+    }
 
     public function isOpen(): bool
     {
@@ -67,5 +102,8 @@ class WorkgroupSurvey extends Model
             && ($this->closes_at === null || $this->closes_at->isFuture());
     }
 
-    public function hasResponses(): bool { return $this->responses()->whereNotNull('submitted_at')->exists(); }
+    public function hasResponses(): bool
+    {
+        return $this->responses()->whereNotNull('submitted_at')->exists();
+    }
 }

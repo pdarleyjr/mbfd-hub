@@ -94,7 +94,8 @@ class SurveyPlatformTest extends TestCase
     public function test_back_to_basics_seed_is_exact_name_fail_closed_and_idempotent(): void
     {
         $this->artisan('workgroup-surveys:seed-back-to-basics')->assertExitCode(1);
-        $workgroup = Workgroup::create(['name' => 'Back to Basics - Train the Trainer']);
+        $owner = User::factory()->create();
+        $workgroup = Workgroup::create(['name' => 'Back to Basics - Train the Trainer', 'created_by' => $owner->id]);
         $this->artisan('workgroup-surveys:seed-back-to-basics')->assertExitCode(0);
         $survey = WorkgroupSurvey::query()->where('workgroup_id', $workgroup->id)->where('title', BackToBasicsSurveyBlueprint::TITLE)->sole();
         $this->assertSame('draft', $survey->status);
@@ -124,7 +125,7 @@ class SurveyPlatformTest extends TestCase
     private function makeSurvey(bool $countEvaluations = true): array
     {
         $user = User::factory()->create();
-        $workgroup = Workgroup::create(['name' => 'Survey Workgroup']);
+        $workgroup = Workgroup::create(['name' => 'Survey Workgroup', 'created_by' => $user->id]);
         $member = WorkgroupMember::create(['workgroup_id' => $workgroup->id, 'user_id' => $user->id, 'role' => 'facilitator', 'is_active' => true, 'count_evaluations' => $countEvaluations]);
         app(WorkgroupContext::class)->select($user, $workgroup->id);
         $survey = WorkgroupSurvey::create([

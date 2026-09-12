@@ -13,8 +13,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class WorkgroupSurveyResponse extends Model
 {
     protected $fillable = ['survey_id', 'survey_revision', 'participant_token', 'demographics', 'submitted_at'];
+
     protected $hidden = ['participant_token'];
-    protected function casts(): array { return ['demographics' => 'array', 'submitted_at' => 'datetime']; }
+
+    protected function casts(): array
+    {
+        return ['demographics' => 'array', 'submitted_at' => 'datetime'];
+    }
 
     public function demographicValue(string $key): mixed
     {
@@ -24,7 +29,14 @@ class WorkgroupSurveyResponse extends Model
     }
 
     /** @return BelongsTo<WorkgroupSurvey, $this> */
-    public function survey(): BelongsTo { return $this->belongsTo(WorkgroupSurvey::class, 'survey_id'); }
+    public function survey(): BelongsTo
+    {
+        return $this->belongsTo(WorkgroupSurvey::class, 'survey_id');
+    }
+
     /** @return HasMany<WorkgroupSurveyAnswer, $this> */
-    public function answers(): HasMany { return $this->hasMany(WorkgroupSurveyAnswer::class, 'survey_response_id'); }
+    public function answers(): HasMany
+    {
+        return $this->hasMany(WorkgroupSurveyAnswer::class, 'survey_response_id');
+    }
 }

@@ -12,10 +12,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class WorkgroupSurveyParticipant extends Model
 {
     protected $fillable = ['survey_id', 'workgroup_member_id', 'is_eligible', 'include_in_analysis', 'response_token', 'submitted_at'];
+
     protected $hidden = ['workgroup_member_id', 'response_token'];
-    protected function casts(): array { return ['is_eligible' => 'boolean', 'include_in_analysis' => 'boolean', 'submitted_at' => 'datetime']; }
+
+    protected function casts(): array
+    {
+        return ['is_eligible' => 'boolean', 'include_in_analysis' => 'boolean', 'submitted_at' => 'datetime'];
+    }
+
     /** @return BelongsTo<WorkgroupSurvey, $this> */
-    public function survey(): BelongsTo { return $this->belongsTo(WorkgroupSurvey::class, 'survey_id'); }
+    public function survey(): BelongsTo
+    {
+        return $this->belongsTo(WorkgroupSurvey::class, 'survey_id');
+    }
+
     /** @return BelongsTo<WorkgroupMember, $this> */
-    public function member(): BelongsTo { return $this->belongsTo(WorkgroupMember::class, 'workgroup_member_id'); }
+    public function member(): BelongsTo
+    {
+        return $this->belongsTo(WorkgroupMember::class, 'workgroup_member_id');
+    }
 }

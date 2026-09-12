@@ -15,13 +15,19 @@ use Filament\Pages\Page;
 class SurveyFormPage extends Page
 {
     protected static string $view = 'filament-workgroup.pages.survey-form';
+
     protected static ?string $title = 'Survey';
+
     protected static bool $shouldRegisterNavigation = false;
 
     public int $surveyId;
+
     public ?WorkgroupSurvey $survey = null;
+
     public array $answers = [];
+
     public array $demographics = [];
+
     public bool $submitted = false;
 
     public function mount(): void
@@ -54,7 +60,23 @@ class SurveyFormPage extends Page
         Notification::make()->success()->title('Survey submitted')->body('Thank you. Your answers are de-identified in reporting.')->send();
     }
 
-    private function requiredSurvey(): WorkgroupSurvey { abort_unless($this->survey instanceof WorkgroupSurvey, 404); return $this->survey; }
-    private function user(): User { $user = auth()->user(); abort_unless($user instanceof User, 404); return $user; }
-    private function responseService(): SurveyResponseService { return app(SurveyResponseService::class); }
+    private function requiredSurvey(): WorkgroupSurvey
+    {
+        abort_unless($this->survey instanceof WorkgroupSurvey, 404);
+
+        return $this->survey;
+    }
+
+    private function user(): User
+    {
+        $user = auth()->user();
+        abort_unless($user instanceof User, 404);
+
+        return $user;
+    }
+
+    private function responseService(): SurveyResponseService
+    {
+        return app(SurveyResponseService::class);
+    }
 }

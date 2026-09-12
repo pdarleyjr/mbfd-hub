@@ -17,13 +17,18 @@ use Filament\Pages\Page;
 class SurveyResultsPage extends Page
 {
     protected static string $view = 'filament-workgroup.pages.survey-results';
+
     protected static ?string $title = 'Survey Results';
+
     protected static bool $shouldRegisterNavigation = false;
 
     public int $surveyId;
+
     public ?WorkgroupSurvey $survey = null;
+
     /** @var array<string,mixed> */
     public array $analytics = [];
+
     public ?WorkgroupSurveyReport $report = null;
 
     public function mount(): void
@@ -75,6 +80,18 @@ class SurveyResultsPage extends Page
         ])->setPaper('letter', 'portrait')->download('workgroup-survey-'.$survey->id.'-'.now()->format('Y-m-d').'.pdf');
     }
 
-    private function requiredSurvey(): WorkgroupSurvey { abort_unless($this->survey instanceof WorkgroupSurvey, 404); return $this->survey; }
-    private function user(): User { $user = auth()->user(); abort_unless($user instanceof User, 404); return $user; }
+    private function requiredSurvey(): WorkgroupSurvey
+    {
+        abort_unless($this->survey instanceof WorkgroupSurvey, 404);
+
+        return $this->survey;
+    }
+
+    private function user(): User
+    {
+        $user = auth()->user();
+        abort_unless($user instanceof User, 404);
+
+        return $user;
+    }
 }

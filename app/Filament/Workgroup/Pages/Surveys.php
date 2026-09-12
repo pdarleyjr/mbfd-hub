@@ -22,9 +22,13 @@ class Surveys extends Page implements HasTable
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+
     protected static ?string $navigationGroup = 'Evaluations / Surveys';
+
     protected static ?string $navigationLabel = 'Surveys';
+
     protected static ?string $title = 'Surveys';
+
     protected static string $view = 'filament-workgroup.pages.surveys';
 
     public function table(Table $table): Table
@@ -52,6 +56,7 @@ class Surveys extends Page implements HasTable
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user instanceof User && app(WorkgroupContext::class)->current($user) !== null;
     }
 
@@ -72,6 +77,7 @@ class Surveys extends Page implements HasTable
     private function canManage(WorkgroupSurvey $survey): bool
     {
         $user = auth()->user();
+
         return $user instanceof User && app(WorkgroupAccess::class)->canManageSurvey($user, $survey);
     }
 }

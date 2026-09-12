@@ -108,7 +108,6 @@ final class BackToBasicsSurveyBlueprint
 
     private static function key(string $label, int $index): string
     {
-        return trim((string) preg_replace('/[^a-z0-9]+/', '_', strtolower(iconv('UTF-8', 'ASCII//TRANSLIT', $label) ?: 'option')) , '_')."_{$index}";
+        return trim((string) preg_replace('/[^a-z0-9]+/', '_', strtolower(iconv('UTF-8', 'ASCII//TRANSLIT', $label) ?: 'option')), '_')."_{$index}";
     }
 }
-
