@@ -16,6 +16,7 @@ use App\Support\Workgroups\WorkgroupAccess;
 use App\Support\Workgroups\WorkgroupContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class SurveyPlatformTest extends TestCase
@@ -59,6 +60,18 @@ class SurveyPlatformTest extends TestCase
         $this->assertFalse($participant->include_in_analysis);
         $service->setAnalysisInclusion($survey, $user, $participant, true);
         $this->assertTrue($participant->fresh()->include_in_analysis);
+    }
+
+    public function test_forged_cross_workgroup_survey_access_fails_closed(): void
+    {
+        [, $survey] = $this->makeSurvey();
+        $outsider = User::factory()->create();
+        $otherWorkgroup = Workgroup::create(['name' => 'Other Survey Workgroup', 'created_by' => $outsider->id]);
+        WorkgroupMember::create(['workgroup_id' => $otherWorkgroup->id, 'user_id' => $outsider->id, 'role' => 'facilitator', 'is_active' => true, 'count_evaluations' => true]);
+        app(WorkgroupContext::class)->select($outsider, $otherWorkgroup->id);
+
+        $this->expectException(HttpException::class);
+        app(SurveyResponseService::class)->participantFor($survey, $outsider);
     }
 
     public function test_multi_select_limit_and_none_exclusivity_are_enforced_server_side(): void
