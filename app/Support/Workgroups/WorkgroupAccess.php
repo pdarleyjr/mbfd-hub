@@ -310,7 +310,10 @@ final class WorkgroupAccess
             return $query;
         }
 
-        return $query->whereHas('survey', fn (Builder $surveys): Builder => $this->scopeManageSurveys($surveys, $user));
+        return $query->whereHas('survey', fn (Builder $surveys): Builder => $surveys->whereIn(
+            'workgroup_id',
+            $this->activeMembershipsFor($user)->whereIn('role', ['admin', 'facilitator'])->select('workgroup_id'),
+        ));
     }
 
     /** @param Builder<WorkgroupSurveyResponse> $query @return Builder<WorkgroupSurveyResponse> */
@@ -326,7 +329,10 @@ final class WorkgroupAccess
             return $query;
         }
 
-        return $query->whereHas('survey', fn (Builder $surveys): Builder => $this->scopeManageSurveys($surveys, $user));
+        return $query->whereHas('survey', fn (Builder $surveys): Builder => $surveys->whereIn(
+            'workgroup_id',
+            $this->activeMembershipsFor($user)->whereIn('role', ['admin', 'facilitator'])->select('workgroup_id'),
+        ));
     }
 
     /**

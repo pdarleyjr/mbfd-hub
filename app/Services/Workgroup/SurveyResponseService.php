@@ -106,7 +106,7 @@ final class SurveyResponseService
                 continue;
             }
 
-            $config = $question->configuration;
+            $config = is_array($question->configuration) ? $question->configuration : [];
             match ($question->type) {
                 'single' => $this->validateSingle($question->id, $value, $config),
                 'multi' => $this->validateMulti($question->id, $value, $config, $requireComplete),
@@ -224,4 +224,3 @@ final class SurveyResponseService
         abort_unless($current->id === $survey->workgroup_id, 404);
     }
 }
-

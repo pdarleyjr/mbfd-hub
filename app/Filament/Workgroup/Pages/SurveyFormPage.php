@@ -6,6 +6,7 @@ namespace App\Filament\Workgroup\Pages;
 
 use App\Models\User;
 use App\Models\WorkgroupSurvey;
+use App\Models\WorkgroupSurveyAnswer;
 use App\Services\Workgroup\SurveyResponseService;
 use App\Support\Workgroups\WorkgroupAccess;
 use Filament\Notifications\Notification;
@@ -34,7 +35,11 @@ class SurveyFormPage extends Page
         abort_unless($this->survey instanceof WorkgroupSurvey, 404);
         $response = app(SurveyResponseService::class)->draftFor($this->survey, $user)->load('answers');
         $this->submitted = $response->submitted_at !== null;
-        $this->answers = $response->answers->mapWithKeys(fn ($answer): array => [(string) $answer->survey_question_id => $answer->answer['value'] ?? null])->all();
+        $this->answers = $response->answers->mapWithKeys(function (WorkgroupSurveyAnswer $answer): array {
+            $answerValue = $answer->answer;
+
+            return [(string) $answer->survey_question_id => is_array($answerValue) ? ($answerValue['value'] ?? null) : null];
+        })->all();
         $this->demographics = $response->demographics ?? [];
     }
 

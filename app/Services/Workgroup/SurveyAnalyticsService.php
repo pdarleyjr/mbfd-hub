@@ -33,7 +33,7 @@ final class SurveyAnalyticsService
                 'position' => $question->position,
                 'prompt' => $question->prompt,
                 'type' => $question->type,
-                'metrics' => $this->questionMetrics($question->type, $question->configuration, $answers),
+                'metrics' => $this->questionMetrics($question->type, is_array($question->configuration) ? $question->configuration : [], $answers),
             ];
         }
 
@@ -62,7 +62,11 @@ final class SurveyAnalyticsService
     private function questionMetrics(string $type, array $config, Collection $answers): array
     {
         return match ($type) {
-            'single' => $this->choiceMetrics($answers->map(fn (WorkgroupSurveyAnswer $answer): mixed => $answer->answer['value'] ?? null)->filter(), $config['options'] ?? []),
+            'single' => $this->choiceMetrics($answers->map(function (WorkgroupSurveyAnswer $answer): mixed {
+                $value = $answer->answer;
+
+                return is_array($value) ? ($value['value'] ?? null) : null;
+            })->filter(), $config['options'] ?? []),
             'multi' => $this->multiQuestionMetrics($answers, $config),
             'matrix' => $this->matrixMetrics($answers, $config),
             'compound' => $this->compoundMetrics($answers, $config),
@@ -73,7 +77,11 @@ final class SurveyAnalyticsService
     /** @param Collection<int, WorkgroupSurveyAnswer> $answers @param array<string, mixed> $config @return array<string, mixed> */
     private function multiQuestionMetrics(Collection $answers, array $config): array
     {
-        $values = $answers->map(fn (WorkgroupSurveyAnswer $answer): mixed => $answer->answer['value'] ?? null)
+        $values = $answers->map(function (WorkgroupSurveyAnswer $answer): mixed {
+            $value = $answer->answer;
+
+            return is_array($value) ? ($value['value'] ?? null) : null;
+        })
             ->filter(fn (mixed $value): bool => is_array($value))
             ->values();
         /** @var Collection<int, array<int, string>> $values */
@@ -123,7 +131,11 @@ final class SurveyAnalyticsService
     {
         $rows = [];
         foreach ($config['rows'] ?? [] as $row) {
-            $values = $answers->map(fn (WorkgroupSurveyAnswer $answer): mixed => $answer->answer['value'][$row['key']] ?? null)->filter();
+            $values = $answers->map(function (WorkgroupSurveyAnswer $answer) use ($row): mixed {
+                $value = $answer->answer;
+
+                return is_array($value) && is_array($value['value'] ?? null) ? ($value['value'][$row['key']] ?? null) : null;
+            })->filter();
             $rows[] = ['key' => $row['key'], 'label' => $row['label'], 'metrics' => $this->choiceMetrics($values, $config['options'] ?? [])];
         }
 
@@ -135,7 +147,11 @@ final class SurveyAnalyticsService
     {
         $parts = [];
         foreach ($config['parts'] ?? [] as $part) {
-            $values = $answers->map(fn (WorkgroupSurveyAnswer $answer): mixed => $answer->answer['value'][$part['key']] ?? null)->filter();
+            $values = $answers->map(function (WorkgroupSurveyAnswer $answer) use ($part): mixed {
+                $value = $answer->answer;
+
+                return is_array($value) && is_array($value['value'] ?? null) ? ($value['value'][$part['key']] ?? null) : null;
+            })->filter();
             $parts[] = ['key' => $part['key'], 'label' => $part['label'], 'metrics' => $this->choiceMetrics($values, $part['options'] ?? [])];
         }
 
