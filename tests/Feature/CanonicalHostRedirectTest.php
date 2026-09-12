@@ -50,9 +50,9 @@ final class CanonicalHostRedirectTest extends TestCase
 
     private function middlewareResponse(Request $request): Response
     {
-        return (new CanonicalHostRedirect())->handle(
+        return app(CanonicalHostRedirect::class)->handle(
             $request,
-            static fn (Request $request): Response => new Response('next'),
+            static fn (Request $request): Response => response('next'),
         );
     }
 }
