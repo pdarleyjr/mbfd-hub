@@ -37,6 +37,6 @@ test("station detail launches fixed station context without bundling LiveKit", (
   assert.match(stationDetail, /href=\{`\/video-conferencing\/stations\/\$\{stationNumber\}`\}/);
   assert.match(stationDetail, /stationNumber === 2/);
   assert.match(stationDetail, /Morning Lineup Video Conference — Station 2/);
-  assert.match(stationDetail, /href="\/employee\/video-conferencing\/command"/);
+  assert.match(stationDetail, /\/employee\/video-conferencing\/command\?return_to=/);
   assert.doesNotMatch(stationDetail, /from ['"]livekit-client['"]/);
 });

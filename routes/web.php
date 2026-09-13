@@ -175,6 +175,7 @@ Route::prefix('employee/video-conferencing/api')
         Route::post('/direct/start', StartDirectCallController::class)->name('direct.start');
         Route::post('/sessions/{session}/end', EndConferenceSessionController::class)->name('sessions.end');
         Route::post('/sessions', ConferenceSessionController::class)->name('sessions');
+        Route::get('/sessions/{session}/status', [ConferenceSessionController::class, 'status'])->name('sessions.status');
         Route::post('/connectivity-failures', ConferenceConnectivityFailureController::class)
             ->name('connectivity-failures');
         Route::post('/sessions/{session}/token', ConferenceTokenController::class)

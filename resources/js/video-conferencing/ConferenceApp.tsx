@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import {
     createLocalTracks,
+    DisconnectReason,
+    setLogLevel,
     LocalTrack,
     LocalVideoTrack,
     Participant,
@@ -45,14 +47,17 @@ import {
     type MediaDevices,
 } from './media';
 import { ParticipantTile } from './ParticipantTile';
+import { ConferenceDialog } from './ConferenceDialog';
+import { LineupStartAlert } from './session-transition';
+import lineupStartTone from './lineup-start.mp3';
 import {
     accumulateInboundRtcStats,
     emptyInboundRtcAccumulator,
     type InboundRtcSample,
 } from './rtc-stats';
-import { resolveFocusedIdentity, SpeakerFocusTracker } from './speaker-focus';
 import type {
     CommandStatusResponse,
+    ConferenceUsage,
     ConferenceBootstrap,
     ConferencePhase,
     JoinRole,
@@ -77,6 +82,9 @@ const stationOptions: Array<{ value: StationRole; label: string }> = [
     { value: 'sta6', label: 'Station 6' },
 ];
 const emptyLineup: LineupState = { active: false, session_id: null, started_at: null, ends_at: null };
+
+// SDK debug/info output includes signaling URLs. Never emit it in production.
+if (import.meta.env.PROD) setLogLevel('warn');
 
 function isStationRole(role: JoinRole): role is StationRole {
     return role.startsWith('sta');
@@ -105,8 +113,10 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     const [notice, setNotice] = useState<string | null>(null);
     const [takeover, setTakeover] = useState(false);
     const [participantRefresh, setParticipantRefresh] = useState(0);
-    const [automaticFocus, setAutomaticFocus] = useState<string | null>(null);
     const [manualPin, setManualPin] = useState<string | null>(null);
+    const [controlsOpen, setControlsOpen] = useState(false);
+    const [confirmEnd, setConfirmEnd] = useState(false);
+    const [usage, setUsage] = useState<ConferenceUsage | null>(null);
     const [audioBlocked, setAudioBlocked] = useState(false);
     const [forcedStationMic, setForcedStationMic] = useState(false);
     const [speakerTesting, setSpeakerTesting] = useState(false);
@@ -128,13 +138,16 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     const participationIdRef = useRef<string | null>(null);
     const joiningRef = useRef(false);
     const stationTokenRequestRef = useRef(false);
+    const stationStatusRequestRef = useRef(false);
+    const commandStatusRequestRef = useRef(false);
     const isLeavingRef = useRef(false);
     const autoMediaStartedRef = useRef(false);
     const activeLineupSeenRef = useRef(false);
     const activeDirectSeenRef = useRef(false);
     const stationOptedOutRef = useRef(false);
-    const speakerTimerRef = useRef<number | null>(null);
-    const speakerFocusTrackerRef = useRef(new SpeakerFocusTracker());
+    const terminatingRef = useRef(false);
+    const connectedSessionRef = useRef<string | null>(null);
+    const alertRef = useRef(new LineupStartAlert());
     const inboundRtcAccumulatorRef = useRef(emptyInboundRtcAccumulator());
 
     const refreshDevices = useCallback(async (requestPermissions = false) => {
@@ -215,26 +228,22 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         isLeavingRef.current = false;
     }, [notifyLeave]);
 
-    const handleActiveSpeakers = useCallback((speakers: Participant[]) => {
-        const candidate = speakers[0]?.identity ?? null;
-        if (speakerTimerRef.current !== null) window.clearTimeout(speakerTimerRef.current);
-        const now = Date.now();
-        speakerFocusTrackerRef.current.updateCandidate(candidate, now);
-        const delay = speakerFocusTrackerRef.current.remainingDelay(now);
-        if (delay === null) return;
-        speakerTimerRef.current = window.setTimeout(() => {
-            const focused = speakerFocusTrackerRef.current.commit(Date.now());
-            if (focused !== undefined) setAutomaticFocus(focused);
-        }, delay);
-    }, []);
+    const returnFromConference = useCallback(async (target = bootstrap.navigation.back, ended = true) => {
+        if (terminatingRef.current) return;
+        terminatingRef.current = true;
+        stationOptedOutRef.current = true;
+        setError(null);
+        setPhase('leaving');
+        stopPreview();
+        await cleanupRoom(!ended);
+        if (!ended) notifyStandDown();
+        window.location.replace(target);
+    }, [bootstrap.navigation.back, cleanupRoom, notifyStandDown, stopPreview]);
 
     const attachRoomEvents = useCallback((nextRoom: Room) => {
         const refresh = () => setParticipantRefresh((value) => value + 1);
         nextRoom.on(RoomEvent.ParticipantConnected, refresh);
         nextRoom.on(RoomEvent.ParticipantDisconnected, (participant) => {
-            if (speakerFocusTrackerRef.current.participantLeft(participant.identity)) {
-                setAutomaticFocus(null);
-            }
             setManualPin((identity) => identity === participant.identity ? null : identity);
             refresh();
         });
@@ -244,13 +253,19 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         nextRoom.on(RoomEvent.TrackUnsubscribed, refresh);
         nextRoom.on(RoomEvent.TrackMuted, refresh);
         nextRoom.on(RoomEvent.TrackUnmuted, refresh);
-        nextRoom.on(RoomEvent.ActiveSpeakersChanged, handleActiveSpeakers);
+        nextRoom.on(RoomEvent.ActiveSpeakersChanged, refresh);
+        nextRoom.on(RoomEvent.LocalTrackPublished, refresh);
+        nextRoom.on(RoomEvent.LocalTrackUnpublished, refresh);
         nextRoom.on(RoomEvent.ConnectionQualityChanged, refresh);
         nextRoom.on(RoomEvent.MediaDevicesChanged, () => void refreshDevices(false));
         nextRoom.on(RoomEvent.MediaDevicesError, (deviceError) => setError(mediaErrorMessage(deviceError)));
         nextRoom.on(RoomEvent.Reconnecting, () => setPhase('reconnecting'));
         nextRoom.on(RoomEvent.Reconnected, () => setPhase('connected'));
-        nextRoom.on(RoomEvent.Disconnected, () => {
+        nextRoom.on(RoomEvent.Disconnected, (reason) => {
+            if (reason === DisconnectReason.ROOM_DELETED) {
+                void returnFromConference();
+                return;
+            }
             if (!isLeavingRef.current) {
                 setError('The conference connection ended. Check your Internet connection and try again.');
                 void cleanupRoom(true).finally(() => {
@@ -258,10 +273,10 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 });
             }
         });
-    }, [bootstrap.entry_mode, cleanupRoom, handleActiveSpeakers, refreshDevices]);
+    }, [bootstrap.entry_mode, cleanupRoom, refreshDevices, returnFromConference]);
 
     const connectWithCredentials = useCallback(async (credentials: TokenResponse, confirmedTakeover = false) => {
-        if (joiningRef.current || roomRef.current) return;
+        if (terminatingRef.current || joiningRef.current || roomRef.current) return;
         if (previewTracksRef.current.length === 0) {
             setError('Camera or microphone preparation is required before joining.');
             return;
@@ -317,10 +332,15 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 rtcConfig: forceRelay ? { iceTransportPolicy: 'relay' } : undefined,
                 websocketTimeout: 10_000,
             });
+            if (terminatingRef.current) return;
 
             const preparedTracks = [...previewTracksRef.current];
             previewTracksRef.current = [];
             for (const track of preparedTracks) {
+                if (terminatingRef.current) {
+                    preparedTracks.forEach((prepared) => prepared.stop());
+                    return;
+                }
                 if (track.kind === Track.Kind.Audio && (bootstrap.entry_mode === 'station' || !microphoneEnabled)) {
                     await track.mute();
                 }
@@ -332,10 +352,9 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             }
             participationIdRef.current = credentials.participation_id;
             inboundRtcAccumulatorRef.current = emptyInboundRtcAccumulator();
-            setSessionId(credentials.session?.id ?? lineup.session_id);
+            connectedSessionRef.current = credentials.session?.id ?? lineup.session_id;
+            setSessionId(connectedSessionRef.current);
             setRoom(nextRoom);
-            setAutomaticFocus(nextRoom.localParticipant.identity);
-            speakerFocusTrackerRef.current.recordFocus(nextRoom.localParticipant.identity, Date.now());
             setAudioBlocked(!nextRoom.canPlaybackAudio);
             if (nextRoom.canPlaybackAudio) await nextRoom.startAudio().catch(() => setAudioBlocked(true));
             setForcedStationMic(bootstrap.entry_mode === 'station');
@@ -344,6 +363,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             setNotice(null);
             setPhase('connected');
         } catch (joinError) {
+            if (terminatingRef.current) return;
             if (nextRoom) {
                 nextRoom.removeAllListeners();
                 await nextRoom.disconnect(true).catch(() => undefined);
@@ -355,9 +375,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 setTakeover(true);
                 setError(joinError.message);
             } else {
-                setError(joinError instanceof Error
-                    ? joinError.message
-                    : 'Unable to connect to the video conferencing service. Check your Internet connection and try again.');
+                setError('Unable to connect to the video conferencing service. Check your Internet connection and try again.');
             }
             setPhase(bootstrap.entry_mode === 'station' ? 'standing_by' : 'ready');
             if (!confirmedTakeover && bootstrap.entry_mode !== 'station') {
@@ -375,7 +393,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     }, [attachRoomEvents, bootstrap, cameraEnabled, forceRelay, lineup.session_id, microphoneEnabled]);
 
     const requestStationToken = useCallback(async (requestedRoom: 'lineup' | 'direct', confirmedTakeover = false) => {
-        if (!bootstrap.launch_context || stationTokenRequestRef.current || joiningRef.current || roomRef.current) return;
+        if (terminatingRef.current || !bootstrap.launch_context || stationTokenRequestRef.current || joiningRef.current || roomRef.current) return;
         stationTokenRequestRef.current = true;
         try {
             const credentials = await postJson<TokenResponse>(
@@ -401,12 +419,26 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     }, [bootstrap, connectWithCredentials]);
 
     const refreshStationStatus = useCallback(async () => {
-        if (!bootstrap.launch_context) return;
+        if (!bootstrap.launch_context || stationStatusRequestRef.current || terminatingRef.current) return;
+        stationStatusRequestRef.current = true;
         try {
             const status = await getJson<StationStatusResponse>(
                 `${bootstrap.endpoints.station_status}?launch_context=${encodeURIComponent(bootstrap.launch_context)}`,
             );
+            if (terminatingRef.current) return;
             setLineup(status.lineup);
+            const current = roomMode === 'direct' ? status.direct : status.lineup;
+            if (connectedSessionRef.current && (!current.active || current.session_id !== connectedSessionRef.current)) {
+                await returnFromConference();
+                return;
+            }
+            if (alertRef.current.observe(status.lineup.active, status.lineup.session_id,
+                !stationOptedOutRef.current && previewTracksRef.current.length > 0 && !roomRef.current && !joiningRef.current)) {
+                setNotice('Morning Lineup is starting…');
+                void new Audio(lineupStartTone).play().catch(() => {
+                    if (!terminatingRef.current) setNotice('Morning Lineup is starting — alert sound was blocked by your browser.');
+                });
+            }
             if (status.lineup.active) {
                 activeLineupSeenRef.current = true;
                 if (!stationOptedOutRef.current && !roomRef.current && !joiningRef.current) await requestStationToken('lineup', false);
@@ -415,39 +447,38 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 setNotice('300 is calling this station directly. Joining automatically…');
                 if (!stationOptedOutRef.current && !roomRef.current && !joiningRef.current) await requestStationToken('direct', false);
             } else if (activeLineupSeenRef.current && roomRef.current && roomMode === 'lineup') {
-                await cleanupRoom(false);
-                setNotice('Morning Lineup has ended.');
-                setStationReadiness([]);
-                setPhase('ready');
+                await returnFromConference();
             } else if (activeDirectSeenRef.current && roomRef.current && roomMode === 'direct') {
                 activeDirectSeenRef.current = false;
-                await cleanupRoom(false);
-                setNotice('The direct call has ended.');
-                setPhase('standing_by');
+                await returnFromConference();
             }
         } catch (statusError) {
             setError(statusError instanceof Error ? statusError.message : 'Unable to refresh lineup status.');
+        } finally {
+            stationStatusRequestRef.current = false;
         }
-    }, [bootstrap, cleanupRoom, requestStationToken, roomMode]);
+    }, [bootstrap, returnFromConference, requestStationToken, roomMode]);
 
     const refreshCommandStatus = useCallback(async () => {
-        if (!commandAuthorized) return;
+        if (!commandAuthorized || commandStatusRequestRef.current || terminatingRef.current) return;
+        commandStatusRequestRef.current = true;
         try {
             const status = await getJson<CommandStatusResponse>(bootstrap.endpoints.command_status);
             setProviderApiHealthy(status.provider_api_healthy);
             setLineup(status.lineup);
             setStationReadiness(status.stations);
+            setUsage(status.usage);
             if (status.lineup.active) activeLineupSeenRef.current = true;
             if (!status.lineup.active && activeLineupSeenRef.current && roomRef.current && roomMode === 'lineup') {
-                await cleanupRoom(false);
-                setNotice('Morning Lineup has ended.');
-                setPhase('ready');
+                await returnFromConference();
             }
         } catch (statusError) {
             if (statusError instanceof ApiError && statusError.status === 403) setCommandAuthorized(false);
             else setError(statusError instanceof Error ? statusError.message : 'Unable to refresh station readiness.');
+        } finally {
+            commandStatusRequestRef.current = false;
         }
-    }, [bootstrap.endpoints.command_status, cleanupRoom, commandAuthorized, roomMode]);
+    }, [bootstrap.endpoints.command_status, returnFromConference, commandAuthorized, roomMode]);
 
     const prepareMedia = useCallback(async () => {
         setError(null);
@@ -539,10 +570,11 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     }, [phase]);
 
     useEffect(() => () => {
-        if (speakerTimerRef.current !== null) window.clearTimeout(speakerTimerRef.current);
         stopPreview();
-        void cleanupRoom(true);
-        notifyStandDown();
+        if (!terminatingRef.current) {
+            void cleanupRoom(true);
+            notifyStandDown();
+        }
     }, [cleanupRoom, notifyStandDown, stopPreview]);
 
     useEffect(() => {
@@ -598,6 +630,21 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         return () => window.clearInterval(timer);
     }, []);
 
+    // Exact-session status also covers self joins, direct calls and a missed
+    // ROOM_DELETED event after a network interruption.
+    useEffect(() => {
+        if (bootstrap.entry_mode === 'station' || !connectedSessionRef.current) return;
+        const poll = async () => {
+            if (terminatingRef.current) return;
+            try {
+                const status = await getJson<{ active: boolean }>(`${bootstrap.endpoints.api_base}/sessions/${connectedSessionRef.current}/status`);
+                if (!status.active) await returnFromConference();
+            } catch { /* Transient status failures leave LiveKit reconnect in control. */ }
+        };
+        const timer = window.setInterval(() => void poll(), bootstrap.status_poll_ms);
+        return () => window.clearInterval(timer);
+    }, [bootstrap, phase, returnFromConference]);
+
     const participants = useMemo(
         () => room ? [room.localParticipant, ...Array.from(room.remoteParticipants.values())] : [],
         [participantRefresh, room],
@@ -606,13 +653,8 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         Array.from(participant.trackPublications.values()).some((publication) =>
             publication.source === Track.Source.ScreenShare && publication.isMuted === false,
         ))?.identity ?? null, [participantRefresh, participants]);
-    const focusedIdentity = resolveFocusedIdentity(
-        screenShareIdentity,
-        manualPin,
-        automaticFocus,
-        participants[0]?.identity ?? null,
-    );
-    const focusedParticipant = participants.find((participant) => participant.identity === focusedIdentity) ?? participants[0];
+    const focusedIdentity = screenShareIdentity ?? manualPin;
+    const focusedParticipant = participants.find((participant) => participant.identity === focusedIdentity);
     const thumbnailParticipants = participants.filter((participant) => participant.identity !== focusedParticipant?.identity);
 
     useEffect(() => {
@@ -622,7 +664,9 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 if (!(publication instanceof RemoteTrackPublication)) continue;
                 const high = publication.source === Track.Source.ScreenShare
                     || participant.identity === focusedIdentity;
-                publication.setVideoQuality(high ? VideoQuality.HIGH : VideoQuality.LOW);
+                // Adaptive stream follows the attached element's actual dimensions.
+                // Only presentation/pinned tracks need an explicit high preference.
+                if (high) publication.setVideoQuality(VideoQuality.HIGH);
             }
         }
     }, [focusedIdentity, participantRefresh, room]);
@@ -727,14 +771,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 bootstrap.csrf_token,
                 { confirmed_takeover: confirmedTakeover },
             );
-            if (credentials.session) {
-                setLineup({
-                    active: true,
-                    session_id: credentials.session.id,
-                    started_at: new Date().toISOString(),
-                    ends_at: new Date(Date.now() + bootstrap.lineup_max_minutes * 60_000).toISOString(),
-                });
-            }
+            await refreshCommandStatus();
             activeLineupSeenRef.current = true;
             setRoomMode('lineup');
             await connectWithCredentials(credentials, confirmedTakeover);
@@ -785,7 +822,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 { join_as: 'self' },
             );
             setLineup({ ...emptyLineup, active: true, session_id: active.session.id });
-            await connectWithCredentials(credentials);
+            await connectWithCredentials({ ...credentials, session: active.session });
         } catch (joinError) {
             setError(joinError instanceof Error ? joinError.message : 'No active Morning Lineup is available.');
             setPhase('ready');
@@ -797,16 +834,11 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     const endConference = async () => {
         setActionBusy('end');
         try {
-            const endpoint = roomMode === 'direct' && sessionId
+            const endpoint = sessionId
                 ? `${bootstrap.endpoints.api_base}/sessions/${sessionId}/end`
                 : bootstrap.endpoints.command_end;
             await postJson(endpoint, bootstrap.csrf_token, {});
-            await cleanupRoom(false);
-            setLineup(emptyLineup);
-            setStationReadiness([]);
-            activeDirectSeenRef.current = false;
-            setNotice(roomMode === 'direct' ? 'Direct call ended.' : 'Morning Lineup ended. All stations were disconnected.');
-            setPhase('ready');
+            await returnFromConference();
         } catch (endError) {
             setError(endError instanceof Error ? endError.message : 'Morning Lineup could not be ended.');
         } finally {
@@ -900,10 +932,15 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         ? Math.max(0, Math.floor((new Date(lineup.ends_at).getTime() - clock) / 1000))
         : null;
     const commandPinReady = /^\d{4,8}$/.test(commandPin);
+    const endLabel = roomMode === 'direct' ? 'End Direct Call' : 'End Conference';
 
     return (
         <div className="vc-shell" data-phase={phase} data-entry-mode={bootstrap.entry_mode} data-ice-policy={forceRelay ? 'relay' : 'all'}>
             <header className="vc-header">
+                <nav className="vc-navigation" aria-label="Conference navigation">
+                    <button type="button" onClick={() => void returnFromConference(bootstrap.navigation.back, false)}>Back</button>
+                    <button type="button" onClick={() => void returnFromConference(bootstrap.navigation.home, false)}>Home</button>
+                </nav>
                 <div>
                     <span className="vc-eyebrow"><ShieldCheck size={15} /> MBFD secure conference</span>
                     <h1>{bootstrap.entry_mode === 'command' ? 'Morning Lineup — 300' : bootstrap.display_name}</h1>
@@ -920,8 +957,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
 
             {phase === 'reconnecting' && <div className="vc-banner vc-banner--warning" role="status"><RefreshCw size={18} className="vc-spin" /> Network interrupted. LiveKit is reconnecting automatically.</div>}
             {audioBlocked && connected && <button className="vc-banner vc-banner--action" type="button" onClick={async () => {
-                await room?.startAudio();
-                setAudioBlocked(false);
+                await room?.startAudio().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
             }}><Volume2 size={18} /> Tap to enable conference audio</button>}
             {error && <div className="vc-banner vc-banner--error" role="alert"><CircleAlert size={19} /><span>{error}</span></div>}
             {notice && !error && <div className="vc-banner vc-banner--info" role="status"><Check size={19} /><span>{notice}</span></div>}
@@ -995,13 +1031,14 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 </div>
             ) : (
                 <div className={`vc-conference ${bootstrap.entry_mode === 'command' ? 'vc-conference--command' : ''}`}>
-                    <main className="vc-speaker-layout">
-                        <div className="vc-focus-bar"><span>{screenShareIdentity ? 'Screen share' : manualPin ? 'Pinned' : 'Auto speaker'}</span>{manualPin && !screenShareIdentity && <button type="button" onClick={() => setManualPin(null)}>AUTO</button>}</div>
-                        <div className="vc-focus-stage">{focusedParticipant && <ParticipantTile participant={focusedParticipant} local={focusedParticipant === room?.localParticipant} refreshKey={participantRefresh} focused onFocus={() => setManualPin(focusedParticipant.identity)} />}</div>
-                        {thumbnailParticipants.length > 0 && <div className="vc-thumbnails" aria-label="Other participants">{thumbnailParticipants.map((participant) => <ParticipantTile key={participant.identity} participant={participant} local={participant === room?.localParticipant} refreshKey={participantRefresh} focused={false} onFocus={() => setManualPin(participant.identity)} />)}</div>}
+                    <main className={`vc-meeting ${focusedParticipant ? 'vc-meeting--presentation' : ''}`}>
+                        <div className="vc-focus-bar"><span>{screenShareIdentity ? 'Screen share' : manualPin ? 'Pinned' : 'Gallery'} · {participants.length} participants</span>{manualPin && <button type="button" onClick={() => setManualPin(null)}>Return to Gallery</button>}</div>
+                        <div className={`vc-gallery ${focusedParticipant ? 'vc-gallery--presentation' : ''}`} data-count={participants.length} aria-label={focusedParticipant ? 'Presentation layout' : 'Participant gallery'}>
+                            {(focusedParticipant ? [focusedParticipant, ...thumbnailParticipants] : participants).map((participant) => <ParticipantTile key={participant.identity} participant={participant} local={participant === room?.localParticipant} refreshKey={participantRefresh} focused={participant === focusedParticipant} onFocus={() => setManualPin((current) => current === participant.identity ? null : participant.identity)} />)}
+                        </div>
                     </main>
 
-                    {bootstrap.entry_mode === 'command' && <aside className="vc-command" aria-label="300 station microphone controls">
+                    {bootstrap.entry_mode === 'command' && controlsOpen && <ConferenceDialog title="300 Controls" onClose={() => setControlsOpen(false)} drawer><aside className="vc-command" aria-label="300 station microphone controls">
                         <div><span>300 controls</span><h2>Station microphones</h2><p>More than one station may have the floor. Your own microphone is independent.</p></div>
                         <button type="button" className="vc-button vc-button--danger-outline" onClick={() => void muteAllStations()} disabled={actionBusy !== null}><MicOff size={18} /> Mute all stations</button>
                         <div className="vc-command__stations">{stationOptions.map((station) => {
@@ -1009,8 +1046,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                             const micLive = participant ? Array.from(participant.audioTrackPublications.values()).some((publication) => !publication.isMuted) : false;
                             return <div key={station.value}><span><strong>{station.label}</strong><small>{participant ? 'Connected' : 'Not connected'}</small></span><button type="button" onClick={() => void stationMicrophone(station.value, !micLive)} disabled={!participant || actionBusy !== null}>{micLive ? <><MicOff size={16} /> Mute</> : <><Mic size={16} /> Give Floor</>}</button></div>;
                         })}</div>
-                        <button type="button" className="vc-button vc-button--danger" onClick={() => void endConference()} disabled={actionBusy !== null}><PhoneOff size={18} /> {roomMode === 'direct' ? 'End Direct Call' : 'End Morning Lineup'}</button>
-                    </aside>}
+                    </aside></ConferenceDialog>}
 
                     {bootstrap.entry_mode === 'station' && <div className={`vc-station-mic ${forcedStationMic || !microphoneEnabled ? 'vc-station-mic--muted' : 'vc-station-mic--live'}`} role="status">{forcedStationMic ? <><MicOff size={24} /> MIC MUTED — WAITING FOR 300</> : microphoneEnabled ? <><Mic size={24} /> MIC LIVE</> : <><MicOff size={24} /> MIC MUTED</>}</div>}
 
@@ -1018,12 +1054,17 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                         <button type="button" onClick={() => void toggleMicrophone()} disabled={forcedStationMic} aria-pressed={!microphoneEnabled}>{microphoneEnabled ? <Mic /> : <MicOff />}<span>{microphoneEnabled ? 'Mute' : 'Unmute'}</span></button>
                         <button type="button" onClick={() => void toggleCamera()} aria-pressed={!cameraEnabled}>{cameraEnabled ? <Camera /> : <CameraOff />}<span>{cameraEnabled ? 'Camera off' : 'Camera on'}</span></button>
                         <button type="button" onClick={() => void toggleScreenShare()} aria-pressed={screenShareEnabled}><Cast /><span>{screenShareEnabled ? 'Stop sharing' : 'Share screen'}</span></button>
-                        <button type="button" onClick={async () => { await room?.startAudio(); setAudioBlocked(false); }}><Headphones /><span>Audio</span></button>
-                        <button type="button" onClick={() => setManualPin(focusedParticipant?.identity ?? null)}><Pin /><span>Pin</span></button>
+                        <button type="button" onClick={async () => { await room?.startAudio().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true)); }}><Headphones /><span>Audio</span></button>
+                        {manualPin && <button type="button" onClick={() => setManualPin(null)}><Pin /><span>Gallery</span></button>}
+                        {bootstrap.entry_mode === 'command' && <>
+                            <button type="button" onClick={() => setControlsOpen(true)} aria-haspopup="dialog" aria-expanded={controlsOpen}><Users /><span>300 Controls</span></button>
+                            <button type="button" className="vc-controls__leave" onClick={() => setConfirmEnd(true)} disabled={actionBusy !== null}><PhoneOff /><span>{endLabel}</span></button>
+                        </>}
                         {bootstrap.entry_mode !== 'command' && <button type="button" className="vc-controls__leave" onClick={async () => {
                             setPhase('leaving');
                             if (bootstrap.entry_mode === 'station') stationOptedOutRef.current = true;
                             await cleanupRoom(true);
+                            connectedSessionRef.current = null;
                             if (bootstrap.entry_mode === 'station') {
                                 notifyStandDown();
                                 setStationReadiness([]);
@@ -1031,9 +1072,24 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                             setPhase('ready');
                         }}><PhoneOff /><span>Leave</span></button>}
                     </nav>
+                    {bootstrap.entry_mode === 'command' && <div className="vc-meeting-status">
+                        {roomMode === 'lineup' && remainingSeconds !== null && <span><Clock3 size={14} /> Lineup · {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, '0')} remaining</span>}
+                        {usage && <details className="vc-usage"><summary>LiveKit · ~{Math.floor(usage.participant_minutes_remaining).toLocaleString()} participant-min left · resets {new Date(usage.resets_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' })}</summary><div>
+                            <p>Participant-min: ~{usage.participant_minutes_estimated.toLocaleString()} / {usage.participant_minutes_allowance.toLocaleString()} used · ~{usage.participant_minutes_remaining.toLocaleString()} remaining</p>
+                            <p>Downstream: ~{usage.downstream_gb_estimated} / {usage.downstream_allowance_gb} GB used · ~{usage.downstream_gb_remaining} GB remaining</p>
+                            <p>Resets {new Date(usage.resets_at).toLocaleDateString(undefined, { timeZone: 'UTC' })} (UTC)</p>
+                            <p>MBFD estimate — LiveKit dashboard is authoritative.</p>
+                        </div></details>}
+                    </div>}
                 </div>
             )}
 
+            {confirmEnd && <ConferenceDialog title={roomMode === 'direct' ? 'End Direct Call?' : 'End Morning Lineup?'} onClose={() => setConfirmEnd(false)}>
+                <p>This will disconnect all connected stations.</p><div className="vc-dialog__actions">
+                    <button type="button" className="vc-button vc-button--secondary" onClick={() => setConfirmEnd(false)}>Cancel</button>
+                    <button type="button" className="vc-button vc-button--danger" disabled={actionBusy !== null} onClick={() => void endConference()}>{endLabel}</button>
+                </div>
+            </ConferenceDialog>}
             {takeover && <div className="vc-modal-backdrop" role="presentation"><div className="vc-modal" role="alertdialog" aria-modal="true" aria-labelledby="takeover-title" aria-describedby="takeover-description"><CircleAlert size={28} /><h2 id="takeover-title">Endpoint already in use</h2><p id="takeover-description">Taking over will disconnect the existing {isStationRole(bootstrap.join_as) ? stationLabel(bootstrap.join_as) : '300'} connection.</p><div><button type="button" autoFocus className="vc-button vc-button--secondary" onClick={() => setTakeover(false)}>Cancel</button><button type="button" className="vc-button vc-button--danger" onClick={() => bootstrap.entry_mode === 'station' ? void requestStationToken(roomMode, true) : pendingDirectStation ? void startDirectCall(pendingDirectStation, true) : void startLineup(true)}>Confirm takeover</button></div></div></div>}
         </div>
     );

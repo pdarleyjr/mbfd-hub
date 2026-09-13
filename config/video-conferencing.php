@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 $lineupTime = env('VIDEO_CONFERENCING_LINEUP_TIME');
 $lineupTime = is_string($lineupTime) && preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $lineupTime)
     ? $lineupTime
@@ -20,6 +22,8 @@ return [
         'stale_after_seconds' => (int) env('VIDEO_CONFERENCING_READY_STALE_SECONDS', 75),
     ],
     'usage' => [
+        'webrtc_minutes_allowance' => (int) env('VIDEO_CONFERENCING_USAGE_WEBRTC_MINUTES_ALLOWANCE', 5000),
+        'downstream_allowance_gb' => (int) env('VIDEO_CONFERENCING_USAGE_DOWNSTREAM_ALLOWANCE_GB', 50),
         'information_gb' => (int) env('VIDEO_CONFERENCING_USAGE_INFORMATION_GB', 30),
         'warning_gb' => (int) env('VIDEO_CONFERENCING_USAGE_WARNING_GB', 35),
         'conservation_gb' => (int) env('VIDEO_CONFERENCING_USAGE_CONSERVATION_GB', 40),

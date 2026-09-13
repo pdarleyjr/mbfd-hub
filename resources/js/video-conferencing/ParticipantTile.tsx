@@ -3,7 +3,6 @@ import {
     ConnectionQuality,
     Participant,
     Track,
-    type TrackPublication,
 } from 'livekit-client';
 
 interface ParticipantTileProps {
@@ -29,20 +28,23 @@ export function ParticipantTile({ participant, local = false, refreshKey, focuse
     );
     const videoPublication = screenPublication ?? cameraPublication;
     const audioPublication = publications.find((publication) => publication.kind === Track.Kind.Audio);
+    const videoTrack = videoPublication?.track;
+    const audioTrack = audioPublication?.track;
+    const videoMuted = videoPublication?.isMuted;
 
     useEffect(() => {
-        const attachments: Array<{ publication: TrackPublication; element: HTMLMediaElement }> = [];
-        if (videoPublication?.track && videoRef.current) {
-            videoPublication.track.attach(videoRef.current);
-            attachments.push({ publication: videoPublication, element: videoRef.current });
+        const attachments: Array<{ track: Track; element: HTMLMediaElement }> = [];
+        if (videoTrack && videoRef.current) {
+            videoTrack.attach(videoRef.current);
+            attachments.push({ track: videoTrack, element: videoRef.current });
         }
-        if (!local && audioPublication?.track && audioRef.current) {
-            audioPublication.track.attach(audioRef.current);
-            attachments.push({ publication: audioPublication, element: audioRef.current });
+        if (!local && audioTrack && audioRef.current) {
+            audioTrack.attach(audioRef.current);
+            attachments.push({ track: audioTrack, element: audioRef.current });
         }
 
-        return () => attachments.forEach(({ publication, element }) => publication.track?.detach(element));
-    }, [audioPublication, local, refreshKey, videoPublication]);
+        return () => attachments.forEach(({ track, element }) => track.detach(element));
+    }, [audioTrack, local, videoMuted, videoTrack]);
 
     const quality = participant.connectionQuality ?? ConnectionQuality.Unknown;
     const initials = (participant.name || participant.identity)
@@ -53,8 +55,8 @@ export function ParticipantTile({ participant, local = false, refreshKey, focuse
         .toUpperCase();
 
     return (
-        <article className={`vc-tile ${focused ? 'vc-tile--focused' : ''}`} aria-label={`${participant.name || 'Participant'} video`}>
-            <button type="button" className="vc-tile__focus" onClick={onFocus} aria-pressed={focused}>
+        <article className={`vc-tile ${focused ? 'vc-tile--focused' : ''} ${participant.isSpeaking ? 'vc-tile--speaking' : ''}`} aria-label={`${participant.name || 'Participant'} video`}>
+            <button type="button" className="vc-tile__focus" onClick={onFocus} aria-pressed={focused} aria-label={`${focused ? 'Unpin' : 'Pin'} ${participant.name || 'participant'}`}>
                 {videoPublication?.track && !videoPublication.isMuted ? (
                     <video ref={videoRef} autoPlay playsInline muted={local} />
                 ) : (

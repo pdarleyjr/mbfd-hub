@@ -7,7 +7,7 @@ const forceRelay = process.env.VIDEO_CONFERENCING_E2E_FORCE_RELAY === 'true';
 
 test.skip(!employeeId || !password || !commandPin, 'Set explicit disposable conference E2E credentials and the 300 command PIN.');
 
-type Endpoint = { context: BrowserContext; page: Page };
+type Endpoint = { context: BrowserContext; page: Page; sessionId?: string; errors: string[]; navigations: string[] };
 
 async function endpointContext(browser: Browser, baseURL: string): Promise<Endpoint> {
     const context = await browser.newContext({
@@ -16,6 +16,16 @@ async function endpointContext(browser: Browser, baseURL: string): Promise<Endpo
         permissions: ['camera', 'microphone'],
     });
     await context.addInitScript(() => {
+        const nativePlay = HTMLMediaElement.prototype.play;
+        Object.assign(window, { __mbfdAlerts: 0, __mbfdBlockAlert: false, __mbfdUnhandled: [] });
+        window.addEventListener('unhandledrejection', () => (window as any).__mbfdUnhandled.push('unhandled rejection'));
+        HTMLMediaElement.prototype.play = function () {
+            if (this.src.includes('lineup-start')) {
+                (window as any).__mbfdAlerts++;
+                if ((window as any).__mbfdBlockAlert) return Promise.reject(new DOMException('Blocked', 'NotAllowedError'));
+            }
+            return nativePlay.call(this);
+        };
         const NativePeerConnection = window.RTCPeerConnection;
         const peerConnections: RTCPeerConnection[] = [];
         window.RTCPeerConnection = new Proxy(NativePeerConnection, {
@@ -29,6 +39,7 @@ async function endpointContext(browser: Browser, baseURL: string): Promise<Endpo
         Object.defineProperty(window, '__mbfdPeerConnections', { value: peerConnections });
 
         const nativeGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getDisplayMedia = async () => nativeGetUserMedia({ video: true, audio: false });
         let gainNode: GainNode | undefined;
         navigator.mediaDevices.getUserMedia = async (constraints) => {
             const stream = await nativeGetUserMedia(constraints);
@@ -86,11 +97,44 @@ async function endpointContext(browser: Browser, baseURL: string): Promise<Endpo
         });
     });
 
-    return { context, page: await context.newPage() };
+    const endpoint: Endpoint = { context, page: await context.newPage(), errors: [], navigations: [] };
+    endpoint.page.on('request', request => { if (request.isNavigationRequest()) endpoint.navigations.push(new URL(request.url()).pathname); });
+    endpoint.page.on('pageerror', () => endpoint.errors.push('Uncaught JavaScript error'));
+    endpoint.page.on('console', message => {
+        if (/(?:access_token=|eyJ[a-zA-Z0-9_-]+\.eyJ)/.test(message.text())) endpoint.errors.push('Credential-bearing console output');
+    });
+    endpoint.page.on('response', async response => {
+        if (/api\/(lineup|direct)\/start$/.test(response.url()) && response.ok()) {
+            endpoint.sessionId = (await response.json()).session?.id;
+        }
+    });
+    return endpoint;
 }
 
-async function prepareStation(browser: Browser, baseURL: string, station: 1 | 2 | 3 | 4 | 6): Promise<Endpoint> {
+async function signIn(page: Page) {
+    await page.goto('/login');
+    await page.getByLabel('Employee ID').fill(employeeId!);
+    await page.getByLabel('Password', {exact:true}).fill(password!);
+    await page.getByRole('button', {name:/sign in/i}).click();
+    await expect(page).not.toHaveURL(/\/login$/);
+}
+
+async function cleanupTestConference(endpoint: Endpoint) {
+    if (!endpoint.sessionId) return;
+    await endpoint.page.evaluate(async sessionId => {
+        const root = document.getElementById('video-conferencing-root');
+        if (!root) return;
+        const bootstrap = JSON.parse(root.dataset.bootstrap!);
+        await fetch(bootstrap.endpoints.api_base + '/sessions/' + sessionId + '/end', {
+            method: 'POST', credentials: 'same-origin',
+            headers: {Accept:'application/json', 'Content-Type':'application/json', 'X-CSRF-TOKEN':bootstrap.csrf_token}, body:'{}',
+        });
+    }, endpoint.sessionId).catch(() => undefined);
+}
+
+async function prepareStation(browser: Browser, baseURL: string, station: 1 | 2 | 3 | 4 | 6, authenticated = false): Promise<Endpoint> {
     const endpoint = await endpointContext(browser, baseURL);
+    if (authenticated) await signIn(endpoint.page);
     await endpoint.page.goto(`/video-conferencing/stations/${station}${forceRelay ? '?force_relay=1' : ''}`);
     await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-entry-mode', 'station');
     await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'standing_by');
@@ -102,8 +146,8 @@ async function prepareStation(browser: Browser, baseURL: string, station: 1 | 2 
 
 async function prepareCommand(browser: Browser, baseURL: string): Promise<Endpoint> {
     const endpoint = await endpointContext(browser, baseURL);
-    await endpoint.page.goto(`/employee/video-conferencing/command${forceRelay ? '?force_relay=1' : ''}`);
-    if (endpoint.page.url().includes('/employee/login')) {
+    await endpoint.page.goto(`/employee/video-conferencing/command?return_to=%2Fdaily%2Fstations%2F2${forceRelay ? '&force_relay=1' : ''}`);
+    if (endpoint.page.url().includes('/login')) {
         await endpoint.page.getByLabel('Employee ID').fill(employeeId!);
         await endpoint.page.getByLabel('Password').fill(password!);
         await endpoint.page.getByRole('button', { name: /sign in/i }).click();
@@ -232,6 +276,7 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
             await expect(row).toContainText('READY');
         }
 
+        await stations[0].page.evaluate(() => { (window as any).__mbfdBlockAlert = true; });
         await command.page.getByRole('button', { name: 'Start Morning Lineup' }).click();
         await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
         await Promise.all(stations.map(({ page }) => expect(page.locator('.vc-shell')).toHaveAttribute(
@@ -240,67 +285,73 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
             { timeout: 45_000 },
         )));
         await expect(command.page.locator('.vc-tile')).toHaveCount(6);
-        await expect.poll(() => conferenceFitsWithoutPageScroll(command.page)).toBe(true);
-        await command.page.setViewportSize({ width: 1280, height: 800 });
-        await expect.poll(() => conferenceFitsWithoutPageScroll(command.page)).toBe(true);
-        for (const station of stations) await expect(station.page.locator('.vc-station-mic')).toContainText('MIC MUTED');
-
-        await setSyntheticAudioLevel(command.page, 0.45);
-        await expect(command.page.locator('.vc-focus-stage .vc-mic')).toContainText('Speaking');
-
+        for (const viewport of [{width:1920,height:1080}, {width:1366,height:768}, {width:1024,height:768}, {width:390,height:844}]) {
+            await command.page.setViewportSize(viewport);
+            await expect.poll(() => conferenceFitsWithoutPageScroll(command.page)).toBe(true);
+            await expect(command.page.getByRole('button', {name:'End Conference', exact:true})).toBeInViewport();
+            await expect(command.page.locator('.vc-gallery')).toHaveAttribute('aria-label', 'Participant gallery');
+            const tiles = await command.page.locator('.vc-gallery .vc-tile').evaluateAll(elements => elements.map(el => {
+                const bounds = el.getBoundingClientRect();
+                const video = el.querySelector('video');
+                return { width: bounds.width, height: bounds.height, fit: video && getComputedStyle(video).objectFit };
+            }));
+            expect(tiles.every(tile => tile.width > 130 && tile.height > 90 && tile.fit === 'contain')).toBe(true);
+            await expect.poll(() => command.page.locator('.vc-gallery video').evaluateAll(videos => videos.every(video => (video as HTMLVideoElement).readyState >= 2 && (video as HTMLVideoElement).videoWidth > 0))).toBe(true);
+            await command.page.screenshot({path: 'test-results/video-conferencing/gallery-' + viewport.width + '.png'});
+        }
+        await command.page.setViewportSize({width:1366,height:768});
+        for (const station of stations) {
+            await expect(station.page.locator('.vc-station-mic')).toContainText('MIC MUTED');
+            expect(await station.page.evaluate(() => (window as any).__mbfdAlerts)).toBe(1);
+        }
+        await command.page.getByRole('button', {name:'Pin Station 2', exact:true}).click();
+        await expect(command.page.locator('.vc-focus-bar')).toContainText('Pinned');
+        await command.page.getByRole('button', {name:'Return to Gallery'}).click();
+        await expect(command.page.locator('.vc-focus-bar')).toContainText('Gallery');
+        await command.page.getByRole('button', {name:'300 Controls', exact:true}).click();
+        await expect(command.page.getByRole('dialog', {name:'300 Controls'})).toBeVisible();
+        const stationOne = command.page.locator('.vc-command__stations > div').filter({hasText:'Station 1'});
+        await stationOne.getByRole('button', {name:'Give Floor'}).click();
+        await expect(stations[0].page.locator('.vc-station-mic')).toContainText('MIC LIVE');
+        await setSyntheticAudioLevel(stations[0].page, 0.8);
+        await expect(command.page.locator('.vc-tile--speaking')).not.toHaveCount(0);
+        await expect(command.page.locator('.vc-focus-bar')).toContainText('Gallery');
+        await command.page.getByRole('button', {name:'Mute all stations'}).click();
+        await expect(stations[0].page.locator('.vc-station-mic')).toContainText('MIC MUTED');
+        await command.page.getByRole('button', {name:'Close 300 Controls'}).click();
+        await command.page.getByRole('button', {name:'Share screen'}).click();
+        await expect(command.page.locator('.vc-focus-bar')).toContainText('Screen share');
+        await expect(stations[0].page.locator('.vc-focus-bar')).toContainText('Screen share');
+        await command.page.getByRole('button', {name:'Stop sharing'}).click();
+        await expect(command.page.locator('.vc-focus-bar')).toContainText('Gallery');
+        await expect(stations[0].page.locator('.vc-focus-bar')).toContainText('Gallery');
+        await command.page.getByRole('button', {name:'End Conference', exact:true}).click();
+        await command.page.getByRole('dialog', {name:'End Morning Lineup?'}).getByRole('button', {name:'Cancel', exact:true}).click();
+        await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
+        await stations[4].page.getByRole('button', {name:'Back', exact:true}).click();
+        await expect.poll(() => stations[4].navigations).toContain('/daily/stations/6');
+        await expect(command.page.locator('.vc-tile')).toHaveCount(5);
         if (forceRelay) {
             await expectRelayOnly(command.page);
-            for (const station of stations) {
-                await expectRelayOnly(station.page);
-            }
-            await command.page.getByRole('button', { name: 'End Morning Lineup' }).click();
-            await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
-            await Promise.all(stations.map(({ page }) => expect(page.locator('.vc-shell')).toHaveAttribute('data-phase', 'standing_by')));
-
-            return;
+            for (const station of stations.slice(0,4)) await expectRelayOnly(station.page);
         }
-
-        const stationOne = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 1' });
-        const stationThree = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 3' });
-        await stationOne.getByRole('button', { name: 'Give Floor' }).click();
-        await setSyntheticAudioLevel(stations[0].page, 0.8);
-        await command.page.waitForTimeout(2_500);
-        await setSyntheticAudioLevel(command.page, 0);
-        await expect(stations[0].page.locator('.vc-station-mic')).toContainText('MIC LIVE');
-        await expect(stations[0].page.locator('.vc-focus-stage .vc-mic')).toContainText('Speaking');
-        await stationThree.getByRole('button', { name: 'Give Floor' }).click();
-        await setSyntheticAudioLevel(stations[0].page, 0);
-        await setSyntheticAudioLevel(stations[2].page, 0.9);
-        await expect(stations[2].page.locator('.vc-station-mic')).toContainText('MIC LIVE');
-        await expect(stations[2].page.locator('.vc-focus-stage .vc-mic')).toContainText('Speaking');
-        await stationOne.getByRole('button', { name: 'Mute' }).click();
-        await expect(stations[0].page.locator('.vc-station-mic')).toContainText('MIC MUTED');
-        await command.page.getByRole('button', { name: 'Mute all stations' }).click();
-        await expect(stations[2].page.locator('.vc-station-mic')).toContainText('MIC MUTED');
-
-        await command.page.locator('.vc-controls').getByRole('button', { name: 'Mute' }).click();
-        const stationTwo = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 2' });
-        await stationTwo.getByRole('button', { name: 'Give Floor' }).click();
-        await setSyntheticAudioLevel(stations[2].page, 0);
-        await setSyntheticAudioLevel(stations[1].page, 0.9);
-        await expect(stations[1].page.locator('.vc-focus-stage .vc-mic')).toContainText('Speaking');
-
-        await command.page.getByRole('button', { name: 'Share screen' }).click();
-        await expect(stations[0].page.locator('.vc-focus-bar')).toContainText('Screen share');
-        await command.page.getByRole('button', { name: 'Stop sharing' }).click();
-        await expect(command.page.locator('.vc-focus-bar')).toContainText('Auto speaker');
-        await expect(stations[0].page.locator('.vc-focus-bar')).toContainText('Auto speaker', { timeout: 45_000 });
-
-        await command.page.getByRole('button', { name: 'End Morning Lineup' }).click();
-        await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
-        await Promise.all(stations.map(({ page }) => expect(page.locator('.vc-shell')).toHaveAttribute('data-phase', 'standing_by')));
+        for (const endpoint of [command, ...stations.slice(0,4)]) {
+            expect(endpoint.errors).toEqual([]);
+            expect(await endpoint.page.evaluate(() => (window as any).__mbfdUnhandled)).toEqual([]);
+        }
+        await command.page.getByRole('button', {name:'End Conference', exact:true}).click();
+        await command.page.getByRole('dialog', {name:'End Morning Lineup?'}).getByRole('button', {name:'End Conference', exact:true}).click();
+        await expect(command.page).toHaveURL(/\/daily\/stations\/2$/);
+        for (const station of stations) await expect.poll(() => station.navigations).toContain('/daily/stations/' + station.station);
     } finally {
-        await Promise.all([command.context.close(), ...stations.map(({ context }) => context.close())]);
+        await cleanupTestConference(command);
+        // Close sequentially so Playwright finalizes each context's trace archive.
+        for (const endpoint of [command, ...stations]) await endpoint.context.close();
     }
 });
 
 test('300 can place and end a direct Station 1 call', async ({ browser, baseURL }) => {
-    const station = await prepareStation(browser, baseURL!, 1);
+    const station = await prepareStation(browser, baseURL!, 1, true);
     const command = await prepareCommand(browser, baseURL!);
     try {
         const stationOne = command.page.locator('.vc-ready-list > div').filter({ hasText: 'Station 1' });
@@ -312,18 +363,48 @@ test('300 can place and end a direct Station 1 call', async ({ browser, baseURL 
             await expectRelayOnly(command.page);
             await expectRelayOnly(station.page);
         }
-        await setSyntheticAudioLevel(command.page, 0.45);
-        await expect(station.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /300 video/);
-        const stationOneControl = command.page.locator('.vc-command__stations > div').filter({ hasText: 'Station 1' });
-        await stationOneControl.getByRole('button', { name: 'Give Floor' }).click();
-        await setSyntheticAudioLevel(station.page, 0.9);
-        await command.page.waitForTimeout(2_500);
-        await setSyntheticAudioLevel(command.page, 0);
-        await expect(command.page.locator('.vc-focus-stage .vc-tile')).toHaveAttribute('aria-label', /Station 1 video/);
-        await command.page.getByRole('button', { name: 'End Direct Call' }).click();
-        await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
-        await expect(station.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'standing_by');
+        await command.page.getByRole('button', {name:'300 Controls', exact:true}).click();
+        const stationOneControl = command.page.locator('.vc-command__stations > div').filter({hasText:'Station 1'});
+        await stationOneControl.getByRole('button', {name:'Give Floor'}).click();
+        await expect(station.page.locator('.vc-station-mic')).toContainText('MIC LIVE');
+        await command.page.getByRole('button', {name:'Close 300 Controls'}).click();
+        expect(command.errors).toEqual([]);
+        expect(station.errors).toEqual([]);
+        await command.page.getByRole('button', {name:'End Direct Call', exact:true}).click();
+        await command.page.getByRole('dialog', {name:'End Direct Call?'}).getByRole('button', {name:'End Direct Call', exact:true}).click();
+        await expect(command.page).toHaveURL(/\/daily\/stations\/2$/);
+        await expect(station.page).toHaveURL(/\/daily\/stations\/1$/);
     } finally {
-        await Promise.all([command.context.close(), station.context.close()]);
+        await cleanupTestConference(command);
+        await command.context.close();
+        await station.context.close();
+    }
+});
+
+test('self join keeps the exact session for status fallback and returns safely', async ({browser, baseURL}) => {
+    const command = await prepareCommand(browser, baseURL!);
+    const self = await endpointContext(browser, baseURL!);
+    try {
+        await command.page.getByRole('button', {name:'Start Morning Lineup'}).click();
+        await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
+        await signIn(self.page);
+        await self.page.goto('/employee/video-conferencing?return_to=%2Femployee');
+        await expect(self.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
+        await self.page.getByRole('button', {name:'Join active Morning Lineup'}).click();
+        await expect(self.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
+        await expect(command.page.locator('.vc-tile')).toHaveCount(2);
+        // Simulate a missed LiveKit closure reason: server status remains the
+        // fallback authority even while the transport itself has not notified us.
+        await self.page.route('**/api/sessions/*/status', route => route.fulfill({json:{active:false}}));
+        await expect(self.page).toHaveURL(/\/employee\/dashboard$/);
+        expect(self.navigations).toContain('/employee');
+        expect(self.errors).toEqual([]);
+        await command.page.getByRole('button', {name:'End Conference', exact:true}).click();
+        await command.page.getByRole('dialog', {name:'End Morning Lineup?'}).getByRole('button', {name:'End Conference', exact:true}).click();
+        await expect(command.page).toHaveURL(/\/daily\/stations\/2$/);
+    } finally {
+        await cleanupTestConference(command);
+        await command.context.close();
+        await self.context.close();
     }
 });

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\VideoConferencing;
 
 use App\Concerns\ResolvesCanonicalEmployee;
@@ -36,7 +38,7 @@ class ConferencePageController extends Controller
 
         return view('video-conferencing', [
             'enabled' => (bool) config('video-conferencing.enabled'),
-            'conferenceBootstrap' => $bootstrap->make('command', ConferenceJoinRole::Command, employee: $employee),
+            'conferenceBootstrap' => $bootstrap->make('command', ConferenceJoinRole::Command, employee: $employee, returnTo: $request->query('return_to')),
         ]);
     }
 }

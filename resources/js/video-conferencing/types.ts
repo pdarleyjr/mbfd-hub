@@ -18,6 +18,7 @@ export interface ConferenceBootstrap {
     join_as: JoinRole;
     display_name: string;
     launch_context: string | null;
+    navigation: { back: string; home: string };
     lineup_time: string | null;
     lineup_max_minutes: number;
     status_poll_ms: number;
@@ -95,8 +96,19 @@ export interface StationStatusResponse {
 }
 
 export interface CommandStatusResponse {
+    usage: ConferenceUsage;
     provider_api_healthy: boolean;
     lineup: LineupState;
     stations: StationReadiness[];
     participants: Array<{ identity: string; name: string }>;
+}
+
+export interface ConferenceUsage {
+    participant_minutes_estimated: number;
+    participant_minutes_allowance: number;
+    participant_minutes_remaining: number;
+    downstream_gb_estimated: number;
+    downstream_allowance_gb: number;
+    downstream_gb_remaining: number;
+    resets_at: string;
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature\VideoConferencing;
 
 use App\Contracts\VideoConferencing\ConferenceProvider;
@@ -201,6 +203,33 @@ class ConferenceWorkflowTest extends TestCase
         $participation = VideoConferenceParticipation::query()->findOrFail($token->json('participation_id'));
         $this->assertNull($participation->active_identity_key);
         $this->assertNotNull($participation->left_at);
+    }
+
+    public function test_exact_session_status_is_private_and_detects_server_end(): void
+    {
+        $started = $this->authorizeAndStart();
+        $session = VideoConferenceSession::query()->findOrFail($started['session']['id']);
+        $url = '/employee/video-conferencing/api/sessions/'.$session->id.'/status';
+        $this->getJson($url)->assertOk()->assertJsonPath('active', true);
+        app(\App\Services\VideoConferencing\ConferenceSessionService::class)->end($session);
+        $this->getJson($url)->assertOk()->assertJsonPath('active', false);
+        $other = Employee::query()->create(['employee_id' => 'F044', 'name' => 'Other Member', 'password' => 'not-used']);
+        $this->actingAs($other, 'employee')->getJson($url)->assertForbidden();
+        $this->assertCount(1, $this->provider->closedRooms);
+    }
+
+    public function test_expiration_closes_room_and_participation_once(): void
+    {
+        $started = $this->authorizeAndStart();
+        $session = VideoConferenceSession::query()->findOrFail($started['session']['id']);
+        $session->update(['started_at' => now()->subMinutes(16)]);
+        $this->artisan('video-conferencing:expire-lineup')->assertSuccessful();
+        $this->assertNotNull($session->fresh()->ended_at);
+        $this->assertSame(0, $session->participations()->whereNull('left_at')->count());
+        $this->getJson('/employee/video-conferencing/api/sessions/'.$session->id.'/status')
+            ->assertOk()->assertJsonPath('active', false);
+        $this->artisan('video-conferencing:expire-lineup')->assertSuccessful();
+        $this->assertCount(1, $this->provider->closedRooms);
     }
 
     /** @return array<string, mixed> */
