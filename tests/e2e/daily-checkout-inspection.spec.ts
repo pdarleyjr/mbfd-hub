@@ -807,7 +807,7 @@ test('a string Station 2 API value renders both authorized conference links', as
   await expect(page.getByRole('link', { name: 'Morning Lineup Video Conference — Station 2', exact: true }))
     .toHaveAttribute('href', '/video-conferencing/stations/2');
   await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true }))
-    .toHaveAttribute('href', '/employee/video-conferencing/command');
+    .toHaveAttribute('href', '/employee/video-conferencing/command?return_to=%2Fdaily%2Fstations%2F2');
 });
 
 test('a string Station 3 API value renders its conference link', async ({ page }) => {
