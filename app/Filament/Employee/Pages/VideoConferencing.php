@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Employee\Pages;
 
 use App\Concerns\ResolvesCanonicalEmployee;
@@ -30,7 +32,7 @@ class VideoConferencing extends Page
         return [
             'enabled' => (bool) config('video-conferencing.enabled'),
             'conferenceBootstrap' => app(ConferenceBootstrapFactory::class)
-                ->make('self', ConferenceJoinRole::Self, employee: $employee),
+                ->make('self', ConferenceJoinRole::Self, employee: $employee, returnTo: request()->query('return_to')),
         ];
     }
 }

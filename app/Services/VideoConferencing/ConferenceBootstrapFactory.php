@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\VideoConferencing;
 
 use App\Enums\VideoConferencing\ConferenceJoinRole;
@@ -13,6 +15,7 @@ class ConferenceBootstrapFactory
         ConferenceJoinRole $role,
         ?string $launchContext = null,
         ?Employee $employee = null,
+        mixed $returnTo = null,
     ): array {
         if (in_array($role, [ConferenceJoinRole::Self, ConferenceJoinRole::Command], true) && $employee === null) {
             throw new \LogicException('An authenticated employee is required for this conference entry mode.');
@@ -30,6 +33,12 @@ class ConferenceBootstrapFactory
             'join_as' => $role->value,
             'display_name' => $displayName,
             'launch_context' => $launchContext,
+            'navigation' => [
+                'back' => $role->isStation()
+                    ? '/daily/stations/'.substr($role->value, 3)
+                    : $this->safeReturnTo($returnTo),
+                'home' => '/',
+            ],
             'lineup_time' => config('video-conferencing.lineup_time'),
             'lineup_max_minutes' => max(5, min(30, (int) config('video-conferencing.lineup_max_minutes', 15))),
             'status_poll_ms' => max(3000, min(15000, (int) config('video-conferencing.readiness.poll_seconds', 5) * 1000)),
@@ -59,5 +68,21 @@ class ConferenceBootstrapFactory
             ],
             'csrf_token' => csrf_token(),
         ];
+    }
+
+    private function safeReturnTo(mixed $returnTo): string
+    {
+        // Only known portal destinations are accepted, excluding conference pages
+        // so that an ended room cannot redirect straight back into a join loop.
+        if (! is_string($returnTo)) {
+            return '/';
+        }
+        $origin = rtrim((string) config('app.url'), '/');
+        if ($origin !== '' && str_starts_with($returnTo, $origin.'/')) {
+            $returnTo = substr($returnTo, strlen($origin));
+        }
+
+        return preg_match('#^/(?:daily/stations/[12346]|employee)?$#D', $returnTo) === 1
+            ? $returnTo : '/';
     }
 }

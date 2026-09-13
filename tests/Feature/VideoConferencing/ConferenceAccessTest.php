@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature\VideoConferencing;
 
 use App\Contracts\VideoConferencing\ConferenceProvider;
@@ -16,6 +18,25 @@ use Tests\TestCase;
 class ConferenceAccessTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_navigation_is_server_bound_and_rejects_unsafe_return_destinations(): void
+    {
+        config(['video-conferencing.enabled' => true, 'app.url' => 'https://www.mbfdhub.com']);
+        $this->withoutVite();
+        $this->get('/video-conferencing/stations/2?return_to=https://evil.example')
+            ->assertViewHas('conferenceBootstrap', fn (array $data): bool => $data['navigation'] === [
+                'back' => '/daily/stations/2', 'home' => '/',
+            ]);
+        $this->actingAs($this->employee(), 'employee');
+        foreach (['/daily/stations/2', 'https://www.mbfdhub.com/daily/stations/2'] as $target) {
+            $this->get('/employee/video-conferencing/command?'.http_build_query(['return_to' => $target]))
+                ->assertViewHas('conferenceBootstrap', fn (array $data): bool => $data['navigation']['back'] === '/daily/stations/2');
+        }
+        foreach (['https://evil.example', '//evil.example', '/\\evil.example', '/employee/video-conferencing', '/daily/stations/2?next=https://evil.example', '/daily/stations/5', ['/daily/stations/2']] as $target) {
+            $this->get('/employee/video-conferencing/command?'.http_build_query(['return_to' => $target]))
+                ->assertViewHas('conferenceBootstrap', fn (array $data): bool => $data['navigation']['back'] === '/');
+        }
+    }
 
     public function test_guest_is_sent_to_canonical_login_with_the_full_intended_query(): void
     {

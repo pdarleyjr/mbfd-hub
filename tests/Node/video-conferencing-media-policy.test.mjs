@@ -42,12 +42,13 @@ test('browser-neutral 300 authorization remains interactive before media is read
   assert.doesNotMatch(authorizeCommand, /microphoneReady/);
 });
 
-test('focused videos request HIGH and thumbnails request LOW with adaptive delivery enabled', () => {
+test('presentation preference preserves adaptive delivery at actual gallery dimensions', () => {
   assert.match(app, /adaptiveStream: true/);
   assert.match(app, /dynacast: true/);
   assert.match(app, /simulcast: true/);
   assert.match(app, /VideoPresets\.h720/);
-  assert.match(app, /setVideoQuality\(high \? VideoQuality\.HIGH : VideoQuality\.LOW\)/);
+  assert.match(app, /if \(high\) publication.setVideoQuality\(VideoQuality.HIGH\)/);
+  assert.doesNotMatch(app, /VideoQuality.LOW/);
 });
 
 test('station microphone RPC reflects floor state before WebRTC renegotiation completes', () => {

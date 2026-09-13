@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\VideoConferencing;
 
 use App\Models\VideoConferenceParticipation;
@@ -12,10 +14,17 @@ class ConferenceUsageService
     {
         $month = CarbonImmutable::now('UTC')->startOfMonth();
         $participations = VideoConferenceParticipation::query()
-            ->where('token_issued_at', '>=', $month)
+            ->where(function ($query) use ($month): void {
+                $query->where('token_issued_at', '>=', $month)
+                    ->orWhere(function ($ongoing) use ($month): void {
+                        $ongoing->whereNotNull('joined_at')->where(function ($ended) use ($month): void {
+                            $ended->whereNull('left_at')->orWhere('left_at', '>=', $month);
+                        });
+                    });
+            })
             ->get();
         $now = CarbonImmutable::now('UTC');
-        $participantSeconds = $participations->sum(function (VideoConferenceParticipation $participation) use ($now): int {
+        $participantSeconds = $participations->sum(function (VideoConferenceParticipation $participation) use ($now, $month): int {
             if ($participation->joined_at === null) {
                 return 0;
             }
@@ -23,7 +32,9 @@ class ConferenceUsageService
                 ? $now
                 : CarbonImmutable::instance($participation->left_at);
 
-            return max(0, CarbonImmutable::instance($participation->joined_at)->diffInSeconds($ended));
+            $started = CarbonImmutable::instance($participation->joined_at)->max($month);
+
+            return (int) max(0, $started->diffInSeconds($ended));
         });
         $downstreamBytes = (int) $participations->sum('downstream_bytes');
         $downstreamGb = round($downstreamBytes / 1_000_000_000, 3);
@@ -43,12 +54,20 @@ class ConferenceUsageService
             }
         }
 
+        $minutes = round($participantSeconds / 60, 1);
+        $minutesAllowance = max(0, (int) config('video-conferencing.usage.webrtc_minutes_allowance', 5000));
+        $downstreamAllowance = max(0, (int) config('video-conferencing.usage.downstream_allowance_gb', 50));
+
         return [
             'month' => $month->format('Y-m'),
-            'participant_minutes_estimated' => round($participantSeconds / 60, 1),
+            'participant_minutes_estimated' => $minutes,
+            'participant_minutes_allowance' => $minutesAllowance,
+            'participant_minutes_remaining' => max(0, $minutesAllowance - $minutes),
+            'resets_at' => $month->addMonth()->toIso8601String(),
             'downstream_bytes_estimated' => $downstreamBytes,
             'downstream_gb_estimated' => $downstreamGb,
-            'downstream_allowance_gb' => 50,
+            'downstream_allowance_gb' => $downstreamAllowance,
+            'downstream_gb_remaining' => max(0, round($downstreamAllowance - $downstreamGb, 3)),
             'band' => $band,
             'estimate_label' => 'Estimated from MBFD participation and browser RTC stats; the LiveKit dashboard is authoritative.',
         ];

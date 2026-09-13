@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Employee\VideoConferencing;
 
 use App\Concerns\ResolvesCanonicalEmployee;
@@ -8,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Services\VideoConferencing\ConferenceCommandAuthorizationService;
 use App\Services\VideoConferencing\ConferenceLineupReadinessService;
 use App\Services\VideoConferencing\ConferenceSessionService;
+use App\Services\VideoConferencing\ConferenceUsageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,6 +24,7 @@ class CommandLineupStatusController extends Controller
         ConferenceLineupReadinessService $readiness,
         ConferenceSessionService $sessions,
         ConferenceProvider $provider,
+        ConferenceUsageService $usage,
     ): JsonResponse {
         $employee = $this->authenticatedEmployee();
         $authorization->assertAuthorized($request, $employee);
@@ -44,6 +48,7 @@ class CommandLineupStatusController extends Controller
             'lineup' => $sessions->lineupStatus($session),
             'stations' => $readiness->allStations(),
             'participants' => $participants,
+            'usage' => $usage->monthlyEstimate(),
         ])->header('Cache-Control', 'no-store');
     }
 }

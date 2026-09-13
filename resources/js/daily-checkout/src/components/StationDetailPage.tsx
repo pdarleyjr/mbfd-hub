@@ -325,7 +325,7 @@ export default function StationDetailPage() {
           )}
           {stationNumber === 2 && (
             <a
-              href="/employee/video-conferencing/command"
+              href={`/employee/video-conferencing/command?return_to=${encodeURIComponent(`/daily/stations/${stationNumber}`)}`}
               className="flex min-h-12 items-center gap-2.5 rounded-xl bg-orange-600 p-3 text-sm font-bold text-white ring-1 ring-orange-700/30 transition-colors hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
             >
               <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

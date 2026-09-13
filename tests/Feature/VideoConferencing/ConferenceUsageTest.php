@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature\VideoConferencing;
 
 use App\Enums\VideoConferencing\ConferenceJoinRole;
@@ -60,5 +62,20 @@ class ConferenceUsageTest extends TestCase
         $this->assertSame(1.5, $usage['downstream_gb_estimated']);
         $this->assertSame('normal', $usage['band']);
         $this->assertStringStartsWith('Estimated', $usage['estimate_label']);
+        $this->assertSame(5000, $usage['participant_minutes_allowance']);
+        $this->assertSame(4995.0, $usage['participant_minutes_remaining']);
+        $this->assertSame(50, $usage['downstream_allowance_gb']);
+        $this->assertSame(48.5, $usage['downstream_gb_remaining']);
+        $this->assertSame(\Carbon\CarbonImmutable::now('UTC')->startOfMonth()->addMonth()->toIso8601String(), $usage['resets_at']);
+
+        config(['video-conferencing.usage.webrtc_minutes_allowance' => 3, 'video-conferencing.usage.downstream_allowance_gb' => 1]);
+        $limited = app(ConferenceUsageService::class)->monthlyEstimate();
+        $this->assertSame(0, $limited['participant_minutes_remaining']);
+        $this->assertSame(0, $limited['downstream_gb_remaining']);
+
+        $joined = VideoConferenceParticipation::query()->whereNotNull('joined_at')->firstOrFail();
+        $month = \Carbon\CarbonImmutable::now('UTC')->startOfMonth();
+        $joined->update(['token_issued_at' => $month->subMinutes(10), 'joined_at' => $month->subMinutes(5), 'left_at' => $month->addMinutes(2)]);
+        $this->assertSame(2.0, app(ConferenceUsageService::class)->monthlyEstimate()['participant_minutes_estimated']);
     }
 }

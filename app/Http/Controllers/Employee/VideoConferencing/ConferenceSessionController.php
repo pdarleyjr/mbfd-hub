@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Employee\VideoConferencing;
 
 use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\VideoConferencing\ConferenceJoinRole;
 use App\Exceptions\VideoConferencing\ConferenceUnavailableException;
 use App\Http\Controllers\Controller;
+use App\Models\VideoConferenceSession;
 use App\Services\VideoConferencing\ConferenceCommandPinService;
 use App\Services\VideoConferencing\ConferenceSessionService;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +18,15 @@ use Illuminate\Validation\Rule;
 class ConferenceSessionController extends Controller
 {
     use ResolvesCanonicalEmployee;
+
+    public function status(VideoConferenceSession $session): JsonResponse
+    {
+        $employee = $this->authenticatedEmployee();
+        abort_unless($session->participations()->where('employee_id', $employee->getKey())->exists(), 403);
+
+        return response()->json(['active' => $session->ended_at === null && $session->active_key !== null])
+            ->header('Cache-Control', 'no-store');
+    }
 
     public function __invoke(
         Request $request,
