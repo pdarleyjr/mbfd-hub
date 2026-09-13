@@ -144,10 +144,24 @@ class SurveyPlatformTest extends TestCase
         [$user, $openSurvey] = $this->makeSurvey();
         $service = app(SurveyResponseService::class);
         $blockedStates = [
-            ['status' => 'draft'],
-            ['status' => 'active', 'opens_at' => now()->addHour()],
-            ['status' => 'active', 'closes_at' => now()->subHour()],
-            ['status' => 'closed'],
+            [
+                'status' => 'draft',
+                'message' => 'This survey is still being prepared and is not accepting responses yet.',
+            ],
+            [
+                'status' => 'active',
+                'opens_at' => now()->addHour(),
+                'message' => 'This survey is scheduled to open later and is not accepting responses yet.',
+            ],
+            [
+                'status' => 'active',
+                'closes_at' => now()->subHour(),
+                'message' => 'This survey is closed and is no longer accepting responses.',
+            ],
+            [
+                'status' => 'closed',
+                'message' => 'This survey is closed and is no longer accepting responses.',
+            ],
         ];
 
         foreach ($blockedStates as $index => $state) {
@@ -159,8 +173,15 @@ class SurveyPlatformTest extends TestCase
                 'closes_at' => $state['closes_at'] ?? null,
                 'is_anonymous' => true,
             ]);
-            $this->assertHttpFailure(fn () => $service->draftFor($survey, $user), 422);
+            foreach ([
+                fn () => $service->participantFor($survey, $user),
+                fn () => $service->draftFor($survey, $user),
+                fn () => $service->submit($survey, $user, []),
+            ] as $blockedOperation) {
+                $this->assertHttpFailure($blockedOperation, 422, $state['message']);
+            }
             $this->assertSame(0, $survey->participants()->count());
+            $this->assertSame(0, $survey->participants()->whereNotNull('response_token')->count());
             $this->assertSame(0, $survey->responses()->count());
         }
 
@@ -416,6 +437,39 @@ class SurveyPlatformTest extends TestCase
             );
     }
 
+    public function test_pdf_export_is_letter_portrait_and_groups_print_results_with_the_mbfd_logo(): void
+    {
+        [$user, $survey] = $this->makeSurvey();
+        $this->actingAs($user);
+        $survey->questions()->create([
+            'position' => 2,
+            'type' => 'matrix',
+            'prompt' => 'Rate each result',
+            'is_required' => false,
+            'configuration' => [
+                'rows' => [['key' => 'first', 'label' => 'First result']],
+                'options' => [['key' => 'excellent', 'label' => 'Excellent', 'score' => 5]],
+            ],
+        ]);
+        $survey = $survey->fresh(['questions', 'workgroup']);
+        $analytics = app(SurveyAnalyticsService::class)->calculate($survey);
+        $html = view('filament-workgroup.pages.survey-results-pdf', compact('survey', 'analytics'))->render();
+
+        $this->assertStringContainsString('class="report-logo"', $html);
+        $this->assertStringContainsString('data:image/png;base64,', $html);
+        $this->assertStringContainsString('section-start', $html);
+        $this->assertStringContainsString('class="question-title"', $html);
+        $this->assertStringContainsString('class="result-block"', $html);
+        $this->assertStringContainsString('page-break-inside: avoid', $html);
+        $this->assertStringContainsString('display: table-header-group', $html);
+
+        $page = app(SurveyResultsPage::class);
+        $page->survey = $survey;
+        $pdf = $this->streamedContent($page->downloadPdf());
+        $this->assertStringStartsWith('%PDF-', $pdf);
+        $this->assertStringContainsString('/MediaBox [0.000 0.000 612.000 792.000]', $pdf);
+    }
+
     public function test_anonymous_csv_pdf_print_and_ai_payloads_do_not_contain_member_identity_or_other_text(): void
     {
         [$user, $survey] = $this->makeSurvey();
@@ -546,13 +600,16 @@ class SurveyPlatformTest extends TestCase
         }
     }
 
-    private function assertHttpFailure(callable $callback, int $status): void
+    private function assertHttpFailure(callable $callback, int $status, ?string $message = null): void
     {
         try {
             $callback();
             $this->fail("Expected HTTP {$status} failure.");
         } catch (HttpException $exception) {
             $this->assertSame($status, $exception->getStatusCode());
+            if ($message !== null) {
+                $this->assertSame($message, $exception->getMessage());
+            }
         }
     }
 
