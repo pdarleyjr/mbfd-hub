@@ -22,7 +22,7 @@ final class SurveyResponseService
     public function participantFor(WorkgroupSurvey $survey, User $user): WorkgroupSurveyParticipant
     {
         $this->requireCurrentSurveyContext($survey, $user);
-        abort_unless($survey->isOpen(), 422, 'This survey is not open.');
+        $this->requireOpenSurvey($survey);
         $member = app(WorkgroupContext::class)->requireMember($user);
 
         return WorkgroupSurveyParticipant::query()->firstOrCreate(
@@ -60,7 +60,7 @@ final class SurveyResponseService
             }
         }
 
-        abort_unless($survey->isOpen(), 422, 'This survey is not open.');
+        $this->requireOpenSurvey($survey);
         $participant ??= $this->participantFor($survey, $user);
         abort_unless($participant->is_eligible, 404);
 
@@ -100,7 +100,7 @@ final class SurveyResponseService
     /** @param array<int|string, mixed> $answers @param array<string, mixed> $demographics */
     public function submit(WorkgroupSurvey $survey, User $user, array $answers, array $demographics = []): WorkgroupSurveyResponse
     {
-        abort_unless($survey->isOpen(), 422, 'This survey is not open.');
+        $this->requireOpenSurvey($survey);
 
         return DB::transaction(function () use ($survey, $user, $answers, $demographics): WorkgroupSurveyResponse {
             $response = $this->draftFor($survey, $user);
@@ -354,5 +354,27 @@ final class SurveyResponseService
         app(WorkgroupAccess::class)->requireSurvey($user, $survey);
         $current = app(WorkgroupContext::class)->requireCurrent($user);
         abort_unless($current->id === $survey->workgroup_id, 404);
+    }
+
+    private function requireOpenSurvey(WorkgroupSurvey $survey): void
+    {
+        abort_unless($survey->isOpen(), 422, $this->notOpenMessage($survey));
+    }
+
+    private function notOpenMessage(WorkgroupSurvey $survey): string
+    {
+        if ($survey->status === 'draft') {
+            return 'This survey is still being prepared and is not accepting responses yet.';
+        }
+
+        if ($survey->status === 'closed' || $survey->closes_at?->isPast()) {
+            return 'This survey is closed and is no longer accepting responses.';
+        }
+
+        if ($survey->status === 'active' && $survey->opens_at?->isFuture()) {
+            return 'This survey is scheduled to open later and is not accepting responses yet.';
+        }
+
+        return 'This survey is not currently accepting responses.';
     }
 }
