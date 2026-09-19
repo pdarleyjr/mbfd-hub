@@ -52,6 +52,8 @@ class User extends Authenticatable implements FilamentUser
 
     public const NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES = 'department_updates';
 
+    public const NOTIFICATION_PREFERENCE_HUB_SUPPORT_TICKETS = 'hub_support_tickets';
+
     /**
      * The current roles that grant access to the Filament admin panel.
      *
@@ -90,6 +92,7 @@ class User extends Authenticatable implements FilamentUser
         self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS => true,
         self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS => true,
         self::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES => true,
+        self::NOTIFICATION_PREFERENCE_HUB_SUPPORT_TICKETS => false,
     ];
 
     /**
@@ -342,6 +345,10 @@ class User extends Authenticatable implements FilamentUser
                 'label' => 'Department Updates',
                 'description' => 'Receive published department notices and operational updates.',
             ],
+            self::NOTIFICATION_PREFERENCE_HUB_SUPPORT_TICKETS => [
+                'label' => 'Website / App Issue Reports',
+                'description' => 'Receive reports from members about MBFD Hub problems.',
+            ],
         ];
     }
 
@@ -354,6 +361,7 @@ class User extends Authenticatable implements FilamentUser
             'station_request' => self::NOTIFICATION_PREFERENCE_STATION_REQUESTS,
             'apparatus_service_ticket' => self::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS,
             'evaluation_submission' => self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS,
+            'hub_support_ticket' => self::NOTIFICATION_PREFERENCE_HUB_SUPPORT_TICKETS,
             'station_inventory_submission' => self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS,
             default => null,
         };
@@ -371,14 +379,14 @@ class User extends Authenticatable implements FilamentUser
 
     public function canManageNotificationSettings(): bool
     {
-        return $this->hasAnyRole([
+        return $this->isAuthenticationAllowed() && ($this->hasDirectWebPermission('admin.support.view') || $this->hasAnyRole([
             'super_admin',
             'admin',
             'logistics_admin',
             'training_admin',
             'workgroup_admin',
             'workgroup_facilitator',
-        ]);
+        ]));
     }
 
     /**

@@ -42,7 +42,7 @@ const responsiveViewports = [
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /(canonical-login-responsive|daily-checkout-(inspection|responsive|service-worker))\.spec\.ts/,
+  testMatch: /(canonical-login-responsive|daily-checkout-(inspection|responsive|service-worker)|daily-issue-report)\.spec\.ts/,
   timeout: 45_000,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
@@ -68,6 +68,16 @@ export default defineConfig({
     env: webServerEnvironment,
   },
   projects: [
+    {
+      name: 'daily-issue-report-chromium',
+      testMatch: /daily-issue-report\.spec\.ts/,
+      use: { browserName: 'chromium', viewport: { width: 1280, height: 800 } },
+    },
+    {
+      name: 'daily-issue-report-webkit',
+      testMatch: /daily-issue-report\.spec\.ts/,
+      use: { ...devices['iPhone 13'], browserName: 'webkit' },
+    },
     {
       name: 'daily-checkout-chromium',
       testMatch: /daily-checkout-inspection\.spec\.ts/,

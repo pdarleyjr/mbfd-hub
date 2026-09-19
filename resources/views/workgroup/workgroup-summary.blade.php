@@ -1063,5 +1063,6 @@
     </div><!-- /.report-body -->
 </div><!-- /.report-container -->
 
+    @include('components.hub-support-widget')
 </body>
 </html>

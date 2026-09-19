@@ -20,5 +20,8 @@
         ></main>
         @vite('resources/js/video-conferencing/main.tsx')
     @endif
+    @if (request()->routeIs('employee.video-conferencing.command'))
+        @include('components.hub-support-widget')
+    @endif
 </body>
 </html>

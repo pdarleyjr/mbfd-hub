@@ -53,5 +53,6 @@
         Home
     </a>
     <div id="pump-simulator-root"></div>
+    @include('components.hub-support-widget')
 </body>
 </html>

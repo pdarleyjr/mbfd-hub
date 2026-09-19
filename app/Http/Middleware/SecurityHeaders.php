@@ -99,7 +99,9 @@ class SecurityHeaders
         if ($request->secure()) {
             $cspParts[] = 'upgrade-insecure-requests';
         }
-        $response->headers->set('Content-Security-Policy', implode('; ', $cspParts));
+        if (! $response->headers->has('Content-Security-Policy')) {
+            $response->headers->set('Content-Security-Policy', implode('; ', $cspParts));
+        }
 
         // Strip X-Powered-By from BOTH the Symfony response bag (covers PHP-FPM)
         // AND PHP's SAPI-level header stack (covers the php artisan serve dev

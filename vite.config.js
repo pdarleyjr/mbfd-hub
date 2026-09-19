@@ -10,6 +10,7 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/js/app.js',
+                'resources/js/hub-support/blade.js',
                 'resources/js/pump-simulator/main.tsx',
                 'resources/js/push-notification-widget.js',
                 'resources/css/filament/admin/theme.css',

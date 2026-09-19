@@ -4,6 +4,9 @@ import * as Sentry from '@sentry/react'
 import App from './App.tsx'
 import { QueryProvider } from './providers/QueryProvider'
 import './index.css'
+import { startHubIssueDiagnosticsCollector } from '../../hub-support/diagnostics.js'
+
+startHubIssueDiagnosticsCollector()
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,

@@ -918,5 +918,6 @@
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, min: 78, max: 95, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 12 } } }, x: { grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 0, minRotation: 0 } } } }
         });
     </script>
+    @include('components.hub-support-widget')
 </body>
 </html>

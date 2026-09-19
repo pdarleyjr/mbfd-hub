@@ -33,5 +33,6 @@
         </div>
         <div class="mt-8">{{ $departmentUpdates->links() }}</div>
     </main>
+    @include('components.hub-support-widget')
 </body>
 </html>

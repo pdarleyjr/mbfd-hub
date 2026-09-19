@@ -40,6 +40,8 @@ use App\Http\Controllers\Employee\VideoConferencing\StartMorningLineupController
 use App\Http\Controllers\Employee\VideoConferencing\StationMicrophoneController;
 use App\Http\Controllers\HealthReadinessController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\HubSupportTicketAttachmentController;
+use App\Http\Controllers\HubSupportTicketController;
 use App\Http\Controllers\IncidentsController;
 use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\VideoConferencing\ConferencePageController;
@@ -67,6 +69,22 @@ Route::middleware('auth:web')->group(function (): void {
     Route::get('/updates/{departmentUpdate}/attachment', [DepartmentUpdateController::class, 'attachment'])->name('updates.attachment');
     Route::get('/updates/{departmentUpdate}', [DepartmentUpdateController::class, 'show'])->name('updates.show');
 });
+
+Route::prefix('support/issues')->middleware('auth:web')->name('hub-support.')->group(function (): void {
+    Route::get('/', [HubSupportTicketController::class, 'index'])->name('index');
+    Route::get('/create', [HubSupportTicketController::class, 'create'])->name('create');
+    Route::post('/', [HubSupportTicketController::class, 'store'])
+        ->middleware('throttle:hub-support-submissions')->name('store');
+    Route::get('/attachments/{attachment}', [HubSupportTicketAttachmentController::class, 'member'])
+        ->middleware('throttle:30,1')->name('attachments.download');
+    Route::get('/{ticket}', [HubSupportTicketController::class, 'show'])->name('show');
+    Route::post('/{ticket}/reply', [HubSupportTicketController::class, 'reply'])
+        ->middleware('throttle:20,1')->name('reply');
+});
+
+Route::get('/admin/hub-support-attachments/{attachment}', [HubSupportTicketAttachmentController::class, 'admin'])
+    ->middleware(['auth:web', 'throttle:30,1'])
+    ->name('admin.hub-support-attachments.download');
 
 // Public Security & Standards trust page — no auth required, indexable.
 Route::view('/security-standards', 'security-standards')

@@ -4,6 +4,7 @@ import DailyCheckoutQueueProcessor from './components/DailyCheckoutQueueProcesso
 import OfflineIndicator from './components/OfflineIndicator';
 import { IOSInstallPrompt } from './components/IOSInstallPrompt';
 import SuccessPage from './components/SuccessPage';
+import HubIssueWidget from './components/HubIssueWidget';
 
 const ApparatusList = lazy(() => import('./components/ApparatusList'));
 const InspectionWizard = lazy(() => import('./components/InspectionWizard'));
@@ -60,6 +61,7 @@ function App() {
         <OfflineIndicator />
         <DailyCheckoutQueueProcessor />
         <IOSInstallPrompt />
+        <HubIssueWidget />
         <main id="main-content" data-testid="daily-workspace" className="daily-workspace mx-auto px-4 py-6 sm:px-6 md:py-8 lg:px-8 xl:px-10 2xl:px-12">
           <Suspense fallback={<PageLoading />}>
           <Routes>

@@ -400,5 +400,6 @@
         root.render(<App />);
     </script>
     @endverbatim
+    @include('components.hub-support-widget')
 </body>
 </html>
