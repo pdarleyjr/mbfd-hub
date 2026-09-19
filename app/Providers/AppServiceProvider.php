@@ -104,6 +104,15 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('hub-support-submissions', function (Request $request): array {
+            $user = $request->user('web');
+
+            return [
+                Limit::perHour(10)->by('hub-support-user:'.($user instanceof User ? $user->id : $request->ip())),
+                Limit::perHour(60)->by('hub-support-ip:'.$request->ip()),
+            ];
+        });
+
         if (str_contains(config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
@@ -137,6 +146,22 @@ class AppServiceProvider extends ServiceProvider
         \Filament\Support\Facades\FilamentView::registerRenderHook(
             \Filament\View\PanelsRenderHook::HEAD_END,
             fn (): \Illuminate\Contracts\View\View => view('filament.partials.session-expiry'),
+        );
+        \Filament\Support\Facades\FilamentView::registerRenderHook(
+            \Filament\View\PanelsRenderHook::BODY_END,
+            function (): string {
+                if (! auth('web')->check()) {
+                    return '';
+                }
+
+                try {
+                    return view('components.hub-support-widget')->render();
+                } catch (\Throwable $exception) {
+                    report($exception);
+
+                    return '';
+                }
+            },
         );
 
         // ─── Submission Notification Triggers ──────────────────────────────

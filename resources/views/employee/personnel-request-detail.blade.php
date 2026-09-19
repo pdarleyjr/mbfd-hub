@@ -81,5 +81,6 @@
             </div>
         </article>
     </main>
+    @include('components.hub-support-widget')
 </body>
 </html>

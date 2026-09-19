@@ -10,6 +10,7 @@ return [
         App\Models\ApparatusDefectRecommendation::class => 'admin.fleet',
         App\Models\ApparatusInspection::class => 'admin.fleet',
         App\Models\ApparatusServiceTicket::class => 'admin.fleet',
+        App\Models\HubSupportTicket::class => 'admin.support',
         App\Models\ShopWork::class => 'admin.fleet',
         App\Models\UnitMasterVehicle::class => 'admin.fleet',
         App\Models\Station::class => 'admin.stations',

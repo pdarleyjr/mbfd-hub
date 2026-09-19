@@ -537,5 +537,6 @@
         };
     }
     </script>
+    @include('components.hub-support-widget')
 </body>
 </html>

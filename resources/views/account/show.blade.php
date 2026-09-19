@@ -56,5 +56,6 @@
             </ul>
         </section>
     </main>
+    @include('components.hub-support-widget')
 </body>
 </html>

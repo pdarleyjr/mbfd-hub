@@ -56,6 +56,7 @@ final class ApplicationAccessRegistry
             'workgroups' => 'Workgroups', 'forms' => 'Forms', 'projects' => 'Projects',
             'notifications' => 'Notifications', 'communications' => 'Communications',
             'system' => 'System', 'department_updates' => 'Department updates',
+            'support' => 'Website / App Issue Reports',
         ] as $key => $label) {
             foreach (['view' => 'view', 'manage' => 'manage'] as $action => $actionLabel) {
                 if ($key === 'communications' && $action === 'manage') {

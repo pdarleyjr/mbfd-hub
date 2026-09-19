@@ -9,5 +9,6 @@
 </head>
 <body>
     <div id="workgroup-data-dashboard"></div>
+    @include('components.hub-support-widget')
 </body>
 </html>

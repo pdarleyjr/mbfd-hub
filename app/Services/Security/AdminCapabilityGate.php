@@ -32,6 +32,15 @@ final class AdminCapabilityGate
             ? ($capability[$access] ?? null)
             : $capability.'.'.$access;
 
-        return is_string($permission) && $user->hasDirectWebPermission($permission);
+        if (! is_string($permission)) {
+            return false;
+        }
+
+        // Support managers must be able to inspect the reports they manage.
+        if ($capability === 'admin.support' && $access === 'view' && $user->hasDirectWebPermission('admin.support.manage')) {
+            return true;
+        }
+
+        return $user->hasDirectWebPermission($permission);
     }
 }
