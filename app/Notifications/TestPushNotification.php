@@ -2,9 +2,9 @@
 
 namespace App\Notifications;
 
+use Illuminate\Notifications\Notification;
 use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
-use Illuminate\Notifications\Notification;
 
 class TestPushNotification extends Notification
 {
