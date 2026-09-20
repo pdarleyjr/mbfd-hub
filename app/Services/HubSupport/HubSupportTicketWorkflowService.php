@@ -85,6 +85,16 @@ final class HubSupportTicketWorkflowService
                     $changes['resolution_summary'] = null;
                 }
             }
+            $metadata = ['event' => $target === $current ? 'updated' : 'status_transition'];
+            if ($target === HubSupportTicketStatus::Resolved) {
+                $metadata['resolution_summary'] = $resolution;
+            }
+            if ($target === HubSupportTicketStatus::InProgress && in_array($current, [HubSupportTicketStatus::Resolved, HubSupportTicketStatus::Closed], true)) {
+                $previousResolution = trim((string) $locked->resolution_summary);
+                if ($previousResolution !== '') {
+                    $metadata['previous_resolution_summary'] = $previousResolution;
+                }
+            }
             $locked->update($changes);
             $locked->updates()->create([
                 'previous_status' => $current,
@@ -92,7 +102,7 @@ final class HubSupportTicketWorkflowService
                 'public_response' => $public !== '' ? $public : null,
                 'internal_note' => $internal !== '' ? $internal : null,
                 'changed_by_user_id' => $actor->id,
-                'metadata' => ['event' => $target === $current ? 'updated' : 'status_transition'],
+                'metadata' => $metadata,
             ]);
 
             if ($target === HubSupportTicketStatus::WaitingForReporter || $target === HubSupportTicketStatus::Resolved) {
@@ -126,10 +136,15 @@ final class HubSupportTicketWorkflowService
                 abort(403);
             }
             $previous = $locked->status;
+            $metadata = ['event' => 'reporter_reply'];
             if ($previous === HubSupportTicketStatus::WaitingForReporter) {
                 $locked->update(['status' => HubSupportTicketStatus::Acknowledged, 'acknowledged_at' => $locked->acknowledged_at ?? now()]);
             }
             if ($previous === HubSupportTicketStatus::Resolved) {
+                $previousResolution = trim((string) $locked->resolution_summary);
+                if ($previousResolution !== '') {
+                    $metadata['previous_resolution_summary'] = $previousResolution;
+                }
                 $locked->update([
                     'status' => HubSupportTicketStatus::InProgress,
                     'started_at' => $locked->started_at ?? now(),
@@ -144,7 +159,7 @@ final class HubSupportTicketWorkflowService
                 'status' => $locked->status,
                 'public_response' => trim($validated['response']),
                 'changed_by_user_id' => $reporter->id,
-                'metadata' => ['event' => 'reporter_reply'],
+                'metadata' => $metadata,
             ]);
 
             DB::afterCommit(function () use ($locked): void {

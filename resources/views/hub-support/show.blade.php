@@ -25,7 +25,7 @@
                 </ul>
             @endif
         </section>
-        @if($report->status === \App\Enums\HubSupportTicketStatus::Resolved && filled($report->resolution_summary))
+        @if(in_array($report->status, [\App\Enums\HubSupportTicketStatus::Resolved, \App\Enums\HubSupportTicketStatus::Closed], true) && filled($report->resolution_summary))
             <section class="mt-4 rounded-xl border border-green-200 bg-green-50 p-5">
                 <p class="font-semibold text-green-950">What we found</p>
                 <p class="mt-2 whitespace-pre-wrap text-green-950">{{ $report->resolution_summary }}</p>

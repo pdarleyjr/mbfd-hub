@@ -145,7 +145,7 @@ final class HubSupportAuthorizationAndWorkflowTest extends TestCase
         }
     }
 
-    public function test_reopening_clears_current_terminal_state_without_rewriting_history(): void
+    public function test_administrative_reopen_clears_current_terminal_state_and_preserves_the_prior_resolution(): void
     {
         $reporter = User::factory()->create(['account_status' => AccountStatus::Active]);
         $manager = User::factory()->create(['account_status' => AccountStatus::Active]);
@@ -164,7 +164,33 @@ final class HubSupportAuthorizationAndWorkflowTest extends TestCase
         self::assertSame(HubSupportTicketStatus::InProgress, $ticket->status);
         self::assertNull($ticket->resolved_at);
         self::assertNull($ticket->resolution_summary);
-        self::assertSame('status_transition', $ticket->updates()->latest('id')->first()->metadata['event']);
+        $reopen = $ticket->updates()->reorder()->latest('id')->firstOrFail();
+        self::assertSame('status_transition', $reopen->metadata['event']);
+        self::assertSame('Previously fixed.', $reopen->metadata['previous_resolution_summary']);
+    }
+
+    public function test_closed_reopen_preserves_the_original_resolution_in_append_only_history(): void
+    {
+        $reporter = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $manager = $this->supportManager();
+        $ticket = HubSupportTicket::factory()->for($reporter, 'reporter')->create([
+            'status' => HubSupportTicketStatus::InProgress,
+        ]);
+        $service = app(HubSupportTicketWorkflowService::class);
+
+        $service->transition($ticket, $manager, HubSupportTicketStatus::Resolved, [
+            'resolution_summary' => 'We restored the form service and verified the upload path.',
+        ]);
+        $service->transition($ticket, $manager, HubSupportTicketStatus::Closed);
+        $service->transition($ticket, $manager, HubSupportTicketStatus::InProgress);
+
+        $ticket->refresh();
+        self::assertSame(HubSupportTicketStatus::InProgress, $ticket->status);
+        self::assertNull($ticket->resolution_summary);
+        $resolved = $ticket->updates()->where('status', HubSupportTicketStatus::Resolved->value)->sole();
+        self::assertSame('We restored the form service and verified the upload path.', $resolved->metadata['resolution_summary']);
+        $reopen = $ticket->updates()->reorder()->latest('id')->firstOrFail();
+        self::assertSame('We restored the form service and verified the upload path.', $reopen->metadata['previous_resolution_summary']);
     }
 
     #[DataProvider('validAdministrativeTransitions')]
@@ -211,6 +237,7 @@ final class HubSupportAuthorizationAndWorkflowTest extends TestCase
         self::assertSame(HubSupportTicketStatus::Resolved, $reply->previous_status);
         self::assertSame(HubSupportTicketStatus::InProgress, $reply->status);
         self::assertSame('reporter_reply', $reply->metadata['event']);
+        self::assertSame('The form service was restored.', $reply->metadata['previous_resolution_summary']);
     }
 
     public function test_member_notification_failure_does_not_masquerade_as_a_failed_committed_workflow_change(): void
@@ -233,6 +260,24 @@ final class HubSupportAuthorizationAndWorkflowTest extends TestCase
             'previous_status' => HubSupportTicketStatus::InProgress->value,
             'status' => HubSupportTicketStatus::Resolved->value,
         ]);
+    }
+
+    public function test_resolving_records_the_member_safe_summary_in_append_only_history(): void
+    {
+        $reporter = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $manager = $this->supportManager();
+        $ticket = HubSupportTicket::factory()->for($reporter, 'reporter')->create([
+            'status' => HubSupportTicketStatus::InProgress,
+        ]);
+
+        app(HubSupportTicketWorkflowService::class)->transition($ticket, $manager, HubSupportTicketStatus::Resolved, [
+            'resolution_summary' => 'The form service was restored.',
+        ]);
+
+        $ticket->refresh();
+        self::assertSame('The form service was restored.', $ticket->resolution_summary);
+        $resolution = $ticket->updates()->where('status', HubSupportTicketStatus::Resolved->value)->sole();
+        self::assertSame('The form service was restored.', $resolution->metadata['resolution_summary']);
     }
 
     public function test_resolved_member_notification_uses_the_safe_resolution_summary(): void
@@ -290,6 +335,28 @@ final class HubSupportAuthorizationAndWorkflowTest extends TestCase
             ->assertDontSee('private-token')
             ->assertDontSee('csrf=private')
             ->assertDontSee('never rendered');
+    }
+
+    public function test_authorized_admin_can_view_resolution_history_without_raw_metadata(): void
+    {
+        $reporter = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $manager = $this->supportManager();
+        $ticket = HubSupportTicket::factory()->for($reporter, 'reporter')->create([
+            'status' => HubSupportTicketStatus::InProgress,
+        ]);
+        $service = app(HubSupportTicketWorkflowService::class);
+
+        $service->transition($ticket, $manager, HubSupportTicketStatus::Resolved, [
+            'resolution_summary' => 'The upload path was restored.',
+        ]);
+        $service->transition($ticket, $manager, HubSupportTicketStatus::InProgress);
+
+        $this->actingAsCanonicalUser($manager)->get('/admin/hub-support-tickets/'.$ticket->id)
+            ->assertOk()
+            ->assertSee('Resolution recorded')
+            ->assertSee('Previous resolution')
+            ->assertSee('The upload path was restored.')
+            ->assertDontSee('resolution_summary', false);
     }
 
     public function test_only_authorized_and_opted_in_admins_receive_submission_alerts(): void

@@ -10,6 +10,7 @@ use App\Enums\HubSupportTicketStatus;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\HubSupportTicketResource\Pages;
 use App\Models\HubSupportTicket;
+use App\Models\HubSupportTicketUpdate;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
@@ -137,6 +138,14 @@ final class HubSupportTicketResource extends Resource
                     Infolists\Components\TextEntry::make('changedBy.name')->label('By')->placeholder('System'),
                     Infolists\Components\TextEntry::make('public_response')->label('Member-visible reply')->placeholder('—')->columnSpanFull(),
                     Infolists\Components\TextEntry::make('internal_note')->label('Internal note')->placeholder('—')->columnSpanFull(),
+                    Infolists\Components\TextEntry::make('metadata.resolution_summary')
+                        ->label('Resolution recorded')
+                        ->visible(fn (HubSupportTicketUpdate $record): bool => filled($record->metadata['resolution_summary'] ?? null))
+                        ->columnSpanFull(),
+                    Infolists\Components\TextEntry::make('metadata.previous_resolution_summary')
+                        ->label('Previous resolution')
+                        ->visible(fn (HubSupportTicketUpdate $record): bool => filled($record->metadata['previous_resolution_summary'] ?? null))
+                        ->columnSpanFull(),
                 ])->columns(3),
             ]),
         ]);
