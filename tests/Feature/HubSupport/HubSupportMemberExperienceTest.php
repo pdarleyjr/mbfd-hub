@@ -117,6 +117,32 @@ final class HubSupportMemberExperienceTest extends TestCase
             ->assertDontSee('Never show this resolution work note.');
     }
 
+    public function test_member_sees_the_approved_resolution_after_the_report_is_closed(): void
+    {
+        $member = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $manager = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $report = HubSupportTicket::factory()->for($member, 'reporter')->create([
+            'status' => HubSupportTicketStatus::Closed,
+            'resolution_summary' => 'We restored the form service and verified the submission path.',
+            'diagnostics' => ['events' => [['message' => 'private diagnostic']]],
+        ]);
+        $report->updates()->create([
+            'status' => HubSupportTicketStatus::Closed,
+            'internal_note' => 'Never show this closed work note.',
+            'metadata' => ['previous_resolution_summary' => 'Admin-only metadata is not member content.'],
+            'changed_by_user_id' => $manager->id,
+        ]);
+
+        $this->actingAsCanonicalUser($member)->get(route('hub-support.show', $report))
+            ->assertOk()
+            ->assertSee('Closed')
+            ->assertSee('What we found')
+            ->assertSee('We restored the form service and verified the submission path.')
+            ->assertDontSee('Never show this closed work note.')
+            ->assertDontSee('Admin-only metadata is not member content.')
+            ->assertDontSee('private diagnostic');
+    }
+
     public function test_fallback_shows_individual_attachment_validation_errors(): void
     {
         $user = User::factory()->create(['account_status' => AccountStatus::Active]);
