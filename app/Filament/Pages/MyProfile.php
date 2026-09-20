@@ -11,6 +11,8 @@ use Filament\Pages\Page;
 
 class MyProfile extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-user';
 
     protected static string $view = 'filament.employees.legacy-redirect';

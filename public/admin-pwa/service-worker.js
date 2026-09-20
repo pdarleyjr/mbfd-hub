@@ -1,5 +1,5 @@
 /**
- * MBFD Admin PWA Service Worker
+ * MBFD Hub scoped-admin service worker
  *
  * Scope: /admin/*
  * Strategy:
@@ -29,7 +29,7 @@ const VERSION = 'mbfd-admin-v3';
 const STATIC_CACHE = `${VERSION}-static`;
 
 const PRECACHE_URLS = [
-  '/admin-pwa/manifest.webmanifest',
+  '/manifest.json',
   '/admin-pwa/icons/icon-96.png',
   '/admin-pwa/icons/icon-192.png',
   '/admin-pwa/icons/icon-512.png',
@@ -150,8 +150,8 @@ async function networkOnlyAdminJson(request) {
 self.addEventListener('push', (event) => {
   if (!event.data) return;
   let payload;
-  try { payload = event.data.json(); } catch (e) { payload = { title: 'MBFD Admin', body: event.data.text() }; }
-  const title = payload.title || 'MBFD Admin';
+  try { payload = event.data.json(); } catch (e) { payload = { title: 'MBFD Hub', body: event.data.text() }; }
+  const title = payload.title || 'MBFD Hub';
   const options = {
     body: payload.body || '',
     icon: payload.icon || '/admin-pwa/icons/icon-192.png',
@@ -165,7 +165,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const target = event.notification.data?.url || '/admin';
+  const target = sameOriginNavigation(event.notification.data?.url, '/');
   event.waitUntil(
     self.clients.matchAll({ type: 'window' }).then((wins) => {
       const existing = wins.find((w) => w.url.includes('/admin'));
@@ -178,3 +178,14 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+
+function sameOriginNavigation(value, fallback) {
+  try {
+    const candidate = new URL(String(value || fallback), self.location.origin);
+    return candidate.origin === self.location.origin
+      ? candidate.pathname + candidate.search + candidate.hash
+      : fallback;
+  } catch {
+    return fallback;
+  }
+}

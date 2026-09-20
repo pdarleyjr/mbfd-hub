@@ -1,16 +1,16 @@
 {
-  "name": "MBFD Support Hub — Admin",
-  "short_name": "MBFD Admin",
-  "id": "/admin/?source=pwa",
-  "description": "Mt. Brook Fire Department Support Hub administrative console — desktop PWA for fleet, station, inventory, and workgroup management.",
-  "start_url": "/admin?source=pwa",
-  "scope": "/admin/",
+  "name": "MBFD Hub",
+  "short_name": "MBFD Hub",
+  "id": "/",
+  "description": "Miami Beach Fire Department Hub",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",
   "theme_color": "#1e293b",
   "background_color": "#0f172a",
-  "categories": ["business", "productivity", "utilities"],
+  "categories": ["productivity", "utilities"],
   "lang": "en-US",
   "dir": "ltr",
   "prefer_related_applications": false,
@@ -34,34 +34,5 @@
       "purpose": "any maskable"
     }
   ],
-  "shortcuts": [
-    {
-      "name": "Apparatus",
-      "short_name": "Apparatus",
-      "description": "Fleet apparatus management",
-      "url": "/admin/apparatus?source=pwa-shortcut",
-      "icons": [{ "src": "/admin-pwa/icons/icon-96.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Stations",
-      "short_name": "Stations",
-      "description": "Station operations hub",
-      "url": "/admin/stations?source=pwa-shortcut",
-      "icons": [{ "src": "/admin-pwa/icons/icon-96.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Application Health",
-      "short_name": "Health",
-      "description": "Live system health dashboard",
-      "url": "/admin/health?source=pwa-shortcut",
-      "icons": [{ "src": "/admin-pwa/icons/icon-96.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Pulse",
-      "short_name": "Pulse",
-      "description": "Performance & queues",
-      "url": "/admin/pulse?source=pwa-shortcut",
-      "icons": [{ "src": "/admin-pwa/icons/icon-96.png", "sizes": "96x96" }]
-    }
-  ]
+  "shortcuts": []
 }

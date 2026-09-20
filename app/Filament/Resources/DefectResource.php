@@ -22,6 +22,8 @@ class DefectResource extends Resource
 
     protected static ?string $navigationLabel = 'Missing / Damaged Equipment';
 
+    protected static ?string $navigationGroup = 'Fleet Management';
+
     protected static ?string $modelLabel = 'Equipment Issue';
 
     protected static ?string $pluralModelLabel = 'Missing / Damaged Equipment';

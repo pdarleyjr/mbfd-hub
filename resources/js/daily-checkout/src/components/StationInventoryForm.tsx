@@ -1,45 +1,31 @@
 import { useState } from 'react';
-import { Shift, PINVerifyResponse } from '../types';
+import { Shift } from '../types';
 import InventoryUserInfoStep from './InventoryUserInfoStep';
-import InventoryPINStep from './InventoryPINStep';
 import InventoryCountPage from './InventoryCountPage';
 import PreviousPageButton from './PreviousPageButton';
 
-type Step = 'userInfo' | 'pin' | 'inventory';
+type Step = 'userInfo' | 'inventory';
 
 export default function StationInventoryForm() {
   const [step, setStep] = useState<Step>('userInfo');
   const [userInfo, setUserInfo] = useState<{
-    employeeName: string;
     shift: Shift;
     station: number;
     stationNumber: number;
   } | null>(null);
-  const [authResponse, setAuthResponse] = useState<PINVerifyResponse | null>(null);
-
-  const handleUserInfoSubmit = (data: { employeeName: string; shift: Shift; station: number; stationNumber: number }) => {
+  const handleUserInfoSubmit = (data: { shift: Shift; station: number; stationNumber: number }) => {
     setUserInfo(data);
-    setStep('pin');
-  };
-
-  const handlePINSuccess = (response: PINVerifyResponse) => {
-    setAuthResponse(response);
     setStep('inventory');
-  };
-
-  const handleBackFromPIN = () => {
-    setStep('userInfo');
   };
 
   const handleLogout = () => {
     setStep('userInfo');
     setUserInfo(null);
-    setAuthResponse(null);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header - Only show on userInfo and PIN steps */}
+      {/* Header - Only show before the inventory workspace. */}
       {step !== 'inventory' && (
         <div className="bg-green-600 text-white py-4 px-4">
           <div className="max-w-2xl mx-auto">
@@ -55,7 +41,7 @@ export default function StationInventoryForm() {
             )}
             <h1 className="text-xl font-bold">Station Inventory</h1>
             <p className="text-green-100 text-sm">
-              {step === 'userInfo' ? 'Step 1 of 2' : 'Step 2 of 2'}
+              Select the station and shift context.
             </p>
           </div>
         </div>
@@ -67,27 +53,14 @@ export default function StationInventoryForm() {
           <InventoryUserInfoStep onContinue={handleUserInfoSubmit} />
         )}
 
-        {step === 'pin' && userInfo && (
-          <InventoryPINStep
-            stationId={userInfo.station}
-            stationNumber={userInfo.stationNumber}
-            actorName={userInfo.employeeName}
-            actorShift={userInfo.shift}
-            onSuccess={handlePINSuccess}
-            onBack={handleBackFromPIN}
-          />
-        )}
       </div>
 
       {/* Inventory page renders full-screen */}
-      {step === 'inventory' && userInfo && authResponse && (
+      {step === 'inventory' && userInfo && (
         <InventoryCountPage
-          stationId={authResponse.station_id}
-          stationName={authResponse.station.name}
-          actorName={userInfo.employeeName}
+          stationId={userInfo.station}
+          stationName={`Station ${userInfo.stationNumber}`}
           actorShift={userInfo.shift}
-          inventoryUrl={authResponse.inventory_url}
-          supplyRequestsUrl={authResponse.supply_requests_url}
           onLogout={handleLogout}
         />
       )}

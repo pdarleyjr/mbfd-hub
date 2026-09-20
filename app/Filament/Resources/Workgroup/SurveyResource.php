@@ -23,7 +23,7 @@ class SurveyResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Evaluations / Surveys';
+    protected static ?string $navigationGroup = 'Workgroup Management';
 
     protected static ?string $navigationLabel = 'Manage surveys';
 

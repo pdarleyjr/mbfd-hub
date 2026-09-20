@@ -62,6 +62,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->middleware('auth:web');
 
+Route::view('/install', 'install')->name('install');
+
 Route::middleware('auth:web')->group(function (): void {
     Route::get('/account', AccountController::class)->name('account.show');
     Route::get('/updates', [DepartmentUpdateController::class, 'index'])->name('updates.index');

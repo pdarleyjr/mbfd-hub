@@ -58,7 +58,7 @@ final class CanonicalLoginDestination
             return $user->canAccessPanel(Filament::getPanel($panelId)) ? $destination : '/';
         }
 
-        return '/';
+        return $this->isMemberDestination($destination) ? $destination : '/';
     }
 
     private function normalizeInternalPath(mixed $candidate): ?string
@@ -123,5 +123,18 @@ final class CanonicalLoginDestination
     private function hasPathPrefix(string $path, string $prefix): bool
     {
         return $path === $prefix || str_starts_with($path, $prefix.'/');
+    }
+
+    private function isMemberDestination(string $destination): bool
+    {
+        $path = (string) parse_url($destination, PHP_URL_PATH);
+
+        foreach (['/login', '/logout', '/password', '/auth', '/oauth'] as $prefix) {
+            if ($this->hasPathPrefix($path, $prefix)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

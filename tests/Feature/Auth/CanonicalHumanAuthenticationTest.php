@@ -62,6 +62,21 @@ final class CanonicalHumanAuthenticationTest extends TestCase
         $this->assertSame($registered->id, session('auth.canonical_session_id'));
     }
 
+    public function test_linked_active_user_authenticates_by_normalized_unique_email_without_changing_their_identity(): void
+    {
+        $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
+        $user->forceFill(['email' => 'member@miamibeachfl.gov'])->save();
+        $before = $user->fresh()->only(['id', 'employee_profile_id', 'password', 'security_version']);
+
+        $this->post('/login', [
+            'employee_id' => '  MEMBER@MIAMIBEACHFL.GOV  ',
+            'password' => 'correct-password',
+        ])->assertRedirect('/');
+
+        $this->assertAuthenticatedAs($user, 'web');
+        $this->assertSame($before, $user->fresh()->only(['id', 'employee_profile_id', 'password', 'security_version']));
+    }
+
     public function test_canonical_login_session_serves_member_context_without_a_bearer_token_and_logout_revokes_both_surfaces(): void
     {
         $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
@@ -315,7 +330,10 @@ final class CanonicalHumanAuthenticationTest extends TestCase
             ->assertDontSee('Continue with MBFD Identity');
 
         config()->set('identity.credential_authority', 'authentik');
-        $this->get('/login')->assertSee('Continue with MBFD Identity');
+        $this->get('/login')
+            ->assertSee('Employee ID or email')
+            ->assertDontSee('Continue with MBFD Identity')
+            ->assertDontSee('Transition access');
     }
 
     public function test_established_member_account_page_exposes_normal_password_and_account_management(): void

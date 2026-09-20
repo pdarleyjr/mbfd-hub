@@ -256,14 +256,8 @@ Route::post('/v2/media-control/auth/revalidate', \App\Http\Controllers\Api\Media
 Route::post('/v2/media-control/auth/cloud-access', \App\Http\Controllers\Api\MediaControl\CloudAccessController::class)
     ->middleware(['throttle:6000,1,media-identity:', 'verify.media-control.token', \App\Http\Middleware\ThrottleMediaControlIdentity::class])->name('api.v2.media-control.auth.cloud-access');
 
-Route::prefix('v2')->middleware(['throttle:60,1'])->group(function () {
-    // PIN verification endpoint (public)
-    Route::post('/station-inventory/verify-pin', [StationInventoryV2Controller::class, 'verifyPin'])->middleware(['auth:sanctum', 'canonical.api']);
-
-    // Every protected endpoint validates the PIN-issued base URL in the shared
-    // guard. Nested operations reuse that signature, so Laravel's exact-URL
-    // signed middleware cannot run before the base URL is reconstructed.
-    Route::middleware('station-inventory.signed')->name('api.v2.station-inventory.')->group(function () {
+Route::prefix('v2')->middleware(['auth:sanctum', 'canonical.api', 'throttle:60,1'])->group(function () {
+    Route::name('api.v2.station-inventory.')->group(function () {
         // Inventory list
         Route::get('/station-inventory/{stationId}', [StationInventoryV2Controller::class, 'getInventory'])
             ->name('access');

@@ -29,4 +29,24 @@ final class CanonicalLoginDestinationTest extends TestCase
             self::assertSame('/', $destinations->resolve(new User, $unsafe));
         }
     }
+
+    public function test_safe_same_origin_member_destinations_survive_while_sensitive_boundaries_remain_authorized(): void
+    {
+        $user = new User;
+        $destinations = app(CanonicalLoginDestination::class);
+
+        foreach ([
+            '/stations/2',
+            '/apparatus/12/daily-checkout?shift=A-Day',
+            '/forms/leave-request?draft=opaque%2Bvalue',
+            '/department-updates/3',
+            '/report-an-issue',
+        ] as $path) {
+            self::assertSame($path, $destinations->resolve($user, $path));
+        }
+
+        foreach (['/login', '/logout', '/password/reset', '/auth/media-control/authorize/extra'] as $unsafe) {
+            self::assertSame('/', $destinations->resolve($user, $unsafe));
+        }
+    }
 }

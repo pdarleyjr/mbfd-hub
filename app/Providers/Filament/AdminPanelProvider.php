@@ -6,11 +6,10 @@ use App\Filament\Admin\Pages\BidAccessPin;
 use App\Filament\Admin\Pages\EquipmentIntake;
 use App\Filament\Admin\Pages\KnowledgeBase;
 use App\Filament\Admin\Pages\TrtTrailerInventory;
-use App\Filament\Pages\NotificationSettings;
-use App\Filament\Pages\Settings;
+use App\Filament\Pages\HealthCheckResults;
+use App\Filament\Pages\PulseDashboard;
 use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
-use App\Filament\Widgets\SmartUpdatesWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
 use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
 use App\Http\Middleware\AuthenticateCanonicalPanelUser;
@@ -93,38 +92,48 @@ class AdminPanelProvider extends PanelProvider
                 FleetStatsWidget::class,
                 InventoryOverviewWidget::class,
                 StationOperationsHubWidget::class,
-                SmartUpdatesWidget::class,
             ])
             ->navigationGroups([
                 NavigationGroup::make()
                     ->label('Dashboard')
                     ->icon('heroicon-o-rectangle-group')
-                    ->collapsed(false),
+                    ->collapsed(),
                 NavigationGroup::make()
                     ->label('Active Operations')
                     ->icon('heroicon-o-clipboard-document-list')
-                    ->collapsed(false),
+                    ->collapsed(),
                 NavigationGroup::make()
                     ->label('Fleet Management')
-                    ->icon('heroicon-o-truck'),
+                    ->icon('heroicon-o-truck')
+                    ->collapsed(),
                 NavigationGroup::make()
                     ->label('Inventory & Logistics')
-                    ->icon('heroicon-o-cube'),
+                    ->icon('heroicon-o-cube')
+                    ->collapsed(),
                 NavigationGroup::make()
                     ->label('Workgroup Management')
-                    ->icon('heroicon-o-user-group'),
+                    ->icon('heroicon-o-user-group')
+                    ->collapsed(),
                 NavigationGroup::make()
                     ->label('Station Management')
-                    ->icon('heroicon-o-building-office-2'),
+                    ->icon('heroicon-o-building-office-2')
+                    ->collapsed(),
                 NavigationGroup::make()
                     ->label('Bid Administration')
-                    ->icon('heroicon-o-key'),
+                    ->icon('heroicon-o-key')
+                    ->collapsed(),
                 NavigationGroup::make()
                     ->label('Communications')
-                    ->icon('heroicon-o-envelope'),
+                    ->icon('heroicon-o-envelope')
+                    ->collapsed(),
                 NavigationGroup::make()
                     ->label('Administration')
-                    ->icon('heroicon-o-cog-6-tooth'),
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->collapsed(),
+                NavigationGroup::make()
+                    ->label('Monitoring')
+                    ->icon('heroicon-o-signal')
+                    ->collapsed(),
             ])
             ->userMenuItems([
                 MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
@@ -134,50 +143,6 @@ class AdminPanelProvider extends PanelProvider
                     ->url(fn (): string => route('city-email.show'))
                     ->icon('heroicon-o-envelope')
                     ->visible(fn (): bool => auth()->user()?->employee_profile_id !== null),
-                MenuItem::make()
-                    ->label('Settings')
-                    ->url(fn (): string => Settings::getUrl())
-                    ->icon('heroicon-o-cog-6-tooth'),
-                MenuItem::make()
-                    ->label('Notification Settings')
-                    ->url(fn (): string => NotificationSettings::getUrl(panel: 'admin'))
-                    ->icon('heroicon-o-bell')
-                    ->visible(fn (): bool => auth()->user()?->canManageNotificationSettings() ?? false),
-                MenuItem::make()
-                    ->label('Employees & Access')
-                    ->url(fn (): string => \App\Filament\Resources\EmployeeResource::getUrl())
-                    ->icon('heroicon-o-users')
-                    ->sort(10)
-                    ->visible(fn (): bool => auth()->user()?->can('admin.members.view') ?? false),
-                MenuItem::make()
-                    ->label('Roles')
-                    ->url(fn (): string => url('/admin/shield/roles'))
-                    ->icon('heroicon-o-shield-check')
-                    ->sort(11)
-                    ->visible(fn (): bool => auth()->user()?->hasRole('super_admin') ?? false),
-                MenuItem::make()
-                    ->label('Replacement Recommendations')
-                    ->url(fn (): string => \App\Filament\Resources\RecommendationResource::getUrl('index'))
-                    ->icon('heroicon-o-light-bulb')
-                    ->sort(12)
-                    ->visible(fn (): bool => auth()->user()?->can('admin.projects.view') ?? false),
-                MenuItem::make()
-                    ->label('Application Health')
-                    ->url(fn (): string => url('/admin/health'))
-                    ->icon('heroicon-o-heart')
-                    ->sort(20)
-                    ->visible(fn (): bool => auth()->user()?->can('admin.system.view') ?? false),
-                MenuItem::make()
-                    ->label('Laravel Pulse')
-                    ->url(fn (): string => url('/admin/pulse'))
-                    ->icon('heroicon-o-bolt')
-                    ->sort(21)
-                    ->visible(fn (): bool => auth()->user()?->can('admin.system.view') ?? false),
-                MenuItem::make()
-                    ->label('Return to Home')
-                    ->url('/')
-                    ->icon('heroicon-o-home')
-                    ->sort(99),
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -211,6 +176,18 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-cube')
                     ->group('Inventory & Logistics')
                     ->sort(10),
+                NavigationItem::make('Laravel Pulse')
+                    ->url(fn (): string => PulseDashboard::getUrl(panel: 'admin'))
+                    ->icon('heroicon-o-bolt')
+                    ->group('Monitoring')
+                    ->sort(1)
+                    ->visible(fn (): bool => auth()->user()?->can('admin.system.view') ?? false),
+                NavigationItem::make('Application Health')
+                    ->url(fn (): string => HealthCheckResults::getUrl(panel: 'admin'))
+                    ->icon('heroicon-o-heart')
+                    ->group('Monitoring')
+                    ->sort(2)
+                    ->visible(fn (): bool => auth()->user()?->can('admin.system.view') ?? false),
             ])
             ->renderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_BEFORE,

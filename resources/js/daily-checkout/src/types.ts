@@ -678,36 +678,12 @@ export interface SupplyRequest {
   updated_at: string;
 }
 
-export interface PINVerifyRequest {
-  station_id: number;
-  pin: string;
-  actor_name: string;
-  actor_shift: Shift;
-}
-
-export interface PINVerifyResponse {
-  success: boolean;
-  station_id: number; // Canonical PK
-  station: {
-    id: number;
-    name: string;
-    station_number: string;
-    address: string;
-  };
-  // Absolute signed URLs - use as-is, do NOT concatenate
-  inventory_url: string;
-  supply_requests_url: string;
-  message?: string;
-}
-
 export interface UpdateItemRequest {
   on_hand: number;
-  actor_name: string;
   actor_shift: Shift;
 }
 
 export interface CreateSupplyRequestRequest {
   request_text: string;
-  actor_name: string;
   actor_shift: Shift;
 }

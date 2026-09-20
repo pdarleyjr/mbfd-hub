@@ -16,6 +16,24 @@ class AdminPwaRoutesTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_one_canonical_hub_manifest_and_capability_first_install_page_are_available(): void
+    {
+        $manifest = $this->getJson('/manifest.json')
+            ->assertOk()
+            ->json();
+
+        $this->assertSame('MBFD Hub', $manifest['name']);
+        $this->assertSame('MBFD Hub', $manifest['short_name']);
+        $this->assertSame('/', $manifest['id']);
+        $this->assertSame('/', $manifest['start_url']);
+        $this->assertSame('/', $manifest['scope']);
+
+        $this->get('/install')
+            ->assertOk()
+            ->assertSee('Install MBFD Hub')
+            ->assertSee('beforeinstallprompt');
+    }
+
     public function test_service_worker_is_served_from_within_its_admin_scope(): void
     {
         $response = $this->get('/admin/service-worker.js');
@@ -33,6 +51,19 @@ class AdminPwaRoutesTest extends TestCase
         );
         $this->assertStringContainsString("const VERSION = 'mbfd-admin-v3'", $worker);
         $this->assertStringNotContainsString('networkOnlyAdminNavigation', $worker);
+    }
+
+    public function test_operational_monitoring_is_in_the_collapsed_sidebar_not_the_personal_menu(): void
+    {
+        $panelProvider = (string) file_get_contents(app_path('Providers/Filament/AdminPanelProvider.php'));
+        $pulsePage = (string) file_get_contents(app_path('Filament/Pages/PulseDashboard.php'));
+        $dashboard = (string) file_get_contents(app_path('Filament/Pages/Dashboard.php'));
+
+        $this->assertStringContainsString("->label('Monitoring')", $panelProvider);
+        $this->assertStringContainsString("->label('Laravel Pulse')", $panelProvider);
+        $this->assertStringContainsString("->label('Application Health')", $panelProvider);
+        $this->assertStringContainsString("protected static ?string \$slug = 'pulse';", $pulsePage);
+        $this->assertStringNotContainsString('Ask AI Assistant', $dashboard);
     }
 
     public function test_background_pwa_asset_requests_do_not_replace_the_previous_admin_url(): void

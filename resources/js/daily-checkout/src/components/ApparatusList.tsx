@@ -156,7 +156,7 @@ export default function ApparatusList() {
       )}
 
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">MBFD Daily Checkout</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Daily Checkout</h1>
         <p className="text-gray-600">Select an apparatus to begin the daily inspection</p>
       </div>
 

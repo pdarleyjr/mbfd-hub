@@ -1,7 +1,7 @@
 import {
   Apparatus, ChecklistData, ChecklistField, ChecklistInputType, InspectionSubmission, EmployeeOption, ScheduledChecklistTask, Station, StationDetail,
   Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData,
-  StationInventorySubmission, InventorySubmissionItem, PINVerifyRequest, PINVerifyResponse,
+  StationInventorySubmission, InventorySubmissionItem,
   InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
   StationInspectionSummary, FireEquipmentRequestSummary,
   SingleGasMeterSummary, StationRequestSummary, ApparatusServiceTicketSummary, StationActivityEntry, RoomProfile,
@@ -602,22 +602,8 @@ export class ApiClient {
   // Station Inventory V2 API
   // ============================================
 
-  static async verifyPIN(request: PINVerifyRequest): Promise<PINVerifyResponse> {
-    const response = await fetch(`${API_BASE}/v2/station-inventory/verify-pin`, {
-      method: 'POST',
-      headers: { ...DEFAULT_HEADERS },
-      body: JSON.stringify(request),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Invalid PIN');
-    }
-    return response.json();
-  }
-
-  static async getInventoryV2(inventoryUrl: string): Promise<InventoryV2Response> {
-    // inventoryUrl is a complete signed URL from the backend - use as-is
-    const response = await fetch(inventoryUrl, {
+  static async getInventoryV2(stationId: number): Promise<InventoryV2Response> {
+    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -627,17 +613,11 @@ export class ApiClient {
   }
 
   static async updateInventoryItem(
-    inventoryUrl: string,
+    stationId: number,
     stationInventoryItemId: number,
     data: UpdateItemRequest
   ): Promise<{ success: boolean; message: string }> {
-    // Reuse the PIN-issued base signature and append the station inventory item.
-    // The API validates that signature against the base URL server-side.
-    const baseUrl = inventoryUrl.split('?')[0]; // Get everything before query string
-    const queryString = inventoryUrl.split('?')[1]; // Get query string with signature
-    const url = `${baseUrl}/item/${stationInventoryItemId}?${queryString}`;
-    
-    const response = await fetch(url, {
+    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/item/${stationInventoryItemId}`, {
       method: 'PUT',
       credentials: 'same-origin',
       headers: mutationHeaders(),
@@ -650,9 +630,8 @@ export class ApiClient {
     return response.json();
   }
 
-  static async getSupplyRequests(supplyRequestsUrl: string): Promise<{ success: boolean; requests: SupplyRequest[] }> {
-    // supplyRequestsUrl is a complete signed URL from the backend - use as-is
-    const response = await fetch(supplyRequestsUrl, {
+  static async getSupplyRequests(stationId: number): Promise<{ success: boolean; requests: SupplyRequest[] }> {
+    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/supply-requests`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -767,11 +746,10 @@ export class ApiClient {
   }
 
   static async createSupplyRequest(
-    supplyRequestsUrl: string,
+    stationId: number,
     request: CreateSupplyRequestRequest
   ): Promise<{ success: boolean; message: string }> {
-    // supplyRequestsUrl is a complete signed URL from the backend - use as-is for POST
-    const response = await fetch(supplyRequestsUrl, {
+    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/supply-requests`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: mutationHeaders(),
