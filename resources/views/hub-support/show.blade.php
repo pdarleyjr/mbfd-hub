@@ -25,6 +25,12 @@
                 </ul>
             @endif
         </section>
+        @if($report->status === \App\Enums\HubSupportTicketStatus::Resolved && filled($report->resolution_summary))
+            <section class="mt-4 rounded-xl border border-green-200 bg-green-50 p-5">
+                <p class="font-semibold text-green-950">What we found</p>
+                <p class="mt-2 whitespace-pre-wrap text-green-950">{{ $report->resolution_summary }}</p>
+            </section>
+        @endif
         @foreach($report->updates as $update)
             <section class="mt-4 rounded-xl border border-neutral-200 bg-white p-5">
                 <p class="whitespace-pre-wrap">{{ $update->public_response }}</p>

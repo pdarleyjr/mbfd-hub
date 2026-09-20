@@ -14,6 +14,7 @@ use App\Notifications\HubSupportMemberNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 final class HubSupportTicketWorkflowService
 {
@@ -95,12 +96,16 @@ final class HubSupportTicketWorkflowService
             ]);
 
             if ($target === HubSupportTicketStatus::WaitingForReporter || $target === HubSupportTicketStatus::Resolved) {
-                DB::afterCommit(function () use ($locked, $target, $public): void {
-                    $locked->reporter->notify(new HubSupportMemberNotification(
-                        $locked->id,
-                        $target->memberLabel(),
-                        $public,
-                    ));
+                DB::afterCommit(function () use ($locked, $target, $public, $resolution): void {
+                    try {
+                        $locked->reporter->notify(new HubSupportMemberNotification(
+                            $locked->id,
+                            $target->memberLabel(),
+                            $public !== '' ? $public : $resolution,
+                        ));
+                    } catch (Throwable $exception) {
+                        report($exception);
+                    }
                 });
             }
 
@@ -123,6 +128,15 @@ final class HubSupportTicketWorkflowService
             $previous = $locked->status;
             if ($previous === HubSupportTicketStatus::WaitingForReporter) {
                 $locked->update(['status' => HubSupportTicketStatus::Acknowledged, 'acknowledged_at' => $locked->acknowledged_at ?? now()]);
+            }
+            if ($previous === HubSupportTicketStatus::Resolved) {
+                $locked->update([
+                    'status' => HubSupportTicketStatus::InProgress,
+                    'started_at' => $locked->started_at ?? now(),
+                    'resolved_at' => null,
+                    'closed_at' => null,
+                    'resolution_summary' => null,
+                ]);
             }
 
             $update = $locked->updates()->create([

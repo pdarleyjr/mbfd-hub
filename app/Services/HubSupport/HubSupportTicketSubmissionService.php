@@ -57,7 +57,7 @@ final class HubSupportTicketSubmissionService
                     return new HubSupportTicketSubmissionResult($existing, false);
                 }
 
-                $description = trim(preg_replace('/\s+/u', ' ', $validated['description']) ?? $validated['description']);
+                $description = $this->normalizeDescription($validated['description']);
                 $path = $this->sanitizer->path($validated['page_path'] ?? null);
                 $diagnostics = $this->sanitizer->sanitizeDiagnostics($validated['diagnostics'] ?? null);
                 try {
@@ -191,6 +191,15 @@ final class HubSupportTicketSubmissionService
     private function routeName(mixed $value): ?string
     {
         return is_string($value) && preg_match('/^[a-zA-Z0-9._-]{1,255}$/', $value) === 1 ? $value : null;
+    }
+
+    private function normalizeDescription(string $description): string
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", $description);
+        $normalized = preg_replace('/[^\S\r\n]+/u', ' ', $normalized) ?? $normalized;
+        $normalized = preg_replace("/\n{3,}/", "\n\n", $normalized) ?? $normalized;
+
+        return trim($normalized);
     }
 
     private function deployedCommit(): ?string

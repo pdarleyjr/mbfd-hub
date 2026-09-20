@@ -120,6 +120,16 @@ final class HubSupportTicketSubmissionTest extends TestCase
         $service->submit($other, $payload);
     }
 
+    public function test_submission_preserves_meaningful_member_line_breaks(): void
+    {
+        $ticket = app(HubSupportTicketSubmissionService::class)->submit($this->reporter, [
+            'client_submission_id' => '7616fc18-5df0-4e20-9568-bf9c7ae35472',
+            'description' => "First, I selected Submit.\r\n\r\nThen the page remained on the same screen.\rFinally, I tried again.",
+        ])->ticket;
+
+        self::assertSame("First, I selected Submit.\n\nThen the page remained on the same screen.\nFinally, I tried again.", $ticket->description);
+    }
+
     public function test_only_two_png_jpeg_or_pdf_files_up_to_ten_megabytes_are_accepted(): void
     {
         $service = app(HubSupportTicketSubmissionService::class);

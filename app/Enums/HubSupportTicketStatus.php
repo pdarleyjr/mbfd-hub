@@ -29,10 +29,10 @@ enum HubSupportTicketStatus: string
     public function allowedTransitions(): array
     {
         return match ($this) {
-            self::New => [self::Acknowledged, self::InProgress, self::WaitingForReporter, self::Resolved, self::Closed],
-            self::Acknowledged => [self::InProgress, self::WaitingForReporter, self::Resolved, self::Closed],
-            self::InProgress => [self::WaitingForReporter, self::Resolved, self::Closed],
-            self::WaitingForReporter => [self::Acknowledged, self::InProgress, self::Resolved, self::Closed],
+            self::New => [self::Acknowledged, self::InProgress],
+            self::Acknowledged => [self::InProgress, self::WaitingForReporter, self::Resolved],
+            self::InProgress => [self::WaitingForReporter, self::Resolved],
+            self::WaitingForReporter => [self::InProgress, self::Resolved],
             self::Resolved => [self::InProgress, self::Closed],
             self::Closed => [self::InProgress],
         };

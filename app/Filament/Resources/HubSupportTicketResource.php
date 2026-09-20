@@ -93,6 +93,27 @@ final class HubSupportTicketResource extends Resource
                     ->state(fn (HubSupportTicket $record): string => self::diagnosticSummary($record)),
                 Infolists\Components\TextEntry::make('issue_fingerprint')->label('Related issue fingerprint')->placeholder('—'),
             ])->columns(2),
+            Infolists\Components\Section::make('Technical details')
+                ->schema([
+                    Infolists\Components\RepeatableEntry::make('technical_details')->hiddenLabel()
+                        ->state(fn (HubSupportTicket $record): array => self::technicalDetails($record))
+                        ->schema([
+                            Infolists\Components\TextEntry::make('type')->badge(),
+                            Infolists\Components\TextEntry::make('timestamp')->label('When')->placeholder('—'),
+                            Infolists\Components\TextEntry::make('name')->label('Error')->placeholder('—'),
+                            Infolists\Components\TextEntry::make('message')->label('Message')->placeholder('—')->columnSpanFull(),
+                            Infolists\Components\TextEntry::make('source')->label('Source')->placeholder('—'),
+                            Infolists\Components\TextEntry::make('location')->label('Line / column')->placeholder('—'),
+                            Infolists\Components\TextEntry::make('stack')->label('Sanitized stack')->placeholder('—')->columnSpanFull(),
+                            Infolists\Components\TextEntry::make('method')->label('Method')->placeholder('—'),
+                            Infolists\Components\TextEntry::make('path')->label('Path')->placeholder('—'),
+                            Infolists\Components\TextEntry::make('status')->label('Status')->placeholder('—'),
+                            Infolists\Components\TextEntry::make('duration')->label('Duration')->placeholder('—'),
+                        ])->columns(4),
+                ])
+                ->visible(fn (HubSupportTicket $record): bool => self::technicalDetails($record) !== [])
+                ->collapsible()
+                ->collapsed(),
             Infolists\Components\Section::make('Environment')->schema([
                 Infolists\Components\TextEntry::make('browser_summary')->label('Browser / display')
                     ->state(fn (HubSupportTicket $record): string => self::environmentSummary($record)),
@@ -174,6 +195,35 @@ final class HubSupportTicketResource extends Resource
         }
 
         return $parts !== [] ? implode(' · ', $parts) : 'No environment details available';
+    }
+
+    /** @return list<array<string, string>> */
+    private static function technicalDetails(HubSupportTicket $record): array
+    {
+        $events = data_get($record->diagnostics, 'events', []);
+        if (! is_array($events)) {
+            return [];
+        }
+
+        return collect($events)->filter(fn (mixed $event): bool => is_array($event))->map(function (array $event): array {
+            $detail = [];
+            foreach (['type', 'timestamp', 'name', 'message', 'source', 'stack', 'method', 'path'] as $field) {
+                if (is_string($event[$field] ?? null) && $event[$field] !== '') {
+                    $detail[$field] = $event[$field];
+                }
+            }
+            if (isset($event['line']) || isset($event['column'])) {
+                $detail['location'] = trim(($event['line'] ?? '—').' / '.($event['column'] ?? '—'));
+            }
+            if (is_int($event['status'] ?? null)) {
+                $detail['status'] = 'HTTP '.$event['status'];
+            }
+            if (is_int($event['duration'] ?? null)) {
+                $detail['duration'] = $event['duration'].' ms';
+            }
+
+            return $detail;
+        })->filter(fn (array $event): bool => $event !== [])->values()->all();
     }
 
     public static function getEloquentQuery(): Builder
