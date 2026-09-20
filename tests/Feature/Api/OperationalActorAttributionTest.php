@@ -14,7 +14,6 @@ use App\Models\StationInventoryItem;
 use App\Models\User;
 use App\Services\DailyCheckoutChecklistResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -118,12 +117,11 @@ final class OperationalActorAttributionTest extends TestCase
             ->assertJsonMissingPath('offline.token');
     }
 
-    public function test_inventory_pin_is_station_authorization_not_human_identity(): void
+    public function test_authenticated_member_can_use_another_station_inventory_without_a_station_pin_and_audit_identity_is_server_derived(): void
     {
         [$actor, $actorEmployee] = $this->canonicalMember('E01-C', 'Inventory Actor');
         [, $otherEmployee] = $this->canonicalMember('E01-D', 'Forged Inventory Actor');
         $station = $this->station();
-        $station->forceFill(['inventory_pin_hash' => Hash::make('9191')])->save();
         $category = InventoryCategory::query()->create(['name' => 'E01 Supplies']);
         $catalogItem = InventoryItem::query()->create([
             'category_id' => $category->id,
@@ -137,25 +135,11 @@ final class OperationalActorAttributionTest extends TestCase
         ]);
         $this->actingAsCanonicalUser($actor);
 
-        $verified = $this->postJson('/api/v2/station-inventory/verify-pin', [
-            'station_id' => $station->id,
-            'pin' => '9191',
-            'actor_name' => $otherEmployee->name,
-            'actor_shift' => 'B-Day',
-        ])->assertOk();
+        $this->getJson("/api/v2/station-inventory/{$station->id}")
+            ->assertOk()
+            ->assertJsonPath('station.id', $station->id);
 
-        $this->assertStringNotContainsString('actor_name', (string) $verified->json('inventory_url'));
-        $this->assertDatabaseHas('station_inventory_audits', [
-            'station_id' => $station->id,
-            'actor_user_id' => $actor->id,
-            'actor_employee_id' => $actorEmployee->id,
-            'actor_name' => $actorEmployee->name,
-            'action' => 'pin_verified',
-        ]);
-
-        $parts = parse_url((string) $verified->json('inventory_url'));
-        $updateUrl = $parts['path'].'/item/'.$stationItem->id.'?'.$parts['query'];
-        $this->putJson($updateUrl, [
+        $this->putJson("/api/v2/station-inventory/{$station->id}/item/{$stationItem->id}", [
             'on_hand' => 3,
             'actor_name' => $otherEmployee->name,
             'actor_shift' => 'Forged Shift',

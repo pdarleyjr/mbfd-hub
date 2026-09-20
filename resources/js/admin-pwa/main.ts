@@ -106,8 +106,8 @@ function showInstallBanner(promptEvent: BeforeInstallPromptEvent): void {
         <div style="display:flex;align-items:flex-start;gap:10px;">
             <img src="/admin-pwa/icons/icon-96.png" alt="" width="36" height="36" style="border-radius:8px;flex-shrink:0;">
             <div>
-                <div style="font-weight:700;font-size:14px;color:#0f172a;">Install MBFD Admin</div>
-                <div style="color:#475569;margin-top:2px;">Open the admin console like a desktop app — its own window, taskbar icon, and instant launch.</div>
+                <div style="font-weight:700;font-size:14px;color:#0f172a;">Install MBFD Hub</div>
+                <div style="color:#475569;margin-top:2px;">Open the Hub like a desktop app, with Admin available when authorized.</div>
             </div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">

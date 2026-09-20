@@ -10,15 +10,12 @@ use App\Models\StationSupplyRequest;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 
 /**
  * Station Inventory V2 API Controller
  *
- * Provides PIN-protected access to station inventory management.
- * Uses signed URLs for session-based authentication after PIN verification.
+ * Provides authenticated access to station inventory management.
  */
 class StationInventoryV2Controller extends Controller
 {
@@ -30,101 +27,13 @@ class StationInventoryV2Controller extends Controller
     }
 
     /**
-     * Verify station PIN and generate access token
-     *
-     * POST /api/v2/station-inventory/verify-pin
-     */
-    public function verifyPin(Request $request, AuthenticatedMemberContextResolver $memberContextResolver): JsonResponse
-    {
-        $actor = $memberContextResolver->resolve($request)->actor();
-        $employee = $actor->requireEmployee();
-        $validator = Validator::make($request->all(), [
-            'station_id' => 'required|integer',
-            'pin' => 'required|string|size:4',
-            'actor_shift' => 'required|string|max:50',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        // Try to find station by ID first, then by station_number
-        $station = Station::find($request->station_id);
-        if (! $station) {
-            $station = Station::where('station_number', $request->station_id)->first();
-        }
-
-        if (! $station) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Station not found',
-            ], 404);
-        }
-
-        // Verify PIN using Hash::check
-        if (! Hash::check($request->pin, $station->inventory_pin_hash)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid PIN',
-            ], 401);
-        }
-
-        // Create audit log for PIN verification
-        StationInventoryAudit::create([
-            'station_id' => $station->id,
-            'inventory_item_id' => null,
-            'actor_user_id' => $actor->userId(),
-            'actor_employee_id' => $employee->getKey(),
-            'actor_name' => $employee->name,
-            'actor_shift' => $request->actor_shift,
-            'action' => 'pin_verified',
-            'from_value' => null,
-            'to_value' => null,
-        ]);
-
-        // Generate signed URLs (expires in 4 hours)
-        $urlParams = [
-            'stationId' => $station->id,
-            'shift_context' => $request->actor_shift,
-        ];
-
-        $inventoryUrl = URL::temporarySignedRoute(
-            'api.v2.station-inventory.access',
-            now()->addHours(4),
-            $urlParams
-        );
-
-        $supplyRequestsUrl = URL::temporarySignedRoute(
-            'api.v2.station-inventory.supply-requests',
-            now()->addHours(4),
-            $urlParams
-        );
-
-        return response()->json([
-            'success' => true,
-            'station_id' => $station->id,  // Canonical PK for any subsequent operations
-            'station' => [
-                'id' => $station->id,
-                'name' => $station->name,
-                'station_number' => $station->station_number,
-                'address' => $station->address,
-            ],
-            // Return absolute signed URLs - frontend should use these as-is
-            'inventory_url' => $inventoryUrl,
-            'supply_requests_url' => $supplyRequestsUrl,
-        ]);
-    }
-
-    /**
      * Get full inventory list for a station
      *
      * GET /api/v2/station-inventory/{stationId}
      */
-    public function getInventory(Request $request, int $stationId): JsonResponse
+    public function getInventory(Request $request, int $stationId, AuthenticatedMemberContextResolver $memberContextResolver): JsonResponse
     {
+        $memberContextResolver->resolve($request)->actor()->requireEmployee();
         $station = Station::findOrFail($stationId);
 
         // Load station inventory items with relationships

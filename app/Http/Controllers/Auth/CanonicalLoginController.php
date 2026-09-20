@@ -53,10 +53,6 @@ final class CanonicalLoginController extends Controller
         return view('auth.canonical-login', [
             'loginAction' => $attempts->requested($request) ? $attempts->loginUrl($request) : route('login.store'),
             'applicationLabel' => $attempts->requested($request) ? $attempts->applicationLabel($request) : null,
-            'identityLoginUrl' => config('identity.credential_authority') === 'authentik'
-                && in_array(config('identity.mode'), ['hybrid', 'authentik'], true)
-                ? route('identity.redirect', $request->only('login_attempt'))
-                : null,
         ]);
     }
 
@@ -96,7 +92,7 @@ final class CanonicalLoginController extends Controller
             return $this->denied($request, $employeeId, 'rate_limited');
         }
 
-        $user = $users->byEmployeeId($employeeId);
+        $user = $users->byIdentifier($employeeId);
         $passwordMatches = Hash::check(
             $credentials['password'],
             $user?->getAuthPassword() ?? (string) config('identity.canonical_login_dummy_password_hash'),

@@ -20,6 +20,6 @@ class TestPushNotification extends Notification
             ->body('This is a test notification from MBFD Hub. Push notifications are working correctly!')
             ->icon('/images/mbfd-logo.png')
             ->badge('/images/mbfd-logo.png')
-            ->data(['url' => '/admin']);
+            ->data(['url' => '/']);
     }
 }

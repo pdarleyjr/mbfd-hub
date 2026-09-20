@@ -1,13 +1,14 @@
 {
-  "name": "MBFD Daily Checkout",
-  "short_name": "MBFD Checkout",
-  "description": "Daily apparatus inspection app for Miami Beach Fire Department",
-  "start_url": "/daily/",
-  "scope": "/daily/",
+  "name": "MBFD Hub",
+  "short_name": "MBFD Hub",
+  "id": "/",
+  "description": "Miami Beach Fire Department Hub",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1e40af",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "categories": ["productivity", "utilities"],
   "prefer_related_applications": false,
   "icons": [
@@ -25,18 +26,5 @@
     }
   ],
   "screenshots": [],
-  "shortcuts": [
-    {
-      "name": "Start Inspection",
-      "short_name": "Inspect",
-      "description": "Begin daily apparatus inspection",
-      "url": "/daily/",
-      "icons": [
-        {
-          "src": "/daily/icons/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    }
-  ]
+  "shortcuts": []
 }

@@ -33,13 +33,6 @@ class Dashboard extends BaseDashboard
                 ->icon('heroicon-o-plus-circle')
                 ->color('primary')
                 ->url(fn () => route('filament.admin.resources.todos.create')),
-            Action::make('askAI')
-                ->label('Ask AI Assistant')
-                ->icon('heroicon-o-sparkles')
-                ->color('gray')
-                ->action(function () {
-                    $this->dispatch('open-ai-chat');
-                }),
         ];
     }
 }

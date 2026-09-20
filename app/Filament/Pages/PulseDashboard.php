@@ -14,6 +14,8 @@ class PulseDashboard extends Page
 
     protected static ?string $title = 'Laravel Pulse';
 
+    protected static ?string $slug = 'pulse';
+
     protected static ?int $navigationSort = 1;
 
     protected static bool $shouldRegisterNavigation = false;

@@ -68,29 +68,6 @@ class StationResource extends Resource
                         Forms\Components\Textarea::make('notes')
                             ->columnSpanFull(),
                     ]),
-                Forms\Components\Section::make('Inventory Access')
-                    ->schema([
-                        Forms\Components\TextInput::make('inventory_pin')
-                            ->label('Inventory PIN')
-                            ->password()
-                            ->revealable()
-                            ->helperText('Enter a 4-digit PIN. Leave blank to keep the current PIN.')
-                            ->minLength(4)
-                            ->maxLength(4)
-                            ->rule('digits:4')
-                            ->extraAttributes([
-                                'inputmode' => 'numeric',
-                                'maxlength' => 4,
-                            ])
-                            ->afterStateHydrated(function (Forms\Components\TextInput $component): void {
-                                $record = $component->getRecord();
-
-                                if ($record?->inventory_pin_hash) {
-                                    $component->state('••••');
-                                }
-                            })
-                            ->dehydrated(fn ($state): bool => filled($state) && $state !== '••••'),
-                    ]),
             ]);
     }
 
@@ -130,9 +107,6 @@ class StationResource extends Resource
                         Infolists\Components\TextEntry::make('captain_in_charge')
                             ->label('Captain in Charge'),
                         Infolists\Components\TextEntry::make('phone'),
-                        Infolists\Components\TextEntry::make('inventory_pin_masked')
-                            ->label('Inventory PIN')
-                            ->state(fn ($record) => $record->inventory_pin_hash ? '••••' : 'Not set'),
                     ])->columns(4),
                 Infolists\Components\Section::make('Address')
                     ->schema([

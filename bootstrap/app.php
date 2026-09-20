@@ -55,7 +55,6 @@ $app = Application::configure(basePath: dirname(__DIR__))
             'verify.bid.reader' => \App\Http\Middleware\VerifyBidReaderToken::class,
             'verify.bid.federation' => \App\Http\Middleware\VerifyBidFederationToken::class,
             'verify.media-control.token' => \App\Http\Middleware\VerifyMediaControlServiceToken::class,
-            'station-inventory.signed' => \App\Http\Middleware\ValidateStationInventorySignature::class,
             'display.readonly' => \App\Http\Middleware\EnsureDisplayReadOnly::class,
             'display.token' => \App\Http\Middleware\EnsureDisplayToken::class,
             'conference.enabled' => \App\Http\Middleware\EnsureVideoConferencingEnabled::class,

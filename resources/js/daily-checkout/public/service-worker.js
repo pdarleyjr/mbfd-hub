@@ -3,7 +3,7 @@ const API_CACHE_NAME = 'mbfd-api-cache-v6';
 const APP_SHELL_CACHE_KEYS = [
   '/daily/',
   '/daily/index.html',
-  '/daily/manifest.json',
+  '/manifest.json',
 ];
 
 // Install event - cache static assets
@@ -204,12 +204,12 @@ self.addEventListener('notificationclick', function (event) {
   event.notification.close();
 
   const data = event.notification.data || {};
-  let requestedUrl = data.url || '/admin';
+  let requestedUrl = data.url || '/';
 
   if (event.action === 'open-chat' || requestedUrl.includes('/chat')) {
-    requestedUrl = data.url || '/admin/chat';
+    requestedUrl = data.url || '/';
   }
-  const urlToOpen = sameOriginNavigation(requestedUrl, '/admin');
+  const urlToOpen = sameOriginNavigation(requestedUrl, '/');
 
   event.waitUntil(
     clients

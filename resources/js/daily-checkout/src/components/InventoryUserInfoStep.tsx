@@ -1,33 +1,28 @@
-import { useState } from 'react';
-import { Shift } from '../types';
-
-// Map station numbers to database IDs
-const STATION_ID_MAP: Record<number, number> = {
-  1: 29,
-  2: 30,
-  3: 31,
-  4: 32,
-  6: 33,
-};
+import { useEffect, useState } from 'react';
+import { Shift, Station } from '../types';
+import { ApiClient } from '../utils/api';
 
 interface InventoryUserInfoStepProps {
-  onContinue: (data: { employeeName: string; shift: Shift; station: number; stationNumber: number }) => void;
+  onContinue: (data: { shift: Shift; station: number; stationNumber: number }) => void;
 }
 
 export default function InventoryUserInfoStep({ onContinue }: InventoryUserInfoStepProps) {
-  const [employeeName, setEmployeeName] = useState('');
   const [shift, setShift] = useState<Shift | ''>('');
   const [station, setStation] = useState<number | ''>('');
+  const [stations, setStations] = useState<Station[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    ApiClient.getStations()
+      .then((availableStations) => setStations(availableStations.filter((item) => item.is_active)))
+      .catch(() => setErrors((current) => ({ ...current, station: 'Stations are unavailable. Please try again.' })));
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validation
     const newErrors: Record<string, string> = {};
-    if (!employeeName.trim()) {
-      newErrors.employeeName = 'Employee name is required';
-    }
     if (!shift) {
       newErrors.shift = 'Shift is required';
     }
@@ -40,14 +35,16 @@ export default function InventoryUserInfoStep({ onContinue }: InventoryUserInfoS
       return;
     }
 
-    // Convert station number to DB ID
-    const stationDbId = STATION_ID_MAP[station as number];
+    const selectedStation = stations.find((item) => item.id === station);
+    if (!selectedStation) {
+      setErrors((current) => ({ ...current, station: 'Select an active station.' }));
+      return;
+    }
     
     onContinue({
-      employeeName: employeeName.trim(),
       shift: shift as Shift,
-      station: stationDbId, // DB ID for API calls
-      stationNumber: station as number, // Station number for display
+      station: selectedStation.id,
+      stationNumber: selectedStation.station_number,
     });
   };
 
@@ -55,34 +52,10 @@ export default function InventoryUserInfoStep({ onContinue }: InventoryUserInfoS
     <div className="space-y-6">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Station Inventory Check</h2>
-        <p className="text-gray-600">Enter your information to begin</p>
+        <p className="text-gray-600">Select the station and shift context to begin</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Employee Name */}
-        <div>
-          <label htmlFor="employeeName" className="block text-sm font-medium text-gray-700 mb-2">
-            Employee Name <span className="text-red-600">*</span>
-          </label>
-          <input
-            id="employeeName"
-            type="text"
-            value={employeeName}
-            onChange={(e) => {
-              setEmployeeName(e.target.value);
-              setErrors(prev => ({ ...prev, employeeName: '' }));
-            }}
-            className={`w-full px-4 py-3 text-lg border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-              errors.employeeName ? 'border-red-400 bg-red-50' : 'border-gray-300'
-            }`}
-            placeholder="Enter your name"
-            autoComplete="name"
-          />
-          {errors.employeeName && (
-            <p className="mt-1 text-sm text-red-600">{errors.employeeName}</p>
-          )}
-        </div>
-
         {/* Shift Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -129,9 +102,9 @@ export default function InventoryUserInfoStep({ onContinue }: InventoryUserInfoS
             }`}
           >
             <option value="">Select a station</option>
-            {[1, 2, 3, 4, 6].map((num) => (
-              <option key={num} value={num}>
-                Station {num}
+            {stations.map((item) => (
+              <option key={item.id} value={item.id}>
+                Station {item.station_number}
               </option>
             ))}
           </select>
@@ -145,7 +118,7 @@ export default function InventoryUserInfoStep({ onContinue }: InventoryUserInfoS
           type="submit"
           className="w-full py-4 bg-green-600 text-white text-lg font-semibold rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-300 transition-all shadow-md"
         >
-          Continue to PIN Entry
+          Open station inventory
         </button>
       </form>
     </div>

@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
-use Illuminate\Support\Facades\Hash;
 
 class Station extends Model
 {
@@ -19,8 +18,6 @@ class Station extends Model
         'is_active',
         'notes',
         'image_url',
-        'inventory_pin',
-        'inventory_pin_hash',
     ];
 
     protected $casts = [
@@ -28,24 +25,6 @@ class Station extends Model
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
     ];
-
-    protected $hidden = [
-        'inventory_pin_hash',
-    ];
-
-    /**
-     * Hash and store a plain-text inventory PIN.
-     */
-    public function setInventoryPinAttribute(?string $value): void
-    {
-        $pin = is_string($value) ? trim($value) : '';
-
-        if ($pin === '') {
-            return;
-        }
-
-        $this->attributes['inventory_pin_hash'] = Hash::make($pin);
-    }
 
     /**
      * Get the station name (alias for station_number)
