@@ -77,6 +77,25 @@ final class CanonicalHumanAuthenticationTest extends TestCase
         $this->assertSame($before, $user->fresh()->only(['id', 'employee_profile_id', 'password', 'security_version']));
     }
 
+    public function test_login_form_and_validation_accept_the_full_email_identifier_contract(): void
+    {
+        $email = str_repeat('a', 242).'@mbfdhub.com';
+        self::assertSame(254, strlen($email));
+        $user = $this->linkedUser(AccountStatus::Active, 'correct-password');
+        $user->forceFill(['email' => $email])->save();
+
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('maxlength="254"', false);
+
+        $this->post('/login', [
+            'employee_id' => $email,
+            'password' => 'correct-password',
+        ])->assertRedirect('/');
+
+        $this->assertAuthenticatedAs($user, 'web');
+    }
+
     public function test_canonical_login_session_serves_member_context_without_a_bearer_token_and_logout_revokes_both_surfaces(): void
     {
         $user = $this->linkedUser(AccountStatus::Active, 'correct-password');

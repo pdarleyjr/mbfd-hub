@@ -6,8 +6,16 @@ use App\Filament\Admin\Pages\BidAccessPin;
 use App\Filament\Admin\Pages\EquipmentIntake;
 use App\Filament\Admin\Pages\KnowledgeBase;
 use App\Filament\Admin\Pages\TrtTrailerInventory;
+use App\Filament\Pages\CommunicationsUsage;
+use App\Filament\Pages\ComposeEmail;
+use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\HealthCheckResults;
+use App\Filament\Pages\MyProfile;
+use App\Filament\Pages\NotificationSettings;
 use App\Filament\Pages\PulseDashboard;
+use App\Filament\Pages\SetPasswordPage;
+use App\Filament\Pages\Settings;
+use App\Filament\Pages\WorkgroupAdministration;
 use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
@@ -23,7 +31,6 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
 use Filament\Navigation\NavigationItem;
-use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -80,9 +87,21 @@ class AdminPanelProvider extends PanelProvider
             ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
-                Pages\Dashboard::class,
+                // The primary Admin dashboard is intentionally explicit. Registering
+                // Filament's stock Dashboard here previously overrode the application
+                // Dashboard discovered from app/Filament/Pages and made /admin
+                // ambiguous at runtime.
+                Dashboard::class,
+                CommunicationsUsage::class,
+                ComposeEmail::class,
+                HealthCheckResults::class,
+                MyProfile::class,
+                NotificationSettings::class,
+                PulseDashboard::class,
+                SetPasswordPage::class,
+                Settings::class,
+                WorkgroupAdministration::class,
                 EquipmentIntake::class,
                 TrtTrailerInventory::class,
                 BidAccessPin::class,
@@ -136,7 +155,7 @@ class AdminPanelProvider extends PanelProvider
                     ->collapsed(),
             ])
             ->userMenuItems([
-                MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
+                'profile' => MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
                 MenuItem::make()->label('Change Password')->url(fn (): string => \App\Filament\Pages\SetPasswordPage::getUrl(panel: 'admin'))->icon('heroicon-o-key'),
                 \Filament\Navigation\MenuItem::make()
                     ->label('City email & verification')
@@ -195,10 +214,15 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => self::safeRender(
-                    'filament.admin.partials.head-pwa',
-                    '<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="MBFD Hub">'
-                )
+                fn (): string => self::safeRender('filament.admin.partials.head-pwa', '<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="MBFD Hub">')
+                    .self::safeRender('filament.admin.partials.navigation-state', data: [
+                        'groups' => [
+                            'Dashboard', 'Active Operations', 'Fleet Management', 'Inventory & Logistics',
+                            'Workgroup Management', 'Station Management', 'Bid Administration', 'Communications',
+                            'Administration', 'Monitoring',
+                        ],
+                        'version' => '2026-09-admin-navigation-defaults-v1',
+                    ])
             )
             // Bisect step 2 (re-introduce): BODY_END composes 4 desktop-modernization
             // partials via safeRender. Each partial is wrapped in try/catch/Throwable
@@ -223,14 +247,14 @@ class AdminPanelProvider extends PanelProvider
      * crashing the entire admin page. Errors are reported to Sentry so we
      * still hear about it.
      */
-    private static function safeRender(string $view, string $fallback = ''): string
+    private static function safeRender(string $view, string $fallback = '', array $data = []): string
     {
         try {
             if (! view()->exists($view)) {
                 return $fallback;
             }
 
-            return view($view)->render();
+            return view($view, $data)->render();
         } catch (\Throwable $e) {
             if (app()->bound('sentry')) {
                 try {

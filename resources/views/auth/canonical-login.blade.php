@@ -38,7 +38,7 @@
     <form method="POST" action="{{ $loginAction ?? route('login.store') }}">
         @csrf
         <label for="employee_id">Employee ID or email</label>
-        <input id="employee_id" name="employee_id" type="text" maxlength="64" autocomplete="username" value="{{ old('employee_id') }}" required autofocus @error('employee_id') aria-invalid="true" aria-describedby="employee_id-error" @enderror>
+        <input id="employee_id" name="employee_id" type="text" maxlength="254" autocomplete="username" value="{{ old('employee_id') }}" required autofocus @error('employee_id') aria-invalid="true" aria-describedby="employee_id-error" @enderror>
         @error('employee_id')
             <div id="employee_id-error" class="error" role="alert">{{ $message }}</div>
         @enderror

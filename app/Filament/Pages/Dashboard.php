@@ -2,8 +2,10 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Actions\Action;
 use Filament\Pages\Dashboard as BaseDashboard;
+use App\Filament\Widgets\FleetStatsWidget;
+use App\Filament\Widgets\InventoryOverviewWidget;
+use App\Filament\Widgets\StationOperationsHubWidget;
 
 class Dashboard extends BaseDashboard
 {
@@ -13,7 +15,7 @@ class Dashboard extends BaseDashboard
 
     public function getSubheading(): ?string
     {
-        return 'Operational overview for fleet, logistics, inventory, and active support-service tasks.';
+        return 'Operational exceptions and the next place to act.';
     }
 
     public function getColumns(): int|string|array
@@ -25,14 +27,12 @@ class Dashboard extends BaseDashboard
         ];
     }
 
-    protected function getHeaderActions(): array
+    public function getWidgets(): array
     {
         return [
-            Action::make('newTodo')
-                ->label('New Todo')
-                ->icon('heroicon-o-plus-circle')
-                ->color('primary')
-                ->url(fn () => route('filament.admin.resources.todos.create')),
+            FleetStatsWidget::class,
+            InventoryOverviewWidget::class,
+            StationOperationsHubWidget::class,
         ];
     }
 }

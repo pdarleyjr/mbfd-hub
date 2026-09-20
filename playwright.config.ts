@@ -111,6 +111,16 @@ export default defineConfig({
       testMatch: /admin-pwa\.spec\.ts/,
     },
     {
+      name: 'admin-ux-acceptance',
+      use: {
+        viewport: { width: 1366, height: 768 },
+        storageState: 'tests/e2e/.auth/admin.json',
+        serviceWorkers: 'allow',
+      },
+      dependencies: ['setup'],
+      testMatch: /admin-ux-acceptance\.spec\.ts/,
+    },
+    {
       name: 'apparatus-service-mobile',
       use: { ...devices['iPhone 13'], serviceWorkers: 'block' },
       testMatch: /apparatus-service-tickets\.spec\.ts/,
