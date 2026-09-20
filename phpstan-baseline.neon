@@ -325,12 +325,6 @@ parameters:
 			path: app/Filament/Resources/RecommendationResource.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$inventory_pin_hash\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Filament/Resources/StationResource.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 2
