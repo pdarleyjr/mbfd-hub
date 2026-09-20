@@ -27,23 +27,44 @@
 <main>
     <p class="eyebrow">Miami Beach Fire Department</p>
     <h1>Install MBFD Hub</h1>
-    <p>Use the Hub from your device home screen for faster access to the tools you use on shift.</p>
+    <p id="install-introduction">Use the Hub from your device home screen for faster access to the tools you use on shift.</p>
+    <p id="already-installed" role="status" hidden>MBFD Hub is already running as an installed app.</p>
     <button id="install" type="button" hidden>Install MBFD Hub</button>
-    <section>
-        <h2>On iPhone or iPad</h2>
-        <ol><li>Open this page in Safari.</li><li>Select Share, then Add to Home Screen.</li><li>Choose Add.</li></ol>
-    </section>
-    <section>
-        <h2>On Android or desktop</h2>
-        <p>Use the browser’s install option, or choose the button above when it appears.</p>
+    <section id="install-guidance">
+        <h2 id="install-guidance-heading">Install on this device</h2>
+        <ol id="install-guidance-steps"></ol>
     </section>
     <p><a href="/">Return to MBFD Hub</a></p>
 </main>
 <script>
     let installPrompt;
     const installButton = document.getElementById('install');
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    const guidanceSteps = document.getElementById('install-guidance-steps');
+    const guidanceHeading = document.getElementById('install-guidance-heading');
+    const userAgent = navigator.userAgent;
+
+    const instructions = /iPad|iPhone|iPod/.test(userAgent)
+        ? ['Open this page in Safari.', 'Select Share, then Add to Home Screen.', 'Choose Add.']
+        : /Macintosh/.test(userAgent) && /Safari/.test(userAgent) && !/Chrome|Chromium/.test(userAgent)
+            ? ['Open the Share menu in Safari.', 'Choose Add to Dock.', 'Confirm Add.']
+            : ['Use your browser’s install option.', 'Choose the button above when it becomes available.', 'If no button appears, your browser does not offer an install prompt.'];
+
+    guidanceSteps.replaceChildren(...instructions.map((instruction) => {
+        const item = document.createElement('li');
+        item.textContent = instruction;
+        return item;
+    }));
+
+    if (standalone) {
+        document.getElementById('already-installed').hidden = false;
+        document.getElementById('install-introduction').hidden = true;
+        document.getElementById('install-guidance').hidden = true;
+    }
+
     window.addEventListener('beforeinstallprompt', (event) => {
         event.preventDefault();
+        if (standalone) return;
         installPrompt = event;
         installButton.hidden = false;
     });

@@ -28,7 +28,7 @@ self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
     const data = event.notification.data || {};
-    let urlToOpen = data.url || '/admin';
+    let urlToOpen = sameOriginNavigation(data.url);
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
@@ -45,6 +45,18 @@ self.addEventListener('notificationclick', function(event) {
         })
     );
 });
+
+function sameOriginNavigation(value) {
+    try {
+        const candidate = new URL(String(value || '/'), self.location.origin);
+
+        return candidate.origin === self.location.origin
+            ? candidate.pathname + candidate.search + candidate.hash
+            : '/';
+    } catch (_) {
+        return '/';
+    }
+}
 
 // Install event - cache static assets
 self.addEventListener('install', function(event) {

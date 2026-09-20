@@ -346,14 +346,40 @@
     border: 1px solid #E8E5E0;
 }
 
-/* Dashboard 2-column grid on desktop */
-@media (min-width: 1280px) {
-    .filament-widgets-container {
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 1rem !important;
-    }
+/* The Admin dashboard is an exception overview; its grid is owned by the
+   Dashboard page's responsive column contract rather than a global override. */
+
+.mbfd-station-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: .75rem;
 }
+
+.mbfd-station-overview-card {
+    display: grid;
+    gap: .35rem;
+    min-width: 0;
+    padding: .875rem 1rem;
+    color: #1e293b;
+    text-decoration: none;
+    background: #fafaf9;
+    border: 1px solid #e7e5e4;
+    border-radius: .625rem;
+    transition: border-color .15s ease, background-color .15s ease;
+}
+
+.mbfd-station-overview-card:hover,
+.mbfd-station-overview-card:focus-visible {
+    background: #fff;
+    border-color: #b91c1c;
+    outline: none;
+}
+
+.mbfd-station-overview-card-attention { border-inline-start: 3px solid #b45309; }
+.mbfd-station-overview-name { font-weight: 700; letter-spacing: -.01em; }
+.mbfd-station-overview-checkout { color: #57534e; font-size: .8125rem; }
+.mbfd-station-overview-metrics { display: flex; gap: .6rem; color: #78716c; font-size: .75rem; }
+.mbfd-station-overview-metrics strong { color: #292524; font-variant-numeric: tabular-nums; }
 
 /* ===== TABLE ENHANCEMENTS ===== */
 .fi-ta-row {

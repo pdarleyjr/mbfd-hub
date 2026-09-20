@@ -89,22 +89,22 @@ final class EmployeeAccessSchema
                 Forms\Placeholder::make('recovery_help')->label('Recovery controls')
                     ->content('Local accounts can receive a one-time temporary password. MBFD Identity accounts use private, time-limited recovery links sent only to the authoritative recovery address. Session revocation and disable actions remain locally authoritative and queue upstream enforcement.'),
             ]),
-            Forms\Tabs\Tab::make('Administration')->schema([
-                self::controls('hub-roles', 'Hub roles', ['manageRoles' => 'Edit Hub roles'], 'Current assigned roles. Hub roles can provide inherited administrative capabilities.'),
-                Forms\Placeholder::make('authorized_roles')->label('Current Hub roles')
-                    ->content(fn (?Model $record): string => self::account($record)?->roles->pluck('name')->implode(', ') ?: 'No assigned roles'),
-                self::controls('hub-capabilities', 'Hub capabilities', ['manageAdministrationCapabilities' => 'Edit direct Hub capabilities'], 'The effective summary includes direct and role-inherited capabilities. Role-inherited capabilities must be changed through Hub roles, not direct grants.'),
+            Forms\Tabs\Tab::make('Access & capabilities')->schema([
+                self::controls('hub-capabilities', 'Administrative capabilities', ['manageAdministrationCapabilities' => 'Edit direct administrative capabilities'], 'The effective summary includes direct and role-inherited capabilities. Role-inherited capabilities are maintained through advanced system access.'),
                 Forms\Placeholder::make('authorized_capabilities')->label('Effective administrative capabilities')
                     ->content(function (?Model $record): string {
                         $user = self::account($record);
                         if ($user?->hasRole('super_admin')) {
-                            return 'Super Administrator — all Hub capabilities. Application enforcement is shown separately.';
+                            return 'Full administrative capabilities. Application enforcement is shown separately.';
                         }
                         $labels = app(ApplicationAccessRegistry::class)->capabilityOptions();
 
                         return $user?->getAllPermissions()->pluck('name')->filter(fn (string $name): bool => isset($labels[$name]))
                             ->map(fn (string $name): string => $labels[$name])->implode('; ') ?: 'No administrative capabilities';
                     }),
+                self::controls('hub-roles', 'Advanced system access', ['manageRoles' => 'Edit advanced system access'], 'Framework role assignments are an advanced system function. Use application access and capabilities for routine administration.'),
+                Forms\Placeholder::make('authorized_roles')->label('Advanced system roles')
+                    ->content(fn (?Model $record): string => self::account($record)?->roles->pluck('name')->implode(', ') ?: 'No assigned roles'),
             ]),
             Forms\Tabs\Tab::make('Ecosystem access')->schema([
                 self::controls('ecosystem', 'Application access & administrator roles', [

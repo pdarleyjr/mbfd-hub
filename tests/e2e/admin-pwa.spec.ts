@@ -51,14 +51,15 @@ test.describe('admin PWA unauthenticated', () => {
     await context.close();
   });
 
-  test('manifest is served with correct content-type', async ({ request }) => {
-    const res = await request.get('/admin-pwa/manifest.webmanifest');
+  test('root manifest is the single MBFD Hub PWA contract', async ({ request }) => {
+    const res = await request.get('/manifest.json');
     expect(res.status()).toBe(200);
     const ct = res.headers()['content-type'] ?? '';
     expect(ct).toMatch(/manifest\+json|application\/json/);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.scope).toBe('/admin/');
-    expect(String(body.start_url)).toMatch(/^\/admin/);
+    expect(body.name).toBe('MBFD Hub');
+    expect(body.scope).toBe('/');
+    expect(body.start_url).toBe('/');
     expect(Array.isArray(body.icons)).toBe(true);
   });
 
@@ -70,6 +71,15 @@ test.describe('admin PWA unauthenticated', () => {
     const body = await res.text();
     expect(body).toMatch(/addEventListener\(['"]install['"]/);
     expect(body).toMatch(/addEventListener\(['"]fetch['"]/);
+  });
+
+  test('root push worker falls back safely and rejects an external destination', async ({ request }) => {
+    const res = await request.get('/sw.js');
+    expect(res.status()).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("sameOriginNavigation(data.url)");
+    expect(body).toContain("? candidate.pathname + candidate.search + candidate.hash");
+    expect(body).toContain(": '/';");
   });
 
   test('/up health endpoint responds 200', async ({ request }) => {
@@ -86,6 +96,14 @@ test.describe('admin PWA unauthenticated', () => {
       res.status(),
       'CRITICAL: /admin/login must never 500 for unauthenticated users (see post-mortem in PHASE_STATUS.md)',
     ).toBe(200);
+  });
+});
+
+test.describe('install page', () => {
+  test('does not show a fake install control before browser capability is available', async ({ page }) => {
+    await page.goto('/install');
+    await expect(page.getByRole('button', { name: 'Install MBFD Hub' })).toBeHidden();
+    await expect(page.locator('#install-guidance-steps li')).toHaveCount(3);
   });
 });
 

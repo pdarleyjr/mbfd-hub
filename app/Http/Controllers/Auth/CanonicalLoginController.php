@@ -72,7 +72,7 @@ final class CanonicalLoginController extends Controller
             return $attempts->requested($request) ? $attempts->complete($request) : redirect('/');
         }
         $validator = Validator::make($request->all(), [
-            'employee_id' => ['required', 'string', 'max:64'],
+            'employee_id' => ['required', 'string', 'max:254'],
             'password' => ['required', 'string', 'max:4096'],
         ]);
         if ($attempts->requested($request) && $validator->fails()) {
