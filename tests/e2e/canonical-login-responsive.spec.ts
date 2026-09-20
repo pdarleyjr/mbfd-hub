@@ -11,8 +11,8 @@ const template = readFileSync(
 test('canonical login stays contained, named, touchable, and keyboard focusable', async ({ page }) => {
   await page.setContent(template);
 
-  await expect(page.getByRole('heading', { name: 'MBFD Hub' })).toBeVisible();
-  await expect(page.getByLabel('Employee ID')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'MBFD Sign In' })).toBeVisible();
+  await expect(page.getByLabel('Employee ID or email')).toBeVisible();
   await expect(page.getByLabel('Password')).toBeVisible();
 
   const dimensions = await page.evaluate(() => ({
@@ -28,7 +28,7 @@ test('canonical login stays contained, named, touchable, and keyboard focusable'
   expect(dimensions.main?.left).toBeGreaterThanOrEqual(0);
   expect(dimensions.main?.right).toBeLessThanOrEqual(dimensions.clientWidth);
 
-  for (const control of [page.getByLabel('Employee ID'), page.getByLabel('Password'), page.getByRole('button', { name: 'Sign in' })]) {
+  for (const control of [page.getByLabel('Employee ID or email'), page.getByLabel('Password'), page.getByRole('button', { name: 'Sign in' })]) {
     const box = await control.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
   }
