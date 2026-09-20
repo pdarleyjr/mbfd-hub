@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature\HubSupport;
 
 use App\Enums\AccountStatus;
+use App\Enums\HubSupportTicketStatus;
 use App\Models\HubSupportTicket;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -31,6 +33,9 @@ final class HubSupportMemberExperienceTest extends TestCase
             ->assertDontSee('name="impact"', false)
             ->assertDontSee('name="severity"', false)
             ->assertDontSee('name="diagnostics"', false);
+
+        $response->assertSee("We'll automatically include the page and available app information that may help us find the problem.", false)
+            ->assertDontSee('safe technical details that may help us find the problem.');
     }
 
     public function test_password_challenge_never_renders_the_report_widget(): void
@@ -87,5 +92,47 @@ final class HubSupportMemberExperienceTest extends TestCase
             ->assertDontSee('Other member report')
             ->assertDontSee('Never show this note')
             ->assertDontSee('private diagnostic');
+    }
+
+    public function test_member_sees_the_approved_resolution_without_internal_notes(): void
+    {
+        $member = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $manager = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $report = HubSupportTicket::factory()->for($member, 'reporter')->create([
+            'status' => HubSupportTicketStatus::Resolved,
+            'resolution_summary' => 'We restored the form service and verified the submission path.',
+        ]);
+        $report->updates()->create([
+            'status' => HubSupportTicketStatus::Resolved,
+            'public_response' => 'Internal-only message should not override the approved resolution.',
+            'internal_note' => 'Never show this resolution work note.',
+            'changed_by_user_id' => $manager->id,
+        ]);
+
+        $this->actingAsCanonicalUser($member)->get(route('hub-support.show', $report))
+            ->assertOk()
+            ->assertSee('Fixed')
+            ->assertSee('What we found')
+            ->assertSee('We restored the form service and verified the submission path.')
+            ->assertDontSee('Never show this resolution work note.');
+    }
+
+    public function test_fallback_shows_individual_attachment_validation_errors(): void
+    {
+        $user = User::factory()->create(['account_status' => AccountStatus::Active]);
+
+        $this->actingAsCanonicalUser($user)
+            ->from('/support/issues/create')
+            ->post('/support/issues', [
+                'client_submission_id' => 'f5f8889a-b1eb-4af5-8969-015f9a8ba72e',
+                'description' => 'The attached file does not work.',
+                'attachments' => [UploadedFile::fake()->create('unsupported.txt', 1, 'text/plain')],
+            ])
+            ->assertRedirect('/support/issues/create')
+            ->assertSessionHasErrors('attachments.0');
+
+        $this->get('/support/issues/create')
+            ->assertOk()
+            ->assertSee('file of type', false);
     }
 }

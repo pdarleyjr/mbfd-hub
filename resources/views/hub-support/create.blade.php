@@ -24,8 +24,11 @@
                 <label for="attachments" class="font-semibold text-red-700">+ Add screenshot or file</label>
                 <input id="attachments" type="file" name="attachments[]" accept="image/png,image/jpeg,application/pdf" multiple class="mt-2 block w-full text-sm">
                 @error('attachments') <p role="alert" class="text-sm text-red-700">{{ $message }}</p> @enderror
+                @foreach($errors->get('attachments.*') as $messages)
+                    @foreach($messages as $message) <p role="alert" class="text-sm text-red-700">{{ $message }}</p> @endforeach
+                @endforeach
             </div>
-            <p class="text-sm text-neutral-600">We’ll automatically include the page you’re on and safe technical details that may help us find the problem.</p>
+            <p class="text-sm text-neutral-600">We'll automatically include the page and available app information that may help us find the problem.</p>
             <div class="flex justify-end gap-3">
                 <a href="{{ url()->previous() }}" class="rounded-lg px-4 py-3">Cancel</a>
                 <button type="submit" class="rounded-lg bg-red-700 px-5 py-3 font-semibold text-white">Send</button>
