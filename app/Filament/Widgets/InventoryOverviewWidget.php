@@ -20,7 +20,9 @@ class InventoryOverviewWidget extends BaseWidget
     {
         $lowStockCount = EquipmentItem::query()
             ->where('is_active', true)
-            ->whereColumn('stock', '<=', 'reorder_min')
+            ->withSum('stockMutations as stock_total', 'amount')
+            ->get()
+            ->filter(fn (EquipmentItem $item): bool => (int) ($item->stock_total ?? 0) <= $item->reorder_min)
             ->count();
 
         return [
