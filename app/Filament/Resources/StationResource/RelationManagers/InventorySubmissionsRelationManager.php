@@ -2,8 +2,6 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
-use App\Filament\Resources\StationInventorySubmissionResource;
-use App\Models\StationInventorySubmission;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -11,6 +9,7 @@ use Filament\Tables\Table;
 class InventorySubmissionsRelationManager extends RelationManager
 {
     protected static string $relationship = 'inventorySubmissions';
+
     protected static ?string $title = 'Inventory Submissions';
 
     public function table(Table $table): Table
@@ -52,16 +51,10 @@ class InventorySubmissionsRelationManager extends RelationManager
                         'C' => 'C Shift',
                     ]),
             ])
-            ->headerActions([
-                //
-            ])
-            ->actions([
-                Tables\Actions\ViewAction::make()
-                    ->url(fn (StationInventorySubmission $record): string => 
-                        StationInventorySubmissionResource::getUrl('view', ['record' => $record])
-                    )
-                    ->openUrlInNewTab(false),
-            ])
+            // There is no standalone Filament resource for these records.
+            // Keep them in their canonical Station relation rather than
+            // emitting a route that resolves to a non-existent resource.
+            ->actions([])
             ->bulkActions([]);
     }
 }
