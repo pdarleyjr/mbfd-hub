@@ -62,28 +62,31 @@ export const saveInspectionProgress = (apparatusSlug: string, data: InspectionDa
       apparatusSlug,
       timestamp: Date.now(),
     };
-    localStorage.setItem(autosaveKey(apparatusSlug, data.checklist_version), JSON.stringify(saveData));
+    const owner = data.actorUserId !== undefined && data.actorSecurityVersion !== undefined
+      ? `_actor_${data.actorUserId}_${data.actorSecurityVersion}` : '';
+    localStorage.setItem(`${autosaveKey(apparatusSlug, data.checklist_version)}${owner}`, JSON.stringify(saveData));
+    return true;
   } catch (error) {
     console.error('Failed to autosave inspection:', error);
+    return false;
   }
 };
 
 export const loadInspectionProgress = (
   apparatusSlug: string,
   checklistVersion: string,
+  owner?: { userId: number; securityVersion: number },
 ): InspectionData | null => {
   try {
-    const exact = readInspectionProgress(autosaveKey(apparatusSlug, checklistVersion));
+    const exact = readInspectionProgress(`${autosaveKey(apparatusSlug, checklistVersion)}${owner ? `_actor_${owner.userId}_${owner.securityVersion}` : ''}`);
     if (exact) return exact;
-
-    const legacy = readInspectionProgress(autosaveKey(apparatusSlug));
-    if (legacy) return legacy;
 
     const prefix = `${STORAGE_KEYS.AUTOSAVE}_${apparatusSlug}_`;
     const versioned = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
       .filter((key): key is string => key !== null && key.startsWith(prefix))
       .map((key) => readInspectionProgress(key))
       .filter((data): data is InspectionData => data !== null)
+      .filter(data => !owner || (data.actorUserId === owner.userId && data.actorSecurityVersion === owner.securityVersion))
       .sort((left, right) => {
         const leftTimestamp = Number((left as InspectionData & { timestamp?: unknown }).timestamp) || 0;
         const rightTimestamp = Number((right as InspectionData & { timestamp?: unknown }).timestamp) || 0;
@@ -91,16 +94,16 @@ export const loadInspectionProgress = (
         return rightTimestamp - leftTimestamp;
       });
 
-    return versioned[0] ?? null;
+    return versioned[0] ?? readInspectionProgress(autosaveKey(apparatusSlug));
   } catch (error) {
     console.error('Failed to load autosaved inspection:', error);
     return null;
   }
 };
 
-export const clearInspectionProgress = (apparatusSlug: string, checklistVersion: string) => {
+export const clearInspectionProgress = (apparatusSlug: string, checklistVersion: string, owner?: { userId: number; securityVersion: number } | null) => {
   try {
-    localStorage.removeItem(autosaveKey(apparatusSlug, checklistVersion));
+    localStorage.removeItem(`${autosaveKey(apparatusSlug, checklistVersion)}${owner ? `_actor_${owner.userId}_${owner.securityVersion}` : ''}`);
     localStorage.removeItem(sessionStartKey(apparatusSlug, checklistVersion));
   } catch (error) {
     console.error('Failed to clear autosaved inspection:', error);

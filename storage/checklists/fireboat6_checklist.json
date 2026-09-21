@@ -21,10 +21,14 @@
     { "id": "fb6-scba-id-2", "name": "SCBA ID#", "inputType": "text", "required": false },
     { "id": "fb6-scba-id-3", "name": "SCBA ID#", "inputType": "text", "required": false },
     { "id": "fb6-scba-id-4", "name": "SCBA ID#", "inputType": "text", "required": false },
-    { "id": "fb6-driver-radio-last-four-serial", "name": "Driver Radio Last 4 Digits of Motorola Serial Number for Assigned Radios", "inputType": "text", "required": false },
-    { "id": "fb6-engineer", "name": "Engineer", "inputType": "text", "required": false },
-    { "id": "fb6-officer", "name": "Officer", "inputType": "text", "required": false },
-    { "id": "fb6-deck-hand", "name": "Deck Hand", "inputType": "text", "required": false }
+    { "id": "fb6-driver-radio-last-four-serial", "name": "Driver Radio - Last 4 Digits of Motorola Serial Number", "inputType": "text", "required": false },
+    { "id": "fb6-engineer", "name": "Engineer Radio - Last 4 Digits of Motorola Serial Number", "inputType": "text", "required": false },
+    { "id": "fb6-officer", "name": "Officer Radio - Last 4 Digits of Motorola Serial Number", "inputType": "text", "required": false },
+    { "id": "fb6-deck-hand", "name": "Deck Hand Radio - Last 4 Digits of Motorola Serial Number", "inputType": "text", "required": false },
+    { "id": "fb6-driver-crew-signoff", "name": "Driver crew signoff (paper footer; text record)", "inputType": "text", "required": false },
+    { "id": "fb6-engineer-crew-signoff", "name": "Engineer crew signoff (paper footer; text record)", "inputType": "text", "required": false },
+    { "id": "fb6-officer-crew-signoff", "name": "Officer crew signoff (paper footer; text record)", "inputType": "text", "required": false },
+    { "id": "fb6-deck-hand-crew-signoff", "name": "Deck Hand crew signoff (paper footer; text record)", "inputType": "text", "required": false }
   ],
   "recurringTasks": [
     {
@@ -83,8 +87,7 @@
         { "id": "fb6-interior-cab-engine-room-lights", "name": "Engine Room Lights", "inputType": "checkbox" },
         { "id": "fb6-interior-cab-emerg-lights", "name": "EMERG Lights", "inputType": "checkbox" },
         { "id": "fb6-interior-cab-ram-lights", "name": "RAM Lights", "inputType": "checkbox" },
-        { "id": "fb6-interior-cab-bilge-pumps", "name": "BILGE Pumps", "inputType": "checkbox" },
-        { "id": "fb6-interior-cab-powered-red-lights", "name": "Powered with red lights X4", "inputType": "checkbox", "expectedQuantity": 4 },
+        { "id": "fb6-interior-cab-bilge-pumps", "name": "BILGE Pumps", "inputType": "checkbox", "note": "Powered with red lights X4" },
         { "id": "fb6-interior-cab-manual-co-sea-fire", "name": "Manual CO SEA FIRE system safety pin in place", "inputType": "checkbox" }
       ]
     },

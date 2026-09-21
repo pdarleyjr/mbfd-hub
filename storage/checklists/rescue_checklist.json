@@ -177,9 +177,9 @@
       "id": "radio_numbers",
       "title": "Radio Numbers",
       "items": [
-        { "name": "Radio - R. Lt.", "inputType": "radio", "note": "Check accounted for and enter radio number if known" },
-        { "name": "Radio - F1A", "inputType": "radio", "note": "Check accounted for and enter radio number if known" },
-        { "name": "Radio - F1B", "inputType": "radio", "note": "Check accounted for and enter radio number if known" }
+        { "name": "Radio - R. Lt.", "inputType": "text", "valueRequired": false, "note": "Check accounted for and enter radio number if known" },
+        { "name": "Radio - F1A", "inputType": "text", "valueRequired": false, "note": "Check accounted for and enter radio number if known" },
+        { "name": "Radio - F1B", "inputType": "text", "valueRequired": false, "note": "Check accounted for and enter radio number if known" }
       ]
     }
   ]

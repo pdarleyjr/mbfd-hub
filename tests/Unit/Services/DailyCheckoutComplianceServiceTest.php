@@ -20,6 +20,33 @@ class DailyCheckoutComplianceServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_accepted_checkout_counts_as_complete_while_its_follow_up_stays_visible(): void
+    {
+        $this->activateBaseCutover();
+        $station = Station::create(['station_number' => 99, 'name' => 'Test station', 'address' => 'Test address', 'is_active' => true]);
+        $apparatus = $this->makeApparatus($station, 'E99', 'required', 'In Service');
+        $now = CarbonImmutable::now('America/New_York');
+        $inspection = $this->recordInspection($apparatus, $now->utc());
+        $inspection->update(['processing_status' => 'accepted_with_exception']);
+        $exception = \App\Models\ApparatusInspectionException::create([
+            'apparatus_id' => $apparatus->id, 'apparatus_inspection_id' => $inspection->id,
+            'field' => 'miles', 'reason' => 'rollback', 'status' => 'revision_requested',
+        ]);
+
+        $summary = app(DailyCheckoutComplianceService::class)->summaryForApparatuses($station->apparatuses()->get(), $now);
+        $this->assertSame(1, $summary['completed']);
+        $this->assertSame(0, $summary['review_pending']);
+        $this->assertSame(1, $summary['open_inspection_exceptions']);
+        $this->assertTrue($summary['matrix'][0]['included_in_completed']);
+        $this->assertTrue($summary['matrix'][0]['revision_requested']);
+
+        $exception->update(['status' => 'resolved']);
+        $summary = app(DailyCheckoutComplianceService::class)->summaryForApparatuses($station->apparatuses()->get(), $now);
+        $this->assertSame(1, $summary['completed']);
+        $this->assertSame(0, $summary['open_inspection_exceptions']);
+        $this->assertFalse($summary['matrix'][0]['revision_requested']);
+    }
+
     public function test_it_exposes_a_reconcilable_canonical_matrix_and_excludes_oos_and_exempt_apparatus(): void
     {
         $this->activateBaseCutover();

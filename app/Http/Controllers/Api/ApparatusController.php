@@ -14,6 +14,7 @@ use App\Models\DailyCheckoutInspectionSession;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\ApparatusInspectionApprovalService;
+use App\Services\ApparatusInspectionProcessingService;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\DailyCheckoutInspectionSessionService;
 use App\Services\Display\DisplaySnapshotService;
@@ -88,6 +89,7 @@ class ApparatusController extends Controller
             // This browser route only needs a warning count. Never
             // serialize defect notes, photos, resolution history, or paths.
             'open_defects_count' => $apparatus->openDefects()->count(),
+            'open_findings' => $this->knownFindings($apparatus),
         ]);
     }
 
@@ -171,6 +173,7 @@ class ApparatusController extends Controller
             'inspection_date' => $session->duty_date?->toDateString(),
             'due_tasks' => $session->due_tasks,
             'open_defects_count' => $apparatus->openDefects()->count(),
+            'open_findings' => $this->knownFindings($apparatus),
             'inspection_session' => $inspectionSessionService->publicContract($session, $issued['token']),
         ], $issued['created'] ? 201 : 200);
 
@@ -276,6 +279,7 @@ class ApparatusController extends Controller
             'inspection_date' => $sessionDutyDate->toDateString(),
             'due_tasks' => $session->due_tasks,
             'open_defects_count' => $apparatus->openDefects()->count(),
+            'open_findings' => $this->knownFindings($apparatus),
             'inspection_session' => $inspectionSessionService->publicContract($session, $issued['token']),
         ], $issued['created'] ? 201 : 200);
     }
@@ -292,12 +296,14 @@ class ApparatusController extends Controller
         $validated = $request->validate([
             'client_submission_id' => ['required', 'uuid'],
             'checklist_version' => ['required', 'string', 'regex:/\\A[a-f0-9]{64}\\z/i'],
+            'processing_version' => ['nullable', 'integer', 'in:1'],
+            'meter_baseline_token' => ['nullable', 'string', 'max:2048'],
             'operator_name' => ['required', 'string', 'max:255'],
             'rank' => ['required', 'string', 'max:100'],
-            'shift' => ['nullable', 'string', 'max:20'],
+            'shift' => ['required_if:processing_version,1', 'nullable', 'string', 'in:A,B,C'],
             'unit_number' => ['nullable', 'string', 'max:100'],
-            'engine_hours' => ['nullable', 'numeric', 'min:0'],
-            'miles' => ['nullable', 'integer', 'min:0'],
+            'engine_hours' => ['nullable', 'numeric', 'min:0', 'max:9999999.9', 'decimal:0,1'],
+            'miles' => ['nullable', 'integer', 'min:0', 'max:2147483647'],
             'compartments' => ['required', 'array', 'min:1'],
             'compartments.*' => ['required', 'array'],
             'compartments.*.id' => ['required', 'string', 'max:255'],
@@ -307,7 +313,10 @@ class ApparatusController extends Controller
             'compartments.*.items.*.id' => ['nullable', 'string', 'max:255'],
             'compartments.*.items.*.name' => ['required', 'string', 'max:255'],
             'compartments.*.items.*.status' => ['required', 'string', 'in:Present,Missing,Damaged'],
+            'compartments.*.items.*.observed' => ['sometimes', 'boolean'],
+            'compartments.*.items.*.value' => ['sometimes', 'nullable'],
             'compartments.*.items.*.notes' => ['nullable', 'string', 'max:2000'],
+            'compartments.*.items.*.photo' => ['nullable', 'string', 'max:7000000'],
             'defects' => ['nullable', 'array', 'max:100'],
             'defects.*.compartment' => ['required', 'string', 'max:255'],
             'defects.*.item' => ['required', 'string', 'max:255'],
@@ -324,11 +333,12 @@ class ApparatusController extends Controller
             'scheduled_tasks.*' => ['required', 'array'],
             'scheduled_tasks.*.id' => ['required', 'string', 'max:255'],
             'scheduled_tasks.*.status' => ['required', 'string', 'in:Present,Missing,Damaged'],
+            'scheduled_tasks.*.observed' => ['sometimes', 'boolean'],
             'scheduled_tasks.*.notes' => ['nullable', 'string', 'max:2000'],
             'inspection_session_id' => ['nullable', 'uuid'],
             'inspection_session_token' => ['nullable', 'string', 'regex:/\A[a-f0-9]{64}\z/i'],
             'inspection_session_replay_key' => ['nullable', 'uuid'],
-            'officer_signature' => ['nullable', 'string', 'max:7000000'],
+            'officer_signature' => ['required_if:processing_version,1', 'nullable', 'string', 'max:7000000'],
             'employee_id' => ['nullable', 'integer', 'exists:employees,id'],
         ]);
 
@@ -452,6 +462,14 @@ class ApparatusController extends Controller
                     $checklistResolver,
                     $lockedInspectionSession,
                 );
+                if (($prepared['processing_version'] ?? null) === 1) {
+                    foreach ($prepared['field_values'] ?? [] as $field) {
+                        if (($field['id'] === 'vehicle_num' && $field['value'] !== $lockedApparatus->vehicle_number)
+                            || ($field['id'] === 'mileage' && $field['value'] !== ($prepared['miles'] ?? null))) {
+                            throw ValidationException::withMessages(['field_values' => 'The paper mileage and physical vehicle must match this inspection.']);
+                        }
+                    }
+                }
 
                 // The client may display a unit number, but the persisted identity must
                 // always come from the apparatus selected by its unique route ID.
@@ -494,6 +512,9 @@ class ApparatusController extends Controller
                     'vehicle_number' => $lockedApparatus->vehicle_number,
                     'designation_at_time' => $lockedApparatus->designation,
                     'results' => $prepared['compartments'] ?? null,
+                    'checklist_evidence' => ($prepared['processing_version'] ?? null) === 1
+                        ? app(\App\Services\InspectionPaperFields::class)->snapshot($prepared, $lockedChecklist)
+                        : null,
                     'officer_signature' => $prepared['officer_signature_path'] ?? null,
                     'employee_id' => $prepared['employee_id'] ?? null,
                     // The authenticated actor is immutable provenance; signatures
@@ -507,6 +528,10 @@ class ApparatusController extends Controller
                 $inspection->update(['inspection_reference' => $inspectionRef]);
                 if ($lockedInspectionSession !== null) {
                     $lockedInspectionSession->update(['submitted_inspection_id' => $inspection->id]);
+                }
+
+                if (($prepared['processing_version'] ?? null) === 1) {
+                    app(ApparatusInspectionProcessingService::class)->process($inspection, $lockedApparatus, $prepared['meter_baseline_token'] ?? null, $lockedChecklist);
                 }
 
                 DB::afterCommit(function (): void {
@@ -548,6 +573,29 @@ class ApparatusController extends Controller
 
             throw $exception;
         }
+    }
+
+    /** Equipment context for authenticated members; no personnel, notes or private storage paths. */
+    private function knownFindings(Apparatus $apparatus): array
+    {
+        $resolved = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $definitions = collect(app(\App\Services\InspectionPaperFields::class)->equipmentDefinitions($resolved['checklist'] ?? []))->flatten(1);
+
+        return $apparatus->openDefects()->with(['latestObservation', 'serviceTicket'])->get()->map(static function ($defect) use ($definitions): array {
+            $matches = $definitions->filter(fn (array $identity): bool => in_array($defect->compartment, $identity['compartment_names'], true) && in_array($defect->item, $identity['item_names'], true));
+            $identity = $matches->count() === 1 ? $matches->first() : null;
+
+            return [
+                'id' => $defect->id,
+                'compartment' => $identity['compartment'] ?? $defect->compartment,
+                'item' => $identity['item'] ?? $defect->item,
+                'issue_type' => $defect->issue_type,
+                'operational_impact' => $defect->operational_impact,
+                'last_observation' => $defect->latestObservation?->observation,
+                'last_observed_at' => $defect->latestObservation?->created_at?->toIso8601String(),
+                'service_status' => $defect->serviceTicket?->status,
+            ];
+        })->all();
     }
 
     /**
@@ -908,6 +956,7 @@ class ApparatusController extends Controller
             'apparatus_id' => $inspection->apparatus_id,
             'inspection_reference' => $inspection->inspection_reference,
             'review_status' => $inspection->review_status,
+            'processing_status' => $inspection->processing_status,
             'completed_at' => $inspection->completed_at,
         ];
     }
@@ -930,7 +979,8 @@ class ApparatusController extends Controller
         }
         unset($data['officer_signature']);
 
-        foreach ($data['defects'] ?? [] as $index => &$defect) {
+        $data['defects'] ??= [];
+        foreach ($data['defects'] as $index => &$defect) {
             if (filled($defect['photo'] ?? null)) {
                 $defect['photo_path'] = $this->storeImageOrFail(
                     (string) $defect['photo'],
@@ -943,6 +993,23 @@ class ApparatusController extends Controller
             unset($defect['photo']);
         }
         unset($defect);
+
+        foreach ($data['compartments'] as $compartmentIndex => &$compartment) {
+            foreach ($compartment['items'] as $itemIndex => &$item) {
+                if (filled($item['photo'] ?? null)) {
+                    $matching = collect($data['defects'])->first(fn (array $finding): bool => $finding['compartment'] === $compartment['name'] && $finding['item'] === $item['name']);
+                    $existingPath = $matching['photo_path'] ?? null;
+                    $photoPath = is_string($existingPath) ? $existingPath : $this->storeImageOrFail(
+                        (string) $item['photo'], 'defects', 'observation', "compartments.{$compartmentIndex}.items.{$itemIndex}.photo",
+                    );
+                    $item['photo_path'] = $photoPath;
+                    $storedPaths[] = $photoPath;
+                }
+                unset($item['photo']);
+            }
+            unset($item);
+        }
+        unset($compartment);
 
         return $data;
     }
@@ -989,6 +1056,9 @@ class ApparatusController extends Controller
         DailyCheckoutChecklistResolver $checklistResolver,
         ?DailyCheckoutInspectionSession $inspectionSession = null,
     ): void {
+        if (($submission['processing_version'] ?? null) === 1 && $checklist !== null) {
+            app(\App\Services\InspectionPaperFields::class)->validate($submission, $checklist);
+        }
         if ($this->isV2Checklist($checklist)) {
             $this->validateCompleteV2Checklist($submission, $checklist, $checklistResolver, $inspectionSession);
 

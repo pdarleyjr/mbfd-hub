@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { PmHealthStatus } from '../types';
 
 export interface MeterData {
   engine_hours: number | null;
@@ -10,20 +11,23 @@ interface MeterStepProps {
   apparatusName: string;
   vehicleNumber: string;
   initialData: MeterData;
+  pmHealth?: PmHealthStatus | null;
   previousHours: number | null;
   previousMiles: number | null;
   onSubmit: (data: MeterData) => void;
+  onChange: (data: MeterData) => void;
   onBack: () => void;
 }
 
 export default function MeterStep({
-  apparatusId,
+  pmHealth,
   apparatusName,
   vehicleNumber,
   initialData,
   previousHours,
   previousMiles,
   onSubmit,
+  onChange,
   onBack,
 }: MeterStepProps) {
   const [engineHours, setEngineHours] = useState<string>(
@@ -45,15 +49,9 @@ export default function MeterStep({
     if (isNaN(numValue)) return 'Please enter a valid number';
     if (numValue < 0) return 'Value cannot be negative';
 
-    if (field === 'engine_hours' && previousHours !== null) {
-      if (numValue < previousHours) return `Must be ≥ previous reading (${previousHours}h)`;
-      if (numValue === previousHours) return 'Must exceed previous reading';
-    }
-
-    if (field === 'miles' && previousMiles !== null) {
-      if (numValue < previousMiles) return `Must be ≥ previous (${previousMiles.toLocaleString()} mi)`;
-      if (numValue === previousMiles) return 'Must exceed previous reading';
-    }
+    if (!Number.isFinite(numValue) || numValue > (field === 'engine_hours' ? 9999999.9 : 2147483647)) return 'Reading is outside the supported range';
+    if (field === 'engine_hours' && !/^\d+(\.\d)?$/.test(value)) return 'Enter hours with at most one decimal place';
+    if (field === 'miles' && !Number.isInteger(numValue)) return 'Enter whole miles';
 
     return undefined;
   };
@@ -61,6 +59,7 @@ export default function MeterStep({
   const handleEngineHoursChange = (value: string) => {
     const sanitized = value.replace(/[^0-9.]/g, '');
     setEngineHours(sanitized);
+    if (sanitized === '' || /^\d+(\.\d*)?$/.test(sanitized)) onChange({ ...initialData, engine_hours: sanitized === '' ? null : Number(sanitized) });
     if (touched.engine_hours) {
       setErrors(prev => ({ ...prev, engine_hours: validateField('engine_hours', sanitized) }));
     }
@@ -69,6 +68,7 @@ export default function MeterStep({
   const handleMilesChange = (value: string) => {
     const sanitized = value.replace(/[^0-9]/g, '');
     setMiles(sanitized);
+    onChange({ ...initialData, miles: sanitized === '' ? null : Number(sanitized) });
     if (touched.miles) {
       setErrors(prev => ({ ...prev, miles: validateField('miles', sanitized) }));
     }
@@ -94,12 +94,9 @@ export default function MeterStep({
     });
   };
 
-  // PM status calculation
-  const hoursSinceLastPm = previousHours !== null && engineHours.trim() && !errors.engine_hours
-    ? parseFloat(engineHours) - previousHours
-    : null;
-  const isApproachingPm = hoursSinceLastPm !== null && hoursSinceLastPm >= 275 && hoursSinceLastPm < 300;
-  const isPmDue = hoursSinceLastPm !== null && hoursSinceLastPm >= 300;
+  const hoursSinceLastPm = pmHealth?.hours_since_pm ?? null;
+  const isApproachingPm = pmHealth?.status === 'yellow';
+  const isPmDue = pmHealth?.status === 'red';
 
   return (
     <div className="max-w-lg mx-auto">
@@ -108,6 +105,8 @@ export default function MeterStep({
         <h2 className="text-2xl font-bold text-neutral-800 font-heading">Meter Readings</h2>
         <p className="text-neutral-500 mt-1">{apparatusName} · Unit {vehicleNumber}</p>
       </div>
+
+      {((engineHours !== '' && previousHours !== null && Number(engineHours) < previousHours) || (miles !== '' && previousMiles !== null && Number(miles) < previousMiles)) && <p className="mb-4 text-sm text-amber-800">This is below the previous reading. Record what the display shows; it will be saved for review.</p>}
 
       {/* Previous readings — compact reference strip */}
       {(previousHours !== null || previousMiles !== null) && (
@@ -137,7 +136,7 @@ export default function MeterStep({
           <div>
             <p className="font-semibold text-red-800 text-sm">PM Service Due</p>
             <p className="text-red-700 text-xs mt-0.5">
-              {hoursSinceLastPm?.toFixed(1)}h since last PM — 300h interval exceeded.
+              {hoursSinceLastPm?.toFixed(1)}h since last PM — {pmHealth?.interval_hours}h service interval.
             </p>
           </div>
         </div>
@@ -151,7 +150,7 @@ export default function MeterStep({
           <div>
             <p className="font-semibold text-amber-800 text-sm">PM Approaching</p>
             <p className="text-amber-700 text-xs mt-0.5">
-              {hoursSinceLastPm?.toFixed(1)}h of 300h cycle used.
+              {hoursSinceLastPm?.toFixed(1)}h of {pmHealth?.interval_hours}h cycle used.
             </p>
           </div>
         </div>
@@ -217,7 +216,7 @@ export default function MeterStep({
             isPmDue ? 'bg-red-50 text-red-700' : isApproachingPm ? 'bg-amber-50 text-amber-700' : 'bg-teal-50 text-teal-700'
           }`}>
             <span>Hours since PM</span>
-            <span className="font-bold tabular-nums">{hoursSinceLastPm.toFixed(1)} / 300</span>
+            <span className="font-bold tabular-nums">{hoursSinceLastPm.toFixed(1)} / {pmHealth?.interval_hours}</span>
           </div>
         )}
 

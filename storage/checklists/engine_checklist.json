@@ -31,303 +31,361 @@
     }
   ],
   "officerChecklist": [
-    { "id": "mileage", "name": "Mileage", "inputType": "number", "required": true },
-    { "id": "vehicle_num", "name": "Vehicle #", "inputType": "text", "required": true },
-    { "id": "engine_temp", "name": "Engine Temp", "inputType": "text", "required": true },
-    { "id": "oil_pressure", "name": "Oil Pressure", "inputType": "text", "required": true },
-    { "id": "fuel", "name": "Fuel", "inputType": "text", "required": true },
-    { "id": "air_pressure_front", "name": "Air Pressure / Front", "inputType": "number", "required": true },
-    { "id": "air_pressure_rear", "name": "Air Pressure / Rear", "inputType": "number", "required": true },
-    { "id": "toughbook_num", "name": "Toughbook #", "inputType": "text" },
-    { "id": "cad_num", "name": "CAD #", "inputType": "text" },
-    { "id": "sensit_num", "name": "SENSIT #", "inputType": "text" },
-    { "id": "scba_1", "name": "SCBA #1", "inputType": "text" },
-    { "id": "scba_2", "name": "SCBA #2", "inputType": "text" },
-    { "id": "scba_3", "name": "SCBA #3", "inputType": "text" },
-    { "id": "scba_4", "name": "SCBA #4", "inputType": "text" },
-    { "id": "radio_oic", "name": "Crew Radio# OIC", "inputType": "text" },
-    { "id": "radio_de", "name": "DE Radio#", "inputType": "text" },
-    { "id": "radio_fi1", "name": "FI Radio# 1", "inputType": "text" },
-    { "id": "radio_fi2", "name": "FI Radio# 2", "inputType": "text" },
-    { "id": "plymovent_trans", "name": "Plymovent Trans Working? (Y/N)", "inputType": "text", "required": true }
+    {"id":"inspection_date","name":"Date","inputType":"date","required":false},
+    {"id":"mileage","name":"Mileage","inputType":"number","required":true},
+    {"id":"vehicle_num","name":"Vehicle #","inputType":"text","required":true},
+    {"id":"engine_temp","name":"Engine Temp","inputType":"text","required":true},
+    {"id":"oil_pressure","name":"Oil Pressure","inputType":"text","required":true},
+    {"id":"fuel","name":"Fuel","inputType":"text","required":true},
+    {"id":"air_pressure_front","name":"Air Pressure / Front","inputType":"number","required":true},
+    {"id":"air_pressure_rear","name":"Air Pressure / Rear","inputType":"number","required":true},
+    {"id":"toughbook_num","name":"Toughbook #","inputType":"text"},
+    {"id":"cad_num","name":"CAD #","inputType":"text"},
+    {"id":"sensit_num","name":"SENSIT #","inputType":"text"},
+    {"id":"scba_1","name":"SCBA #1","inputType":"text"},
+    {"id":"scba_2","name":"SCBA #2","inputType":"text"},
+    {"id":"scba_3","name":"SCBA #3","inputType":"text"},
+    {"id":"scba_4","name":"SCBA #4","inputType":"text"},
+    {"id":"radio_oic","name":"Crew Radio# OIC","inputType":"text"},
+    {"id":"radio_de","name":"DE Radio#","inputType":"text"},
+    {"id":"radio_fi1","name":"FI Radio# 1","inputType":"text"},
+    {"id":"radio_fi2","name":"FI Radio# 2","inputType":"text"},
+    {"id":"plymovent_trans","name":"Plymovent Trans Working? (Y/N)","inputType":"text","required":true},
+    {"id":"scba_5","name":"SCBA #5","inputType":"text"},
+    {"id":"radio_fi3","name":"FI Radio# 3","inputType":"text"},
+    {"id":"voice_amp_num","name":"Voice Amp# (Front Cab)","inputType":"text"},
+    {"id":"checkout_type","name":"Daily Check Out / Change Over","inputType":"text"},
+    {"id":"changeover_equipment_removed","name":"Change Over - equipment removed","inputType":"text","multiline":true},
+    {"id":"new_damage_description","name":"New Damages - description","inputType":"text","multiline":true},
+    {"id":"new_damage_location","name":"New Damages - location on apparatus","inputType":"text"}
   ],
   "compartments": [
     {
       "id": "front_cab",
       "title": "Front Cab",
       "items": [
-        { "name": "Toughbook", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Toughbook" },
-        { "name": "CAD", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "CAD" },
-        { "name": "Passports", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Binoculars", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Binoculars" },
-        { "name": "Garage Door Clicker", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "TIC", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "TIC" },
-        { "name": "Hot Stick", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Hot Stick" },
-        { "name": "Flashlight", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "SCBA", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "SCBA" },
-        { "name": "Lock Box Key", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Elevator Key", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "MOM's", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "ERG", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Fire Violation", "inputType": "checkbox", "expectedQuantity": 10 },
-        { "name": "Fire Watch Forms", "inputType": "checkbox", "expectedQuantity": 5 },
-        { "name": "City/Hydrant Map", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Tool Ops Manual", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Fog Manual", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Safety vests", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Pierce Manual", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Dreager Gas Meter", "inputType": "checkbox", "snipeit_match": "Dreager Gas Meter" },
-        { "name": "RAD Alert 50", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "RAD Alert 50" },
-        { "name": "Voice Amp", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Voice Amp" },
-        { "name": "Gas Card", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Rope Log", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "FB Sitemap", "inputType": "checkbox", "expectedQuantity": 1 }
+        {"id":"front_cab-item-1","name":"Toughbook","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"Toughbook"},
+        {"id":"front_cab-item-2","name":"CAD","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"CAD"},
+        {"id":"front_cab-item-3","name":"Passports","inputType":"checkbox","expectedQuantity":2},
+        {"id":"front_cab-item-4","name":"Binoculars","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"Binoculars"},
+        {"id":"front_cab-item-5","name":"Garage Door Clicker","inputType":"checkbox","expectedQuantity":1},
+        {"id":"front_cab-item-6","name":"TIC","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"TIC"},
+        {"id":"front_cab-item-7","name":"Hot Stick","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"Hot Stick"},
+        {"id":"front_cab-item-8","name":"Flashlight","inputType":"checkbox","expectedQuantity":2},
+        {"id":"front_cab-item-9","name":"SCBA","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"SCBA"},
+        {"id":"front_cab-item-10","name":"Lock Box Key","inputType":"checkbox","expectedQuantity":1},
+        {"id":"front_cab-item-11","name":"Elevator Key","inputType":"checkbox","expectedQuantity":1},
+        {"id":"front_cab-item-12","name":"MOM's","inputType":"checkbox","expectedQuantity":1},
+        {"id":"front_cab-item-13","name":"ERG","inputType":"checkbox","expectedQuantity":1},
+        {"id":"front_cab-item-14","name":"Fire Violations","inputType":"checkbox","expectedQuantity":10,"legacyCompartmentNames":["Front Cab"],"legacyItemNames":["Fire Violation"]},
+        {"id":"front_cab-item-15","name":"Fire Watch Forms","inputType":"checkbox","expectedQuantity":5},
+        {"id":"front_cab-item-16","name":"City/Hydrant Map","inputType":"checkbox","expectedQuantity":1},
+        {"id":"front_cab-item-17","name":"Tool Ops Manual","inputType":"checkbox","expectedQuantity":1},
+        {"id":"front_cab-item-18","name":"Fog Manual","inputType":"checkbox","expectedQuantity":1},
+        {"id":"front_cab-item-19","name":"Safety vests","inputType":"checkbox","expectedQuantity":2},
+        {"id":"front_cab-item-20","name":"Pierce Manual","inputType":"checkbox","expectedQuantity":1},
+        {"id":"front_cab-item-21","name":"Dreager Gas Meter","inputType":"checkbox","snipeit_match":"Dreager Gas Meter"},
+        {"id":"front_cab-item-22","name":"RAD Alert 50","inputType":"checkbox","snipeit_match":"RAD Alert 50"},
+        {"id":"front_cab-item-23","name":"Voice Amp","inputType":"checkbox","note":"Voice amplifier number is entered in Checklist details.","snipeit_match":"Voice Amp"},
+        {"id":"front_cab-item-24","name":"Gas Card","inputType":"checkbox"},
+        {"id":"front_cab-item-25","name":"Rope Log","inputType":"checkbox"},
+        {"id":"front_cab-item-26","name":"FB Sitemap","inputType":"checkbox"}
       ]
     },
     {
       "id": "rear_cab",
       "title": "Rear Cab",
       "items": [
-        { "name": "SCBA", "inputType": "checkbox", "expectedQuantity": 3, "snipeit_match": "SCBA" },
-        { "name": "Elevator Keys Set", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Fire Alarm Keys Set", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Flashlights", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Torpedo Buoys", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Car Lock Out Kit", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Car Lock Out Kit" },
-        { "name": "Long Reach Tool", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Long Reach Tool" },
-        { "name": "PPE Bag", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Safety vests", "inputType": "checkbox", "expectedQuantity": 2 }
+        {"id":"rear_cab-item-1","name":"SCBA","inputType":"checkbox","expectedQuantity":3,"snipeit_match":"SCBA"},
+        {"id":"rear_cab-item-2","name":"Elevator Keys Set","inputType":"checkbox","expectedQuantity":1},
+        {"id":"rear_cab-item-3","name":"Fire Alarm Keys Set","inputType":"checkbox","expectedQuantity":1},
+        {"id":"rear_cab-item-4","name":"Flashlights","inputType":"checkbox","expectedQuantity":2},
+        {"id":"rear_cab-item-5","name":"Torpedo Buoys","inputType":"checkbox","expectedQuantity":2},
+        {"id":"rear_cab-item-6","name":"Car Lock Out Kit","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"Car Lock Out Kit"},
+        {"id":"rear_cab-item-7","name":"Long Reach Tool","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"Long Reach Tool"},
+        {"id":"rear_cab-item-9","name":"Safety vests","inputType":"checkbox","expectedQuantity":2},
+        {"id":"rear_cab-small-pike-pole","name":"Small Pike Pole","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Small Pike Pole"]},
+        {"id":"rear_cab-sledgehammer","name":"Sledgehammer","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_3-item-14","name":"Irons","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Irons"]}
       ]
     },
     {
-      "id": "comp_1",
-      "title": "Compartment 1",
+      "id": "comp_a1",
+      "title": "Side A · Compartment 1",
       "items": [
-        { "name": "Driver's Gear", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Surf Rescue Gear", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Gloves", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Sleeves", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "MCI Kit", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Handtevy Kit", "inputType": "checkbox", "expectedQuantity": 1 }
+        {"id":"comp_1-item-1","name":"Driver's Gear","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 1"],"legacyItemNames":["Driver's Gear"]},
+        {"id":"comp_1-item-2","name":"Surf Rescue Gear","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Compartment 1"],"legacyItemNames":["Surf Rescue Gear"]},
+        {"id":"comp_a1-gloves","name":"Gloves","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 1"],"legacyItemNames":["Gloves"]},
+        {"id":"comp_a1-sleeves","name":"Sleeves","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 1"],"legacyItemNames":["Sleeves"]}
       ]
     },
     {
-      "id": "comp_2",
-      "title": "Compartment 2",
+      "id": "comp_a2",
+      "title": "Side A · Compartment 2",
       "items": [
-        { "name": "Yellow Safety Tape", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Plug & Dike", "inputType": "checkbox" },
-        { "name": "Hydraulic Rabbit Tool/K Tool", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Gas Shut Off Locks", "inputType": "checkbox" },
-        { "name": "Tool Box", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Builder's Square", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "SawZall", "inputType": "checkbox", "note": "1 SawZall, 2 Batteries", "snipeit_match": "SawZall" },
-        { "name": "Sprinkler Kit", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Air Chisel", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Socket Set", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "2 Cycle Engine Oil", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Lubricant and Silicone", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Bar Chain Oil", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Partner Saw", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "14in Cut-off Saw" },
-        { "name": "Partner Saw Spare Blades", "inputType": "checkbox", "expectedQuantity": 4 },
-        { "name": "Cutters Edge & Spare Chain", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "18in Chainsaw" },
-        { "name": "Electric Fan", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "PPV Fan" },
-        { "name": "Gas Fan", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Gas Cans [Reg & Mix]", "inputType": "checkbox", "note": "1 Regular, 1 Mix" },
-        { "name": "3 Prong Twist Lock Extensions", "inputType": "checkbox" },
-        { "name": "3 Prong Twist Lock Pig Tails", "inputType": "checkbox" },
-        { "name": "Standard Extension cords", "inputType": "checkbox", "expectedQuantity": 3 },
-        { "name": "Portable Lights", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Small Engine's Bag", "inputType": "checkbox", "expectedQuantity": 1 }
+        {"id":"comp_2-item-1","name":"Yellow Safety Tape / Duct Tape","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Yellow Safety Tape"]},
+        {"id":"comp_2-item-2","name":"Plug & Dike","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Plug & Dike"]},
+        {"id":"comp_2-item-3","name":"Hydraulic Rabbit Tool/K Tool","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Hydraulic Rabbit Tool/K Tool"]},
+        {"id":"comp_2-item-8","name":"Sprinkler Kit/Gas Shut off","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Sprinkler Kit"]},
+        {"id":"comp_2-item-5","name":"Tool Box/Socket Set","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Tool Box","Socket Set"]},
+        {"id":"comp_4-item-16","name":"Come-a-long Chains","inputType":"checkbox","note":"1 each","legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Come-a-long/Chains"]},
+        {"id":"comp_a2-come-a-long-handle","name":"Come-a-long Handle","inputType":"checkbox"},
+        {"id":"comp_2-item-6","name":"Builder's Square","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Builder's Square"]},
+        {"id":"comp_a2-air-hose-gauge-chuck","name":"Air Hose/Gauge/Chuck","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_2-item-7","name":"SawZall 20 Volt and Batteries","inputType":"checkbox","note":"Paper specifies 1 SawZall and 2 batteries.","snipeit_match":"SawZall","legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["SawZall"]},
+        {"id":"comp_2-item-9","name":"Air Chisel","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Air Chisel"]},
+        {"id":"comp_a2-gloves","name":"Gloves","inputType":"checkbox"},
+        {"id":"comp_a2-jumper-cables","name":"Jumper Cables","inputType":"checkbox"}
       ]
     },
     {
-      "id": "comp_3",
-      "title": "Compartment 3",
+      "id": "comp_a3",
+      "title": "Side A · Compartment 3",
       "items": [
-        { "name": "1 ¾\" Fog Nozzle", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "3\" Fog Nozzle", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Reducer", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Solid Bore Nozzle", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Storz to 4\" Female", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "3\" & 1 ¾\" Gated Wye", "inputType": "checkbox" },
-        { "name": "Storz to 4\" Male Hyd Thread", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Metro Adapter", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Storz to Siamese", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Double Males/Females", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Storz to 3\"", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Cellar Nozzle", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "90° Piercing Nozzle", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Irons", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Sledge Hammer", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Pick Headed Axe", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Small Pike Pole", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Pry Bar", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Bolt Cutter", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Override Tool", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Hi-Lift Jack", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Hi-Lift Jack" }
+        {"id":"comp_a3-auto-pulse","name":"Auto Pulse","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_3-item-1","name":"1 ¾\" Fog Nozzle","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["1 ¾\" Fog Nozzle"]},
+        {"id":"comp_3-item-2","name":"3\" Fog Nozzle","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["3\" Fog Nozzle"]},
+        {"id":"comp_3-item-3","name":"Reducer/1.75\" cap","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Reducer"]},
+        {"id":"comp_3-item-4","name":"Solid Bore Nozzle 3\"/1.75\"","inputType":"checkbox","note":"1 each","legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Solid Bore Nozzle"]},
+        {"id":"comp_a3-steamer-cap","name":"Steamer Cap","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_3-item-6","name":"3\" & 1 ¾\" Gated Wye","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["3\" & 1 ¾\" Gated Wye"]},
+        {"id":"comp_3-item-5","name":"Storz to 4\" Female Hyd Thread","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Storz to 4\" Female"]},
+        {"id":"comp_3-item-9","name":"Storz to Siamese","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Storz to Siamese"]},
+        {"id":"comp_3-item-10","name":"Double Males/Females","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Double Males/Females"]},
+        {"id":"comp_3-item-11","name":"Storz to 3\" Male","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Storz to 3\""]},
+        {"id":"comp_3-item-12","name":"Cellar Nozzle","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Cellar Nozzle"]},
+        {"id":"comp_a3-garden-hose-adapter","name":"Garden Hose & Adapter","inputType":"checkbox"},
+        {"id":"comp_a3-pressure-gauge","name":"Pressure Gauge","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_3-item-21","name":"Hi-Lift Jack","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"Hi-Lift Jack","legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Hi-Lift Jack"]},
+        {"id":"comp_a3-gaskets-out-of-service-tags","name":"Gaskets/Out of Service Tags","inputType":"checkbox"},
+        {"id":"comp_a3-2-in-line-valve","name":"2 ½\" In line Valve","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_a3-2-siamese","name":"2 ½\" Siamese","inputType":"checkbox","expectedQuantity":1}
       ]
     },
     {
-      "id": "comp_4",
-      "title": "Compartment 4",
+      "id": "comp_a4",
+      "title": "Side A · Compartment 4",
       "items": [
-        { "name": "LifePak", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Med Box", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Airway Bag", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "O2 Bottle", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Med Supply Box", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Coil Pack", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Lifepak CO monitor Serial #1", "inputType": "text", "note": "Enter serial number" },
-        { "name": "Lifepak CO monitor Serial #2", "inputType": "text", "note": "Enter serial number" },
-        { "name": "Cribbing Step Chocks/Wedges", "inputType": "checkbox", "expectedQuantity": 4 },
-        { "name": "Flares", "inputType": "checkbox", "expectedQuantity": 5 },
-        { "name": "3\" Pony Line", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Utility Rope bag", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Extrication Bag", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "High Rise Bag", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Vinegar", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Come-a-long/Chains", "inputType": "checkbox", "note": "1 each" },
-        { "name": "Absorbent Can", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Hose Clamps", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "50' LDH Roll", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "High Rise Pack", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Cones", "inputType": "checkbox", "expectedQuantity": 5 },
-        { "name": "Wet Water Ext", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Hi-Lift Accessory Bag", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Hydraulic Gas Squeeze Off", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Hydraulic Gas Squeeze Off" },
-        { "name": "Manual Gas Squeeze Off", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Manual Gas Squeeze Off" }
+        {"id":"comp_4-item-9","name":"Cribbing Step Chocks/Wedges","inputType":"checkbox","note":"4 each","legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Cribbing Step Chocks/Wedges"]},
+        {"id":"comp_a4-cribbing-crates","name":"Cribbing Crates","inputType":"checkbox","expectedQuantity":2},
+        {"id":"comp_4-item-10","name":"Flares & Emergency Triangles","inputType":"checkbox","expectedQuantity":5,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Flares"]},
+        {"id":"comp_4-item-12","name":"Utility Rope bag","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Utility Rope bag"]},
+        {"id":"comp_4-item-13","name":"Extrication Bag","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Extrication Bag"]},
+        {"id":"comp_4-item-14","name":"High Rise Bag","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["High Rise Bag"]},
+        {"id":"comp_4-item-15","name":"Vinegar","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Vinegar"]},
+        {"id":"comp_a4-hose-roller","name":"Hose Roller","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_4-item-19","name":"50' LDH Roll","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["50' LDH Roll"]},
+        {"id":"comp_4-item-11","name":"3\" Pony Line","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["3\" Pony Line"]},
+        {"id":"comp_4-item-17","name":"Absorbent Can","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Absorbent Can"]},
+        {"id":"comp_4-item-20","name":"High Rise Pack","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["High Rise Pack"]},
+        {"id":"comp_4-item-22","name":"Wet Water Extinguisher","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Wet Water Ext"]},
+        {"id":"top_comp_3-item-1","name":"CO2 Extinguisher","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Top Compartment 3"],"legacyItemNames":["CO2 Extinguisher"]},
+        {"id":"top_comp_3-item-2","name":"Dry Chem Extinguisher","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Top Compartment 3"],"legacyItemNames":["Dry Chem Extinguisher"]},
+        {"id":"comp_4-item-24","name":"Hydraulic Gas Squeeze Off","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"Hydraulic Gas Squeeze Off","legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Hydraulic Gas Squeeze Off"]},
+        {"id":"comp_4-item-25","name":"Manual Gas Squeeze off","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"Manual Gas Squeeze Off","legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Manual Gas Squeeze Off"]},
+        {"id":"comp_a4-gas-shut-off-valves","name":"Gas Shut off valves","inputType":"checkbox"}
+      ]
+    },
+    {
+      "id": "comp_b1",
+      "title": "Side B · Compartment 1",
+      "items": [
+        {"id":"comp_1-item-5","name":"MCI Kit","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 1"],"legacyItemNames":["MCI Kit"]},
+        {"id":"comp_b1-gloves","name":"Gloves","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 1"],"legacyItemNames":["Gloves"]},
+        {"id":"comp_b1-sleeves","name":"Sleeves","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 1"],"legacyItemNames":["Sleeves"]},
+        {"id":"comp_1-item-6","name":"Handtevy Kit","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 1"],"legacyItemNames":["Handtevy Kit"]}
+      ]
+    },
+    {
+      "id": "comp_b2",
+      "title": "Side B · Compartment 2",
+      "items": [
+        {"id":"comp_2-item-12","name":"Lubricant and Silicone","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Lubricant and Silicone"]},
+        {"id":"comp_2-item-13","name":"Bar Chain Oil","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Bar Chain Oil"]},
+        {"id":"comp_2-item-14","name":"Partner Saw & Spare Blades","inputType":"checkbox","note":"Paper row reads Partner Saw & Spare Blades (4); the count is not separated by equipment type.","snipeit_match":"14in Cut-off Saw","legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Partner Saw","Partner Saw Spare Blades"]},
+        {"id":"comp_2-item-16","name":"Cutters Edge & Spare Chain","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"18in Chainsaw","legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Cutters Edge & Spare Chain"]},
+        {"id":"comp_2-item-17","name":"Electric Fan","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"PPV Fan","legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Electric Fan"]},
+        {"id":"comp_2-item-18","name":"Gas Fan","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Gas Fan"]},
+        {"id":"comp_2-item-19","name":"Gas Cans [Reg & Mix]","inputType":"checkbox","note":"1 Regular, 1 Mix","legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Gas Cans [Reg & Mix]"]},
+        {"id":"comp_2-item-20","name":"3 Prong Twist Lock Extensions","inputType":"checkbox","legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["3 Prong Twist Lock Extensions"]},
+        {"id":"comp_2-item-21","name":"3 Prong Twist Lock Pig Tails","inputType":"checkbox","expectedQuantity":6,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["3 Prong Twist Lock Pig Tails"]},
+        {"id":"comp_2-item-22","name":"Standard Extension cords","inputType":"checkbox","expectedQuantity":3,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Standard Extension cords"]},
+        {"id":"comp_2-item-23","name":"Portable Lights","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Portable Lights"]},
+        {"id":"comp_2-item-24","name":"Small Engine's Bag","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Small Engine's Bag"]}
+      ]
+    },
+    {
+      "id": "comp_b3",
+      "title": "Side B · Compartment 3",
+      "items": [
+        {"id":"comp_3-item-15","name":"Sledge Hammer","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Sledge Hammer"]},
+        {"id":"comp_3-item-16","name":"Pick Headed Axe","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Pick Headed Axe"]},
+        {"id":"comp_b3-small-pike-pole","name":"Small Pike Pole","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Small Pike Pole"]},
+        {"id":"comp_3-item-18","name":"Pry Bar","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Pry Bar"]},
+        {"id":"comp_3-item-19","name":"Bolt Cutter","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Bolt Cutter"]},
+        {"id":"comp_3-item-20","name":"Override Tool","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Override Tool"]},
+        {"id":"comp_b3-glassmaster-center-punch","name":"Glassmaster/Center Punch","inputType":"checkbox","expectedQuantity":1}
+      ]
+    },
+    {
+      "id": "comp_b4",
+      "title": "Side B · Compartment 4",
+      "items": [
+        {"id":"comp_4-item-1","name":"LifePak","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["LifePak"]},
+        {"id":"comp_4-item-2","name":"Med Box","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Med Box"]},
+        {"id":"comp_4-item-3","name":"Airway Bag","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Airway Bag"]},
+        {"id":"comp_4-item-4","name":"Spare O2 Bottle","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["O2 Bottle"]},
+        {"id":"comp_4-item-5","name":"Med Supply Box","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Med Supply Box"]},
+        {"id":"comp_4-item-6","name":"Coil Pack","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Coil Pack"]},
+        {"id":"comp_b4-lsu-suction","name":"LSU Suction","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_b4-boo-boo-box","name":"Boo Boo Box","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_b4-sharps-cont","name":"Sharps Cont.","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_b4-c-collars","name":"C-Collars","inputType":"checkbox","expectedQuantity":6},
+        {"id":"comp_b4-head-beds-straps","name":"Head Beds/Straps","inputType":"checkbox"},
+        {"id":"comp_b4-water-cooler-cups","name":"Water Cooler/Cups","inputType":"checkbox"}
       ]
     },
     {
       "id": "backboards_comp",
       "title": "Backboards Compartment",
       "items": [
-        { "name": "Backboards", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Cardboard Splints", "inputType": "checkbox", "expectedQuantity": 2 }
+        {"id":"backboards_comp-item-1","name":"Backboards","inputType":"checkbox","expectedQuantity":2},
+        {"id":"backboards_comp-item-2","name":"Cardboard Splints","inputType":"checkbox","expectedQuantity":2}
       ]
     },
     {
       "id": "front_bumper",
       "title": "Front Bumper",
       "items": [
-        { "name": "Hydrant Wrench", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Spanners", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Rubber Mallet", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "15' Soft Suction", "inputType": "checkbox", "expectedQuantity": 1 }
+        {"id":"front_bumper-item-1","name":"Hydrant Wrench","inputType":"checkbox","expectedQuantity":1},
+        {"id":"front_bumper-item-2","name":"Spanners","inputType":"checkbox","expectedQuantity":2},
+        {"id":"front_bumper-item-3","name":"Rubber Mallet","inputType":"checkbox","expectedQuantity":1},
+        {"id":"front_bumper-item-4","name":"15' Soft Suction","inputType":"checkbox","expectedQuantity":1},
+        {"id":"front_bumper-150-trash-line","name":"150' Trash Line","inputType":"checkbox"},
+        {"id":"front_bumper-fog-nozzle","name":"Fog Nozzle","inputType":"checkbox"},
+        {"id":"front_bumper-inline-valve-m-f","name":"Inline Valve (M/F)","inputType":"checkbox"},
+        {"id":"front_bumper-ldh-spanners","name":"LDH spanners","inputType":"checkbox","expectedQuantity":4},
+        {"id":"comp_3-item-8","name":"Metro Adapter","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Metro Adapter"]}
       ]
     },
     {
       "id": "rear_1",
       "title": "Rear 1",
       "items": [
-        { "name": "10' Suction Hose", "inputType": "checkbox", "expectedQuantity": 2 }
+        {"id":"rear_1-item-1","name":"10' Suction Hose","inputType":"checkbox","expectedQuantity":2}
       ]
     },
     {
       "id": "rear_2",
       "title": "Rear 2",
       "items": [
-        { "name": "8' Pike Pole", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "10' Pike Pole", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Attic Ladder", "inputType": "checkbox", "expectedQuantity": 1 }
+        {"id":"rear_2-item-1","name":"8' Pike Pole","inputType":"checkbox","expectedQuantity":1},
+        {"id":"rear_2-item-2","name":"10' Pike Pole","inputType":"checkbox","expectedQuantity":1},
+        {"id":"rear_2-item-3","name":"Attic Ladder","inputType":"checkbox","expectedQuantity":1}
       ]
     },
     {
       "id": "rear_3",
       "title": "Rear 3",
       "items": [
-        { "name": "Trash Hook", "inputType": "checkbox", "expectedQuantity": 1 }
+        {"id":"rear_3-item-1","name":"NY Trash Hook","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Rear 3"],"legacyItemNames":["Trash Hook"]}
       ]
     },
     {
       "id": "rear_4",
       "title": "Rear 4",
       "items": [
-        { "name": "16' Roof Ladder", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "24' Extension Ladder", "inputType": "checkbox", "expectedQuantity": 1 }
+        {"id":"rear_4-item-1","name":"14' Roof Ladder","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Rear 4"],"legacyItemNames":["16' Roof Ladder"]},
+        {"id":"rear_4-item-2","name":"24' Extension Ladder","inputType":"checkbox","expectedQuantity":1}
       ]
     },
     {
       "id": "rear_5",
       "title": "Rear 5",
       "items": [
-        { "name": "Hydrant Assist", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Street Manifold", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Officer's Pack", "inputType": "checkbox", "expectedQuantity": 1 }
+        {"id":"rear_5-item-1","name":"Hydrant Assist","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_3-item-7","name":"Storz to 4\" Male","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Storz to 4\" Male Hyd Thread"]},
+        {"id":"rear_5-item-2","name":"Street Manifold","inputType":"checkbox","expectedQuantity":1},
+        {"id":"rear_5-item-3","name":"Officer's Pack","inputType":"checkbox","expectedQuantity":1}
       ]
     },
     {
       "id": "top_comp_1",
       "title": "Top Compartment 1",
       "items": [
-        { "name": "Foam", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Foam Eductor", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Turbo Draft", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Turbo Draft" },
-        { "name": "Blitzfire", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Blitzfire" },
-        { "name": "90 Piercing Nozzle", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "MX Foam Jet", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "MX Foam Jet" }
+        {"id":"top_comp_2-item-4","name":"Stair Chair","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Top Compartment 2"],"legacyItemNames":["Stair Chair"]},
+        {"id":"top_comp_2-item-3","name":"Little Giant","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"Little Giant","legacyCompartmentNames":["Top Compartment 2"],"legacyItemNames":["Little Giant"]}
       ]
     },
     {
       "id": "top_comp_2",
       "title": "Top Compartment 2",
       "items": [
-        { "name": "Cribbing Crates", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Tarps", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Little Giant", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Little Giant" },
-        { "name": "Stair Chair", "inputType": "checkbox", "expectedQuantity": 1 }
+        {"id":"top_comp_2-cribbing-crates-composite","name":"Cribbing Crates (Composite)","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Top Compartment 2"],"legacyItemNames":["Cribbing Crates"]},
+        {"id":"top_comp_2-cribbing-crates-wood","name":"Cribbing Crates (Wood)","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Top Compartment 2"],"legacyItemNames":["Cribbing Crates"]},
+        {"id":"top_comp_2-item-2","name":"Salvage Covers","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Top Compartment 2"],"legacyItemNames":["Tarps"]},
+        {"id":"top_comp_1-item-1","name":"Foam","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Top Compartment 1"],"legacyItemNames":["Foam"]},
+        {"id":"top_comp_2-absorbent-refill","name":"Absorbent Refill","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_4-item-18","name":"Hose Clamps","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Hose Clamps"]}
       ]
     },
     {
       "id": "top_comp_3",
       "title": "Top Compartment 3",
       "items": [
-        { "name": "CO2 Extinguisher", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Dry Chem Extinguisher", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "KED", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Traction Splint", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Drager Box", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Drager Box" },
-        { "name": "Tyvek Suit", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Strainer", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Foam Pickup Tube", "inputType": "checkbox", "expectedQuantity": 1 }
+        {"id":"top_comp_3-item-5","name":"Drager Box","inputType":"checkbox","snipeit_match":"Drager Box"},
+        {"id":"top_comp_3-item-3","name":"KED","inputType":"checkbox","expectedQuantity":1},
+        {"id":"top_comp_3-item-4","name":"Traction Splint","inputType":"checkbox","expectedQuantity":1},
+        {"id":"top_comp_3-item-6","name":"Tyvek Suits","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Top Compartment 3"],"legacyItemNames":["Tyvek Suit"]},
+        {"id":"top_comp_3-item-7","name":"Strainer","inputType":"checkbox","expectedQuantity":1},
+        {"id":"top_comp_1-item-3","name":"Turbo Draft","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"Turbo Draft","legacyCompartmentNames":["Top Compartment 1"],"legacyItemNames":["Turbo Draft"]},
+        {"id":"top_comp_1-item-4","name":"Blitzfire","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"Blitzfire","legacyCompartmentNames":["Top Compartment 1"],"legacyItemNames":["Blitzfire"]},
+        {"id":"top_comp_1-item-6","name":"MX Foam Jet","inputType":"checkbox","expectedQuantity":1,"snipeit_match":"MX Foam Jet","legacyCompartmentNames":["Top Compartment 1"],"legacyItemNames":["MX Foam Jet"]},
+        {"id":"top_comp_3-item-8","name":"Foam Pickup Tube","inputType":"checkbox","expectedQuantity":1},
+        {"id":"top_comp_1-item-5","name":"90° Piercing Nozzle","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Top Compartment 1","Compartment 3"],"legacyItemNames":["90 Piercing Nozzle","90° Piercing Nozzle"]},
+        {"id":"top_comp_1-item-2","name":"Foam Eductor","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Top Compartment 1"],"legacyItemNames":["Foam Eductor"]}
       ]
     },
     {
       "id": "top_comp_4",
       "title": "Top Compartment 4",
       "items": [
-        { "name": "Shovel", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Broom Stick", "inputType": "checkbox", "expectedQuantity": 4 },
-        { "name": "Squeegee", "inputType": "checkbox", "expectedQuantity": 4 },
-        { "name": "Road Broom", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "Plaster Hook", "inputType": "checkbox", "expectedQuantity": 1 }
+        {"id":"top_comp_4-broom-heads","name":"Broom Heads","inputType":"checkbox","expectedQuantity":2},
+        {"id":"top_comp_4-item-1","name":"Shovel","inputType":"checkbox","expectedQuantity":1},
+        {"id":"top_comp_4-item-2","name":"Broom Stick","inputType":"checkbox","expectedQuantity":6},
+        {"id":"top_comp_4-item-3","name":"Squeegee","inputType":"checkbox","expectedQuantity":4},
+        {"id":"top_comp_4-item-4","name":"Road Broom","inputType":"checkbox","expectedQuantity":2},
+        {"id":"top_comp_4-item-5","name":"Plaster Hook","inputType":"checkbox","expectedQuantity":1},
+        {"id":"top_comp_4-trash-hook","name":"Trash Hook","inputType":"checkbox","expectedQuantity":1},
+        {"id":"top_comp_4-snow-shovel","name":"Snow Shovel","inputType":"checkbox","expectedQuantity":1}
       ]
     },
     {
       "id": "jumplines",
       "title": "Jumplines",
       "items": [
-        { "name": "200' 1 ¾\" line", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "300' 1 ¾\" line", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Fog Nozzles", "inputType": "checkbox", "expectedQuantity": 3 }
+        {"id":"jumplines-item-1","name":"200' 1 ¾\" line","inputType":"checkbox","expectedQuantity":2},
+        {"id":"jumplines-item-2","name":"250' 1 ¾\" line","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Jumplines"],"legacyItemNames":["300' 1 ¾\" line"]},
+        {"id":"jumplines-item-3","name":"Fog Nozzles","inputType":"checkbox","expectedQuantity":3}
       ]
     },
     {
       "id": "tailboard",
       "title": "Tailboard",
       "items": [
-        { "name": "Hydrant Wrench", "inputType": "checkbox", "expectedQuantity": 1 },
-        { "name": "Spanner Wrench", "inputType": "checkbox", "expectedQuantity": 2 },
-        { "name": "LDH Spanner Wrench Set", "inputType": "checkbox", "expectedQuantity": 1 }
+        {"id":"tailboard-item-1","name":"Hydrant Wrench","inputType":"checkbox","expectedQuantity":1},
+        {"id":"tailboard-item-2","name":"Spanner Wrench","inputType":"checkbox","expectedQuantity":2},
+        {"id":"tailboard-item-3","name":"LDH Spanner Wrench Set","inputType":"checkbox","expectedQuantity":1},
+        {"id":"comp_4-item-21","name":"Cones","inputType":"checkbox","expectedQuantity":5,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Cones"]}
       ]
     },
     {
       "id": "hose_inventory",
-      "title": "Hose Inventory",
+      "title": "Hose",
       "items": [
-        { "name": "1000' 5\" Hose w/ Storz connection", "inputType": "checkbox" },
-        { "name": "1600' 3\" Hose w/ Inline Valve w/ Dbl/Male/Females", "inputType": "checkbox", "expectedQuantity": 2 }
+        {"id":"hose_inventory-item-1","name":"1000' 5\" Hose w/ Storz connection","inputType":"checkbox","legacyCompartmentNames":["Hose Inventory"],"legacyItemNames":["1000' 5\" Hose w/ Storz connection"]},
+        {"id":"hose_inventory-item-2","name":"800' 3\" Hose w/ Inline Valve w/ Dbl/Male/Females","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Hose Inventory"],"legacyItemNames":["1600' 3\" Hose w/ Inline Valve w/ Dbl/Male/Females"]},
+        {"id":"hose_inventory-800-3-hose-w-fog-nozzle","name":"800' 3\" Hose w/ Fog Nozzle","inputType":"checkbox"}
       ]
     }
   ]

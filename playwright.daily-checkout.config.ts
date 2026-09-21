@@ -42,7 +42,7 @@ const responsiveViewports = [
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /(canonical-login-responsive|daily-checkout-(inspection|responsive|service-worker)|daily-issue-report)\.spec\.ts/,
+  testMatch: /(canonical-login-responsive|daily-checkout-(inspection|responsive|service-worker|workspace)|daily-issue-report)\.spec\.ts/,
   timeout: 45_000,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
@@ -80,11 +80,21 @@ export default defineConfig({
     },
     {
       name: 'daily-checkout-chromium',
-      testMatch: /daily-checkout-inspection\.spec\.ts/,
+      testMatch: /daily-checkout-(inspection|workspace)\.spec\.ts/,
       use: {
         browserName: 'chromium',
         viewport: { width: 1280, height: 800 },
       },
+    },
+    {
+      name: 'daily-workspace-webkit-iphone',
+      testMatch: /daily-checkout-workspace\.spec\.ts/,
+      use: { ...devices['iPhone 13'], browserName: 'webkit' },
+    },
+    {
+      name: 'daily-workspace-webkit-ipad',
+      testMatch: /daily-checkout-workspace\.spec\.ts/,
+      use: { ...devices['iPad (gen 7)'], browserName: 'webkit' },
     },
     {
       name: 'daily-pwa-chromium',
@@ -117,7 +127,7 @@ export default defineConfig({
     },
     ...responsiveViewports.map(({ name, width, height }) => ({
       name: `daily-responsive-${name}`,
-      testMatch: /(canonical-login-responsive|daily-checkout-responsive)\.spec\.ts/,
+      testMatch: /(canonical-login-responsive|daily-checkout-responsive|daily-checkout-workspace)\.spec\.ts/,
       use: {
         browserName: 'chromium' as const,
         viewport: { width, height },

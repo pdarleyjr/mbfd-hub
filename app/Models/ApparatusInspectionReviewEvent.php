@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
+/** @property array<string, mixed>|null $metadata */
 final class ApparatusInspectionReviewEvent extends Model
 {
     protected $fillable = [

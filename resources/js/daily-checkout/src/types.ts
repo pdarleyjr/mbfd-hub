@@ -11,6 +11,8 @@ export interface DailyCheckoutMatrixRow {
   included_in_required_total: boolean;
   included_in_completed: boolean;
   has_pending_submission: boolean;
+  open_inspection_exceptions?: number;
+  revision_requested?: boolean;
   return_checkout_required: boolean;
   return_checkout_verified: boolean;
 }
@@ -52,12 +54,13 @@ export interface Apparatus {
   // PM Maintenance fields
   current_engine_hours?: number | null;
   current_miles?: number | null;
+  meter_baseline_token?: string;
   last_pm_engine_hours?: number | null;
   last_pm_mileage?: number | null;
   last_pm_date?: string | null;
   pm_interval_hours?: number;
   // Computed PM health from API
-  pm_health?: PmHealthStatus;
+  pm_health?: PmHealthStatus | null;
 }
 
 export type Rank = 'Chief' | 'Deputy Chief' | 'Captain' | 'Lieutenant' | 'Sergeant' | 'Corporal' | 'Firefighter';
@@ -73,7 +76,7 @@ export interface EmployeeOption {
 export interface OfficerInfo {
   name: string;
   rank: Rank;
-  shift: Shift;
+  shift: Shift | '';
   unitNumber: string;
   employeeId?: number;
 }
@@ -83,6 +86,7 @@ export type ChecklistInputType = 'text' | 'number' | 'date' | 'checkbox' | 'perc
 export type ChecklistFieldValue = string | number | boolean | null;
 
 export interface ChecklistField {
+  multiline?: boolean;
   id: string;
   name: string;
   inputType: ChecklistInputType;
@@ -115,15 +119,21 @@ export interface InspectionSessionContract {
 }
 
 export interface ScheduledChecklistTaskResult {
+  observed?: boolean;
   id: string;
   status: ItemStatus;
   notes?: string | null;
 }
 
 export interface ChecklistItem {
+  instructions?: string;
   id: string;
   name: string;
   status: ItemStatus;
+  /** Explicit member observation; template defaults are not inspection evidence. */
+  observed?: boolean;
+  value?: ChecklistFieldValue;
+  valueRequired?: boolean;
   notes?: string;
   photo?: string; // base64 encoded image
   inputType?: ChecklistInputType;
@@ -137,6 +147,7 @@ export interface Compartment {
 }
 
 export interface ChecklistData {
+  open_findings?: Array<{ id: number; compartment: string; item: string; issue_type: string; operational_impact: string; last_observation: string | null; last_observed_at: string | null; service_status: string | null }>;
   checklist_version: string;
   schema_version: 1 | 2;
   template_id?: string;
@@ -160,6 +171,8 @@ export interface Defect {
 }
 
 export interface InspectionSubmission {
+  processing_version?: 1;
+  meter_baseline_token?: string;
   client_submission_id: string;
   checklist_version: string;
   operator_name: string;
@@ -185,6 +198,9 @@ export interface MeterData {
 }
 
 export interface InspectionData {
+  signature?: string | null;
+  actorUserId?: number;
+  actorSecurityVersion?: number;
   checklist_version: string;
   apparatusSnapshot?: Apparatus;
   officer: OfficerInfo;
@@ -194,6 +210,17 @@ export interface InspectionData {
   scheduledTasks?: ScheduledChecklistTaskResult[];
   inspectionSession?: InspectionSessionContract;
   checklistSnapshot?: ChecklistData;
+}
+
+export interface InspectionRevision {
+  id: number;
+  status: 'revision_requested' | 'revision_submitted';
+  field: string;
+  reason: string;
+  submitted_value: string | number | null;
+  current_value: string | number | null;
+  reviewer_note: string | null;
+  apparatus: { id: number; vehicle_number: string | null; name: string; unit_id: string | null };
 }
 
 // ============================================

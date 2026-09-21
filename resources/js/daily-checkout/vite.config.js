@@ -67,8 +67,25 @@ const serviceWorkerCopyPlugin = {
       throw new Error(`Service worker source is missing: ${customSwPath}`)
     }
     fs.mkdirSync(dailyOutDir, { recursive: true })
-    fs.copyFileSync(customSwPath, outputSwPath)
+    const assets = fs.readdirSync(path.join(dailyOutDir, 'assets'))
+      .filter(file => /\.(js|css)$/.test(file)).sort().map(file => `/daily/assets/${file}`)
+    const source = fs.readFileSync(customSwPath, 'utf-8')
+    if (!source.includes('/* DAILY_BUILD_ASSETS */ []')) throw new Error('Service worker asset marker is missing')
+    fs.writeFileSync(outputSwPath, source.replace('/* DAILY_BUILD_ASSETS */ []', JSON.stringify(assets)))
     console.log(`[service-worker-copy] \u2713 ${outputSwPath}`)
+  }
+}
+
+// Laravel serves the canonical Hub manifest at the origin root. The isolated
+// Daily preview must expose that same asset for the real worker's install step.
+const hubManifestPreviewPlugin = {
+  name: 'hub-manifest-preview',
+  configurePreviewServer(server) {
+    server.middlewares.use((request, response, next) => {
+      if (request.url !== '/manifest.json') return next()
+      response.setHeader('Content-Type', 'application/manifest+json')
+      response.end(fs.readFileSync(path.join(__dirname, '../../../public/manifest.json')))
+    })
   }
 }
 
@@ -79,6 +96,7 @@ export default defineConfig({
     react(),
     manifestCopyPlugin,
     serviceWorkerCopyPlugin,
+    hubManifestPreviewPlugin,
   ],
   build: {
     outDir: dailyOutDir,

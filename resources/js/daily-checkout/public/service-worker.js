@@ -1,9 +1,11 @@
-const CACHE_NAME = 'mbfd-checkout-v6';
-const API_CACHE_NAME = 'mbfd-api-cache-v6';
+const CACHE_NAME = 'mbfd-checkout-v7';
+const API_CACHE_NAME = 'mbfd-api-cache-v7';
+const BUILD_ASSETS = /* DAILY_BUILD_ASSETS */ [];
 const APP_SHELL_CACHE_KEYS = [
   '/daily/',
   '/daily/index.html',
   '/manifest.json',
+  ...BUILD_ASSETS,
 ];
 
 // Install event - cache static assets
@@ -70,6 +72,13 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('/service-notices') ||
     url.pathname.endsWith('/service-tickets')
   );
+
+  // Identity and member-specific follow-ups must always be authorized live.
+  // Only the existing, redacted station/apparatus read models may use API cache.
+  if (isSameOrigin && url.pathname.startsWith('/api/') && !isApparatusApiRequest && !isStationApiRequest) {
+    event.respondWith(fetch(request, { cache: 'no-store' }));
+    return;
+  }
 
   // Service state is operationally time-sensitive. Never satisfy it from a
   // stale service-worker cache; callers render a non-blocking unavailable state.

@@ -6,11 +6,13 @@ const CACHE_KEY = 'authenticated-offline-identity-v1';
 export interface OfflineIdentity {
   userId: number;
   securityVersion: number;
+  personnel?: { employee_profile_id: number; employee_number: string; name: string; rank: string };
 }
 
 interface MemberContextResponse {
   identity?: { user_id?: unknown };
   offline?: { security_version?: unknown };
+  personnel?: OfflineIdentity['personnel'];
 }
 
 const parseIdentity = (value: unknown): OfflineIdentity | null => {
@@ -20,7 +22,7 @@ const parseIdentity = (value: unknown): OfflineIdentity | null => {
   const securityVersion = context.offline?.security_version;
 
   return Number.isInteger(userId) && Number.isInteger(securityVersion)
-    ? { userId: userId as number, securityVersion: securityVersion as number }
+    ? { userId: userId as number, securityVersion: securityVersion as number, personnel: context.personnel }
     : null;
 };
 
