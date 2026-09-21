@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Contracts\VideoConferencing\ConferenceProvider;
 use App\Models\Apparatus;
+use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\EvaluationSubmission;
 use App\Models\StationInspection;
@@ -14,6 +15,7 @@ use App\Models\User;
 use App\Models\WorkgroupSharedUpload;
 use App\Notifications\NewSubmissionNotification;
 use App\Observers\ApparatusObserver;
+use App\Observers\ApparatusDefectObserver;
 use App\Observers\TodoObserver;
 use App\Observers\TrainingTodoObserver;
 use App\Observers\UpstreamIdentityObserver;
@@ -126,6 +128,7 @@ class AppServiceProvider extends ServiceProvider
         Todo::observe(TodoObserver::class);
         TrainingTodo::observe(TrainingTodoObserver::class);
         Apparatus::observe(ApparatusObserver::class);
+        ApparatusDefect::observe(ApparatusDefectObserver::class);
         User::observe(UpstreamIdentityObserver::class);
 
         // Auto-vectorize uploaded workgroup files (PDFs, DOCX, etc.) into workgroup-specs index

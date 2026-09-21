@@ -24,9 +24,8 @@ class FleetStatsWidget extends BaseWidget
             Apparatus::query()->get(['id', 'status'])
         );
         $outOfService = $statusCounts['out_of_service'];
-        $openDefects = ApparatusDefect::where('resolved', false)->count();
-        $criticalDefects = ApparatusDefect::where('resolved', false)
-            ->where('status', 'Missing')
+        $openDefects = ApparatusDefect::query()->unresolved()->count();
+        $criticalDefects = ApparatusDefect::query()->unresolved()->missing()
             ->count();
 
         $defectColor = $criticalDefects > 0 ? 'danger' : ($openDefects > 0 ? 'warning' : 'success');

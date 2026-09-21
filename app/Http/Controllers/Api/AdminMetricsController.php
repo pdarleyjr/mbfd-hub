@@ -25,9 +25,8 @@ class AdminMetricsController extends Controller
             ],
             
             'defects' => [
-                'open' => ApparatusDefect::where('resolved', false)->count(),
-                'critical' => ApparatusDefect::where('resolved', false)
-                    ->where('status', 'Missing')->count(),
+                'open' => ApparatusDefect::query()->unresolved()->count(),
+                'critical' => ApparatusDefect::query()->unresolved()->missing()->count(),
                 'total' => ApparatusDefect::count(),
             ],
             
@@ -53,8 +52,7 @@ class AdminMetricsController extends Controller
             ],
             
             // NEW: Top missing items (for reorder suggestions)
-            'top_missing_items' => ApparatusDefect::where('resolved', false)
-                ->where('status', 'Missing')
+            'top_missing_items' => ApparatusDefect::query()->unresolved()->missing()
                 ->select('item')
                 ->groupBy('item')
                 ->selectRaw('count(*) as frequency')

@@ -344,8 +344,8 @@ final class DisplaySnapshotService
     {
         $criticalDefects = ApparatusDefect::query()
             ->with('apparatus:id,unit_id,designation,name')
-            ->where('resolved', false)
-            ->where('status', 'Missing')
+            ->unresolved()
+            ->missing()
             ->orderByDesc('created_at')
             ->limit(50)
             ->get(['id', 'apparatus_id', 'item', 'issue_type', 'status', 'reported_date', 'created_at']);
@@ -545,16 +545,16 @@ final class DisplaySnapshotService
      */
     private function defectSummary(): array
     {
-        $totalOpen = ApparatusDefect::query()->where('resolved', false)->count();
+        $totalOpen = ApparatusDefect::query()->unresolved()->count();
         $criticalMissing = ApparatusDefect::query()
-            ->where('resolved', false)
-            ->where('status', 'Missing')
+            ->unresolved()
+            ->missing()
             ->count();
 
         $items = ApparatusDefect::query()
             ->with('apparatus:id,unit_id,designation,name')
-            ->where('resolved', false)
-            ->orderByRaw("CASE WHEN status = 'Missing' THEN 0 ELSE 1 END")
+            ->unresolved()
+            ->orderByRaw("CASE WHEN issue_type = 'missing' THEN 0 ELSE 1 END")
             ->orderByDesc('created_at')
             ->limit(25)
             ->get(['id', 'apparatus_id', 'item', 'issue_type', 'status', 'created_at'])
@@ -809,7 +809,7 @@ final class DisplaySnapshotService
 
         return ApparatusDefect::query()
             ->whereIn('apparatus_id', $apparatusIds)
-            ->where('resolved', false)
+            ->unresolved()
             ->count();
     }
 
@@ -824,8 +824,8 @@ final class DisplaySnapshotService
 
         return ApparatusDefect::query()
             ->whereIn('apparatus_id', $apparatusIds)
-            ->where('resolved', false)
-            ->where('status', 'Missing')
+            ->unresolved()
+            ->missing()
             ->count();
     }
 
@@ -841,7 +841,7 @@ final class DisplaySnapshotService
 
         return ApparatusDefect::query()
             ->whereIn('apparatus_id', $apparatusIds)
-            ->where('resolved', false)
+            ->unresolved()
             ->selectRaw('apparatus_id, COUNT(*) as aggregate')
             ->groupBy('apparatus_id')
             ->pluck('aggregate', 'apparatus_id')
@@ -861,8 +861,8 @@ final class DisplaySnapshotService
 
         return ApparatusDefect::query()
             ->whereIn('apparatus_id', $apparatusIds)
-            ->where('resolved', false)
-            ->where('status', 'Missing')
+            ->unresolved()
+            ->missing()
             ->selectRaw('apparatus_id, COUNT(*) as aggregate')
             ->groupBy('apparatus_id')
             ->pluck('aggregate', 'apparatus_id')

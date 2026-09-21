@@ -61,13 +61,29 @@ final class CanonicalAuthorizationTest extends TestCase
                 'audience' => 'media-control',
                 'subject' => 'hub-user:'.$user->id,
                 'user_id' => $user->id,
+                'security_version' => 1,
+                'media_control_security_version' => 0,
+                'member_id' => $user->employee_profile_id,
                 'display_name' => $user->display_name ?: $user->name,
+                'email' => strtolower(trim($user->email)),
                 'role' => $role === 'super_admin' ? 'platform_admin' : 'user',
             ])
             ->assertJsonMissingPath('password')
             ->assertJsonMissingPath('password_hash')
-            ->assertJsonMissingPath('session')
-            ->assertJsonMissingPath('email');
+            ->assertJsonMissingPath('session');
+    }
+
+    public function test_synthetic_canonical_email_is_not_exposed_for_media_account_binding(): void
+    {
+        $user = $this->authorizedUser();
+        $user->forceFill(['email' => 'employee-'.$user->employee_profile_id.'@canonical.mbfdhub.invalid'])->save();
+        $code = app(\App\Services\MediaControl\MediaControlAuthorizationCodeBroker::class)
+            ->issue($user->fresh(), 'media-control', self::CALLBACK);
+
+        $this->exchange($code)
+            ->assertOk()
+            ->assertJsonPath('subject', 'hub-user:'.$user->id)
+            ->assertJsonPath('email', null);
     }
 
     /** @return array<string, array{string}> */
@@ -319,6 +335,7 @@ final class CanonicalAuthorizationTest extends TestCase
         $user = User::factory()->create([
             'employee_id' => $employeeId,
             'employee_profile_id' => $employee->id,
+            'email' => strtolower($employeeId).'@miamibeachfl.gov',
             'account_status' => AccountStatus::Active,
             'password' => Hash::make('canonical-user-password'),
             'security_version' => 1,

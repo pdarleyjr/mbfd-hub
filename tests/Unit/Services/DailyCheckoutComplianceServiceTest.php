@@ -133,14 +133,14 @@ class DailyCheckoutComplianceServiceTest extends TestCase
             CarbonImmutable::parse('2026-08-25 09:00:00', 'America/New_York')->utc(),
             'approved',
         );
-        ApparatusDefect::query()->create([
-            'apparatus_id' => $damaged->id,
-            'apparatus_inspection_id' => $damagedInspection->id,
-            'compartment' => 'Cab',
-            'item' => 'Flashlight',
-            'status' => 'Damaged',
-            'resolved' => false,
-        ]);
+        ApparatusDefect::recordDefect(
+            $damaged->id,
+            'Cab',
+            'Flashlight',
+            'Damaged',
+            'Lens is cracked.',
+            inspectionId: $damagedInspection->id,
+        );
 
         $summary = app(DailyCheckoutComplianceService::class)->summaryForApparatuses(
             $station->apparatuses()->get(),

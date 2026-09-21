@@ -9,9 +9,9 @@
     @else
     <p>This sign-in attempt has expired, was already used, or cannot be verified in this browser.</p>
     @endif
-    <p>Return to the application and choose Sign in with MBFD Hub again. Close unused sign-in tabs; if you have opened many attempts, wait five minutes before retrying.</p>
+    <p>Return to the application and choose MBFD Sign In again. Close unused sign-in tabs; if you have opened many attempts, wait five minutes before retrying.</p>
     <p>Your password and unsaved form contents were not retained or submitted again.</p>
-    <a href="/login">Open MBFD Hub sign-in</a>
+    <a href="/login">MBFD Sign In</a>
 </main>
 </body>
 </html>

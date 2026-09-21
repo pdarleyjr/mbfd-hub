@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\MediaControl;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\MediaControl\ExchangeMediaControlAuthorizationCodeRequest;
 use App\Models\User;
+use App\Services\Identity\CityEmailVerificationService;
 use App\Services\MediaControl\MediaControlAuthorizationCodeBroker;
 use Illuminate\Http\JsonResponse;
 use Throwable;
@@ -52,6 +53,7 @@ final class AuthorizationCodeExchangeController extends Controller
             'media_control_security_version' => (int) $user->media_control_security_version,
             'member_id' => $user->employee_profile_id === null ? null : (int) $user->employee_profile_id,
             'display_name' => (string) ($user->display_name ?: $user->name),
+            'email' => app(CityEmailVerificationService::class)->connectedEmail($user),
             'role' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($user, 'media_control'),
         ]);
         $response->headers->set('Cache-Control', 'no-store, private');

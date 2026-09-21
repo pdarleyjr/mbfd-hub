@@ -241,9 +241,9 @@ class StationOperationsHubWidget extends Widget
         if ($apparatusToStation === []) {
             return [];
         }
-        $query = ApparatusDefect::query()->whereIn('apparatus_id', array_keys($apparatusToStation))->where('resolved', false);
+        $query = ApparatusDefect::query()->whereIn('apparatus_id', array_keys($apparatusToStation))->unresolved();
         if ($missing) {
-            $query->where('status', 'Missing');
+            $query->missing();
         }
         $result = [];
         foreach ($query->selectRaw('apparatus_id, COUNT(*) as aggregate')->groupBy('apparatus_id')->get() as $row) {
