@@ -32,7 +32,7 @@ use Illuminate\Support\Facades\Cache;
  *
  * Apparatus status strings drift across imports ('In Service' vs 'in_service'
  * vs 'Active'); all status comparisons here are normalised and matched
- * case-insensitively via {@see classifyStatus()}.
+ * case-insensitively via {@see classifyApparatusStatus()}.
  */
 final class DisplaySnapshotService
 {
@@ -535,17 +535,9 @@ final class DisplaySnapshotService
      */
     private function apparatusStatusCounts(): array
     {
-        $counts = ['in_service' => 0, 'out_of_service' => 0, 'maintenance' => 0, 'unclassified' => 0];
-
-        Apparatus::query()
-            ->select(['id', 'status'])
-            ->chunk(500, function (Collection $chunk) use (&$counts): void {
-                foreach ($chunk as $apparatus) {
-                    $counts[$this->classifyStatus($apparatus->status)]++;
-                }
-            });
-
-        return $counts;
+        return $this->classifyApparatusCollection(
+            Apparatus::query()->get(['id', 'status'])
+        );
     }
 
     /**
@@ -752,7 +744,7 @@ final class DisplaySnapshotService
                 'name' => $a->designation ?: $a->name ?: $a->unit_id,
                 'designation' => $a->designation,
                 'type' => $a->type !== null ? strtolower((string) $a->type) : null,
-                'status' => $this->classifyStatus($a->status),
+                'status' => $this->classifyApparatusStatus($a->status),
                 'pm_health' => [
                     'status' => $health['status'] ?? null,
                     'hours_since_pm' => $health['hours_since_pm'] ?? null,
@@ -771,7 +763,7 @@ final class DisplaySnapshotService
     /**
      * Normalise a drifting apparatus status string into a canonical bucket.
      */
-    private function classifyStatus(?string $status): string
+    public function classifyApparatusStatus(?string $status): string
     {
         $normalized = strtolower(trim((string) $status));
         $normalized = str_replace([' ', '-'], '_', $normalized);
@@ -786,16 +778,13 @@ final class DisplaySnapshotService
 
     /**
      * @param  Collection<int, Apparatus>  $apparatus
-     * @return array{in_service: int, out_of_service: int, maintenance: int}
+     * @return array{in_service: int, out_of_service: int, maintenance: int, unclassified: int}
      */
-    private function classifyApparatusCollection(Collection $apparatus): array
+    public function classifyApparatusCollection(Collection $apparatus): array
     {
-        $counts = ['in_service' => 0, 'out_of_service' => 0, 'maintenance' => 0];
+        $counts = ['in_service' => 0, 'out_of_service' => 0, 'maintenance' => 0, 'unclassified' => 0];
         foreach ($apparatus as $a) {
-            $bucket = $this->classifyStatus($a->status);
-            if (isset($counts[$bucket])) {
-                $counts[$bucket]++;
-            }
+            $counts[$this->classifyApparatusStatus($a->status)]++;
         }
 
         return $counts;

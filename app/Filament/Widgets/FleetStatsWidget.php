@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
+use App\Services\Display\DisplaySnapshotService;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -11,7 +12,7 @@ class FleetStatsWidget extends BaseWidget
 {
     protected static ?int $sort = 1;
 
-    protected int | string | array $columnSpan = [
+    protected int|string|array $columnSpan = [
         'sm' => 1,
         'md' => 1,
         'xl' => 1,
@@ -19,10 +20,13 @@ class FleetStatsWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        $outOfService = Apparatus::where('status', '!=', 'In Service')->count();
+        $statusCounts = app(DisplaySnapshotService::class)->classifyApparatusCollection(
+            Apparatus::query()->get(['id', 'status'])
+        );
+        $outOfService = $statusCounts['out_of_service'];
         $openDefects = ApparatusDefect::where('resolved', false)->count();
         $criticalDefects = ApparatusDefect::where('resolved', false)
-            ->where('issue_type', 'critical')
+            ->where('status', 'Missing')
             ->count();
 
         $defectColor = $criticalDefects > 0 ? 'danger' : ($openDefects > 0 ? 'warning' : 'success');

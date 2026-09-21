@@ -381,6 +381,41 @@
 .mbfd-station-overview-metrics { display: flex; gap: .6rem; color: #78716c; font-size: .75rem; }
 .mbfd-station-overview-metrics strong { color: #292524; font-variant-numeric: tabular-nums; }
 
+.mbfd-station-console { display: grid; gap: .75rem; min-width: 0; }
+.mbfd-station-console-toolbar { display: flex; align-items: end; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
+.mbfd-station-console-selector { display: grid; gap: .25rem; color: #57534e; font-size: .8125rem; font-weight: 700; }
+.mbfd-station-console-selector select { min-height: 2.5rem; min-width: 11rem; border: 1px solid #d6d3d1; border-radius: .5rem; background: #fff; color: #1c1917; padding: .375rem .625rem; }
+.mbfd-station-console-refresh { color: #78716c; font-size: .8125rem; }
+.mbfd-station-console-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+.mbfd-station-console-strip a { display: grid; gap: .25rem; min-width: 0; padding: .75rem; color: #1e293b; text-decoration: none; background: #fafaf9; border: 1px solid #e7e5e4; border-radius: .625rem; }
+.mbfd-station-console-strip a:hover, .mbfd-station-console-strip a:focus-visible { border-color: #b91c1c; outline: none; }
+.mbfd-station-console-strip strong { color: #991b1b; font-size: .8125rem; }
+.mbfd-station-console-strip span { color: #57534e; font-size: .75rem; line-height: 1.35; }
+.mbfd-station-console-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .75rem; min-width: 0; }
+.mbfd-station-console-card { display: grid; align-content: start; gap: .75rem; min-width: 0; padding: .875rem; background: #fff; border: 1px solid #e7e5e4; border-radius: .75rem; }
+.mbfd-station-console-card-attention { border-inline-start: 3px solid #b45309; }
+.mbfd-station-console-card-header { display: flex; align-items: start; justify-content: space-between; gap: .5rem; }
+.mbfd-station-console-kicker { margin: 0; color: #78716c; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.mbfd-station-console-card h3 { margin: .125rem 0 0; color: #1c1917; font-size: .9375rem; line-height: 1.3; }
+.mbfd-station-console-open { flex: none; color: #991b1b; font-size: .8125rem; font-weight: 700; }
+.mbfd-station-console-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin: 0; }
+.mbfd-station-console-metrics div { min-width: 0; padding: .5rem; background: #fafaf9; border-radius: .5rem; }
+.mbfd-station-console-metrics dt { color: #78716c; font-size: .6875rem; }
+.mbfd-station-console-metrics dd { margin: .125rem 0 0; color: #292524; font-size: .875rem; font-variant-numeric: tabular-nums; font-weight: 700; }
+.mbfd-station-console-exceptions { display: grid; gap: .35rem; }
+.mbfd-station-console-exceptions a { color: #57534e; font-size: .75rem; text-decoration: none; }
+.mbfd-station-console-exceptions a:hover, .mbfd-station-console-exceptions a:focus-visible { color: #991b1b; text-decoration: underline; }
+.mbfd-station-console-exceptions strong { color: #1c1917; font-variant-numeric: tabular-nums; }
+.mbfd-station-console-recent { display: grid; gap: .2rem; color: #57534e; font-size: .75rem; }
+.mbfd-station-console-recent p { margin: 0; color: #78716c; font-size: .6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.mbfd-station-console-work { display: grid; gap: .25rem; margin: 0; padding: .5rem 0 0; border-top: 1px solid #e7e5e4; list-style: none; color: #44403c; font-size: .75rem; }
+.mbfd-station-console-work li { display: flex; min-width: 0; justify-content: space-between; gap: .5rem; }
+.mbfd-station-console-work li span { flex: none; color: #78716c; }
+
+@media (max-width: 1535px) { .mbfd-station-console-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1023px) { .mbfd-station-console-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .mbfd-station-console-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 639px) { .mbfd-station-console-toolbar { align-items: stretch; flex-direction: column; } .mbfd-station-console-selector select { width: 100%; } .mbfd-station-console-strip, .mbfd-station-console-grid { grid-template-columns: minmax(0, 1fr); } }
+
 /* ===== TABLE ENHANCEMENTS ===== */
 .fi-ta-row {
     transition: background-color 150ms ease-out;

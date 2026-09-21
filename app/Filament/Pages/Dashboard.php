@@ -2,20 +2,20 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Pages\Dashboard as BaseDashboard;
 use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
+use Filament\Pages\Dashboard as BaseDashboard;
 
 class Dashboard extends BaseDashboard
 {
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-group';
 
-    protected static ?string $title = 'Dashboard';
+    protected static ?string $title = 'Station Operations';
 
     public function getSubheading(): ?string
     {
-        return 'Operational exceptions and the next place to act.';
+        return 'Department readiness, station work, and the next place to act.';
     }
 
     public function getColumns(): int|string|array

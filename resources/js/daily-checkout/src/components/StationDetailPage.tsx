@@ -23,7 +23,7 @@ export default function StationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stationLoadAttempt, setStationLoadAttempt] = useState(0);
-  const [activeTab, setActiveTab] = useState<TabId>('requests');
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
 
   // Tab data (lazy loaded)
   const [stationInspections, setStationInspections] = useState<StationInspectionSummary[]>([]);
@@ -44,12 +44,11 @@ export default function StationDetailPage() {
   const [underlineStyle, setUnderlineStyle] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
 
   const tabs: { id: TabId; label: string; badge?: number }[] = [
+    { id: 'overview', label: 'Overview' },
     { id: 'requests', label: 'Requests' },
     { id: 'service-repair', label: 'Service / Repair', badge: openServiceTicketCount },
-    { id: 'overview', label: 'Overview' },
     { id: 'rooms', label: 'Rooms' },
     { id: 'apparatus', label: 'Apparatus' },
-    { id: 'gas-meters', label: 'Gas Meters' },
     { id: 'inspections', label: 'Inspections' },
     { id: 'activity', label: 'Activity' },
   ];

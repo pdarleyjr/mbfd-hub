@@ -92,6 +92,56 @@ final class StationOperationsHubWidgetDailyCheckoutTest extends TestCase
         $this->assertSame('No required apparatus — completion unavailable', $stationData['dailyCheckoutSubtitle']);
     }
 
+    public function test_it_uses_the_display_status_buckets_and_missing_defects_for_station_operations(): void
+    {
+        $station = Station::query()->create([
+            'station_number' => 1,
+            'name' => 'Station 1',
+            'address' => '1 Test Street',
+            'is_active' => true,
+        ]);
+        $secondStation = Station::query()->create([
+            'station_number' => 2,
+            'name' => 'Station 2',
+            'address' => '2 Test Street',
+            'is_active' => true,
+        ]);
+
+        $available = $this->apparatus($station, 'E1', 'available');
+        $outOfService = $this->apparatus($station, 'R1', 'OOS');
+        $maintenance = $this->apparatus($station, 'T1', 'in-maintenance');
+        $this->apparatus($secondStation, 'E2', 'In Service');
+
+        ApparatusDefect::query()->create([
+            'apparatus_id' => $available->id,
+            'compartment' => 'Cab',
+            'item' => 'Missing radio',
+            'status' => 'Missing',
+            'resolved' => false,
+        ]);
+        ApparatusDefect::query()->create([
+            'apparatus_id' => $outOfService->id,
+            'compartment' => 'Cab',
+            'item' => 'Damaged light',
+            'status' => 'Damaged',
+            'resolved' => false,
+        ]);
+
+        $widget = app(StationOperationsHubWidget::class);
+        $widget->selectedStationId = (string) $station->id;
+        $data = $widget->getViewData();
+
+        $this->assertSame([(int) $station->id], collect($data['stations'])->pluck('id')->all());
+        $this->assertSame(2, $data['department']['apparatus']['in_service']);
+        $this->assertSame(1, $data['department']['apparatus']['out_of_service']);
+        $this->assertSame(1, $data['department']['apparatus']['maintenance']);
+        $this->assertSame(1, $data['department']['work']['missing']);
+        $this->assertSame(1, $data['stationData'][$station->id]['counts']['missingDefects']);
+        $this->assertSame(1, $data['stationData'][$station->id]['apparatus']['in_service']);
+        $this->assertSame(1, $data['stationData'][$station->id]['apparatus']['out_of_service']);
+        $this->assertSame(1, $data['stationData'][$station->id]['apparatus']['maintenance']);
+    }
+
     private function apparatus(
         Station $station,
         string $unit,
