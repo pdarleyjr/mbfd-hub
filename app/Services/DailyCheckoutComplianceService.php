@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
+use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusOperationalStatusEvent;
 use App\Models\DailyCheckoutLedgerCutover;
 use App\Models\Station;
@@ -120,7 +121,7 @@ final class DailyCheckoutComplianceService
      * - completion_percent is null (never 100/NaN) when required_total is zero
      *
      * @param  Collection<int, Apparatus>  $apparatuses
-     * @param  array<int, array{latest_approved_completed_at: ?CarbonImmutable, has_pending_submission: bool}>  $inspectionSignals
+     * @param  array<int, array{latest_approved_completed_at: ?CarbonImmutable, has_pending_submission: bool, open_exception_count?: int, revision_requested_count?: int}>  $inspectionSignals
      * @param  list<int>  $criticalDefectApparatusIds
      * @param  array<int, array{return_checkout_required: bool, return_checkout_cutoff: ?CarbonImmutable}>  $statusTransitionSignals
      * @param  array{activated_at: ?CarbonImmutable, release_sha: ?string, source: ?string}  $cutoverSignal
@@ -362,6 +363,11 @@ final class DailyCheckoutComplianceService
         }
 
         $completed = $checked + $attention;
+        foreach ($matrix as &$row) {
+            $row['open_inspection_exceptions'] = $inspectionSignals[$row['apparatus_id']]['open_exception_count'] ?? 0;
+            $row['revision_requested'] = ($inspectionSignals[$row['apparatus_id']]['revision_requested_count'] ?? 0) > 0;
+        }
+        unset($row);
         $completionAvailable = $requiredTotal > 0;
         $completionPercent = $completionAvailable
             ? round(($completed / $requiredTotal) * 100, 1)
@@ -381,6 +387,7 @@ final class DailyCheckoutComplianceService
             'completion_percent' => $completionPercent,
             'completion_available' => $completionAvailable,
             'pending_submission_count' => $pendingSubmissionCount,
+            'open_inspection_exceptions' => array_sum(array_column($matrix, 'open_inspection_exceptions')),
             'return_checkout_required_count' => $returnCheckoutRequired,
             'cutover_active' => ! $cutoverActivationPending,
             'cutover_activated_at_utc' => $cutoverActivatedAt?->toIso8601String(),
@@ -407,7 +414,7 @@ final class DailyCheckoutComplianceService
 
     /**
      * @param  Collection<int, Apparatus>  $apparatuses
-     * @return array<int, array{latest_approved_completed_at: ?CarbonImmutable, has_pending_submission: bool}>
+     * @return array<int, array{latest_approved_completed_at: ?CarbonImmutable, has_pending_submission: bool, open_exception_count?: int, revision_requested_count?: int}>
      */
     private function inspectionSignals(
         Collection $apparatuses,
@@ -462,6 +469,22 @@ final class DailyCheckoutComplianceService
             $latestApprovedAt = $signals[$apparatusId]['latest_approved_completed_at'];
             if ($completedAt !== null && ($latestApprovedAt === null || $completedAt->greaterThan($latestApprovedAt))) {
                 $signals[$apparatusId]['latest_approved_completed_at'] = $completedAt;
+            }
+        }
+
+        // Follow-ups are separate from completion. They never convert a valid
+        // recorded checkout into a routine approval requirement.
+        if ($evidenceAsOf === null && Schema::connection($connection)->hasTable('apparatus_inspection_exceptions')) {
+            $exceptions = ($connection === null ? ApparatusInspectionException::query() : ApparatusInspectionException::on($connection))
+                ->whereIn('apparatus_id', $apparatusIds)->whereNotIn('status', ['resolved', 'dismissed'])
+                ->get(['apparatus_id', 'status']);
+            foreach ($exceptions as $exception) {
+                $apparatusId = (int) $exception->apparatus_id;
+                $signals[$apparatusId] ??= ['latest_approved_completed_at' => null, 'has_pending_submission' => false];
+                $signals[$apparatusId]['open_exception_count'] = ($signals[$apparatusId]['open_exception_count'] ?? 0) + 1;
+                if ($exception->status === 'revision_requested') {
+                    $signals[$apparatusId]['revision_requested_count'] = ($signals[$apparatusId]['revision_requested_count'] ?? 0) + 1;
+                }
             }
         }
 

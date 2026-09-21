@@ -1,0 +1,123 @@
+.apparatus-inspection { --ink: #24323e; --muted: #586774; --line: #d8dfe2; --red: #b4272d; --green: #146b50; color: var(--ink); max-width: 1440px; margin: 0 auto; padding-bottom: 70px; }
+.apparatus-inspection button, .apparatus-inspection select { touch-action: manipulation; min-height: 44px; }
+.apparatus-inspection :is(button, select, textarea, input, [role=button]):focus-visible { outline: 3px solid #276b95; outline-offset: 3px; }
+.inspection-authority { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 18px; }
+.inspection-authority h1 { font-family: 'DM Sans', sans-serif; font-size: clamp(23px, 3vw, 32px); line-height: 1.15; font-weight: 750; letter-spacing: -.03em; margin: 4px 0; }
+.inspection-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.inspection-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 14px; color: var(--muted); }
+.inspection-save { text-align: right; font-size: 13px; white-space: nowrap; }
+.inspection-save strong { display: block; font-weight: 600; color: var(--green); }
+.inspection-save small { display: block; color: var(--muted); margin-top: 4px; }
+.inspection-readiness { display: flex; flex-wrap: wrap; gap: 7px 20px; padding: 9px 0; border-block: 1px solid var(--line); font-size: 13px; margin-bottom: 4px; }
+.inspection-readiness span { display: inline-flex; gap: 7px; align-items: center; }
+.inspection-readiness .oos { color: #a9232b; font-weight: 750; }
+.inspection-layout { display: grid; grid-template-columns: minmax(300px, .85fr) minmax(0, 1.35fr); gap: 24px; align-items: start; }
+.inspection-navigation { position: sticky; top: 84px; padding: 18px; background: #f0f3f3; border: 1px solid var(--line); border-radius: 8px; }
+.inspection-panel-heading { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+.inspection-navigation h2 { font-size: 21px; font-weight: 650; margin: 3px 0 12px; }
+.blueprint-views { display: flex; flex-wrap: wrap; gap: 3px; }
+.blueprint-views button { flex: 1; padding: 7px; font-size: 13px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
+.blueprint-views button[aria-pressed=true] { background: var(--ink); color: #fff; }
+.apparatus-blueprint { width: 100%; margin: 9px 0 3px; overflow: visible; }
+.blueprint-body { fill: #e9edef; stroke: #74828a; stroke-width: 2; }
+.blueprint-detail { fill: none; stroke: #a9b3ba; stroke-width: 1.5; }
+.blueprint-wheel { fill: #e0e5e8; stroke: #546370; stroke-width: 5; }
+.blueprint-hub { fill: #f7f8f7; stroke: #89969e; stroke-width: 2; }
+.blueprint-zone { cursor: pointer; outline: none; }
+.blueprint-zone rect { fill: #fbf1ef; stroke: #b66562; stroke-width: 1.5; }
+.blueprint-zone text { fill: #743330; font-weight: 700; font-size: 18px; pointer-events: none; }
+.blueprint-zone .blueprint-zone-count { font-size: 14px; font-weight: 500; }
+.blueprint-zone.is-complete rect { fill: #e0f0e9; stroke: #609480; }
+.blueprint-zone.is-complete text { fill: #155b42; }
+.blueprint-zone.is-active rect { stroke: #233d54; stroke-width: 4; }
+.blueprint-zone.is-active text { fill: #233d54; }
+.blueprint-zone:focus-visible rect { stroke: #1479b5; stroke-width: 5; stroke-dasharray: 7 3; }
+.blueprint-caption { fill: #637481; font-size: 11px; letter-spacing: 1px; }
+.blueprint-legend { display: flex; gap: 13px; font-size: 11px; color: var(--muted); padding: 10px 0 15px; }
+.blueprint-legend span { display: flex; align-items: center; gap: 5px; }
+.blueprint-legend i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.remaining-dot { background: #b66562; } .complete-dot { background: #398066; }
+.inspection-field-label { display: block; font-size: 12px; font-weight: 650; margin: 8px 0 5px; }
+.inspection-navigation select { width: 100%; font-size: 14px; padding: 10px; border: 1px solid #abb8c0; background: #fff; border-radius: 5px; }
+.inspection-area-list { margin-top: 10px; max-height: min(30vh, 300px); overflow-y: auto; overscroll-behavior: contain; }
+.inspection-area-list button { display: flex; width: 100%; align-items: center; gap: 9px; text-align: left; padding: 8px; border-radius: 4px; font-size: 13px; }
+.inspection-area-list button[aria-pressed=true] { background: #dde5e9; font-weight: 650; }
+.inspection-area-list button small { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.area-state { color: #a43e3e; font-size: 18px; } .area-state.is-complete { color: var(--green); }
+.inspection-info-link { width: 100%; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); margin-top: 12px; padding-top: 8px; font-size: 13px; font-weight: 600; }
+.inspection-equipment { min-width: 0; }
+.equipment-heading { display: flex; gap: 12px; justify-content: space-between; align-items: center; padding: 15px 0; }
+.equipment-heading h2 { font-family: 'DM Sans', sans-serif; font-size: 24px; line-height: 1.15; font-weight: 700; letter-spacing: -.025em; margin: 4px 0; }
+.inspection-muted { font-size: 13px; color: var(--muted); }
+.confirm-compartment { color: var(--green); font-weight: 650; font-size: 13px; border: 1px solid #91b3a7; padding: 8px 12px; border-radius: 5px; background: #edf5f1; }
+.inspection-observation-hint { color: var(--muted); font-size: 12px; padding: 0 0 12px; }
+.equipment-list { border-top: 1px solid var(--line); }
+.equipment-row { background: #fff; border-bottom: 1px solid var(--line); }
+.equipment-row.has-issue { background: #fff9f0; }
+.equipment-row.is-expanded { box-shadow: inset 0 0 0 1px #9aaab3; }
+.equipment-summary { display: flex; align-items: center; gap: 12px; padding: 8px 12px; }
+.equipment-expand { display: flex; gap: 12px; align-items: center; flex: 1; min-width: 0; text-align: left; padding: 4px 0; }
+.equipment-expand svg { flex-shrink: 0; color: #6b7d88; }
+.equipment-expand > span:first-of-type { min-width: 0; }
+.equipment-expand strong { display: block; font-size: 15px; font-weight: 650; overflow-wrap: anywhere; }
+.equipment-expand small { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+.equipment-chevron { margin-left: auto; font-size: 21px; color: #586d7b; }
+.equipment-pass { display: flex; align-items: center; gap: 5px; justify-content: center; flex-shrink: 0; width: 76px; border: 1px solid #a8bab2; border-radius: 5px; color: var(--green); font-size: 14px; font-weight: 650; }
+.equipment-pass.is-passed { background: var(--green); color: #fff; border-color: var(--green); }
+.equipment-details { padding: 4px 16px 18px; }
+.equipment-status { display: flex; gap: 6px; margin: 6px 0 12px; }
+.equipment-status button { flex: 1; padding: 7px; border: 1px solid #bdc8cb; border-radius: 4px; font-size: 13px; }
+.equipment-status button[aria-pressed=true] { background: #253b4b; color: #fff; border-color: #253b4b; }
+.equipment-details label { font-size: 12px; font-weight: 650; display: block; margin: 12px 0 4px; }
+.equipment-details textarea { display: block; width: 100%; border: 1px solid #adbdc6; border-radius: 4px; padding: 9px; font-size: 15px; }
+.equipment-details input { max-width: 100%; font-size: 13px; }
+.equipment-issue-copy { font-size: 13px; color: #785025; }
+.inspection-photo { max-height: 150px; margin-top: 10px; }
+.inspection-alert { padding: 12px; background: #fff0de; color: #85391c; font-size: 14px; }
+.inspection-compartment-footer { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; font-size: 13px; color: var(--muted); }
+.inspection-compartment-footer button { color: var(--ink); font-weight: 650; }
+.inspection-action-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 35; background: #fcfdfb; border-top: 1px solid #b9c5ca; padding: 10px max(18px, calc((100vw - 1440px) / 2)) max(10px, env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.quick-checklist-trigger { display: flex; align-items: center; gap: 10px; text-align: left; font-size: 14px; }
+.quick-checklist-trigger strong { font-variant-numeric: tabular-nums; }
+.inspection-review-button { padding: 10px 18px; border-radius: 5px; background: #b4272d; color: #fff; font-weight: 650; font-size: 14px; }
+.inspection-review-button:disabled { background: #e4e8e8; color: #586774; cursor: not-allowed; }
+.quick-checklist { position: fixed; z-index: 40; right: 20px; bottom: 78px; width: min(430px, calc(100vw - 32px)); max-height: 65vh; display: flex; flex-direction: column; background: #fff; border: 1px solid #aebcc4; border-radius: 10px; box-shadow: 0 12px 35px #24323e26; overflow: hidden; }
+.quick-checklist header { padding: 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.quick-checklist h2 { font-size: 22px; font-weight: 650; }
+.quick-checklist header button { width: 44px; font-size: 25px; }
+.quick-checklist > p { padding: 16px; }
+.quick-checklist ul { overflow-y: auto; overscroll-behavior: contain; }
+.quick-checklist li button { display: flex; width: 100%; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--line); font-size: 13px; }
+.quick-checklist li small { display: block; color: var(--muted); font-size: 11px; }
+.quick-checklist li strong { display: block; margin-top: 3px; }
+.daily-workspace:has(.apparatus-inspection) { padding-top: 16px; }
+.blueprint-touch-zones { display: none; }
+body:has(.apparatus-inspection) .hub-issue-widget--daily .hub-issue-trigger { top: 10px; bottom: auto; right: 76px; z-index: 55; min-height: 44px; }
+@media (min-width: 640px) {
+  body:has(.apparatus-inspection) .hub-issue-widget--daily .hub-issue-trigger { right: 136px; }
+}
+.apparatus-inspection > nav { margin-bottom: 8px; }
+@media (max-width: 767px) {
+  .blueprint-touch-zones { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+  .blueprint-touch-zones button { flex: 1 0 44px; min-height: 44px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px; }
+  .blueprint-touch-zones button[aria-pressed=true] { background: #e6edf0; border-color: #344e5e; font-weight: 700; }
+  .inspection-authority { gap: 8px; padding-bottom: 13px; } .inspection-authority h1 { font-size: 26px; }
+  .inspection-save { font-size: 11px; } .inspection-save small { font-size: 10px; }
+  .inspection-identity { font-size: 12px; gap: 2px 8px; } .inspection-readiness { font-size: 12px; margin-bottom: 14px; gap: 6px 12px; }
+  .inspection-layout { display: block; } .inspection-navigation { position: static; padding: 10px; }
+  .inspection-navigation h2 { font-size: 18px; margin-bottom: 8px; } .inspection-area-list { display: none; }
+  .inspection-info-link { display: none; } .blueprint-legend { padding: 0; }
+  .inspection-panel-heading, .inspection-navigation > h2 { display: none; }
+  .apparatus-blueprint { margin: 0; }
+  .inspection-field-label { display: none; } .inspection-navigation select { margin-top: 8px; }
+  .inspection-navigation .blueprint-views button { padding: 4px; font-size: 12px; }
+  .equipment-heading { padding: 20px 0 12px; gap: 8px; } .equipment-heading h2 { font-size: 22px; }
+  .confirm-compartment { padding: 8px; font-size: 12px; max-width: 125px; }
+  .equipment-summary { gap: 8px; padding: 8px; } .equipment-expand { gap: 8px; } .equipment-expand strong { font-size: 14px; }
+  .equipment-pass { width: 63px; } .equipment-expand svg { width: 18px; }
+  .inspection-action-bar { padding-inline: 12px; gap: 8px; } .quick-checklist-trigger { display: block; font-size: 12px; }
+  .quick-checklist-trigger strong { display: block; font-size: 13px; } .quick-checklist-trigger > span { display: none; }
+  .inspection-review-button { font-size: 12px; padding: 10px 12px; }
+  .quick-checklist { right: 8px; width: calc(100vw - 16px); bottom: 76px; }
+}
+@media (prefers-reduced-motion: no-preference) { .equipment-pass, .blueprint-zone rect { transition: background-color 120ms ease, fill 120ms ease, stroke 120ms ease; } }

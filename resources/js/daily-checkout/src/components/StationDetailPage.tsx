@@ -914,6 +914,7 @@ function DailyCheckoutPanel({ dailyCheckout, apparatuses }: { dailyCheckout: Dai
                 <p className="font-semibold text-neutral-900">{apparatusNames.get(row.apparatus_id) ?? `Apparatus ${row.apparatus_id}`}</p>
                 <p className="text-xs text-neutral-500">{requirementStatus}</p>
                 {row.has_pending_submission && <p className="mt-1 text-xs font-medium text-amber-800">A submission is pending review.</p>}
+                {(row.open_inspection_exceptions ?? 0) > 0 && <p className="mt-1 text-xs font-medium text-amber-800">{row.revision_requested ? 'Member clarification requested.' : 'Inspection follow-up recorded.'} {row.included_in_completed && 'Checkout counts as completed.'}</p>}
                 {row.return_checkout_required && <p className="mt-1 text-xs font-medium text-amber-800">Post-return checkout {row.return_checkout_verified ? 'verified' : 'required'}.</p>}
               </div>
               <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${presentation.className}`}>{presentation.label}</span>

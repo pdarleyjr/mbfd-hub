@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Tests\TestCase;
 
 class AdminPwaRoutesTest extends TestCase
@@ -18,9 +19,14 @@ class AdminPwaRoutesTest extends TestCase
 
     public function test_one_canonical_hub_manifest_and_capability_first_install_page_are_available(): void
     {
-        $manifest = $this->getJson('/manifest.json')
+        $response = $this->getJson('/manifest.json')
             ->assertOk()
-            ->json();
+            ->assertHeader('Content-Type', 'application/manifest+json');
+        $this->assertInstanceOf(BinaryFileResponse::class, $response->baseResponse);
+        $file = $response->baseResponse->getFile();
+        $this->assertSame(realpath(public_path('manifest.json')), $file->getRealPath());
+        $this->assertFileIsReadable($file->getPathname());
+        $manifest = json_decode(file_get_contents($file->getPathname()), true, 512, JSON_THROW_ON_ERROR);
 
         $this->assertSame('MBFD Hub', $manifest['name']);
         $this->assertSame('MBFD Hub', $manifest['short_name']);
@@ -60,8 +66,8 @@ class AdminPwaRoutesTest extends TestCase
         $dashboard = (string) file_get_contents(app_path('Filament/Pages/Dashboard.php'));
 
         $this->assertStringContainsString("->label('Monitoring')", $panelProvider);
-        $this->assertStringContainsString("->label('Laravel Pulse')", $panelProvider);
-        $this->assertStringContainsString("->label('Application Health')", $panelProvider);
+        $this->assertStringContainsString("NavigationItem::make('Laravel Pulse')", $panelProvider);
+        $this->assertStringContainsString("NavigationItem::make('Application Health')", $panelProvider);
         $this->assertStringContainsString("protected static ?string \$slug = 'pulse';", $pulsePage);
         $this->assertStringNotContainsString('Ask AI Assistant', $dashboard);
     }

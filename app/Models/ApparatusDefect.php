@@ -50,6 +50,8 @@ class ApparatusDefect extends Model
         'resolved_at',
         'resolution_notes',
         'defect_history',
+        'operational_impact',
+        'service_ticket_id',
     ];
 
     protected $casts = [
@@ -81,6 +83,16 @@ class ApparatusDefect extends Model
     public function apparatus()
     {
         return $this->belongsTo(Apparatus::class);
+    }
+
+    public function latestObservation(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ApparatusDefectObservation::class)->latestOfMany();
+    }
+
+    public function serviceTicket(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(ApparatusServiceTicket::class, 'service_ticket_id');
     }
 
     /**

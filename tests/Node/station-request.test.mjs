@@ -45,7 +45,7 @@ test('station, room, and apparatus service APIs cannot remain stale', () => {
   const serviceWorker = read('resources/js/daily-checkout/public/service-worker.js');
   const api = read('resources/js/daily-checkout/src/utils/api.ts');
 
-  assert.match(serviceWorker, /mbfd-checkout-v6/);
+  assert.match(serviceWorker, /mbfd-checkout-v7/);
   assert.match(serviceWorker, /url\.pathname\.startsWith\('\/api\/public\/stations'\)/);
   assert.match(serviceWorker, /url\.pathname\.endsWith\('\/service-notices'\)/);
   assert.match(serviceWorker, /url\.pathname\.endsWith\('\/service-tickets'\)/);

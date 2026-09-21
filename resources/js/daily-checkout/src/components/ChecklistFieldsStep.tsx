@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
 import type {
   ChecklistData,
   ChecklistFieldValue,
@@ -10,6 +10,8 @@ interface ChecklistFieldsStepProps {
   checklist: ChecklistData;
   initialFieldValues: Array<{ id: string; value: ChecklistFieldValue }>;
   initialScheduledTasks: ScheduledChecklistTaskResult[];
+  onFieldsChange: Dispatch<SetStateAction<Array<{ id: string; value: ChecklistFieldValue }>>>;
+  onTasksChange: Dispatch<SetStateAction<ScheduledChecklistTaskResult[]>>;
   onSubmit: (
     fieldValues: Array<{ id: string; value: ChecklistFieldValue }>,
     scheduledTasks: ScheduledChecklistTaskResult[],
@@ -21,17 +23,14 @@ export default function ChecklistFieldsStep({
   checklist,
   initialFieldValues,
   initialScheduledTasks,
+  onFieldsChange: setFieldValues,
+  onTasksChange: setScheduledTasks,
   onSubmit,
   onBack,
 }: ChecklistFieldsStepProps) {
-  const [fieldValues, setFieldValues] = useState(initialFieldValues);
-  const [scheduledTasks, setScheduledTasks] = useState(initialScheduledTasks);
+  const fieldValues = initialFieldValues;
+  const scheduledTasks = initialScheduledTasks;
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setFieldValues(initialFieldValues);
-    setScheduledTasks(initialScheduledTasks);
-  }, [initialFieldValues, initialScheduledTasks]);
 
   const updateFieldValue = (id: string, value: ChecklistFieldValue) => {
     setFieldValues((current) => current.map((fieldValue) => (
@@ -41,12 +40,12 @@ export default function ChecklistFieldsStep({
 
   const updateScheduledTask = (id: string, status: ItemStatus) => {
     setScheduledTasks((current) => current.map((task) => (
-      task.id === id ? { ...task, status } : task
+      task.id === id ? { ...task, status, observed: true } : task
     )));
   };
 
   const markAllDueTasksPresent = () => {
-    setScheduledTasks((current) => current.map((task) => ({ ...task, status: 'Present' as ItemStatus })));
+    setScheduledTasks((current) => current.map((task) => task.observed && task.status !== 'Present' ? task : ({ ...task, status: 'Present' as ItemStatus, observed: true })));
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -65,6 +64,10 @@ export default function ChecklistFieldsStep({
     }
 
     setError(null);
+    if (scheduledTasks.some(task => !task.observed)) {
+      setError('Confirm each scheduled duty before continuing.');
+      return;
+    }
     onSubmit(fieldValues, scheduledTasks);
   };
 
@@ -72,14 +75,21 @@ export default function ChecklistFieldsStep({
     <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-neutral-800 font-heading">Checklist Details</h2>
-        <p className="mt-1 text-neutral-500">Record the Fire Boat-specific readings and checks before compartment inspection.</p>
+        <p className="mt-1 text-neutral-500">Readings, equipment IDs and crew details from the apparatus checkout sheet.</p>
       </div>
 
       {error && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
 
-      <section aria-label="Checklist fields" className="space-y-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <section aria-label="Checklist fields" className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
         {checklist.fields.map((field) => {
           const value = fieldValues.find((fieldValue) => fieldValue.id === field.id)?.value ?? null;
+
+          if (field.id === 'fb6-shift') return <div key={field.id}>
+            <label htmlFor={field.id} className="mb-1.5 block text-sm font-semibold text-neutral-700">Shift *</label>
+            <select id={field.id} value={String(value ?? '')} required onChange={event => updateFieldValue(field.id, event.target.value)} className="min-h-12 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900">
+              <option value="">Select shift</option>{['A', 'B', 'C'].map(shift => <option key={shift} value={shift}>{shift} Shift</option>)}
+            </select>
+          </div>;
 
           if (field.inputType === 'checkbox') {
             return (
@@ -107,12 +117,14 @@ export default function ChecklistFieldsStep({
               <label htmlFor={field.id} className="mb-1.5 block text-sm font-semibold text-neutral-700">
                 {field.name}{field.required ? ' *' : ''}
               </label>
-              <input
+              {field.multiline ? <textarea id={field.id} rows={3} required={field.required} maxLength={2000} value={value === null ? '' : String(value)} onChange={event => updateFieldValue(field.id, event.target.value)} className="min-h-24 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 focus:border-red-500 focus:outline-none" /> : <input
                 id={field.id}
                 type={type}
                 step={field.inputType === 'number' || field.inputType === 'percentage' ? 'any' : undefined}
                 value={value === null ? '' : String(value)}
-                readOnly={field.inputType === 'date'}
+                readOnly={field.id === checklist.inspection_date_field_id || field.id === 'vehicle_num'}
+                required={field.required}
+                maxLength={field.inputType === 'text' ? 2000 : undefined}
                 onChange={(event) => {
                   if (field.inputType === 'number' || field.inputType === 'percentage') {
                     updateFieldValue(field.id, event.target.value === '' ? null : Number(event.target.value));
@@ -123,13 +135,13 @@ export default function ChecklistFieldsStep({
                   updateFieldValue(field.id, event.target.value);
                 }}
                 className="min-h-12 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 focus:border-red-500 focus:outline-none"
-              />
+              />}
             </div>
           );
         })}
       </section>
 
-      <section aria-labelledby="scheduled-duties-heading" className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      {checklist.schema_version === 2 && <section aria-labelledby="scheduled-duties-heading" className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 id="scheduled-duties-heading" className="font-heading text-lg font-bold text-neutral-800">Scheduled duties due today</h3>
@@ -165,9 +177,9 @@ export default function ChecklistFieldsStep({
                         key={status}
                         type="button"
                         onClick={() => updateScheduledTask(task.id, status)}
-                        aria-pressed={result.status === status}
+                        aria-pressed={result.observed === true && result.status === status}
                         className={`min-h-11 flex-1 rounded-lg border px-3 py-2 text-sm font-semibold ${
-                          result.status === status
+                          result.observed === true && result.status === status
                             ? status === 'Present'
                               ? 'border-green-600 bg-green-600 text-white'
                               : status === 'Missing'
@@ -185,7 +197,7 @@ export default function ChecklistFieldsStep({
             })}
           </div>
         )}
-      </section>
+      </section>}
 
       <div className="flex gap-3">
         <button

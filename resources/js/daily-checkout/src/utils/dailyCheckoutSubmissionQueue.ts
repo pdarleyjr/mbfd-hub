@@ -10,12 +10,13 @@ const QUEUE_UPDATED_EVENT = 'mbfd:daily-checkout-queue-updated';
 export const DAILY_CHECKOUT_QUEUE_SYNC_EVENT = 'mbfd:daily-checkout-queue-synced';
 const CLIENT_ERROR_RETENTION_DAYS = 30;
 
-export type QueuedInspectionSubmissionResult = 'submitted' | 'pending_review' | 'not_found';
+export type QueuedInspectionSubmissionResult = 'submitted' | 'accepted_with_exception' | 'pending_review' | 'not_found';
 
 export interface DailyCheckoutQueueSyncResult {
   submitted: number;
   submittedQueueIds: string[];
   pendingReviewQueueIds: string[];
+  exceptionQueueIds: string[];
   remaining: number;
 }
 
@@ -468,7 +469,7 @@ export const submitQueuedInspection = (
       const receipt = await ApiClient.submitInspection(queuedSubmission.apparatusId, queuedSubmission.data);
       await removeFromQueue(queueId);
 
-      return receipt.review_status === 'pending_review'
+      return receipt.processing_status === 'accepted_with_exception' ? 'accepted_with_exception' as const : receipt.review_status === 'pending_review'
         ? 'pending_review' as const
         : 'submitted' as const;
     } catch (error) {
@@ -498,6 +499,7 @@ export const synchronizeDailyCheckoutQueue = (currentIdentity?: OfflineIdentity)
     let submitted = 0;
     const submittedQueueIds: string[] = [];
     const pendingReviewQueueIds: string[] = [];
+    const exceptionQueueIds: string[] = [];
 
     const identity = currentIdentity ?? await refreshOfflineIdentity();
     for (const queuedSubmission of await getSubmissionQueue()) {
@@ -511,7 +513,7 @@ export const synchronizeDailyCheckoutQueue = (currentIdentity?: OfflineIdentity)
 
       try {
         const result = await submitQueuedInspection(queuedSubmission.id, identity);
-        if (result === 'submitted' || result === 'pending_review') {
+        if (result === 'submitted' || result === 'pending_review' || result === 'accepted_with_exception') {
           submitted += 1;
           submittedQueueIds.push(queuedSubmission.id);
         }
@@ -519,6 +521,7 @@ export const synchronizeDailyCheckoutQueue = (currentIdentity?: OfflineIdentity)
         if (result === 'pending_review') {
           pendingReviewQueueIds.push(queuedSubmission.id);
         }
+        if (result === 'accepted_with_exception') exceptionQueueIds.push(queuedSubmission.id);
       } catch (error) {
         if (isPermanentSubmissionFailure(error)) {
           console.warn('A Daily Checkout submission needs review and remains saved locally.');
@@ -533,6 +536,7 @@ export const synchronizeDailyCheckoutQueue = (currentIdentity?: OfflineIdentity)
       submitted,
       submittedQueueIds,
       pendingReviewQueueIds,
+      exceptionQueueIds,
       remaining: (await getSubmissionQueue()).length,
     };
   })().finally(() => {

@@ -1,5 +1,5 @@
 import {
-  Apparatus, ChecklistData, ChecklistField, ChecklistInputType, InspectionSubmission, EmployeeOption, ScheduledChecklistTask, Station, StationDetail,
+  Apparatus, ChecklistData, ChecklistField, ChecklistInputType, InspectionSubmission, InspectionRevision, EmployeeOption, ScheduledChecklistTask, Station, StationDetail,
   Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData,
   StationInventorySubmission, InventorySubmissionItem,
   InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
@@ -99,6 +99,16 @@ const responseMessage = async (response: Response, fallback: string): Promise<st
 };
 
 export class ApiClient {
+  static async getInspectionRevisions(): Promise<InspectionRevision[]> {
+    const response = await fetch(`${API_BASE}/public/inspection-revisions`, { headers: DEFAULT_HEADERS, cache: 'no-store' });
+    if (!response.ok) throw new Error('Requested clarifications could not be loaded. Reconnect and try again.');
+    return (await response.json()).data;
+  }
+
+  static async submitInspectionRevision(id: number, data: { reason: string; value?: number }): Promise<void> {
+    const response = await fetch(`${API_BASE}/public/inspection-exceptions/${id}/revision`, { method: 'POST', headers: mutationHeaders(), body: JSON.stringify(data) });
+    if (!response.ok) throw new Error(await responseMessage(response, 'Your clarification was not sent. Your draft is saved on this device; try again.'));
+  }
   static async getApparatuses(): Promise<Apparatus[]> {
     const response = await fetch(`${API_BASE}/public/apparatuses`, {
     headers: { ...DEFAULT_HEADERS },
@@ -236,10 +246,17 @@ export class ApiClient {
               name: field.name,
               inputType: field.inputType,
               required: field.required === true,
+              multiline: field.multiline === true,
             };
           });
         })()
-      : [];
+      : (Array.isArray(rawChecklist?.officerChecklist) ? rawChecklist.officerChecklist : []).map((field: any) => ({
+          id: field.id,
+          name: field.name,
+          inputType: isChecklistInputType(field.inputType) ? field.inputType : 'text',
+          required: field.required === true,
+          multiline: field.multiline === true,
+        }));
 
     const dueTasks = schemaVersion === 2
       ? (() => {
@@ -292,12 +309,13 @@ export class ApiClient {
       : undefined;
 
     const checklist: ChecklistData = {
+      open_findings: Array.isArray(payload?.open_findings) ? payload.open_findings : [],
       checklist_version: checklistVersion.toLowerCase(),
       schema_version: schemaVersion,
       template_id: schemaVersion === 2 && typeof rawChecklist?.template_id === 'string' ? rawChecklist.template_id : undefined,
       template_version: schemaVersion === 2 && typeof rawChecklist?.template_version === 'string' ? rawChecklist.template_version : undefined,
-      inspection_date: schemaVersion === 2 && typeof payload?.inspection_date === 'string' ? payload.inspection_date : undefined,
-      inspection_date_field_id: schemaVersion === 2 && typeof rawChecklist?.inspectionDateFieldId === 'string' ? rawChecklist.inspectionDateFieldId : undefined,
+      inspection_date: typeof payload?.inspection_date === 'string' ? payload.inspection_date : undefined,
+      inspection_date_field_id: typeof rawChecklist?.inspectionDateFieldId === 'string' ? rawChecklist.inspectionDateFieldId : fields.some(field => field.id === 'inspection_date') ? 'inspection_date' : undefined,
       fields,
       due_tasks: dueTasks,
       inspection_session: inspectionSession,
@@ -325,9 +343,11 @@ export class ApiClient {
                   id: schemaVersion === 2 ? item.id : item?.id ?? `${compartmentId}-item-${itemIndex + 1}`,
                   name: schemaVersion === 2 ? item.name : item?.name ?? `Item ${itemIndex + 1}`,
                   status: normalizeItemStatus(item?.status),
-                  notes: item?.notes ?? item?.note ?? '',
-                  inputType: schemaVersion === 2 ? item.inputType : undefined,
-                  expectedQuantity: schemaVersion === 2 ? item.expectedQuantity : undefined,
+                  notes: '',
+                  instructions: item?.notes ?? item?.note,
+                  inputType: isChecklistInputType(item.inputType) ? item.inputType : undefined,
+                  valueRequired: item.valueRequired !== false,
+                  expectedQuantity: typeof item.expectedQuantity === 'number' ? item.expectedQuantity : undefined,
                 };
               })
             : [],
@@ -358,7 +378,7 @@ export class ApiClient {
   static async submitInspection(
     apparatusId: number,
     data: InspectionSubmission,
-  ): Promise<{ review_status?: 'approved' | 'pending_review' }> {
+  ): Promise<{ review_status?: 'approved' | 'pending_review'; processing_status?: 'accepted' | 'accepted_with_exception' }> {
     const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/inspections`, {
       method: 'POST',
       credentials: 'same-origin',

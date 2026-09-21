@@ -40,8 +40,8 @@ final class EmployeeContextualControlsTest extends TestCase
             'profile-identity' => ['Correct Employee ID', 'Employment status'],
             'profile-save' => ['Save profile changes'],
             'login-recovery' => ['Issue temporary password', 'Change city email', 'Disable account'],
-            'hub-roles' => ['Edit Hub roles'],
-            'hub-capabilities' => ['Edit direct Hub capabilities'],
+            'hub-roles' => ['Edit advanced system access'],
+            'hub-capabilities' => ['Edit direct administrative capabilities'],
             'ecosystem' => ['Edit application access', 'Edit application administrator roles'],
             'workgroups' => ['Manage workgroups'],
         ] as $context => $labels) {
@@ -49,7 +49,7 @@ final class EmployeeContextualControlsTest extends TestCase
         }
         self::assertSame([], $page->instance()->getCachedHeaderActions());
         self::assertSame(['cancel'], array_map(fn ($action) => $action->getName(), $page->instance()->getCachedFormActions()));
-        $page->assertSee('Role-inherited capabilities must be changed through Hub roles, not direct grants.');
+        $page->assertSee('Role-inherited capabilities are maintained through advanced system access.');
 
         foreach (['manageRoles', 'manageAdministrationCapabilities', 'manageApplicationAccess', 'manageApplicationAdministration', 'manageWorkgroups', 'resetPassword', 'correctEmployeeId'] as $action) {
             $page->mountAction($action)->assertActionMounted($action)
@@ -80,7 +80,7 @@ final class EmployeeContextualControlsTest extends TestCase
         }
         $this->actingAs($viewer);
         Livewire::test(EditEmployee::class, ['record' => $employee->id])
-            ->assertDontSee('Edit Hub roles')->assertDontSee('Edit application access')
+            ->assertDontSee('Edit advanced system access')->assertDontSee('Edit direct administrative capabilities')->assertDontSee('Edit application access')
             ->assertDontSee('Save profile changes')->assertSee('Read-only with your current access.')
             ->assertActionHidden('manageRoles')->assertActionHidden('save');
         $target->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
@@ -88,7 +88,7 @@ final class EmployeeContextualControlsTest extends TestCase
         $this->actingAs($target);
         $page = Livewire::test(EditEmployee::class, ['record' => $employee->id]);
         $this->assertContextContains($page->html(), 'login-recovery', ['Change my password']);
-        $page->assertDontSee('Edit Hub roles')->assertDontSee('Issue temporary password')
+        $page->assertDontSee('Edit advanced system access')->assertDontSee('Edit direct administrative capabilities')->assertDontSee('Issue temporary password')
             ->assertSee('Save profile changes')->assertSee('Your own access cannot be changed here.');
     }
 
@@ -99,7 +99,7 @@ final class EmployeeContextualControlsTest extends TestCase
         $this->assertContextContains($page->html(), 'login-recovery', ['Create login account']);
         $this->assertContextContains($page->html(), 'hub-roles', ['Create a login account in Login & recovery before assigning roles, access or workgroups.']);
         $page->assertDontSee('Read-only with your current access.');
-        $page->assertDontSee('Edit Hub roles')->assertDontSee('Manage workgroups');
+        $page->assertDontSee('Edit advanced system access')->assertDontSee('Manage workgroups');
         $pending = app(\App\Services\Identity\CanonicalUserProvisioner::class)
             ->create($employee->id, 'MISSING_OR_UNSUPPORTED', now())['user'];
         self::assertSame('pending_activation', $pending->getRawOriginal('account_status'));
@@ -144,7 +144,7 @@ final class EmployeeContextualControlsTest extends TestCase
         self::assertSame(1, $nodes->length, 'One contextual action area expected: '.$context);
         $tab = match ($context) {
             'profile-identity', 'profile-save' => 'profile',
-            'hub-roles', 'hub-capabilities' => 'administration',
+            'hub-roles', 'hub-capabilities' => 'access-capabilities',
             'ecosystem' => 'ecosystem-access',
             'workgroups' => 'workgroups-history',
             default => 'identity-security',

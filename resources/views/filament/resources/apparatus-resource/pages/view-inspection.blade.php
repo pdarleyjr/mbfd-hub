@@ -76,6 +76,16 @@
         </div>
 
         {{-- Compartment Results --}}
+        @if(count($inspection->checklist_evidence ?? []) > 0)
+            <section class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6 dark:bg-gray-900 dark:ring-white/10">
+                <h3 class="text-base font-semibold mb-4">Recorded paper checkout fields</h3>
+                <dl class="grid gap-4 sm:grid-cols-2">
+                    @foreach($inspection->checklist_evidence as $field)
+                        <div><dt class="text-sm text-gray-500">{{ $field['name'] }}</dt><dd class="whitespace-pre-wrap break-words">{{ is_bool($field['value']) ? ($field['value'] ? 'Yes' : 'No') : ($field['value'] === null || $field['value'] === '' ? 'Not entered' : $field['value']) }}</dd></div>
+                    @endforeach
+                </dl>
+            </section>
+        @endif
         @if(count($results) > 0)
             @foreach($results as $compartment)
                 <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6 dark:bg-gray-900 dark:ring-white/10">
@@ -94,7 +104,11 @@
                             <tbody>
                                 @foreach($compartment['items'] ?? [] as $item)
                                     <tr class="border-b border-gray-100 dark:border-gray-800">
-                                        <td class="py-2 px-3 text-gray-900 dark:text-white">{{ $item['name'] ?? '—' }}</td>
+                                        <td class="py-2 px-3 text-gray-900 dark:text-white">{{ $item['name'] ?? '—' }}
+                                            @if(isset($item['value']) && $item['value'] !== '')
+                                                <p class="whitespace-pre-wrap break-words text-sm font-medium">{{ $item['value'] }}</p>
+                                            @endif
+                                        </td>
                                         <td class="py-2 px-3 text-center">
                                             @php $status = $item['status'] ?? 'Present'; @endphp
                                             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium

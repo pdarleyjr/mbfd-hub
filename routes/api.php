@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\StationRequestController as AdminStationRequestController;
 use App\Http\Controllers\Api\AdminMetricsController;
 use App\Http\Controllers\Api\ApparatusController;
+use App\Http\Controllers\Api\ApparatusInspectionExceptionController;
 use App\Http\Controllers\Api\AuthenticatedMemberContextController;
 use App\Http\Controllers\Api\Bid\AuthorizationCodeExchangeController as BidAuthorizationCodeExchangeController;
 use App\Http\Controllers\Api\Bid\CredentialsController as BidCredentialsController;
@@ -54,6 +55,8 @@ Route::prefix('admin/audit')->middleware(['web', 'auth', 'admin.capability:admin
 });
 
 Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:60,1'])->group(function () {
+    Route::get('inspection-revisions', [ApparatusInspectionExceptionController::class, 'index']);
+    Route::post('inspection-exceptions/{exception}/revision', [ApparatusInspectionExceptionController::class, 'revision'])->middleware('throttle:30,1');
     Route::get('apparatuses', [ApparatusController::class, 'index']);
     Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class, 'checklist']);
     Route::post('apparatuses/{apparatus}/inspection-sessions', [ApparatusController::class, 'startInspectionSession'])->middleware(['throttle:30,1']);
@@ -216,6 +219,8 @@ Route::delete('/big-ticket-requests/{bigTicketRequest}', [BigTicketRequestContro
 // SECURITY (H-01): approving a pending-review apparatus inspection is the only
 // path that may flip an apparatus Out of Service. Authenticated + authorized only.
 Route::post('/apparatus-inspections/{inspection}/approve', [ApparatusController::class, 'approveInspection'])
+    ->middleware(['auth:sanctum', 'canonical.api', 'admin.capability:admin.fleet.manage', 'throttle:30,1']);
+Route::post('/apparatus-inspection-exceptions/{exception}/reconcile', [ApparatusInspectionExceptionController::class, 'reconcile'])
     ->middleware(['auth:sanctum', 'canonical.api', 'admin.capability:admin.fleet.manage', 'throttle:30,1']);
 Route::post('/apparatus-inspections/{inspection}/reject', [ApparatusController::class, 'rejectInspection'])
     ->middleware(['auth:sanctum', 'canonical.api', 'admin.capability:admin.fleet.manage', 'throttle:30,1']);

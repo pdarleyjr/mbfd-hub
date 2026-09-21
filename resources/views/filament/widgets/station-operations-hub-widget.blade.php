@@ -68,6 +68,9 @@
                         <section class="mbfd-station-console-panel">
                             <h3>Daily Checkout</h3>
                             <p class="mbfd-station-console-summary">{{ $daily['completed'] ?? 0 }} / {{ $daily['required_total'] ?? 0 }} complete · {{ $daily['attention'] ?? 0 }} attention · {{ $daily['review_pending'] ?? 0 }} review</p>
+                            @if(($daily['open_inspection_exceptions'] ?? 0) > 0)
+                                <a href="{{ $data['links']['inspectionExceptions'] }}">{{ $daily['open_inspection_exceptions'] }} inspection follow-ups</a>
+                            @endif
                             <ul class="mbfd-station-console-matrix">
                                 @forelse($daily['matrix'] ?? [] as $entry)
                                     <li><span>{{ $entry['designation'] ?? $entry['unit_id'] ?? 'Apparatus' }}</span><strong>{{ str($entry['state'] ?? 'unknown')->headline() }}</strong></li>

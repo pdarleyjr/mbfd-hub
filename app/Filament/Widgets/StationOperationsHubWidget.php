@@ -189,6 +189,7 @@ class StationOperationsHubWidget extends Widget
                     'defects' => $this->stationFilterUrl(\App\Filament\Resources\DefectResource::getUrl('index'), $stationId),
                     'supplies' => $stationUrl.'?activeRelationManager=supplyRequests',
                     'inventorySubmissions' => $stationUrl.'?activeRelationManager=inventorySubmissions',
+                    'inspectionExceptions' => $this->stationFilterUrl(\App\Filament\Resources\ApparatusInspectionExceptionResource::getUrl('index'), $stationId),
                 ],
                 'dailyCheckout' => $dailyCheckout,
                 'dailyCheckoutSubtitle' => ($dailyCheckout['required_total'] ?? 0) > 0 ? 'Daily Checkout completion' : 'No required apparatus — completion unavailable',
@@ -275,7 +276,7 @@ class StationOperationsHubWidget extends Widget
     {
         return collect()
             ->concat($inspections->map(fn (StationInspection $record): array => $this->stationInspectionActivity($record)))
-            ->concat($apparatusInspections->map(fn (ApparatusInspection $record): array => ['id' => (int) $record->id, 'type' => 'daily_checkout', 'label' => 'Daily Checkout / apparatus inspection', 'status' => $record->review_status ?: 'submitted', 'timestamp' => $this->timestamp($record->completed_at ?: $record->created_at), 'url' => InspectionResource::getUrl('view', ['record' => $record])]))
+            ->concat($apparatusInspections->map(fn (ApparatusInspection $record): array => ['id' => (int) $record->id, 'type' => 'daily_checkout', 'label' => 'Daily Checkout / apparatus inspection', 'status' => $record->processing_status ?: $record->review_status ?: 'submitted', 'timestamp' => $this->timestamp($record->completed_at ?: $record->created_at), 'url' => InspectionResource::getUrl('view', ['record' => $record])]))
             ->concat($requests->map(fn (StationRequest $record): array => ['id' => (int) $record->id, 'type' => 'station_request', 'label' => $record->request_number ?: $record->title ?: 'Station request', 'status' => $record->status, 'timestamp' => $this->timestamp($record->created_at), 'url' => StationRequestResource::getUrl('view', ['record' => $record])]))
             ->concat($tickets->map(fn (ApparatusServiceTicket $record): array => ['id' => (int) $record->id, 'type' => 'service_ticket', 'label' => $record->ticket_number ?: $record->title ?: 'Service ticket', 'status' => $record->status, 'timestamp' => $this->timestamp($record->created_at), 'url' => ApparatusServiceTicketResource::getUrl('view', ['record' => $record])]))
             ->concat($inventory->map(fn (StationInventorySubmission $record): array => ['id' => (int) $record->id, 'type' => 'inventory_submission', 'label' => 'Inventory submission #'.$record->id, 'status' => 'submitted', 'timestamp' => $this->timestamp($record->submitted_at ?: $record->created_at), 'url' => $stationUrl.'?activeRelationManager=inventorySubmissions']))

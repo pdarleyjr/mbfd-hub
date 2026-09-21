@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { Apparatus } from '../types';
 import { ApiClient } from '../utils/api';
 import PreviousPageButton from './PreviousPageButton';
+import InspectionRevisions from './InspectionRevisions';
 
 export default function VehicleInspectionSelect() {
   const [apparatuses, setApparatuses] = useState<Apparatus[]>([]);
@@ -82,6 +83,7 @@ export default function VehicleInspectionSelect() {
 
   return (
     <div>
+      <InspectionRevisions />
       <div className="text-center mb-6">
         <h1 className="text-3xl font-bold text-neutral-800 mb-2 font-heading">Vehicle Inspections</h1>
         <p className="text-neutral-500">Select a vehicle to begin the daily inspection</p>

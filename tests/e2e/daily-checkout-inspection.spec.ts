@@ -146,6 +146,7 @@ const fireBoatChecklist = {
     inspectionDateFieldId: 'inspection_date',
     fields: [
       { id: 'inspection_date', name: 'Date', inputType: 'date', required: true },
+      { id: 'fb6-shift', name: 'Shift', inputType: 'text', required: true },
       { id: 'fb6-high-low-tide', name: 'High Low Tide', inputType: 'text', required: true },
       { id: 'fb6-port-engine-hours', name: 'Port Engine Hours', inputType: 'number', required: true },
     ],
@@ -386,6 +387,9 @@ async function mockFireBoatInspectionApi(
   const genericSubmissions: Array<Record<string, unknown>> = [];
   const sessionStarts: Array<Record<string, unknown>> = [];
   const abandonments: Array<Record<string, unknown>> = [];
+  if (!options.recoverPriorDayContract) {
+    await page.clock.setFixedTime(new Date('2026-08-31T09:00:00-04:00'));
+  }
   const sessionStatus = options.sessionStatus ?? 201;
   let abortNextSessionStart = options.abortFirstSessionStart ?? false;
   let priorDayContractWasAbandoned = false;
@@ -554,20 +558,18 @@ async function mockFireBoatInspectionApi(
 }
 
 async function completeInspection(page: Page): Promise<void> {
-  await expect(page.getByRole('heading', { name: 'Daily Inspection: Engine 1' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Engine 1', exact: true })).toBeVisible();
 
-  const fullName = page.getByLabel('Full Name');
-  if (await fullName.isVisible().catch(() => false)) {
-    await fullName.fill('Captain Browser');
-    await page.getByText('Captain Browser', { exact: true }).click();
-    await expect(page.getByText('Selected: Captain Browser')).toBeVisible();
-    await page.getByRole('button', { name: 'Continue to Inspection' }).click();
-  }
-
+  await expect(page.getByRole('region', { name: 'Compartment Inspection' })).toBeVisible();
+  await page.getByRole('button', { name: 'Member / Vehicle Info', exact: true }).first().click();
+  await expect(page.getByLabel('Member', { exact: true })).toHaveValue('Captain Browser');
+  await expect(page.getByLabel('Member', { exact: true })).toHaveAttribute('readonly', '');
+  await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('A');
+  await page.getByRole('button', { name: 'Continue to Inspection' }).click();
   await expect(page.getByRole('heading', { name: 'Meter Readings' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
 
-  await expect(page.getByRole('heading', { name: 'Compartment Inspection' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Compartment Inspection' })).toBeVisible();
   await expect(page.getByText('Portable Radio', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
   await page.getByRole('button', { name: 'Review & Submit' }).click();
@@ -577,8 +579,11 @@ async function completeInspection(page: Page): Promise<void> {
 }
 
 async function drawInspectionSignature(page: Page): Promise<void> {
+  const shift = page.getByRole('combobox', { name: 'Shift', exact: true });
+  if (await shift.count() && await shift.inputValue() === '') await shift.selectOption('A');
   const canvas = page.locator('canvas');
   await expect(canvas).toHaveCount(1);
+  await canvas.scrollIntoViewIfNeeded();
 
   const box = await canvas.boundingBox();
   if (!box) {
@@ -886,29 +891,30 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
   const api = await mockFireBoatInspectionApi(page);
 
   await page.goto('/daily/apparatus/fire-boat-6');
-  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
   expect(api.sessionStarts).toEqual([
     expect.objectContaining({
       inspection_session_start_key: expect.stringMatching(/^[0-9a-f-]{36}$/),
     }),
   ]);
 
-  await page.getByLabel('Full Name').fill('Captain Browser');
-  await page.getByText('Captain Browser', { exact: true }).click();
-  await page.getByRole('button', { name: 'Continue to Inspection' }).click();
+  await page.getByRole('button', { name: 'Checklist details', exact: true }).click();
 
   await expect(page.getByRole('heading', { name: 'Checklist Details' })).toBeVisible();
   await expect(page.getByLabel('Date')).toHaveValue('2026-08-31');
+  await expect(page.getByLabel('Date')).toHaveAttribute('readonly', '');
   await page.getByLabel('High Low Tide').fill('High 10:00 / Low 16:30');
+  await page.locator('#fb6-shift').selectOption('A');
   await page.getByLabel('Port Engine Hours').fill('45.5');
   await expect(page.getByText('Fuel Tank Hold', { exact: true })).toBeVisible();
   await expect(page.getByText('First Day of Each Month', { exact: true })).not.toBeVisible();
   await page.getByRole('button', { name: 'Mark all due duties as present' }).click();
   await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
 
-  await expect(page.getByText('Expected quantity: 3', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Expected quantity: 3/)).toBeVisible();
   await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
   await page.getByRole('button', { name: 'Review & Submit' }).click();
+  await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
@@ -918,6 +924,7 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
     checklist_version: fireBoatChecklist.checklist_version,
     field_values: [
       { id: 'inspection_date', value: '2026-08-31' },
+      { id: 'fb6-shift', value: 'A' },
       { id: 'fb6-high-low-tide', value: 'High 10:00 / Low 16:30' },
       { id: 'fb6-port-engine-hours', value: 45.5 },
     ],
@@ -948,16 +955,16 @@ test('FB6 null fleet metadata remains selectable and completes the Daily browser
   await expect(page.getByText('Unit: FB6', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Start Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
-  await page.getByLabel('Full Name').fill('Captain Browser');
-  await page.getByText('Captain Browser', { exact: true }).click();
-  await page.getByRole('button', { name: 'Continue to Inspection' }).click();
+  await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Checklist details', exact: true }).click();
   await page.getByLabel('High Low Tide').fill('High 10:00 / Low 16:30');
+  await page.locator('#fb6-shift').selectOption('A');
   await page.getByLabel('Port Engine Hours').fill('45.5');
   await page.getByRole('button', { name: 'Mark all due duties as present' }).click();
   await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
   await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
   await page.getByRole('button', { name: 'Review & Submit' }).click();
+  await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
@@ -987,7 +994,7 @@ test('Fire Boat retries a lost session-start response with its same local issuan
 
   await page.reload();
 
-  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
   expect(api.sessionStarts).toHaveLength(2);
   expect(api.sessionStarts[1]?.inspection_session_start_key).toBe(issuanceKey);
 });
@@ -995,7 +1002,7 @@ test('Fire Boat retries a lost session-start response with its same local issuan
 test('Fire Boat recovers a valid prior-day contract after local storage loss and starts today only by explicit abandonment', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-08-30T23:55:00-04:00') });
   const api = await mockFireBoatInspectionApi(page, { recoverPriorDayContract: true });
-  const autosaveKey = `mbfd_autosave_inspection_fire-boat-6_${fireBoatChecklist.checklist_version}`;
+  const autosaveKey = `mbfd_autosave_inspection_fire-boat-6_${fireBoatChecklist.checklist_version}_actor_101_1`;
 
   await page.goto('/daily/apparatus/fire-boat-6');
   await expect.poll(() => page.evaluate((key) => {
@@ -1010,7 +1017,7 @@ test('Fire Boat recovers a valid prior-day contract after local storage loss and
   await page.clock.setFixedTime(new Date('2026-08-31T00:05:00-04:00'));
   await page.reload();
 
-  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
   await expect(page.getByRole('alert')).toContainText('A valid Fire Boat inspection from the prior duty date is still active.');
   await expect(page.getByRole('button', { name: 'Abandon Prior Inspection / Start Today’s Inspection' })).toBeVisible();
   expect(api.sessionStarts).toHaveLength(2);
@@ -1031,18 +1038,18 @@ test('Fire Boat v2 reload restores same-version typed fields, due-duty status, a
   const api = await mockFireBoatInspectionApi(page);
 
   await page.goto('/daily/apparatus/fire-boat-6');
-  await page.getByLabel('Full Name').fill('Captain Browser');
-  await page.getByText('Captain Browser', { exact: true }).click();
-  await page.getByRole('button', { name: 'Continue to Inspection' }).click();
+  await page.getByRole('button', { name: 'Checklist details', exact: true }).click();
 
   await expect(page.getByRole('heading', { name: 'Checklist Details' })).toBeVisible();
   await page.getByLabel('High Low Tide').fill('High 10:00 / Low 16:30');
+  await page.locator('#fb6-shift').selectOption('A');
   await page.getByLabel('Port Engine Hours').fill('45.5');
   await page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
     .getByRole('button', { name: 'Missing', exact: true })
     .click();
   await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
 
+  await page.getByRole('button', { name: /^Flashlights/ }).click();
   await page.getByRole('group', { name: 'Status for Flashlights' })
     .getByRole('button', { name: /Damaged/ })
     .click();
@@ -1053,12 +1060,13 @@ test('Fire Boat v2 reload restores same-version typed fields, due-duty status, a
   expect(api.sessionStarts).toHaveLength(1);
 
   await expect(page.getByText(/Restored from autosave/)).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Compartment Inspection' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Compartment Inspection' })).toBeVisible();
+  await page.getByRole('button', { name: /^Flashlights/ }).click();
   await expect(page.getByRole('group', { name: 'Status for Flashlights' })
     .getByRole('button', { name: /Damaged/ }))
     .toHaveAttribute('aria-pressed', 'true');
 
-  await page.getByRole('button', { name: 'Back to Checklist Details' }).click();
+  await page.getByRole('button', { name: 'Checklist details', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Checklist Details' })).toBeVisible();
   await expect(page.getByLabel('High Low Tide')).toHaveValue('High 10:00 / Low 16:30');
   await expect(page.getByLabel('Port Engine Hours')).toHaveValue('45.5');
@@ -1072,9 +1080,9 @@ test('Fire Boat v2 reload restores an issued session when the checklist API is o
   const api = await mockFireBoatInspectionApi(page);
 
   await page.goto('/daily/apparatus/fire-boat-6');
-  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate((checklistVersion) => {
-    const saved = window.localStorage.getItem(`mbfd_autosave_inspection_fire-boat-6_${checklistVersion}`);
+    const saved = window.localStorage.getItem(`mbfd_autosave_inspection_fire-boat-6_${checklistVersion}_actor_101_1`);
 
     return saved === null ? null : JSON.parse(saved).inspectionSession?.id;
   }, fireBoatChecklist.checklist_version)).toBe(fireBoatInspectionSession.id);
@@ -1092,7 +1100,7 @@ test('Fire Boat v2 reload restores an issued session when the checklist API is o
 
   await page.reload();
 
-  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
   await expect(page.getByText(/Restored from autosave/)).toBeVisible();
   expect(offlineApiPaths).not.toContain('/api/public/apparatuses');
   expect(offlineApiPaths).not.toContain(`/api/public/apparatuses/${fireBoatApparatus.id}/checklist`);
@@ -1105,7 +1113,7 @@ test('Fire Boat online reload uses current apparatus and service notices over it
   await mockFireBoatInspectionApi(page);
 
   await page.goto('/daily/apparatus/fire-boat-6');
-  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
 
   await page.unroute('**/api/**');
   await page.route('**/api/**', async (route) => {
@@ -1128,14 +1136,14 @@ test('Fire Boat online reload uses current apparatus and service notices over it
 
   await page.reload();
 
-  await expect(page.getByText('Unit: FB6-LIVE', { exact: true })).toBeVisible();
+  await expect(page.getByText('Vehicle FB6-LIVE', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Unit out of service' })).toBeVisible();
   await expect(page.getByText('FB6-LIVE-901 · Live Fleet notice', { exact: true })).toBeVisible();
 });
 
 test('Fire Boat v2 reload does not reuse an expired saved session', async ({ page }) => {
   const api = await mockFireBoatInspectionApi(page);
-  const autosaveKey = `mbfd_autosave_inspection_fire-boat-6_${fireBoatChecklist.checklist_version}`;
+  const autosaveKey = `mbfd_autosave_inspection_fire-boat-6_${fireBoatChecklist.checklist_version}_actor_101_1`;
 
   await page.goto('/daily/apparatus/fire-boat-6');
   await expect.poll(() => page.evaluate((key) => {
@@ -1164,17 +1172,21 @@ test('Fire Boat v2 reload does not reuse an expired saved session', async ({ pag
 
   await page.reload();
 
-  await expect(page.getByRole('heading', { name: 'Daily Inspection: Fire Boat 6' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
   expect(api.sessionStarts).toHaveLength(2);
   await expect(page.getByText(/prior Fire Boat session expired/i)).toBeVisible();
-  await page.getByLabel('Full Name').fill('Captain Browser');
-  await page.getByText('Captain Browser', { exact: true }).click();
-  await page.getByRole('button', { name: 'Continue to Inspection' }).click();
+  await page.getByRole('button', { name: 'Checklist details', exact: true }).click();
   await expect(page.getByLabel('Date')).toHaveValue('2026-08-31');
   await expect(page.getByLabel('High Low Tide')).toHaveValue('');
   await expect(page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
     .getByRole('button', { name: 'Present', exact: true }))
-    .toHaveAttribute('aria-pressed', 'true');
+    .toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
+    .getByRole('button', { name: 'Missing', exact: true }))
+    .toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
+    .getByRole('button', { name: 'Damaged', exact: true }))
+    .toHaveAttribute('aria-pressed', 'false');
 });
 
 test('a pending-review receipt tells the operator that readiness is not yet changed', async ({ page }) => {
@@ -1237,6 +1249,8 @@ test('upgrades a pre-E01 queue without assigning it to the current user', async 
 
 test('a changed checklist preserves the older autosave while a current-version draft is created separately', async ({ page }) => {
   const staleAutosave = {
+    actorUserId: 101,
+    actorSecurityVersion: 1,
     checklist_version: 'b'.repeat(64),
     officer: { name: 'Captain Previous', rank: 'Captain', shift: 'A', unitNumber: 'E1' },
     meter: { engine_hours: 99, miles: 999 },
@@ -1258,7 +1272,7 @@ test('a changed checklist preserves the older autosave while a current-version d
     current: JSON.parse(window.localStorage.getItem(currentKey) ?? 'null'),
   }), {
     legacyKey: legacyAutosaveKey,
-    currentKey: `${legacyAutosaveKey}_${checklist.checklist_version}`,
+    currentKey: `${legacyAutosaveKey}_${checklist.checklist_version}_actor_101_1`,
   });
 
   expect(persisted.legacy).toMatchObject({
@@ -1267,6 +1281,8 @@ test('a changed checklist preserves the older autosave while a current-version d
     compartments: [{ items: [{ status: 'Missing' }] }],
   });
   expect(persisted.current).toMatchObject({
+    actorUserId: 101,
+    actorSecurityVersion: 1,
     checklist_version: checklist.checklist_version,
     officer: { name: 'Captain Browser' },
   });
@@ -1460,7 +1476,7 @@ test('reload replays an ambiguous submission with its original durable client id
   expect(typeof clientSubmissionId).toBe('string');
 
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Daily Inspection: Engine 1' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Engine 1', exact: true })).toBeVisible();
   await expect.poll(() => api.submissions.length).toBe(2);
   await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
 

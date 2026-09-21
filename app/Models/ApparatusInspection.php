@@ -16,6 +16,11 @@ class ApparatusInspection extends Model
 
     protected static function booted(): void
     {
+        static::updating(function (self $inspection): void {
+            if ($inspection->isDirty(['actor_user_id', 'apparatus_id', 'vehicle_number', 'designation_at_time', 'operator_name', 'rank', 'shift', 'unit_number', 'employee_id', 'engine_hours', 'miles', 'results', 'checklist_evidence', 'checklist_version', 'client_submission_id', 'submission_payload_hash', 'officer_signature', 'completed_at'])) {
+                throw new LogicException('Submitted inspection observations are immutable. Record a separate review decision.');
+            }
+        });
         static::deleting(function (self $inspection): void {
             if ($inspection->reviewEvents()->exists()) {
                 throw new LogicException('An apparatus inspection with review history cannot be deleted.');
@@ -38,16 +43,19 @@ class ApparatusInspection extends Model
         'vehicle_number',
         'designation_at_time',
         'results',
+        'checklist_evidence',
         'pending_effects',
         'officer_signature',
         'employee_id',
         'inspection_reference',
         'review_status',
+        'processing_status',
         'completed_at',
     ];
 
     protected $casts = [
         'results' => 'array',
+        'checklist_evidence' => 'array',
         'pending_effects' => 'array',
         'engine_hours' => 'decimal:1',
         'miles' => 'integer',
