@@ -342,11 +342,6 @@ parameters:
 			count: 2
 			path: app/Filament/Resources/StationResource/RelationManagers/CapitalProjectsRelationManager.php
 
-		-
-			message: '#^Call to static method getUrl\(\) on an unknown class App\\Filament\\Resources\\StationInventorySubmissionResource\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Filament/Resources/StationResource/RelationManagers/InventorySubmissionsRelationManager.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$station_number\.$#'
@@ -582,11 +577,6 @@ parameters:
 			count: 2
 			path: app/Filament/Widgets/SmartUpdatesWidget.php
 
-		-
-			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusDefect model\.$#'
-			identifier: larastan.relationExistence
-			count: 1
-			path: app/Filament/Widgets/StationOperationsHubWidget.php
 
 		-
 			message: '#^Left side of && is always true\.$#'

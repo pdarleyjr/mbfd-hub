@@ -62,4 +62,25 @@ test.describe('Admin UX acceptance', () => {
     await expect(page.getByRole('link', { name: 'Change Password' })).toBeVisible();
     await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible();
   });
+
+  test('station operations has an actionable focused workspace without server errors', async ({ page }) => {
+    const serverErrors: string[] = [];
+    page.on('response', (response) => {
+      if (response.status() >= 500) serverErrors.push(`${response.status()} ${response.url()}`);
+    });
+
+    await page.goto('/admin');
+    await expect(page.getByRole('heading', { name: 'Station Operations' })).toBeVisible();
+    const selector = page.getByLabel('Workspace');
+    await expect(selector).toBeVisible();
+    expect(await selector.locator('option').count()).toBeGreaterThan(1);
+    await selector.selectOption({ index: 1 });
+
+    await expect(page.getByText('Focused station workspace')).toBeVisible();
+    await expect(page.getByText('Recent submissions and activity')).toBeVisible();
+    const links = page.locator('.mbfd-station-console-focus a');
+    expect(await links.count()).toBeGreaterThan(0);
+    await expect(links.first()).toHaveAttribute('href', /\/admin\//);
+    expect(serverErrors).toEqual([]);
+  });
 });

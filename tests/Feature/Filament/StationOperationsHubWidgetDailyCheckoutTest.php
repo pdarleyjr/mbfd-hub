@@ -8,8 +8,11 @@ use App\Filament\Widgets\StationOperationsHubWidget;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
+use App\Models\ApparatusServiceTicket;
 use App\Models\DailyCheckoutLedgerCutover;
 use App\Models\Station;
+use App\Models\StationInspection;
+use App\Models\StationRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -21,9 +24,9 @@ final class StationOperationsHubWidgetDailyCheckoutTest extends TestCase
     public function test_it_uses_the_canonical_daily_checkout_matrix_not_raw_inspection_rows(): void
     {
         $station = Station::query()->create([
-            'station_number' => 17,
-            'name' => 'Station 17',
-            'address' => '17 Test Street',
+            'station_number' => 1,
+            'name' => 'Station 1',
+            'address' => '1 Test Street',
             'is_active' => true,
         ]);
 
@@ -60,6 +63,8 @@ final class StationOperationsHubWidgetDailyCheckoutTest extends TestCase
         $this->assertSame(2, $dailyCheckout['completed']);
         $this->assertSame(1, $dailyCheckout['out_of_service']);
         $this->assertSame(50.0, $dailyCheckout['completion_percent']);
+        $this->assertNotSame((int) $dailyCheckout['completion_percent'], $stationData['readiness']['percent']);
+        $this->assertNotSame('UNKNOWN', $stationData['readiness']['status']);
         $this->assertTrue($dailyCheckout['completion_available']);
         $this->assertSame('out_of_service', $matrix[$outOfService->id]['state']);
         $this->assertFalse($matrix[$outOfService->id]['included_in_required_total']);
@@ -72,9 +77,9 @@ final class StationOperationsHubWidgetDailyCheckoutTest extends TestCase
     public function test_it_explicitly_marks_a_zero_required_denominator_as_unavailable(): void
     {
         $station = Station::query()->create([
-            'station_number' => 18,
-            'name' => 'Station 18',
-            'address' => '18 Test Street',
+            'station_number' => 1,
+            'name' => 'Station 1',
+            'address' => '1 Test Street',
             'is_active' => true,
         ]);
 
@@ -140,6 +145,61 @@ final class StationOperationsHubWidgetDailyCheckoutTest extends TestCase
         $this->assertSame(1, $data['stationData'][$station->id]['apparatus']['in_service']);
         $this->assertSame(1, $data['stationData'][$station->id]['apparatus']['out_of_service']);
         $this->assertSame(1, $data['stationData'][$station->id]['apparatus']['maintenance']);
+    }
+
+    public function test_it_uses_only_the_configured_operational_station_scope_everywhere(): void
+    {
+        foreach ([1, 2, 3, 4, 6, 99] as $number) {
+            Station::query()->create([
+                'station_number' => $number,
+                'name' => "Station {$number}",
+                'address' => "{$number} Test Street",
+                'is_active' => true,
+            ]);
+        }
+
+        $data = app(StationOperationsHubWidget::class)->getViewData();
+
+        $this->assertSame([1, 2, 3, 4, 6], collect($data['stationOptions'])->pluck('station_number')->all());
+        $this->assertSame([1, 2, 3, 4, 6], collect($data['stations'])->pluck('station_number')->all());
+        $this->assertCount(5, $data['stationData']);
+    }
+
+    public function test_it_keeps_recent_records_actionable_and_station_scoped(): void
+    {
+        $station = Station::query()->create(['station_number' => 1, 'name' => 'Station 1', 'address' => '1 Test Street', 'is_active' => true]);
+        $otherStation = Station::query()->create(['station_number' => 2, 'name' => 'Station 2', 'address' => '2 Test Street', 'is_active' => true]);
+        $apparatus = $this->apparatus($station, 'E1');
+        $this->apparatus($otherStation, 'E2');
+
+        $inspection = StationInspection::query()->create(['station_id' => $station->id, 'inspection_date' => now(), 'inspection_type' => 'weekly', 'overall_status' => 'pass', 'form_data' => []]);
+        $request = StationRequest::query()->create(['station_id' => $station->id, 'requester_name_snapshot' => 'Fixture Member', 'request_type' => 'equipment', 'title' => 'Radio replacement', 'description' => 'Fixture request', 'priority' => 'high', 'status' => 'submitted']);
+        $ticket = ApparatusServiceTicket::query()->create(['station_id' => $station->id, 'apparatus_id' => $apparatus->id, 'unit_designation_snapshot' => 'E1', 'origin' => 'station', 'category' => 'repair', 'title' => 'Pump check', 'description' => 'Fixture service ticket', 'priority' => 'attention', 'status' => 'submitted']);
+        StationRequest::query()->create(['station_id' => $otherStation->id, 'requester_name_snapshot' => 'Other Member', 'request_type' => 'equipment', 'title' => 'Other station', 'description' => 'Other fixture request', 'priority' => 'normal', 'status' => 'submitted']);
+
+        $data = app(StationOperationsHubWidget::class)->getViewData()['stationData'][$station->id];
+        $activity = collect($data['recentActivity']);
+
+        $this->assertStringContainsString('/admin/station-requests/'.$request->id, $activity->firstWhere('type', 'station_request')['url']);
+        $this->assertStringContainsString('/admin/apparatus-service-tickets/'.$ticket->id, $activity->firstWhere('type', 'service_ticket')['url']);
+        $this->assertStringContainsString('/admin/station-inspections/'.$inspection->id, $activity->firstWhere('type', 'station_inspection')['url']);
+        $this->assertSame(1, $data['stationNumber']);
+        $this->assertStringContainsString('tableFilters%5Bstation_id%5D%5Bvalue%5D='.$station->id, $data['links']['requests']);
+    }
+
+    public function test_it_ranks_recent_inspections_per_station_without_starving_older_station_history(): void
+    {
+        $first = Station::query()->create(['station_number' => 1, 'name' => 'Station 1', 'address' => '1 Test Street', 'is_active' => true]);
+        $second = Station::query()->create(['station_number' => 2, 'name' => 'Station 2', 'address' => '2 Test Street', 'is_active' => true]);
+        foreach (range(1, 7) as $day) {
+            StationInspection::query()->create(['station_id' => $first->id, 'inspection_date' => now()->subDays($day), 'inspection_type' => 'daily', 'overall_status' => 'pass', 'form_data' => []]);
+        }
+        $older = StationInspection::query()->create(['station_id' => $second->id, 'inspection_date' => now()->subDays(30), 'inspection_type' => 'weekly', 'overall_status' => 'needs_attention', 'form_data' => []]);
+
+        $data = app(StationOperationsHubWidget::class)->getViewData()['stationData'];
+
+        $this->assertCount(4, $data[$first->id]['recentInspections']);
+        $this->assertSame($older->id, $data[$second->id]['recentInspections'][0]['id']);
     }
 
     private function apparatus(
