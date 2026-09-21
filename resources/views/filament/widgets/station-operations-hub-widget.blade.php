@@ -119,8 +119,9 @@
                     @endphp
                     <article class="mbfd-station-console-card {{ $hasAttention ? 'mbfd-station-console-card-attention' : '' }}">
                         <div class="mbfd-station-console-card-header">
-                            <div><p class="mbfd-station-console-kicker">Station {{ $station['station_number'] }}</p><h3>{{ $readiness['percent'] ?? 0 }}% {{ str($readiness['status'] ?? 'unknown')->headline() }}</h3></div>
+                            <p class="mbfd-station-console-kicker">Station {{ $station['station_number'] }}</p>
                             <a class="mbfd-station-console-open" href="{{ $data['stationUrl'] }}">Profile</a>
+                            <h3>{{ $readiness['percent'] ?? 0 }}% {{ str($readiness['status'] ?? 'unknown')->headline() }}</h3>
                         </div>
                         <p class="mbfd-station-console-summary">Daily {{ $daily['completed'] ?? 0 }} / {{ $daily['required_total'] ?? 0 }} · Fleet {{ $apparatus['in_service'] ?? 0 }} in service / {{ $apparatus['out_of_service'] ?? 0 }} OOS</p>
                         <div class="mbfd-station-console-exceptions">
