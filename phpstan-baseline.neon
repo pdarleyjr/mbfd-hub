@@ -2705,7 +2705,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property App\\Models\\Apparatus\:\:\$status\.$#'
 			identifier: property.notFound
-			count: 3
+			count: 2
 			path: app/Services/Display/DisplaySnapshotService.php
 
 		-

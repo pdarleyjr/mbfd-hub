@@ -42,13 +42,7 @@ final class StationOperationsHubWidgetDailyCheckoutTest extends TestCase
         $this->inspection($reviewPending, 'pending_review');
         $this->inspection($outOfService, 'approved');
 
-        ApparatusDefect::query()->create([
-            'apparatus_id' => $attention->id,
-            'compartment' => 'Cab',
-            'item' => 'Fixture radio',
-            'status' => 'Missing',
-            'resolved' => false,
-        ]);
+        ApparatusDefect::recordDefect($attention->id, 'Cab', 'Fixture radio', 'Missing', 'Fixture radio absent.');
 
         $data = app(StationOperationsHubWidget::class)->getViewData();
         $stationData = $data['stationData'][$station->id];
@@ -117,20 +111,8 @@ final class StationOperationsHubWidgetDailyCheckoutTest extends TestCase
         $maintenance = $this->apparatus($station, 'T1', 'in-maintenance');
         $this->apparatus($secondStation, 'E2', 'In Service');
 
-        ApparatusDefect::query()->create([
-            'apparatus_id' => $available->id,
-            'compartment' => 'Cab',
-            'item' => 'Missing radio',
-            'status' => 'Missing',
-            'resolved' => false,
-        ]);
-        ApparatusDefect::query()->create([
-            'apparatus_id' => $outOfService->id,
-            'compartment' => 'Cab',
-            'item' => 'Damaged light',
-            'status' => 'Damaged',
-            'resolved' => false,
-        ]);
+        ApparatusDefect::recordDefect($available->id, 'Cab', 'Missing radio', 'Missing', 'Fixture radio absent.');
+        ApparatusDefect::recordDefect($outOfService->id, 'Cab', 'Damaged light', 'Damaged', 'Fixture lens cracked.');
 
         $widget = app(StationOperationsHubWidget::class);
         $widget->selectedStationId = (string) $station->id;

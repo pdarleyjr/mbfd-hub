@@ -2,8 +2,8 @@
 
 namespace App\Policies;
 
-use App\Models\User;
 use App\Models\ApparatusDefect;
+use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class ApparatusDefectPolicy
@@ -47,7 +47,7 @@ class ApparatusDefectPolicy
      */
     public function delete(User $user, ApparatusDefect $apparatusDefect): bool
     {
-        return $user->can('delete_defect');
+        return false;
     }
 
     /**
@@ -55,7 +55,7 @@ class ApparatusDefectPolicy
      */
     public function deleteAny(User $user): bool
     {
-        return $user->can('delete_any_defect');
+        return false;
     }
 
     /**
@@ -63,7 +63,7 @@ class ApparatusDefectPolicy
      */
     public function forceDelete(User $user, ApparatusDefect $apparatusDefect): bool
     {
-        return $user->can('force_delete_defect');
+        return false;
     }
 
     /**
@@ -71,7 +71,7 @@ class ApparatusDefectPolicy
      */
     public function forceDeleteAny(User $user): bool
     {
-        return $user->can('force_delete_any_defect');
+        return false;
     }
 
     /**

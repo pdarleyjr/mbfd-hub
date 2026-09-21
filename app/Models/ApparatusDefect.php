@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
@@ -56,6 +57,26 @@ class ApparatusDefect extends Model
         'resolved' => 'boolean',
         'reported_date' => 'date',
     ];
+
+    public function scopeUnresolved(Builder $query): Builder
+    {
+        return $query->where('resolved', false);
+    }
+
+    public function scopeMissing(Builder $query): Builder
+    {
+        return $query->where('issue_type', 'missing');
+    }
+
+    public function scopeDamaged(Builder $query): Builder
+    {
+        return $query->where('issue_type', 'damaged');
+    }
+
+    public function scopeCriticalForReadiness(Builder $query): Builder
+    {
+        return $this->scopeUnresolved($query)->whereIn('issue_type', ['missing', 'damaged']);
+    }
 
     public function apparatus()
     {
@@ -118,7 +139,7 @@ class ApparatusDefect extends Model
         $existing = self::where('apparatus_id', $apparatusId)
             ->where('compartment', $compartment)
             ->where('item', $item)
-            ->where('resolved', false)
+            ->unresolved()
             ->first();
 
         if ($existing) {

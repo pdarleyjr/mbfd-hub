@@ -573,8 +573,7 @@ final class DailyCheckoutComplianceService
 
         return ($connection === null ? ApparatusDefect::query() : ApparatusDefect::on($connection))
             ->whereIn('apparatus_id', $apparatusIds)
-            ->where('resolved', false)
-            ->whereIn('status', ['Missing', 'Damaged'])
+            ->criticalForReadiness()
             ->select('apparatus_id')
             ->distinct()
             ->pluck('apparatus_id')

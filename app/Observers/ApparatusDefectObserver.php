@@ -26,8 +26,8 @@ class ApparatusDefectObserver
             // Create admin alert for new defect
             $this->createDefectAlert($defect);
             
-            // Generate equipment recommendation (only for Missing/Damaged status)
-            if (in_array($defect->status, ['Missing', 'Damaged'])) {
+            // Generate equipment recommendations for missing or damaged findings.
+            if (in_array($defect->issue_type, ['missing', 'damaged'], true)) {
                 $recommendation = $this->matchingService->generateRecommendationForDefect($defect);
                 
                 if ($recommendation && $recommendation->equipment_item_id) {
@@ -49,12 +49,12 @@ class ApparatusDefectObserver
      */
     protected function createDefectAlert(ApparatusDefect $defect): void
     {
-        $severity = $defect->status === 'Missing' ? 'warning' : 'info';
+        $severity = $defect->issue_type === 'missing' ? 'warning' : 'info';
         
         AdminAlertEvent::create([
             'type' => 'defect_created',
             'severity' => $severity,
-            'message' => "Defect reported: {$defect->item} ({$defect->status}) on {$defect->apparatus->unit_id} - {$defect->compartment}",
+            'message' => "Defect reported: {$defect->item} ({$defect->issue_type}) on {$defect->apparatus->unit_id} - {$defect->compartment}",
             'related_type' => 'apparatus_defect',
             'related_id' => $defect->id,
         ]);

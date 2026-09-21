@@ -60,14 +60,7 @@ class DisplaySnapshotTest extends TestCase
             'completed_at' => now(),
         ]);
 
-        ApparatusDefect::create([
-            'apparatus_id' => $apparatus->id,
-            'compartment' => 'Cab',
-            'item' => 'Flashlight',
-            'status' => 'Missing',
-            'notes' => 'internal note',
-            'resolved' => false,
-        ]);
+        ApparatusDefect::recordDefect($apparatus->id, 'Cab', 'Flashlight', 'Missing', 'internal note');
 
         return $station;
     }

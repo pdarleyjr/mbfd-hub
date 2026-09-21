@@ -152,6 +152,33 @@ final class ApparatusDefectStateIntegrityTest extends TestCase
         $this->assertNotNull($resolved->resolved_at);
     }
 
+    public function test_operational_defect_history_cannot_be_hard_deleted_through_ordinary_permissions(): void
+    {
+        $defect = ApparatusDefect::recordDefect(
+            $this->createApparatus()->id,
+            'Cab',
+            'Portable radio',
+            'Missing',
+            'Radio absent.',
+        );
+        $manager = $this->defectManager();
+        $manager->givePermissionTo([
+            Permission::findOrCreate('delete_defect', 'web'),
+            Permission::findOrCreate('delete_any_defect', 'web'),
+        ]);
+
+        $this->actingAs($manager);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        $this->assertFalse($manager->can('delete', $defect));
+        $this->assertFalse($manager->can('deleteAny', ApparatusDefect::class));
+        Livewire::test(ListDefects::class)
+            ->call('loadTable')
+            ->assertTableBulkActionDoesNotExist('delete');
+        $this->assertModelExists($defect);
+    }
+
     public function test_rereporting_an_in_progress_defect_preserves_its_workflow_state(): void
     {
         $apparatus = $this->createApparatus();
