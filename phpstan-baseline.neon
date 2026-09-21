@@ -436,12 +436,6 @@ parameters:
 		-
 			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
 			identifier: property.notFound
-			count: 3
-			path: app/Filament/Widgets/InventoryOverviewWidget.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
-			identifier: property.notFound
 			count: 4
 			path: app/Filament/Widgets/InventorySuppliesWidget.php
 

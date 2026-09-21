@@ -14,7 +14,7 @@ final class ApplicationAccessRegistry
         return [
             'admin' => ['label' => 'Hub administration', 'permission' => 'admin.access', 'description' => 'Admin panel access. Individual administration capabilities and application administrator roles are managed separately.'],
             'bid' => ['label' => 'Bid', 'permission' => 'app.bid.access', 'description' => 'Member access to Bid. Its administrator role requires a separate explicit grant.'],
-            'media_control' => ['label' => 'Media Control', 'permission' => 'app.media_control.access', 'description' => 'Allows this member to use classroom displays and media controls. Platform administration requires a separate explicit grant.'],
+            'media_control' => ['label' => 'Media Control', 'permission' => 'app.media_control.access', 'description' => 'Allows this member to use Media Control.'],
             'cmd' => ['label' => 'CMD — cmd.mbfdhub.com', 'permission' => 'app.cmd.access', 'description' => 'Hub sign-in through the configured CMD client. Current account status and CMD access are checked during use.'],
             'cloud' => ['label' => 'Cloud — cloud.mbfdhub.com', 'permission' => 'app.cloud.access', 'description' => 'Requires a separately approved link to the existing Cloud account. Account and device-token changes synchronize through the audited Cloud lifecycle.'],
         ];
