@@ -159,6 +159,10 @@ class DefectResource extends Resource
                         'low_quantity' => 'Low Quantity',
                         'other' => 'Other',
                     ]),
+
+                SelectFilter::make('station_id')
+                    ->relationship('apparatus.station', 'station_number')
+                    ->label('Station'),
             ])
             ->actions([
                 Tables\Actions\Action::make('mark_resolved')

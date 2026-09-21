@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use Filament\Infolists;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -51,10 +52,27 @@ class InventorySubmissionsRelationManager extends RelationManager
                         'C' => 'C Shift',
                     ]),
             ])
-            // There is no standalone Filament resource for these records.
-            // Keep them in their canonical Station relation rather than
-            // emitting a route that resolves to a non-existent resource.
-            ->actions([])
+            // These records deliberately have no standalone resource. The
+            // owning Station is their canonical, read-only admin context.
+            ->actions([
+                Tables\Actions\ViewAction::make()
+                    ->infolist([
+                        Infolists\Components\TextEntry::make('employee_name')->label('Submitted by')->placeholder('Unknown employee'),
+                        Infolists\Components\TextEntry::make('shift')->label('Shift')->placeholder('—'),
+                        Infolists\Components\TextEntry::make('submitted_at')->label('Submitted')->dateTime('M j, Y g:i A')->timezone('America/New_York'),
+                        Infolists\Components\TextEntry::make('notes')->label('Notes')->placeholder('No notes')->columnSpanFull(),
+                        Infolists\Components\TextEntry::make('items')
+                            ->label('Submitted inventory')
+                            ->formatStateUsing(static fn (?array $state): string => collect($state ?? [])
+                                ->map(static fn (array $item): string => collect($item)
+                                    ->filter(static fn (mixed $value): bool => $value !== null && $value !== '')
+                                    ->map(static fn (mixed $value, string $key): string => str($key)->headline().': '.$value)
+                                    ->implode(' · '))
+                                ->implode("\n"))
+                            ->placeholder('No submitted inventory lines')
+                            ->columnSpanFull(),
+                    ]),
+            ])
             ->bulkActions([]);
     }
 }
