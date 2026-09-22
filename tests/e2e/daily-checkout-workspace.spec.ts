@@ -146,14 +146,14 @@ test('an additional authorized nonvisual area does not remove the Engine 2 bluep
   await fixture(page, { checklist });
   await expect(page.locator('.apparatus-blueprint')).toHaveCount(1);
   await page.getByText(/^Other areas/).click();
-  await page.getByRole('region', { name: 'Other areas', exact: true }).getByRole('button', { name: 'Additional authorized area', exact: true }).click();
+  await page.getByRole('region', { name: 'Other areas', exact: true }).getByRole('button', { name: /Additional authorized area/ }).click();
   await expect(page.getByRole('heading', { name: 'Additional authorized area', exact: true })).toBeVisible();
   await expect(page.getByText('Other area · Not shown on drawing', { exact: true })).toBeVisible();
 });
 
 test('Rescue uses authoritative named areas without a fabricated blueprint', async ({ page }, testInfo) => {
   const checklist = JSON.parse(readFileSync('storage/checklists/rescue_checklist.json', 'utf8'));
-  await fixture(page, { checklist, vehicle: { ...apparatus, name: 'Rescue 3', designation: 'R3', type: 'rescue', slug: 'rescue-3' } });
+  await fixture(page, { checklist, checklistType: 'rescue', vehicle: { ...apparatus, name: 'Rescue 3', designation: 'R3', type: 'rescue', slug: 'rescue-3' } });
   await expect(page.locator('.apparatus-blueprint')).toHaveCount(0);
   const areas = page.getByRole('region', { name: 'Inspection areas', exact: true });
   await expect(areas.getByRole('button')).toHaveCount(checklist.compartments.length);
