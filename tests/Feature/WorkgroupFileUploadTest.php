@@ -55,8 +55,6 @@ final class WorkgroupFileUploadTest extends TestCase
         Storage::fake('r2');
     }
 
-    #[RunInSeparateProcess]
-    #[PreserveGlobalState(false)]
     public function test_temporary_upload_accepts_a_twenty_megabyte_pdf_and_rejects_over_fifty(): void
     {
         self::assertSame('local', config('livewire.temporary_file_upload.disk'));
