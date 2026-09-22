@@ -287,6 +287,12 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
         $first = $this->payload();
         $first['compartments'][0]['items'][0]['status'] = $status;
         $first['compartments'][0]['items'][0]['notes'] = 'Observed during checkout.';
+        $first['defects'][] = [
+            'compartment' => $first['compartments'][0]['name'],
+            'item' => $first['compartments'][0]['items'][0]['name'],
+            'status' => $status,
+            'notes' => $first['compartments'][0]['items'][0]['notes'],
+        ];
         $this->postJson($this->url(), $first)->assertCreated()->assertJsonPath('processing_status', 'accepted');
 
         $defect = ApparatusDefect::sole();
@@ -297,6 +303,12 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
         $second = $this->payload();
         $second['compartments'][0]['items'][0]['status'] = $status;
         $second['compartments'][0]['items'][0]['notes'] = 'Confirmed on the next checkout.';
+        $second['defects'][] = [
+            'compartment' => $second['compartments'][0]['name'],
+            'item' => $second['compartments'][0]['items'][0]['name'],
+            'status' => $status,
+            'notes' => $second['compartments'][0]['items'][0]['notes'],
+        ];
         $this->postJson($this->url(), $second)->assertCreated()->assertJsonPath('processing_status', 'accepted');
 
         $present = $this->payload();
