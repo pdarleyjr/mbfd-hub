@@ -1,5 +1,3 @@
-import type { Compartment } from '../types';
-
 export interface BlueprintZone {
   compartmentId: string;
   label: string;
@@ -119,16 +117,16 @@ export const fireboat6: BlueprintProfile = {
   ],
 };
 
-const profiles: Array<{ profile: BlueprintProfile; compartmentIds: string[] }> = [
-  { profile: enginePuc, compartmentIds: ['front_cab', 'rear_cab', 'comp_a1', 'comp_a2', 'comp_a3', 'comp_a4', 'comp_b1', 'comp_b2', 'comp_b3', 'comp_b4', 'backboards_comp', 'front_bumper', 'top_comp_1', 'top_comp_2', 'top_comp_3', 'top_comp_4', 'rear_1', 'rear_2', 'rear_3', 'rear_4', 'rear_5', 'tailboard', 'hose_inventory', 'jumplines'] },
-  { profile: engine2Puc, compartmentIds: ['front_cab', 'rear_cab', 'comp_l1', 'comp_l2', 'comp_l3', 'comp_l4', 'comp_r1', 'comp_r2', 'comp_r3', 'comp_r4', 'scba_bottle_comp', 'backboards_comp', 'front_bumper', 'top_comp_1', 'top_comp_2', 'top_comp_3', 'top_comp_4', 'rear_1', 'rear_2', 'rear_3', 'rear_4', 'rear_5', 'tailboard', 'hose_inventory', 'jumplines'] },
-  { profile: ladder1, compartmentIds: ['front_bumper', 'backboards_comp', 'a_comp_1', 'a_comp_2', 'a_comp_3', 'a_comp_4', 'a_comp_5_6', 'b_comp_6', 'b_comp_5', 'b_comp_4', 'b_comp_3', 'b_comp_2', 'extinguishers', 'b_comp_1', 'front_cab', 'rear_cab', 'rear_1', 'tailboard', 'hose', 'top_comp_driver', 'top_comp_officer', 'ladder', 'bucket', 'scba_radio'] },
-  { profile: ladder3, compartmentIds: ['front_bumper', 'pump_panel', 'a_comp_1', 'a_comp_2', 'a_comp_3', 'a_comp_4', 'a_comp_5', 'a_comp_6', 'b_comp_5', 'b_comp_4', 'b_comp_3', 'b_comp_2', 'stokes_comp', 'b_comp_1', 'officer_side_panel', 'rear_comp', 'tailboard', 'hose', 'aerial_bucket', 'aerial_ladder', 'top_comp', 'rear_cab', 'front_cab', 'scba_radio'] },
-  { profile: fireboat6, compartmentIds: ['fb6-interior-cab', 'fb6-port-side-deck-upper-storage', 'fb6-port-side-deck-lower-storage', 'fb6-exterior-deck-inventory', 'fb6-front-anchor-locker', 'fb6-medical-inventory', 'fb6-cubby-storage', 'fb6-inside-seats-port', 'fb6-inside-seats-starboard', 'fb6-starboard-side-upper-storage', 'fb6-starboard-side-lower-storage', 'fb6-inside-cab-storage'] },
-];
+const profilesByChecklistType: Record<string, BlueprintProfile> = {
+  engine: enginePuc,
+  engine2: engine2Puc,
+  ladder1,
+  ladder3,
+  fireboat6,
+};
 
-export function resolveBlueprint(compartments: Compartment[]): BlueprintProfile | null {
-  // Require the complete stable ID contract, never a mutable unit name or partial overlap.
-  const ids = new Set(compartments.map(compartment => compartment.id));
-  return profiles.find(({ compartmentIds }) => compartments.length === compartmentIds.length && ids.size === compartmentIds.length && compartmentIds.every(id => ids.has(id)))?.profile ?? null;
+export function resolveBlueprint(checklistType: string | null | undefined): BlueprintProfile | null {
+  // The server-issued checklist type is authoritative. Profiles only provide
+  // schematic zones; the issued checklist remains the inventory authority.
+  return checklistType ? profilesByChecklistType[checklistType] ?? null : null;
 }

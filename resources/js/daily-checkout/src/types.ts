@@ -149,6 +149,7 @@ export interface Compartment {
 export interface ChecklistData {
   open_findings?: Array<{ id: number; compartment: string; item: string; issue_type: string; operational_impact: string; last_observation: string | null; last_observed_at: string | null; service_status: string | null }>;
   checklist_version: string;
+  checklist_type?: string;
   schema_version: 1 | 2;
   template_id?: string;
   template_version?: string;

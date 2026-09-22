@@ -825,6 +825,7 @@ export default function InspectionWizard() {
       {currentStep === 'compartments' && (
         <CompartmentStep
           actionLabel={readiness.label}
+          checklistType={checklist.checklist_type}
           compartments={compartments}
           findings={checklist.open_findings}
           onChange={setCompartments}

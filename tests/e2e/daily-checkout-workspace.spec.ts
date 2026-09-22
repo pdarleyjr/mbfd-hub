@@ -9,9 +9,10 @@ const version = 'e'.repeat(64);
 const inspectionDate = '2026-09-21';
 const apparatus = { id: 102, name: 'Engine 2', designation: 'E2', type: 'engine', vehicle_number: 'TEST-102', slug: 'engine-2', status: 'In Service', current_engine_hours: 1250, current_miles: 42518, pm_health: { status: 'yellow', hours_since_pm: 270, miles_since_pm: 700, interval_hours: 300, overdue: false, last_pm_date: '2026-09-01' } };
 
-async function fixture(page: Page, options: { checklist?: typeof sourceChecklist; vehicle?: typeof apparatus; findings?: ChecklistData['open_findings']; revisions?: InspectionRevision[] } = {}) {
+async function fixture(page: Page, options: { checklist?: typeof sourceChecklist; checklistType?: string; vehicle?: typeof apparatus; findings?: ChecklistData['open_findings']; revisions?: InspectionRevision[] } = {}) {
   const vehicle = options.vehicle ?? apparatus;
   const checklist = options.checklist ?? sourceChecklist;
+  const checklistType = options.checklistType ?? 'engine2';
   if (checklist.schema_version === 2) await page.clock.setFixedTime(new Date(`${inspectionDate}T13:00:00Z`));
   const submissions: InspectionSubmission[] = [];
   const revisions: Array<{ reason: string; value?: number }> = [];
@@ -21,9 +22,9 @@ async function fixture(page: Page, options: { checklist?: typeof sourceChecklist
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/me/context') return route.fulfill({ json: { identity: { user_id: userId, has_personnel_profile: true }, personnel: { employee_profile_id: userId + 100, employee_number: `TEST-${userId + 100}`, name: userId === 401 ? 'Browser Member' : 'Other Browser Member', rank: 'Captain' }, offline: { security_version: 1 } } });
     if (path === '/api/public/apparatuses') return route.fulfill({ json: [vehicle] });
-    if (path.endsWith('/checklist')) return route.fulfill({ json: { inspection_date: inspectionDate, checklist_version: version, checklist, due_tasks: [], open_findings: options.findings ?? [] } });
+    if (path.endsWith('/checklist')) return route.fulfill({ json: { inspection_date: inspectionDate, checklist_version: version, checklist_type: checklistType, checklist, due_tasks: [], open_findings: options.findings ?? [] } });
     if (path.endsWith('/inspection-sessions')) return route.fulfill({ status: 201, json: {
-      inspection_date: inspectionDate, checklist_version: version, checklist, due_tasks: [],
+      inspection_date: inspectionDate, checklist_version: version, checklist_type: checklistType, checklist, due_tasks: [],
       inspection_session: {
         id: '11111111-2222-4333-8444-555555555555', token: 'd'.repeat(64),
         issued_at: `${inspectionDate}T12:00:00Z`, expires_at: `${inspectionDate}T23:00:00Z`,
@@ -60,9 +61,10 @@ for (const [designation, name, slug, file] of [
 ]) {
   test(`verified ${designation} blueprint views select their authoritative areas`, async ({ page }, testInfo) => {
     const checklist = JSON.parse(readFileSync(`storage/checklists/${file}_checklist.json`, 'utf8'));
-    const profile = resolveBlueprint(checklist.compartments);
+    const checklistType = file === 'engine' ? 'engine' : file;
+    const profile = resolveBlueprint(checklistType);
     if (!profile) throw new Error(`Missing verified profile for ${designation}`);
-    await fixture(page, { checklist, vehicle: { ...apparatus, name, designation, slug } });
+    await fixture(page, { checklist, checklistType, vehicle: { ...apparatus, name, designation, slug } });
     for (const view of profile.views) {
       await page.getByRole('button', { name: view.label, exact: true }).click();
       expect(await page.locator('.blueprint-views button').evaluateAll(buttons => buttons.every(button => button.scrollWidth <= button.clientWidth))).toBe(true);
@@ -130,6 +132,23 @@ test('known findings are visible on mapped zones and unlocated areas remain reac
   await expect(page.getByRole('heading', { name: unlocated.title, exact: true })).toBeVisible();
   await expect(page.getByText('Other area · Not shown on drawing', { exact: true })).toBeVisible();
   await expect(page.locator('.blueprint-zone[aria-pressed=true]')).toHaveCount(0);
+});
+
+test('an additional authorized nonvisual area does not remove the Engine 2 blueprint', async ({ page }) => {
+  const checklist = {
+    ...sourceChecklist,
+    compartments: [...sourceChecklist.compartments, {
+      id: 'test-authorized-other-area',
+      name: 'Additional authorized area',
+      items: [{ id: 'test-authorized-other-item', name: 'Additional authorized item' }],
+    }],
+  };
+  await fixture(page, { checklist });
+  await expect(page.locator('.apparatus-blueprint')).toHaveCount(1);
+  await page.getByText(/^Other areas/).click();
+  await page.getByRole('region', { name: 'Other areas', exact: true }).getByRole('button', { name: 'Additional authorized area', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Additional authorized area', exact: true })).toBeVisible();
+  await expect(page.getByText('Other area · Not shown on drawing', { exact: true })).toBeVisible();
 });
 
 test('Rescue uses authoritative named areas without a fabricated blueprint', async ({ page }, testInfo) => {
@@ -341,7 +360,7 @@ async function inspectActualEquipment(page: Page, checklist: typeof sourceCheckl
 }
 
 async function selectArea(page: Page, checklist: typeof sourceChecklist, areaId: string) {
-  const profile = resolveBlueprint(checklist.compartments);
+  const profile = resolveBlueprint('engine2');
   const view = profile?.views.find(entry => entry.zones.some(zone => zone.compartmentId === areaId));
   if (view) {
     await page.getByLabel('Apparatus views', { exact: true }).getByRole('button', { name: view.label, exact: true }).click();

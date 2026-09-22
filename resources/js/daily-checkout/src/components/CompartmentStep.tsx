@@ -7,6 +7,7 @@ import ApparatusBlueprint from './ApparatusBlueprint';
 import './inspection-workspace.css';
 
 interface Props {
+  checklistType?: string;
   compartments: Compartment[];
   findings?: ChecklistData['open_findings'];
   onChange: Dispatch<SetStateAction<Compartment[]>>;
@@ -16,10 +17,11 @@ interface Props {
   actionLabel: string;
 }
 
-export default function CompartmentStep({ compartments, findings = [], onChange, onSubmit, onBack, actionLabel }: Props) {
-  const profile = resolveBlueprint(compartments);
-  const [activeId, setActiveId] = useState(profile?.views[0].zones[0].compartmentId ?? compartments[0]?.id ?? '');
-  const [viewId, setViewId] = useState(profile?.views[0].id ?? 'all');
+export default function CompartmentStep({ checklistType, compartments, findings = [], onChange, onSubmit, onBack, actionLabel }: Props) {
+  const profile = resolveBlueprint(checklistType);
+  const mappedViews = profile?.views.filter(view => view.zones.some(zone => compartments.some(compartment => compartment.id === zone.compartmentId))) ?? [];
+  const [activeId, setActiveId] = useState(mappedViews[0]?.zones.find(zone => compartments.some(compartment => compartment.id === zone.compartmentId))?.compartmentId ?? compartments[0]?.id ?? '');
+  const [viewId, setViewId] = useState(mappedViews[0]?.id ?? 'all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -28,11 +30,13 @@ export default function CompartmentStep({ compartments, findings = [], onChange,
   const quickButtonRef = useRef<HTMLButtonElement>(null);
   const navigationRef = useRef<HTMLElement>(null);
   const current = compartments.find(compartment => compartment.id === activeId) ?? compartments[0];
-  const view = profile?.views.find(entry => entry.id === viewId) ?? profile?.views[0];
+  const view = mappedViews.find(entry => entry.id === viewId) ?? mappedViews[0];
+  const visibleZones = view?.zones.filter(zone => compartments.some(compartment => compartment.id === zone.compartmentId)) ?? [];
+  const showBlueprint = profile !== null && mappedViews.length > 0;
   const progress = inspectionProgress(compartments);
   const compartmentProgress = current ? inspectionProgress([current]) : null;
   const unlocatedFindings = findings.filter(finding => !compartments.some(compartment => compartment.name === finding.compartment && compartment.items.some(item => item.name === finding.item)));
-  const mappedIds = new Set(profile?.views.flatMap(entry => entry.zones.map(zone => zone.compartmentId)) ?? []);
+  const mappedIds = new Set(mappedViews.flatMap(entry => entry.zones.map(zone => zone.compartmentId)));
   const otherAreas = compartments.filter(compartment => !mappedIds.has(compartment.id));
   const remaining = compartments.flatMap(compartment => compartment.items
     .filter(item => !itemIsComplete(item))
@@ -64,7 +68,7 @@ export default function CompartmentStep({ compartments, findings = [], onChange,
   }, [focusItem, activeId]);
 
   const select = (id: string, itemId?: string) => {
-    const nextView = profile?.views.find(entry => entry.zones.some(zone => zone.compartmentId === id));
+    const nextView = mappedViews.find(entry => entry.zones.some(zone => zone.compartmentId === id));
     if (nextView) setViewId(nextView.id);
     setActiveId(id);
     setExpandedId(itemId ?? null);
@@ -93,22 +97,22 @@ export default function CompartmentStep({ compartments, findings = [], onChange,
 
   if (!current || !compartmentProgress) return <div role="alert">No checklist items available. <button onClick={onBack}>Member / Vehicle Info</button></div>;
 
-  return <div className={`inspection-layout ${profile ? 'with-blueprint' : 'with-area-rail'}`}>
+  return <div className={`inspection-layout ${showBlueprint ? 'with-blueprint' : 'with-area-rail'}`}>
     <aside className="inspection-navigation" aria-label="Apparatus navigation" ref={navigationRef}>
-      <div className="inspection-panel-heading"><span className="inspection-eyebrow">{profile ? 'Apparatus' : 'Inspection areas'}</span><span>{compartments.length} areas</span></div>
-      {profile && view ? <>
+      <div className="inspection-panel-heading"><span className="inspection-eyebrow">{showBlueprint ? 'Apparatus' : 'Inspection areas'}</span><span>{compartments.length} areas</span></div>
+      {showBlueprint && view ? <>
         <div className="blueprint-views" aria-label="Apparatus views">
-          {profile.views.map(entry => <button key={entry.id} type="button" aria-pressed={entry.id === view.id} onClick={() => { setViewId(entry.id); setActiveId(entry.zones[0].compartmentId); setExpandedId(null); }}>{entry.label}</button>)}
+          {mappedViews.map(entry => <button key={entry.id} type="button" aria-pressed={entry.id === view.id} onClick={() => { setViewId(entry.id); setActiveId(entry.zones.find(zone => compartments.some(compartment => compartment.id === zone.compartmentId))!.compartmentId); setExpandedId(null); }}>{entry.label}</button>)}
         </div>
         <ApparatusBlueprint view={view} compartments={compartments} activeId={current.id} findings={findings} onSelect={select} />
-        <div className="blueprint-touch-zones" aria-label="Select a diagram area">{view.zones.map(zone => {
+        <div className="blueprint-touch-zones" aria-label="Select a diagram area">{visibleZones.map(zone => {
           const area = compartments.find(compartment => compartment.id === zone.compartmentId)!;
           const state = inspectionProgress([area]);
           const known = findingsForArea(area, findings).length;
           return <button key={zone.compartmentId} type="button" aria-label={`${area.name}${known ? `, ${known} existing issues` : ''}${state.issues ? `, ${state.issues} reported issues` : ''}`} aria-pressed={current.id === zone.compartmentId} onClick={() => select(zone.compartmentId)}>{state.remaining === 0 && <Check size={13} />}{zone.label}{(known > 0 || state.issues > 0) && <TriangleAlert size={13} />}</button>;
         })}</div>
         <div className="blueprint-legend"><span><i className="remaining-dot" />Remaining</span><span><Check size={13} />Inspected</span><span><b>E</b> Existing</span><span><b>R</b> Reported</span></div>
-        <div className="blueprint-findings">{view.zones.map(zone => {
+        <div className="blueprint-findings">{visibleZones.map(zone => {
           const area = compartments.find(compartment => compartment.id === zone.compartmentId)!;
           const existing = findingsForArea(area, findings).length;
           const reported = inspectionProgress([area]).issues;
@@ -128,7 +132,7 @@ export default function CompartmentStep({ compartments, findings = [], onChange,
 
     <section className="inspection-equipment" aria-label="Compartment Inspection" ref={workspaceRef}>
       <header className="equipment-heading">
-        <div><p className="inspection-eyebrow">{profile && !mappedIds.has(current.id) ? 'Other area · Not shown on drawing' : 'Compartment Inspection'}</p><h2>{current.name}</h2><p className="inspection-muted">{compartmentProgress.completed} of {compartmentProgress.total} inspected{compartmentProgress.issues > 0 ? ` · ${compartmentProgress.issues} reported` : ''}</p></div>
+        <div><p className="inspection-eyebrow">{showBlueprint && !mappedIds.has(current.id) ? 'Other area · Not shown on drawing' : 'Compartment Inspection'}</p><h2>{current.name}</h2><p className="inspection-muted">{compartmentProgress.completed} of {compartmentProgress.total} inspected{compartmentProgress.issues > 0 ? ` · ${compartmentProgress.issues} reported` : ''}</p></div>
         <button type="button" className="confirm-compartment" aria-label="Mark all items in this compartment as present" onClick={() => onChange(previous => previous.map(compartment => compartment.id === current.id ? { ...compartment, items: compartment.items.map(item => (item.observed && item.status !== 'Present') || (item.inputType && item.inputType !== 'checkbox' && !itemIsComplete(item)) ? item : { ...item, status: 'Present', observed: true }) } : compartment))}>✓ Confirm all present</button>
       </header>
       {photoError && <p role="alert" className="inspection-alert">{photoError}</p>}
