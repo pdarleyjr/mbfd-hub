@@ -8,6 +8,7 @@ use App\Enums\AccountStatus;
 use App\Exceptions\MemberBootstrapStateChanged;
 use App\Models\AuthenticationSession;
 use App\Models\Employee;
+use App\Models\MemberOnboardingInvitation;
 use App\Models\User;
 use App\Services\Security\SecurityAuditRecorder;
 use Carbon\CarbonInterface;
@@ -17,32 +18,44 @@ use Illuminate\Support\Facades\Password;
 
 final class AccountSecurityService
 {
-    public function completeMemberBootstrap(
+    public function completeMemberOnboarding(
+        int $invitationId,
         int $userId,
         int $employeeProfileId,
         int $expectedSecurityVersion,
-        string $cityEmail,
+        string $sessionBinding,
         string $passwordHash,
         CarbonInterface $at,
     ): User {
-        return DB::transaction(function () use ($userId, $employeeProfileId, $expectedSecurityVersion, $cityEmail, $passwordHash, $at): User {
+        return DB::transaction(function () use ($invitationId, $userId, $employeeProfileId, $expectedSecurityVersion, $sessionBinding, $passwordHash, $at): User {
+            /** @var MemberOnboardingInvitation|null $invitation */
+            $invitation = MemberOnboardingInvitation::query()->lockForUpdate()->find($invitationId);
             /** @var User|null $lockedUser */
             $lockedUser = User::query()->lockForUpdate()->find($userId);
             /** @var Employee|null $lockedEmployee */
             $lockedEmployee = Employee::query()->lockForUpdate()->find($employeeProfileId);
-            if (! $lockedUser instanceof User || ! $lockedEmployee instanceof Employee
+            $authoritativeEmail = strtolower(trim((string) $lockedEmployee?->city_email));
+            if (! $invitation instanceof MemberOnboardingInvitation || ! $lockedUser instanceof User || ! $lockedEmployee instanceof Employee
+                || $invitation->user_id !== $lockedUser->id
+                || $invitation->employee_profile_id !== $lockedEmployee->id
+                || $invitation->security_version !== $expectedSecurityVersion
+                || $invitation->token_hash === null
+                || $invitation->expires_at === null || ! $invitation->expires_at->greaterThan($at)
+                || $invitation->redeemed_at === null || $invitation->consumed_at !== null
+                || ! is_string($invitation->redeemed_binding_hash)
+                || ! hash_equals($invitation->redeemed_binding_hash, hash('sha256', $sessionBinding))
+                || ! hash_equals($invitation->email, $authoritativeEmail)
                 || $lockedUser->employee_profile_id !== $lockedEmployee->getKey()
                 || $lockedUser->employee_id !== $lockedEmployee->employee_id
                 || $lockedEmployee->roster_status !== 'active'
                 || $lockedUser->getRawOriginal('account_status') !== AccountStatus::PendingActivation->value
                 || ! $lockedUser->bootstrap_onboarding_eligible
                 || $lockedUser->bootstrap_onboarding_completed_at !== null
-                || $lockedUser->security_version !== $expectedSecurityVersion
-                || ! app(MemberBootstrapCredential::class)->available()) {
+                || $lockedUser->security_version !== $expectedSecurityVersion) {
                 throw new MemberBootstrapStateChanged('The onboarding authorization is no longer current.');
             }
 
-            app(CanonicalCityEmailService::class)->sync($lockedEmployee, $lockedUser, $cityEmail);
+            app(CanonicalCityEmailService::class)->sync($lockedEmployee, $lockedUser, $invitation->email);
             DB::table('users')->where('id', $lockedUser->id)->update([
                 'password' => $passwordHash,
                 'temporary_credential_fingerprint' => null,
@@ -51,18 +64,26 @@ final class AccountSecurityService
                 'password_changed_at' => $at,
                 'bootstrap_onboarding_eligible' => false,
                 'bootstrap_onboarding_completed_at' => $at,
+                'email_verified_at' => $at,
                 'security_version' => $lockedUser->security_version + 1,
                 'updated_at' => $at,
             ]);
+            $invitation->forceFill([
+                'token_hash' => null,
+                'expires_at' => null,
+                'redeemed_binding_hash' => null,
+                'consumed_at' => $at,
+                'delivery_status' => 'consumed',
+            ])->save();
             $lockedUser = $lockedUser->fresh('employeeProfile');
-            $this->revokeSessions($lockedUser, 'member bootstrap completed', $at);
+            $this->revokeSessions($lockedUser, 'member onboarding completed', $at);
             app(SecurityAuditRecorder::class)->record(
                 $lockedUser,
                 $lockedUser,
-                'complete_member_bootstrap',
+                'complete_member_onboarding',
                 'allowed',
                 null,
-                ['employee_profile_id' => $lockedEmployee->id, 'city_email_reviewed' => true],
+                ['employee_profile_id' => $lockedEmployee->id, 'city_email_verified' => true],
             );
 
             return $lockedUser;
@@ -104,7 +125,9 @@ final class AccountSecurityService
                 'account_status' => AccountStatus::Active->value,
                 'must_change_password' => true,
                 'password_changed_at' => $at,
+                'email_verified_at' => null,
                 'bootstrap_onboarding_eligible' => false,
+                'bootstrap_onboarding_completed_at' => $at,
                 'security_version' => $lockedUser->security_version + 1,
                 'updated_at' => $at,
             ]);

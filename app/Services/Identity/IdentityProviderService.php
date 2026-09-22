@@ -33,7 +33,7 @@ final class IdentityProviderService
         if ($existing instanceof UserIdentityLink) {
             return $existing;
         }
-        $recoveryEmail = $this->recoveryEmails->connectedEmail($current);
+        $recoveryEmail = $this->recoveryEmails->recoveryAddress($current);
         if ($recoveryEmail === null) {
             throw new RuntimeException('An authoritative recovery address is required before activation.');
         }

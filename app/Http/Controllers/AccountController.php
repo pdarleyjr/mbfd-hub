@@ -25,7 +25,7 @@ final class AccountController extends Controller
         $user = $request->user('web');
         abort_unless($user instanceof User, 403);
         $link = $user->identityLinks()->where('provider', 'authentik')->first();
-        $email = $recovery->connectedEmail($user);
+        $email = $recovery->recoveryAddress($user);
         $maskedEmail = $email === null ? null : $this->maskEmail($email);
         $securityState = $link instanceof UserIdentityLink && is_array($link->security_state)
             ? $link->security_state : [];

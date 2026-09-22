@@ -32,7 +32,7 @@ final class EmployeeAccessSchema
                         $status = self::account($record)?->getRawOriginal('account_status');
 
                         return match ($status) {
-                            'pending_activation' => 'Awaiting activation — issue a unique temporary password when the member is ready to onboard.',
+                            'pending_activation' => 'Awaiting activation — send a personal City-email invitation. If City email is unavailable, verify identity and issue a unique temporary password.',
                             null => 'Awaiting account — personnel record retained; account provisioning is required.',
                             default => ucfirst(str_replace('_', ' ', $status)),
                         };

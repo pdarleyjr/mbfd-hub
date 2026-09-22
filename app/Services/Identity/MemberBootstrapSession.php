@@ -8,15 +8,12 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 
 final class MemberBootstrapSession
 {
     public const KEY = 'auth.member_bootstrap';
 
-    public function __construct(private readonly MemberBootstrapCredential $credential) {}
-
-    public function begin(Request $request, User $user): void
+    public function begin(Request $request, User $user, int $invitationId, string $binding): void
     {
         Auth::guard('web')->logout();
         $request->session()->invalidate();
@@ -26,19 +23,21 @@ final class MemberBootstrapSession
         $request->session()->put(self::KEY, [
             'user_id' => $user->getKey(),
             'employee_profile_id' => $user->employee_profile_id,
+            'invitation_id' => $invitationId,
             'security_version' => $user->security_version,
             'issued_at' => $now->getTimestamp(),
             'expires_at' => $now->addSeconds($ttl)->getTimestamp(),
-            'binding' => Str::random(48),
+            'binding' => $binding,
         ]);
     }
 
     public function current(Request $request): ?User
     {
         $context = $request->session()->get(self::KEY);
-        if (! $this->credential->available() || ! is_array($context)
+        if (! is_array($context)
             || ! is_int($context['user_id'] ?? null)
             || ! is_int($context['employee_profile_id'] ?? null)
+            || ! is_int($context['invitation_id'] ?? null)
             || ! is_int($context['security_version'] ?? null)
             || ! is_int($context['expires_at'] ?? null)
             || ! is_string($context['binding'] ?? null)
@@ -61,7 +60,7 @@ final class MemberBootstrapSession
         return $user;
     }
 
-    /** @return array{user_id:int, employee_profile_id:int, security_version:int, issued_at:int, expires_at:int, binding:string}|null */
+    /** @return array{user_id:int, employee_profile_id:int, invitation_id:int, security_version:int, issued_at:int, expires_at:int, binding:string}|null */
     public function context(Request $request): ?array
     {
         return $this->current($request) instanceof User ? $request->session()->get(self::KEY) : null;

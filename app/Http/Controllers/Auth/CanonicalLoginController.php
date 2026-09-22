@@ -11,8 +11,6 @@ use App\Services\Identity\CanonicalLoginDestination;
 use App\Services\Identity\CanonicalSessionIssuer;
 use App\Services\Identity\CanonicalUserResolver;
 use App\Services\Identity\FederationLoginAttempt;
-use App\Services\Identity\MemberBootstrapCredential;
-use App\Services\Identity\MemberBootstrapSession;
 use App\Services\Identity\SessionRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -33,8 +31,6 @@ final class CanonicalLoginController extends Controller
     public function create(
         Request $request,
         FederationLoginAttempt $attempts,
-        MemberBootstrapCredential $bootstrapCredential,
-        MemberBootstrapSession $bootstrapSessions,
     ): View|Response {
         if ($attempts->requested($request) && $attempts->current($request) === null) {
             return $attempts->unavailable();
@@ -42,11 +38,7 @@ final class CanonicalLoginController extends Controller
         if ($request->user('web') instanceof User) {
             return $attempts->requested($request) ? $attempts->complete($request) : redirect('/');
         }
-        if ($bootstrapSessions->current($request) instanceof User) {
-            return redirect()->route('member-onboarding.show');
-        }
-
-        if (! (bool) config('identity.local_login_enabled') && ! $bootstrapCredential->available()) {
+        if (! (bool) config('identity.local_login_enabled')) {
             return redirect()->route('identity.redirect', $request->only('login_attempt'));
         }
 
@@ -61,10 +53,8 @@ final class CanonicalLoginController extends Controller
         Request $request,
         CanonicalUserResolver $users,
         CanonicalSessionIssuer $sessionIssuer,
-        MemberBootstrapCredential $bootstrapCredential,
-        MemberBootstrapSession $bootstrapSessions,
     ): Response {
-        abort_unless((bool) config('identity.local_login_enabled') || $bootstrapCredential->available(), 404);
+        abort_unless((bool) config('identity.local_login_enabled'), 404);
         if (! $request->query->has('login_attempt') && is_string($request->input('login_attempt'))) {
             // CSRF has already passed before this controller runs. Preserve the
             // bound continuation if a browser drops the form action's query.
@@ -89,9 +79,6 @@ final class CanonicalLoginController extends Controller
         $throttleKey = $this->throttleKey($employeeId, (string) $request->ip());
         $maxAttempts = max(1, (int) config('security.canonical_login.max_attempts', 5));
         $decaySeconds = max(1, (int) config('security.canonical_login.decay_seconds', 60));
-        $bootstrapThrottleKey = $this->bootstrapThrottleKey((string) $request->ip());
-        $bootstrapMaxAttempts = max(1, (int) config('security.member_bootstrap.global_max_attempts', 30));
-        $bootstrapAvailable = $bootstrapCredential->available();
 
         if ($employeeId === ''
             || RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
@@ -103,33 +90,6 @@ final class CanonicalLoginController extends Controller
             $credentials['password'],
             $user?->getAuthPassword() ?? (string) config('identity.canonical_login_dummy_password_hash'),
         );
-        $bootstrapMatches = $bootstrapCredential->matches($credentials['password']);
-        $bootstrapCandidate = ! $attempts->requested($request)
-            && $user instanceof User
-            && $user->isBootstrapOnboardingPending()
-            && $bootstrapAvailable;
-
-        if ($bootstrapCandidate && RateLimiter::tooManyAttempts($bootstrapThrottleKey, $bootstrapMaxAttempts)) {
-            return $this->denied($request, $employeeId, 'rate_limited');
-        }
-
-        if ($bootstrapCandidate && $bootstrapMatches) {
-            RateLimiter::clear($throttleKey);
-            $bootstrapSessions->begin($request, $user);
-            Log::info('member_bootstrap_authentication_succeeded', [
-                'user_id' => $user->id,
-                'employee_profile_id' => $user->employee_profile_id,
-                'authentication_method' => 'restricted_member_bootstrap',
-            ]);
-
-            return redirect()->route('member-onboarding.show');
-        }
-        if ($bootstrapCandidate) {
-            RateLimiter::hit(
-                $bootstrapThrottleKey,
-                max(1, (int) config('security.member_bootstrap.decay_seconds', $decaySeconds)),
-            );
-        }
 
         $denialReason = $this->denialReason($user, $passwordMatches);
         if ($denialReason !== null) {
@@ -222,10 +182,5 @@ final class CanonicalLoginController extends Controller
             $employeeId.'|'.$ip,
             (string) config('app.key'),
         );
-    }
-
-    private function bootstrapThrottleKey(string $ip): string
-    {
-        return 'member-bootstrap-source:'.hash_hmac('sha256', $ip, (string) config('app.key'));
     }
 }

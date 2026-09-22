@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\EmployeeProfileEvent;
 use App\Models\User;
 use App\Services\Identity\CanonicalUserProvisioner;
+use App\Services\Identity\CityEmailVerificationService;
 use App\Services\Identity\EmployeeProfileService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -143,6 +144,22 @@ class EmployeeProfileServiceTest extends TestCase
             self::assertSame('Updated', $employee->fresh()->name);
             self::assertSame('city.member@miamibeachfl.gov', $user->fresh()->email);
         }
+    }
+
+    public function test_roster_email_correction_clears_new_members_prior_recovery_proof_even_if_user_email_is_unchanged(): void
+    {
+        [$employee, $user] = $this->member();
+        DB::table('users')->where('id', $user->id)->update([
+            'email' => 'corrected@miamibeachfl.gov',
+            'email_verified_at' => now(),
+            'bootstrap_onboarding_completed_at' => now(),
+        ]);
+        app(EmployeeProfileService::class)->update($this->administrator(), $employee, [
+            'city_email' => 'corrected@miamibeachfl.gov',
+        ], 'password', 'Correct authoritative roster address');
+
+        self::assertNull($user->fresh()->email_verified_at);
+        self::assertNull(app(CityEmailVerificationService::class)->recoveryAddress($user));
     }
 
     public function test_roster_only_employee_can_be_updated_without_creating_login(): void

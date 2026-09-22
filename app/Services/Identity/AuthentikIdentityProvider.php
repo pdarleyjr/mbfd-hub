@@ -44,7 +44,7 @@ final class AuthentikIdentityProvider implements IdentityProvider
     public function synchronize(User $user, UserIdentityLink $link): void
     {
         $this->assertLink($user, $link);
-        $email = app(CityEmailVerificationService::class)->connectedEmail($user);
+        $email = app(CityEmailVerificationService::class)->recoveryAddress($user);
         $this->client()->patch('/core/users/'.$link->provider_user_id.'/', [
             'username' => $this->employeeId($user),
             'name' => (string) $user->name,
