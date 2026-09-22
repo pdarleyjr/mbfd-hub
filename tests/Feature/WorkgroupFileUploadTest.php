@@ -70,9 +70,8 @@ final class WorkgroupFileUploadTest extends TestCase
         $stream = tmpfile();
         self::assertIsResource($stream);
         fwrite($stream, "%PDF-1.7\n");
-        $chunk = random_bytes(1024 * 1024);
         for ($megabyte = 0; $megabyte < 20; $megabyte++) {
-            fwrite($stream, $chunk);
+            fwrite($stream, str_repeat('x', 1024 * 1024));
         }
         $upload = new File('essentials.pdf', $stream);
         self::assertSame(20 * 1024 * 1024 + 9, $upload->getSize());
