@@ -359,8 +359,48 @@ export const getDailyCheckoutQueueSummary = async (): Promise<DailyCheckoutQueue
   };
 };
 
-const removeFromQueue = async (id: string): Promise<void> => {
-  await db.dailyCheckoutSubmissions.delete(id);
+const equipmentEvidence = (areas: unknown): string | null => {
+  if (!Array.isArray(areas)) return null;
+  const evidence = areas.map((area: unknown) => {
+    if (!area || typeof area !== 'object' || !('id' in area) || typeof area.id !== 'string'
+      || !('items' in area) || !Array.isArray(area.items)) return null;
+    const items = area.items.map((value: unknown) => {
+      if (!value || typeof value !== 'object') return null;
+      const item = value as Record<string, unknown>;
+      if (typeof item.id !== 'string' || !['Present', 'Missing', 'Damaged'].includes(String(item.status))) return null;
+      return {
+        id: item.id,
+        status: item.status,
+        observed: item.observed === true,
+        value: item.value,
+        notes: item.notes || null,
+        photo: item.photo || undefined,
+      };
+    });
+    return items.includes(null) ? null : { id: area.id, items };
+  });
+  return evidence.includes(null) ? null : JSON.stringify(evidence);
+};
+
+const removeFromQueue = async (submission: DailyCheckoutQueuedSubmission): Promise<void> => {
+  const acceptedEvidence = equipmentEvidence(submission.data.compartments);
+  await db.transaction('rw', db.dailyCheckoutSubmissions, db.dailyCheckoutDrafts, async () => {
+    const drafts = await db.dailyCheckoutDrafts.toArray();
+    const matching = drafts.filter(draft => acceptedEvidence !== null
+      && draft.data.apparatusSnapshot?.id === submission.apparatusId
+      && draft.data.checklist_version === submission.checklistVersion
+      && draft.data.actorUserId === submission.ownerUserId
+      && draft.data.actorSecurityVersion === submission.ownerSecurityVersion
+      && draft.data.signature === submission.data.officer_signature
+      && draft.data.officer.shift === submission.data.shift
+      && JSON.stringify(draft.data.fieldValues ?? []) === JSON.stringify(submission.data.field_values ?? [])
+      && JSON.stringify(draft.data.scheduledTasks ?? []) === JSON.stringify(submission.data.scheduled_tasks ?? [])
+      && draft.data.meter?.engine_hours === submission.data.engine_hours
+      && draft.data.meter?.miles === submission.data.miles
+      && equipmentEvidence(draft.data.compartments) === acceptedEvidence);
+    await db.dailyCheckoutDrafts.bulkDelete(matching.map(draft => draft.key));
+    await db.dailyCheckoutSubmissions.delete(submission.id);
+  });
   notifyQueueChanged();
 };
 
@@ -467,11 +507,11 @@ export const submitQueuedInspection = (
 
     try {
       const receipt = await ApiClient.submitInspection(queuedSubmission.apparatusId, queuedSubmission.data);
-      await removeFromQueue(queueId);
+      await removeFromQueue(queuedSubmission);
 
-      return receipt.processing_status === 'accepted_with_exception' ? 'accepted_with_exception' as const : receipt.review_status === 'pending_review'
-        ? 'pending_review' as const
-        : 'submitted' as const;
+      if (receipt.processing_status === 'accepted_with_exception') return 'accepted_with_exception' as const;
+      if (receipt.processing_status === 'accepted') return 'submitted' as const;
+      return receipt.review_status === 'pending_review' ? 'pending_review' as const : 'submitted' as const;
     } catch (error) {
       await recordSubmissionFailure(queueId, error);
       throw error;

@@ -17,6 +17,7 @@ interface MeterStepProps {
   onSubmit: (data: MeterData) => void;
   onChange: (data: MeterData) => void;
   onBack: () => void;
+  continueLabel: string;
 }
 
 export default function MeterStep({
@@ -29,6 +30,7 @@ export default function MeterStep({
   onSubmit,
   onChange,
   onBack,
+  continueLabel,
 }: MeterStepProps) {
   const [engineHours, setEngineHours] = useState<string>(
     initialData.engine_hours !== null ? String(initialData.engine_hours) : ''
@@ -103,7 +105,7 @@ export default function MeterStep({
       {/* Header */}
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-neutral-800 font-heading">Meter Readings</h2>
-        <p className="text-neutral-500 mt-1">{apparatusName} · Unit {vehicleNumber}</p>
+        <p className="text-neutral-500 mt-1">{apparatusName} · Vehicle {vehicleNumber}</p>
       </div>
 
       {((engineHours !== '' && previousHours !== null && Number(engineHours) < previousHours) || (miles !== '' && previousMiles !== null && Number(miles) < previousMiles)) && <p className="mb-4 text-sm text-amber-800">This is below the previous reading. Record what the display shows; it will be saved for review.</p>}
@@ -136,7 +138,7 @@ export default function MeterStep({
           <div>
             <p className="font-semibold text-red-800 text-sm">PM Service Due</p>
             <p className="text-red-700 text-xs mt-0.5">
-              {hoursSinceLastPm?.toFixed(1)}h since last PM — {pmHealth?.interval_hours}h service interval.
+              {hoursSinceLastPm?.toFixed(1)}h since last PM · {pmHealth?.interval_hours}h service interval.
             </p>
           </div>
         </div>
@@ -233,7 +235,7 @@ export default function MeterStep({
             type="submit"
             className="flex-1 min-h-[48px] px-4 py-3 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 active:bg-red-800 transition-colors shadow-sm touch-manipulation"
           >
-            Continue
+            {continueLabel}
           </button>
         </div>
       </form>

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readDrafts, replaceDrafts } from './support/daily-checkout-drafts';
 
 const apparatus = {
   id: 101,
@@ -255,6 +256,7 @@ async function mockInspectionApi(
     readonly omitChecklistVersion?: boolean;
     readonly checklistVersion?: string;
     readonly reviewPendingOnSubmit?: boolean;
+    readonly processingStatus?: 'accepted' | 'accepted_with_exception';
     readonly stationDailyCheckout?: 'canonical' | 'unavailable';
     readonly stationNumber?: string;
   } = {},
@@ -356,6 +358,7 @@ async function mockInspectionApi(
               success: true,
               message: 'Inspection recorded.',
               review_status: options.reviewPendingOnSubmit ? 'pending_review' : 'approved',
+              processing_status: options.processingStatus,
             },
       });
     }
@@ -565,16 +568,14 @@ async function completeInspection(page: Page): Promise<void> {
   await expect(page.getByLabel('Member', { exact: true })).toHaveValue('Captain Browser');
   await expect(page.getByLabel('Member', { exact: true })).toHaveAttribute('readonly', '');
   await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('A');
-  await page.getByRole('button', { name: 'Continue to Inspection' }).click();
-  await expect(page.getByRole('heading', { name: 'Meter Readings' })).toBeVisible();
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
 
   await expect(page.getByRole('region', { name: 'Compartment Inspection' })).toBeVisible();
   await expect(page.getByText('Portable Radio', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
-  await page.getByRole('button', { name: 'Review & Submit' }).click();
+  await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
 
-  await expect(page.getByRole('heading', { name: 'Review & Submit Inspection' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review & Sign Inspection' })).toBeVisible();
   await drawInspectionSignature(page);
 }
 
@@ -909,12 +910,11 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
   await expect(page.getByText('Fuel Tank Hold', { exact: true })).toBeVisible();
   await expect(page.getByText('First Day of Each Month', { exact: true })).not.toBeVisible();
   await page.getByRole('button', { name: 'Mark all due duties as present' }).click();
-  await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
+  await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
 
   await expect(page.getByText(/Expected quantity: 3/)).toBeVisible();
   await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
-  await page.getByRole('button', { name: 'Review & Submit' }).click();
-  await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
+  await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
@@ -961,10 +961,9 @@ test('FB6 null fleet metadata remains selectable and completes the Daily browser
   await page.locator('#fb6-shift').selectOption('A');
   await page.getByLabel('Port Engine Hours').fill('45.5');
   await page.getByRole('button', { name: 'Mark all due duties as present' }).click();
-  await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
+  await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
   await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
-  await page.getByRole('button', { name: 'Review & Submit' }).click();
-  await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
+  await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
@@ -1005,15 +1004,12 @@ test('Fire Boat recovers a valid prior-day contract after local storage loss and
   const autosaveKey = `mbfd_autosave_inspection_fire-boat-6_${fireBoatChecklist.checklist_version}_actor_101_1`;
 
   await page.goto('/daily/apparatus/fire-boat-6');
-  await expect.poll(() => page.evaluate((key) => {
-    const saved = window.localStorage.getItem(key);
-
-    return saved === null ? null : JSON.parse(saved).inspectionSession?.id;
-  }, autosaveKey)).toBe(fireBoatPriorDayInspectionSession.id);
+  await expect.poll(async () => (await readDrafts(page)).find(draft => draft.key === autosaveKey)?.data.inspectionSession?.id).toBe(fireBoatPriorDayInspectionSession.id);
 
   // Model loss of the local PWA/autosave state at midnight. The mocked start
   // endpoint represents recovery through the still-valid HTTP-only binding.
   await page.evaluate(() => window.localStorage.clear());
+  await replaceDrafts(page, []);
   await page.clock.setFixedTime(new Date('2026-08-31T00:05:00-04:00'));
   await page.reload();
 
@@ -1047,13 +1043,13 @@ test('Fire Boat v2 reload restores same-version typed fields, due-duty status, a
   await page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
     .getByRole('button', { name: 'Missing', exact: true })
     .click();
-  await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
+  await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
 
   await page.getByRole('button', { name: /^Flashlights/ }).click();
   await page.getByRole('group', { name: 'Status for Flashlights' })
     .getByRole('button', { name: /Damaged/ })
     .click();
-  await page.getByRole('button', { name: 'Review & Submit' }).click();
+  await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
 
   await page.reload();
 
@@ -1081,11 +1077,7 @@ test('Fire Boat v2 reload restores an issued session when the checklist API is o
 
   await page.goto('/daily/apparatus/fire-boat-6');
   await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
-  await expect.poll(() => page.evaluate((checklistVersion) => {
-    const saved = window.localStorage.getItem(`mbfd_autosave_inspection_fire-boat-6_${checklistVersion}_actor_101_1`);
-
-    return saved === null ? null : JSON.parse(saved).inspectionSession?.id;
-  }, fireBoatChecklist.checklist_version)).toBe(fireBoatInspectionSession.id);
+  await expect.poll(async () => (await readDrafts(page))[0]?.data.inspectionSession?.id).toBe(fireBoatInspectionSession.id);
 
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
@@ -1146,29 +1138,17 @@ test('Fire Boat v2 reload does not reuse an expired saved session', async ({ pag
   const autosaveKey = `mbfd_autosave_inspection_fire-boat-6_${fireBoatChecklist.checklist_version}_actor_101_1`;
 
   await page.goto('/daily/apparatus/fire-boat-6');
-  await expect.poll(() => page.evaluate((key) => {
-    const saved = window.localStorage.getItem(key);
-
-    return saved === null ? null : JSON.parse(saved).inspectionSession?.id;
-  }, autosaveKey)).toBe(fireBoatInspectionSession.id);
-  await page.evaluate((key) => {
-    const saved = JSON.parse(window.localStorage.getItem(key) ?? 'null');
-    if (!saved?.inspectionSession) {
-      throw new Error('Expected a persisted Fire Boat inspection session.');
-    }
-
-    saved.inspectionSession.id = '99999999-9999-4999-8999-999999999999';
-    saved.inspectionSession.expires_at = '2000-01-01T00:00:00-05:00';
-    saved.fieldValues = saved.fieldValues.map((field: { id: string; value: unknown }) => ({
-      ...field,
-      value: field.id === 'inspection_date' ? '1999-01-01' : field.id === 'fb6-high-low-tide' ? 'old tide data' : field.value,
-    }));
-    saved.scheduledTasks = saved.scheduledTasks.map((task: { id: string; status: string }) => ({
-      ...task,
-      status: 'Missing',
-    }));
-    window.localStorage.setItem(key, JSON.stringify(saved));
-  }, autosaveKey);
+  await expect.poll(async () => (await readDrafts(page)).find(draft => draft.key === autosaveKey)?.data.inspectionSession?.id).toBe(fireBoatInspectionSession.id);
+  const drafts = await readDrafts(page);
+  await replaceDrafts(page, drafts.map(draft => ({
+    ...draft,
+    data: {
+      ...draft.data,
+      inspectionSession: { ...draft.data.inspectionSession!, id: '99999999-9999-4999-8999-999999999999', expires_at: '2000-01-01T00:00:00-05:00' },
+      fieldValues: draft.data.fieldValues?.map(field => ({ ...field, value: field.id === 'inspection_date' ? '1999-01-01' : field.id === 'fb6-high-low-tide' ? 'old tide data' : field.value })),
+      scheduledTasks: draft.data.scheduledTasks?.map(task => ({ ...task, status: 'Missing' as const })),
+    },
+  })));
 
   await page.reload();
 
@@ -1198,6 +1178,17 @@ test('a pending-review receipt tells the operator that readiness is not yet chan
 
   await expect(page.getByRole('heading', { name: 'Inspection Submitted for Review!' })).toBeVisible();
   await expect(page.getByText('before it changes readiness, defects, or meter records.')).toBeVisible();
+});
+
+test('automatic acceptance takes precedence over a legacy pending-review receipt field', async ({ page }) => {
+  await mockInspectionApi(page, { reviewPendingOnSubmit: true, processingStatus: 'accepted' });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page).toHaveURL(/\/daily\/success$/);
+  await expect(page.getByText('before it changes readiness, defects, or meter records.')).toHaveCount(0);
 });
 
 test('a checklist without an immutable version fails closed before inspection entry', async ({ page }) => {
@@ -1267,13 +1258,11 @@ test('a changed checklist preserves the older autosave while a current-version d
   await expect(page.getByRole('alert')).toContainText('A previously saved inspection uses a different checklist version');
   await completeInspection(page);
 
-  const persisted = await page.evaluate(({ legacyKey, currentKey }) => ({
-    legacy: JSON.parse(window.localStorage.getItem(legacyKey) ?? 'null'),
-    current: JSON.parse(window.localStorage.getItem(currentKey) ?? 'null'),
-  }), {
-    legacyKey: legacyAutosaveKey,
-    currentKey: `${legacyAutosaveKey}_${checklist.checklist_version}_actor_101_1`,
-  });
+  const persistedDrafts = await readDrafts(page);
+  const persisted = {
+    legacy: persistedDrafts.find(draft => draft.data.checklist_version === staleAutosave.checklist_version)?.data,
+    current: persistedDrafts.find(draft => draft.data.checklist_version === checklist.checklist_version)?.data,
+  };
 
   expect(persisted.legacy).toMatchObject({
     checklist_version: staleAutosave.checklist_version,
@@ -1294,7 +1283,7 @@ test('queued inspection syncs after reconnect while the queued success page rema
   await page.goto('/daily/apparatus/engine-1');
   await completeInspection(page);
   await context.setOffline(true);
-  await page.getByRole('button', { name: 'Close notification' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Offline Mode' })).toBeVisible();
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
   await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();

@@ -108,16 +108,9 @@ final class ApparatusInspectionProcessingService
                     'photo_path' => $photoPath,
                 ]);
                 // A finding is never itself permission to take a unit OOS or
-                // return it to service. Preserve the authorized decision gate.
-                if ($isIssue && ($defect->operational_impact ?? 'unclassified') === 'unclassified') {
-                    ApparatusInspectionException::query()->create([
-                        'apparatus_inspection_id' => $inspection->id,
-                        'apparatus_id' => $apparatus->id,
-                        'field' => 'defect:'.$defect->id,
-                        'reason' => 'operational_impact_review',
-                        'metadata' => ['defect_id' => $defect->id],
-                    ]);
-                }
+                // return it to service. Its authorized disposition remains a
+                // later, explicit administrative decision; an unclassified
+                // finding alone is not a processing exception.
             }
         }
 

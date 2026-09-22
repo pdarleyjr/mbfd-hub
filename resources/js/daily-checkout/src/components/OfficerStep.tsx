@@ -4,9 +4,10 @@ interface Props {
   initialData: OfficerInfo;
   onSubmit: (data: OfficerInfo) => void;
   onChange: (data: OfficerInfo) => void;
+  continueLabel: string;
 }
 
-export default function OfficerStep({ initialData, onSubmit, onChange }: Props) {
+export default function OfficerStep({ initialData, onSubmit, onChange, continueLabel }: Props) {
   return <section className="mx-auto max-w-lg rounded-lg border border-slate-200 bg-white p-5">
     <h2 className="mb-5 text-xl font-semibold">Member / Vehicle Info</h2>
     <form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); onSubmit({ ...initialData, shift: data.get('shift') as Shift }); }}>
@@ -17,7 +18,7 @@ export default function OfficerStep({ initialData, onSubmit, onChange }: Props) 
         <label className="text-sm font-semibold">Shift<select name="shift" required value={initialData.shift} onChange={event => onChange({ ...initialData, shift: event.target.value as Shift })} className="mt-1 block w-full rounded border border-slate-300 p-3 font-normal"><option value="">Choose shift</option>{(['A', 'B', 'C'] as const).map(shift => <option key={shift} value={shift}>Shift {shift}</option>)}</select></label>
       </div>
       <p className="my-4 text-sm text-slate-600">Recorded under your signed-in member account.</p>
-      <button type="submit" className="w-full rounded bg-slate-800 px-4 py-3 font-semibold text-white">Continue to Inspection</button>
+      <button type="submit" className="inspection-review-button w-full">{continueLabel}</button>
     </form>
   </section>;
 }

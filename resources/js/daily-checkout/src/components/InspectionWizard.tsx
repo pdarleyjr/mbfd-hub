@@ -12,7 +12,7 @@ import MeterStep from './MeterStep';
 import CompartmentStep from './CompartmentStep';
 import SubmitStep from './SubmitStep';
 import PreviousPageButton from './PreviousPageButton';
-import { inspectionProgress } from '../utils/inspectionProgress';
+import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProgress';
 import { identityForQueueCapture, type OfflineIdentity } from '../lib/offlineIdentity';
 
 type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'submit';
@@ -118,8 +118,11 @@ export default function InspectionWizard() {
   const [queuedSubmissionBlocker, setQueuedSubmissionBlocker] = useState<DailyCheckoutQueuedSubmission | null>(null);
   const [queueRevision, setQueueRevision] = useState(0);
   const clientSubmissionIdRef = useRef<string | null>(null);
+  const hasQueuedInspectionRef = useRef(false);
   const initializedChecklistKeyRef = useRef<string | null>(null);
   const loadedContractRef = useRef<{ slug: string; apparatus: Apparatus; checklist: ChecklistData } | null>(null);
+  const readiness = inspectionReadiness(checklist, compartments, fieldValues, scheduledTasks, officerInfo, meterData);
+  const continueLabel = readiness.nextStep === 'compartments' ? 'Continue: Apparatus' : readiness.label;
 
   useEffect(() => onDailyCheckoutQueueChanged(() => {
     setQueueRevision((revision) => revision + 1);
@@ -147,8 +150,13 @@ export default function InspectionWizard() {
           throw new Error('Reconnect and sign in to load your member information before starting this inspection.');
         }
         setMemberIdentity(identity);
-        const savedBeforeChecklistFetch = loadInspectionProgress(slug, '', identity);
+        const savedBeforeChecklistFetch = await loadInspectionProgress(slug, '', identity);
         let checklistData = restoreIssuedFireBoatChecklist(savedBeforeChecklistFetch);
+        const savedChecklist = savedBeforeChecklistFetch?.checklistSnapshot;
+        if (isOffline && savedChecklist && savedChecklist.schema_version !== 2
+          && savedChecklist.checklist_version === savedBeforeChecklistFetch?.checklist_version) {
+          checklistData = savedChecklist;
+        }
         const savedApparatus = restoreIssuedFireBoatApparatus(savedBeforeChecklistFetch, slug);
         let saved = savedBeforeChecklistFetch;
         let foundApparatus: Apparatus | undefined;
@@ -205,7 +213,7 @@ export default function InspectionWizard() {
           }
 
           checklistData = await ApiClient.getChecklist(foundApparatus.id);
-          saved = loadInspectionProgress(slug, checklistData.checklist_version, identity);
+          saved = await loadInspectionProgress(slug, checklistData.checklist_version, identity);
           if (checklistData.schema_version === 2) {
             const savedSession = saved?.inspectionSession;
             if (
@@ -329,8 +337,12 @@ export default function InspectionWizard() {
 
   // Autosave progress
   useEffect(() => {
+    let cancelled = false;
     if (
       !loading
+      && !submitting
+      && !hasQueuedInspectionRef.current
+      && !queuedSubmissionBlocker
       && memberIdentity
       && slug
       && apparatus
@@ -357,12 +369,17 @@ export default function InspectionWizard() {
         inspectionSession: checklist.inspection_session,
         checklistSnapshot: checklist,
       };
-      setAutosaveSucceeded(saveInspectionProgress(slug, saveData));
-      if (checklist.schema_version === 2 && checklist.inspection_session) {
-        clearInspectionSessionStartKey(slug, checklist.checklist_version);
-      }
+      setAutosaveSucceeded(null);
+      void saveInspectionProgress(slug, saveData).then(succeeded => {
+        if (cancelled) return;
+        setAutosaveSucceeded(succeeded);
+        if (succeeded && checklist.schema_version === 2 && checklist.inspection_session) {
+          clearInspectionSessionStartKey(slug, checklist.checklist_version);
+        }
+      });
     }
-  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature]);
+    return () => { cancelled = true; };
+  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, submitting, queuedSubmissionBlocker]);
 
   const handleOfficerChange = (info: OfficerInfo) => {
     setOfficerInfo(info);
@@ -371,7 +388,7 @@ export default function InspectionWizard() {
 
   const handleOfficerSubmit = (info: OfficerInfo) => {
     handleOfficerChange(info);
-    setCurrentStep(checklist?.schema_version === 2 ? 'details' : 'meter');
+    setCurrentStep(readiness.nextStep);
   };
 
   const handleMetersChange = (data: MeterData) => {
@@ -390,7 +407,7 @@ export default function InspectionWizard() {
 
   const handleMeterSubmit = (data: MeterData) => {
     setMeterData(data);
-    setCurrentStep('compartments');
+    setCurrentStep(readiness.nextStep);
   };
 
   const handleChecklistDetailsSubmit = (
@@ -399,13 +416,13 @@ export default function InspectionWizard() {
   ) => {
     setFieldValues(updatedFieldValues);
     setScheduledTasks(updatedScheduledTasks);
-    setCurrentStep(inspectionProgress(compartments).remaining === 0 ? 'submit' : 'compartments');
+    setCurrentStep(readiness.nextStep);
   };
 
   const handleCompartmentsSubmit = (updatedCompartments: Compartment[]) => {
     if (inspectionProgress(updatedCompartments).remaining > 0) return;
     setCompartments(updatedCompartments);
-    setCurrentStep(checklist && (checklist.schema_version === 2 || checklist.fields.length > 0) ? 'details' : 'submit');
+    setCurrentStep(readiness.nextStep);
   };
 
   const handleAbandonPriorSession = async () => {
@@ -423,7 +440,7 @@ export default function InspectionWizard() {
         getOrCreateInspectionSessionAbandonKey(slug, inspectionSession.id),
       );
       clearInspectionSessionAbandonKey(slug, inspectionSession.id);
-      clearInspectionProgress(slug, checklist.checklist_version, memberIdentity);
+      await clearInspectionProgress(slug, checklist.checklist_version, memberIdentity);
       clearInspectionSessionStartKey(slug, checklist.checklist_version);
       clientSubmissionIdRef.current = null;
       initializedChecklistKeyRef.current = `${slug}:${todayChecklist.checklist_version}`;
@@ -464,7 +481,7 @@ export default function InspectionWizard() {
 
   const handleSubmit = async (signature: string | null) => {
     if (!apparatus || !slug || !checklist) return;
-    if (inspectionProgress(compartments).remaining > 0) return;
+    if (!readiness.ready) { setCurrentStep(readiness.nextStep); return; }
 
     const inspectionSession = checklist.inspection_session;
     if (checklist.schema_version === 2 && !inspectionSession) {
@@ -549,15 +566,13 @@ export default function InspectionWizard() {
       ) {
         throw new Error('A different saved Daily Checkout was found. This inspection remains in the current autosave and was not submitted.');
       }
+      hasQueuedInspectionRef.current = true;
 
       if (isOffline) {
         // Vibrate to indicate queued
         if ('vibrate' in navigator) {
           navigator.vibrate([50, 100, 50]);
         }
-        
-        // Clear autosave
-        clearInspectionProgress(slug, checklist.checklist_version, memberIdentity);
         
         navigate('/success?queued=true', {
           state: { queuedSubmissionId: queueId },
@@ -572,9 +587,6 @@ export default function InspectionWizard() {
         if ('vibrate' in navigator) {
           navigator.vibrate(200);
         }
-        
-        // Clear autosave
-        clearInspectionProgress(slug, checklist.checklist_version, memberIdentity);
         
         navigate(submissionResult === 'pending_review' ? '/success?review=pending' : submissionResult === 'accepted_with_exception' ? '/success?review=exception' : '/success');
       }
@@ -677,7 +689,7 @@ export default function InspectionWizard() {
   return (
     <div className="apparatus-inspection">
       <header className="inspection-authority">
-        <div><p className="inspection-eyebrow">Daily truck checkout</p><h1>{apparatus.name}</h1>
+        <div><p className="inspection-eyebrow">Daily Checkout</p><h1>{apparatus.name}</h1>
           <div className="inspection-identity"><span>Vehicle {apparatus.vehicle_number ?? 'Not recorded'}</span><span>{officerInfo.name} · {officerInfo.shift ? 'Shift ' + officerInfo.shift : 'Shift not selected'}</span></div>
         </div>
         <div className="inspection-save"><strong>{isOffline ? 'Offline · On this device' : 'Online'}</strong><small role="status">{autosaveSucceeded === true ? 'Changes saved on this device' : autosaveSucceeded === false ? 'Not saved · Keep this page open' : 'Saving…'}</small><small>{progress.completed} / {progress.total} inspected</small></div>
@@ -691,7 +703,7 @@ export default function InspectionWizard() {
       {submissionError && <p role="alert" className="inspection-alert">{submissionError}</p>}
       <div>
         {hasLoadedAutosave && (
-          <p className="text-sm text-sky-600 mt-1">📝 Restored from autosave</p>
+          <p className="inspection-restored">Restored from autosave</p>
         )}
         {autosaveReviewMessage && (
           <p role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
@@ -767,13 +779,14 @@ export default function InspectionWizard() {
 
       <nav className="mb-4 flex flex-wrap gap-2 text-sm" aria-label="Inspection workspace">
         <button type="button" className="px-3 font-semibold" aria-current={currentStep === 'compartments' ? 'page' : undefined} onClick={() => setCurrentStep('compartments')}>Apparatus</button>
-        <button type="button" className="px-3" aria-current={currentStep === 'officer' ? 'page' : undefined} onClick={() => setCurrentStep('officer')}>Member / Vehicle Info</button>
-        <button type="button" className="px-3" aria-current={currentStep === 'meter' || currentStep === 'details' ? 'page' : undefined} onClick={() => setCurrentStep(isV2Checklist ? 'details' : 'meter')}>{isV2Checklist ? 'Checklist details' : 'Meters'}</button>
-        {!isV2Checklist && checklist.fields.length > 0 && <button type="button" className="px-3" aria-current={currentStep === 'details' ? 'page' : undefined} onClick={() => setCurrentStep('details')}>Checklist details</button>}
+        <button type="button" className="px-3" aria-label="Member / Vehicle Info" aria-current={currentStep === 'officer' ? 'page' : undefined} onClick={() => setCurrentStep('officer')}>Member</button>
+        <button type="button" className="px-3" aria-label={isV2Checklist ? 'Checklist details' : 'Meters'} aria-current={currentStep === (isV2Checklist ? 'details' : 'meter') ? 'page' : undefined} onClick={() => setCurrentStep(isV2Checklist ? 'details' : 'meter')}>{isV2Checklist ? 'Details' : 'Meters'}</button>
+        {!isV2Checklist && checklist.fields.length > 0 && <button type="button" className="px-3" aria-label="Checklist details" aria-current={currentStep === 'details' ? 'page' : undefined} onClick={() => setCurrentStep('details')}>Details</button>}
       </nav>
 
       {currentStep === 'officer' && (
         <OfficerStep
+          continueLabel={continueLabel}
           initialData={officerInfo}
           onSubmit={handleOfficerSubmit}
           onChange={handleOfficerChange}
@@ -782,6 +795,7 @@ export default function InspectionWizard() {
 
       {currentStep === 'meter' && (
         <MeterStep
+          continueLabel={continueLabel}
           apparatusId={apparatus.id}
           apparatusName={apparatus.name}
           vehicleNumber={apparatus.vehicle_number ?? apparatus.unit_id ?? ''}
@@ -797,6 +811,7 @@ export default function InspectionWizard() {
 
       {currentStep === 'details' && (
         <ChecklistFieldsStep
+          continueLabel={continueLabel}
           checklist={checklist}
           initialFieldValues={fieldValues}
           initialScheduledTasks={scheduledTasks}
@@ -809,6 +824,7 @@ export default function InspectionWizard() {
 
       {currentStep === 'compartments' && (
         <CompartmentStep
+          actionLabel={readiness.label}
           compartments={compartments}
           findings={checklist.open_findings}
           onChange={setCompartments}
@@ -827,7 +843,7 @@ export default function InspectionWizard() {
           meters={meterData}
           signature={signature}
           onSignatureChange={setSignature}
-          onShiftChange={shift => handleOfficerChange({ ...officerInfo, shift })}
+          scheduledTasks={scheduledTasks}
           onSubmit={handleSubmit}
           onBack={goBack}
           submitting={submitting}

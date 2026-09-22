@@ -17,6 +17,7 @@ interface ChecklistFieldsStepProps {
     scheduledTasks: ScheduledChecklistTaskResult[],
   ) => void;
   onBack: () => void;
+  continueLabel: string;
 }
 
 export default function ChecklistFieldsStep({
@@ -27,6 +28,7 @@ export default function ChecklistFieldsStep({
   onTasksChange: setScheduledTasks,
   onSubmit,
   onBack,
+  continueLabel,
 }: ChecklistFieldsStepProps) {
   const fieldValues = initialFieldValues;
   const scheduledTasks = initialScheduledTasks;
@@ -211,7 +213,7 @@ export default function ChecklistFieldsStep({
           type="submit"
           className="min-h-12 flex-1 rounded-lg bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700"
         >
-          Continue to Compartment Inspection
+          {continueLabel}
         </button>
       </div>
     </form>

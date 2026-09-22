@@ -23,12 +23,13 @@
                 <img src="/images/mbfd_logo-256.png" alt="MBFD Logo" class="h-16 w-16 object-contain" width="64" height="64">
                 <div>
                     <h2 class="text-xl font-bold text-gray-900 dark:text-white">
-                        Inspection Report — {{ $currentDesignation }}
+                        Inspection Report: {{ $currentDesignation }}
                     </h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
                         Vehicle #{{ $inspection->vehicle_number ?? $apparatus->vehicle_number }}
                         &bull; {{ $inspection->completed_at?->format('F j, Y \a\t g:i A') ?? 'N/A' }}
                     </p>
+                    <p class="text-sm font-medium">{{ $inspection->displayStatus() }}</p>
                 </div>
             </div>
 
@@ -69,7 +70,7 @@
                     <p class="font-medium text-gray-900 dark:text-white">{{ $inspection->shift }} Shift</p>
                 </div>
                 <div>
-                    <span class="text-gray-500 dark:text-gray-400">Unit #</span>
+                    <span class="text-gray-500 dark:text-gray-400">Physical vehicle #</span>
                     <p class="font-medium text-gray-900 dark:text-white">{{ $inspection->unit_number ?? '—' }}</p>
                 </div>
             </div>
