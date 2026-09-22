@@ -52,6 +52,7 @@ final class CanonicalLoginController extends Controller
 
         return view('auth.canonical-login', [
             'loginAction' => $attempts->requested($request) ? $attempts->loginUrl($request) : route('login.store'),
+            'loginAttempt' => $attempts->requested($request) ? $request->query('login_attempt') : null,
             'applicationLabel' => $attempts->requested($request) ? $attempts->applicationLabel($request) : null,
         ]);
     }
@@ -64,6 +65,11 @@ final class CanonicalLoginController extends Controller
         MemberBootstrapSession $bootstrapSessions,
     ): Response {
         abort_unless((bool) config('identity.local_login_enabled') || $bootstrapCredential->available(), 404);
+        if (! $request->query->has('login_attempt') && is_string($request->input('login_attempt'))) {
+            // CSRF has already passed before this controller runs. Preserve the
+            // bound continuation if a browser drops the form action's query.
+            $request->query->set('login_attempt', $request->input('login_attempt'));
+        }
         $attempts = app(FederationLoginAttempt::class);
         if ($attempts->requested($request) && $attempts->current($request) === null) {
             return $attempts->unavailable();

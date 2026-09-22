@@ -52,6 +52,26 @@ final class FederationLoginAttemptTest extends TestCase
         self::assertDatabaseCount('authentication_sessions', 1);
     }
 
+    public function test_valid_submission_preserves_bound_attempt_when_form_action_loses_query(): void
+    {
+        $user = $this->member();
+        $handoff = '/auth/media-control/authorize?state=body-fallback';
+        $login = $this->begin($handoff);
+        parse_str((string) parse_url($login, PHP_URL_QUERY), $query);
+
+        $this->get($login)
+            ->assertOk()
+            ->assertSee('name="login_attempt"', false)
+            ->assertSee('value="'.$query['login_attempt'].'"', false);
+
+        $this->post('/login', [
+            '_token' => session()->token(),
+            'login_attempt' => $query['login_attempt'],
+            'employee_id' => $user->employee_id,
+            'password' => 'correct-password',
+        ])->assertRedirect($handoff);
+    }
+
     public function test_real_csrf_failure_retains_only_cookie_bound_attempt_query_and_never_replays_input(): void
     {
         $user = $this->member();
