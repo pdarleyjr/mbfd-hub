@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { readDrafts, replaceDrafts } from './support/daily-checkout-drafts';
+import { resolveBlueprint } from '../../resources/js/daily-checkout/src/data/apparatusBlueprints';
 import type { InspectionSubmission, InspectionRevision, ChecklistData } from '../../resources/js/daily-checkout/src/types';
 
 const sourceChecklist = JSON.parse(readFileSync('storage/checklists/engine2_checklist.json', 'utf8'));
@@ -10,6 +12,7 @@ const apparatus = { id: 102, name: 'Engine 2', designation: 'E2', type: 'engine'
 async function fixture(page: Page, options: { checklist?: typeof sourceChecklist; vehicle?: typeof apparatus; findings?: ChecklistData['open_findings']; revisions?: InspectionRevision[] } = {}) {
   const vehicle = options.vehicle ?? apparatus;
   const checklist = options.checklist ?? sourceChecklist;
+  if (checklist.schema_version === 2) await page.clock.setFixedTime(new Date(`${inspectionDate}T13:00:00Z`));
   const submissions: InspectionSubmission[] = [];
   const revisions: Array<{ reason: string; value?: number }> = [];
   let userId = 401;
@@ -18,7 +21,17 @@ async function fixture(page: Page, options: { checklist?: typeof sourceChecklist
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/me/context') return route.fulfill({ json: { identity: { user_id: userId, has_personnel_profile: true }, personnel: { employee_profile_id: userId + 100, employee_number: `TEST-${userId + 100}`, name: userId === 401 ? 'Browser Member' : 'Other Browser Member', rank: 'Captain' }, offline: { security_version: 1 } } });
     if (path === '/api/public/apparatuses') return route.fulfill({ json: [vehicle] });
-    if (path.endsWith('/checklist')) return route.fulfill({ json: { inspection_date: inspectionDate, checklist_version: version, checklist, open_findings: options.findings ?? [] } });
+    if (path.endsWith('/checklist')) return route.fulfill({ json: { inspection_date: inspectionDate, checklist_version: version, checklist, due_tasks: [], open_findings: options.findings ?? [] } });
+    if (path.endsWith('/inspection-sessions')) return route.fulfill({ status: 201, json: {
+      inspection_date: inspectionDate, checklist_version: version, checklist, due_tasks: [],
+      inspection_session: {
+        id: '11111111-2222-4333-8444-555555555555', token: 'd'.repeat(64),
+        issued_at: `${inspectionDate}T12:00:00Z`, expires_at: `${inspectionDate}T23:00:00Z`,
+        duty_date: inspectionDate, checklist_template_id: checklist.template_id,
+        checklist_template_version: checklist.template_version, checklist_hash: version,
+        due_tasks: [], due_tasks_hash: 'f'.repeat(64), replay_key: '66666666-7777-4888-8999-aaaaaaaaaaaa',
+      },
+    } });
     if (path === `/api/public/apparatuses/${vehicle.id}/inspections` && route.request().method() === 'POST') {
       submissions.push(route.request().postDataJSON());
       return route.fulfill({ status: 201, json: { success: true, review_status: 'approved' } });
@@ -36,9 +49,106 @@ async function fixture(page: Page, options: { checklist?: typeof sourceChecklist
   return { submissions, revisions, setUserId: (id: number) => { userId = id; } };
 }
 
+for (const [designation, name, slug, file] of [
+  ['E1', 'Engine 1', 'engine-1', 'engine'],
+  ['E2', 'Engine 2', 'engine-2', 'engine2'],
+  ['E3', 'Engine 3', 'engine-3', 'engine'],
+  ['E4', 'Engine 4', 'engine-4', 'engine'],
+  ['L1', 'Ladder 1', 'ladder-1', 'ladder1'],
+  ['L3', 'Ladder 3', 'ladder-3', 'ladder3'],
+  ['FB6', 'Fire Boat 6', 'fire-boat-6', 'fireboat6'],
+]) {
+  test(`verified ${designation} blueprint views select their authoritative areas`, async ({ page }, testInfo) => {
+    const checklist = JSON.parse(readFileSync(`storage/checklists/${file}_checklist.json`, 'utf8'));
+    const profile = resolveBlueprint(checklist.compartments);
+    if (!profile) throw new Error(`Missing verified profile for ${designation}`);
+    await fixture(page, { checklist, vehicle: { ...apparatus, name, designation, slug } });
+    for (const view of profile.views) {
+      await page.getByRole('button', { name: view.label, exact: true }).click();
+      expect(await page.locator('.blueprint-views button').evaluateAll(buttons => buttons.every(button => button.scrollWidth <= button.clientWidth))).toBe(true);
+      const zone = view.zones[0];
+      await page.locator(`.blueprint-zone[data-area-id="${zone.compartmentId}"]`).click();
+      await expect(page.locator(`.blueprint-zone[data-area-id="${zone.compartmentId}"]`)).toHaveAttribute('aria-pressed', 'true');
+      const area = checklist.compartments.find((entry: { id: string }) => entry.id === zone.compartmentId);
+      await expect(page.getByRole('heading', { name: area.title ?? area.name, exact: true })).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      const overflowingLabels = await page.locator('.blueprint-zone').evaluateAll(zones => zones.flatMap(element => {
+        const width = element.querySelector('rect')!.width.baseVal.value;
+        return Array.from(element.querySelectorAll(':scope > text')).filter(text => text.getBBox().width > width).map(text => text.textContent);
+      }));
+      expect(overflowingLabels).toEqual([]);
+      const touchZones = page.locator('.blueprint-touch-zones button');
+      for (const control of await touchZones.all()) {
+        const box = await control.boundingBox();
+        expect(box?.width).toBeGreaterThanOrEqual(44);
+        expect(box?.height).toBeGreaterThanOrEqual(44);
+      }
+      await page.screenshot({ path: testInfo.outputPath(`${designation}-${view.id}.png`), fullPage: true });
+    }
+    if (designation === 'FB6') await expect(page.getByText(/daily truck checkout/i)).toHaveCount(0);
+  });
+}
+
+test('remaining work, reported issues and the next required action stay distinct', async ({ page }) => {
+  await fixture(page, { checklist: {
+    ...sourceChecklist,
+    officerChecklist: sourceChecklist.officerChecklist.filter((field: { id: string }) => field.id === 'mileage'),
+    compartments: [{ id: 'cab', name: 'Cab', items: [{ id: 'radio', name: 'Radio' }, { id: 'bag', name: 'Bag' }] }],
+  } });
+  await expect(page.getByRole('button', { name: '2 items remaining', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Pass Radio', exact: true }).click();
+  await page.getByRole('button', { name: /^Bag/ }).click();
+  await page.getByRole('button', { name: 'Damaged', exact: true }).click();
+  await page.getByRole('button', { name: /Checklist Equipment/ }).click();
+  const quick = page.getByRole('complementary', { name: 'Quick Checklist' });
+  await expect(quick.getByRole('heading', { name: 'Equipment inspected', exact: true })).toBeVisible();
+  await expect(quick.getByRole('heading', { name: 'Needs attention (1)', exact: true })).toBeVisible();
+  await expect(quick.getByRole('button', { name: /Bag.*Damaged.*Reported/ })).toBeVisible();
+  await expect(quick.getByRole('heading', { name: /Remaining/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close Quick Checklist' }).click();
+  await page.getByRole('button', { name: 'Continue: Required details', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Checklist Details' })).toBeVisible();
+  await page.locator('#mileage').fill('42520');
+  await page.getByRole('button', { name: 'Continue: Shift', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('A');
+  await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Review & Sign Inspection', exact: true })).toBeVisible();
+});
+
+test('known findings are visible on mapped zones and unlocated areas remain reachable without duplicate navigation', async ({ page }) => {
+  await fixture(page, { findings: [{ id: 901, compartment: 'Compartment L-1', item: "Driver's Gear", issue_type: 'damaged', operational_impact: 'unclassified', last_observation: 'confirmed_again', last_observed_at: '2026-09-21T10:00:00Z', service_status: 'open' }] });
+  const zone = page.locator('.blueprint-zone').filter({ hasText: 'L1' });
+  await expect(zone).toHaveAccessibleName(/1 existing issue/);
+  await expect(zone.locator('.blueprint-warning.existing')).toBeVisible();
+  await expect(page.getByText('L1 · 1 existing issue', { exact: true })).toBeVisible();
+  await expect(page.getByText('0 reported issues', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Compartment', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('All inspection areas', { exact: true })).toHaveCount(0);
+  await page.getByText(/^Other areas/).click();
+  const unlocated = sourceChecklist.compartments.find((area: { id: string }) => area.id === 'backboards_comp');
+  await page.getByRole('region', { name: 'Other areas', exact: true }).getByRole('button', { name: new RegExp(unlocated.title) }).click();
+  await expect(page.getByRole('heading', { name: unlocated.title, exact: true })).toBeVisible();
+  await expect(page.getByText('Other area · Not shown on drawing', { exact: true })).toBeVisible();
+  await expect(page.locator('.blueprint-zone[aria-pressed=true]')).toHaveCount(0);
+});
+
+test('Rescue uses authoritative named areas without a fabricated blueprint', async ({ page }, testInfo) => {
+  const checklist = JSON.parse(readFileSync('storage/checklists/rescue_checklist.json', 'utf8'));
+  await fixture(page, { checklist, vehicle: { ...apparatus, name: 'Rescue 3', designation: 'R3', type: 'rescue', slug: 'rescue-3' } });
+  await expect(page.locator('.apparatus-blueprint')).toHaveCount(0);
+  const areas = page.getByRole('region', { name: 'Inspection areas', exact: true });
+  await expect(areas.getByRole('button')).toHaveCount(checklist.compartments.length);
+  await page.getByRole('button', { name: /Checklist.*remaining/ }).click();
+  const quick = page.getByRole('complementary', { name: 'Quick Checklist' });
+  await quick.getByRole('button').last().click();
+  await expect(page.getByRole('heading', { name: checklist.compartments.at(-1).title, exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('rescue-named-areas.png'), fullPage: true });
+});
+
 test('apparatus workspace fits the viewport and keeps actual equipment visible', async ({ page }, testInfo) => {
   await fixture(page);
-  await expect(page.getByRole('button', { name: 'Review & Submit' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: /^\d+ items remaining$/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: "Pass Driver's Gear", exact: true })).toBeVisible();
   await expect(page.getByText('PM due soon', { exact: true })).toBeVisible();
   await expect(page.getByText('Browser Member · Shift not selected')).toBeVisible();
@@ -77,14 +187,105 @@ test('apparatus workspace fits the viewport and keeps actual equipment visible',
   await expect(page.getByRole('heading', { name: 'Test Hub home destination' })).toBeVisible();
 });
 
+test('multiple large photos persist in IndexedDB and restore exactly without localStorage evidence', async ({ page }) => {
+  const api = await fixture(page);
+  const photo = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1100;
+    canvas.height = 1100;
+    const context = canvas.getContext('2d')!;
+    const pixels = context.createImageData(canvas.width, canvas.height);
+    for (let offset = 0; offset < pixels.data.length; offset += 65536) {
+      crypto.getRandomValues(pixels.data.subarray(offset, Math.min(offset + 65536, pixels.data.length)));
+    }
+    for (let offset = 3; offset < pixels.data.length; offset += 4) pixels.data[offset] = 255;
+    context.putImageData(pixels, 0, 0);
+    return canvas.toDataURL('image/png');
+  });
+  const buffer = Buffer.from(photo.split(',')[1], 'base64');
+  expect(buffer.length).toBeGreaterThan(3_000_000);
+  expect(buffer.length).toBeLessThan(5_000_000);
+  const rows = page.locator('.equipment-row');
+  for (const index of [0, 1]) {
+    await rows.nth(index).locator('.equipment-expand').click();
+    await rows.nth(index).getByLabel('Photo (optional)').setInputFiles({ name: `evidence-${index}.png`, mimeType: 'image/png', buffer });
+    await expect(rows.nth(index).locator('img')).toHaveAttribute('src', photo);
+  }
+  await expect.poll(() => page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('mbfd-daily-checkout');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    if (!database.objectStoreNames.contains('dailyCheckoutDrafts')) {
+      database.close();
+      return 0;
+    }
+    const drafts = await new Promise<Array<{ data: { compartments: Array<{ items: Array<{ photo?: string }> }> } }>>((resolve, reject) => {
+      const request = database.transaction('dailyCheckoutDrafts').objectStore('dailyCheckoutDrafts').getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+    return drafts.flatMap(draft => draft.data.compartments.flatMap(area => area.items)).filter(item => item.photo).length;
+  })).toBe(2);
+  expect(await page.evaluate(() => Object.values(localStorage).some(value => value.includes('data:image/')))).toBe(false);
+  await page.reload();
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  for (const index of [0, 1]) {
+    await rows.nth(index).locator('.equipment-expand').click();
+    await expect(rows.nth(index).locator('img')).toHaveAttribute('src', photo);
+  }
+  api.setUserId(402);
+  await page.reload();
+  await rows.first().locator('.equipment-expand').click();
+  await expect(rows.first().locator('img')).toHaveCount(0);
+  await expect(page.getByText(/Restored from autosave/)).toHaveCount(0);
+  api.setUserId(401);
+  await page.reload();
+  await rows.first().locator('.equipment-expand').click();
+  await expect(rows.first().locator('img')).toHaveAttribute('src', photo);
+});
+
+test('legacy draft migration removes only its source after durable storage', async ({ page }) => {
+  await fixture(page);
+  await page.getByRole('button', { name: "Pass Driver's Gear", exact: true }).click();
+  await expect.poll(async () => (await readDrafts(page))[0]?.data.compartments.some(area => area.items.some(item => item.observed))).toBe(true);
+  const [draft] = await readDrafts(page);
+  await page.goto('/daily/manifest.json');
+  await replaceDrafts(page, []);
+  const legacyKey = `mbfd_autosave_inspection_engine-2_${version}`;
+  await page.evaluate(({ key, data }) => localStorage.setItem(key, JSON.stringify(data)), { key: legacyKey, data: { ...draft.data, timestamp: Date.now() } });
+  await page.goto('/daily/vehicle-inspections/engine-2');
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  await expect.poll(async () => (await readDrafts(page)).length).toBe(1);
+  expect(await page.evaluate(key => localStorage.getItem(key), legacyKey)).toBeNull();
+  expect((await readDrafts(page))[0].data.compartments).toEqual(draft.data.compartments);
+});
+
+test('a failed draft read blocks entry without replacing saved evidence', async ({ page }) => {
+  await fixture(page);
+  await page.getByRole('button', { name: "Pass Driver's Gear", exact: true }).click();
+  await expect.poll(async () => (await readDrafts(page))[0]?.data.compartments.find(area => area.id === 'comp_l1')?.items[0]?.observed).toBe(true);
+  const before = await readDrafts(page);
+  await page.addInitScript(() => {
+    const original = IDBIndex.prototype.getAll;
+    IDBIndex.prototype.getAll = function (query, count) {
+      if (this.objectStore.name === 'dailyCheckoutDrafts') throw new DOMException('Test draft read failure', 'UnknownError');
+      return original.call(this, query, count);
+    };
+  });
+  await page.reload();
+  await expect(page.getByText('Saved inspection data could not be read. Reload this page before continuing; existing saved work has not been replaced.')).toBeVisible();
+  await expect(page.getByRole('button', { name: "Pass Driver's Gear", exact: true })).toHaveCount(0);
+  expect(await readDrafts(page)).toEqual(before);
+});
+
 test('answers autosave before leaving a compartment and restore on reload', async ({ page }) => {
   await fixture(page);
   await page.getByRole('button', { name: "Pass Driver's Gear", exact: true }).click();
   await expect(page.getByRole('button', { name: "Pass Driver's Gear", exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect.poll(() => page.evaluate(version => {
-    const data = JSON.parse(localStorage.getItem(`mbfd_autosave_inspection_engine-2_${version}_actor_401_1`) ?? '{}');
-    return data.compartments?.find((c: { id: string }) => c.id === 'comp_l1')?.items[0]?.observed;
-  }, version)).toBe(true);
+  await expect.poll(async () => (await readDrafts(page))[0]?.data.compartments.find(area => area.id === 'comp_l1')?.items[0]?.observed).toBe(true);
   await page.reload();
   await expect(page.getByRole('button', { name: "Pass Driver's Gear", exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText(/Restored from autosave/)).toBeVisible();
@@ -121,7 +322,7 @@ async function fillRequiredPaperFields(page: Page, checklist: typeof sourceCheck
 async function inspectActualEquipment(page: Page, checklist: typeof sourceChecklist) {
   await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Apparatus', exact: true }).click();
   for (const compartment of checklist.compartments) {
-    await page.getByLabel('Compartment', { exact: true }).selectOption(compartment.id);
+    await selectArea(page, checklist, compartment.id);
     await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
     for (const [index, item] of compartment.items.entries()) {
       if (!item.inputType || item.inputType === 'checkbox') continue;
@@ -130,14 +331,33 @@ async function inspectActualEquipment(page: Page, checklist: typeof sourceCheckl
       await page.getByRole('button', { name: `Pass ${item.name}`, exact: true }).click();
     }
   }
-  await page.getByRole('button', { name: 'Review & Submit', exact: true }).click();
-  await page.getByRole('button', { name: 'Continue to Compartment Inspection' }).click();
-  await expect(page.getByRole('heading', { name: 'Review & Submit Inspection' })).toBeVisible();
+  const next = page.locator('.inspection-review-button');
+  if ((await next.innerText()).includes('Shift')) {
+    await next.click();
+    await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('A');
+  }
+  await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Review & Sign Inspection' })).toBeVisible();
+}
+
+async function selectArea(page: Page, checklist: typeof sourceChecklist, areaId: string) {
+  const profile = resolveBlueprint(checklist.compartments);
+  const view = profile?.views.find(entry => entry.zones.some(zone => zone.compartmentId === areaId));
+  if (view) {
+    await page.getByLabel('Apparatus views', { exact: true }).getByRole('button', { name: view.label, exact: true }).click();
+    await page.locator(`.blueprint-zone[data-area-id="${areaId}"]`).click();
+  } else {
+    if (profile && !(await page.locator('.inspection-other-areas').getAttribute('open'))) {
+      const other = page.locator('.inspection-other-areas');
+      if (!(await other.evaluate(element => (element as HTMLDetailsElement).open))) await other.locator('summary').click();
+    }
+    await page.locator(`button[data-area-id="${areaId}"]`).click();
+  }
 }
 
 async function sign(page: Page) {
   const shift = page.getByRole('combobox', { name: 'Shift', exact: true });
-  if (await shift.inputValue() === '') await shift.selectOption('A');
+  if (await shift.count() && await shift.inputValue() === '') await shift.selectOption('A');
   const canvas = page.locator('canvas');
   await canvas.scrollIntoViewIfNeeded();
   const box = await canvas.boundingBox();
@@ -187,7 +407,7 @@ test('paper text autosaves, survives refresh and offline editing, and queues the
   await page.getByLabel('SCBA #5', { exact: true }).fill('0005-SCBA');
   await page.getByLabel('New Damages - description', { exact: true }).fill(damageDescription);
   await page.getByLabel('New Damages - location on apparatus', { exact: true }).fill('Rear, below step');
-  await expect.poll(() => page.evaluate(version => JSON.parse(localStorage.getItem(`mbfd_autosave_inspection_engine-2_${version}_actor_401_1`) ?? '{}').fieldValues?.find((f: { id: string }) => f.id === 'scba_5')?.value, version)).toBe('0005-SCBA');
+  await expect.poll(async () => (await readDrafts(page))[0]?.data.fieldValues?.find(field => field.id === 'scba_5')?.value).toBe('0005-SCBA');
   await page.reload();
   await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Checklist details' }).click();
   await expect(page.getByLabel('SCBA #5', { exact: true })).toHaveValue('0005-SCBA');
@@ -195,7 +415,7 @@ test('paper text autosaves, survives refresh and offline editing, and queues the
   await context.setOffline(true);
   await expect(page.getByText('Offline · On this device', { exact: true })).toBeVisible();
   await page.getByLabel('New Damages - description', { exact: true }).fill(offlineDamageDescription);
-  await expect.poll(() => page.evaluate(version => JSON.parse(localStorage.getItem(`mbfd_autosave_inspection_engine-2_${version}_actor_401_1`) ?? '{}').fieldValues?.find((f: { id: string }) => f.id === 'new_damage_description')?.value, version)).toContain('Checked while offline.');
+  await expect.poll(async () => (await readDrafts(page))[0]?.data.fieldValues?.find(field => field.id === 'new_damage_description')?.value).toContain('Checked while offline.');
   await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Meters', exact: true }).click();
   await expect(page.locator('#miles')).toHaveValue('42520');
   await page.locator('#engine_hours').fill('1251.5');
@@ -215,6 +435,7 @@ test('paper text autosaves, survives refresh and offline editing, and queues the
   if (await closeNotification.isVisible()) await closeNotification.click();
   await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  expect(await readDrafts(page)).toHaveLength(1);
   const rows = await queued(page);
   expect(rows).toHaveLength(1);
   expect(rows[0]).toMatchObject({ ownerUserId: 401, ownerSecurityVersion: 1, data: { processing_version: 1, operator_name: 'Browser Member', rank: 'Captain', shift: 'A', employee_id: 501, unit_number: 'TEST-102', miles: 42521, engine_hours: 1251.5 } });
@@ -226,6 +447,7 @@ test('paper text autosaves, survives refresh and offline editing, and queues the
   await expect.poll(() => api.submissions.length).toBe(1);
   expect(api.submissions[0]).toEqual(rows[0].data);
   await expect.poll(async () => (await queued(page)).length).toBe(0);
+  await expect.poll(async () => (await readDrafts(page)).length).toBe(0);
 });
 
 test('actual Ladder 1 typed identifiers are entered explicitly and included in review and mocked POST', async ({ page }, testInfo) => {
@@ -258,7 +480,7 @@ test('historical finding without a unique current location remains visible after
   await expect(finding).toContainText('Verify the recorded location or duty before acting.');
   await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
   await expect(finding).toContainText('Legacy Rescue Bag');
-  await page.getByLabel('Compartment', { exact: true }).selectOption('comp_r2');
+  await selectArea(page, sourceChecklist, 'comp_r2');
   await expect(finding).toContainText('Old Combined Compartment');
   await page.screenshot({ path: testInfo.outputPath('historical-unlocated-finding.png'), fullPage: true });
 });

@@ -62,6 +62,20 @@ class ApparatusInspection extends Model
         'completed_at' => 'datetime',
     ];
 
+    public function displayStatus(): string
+    {
+        return match ($this->processing_status) {
+            'accepted' => 'Accepted',
+            'accepted_with_exception' => 'Follow-up needed',
+            default => match ($this->review_status) {
+                'pending_review' => 'Pending review',
+                'approved' => 'Approved',
+                'rejected' => 'Rejected',
+                default => 'Submitted',
+            },
+        };
+    }
+
     public function apparatus()
     {
         return $this->belongsTo(Apparatus::class);

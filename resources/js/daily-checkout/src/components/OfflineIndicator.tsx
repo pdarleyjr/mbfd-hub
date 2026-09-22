@@ -84,9 +84,9 @@ export default function OfflineIndicator() {
     <>
       {/* Offline Banner */}
       {isOffline && attentionCount === 0 && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-white px-4 py-2 text-center text-sm font-medium shadow-lg" role="status">
+        <div className="bg-amber-100 text-amber-950 px-4 py-2 text-center text-sm font-medium" role="status">
           <span className="inline-block mr-2" aria-hidden="true">⚠️</span>
-          Offline Mode - Changes will be saved locally
+          Offline Mode - Submissions wait for a connection
           {queueCount > 0 && (
             <span className="ml-2 inline-block bg-yellow-600 px-2 py-0.5 rounded-full text-xs">
               {queueCount} pending
@@ -97,7 +97,7 @@ export default function OfflineIndicator() {
 
       {attentionCount > 0 && (
         <div
-          className="fixed top-0 left-0 right-0 z-40 bg-red-700 text-white px-4 py-3 text-center text-sm font-medium shadow-lg"
+          className="bg-red-700 text-white px-4 py-3 text-center text-sm font-medium"
           role="alert"
         >
           <p>
@@ -109,7 +109,7 @@ export default function OfflineIndicator() {
       )}
 
       {/* Toast Notification */}
-      {showToast && (
+      {showToast && !isOffline && (
         <div
           className="bg-gray-900 text-white px-4 py-3 shadow-lg"
           role="alert"

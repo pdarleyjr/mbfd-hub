@@ -80,12 +80,13 @@ class InspectionsRelationManager extends RelationManager
                         default => 'gray',
                     }),
 
-                Tables\Columns\TextColumn::make('review_status')
-                    ->label('Review')
+                Tables\Columns\TextColumn::make('inspection_status')
+                    ->label('Status')
+                    ->getStateUsing(fn (ApparatusInspection $record): string => $record->displayStatus())
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'pending_review' => 'warning',
-                        'approved' => 'success',
+                        'Pending review', 'Follow-up needed' => 'warning',
+                        'Approved', 'Accepted' => 'success',
                         default => 'gray',
                     }),
 

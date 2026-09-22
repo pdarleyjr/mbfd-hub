@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
-import type { OfficerInfo, Compartment, ChecklistData, ChecklistFieldValue, MeterData } from '../types';
+import type { OfficerInfo, Compartment, ChecklistData, ChecklistFieldValue, MeterData, ScheduledChecklistTaskResult } from '../types';
+import { Send, Undo2 } from 'lucide-react';
+import { inspectionProgress } from '../utils/inspectionProgress';
 
 interface SubmitStepProps {
   officerInfo: OfficerInfo;
@@ -10,7 +12,7 @@ interface SubmitStepProps {
   meters: MeterData;
   signature: string | null;
   onSignatureChange: (value: string | null) => void;
-  onShiftChange: (value: OfficerInfo['shift']) => void;
+  scheduledTasks: ScheduledChecklistTaskResult[];
   onSubmit: (signature: string | null) => void;
   onBack: () => void;
   submitting: boolean;
@@ -24,14 +26,13 @@ export default function SubmitStep({
   meters,
   signature,
   onSignatureChange,
-  onShiftChange,
+  scheduledTasks,
   onSubmit,
   onBack,
   submitting
 }: SubmitStepProps) {
   const sigRef = useRef<SignatureCanvas | null>(null);
   const [sigError, setSigError] = useState(false);
-  const [shiftError, setShiftError] = useState(false);
   useEffect(() => {
     const pad = sigRef.current;
     if (!pad) return;
@@ -54,13 +55,10 @@ export default function SubmitStep({
     return () => observer.disconnect();
   }, []);
 
-  const totalItems = compartments.reduce((sum, comp) => sum + comp.items.length, 0);
-  const issuesCount = compartments.reduce((sum, comp) =>
-    sum + comp.items.filter(item => item.status !== 'Present').length, 0
-  );
+  const { total: totalItems, issues: issuesCount } = inspectionProgress(compartments);
 
   const handleSubmit = () => {
-    if (!officerInfo.shift) { setShiftError(true); return; }
+    if (!officerInfo.shift) return;
     if (!signature) {
       setSigError(true);
       return;
@@ -80,21 +78,19 @@ export default function SubmitStep({
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <h2 className="text-xl font-semibold text-gray-900 mb-6 text-center">
-        Review & Submit Inspection
+    <div className="inspection-review">
+      <h2 className="text-xl font-semibold">
+        Review & Sign Inspection
       </h2>
 
-      <div className="bg-gray-50 rounded-lg p-6 mb-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Inspection Summary</h3>
+      <div className="inspection-review-summary">
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <p className="text-sm text-gray-600">Member</p>
             <p className="font-medium">{officerInfo.name}</p>
             <p className="text-sm text-gray-600">{officerInfo.rank}</p>
-            <label className="mt-2 block text-sm">Shift<select value={officerInfo.shift} onChange={event => { onShiftChange(event.target.value as OfficerInfo['shift']); setShiftError(false); }} className="mt-1 block min-h-11 w-full rounded border border-slate-300 p-2"><option value="">Choose shift</option>{(['A', 'B', 'C'] as const).map(shift => <option key={shift} value={shift}>Shift {shift}</option>)}</select></label>
-            {shiftError && <p role="alert" className="text-sm text-red-700">Select the shift for this inspection.</p>}
+            <p className="text-sm">Shift {officerInfo.shift}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Physical vehicle</p>
@@ -116,42 +112,39 @@ export default function SubmitStep({
         </div>
       </div>
 
-      <section aria-label="Recorded readings and paper fields" className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="inspection-review-columns"><div>
+      <section aria-label="Recorded readings and paper fields" className="inspection-review-details">
         <h3 className="mb-3 font-semibold">Readings and checkout details</h3>
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div><dt className="text-sm text-slate-500">Engine hours</dt><dd>{meters.engine_hours ?? 'Not entered'}</dd></div>
-          <div><dt className="text-sm text-slate-500">Mileage</dt><dd>{meters.miles ?? 'Not entered'}</dd></div>
-          {fieldValues.map(answer => <div key={answer.id}><dt className="text-sm text-slate-500">{checklist.fields.find(field => field.id === answer.id)?.name}</dt><dd className="break-words whitespace-pre-wrap">{answer.value === true ? 'Yes' : answer.value === false ? 'No' : answer.value === null || answer.value === '' ? 'Not entered' : String(answer.value)}</dd></div>)}
+          {meters.engine_hours !== null && <div><dt className="text-sm text-slate-500">Engine hours</dt><dd>{meters.engine_hours}</dd></div>}
+          {meters.miles !== null && <div><dt className="text-sm text-slate-500">Mileage</dt><dd>{meters.miles}</dd></div>}
+          {fieldValues.filter(answer => answer.value !== null && answer.value !== '').map(answer => <div key={answer.id}><dt className="text-sm text-slate-500">{checklist.fields.find(field => field.id === answer.id)?.name}</dt><dd className="break-words whitespace-pre-wrap">{answer.value === true ? 'Yes' : answer.value === false ? 'No' : String(answer.value)}</dd></div>)}
         </dl>
       </section>
 
       {issuesCount > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <p className="text-red-800 font-medium text-sm">
-            ⚠️ This vehicle has {issuesCount} defect{issuesCount !== 1 ? 's' : ''}. 
+            {issuesCount} issue{issuesCount !== 1 ? 's' : ''} reported.
             Your inspection will be recorded. Findings needing a decision go to an authorized reviewer.
           </p>
         </div>
       )}
 
-      <div className="space-y-4 mb-8">
-        <h3 className="text-lg font-medium text-gray-900">Compartments Summary</h3>
+      <div className="inspection-review-areas">
+        <h3 className="text-lg font-medium">Inspected areas</h3>
 
-        {compartments.map((compartment, index) => {
+        {compartments.map((compartment) => {
           const issuesInCompartment = compartment.items.filter(item => item.status !== 'Present').length;
 
           return (
-            <div key={compartment.id} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="font-medium text-gray-900">
-                  Compartment {index + 1}: {compartment.name}
+            <div key={compartment.id} className={`inspection-review-area ${issuesInCompartment > 0 ? 'has-issues' : ''}`}>
+              <div>
+                <h4>
+                  {compartment.name}
                 </h4>
-                <span className={`text-sm px-2 py-1 rounded ${
-                  issuesInCompartment > 0
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-green-100 text-green-800'
-                }`}>
-                  {issuesInCompartment} issue{issuesInCompartment !== 1 ? 's' : ''}
+                <span>
+                  {issuesInCompartment > 0 ? `${issuesInCompartment} reported` : `${compartment.items.length} inspected`}
                 </span>
               </div>
 
@@ -173,16 +166,22 @@ export default function SubmitStep({
         })}
       </div>
 
+      {scheduledTasks.length > 0 && <section className="inspection-review-details" aria-label="Recorded scheduled duties"><h3 className="mb-3 font-semibold">Scheduled duties</h3><dl>{scheduledTasks.map(task => <div key={task.id} className="inspection-review-area"><dt>{checklist.due_tasks.find(entry => entry.id === task.id)?.name}</dt><dd>{task.status}{task.notes ? ` · ${task.notes}` : ''}</dd></div>)}</dl></section>}
+      </div>
+
       {/* Officer Signature */}
-      <div className="mb-8">
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Officer Signature</h3>
+      <div className="inspection-signature">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Member Signature</h3>
         <p className="text-sm text-gray-600 mb-3">Sign below to certify this inspection is accurate.</p>
         <div className={`border-2 rounded-lg bg-white ${sigError ? 'border-red-500' : 'border-gray-300'}`}>
           <SignatureCanvas
             clearOnResize={false}
             ref={sigRef}
             penColor="black"
-            onEnd={() => onSignatureChange(sigRef.current?.toDataURL('image/png') ?? null)}
+            onEnd={() => {
+              onSignatureChange(sigRef.current?.toDataURL('image/png') ?? null);
+              setSigError(false);
+            }}
             canvasProps={{
               className: 'w-full',
               style: { width: '100%', height: '150px' }
@@ -197,11 +196,10 @@ export default function SubmitStep({
           onClick={clearSignature}
           className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
         >
-          Clear Signature
+          <Undo2 size={16} className="inline mr-2" aria-hidden="true" />Clear Signature
         </button>
-      </div>
 
-      <div className="flex justify-between">
+      <div className="inspection-review-actions">
         <button
           onClick={onBack}
           disabled={submitting}
@@ -213,11 +211,13 @@ export default function SubmitStep({
         <button
           onClick={handleSubmit}
           disabled={submitting}
-          className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 font-medium"
+          className="inspection-review-button disabled:opacity-50"
         >
+          <Send size={16} aria-hidden="true" />
           {submitting ? 'Submitting...' : 'Submit Inspection'}
         </button>
       </div>
+      </div></div>
     </div>
   );
 }
