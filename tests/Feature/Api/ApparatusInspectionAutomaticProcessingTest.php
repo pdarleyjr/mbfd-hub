@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -282,6 +284,8 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
     }
 
     #[DataProvider('routineFindingStatuses')]
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function test_unclassified_routine_findings_are_accepted_and_keep_one_immutable_defect_history(string $status): void
     {
         $first = $this->payload();
