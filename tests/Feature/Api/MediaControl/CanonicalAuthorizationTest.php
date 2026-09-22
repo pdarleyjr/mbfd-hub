@@ -38,6 +38,21 @@ final class CanonicalAuthorizationTest extends TestCase
         ]);
     }
 
+    public function test_media_handoff_ends_the_login_form_navigation_before_cross_origin_callback(): void
+    {
+        $this->canonicalLogin($this->authorizedUser());
+
+        $response = $this->get($this->authorizeUrl())
+            ->assertOk()
+            ->assertViewIs('auth.media-control-handoff')
+            ->assertHeader('Cache-Control', 'no-store, private');
+        $destination = $response->viewData('destination');
+        self::assertIsString($destination);
+        self::assertStringStartsWith(self::CALLBACK.'?', $destination);
+        self::assertStringContainsString('http-equiv="refresh"', (string) $response->getContent());
+        self::assertStringContainsString("form-action 'self';", (string) $response->headers->get('Content-Security-Policy'));
+    }
+
     #[DataProvider('authorizedRoleProvider')]
     public function test_explicit_media_entitlement_can_issue_and_exchange_a_canonical_code_across_existing_roles(string $role): void
     {
@@ -46,10 +61,7 @@ final class CanonicalAuthorizationTest extends TestCase
         $user->givePermissionTo(Permission::findOrCreate('app.media_control.access', 'web'));
         $this->canonicalLogin($user);
 
-        $location = $this->get($this->authorizeUrl())
-            ->assertRedirect()
-            ->headers->get('Location');
-        self::assertIsString($location);
+        $location = $this->handoffDestination($this->authorizeUrl());
         $query = $this->redirectQuery($location);
         self::assertSame(self::STATE, $query['state'] ?? null);
         self::assertIsString($query['code'] ?? null);
@@ -102,10 +114,7 @@ final class CanonicalAuthorizationTest extends TestCase
         $user = $this->linkedUser();
         $this->canonicalLogin($user);
 
-        $location = $this->get($this->authorizeUrl())
-            ->assertRedirect()
-            ->headers->get('Location');
-        self::assertIsString($location);
+        $location = $this->handoffDestination($this->authorizeUrl());
 
         $query = $this->redirectQuery($location);
         self::assertSame('access_denied', $query['error'] ?? null);
@@ -122,10 +131,7 @@ final class CanonicalAuthorizationTest extends TestCase
         $user->forceFill(['employee_profile_id' => null])->save();
         $this->app['auth']->forgetGuards();
 
-        $location = $this->get($this->authorizeUrl())
-            ->assertRedirect()
-            ->headers->get('Location');
-        self::assertIsString($location);
+        $location = $this->handoffDestination($this->authorizeUrl());
 
         $query = $this->redirectQuery($location);
         self::assertIsString($query['code'] ?? null);
@@ -380,14 +386,22 @@ final class CanonicalAuthorizationTest extends TestCase
 
     private function issuedCode(): string
     {
-        $location = $this->get($this->authorizeUrl())
-            ->assertRedirect()
-            ->headers->get('Location');
-        self::assertIsString($location);
+        $location = $this->handoffDestination($this->authorizeUrl());
         $query = $this->redirectQuery($location);
         self::assertIsString($query['code'] ?? null);
 
         return $query['code'];
+    }
+
+    private function handoffDestination(string $url): string
+    {
+        $response = $this->get($url)
+            ->assertOk()
+            ->assertViewIs('auth.media-control-handoff');
+        $destination = $response->viewData('destination');
+        self::assertIsString($destination);
+
+        return $destination;
     }
 
     private function exchange(string $code, string $clientId = 'media-control')
