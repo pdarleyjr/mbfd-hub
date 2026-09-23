@@ -9,6 +9,7 @@ use App\Exceptions\MemberBootstrapStateChanged;
 use App\Models\AuthenticationSession;
 use App\Models\Employee;
 use App\Models\MemberOnboardingInvitation;
+use App\Models\MemberOnboardingRosterBinding;
 use App\Models\User;
 use App\Services\Security\SecurityAuditRecorder;
 use Carbon\CarbonInterface;
@@ -34,6 +35,10 @@ final class AccountSecurityService
             $lockedUser = User::query()->lockForUpdate()->find($userId);
             /** @var Employee|null $lockedEmployee */
             $lockedEmployee = Employee::query()->lockForUpdate()->find($employeeProfileId);
+            $rosterBinding = MemberOnboardingRosterBinding::query()
+                ->where('employee_profile_id', $employeeProfileId)
+                ->lockForUpdate()
+                ->first();
             $authoritativeEmail = strtolower(trim((string) $lockedEmployee?->city_email));
             if (! $invitation instanceof MemberOnboardingInvitation || ! $lockedUser instanceof User || ! $lockedEmployee instanceof Employee
                 || $invitation->user_id !== $lockedUser->id
@@ -45,6 +50,9 @@ final class AccountSecurityService
                 || ! is_string($invitation->redeemed_binding_hash)
                 || ! hash_equals($invitation->redeemed_binding_hash, hash('sha256', $sessionBinding))
                 || ! hash_equals($invitation->email, $authoritativeEmail)
+                || ! $rosterBinding instanceof MemberOnboardingRosterBinding
+                || $rosterBinding->employee_id !== $lockedEmployee->employee_id
+                || $rosterBinding->city_email !== $authoritativeEmail
                 || $lockedUser->employee_profile_id !== $lockedEmployee->getKey()
                 || $lockedUser->employee_id !== $lockedEmployee->employee_id
                 || $lockedEmployee->roster_status !== 'active'

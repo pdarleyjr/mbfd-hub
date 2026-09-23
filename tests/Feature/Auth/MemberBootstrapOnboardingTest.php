@@ -154,6 +154,26 @@ final class MemberBootstrapOnboardingTest extends TestCase
         self::assertNull(MemberOnboardingInvitation::query()->sole()->consumed_at);
     }
 
+    public function test_revoked_roster_approval_after_link_redemption_blocks_password_activation(): void
+    {
+        $member = $this->pending('ONBOARD-ROSTER-REVOKED');
+        $member->forceFill(['email_verified_at' => null])->save();
+        $token = $this->issueAndExtractToken($member);
+        $this->post('/member-onboarding/invite', ['token' => $token])->assertRedirect('/member-onboarding');
+        MemberOnboardingRosterBinding::query()->where('employee_profile_id', $member->employee_profile_id)->delete();
+
+        $this->post('/member-onboarding', [
+            'password' => 'New-Private-Password!7824',
+            'password_confirmation' => 'New-Private-Password!7824',
+        ])->assertRedirect('/login');
+
+        $member->refresh();
+        self::assertSame(AccountStatus::PendingActivation, $member->account_status);
+        self::assertNull($member->bootstrap_onboarding_completed_at);
+        self::assertNull($member->email_verified_at);
+        self::assertNull(MemberOnboardingInvitation::query()->sole()->consumed_at);
+    }
+
     public function test_missing_authoritative_address_cannot_receive_an_invitation(): void
     {
         $missing = $this->pending('ONBOARD-MISSING', null);
