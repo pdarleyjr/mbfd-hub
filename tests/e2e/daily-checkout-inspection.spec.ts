@@ -53,6 +53,7 @@ const stationDetail = {
         included_in_required_total: true,
         included_in_completed: true,
         has_pending_submission: false,
+        open_inspection_exceptions: 2,
         return_checkout_required: false,
         return_checkout_verified: false,
       },
@@ -780,9 +781,11 @@ test('station Daily Checkout renders the canonical server result without estimat
   await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toBeVisible();
   await expect(page.getByText('2 / 4 required inspections completed', { exact: true })).toBeVisible();
   await expect(page.getByText('50%', { exact: true })).toBeVisible();
-  await expect(page.getByText('Review pending', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Submitted', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('Out of service', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText('A submission is pending review.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Review pending', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('A submission is pending review.', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Inspection follow-up recorded.', { exact: false })).toHaveCount(0);
 });
 
 test('station Daily Checkout is explicitly unavailable when the canonical server result is absent', async ({ page }) => {
@@ -871,7 +874,7 @@ test('non-empty checklist permits a complete inspection and sends its submission
   await completeInspection(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection Submitted!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
   expect(api.submissions).toHaveLength(1);
   expect(api.submissions[0]).toMatchObject({
     client_submission_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
@@ -886,6 +889,20 @@ test('non-empty checklist permits a complete inspection and sends its submission
       },
     ],
   });
+});
+
+test('an accepted inspection with meter exceptions has a plain member receipt while retaining the submission', async ({ page }) => {
+  const api = await mockInspectionApi(page, { processingStatus: 'accepted_with_exception' });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.locator('main')).not.toContainText('follow-up');
+  await expect(page.locator('main')).not.toContainText('exception');
+  await expect(page).not.toHaveURL(/review=/);
+  expect(api.submissions).toHaveLength(1);
 });
 
 test('Fire Boat v2 preserves typed field values and submits only server-due recurring duties', async ({ page }) => {
@@ -918,7 +935,7 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection Submitted for Review!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
   expect(api.submissions).toHaveLength(1);
   expect(api.submissions[0]).toMatchObject({
     checklist_version: fireBoatChecklist.checklist_version,
@@ -967,7 +984,7 @@ test('FB6 null fleet metadata remains selectable and completes the Daily browser
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection Submitted for Review!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
   expect(api.submissions).toHaveLength(1);
   expect(pageErrors).toEqual([]);
 });
@@ -1169,15 +1186,17 @@ test('Fire Boat v2 reload does not reuse an expired saved session', async ({ pag
     .toHaveAttribute('aria-pressed', 'false');
 });
 
-test('a pending-review receipt tells the operator that readiness is not yet changed', async ({ page }) => {
+test('a pending-review receipt confirms recording without exposing internal review status', async ({ page }) => {
   await mockInspectionApi(page, { reviewPendingOnSubmit: true });
 
   await page.goto('/daily/apparatus/engine-1');
   await completeInspection(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection Submitted for Review!' })).toBeVisible();
-  await expect(page.getByText('before it changes readiness, defects, or meter records.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.getByText('Your daily checkout has been recorded.')).toBeVisible();
+  await expect(page.locator('main')).not.toContainText('review');
+  await expect(page).not.toHaveURL(/review=/);
 });
 
 test('automatic acceptance takes precedence over a legacy pending-review receipt field', async ({ page }) => {
@@ -1447,8 +1466,10 @@ test('queued inspection reports pending review after reconnect without retaining
 
   await context.setOffline(false);
   await expect.poll(() => api.submissions.length).toBe(1);
-  await expect(page.getByRole('heading', { name: 'Inspection Submitted for Review!' })).toBeVisible();
-  await expect(page.getByText('before it changes readiness, defects, or meter records.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.locator('main')).not.toContainText('review');
+  await expect(page.locator('main')).not.toContainText('follow-up');
+  await expect(page).not.toHaveURL(/review=/);
   await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
 });
 

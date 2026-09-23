@@ -435,7 +435,8 @@ test('paper text autosaves, survives refresh and offline editing, and queues the
   await expect(page.getByText('Offline · On this device', { exact: true })).toBeVisible();
   await page.getByLabel('New Damages - description', { exact: true }).fill(offlineDamageDescription);
   await expect.poll(async () => (await readDrafts(page))[0]?.data.fieldValues?.find(field => field.id === 'new_damage_description')?.value).toContain('Checked while offline.');
-  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Meters', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Readings', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Vehicle Readings' })).toBeVisible();
   await expect(page.locator('#miles')).toHaveValue('42520');
   await page.locator('#engine_hours').fill('1251.5');
   await page.locator('#miles').fill('42521');

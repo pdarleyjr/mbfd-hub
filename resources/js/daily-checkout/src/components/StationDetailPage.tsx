@@ -871,7 +871,7 @@ function DailyCheckoutPanel({ dailyCheckout, apparatuses }: { dailyCheckout: Dai
   const summaryItems = [
     { label: 'Checked', value: dailyCheckout.checked, className: 'bg-green-50 text-green-800' },
     { label: 'Attention', value: dailyCheckout.attention, className: 'bg-amber-50 text-amber-900' },
-    { label: 'Review pending', value: dailyCheckout.review_pending, className: 'bg-amber-50 text-amber-900' },
+    { label: 'Submitted', value: dailyCheckout.review_pending, className: 'bg-blue-50 text-blue-800' },
     { label: 'Not checked', value: dailyCheckout.not_checked, className: 'bg-red-50 text-red-800' },
     { label: 'Out of service', value: dailyCheckout.out_of_service, className: 'bg-neutral-100 text-neutral-700' },
     { label: 'Exempt', value: dailyCheckout.exempt, className: 'bg-neutral-100 text-neutral-700' },
@@ -913,8 +913,7 @@ function DailyCheckoutPanel({ dailyCheckout, apparatuses }: { dailyCheckout: Dai
               <div>
                 <p className="font-semibold text-neutral-900">{apparatusNames.get(row.apparatus_id) ?? `Apparatus ${row.apparatus_id}`}</p>
                 <p className="text-xs text-neutral-500">{requirementStatus}</p>
-                {row.has_pending_submission && <p className="mt-1 text-xs font-medium text-amber-800">A submission is pending review.</p>}
-                {(row.open_inspection_exceptions ?? 0) > 0 && <p className="mt-1 text-xs font-medium text-amber-800">{row.revision_requested ? 'Member clarification requested.' : 'Inspection follow-up recorded.'} {row.included_in_completed && 'Checkout counts as completed.'}</p>}
+                {row.revision_requested && <p className="mt-1 text-xs font-medium text-amber-800">Your input is requested for this inspection.</p>}
                 {row.return_checkout_required && <p className="mt-1 text-xs font-medium text-amber-800">Post-return checkout {row.return_checkout_verified ? 'verified' : 'required'}.</p>}
               </div>
               <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${presentation.className}`}>{presentation.label}</span>
@@ -930,7 +929,7 @@ function dailyCheckoutStatePresentation(row: DailyCheckoutMatrixRow): { label: s
   const labels: Record<DailyCheckoutMatrixRow['state'], { label: string; className: string }> = {
     checked: { label: 'Checked', className: 'bg-green-100 text-green-800' },
     attention: { label: 'Attention', className: 'bg-amber-100 text-amber-900' },
-    review_pending: { label: 'Review pending', className: 'bg-amber-100 text-amber-900' },
+    review_pending: { label: 'Submitted', className: 'bg-blue-100 text-blue-800' },
     not_checked: { label: 'Not checked', className: 'bg-red-100 text-red-800' },
     out_of_service: { label: 'Out of service', className: 'bg-neutral-100 text-neutral-700' },
     exempt: { label: 'Exempt', className: 'bg-neutral-100 text-neutral-700' },

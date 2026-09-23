@@ -104,7 +104,7 @@ export default function MeterStep({
     <div className="max-w-lg mx-auto">
       {/* Header */}
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-neutral-800 font-heading">Meter Readings</h2>
+        <h2 className="text-2xl font-bold text-neutral-800 font-heading">Vehicle Readings</h2>
         <p className="text-neutral-500 mt-1">{apparatusName} · Vehicle {vehicleNumber}</p>
       </div>
 
