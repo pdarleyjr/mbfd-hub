@@ -27,7 +27,7 @@ class AddBuildHeaders
     private function deployedCommit(): string
     {
         $basePath = $this->applicationBasePath ?? base_path();
-        $markerPath = $basePath.'/public/deploy-marker.json';
+        $markerPath = $basePath.'/storage/app/private/deploy-marker.json';
 
         if (is_file($markerPath)) {
             try {
