@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Identity;
 
+use App\Enums\AccountStatus;
 use App\Models\CityEmailVerification;
 use App\Models\Employee;
 use App\Models\User;
@@ -74,6 +75,34 @@ final class CityEmailVerificationService
         }
 
         return null;
+    }
+
+    /**
+     * New member accounts obtain recovery authority only by consuming their
+     * invitation at the roster's authoritative City address. Established
+     * accounts retain their deliberately grandfathered recovery behavior.
+     */
+    public function recoveryAddress(User $user): ?string
+    {
+        $current = $user->fresh('employeeProfile');
+        $address = $current instanceof User ? $this->connectedEmail($current) : null;
+        if (! $current instanceof User
+            || $current->getRawOriginal('account_status') === AccountStatus::PendingActivation->value) {
+            return null;
+        }
+        if ($address === null || $current->bootstrap_onboarding_completed_at === null) {
+            return $address;
+        }
+
+        $employee = $current->employeeProfile;
+        $authoritative = $employee instanceof Employee ? strtolower(trim((string) $employee->city_email)) : '';
+
+        return $current->email_verified_at !== null
+            && is_string($current->email)
+            && hash_equals($authoritative, $address)
+            && hash_equals($current->email, $address)
+            ? $address
+            : null;
     }
 
     public function status(User $user): ?CityEmailVerification

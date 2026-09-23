@@ -97,6 +97,24 @@ class EmployeeResource extends Resource
                 Tables\Columns\TextColumn::make('roster_status')->label('Employment')->badge()->placeholder('Not recorded'),
                 Tables\Columns\TextColumn::make('user.account_status')->label('Login')->badge()->placeholder('Awaiting account')
                     ->formatStateUsing(fn ($state): string => ucfirst(str_replace('_', ' ', $state instanceof \BackedEnum ? $state->value : (string) $state))),
+                Tables\Columns\TextColumn::make('invitation_status')->label('Invitation')->badge()
+                    ->state(function (Employee $record): string {
+                        $status = $record->user?->getRawOriginal('account_status');
+                        if ($status === 'active') {
+                            return 'Account active';
+                        }
+                        if ($status !== 'pending_activation') {
+                            return 'Not applicable';
+                        }
+
+                        return match ($record->user->memberOnboardingInvitation?->delivery_status) {
+                            'queued' => 'Queued — awaiting activation',
+                            'pending' => 'Sending',
+                            'failed' => 'Delivery failed',
+                            'redeemed' => 'Opening invitation',
+                            default => 'Not sent',
+                        };
+                    }),
                 Tables\Columns\TextColumn::make('updated_at')
                     ->label('Last Updated')
                     ->dateTime('M j, Y g:i A')
@@ -180,6 +198,6 @@ class EmployeeResource extends Resource
 
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
-        return parent::getEloquentQuery()->with('user');
+        return parent::getEloquentQuery()->with('user.memberOnboardingInvitation');
     }
 }

@@ -55,7 +55,7 @@
         <button type="submit">Sign in</button>
     </form>
     <a class="help" href="{{ route('password.request') }}">Forgot your password?</a>
-    <p class="help">First time signing in? Use the temporary password provided by MBFD. You will choose a private password immediately.</p>
+    <p class="help">First time signing in? Open the personal setup link sent to your City email. If you did not receive one, contact MBFD Hub support.</p>
 </main>
 </body>
 </html>

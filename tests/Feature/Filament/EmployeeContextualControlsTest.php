@@ -104,7 +104,7 @@ final class EmployeeContextualControlsTest extends TestCase
             ->create($employee->id, 'MISSING_OR_UNSUPPORTED', now())['user'];
         self::assertSame('pending_activation', $pending->getRawOriginal('account_status'));
         $pendingPage = Livewire::test(EditEmployee::class, ['record' => $employee->id]);
-        $this->assertContextContains($pendingPage->html(), 'login-recovery', ['Issue temporary password']);
+        $pendingPage->assertDontSee('Issue temporary password');
         $pendingPage->assertSee('Awaiting activation');
         $target = User::factory()->create(['account_status' => 'active']);
         $page = Livewire::test(EditAccountProfile::class, ['record' => $target->id]);

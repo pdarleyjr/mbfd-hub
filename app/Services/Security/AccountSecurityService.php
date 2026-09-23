@@ -96,7 +96,7 @@ final class AccountSecurityService
                 if ($currentPassword === null || ! Hash::check($currentPassword, $currentActor->getAuthPassword())) {
                     throw new CurrentPasswordMismatch('The current password is incorrect.');
                 }
-                $recipient = $this->recoveryEmails->connectedEmail($currentTarget);
+                $recipient = $this->recoveryEmails->recoveryAddress($currentTarget);
                 if ($recipient === null) {
                     throw new AuthorizationException('An authoritative recovery address is required.');
                 }

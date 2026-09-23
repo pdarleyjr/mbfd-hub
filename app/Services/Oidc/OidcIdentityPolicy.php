@@ -69,7 +69,9 @@ final class OidcIdentityPolicy
         if ($email !== null) {
             $proof = $verification->status($user);
             $claims['email'] = $email;
-            $claims['email_verified'] = $proof?->verified_at !== null && $proof->email === $email;
+            $claims['email_verified'] = ($proof?->verified_at !== null && $proof->email === $email)
+                || ($user->bootstrap_onboarding_completed_at !== null && $user->email_verified_at !== null
+                    && $verification->recoveryAddress($user) === $email);
         }
         if ($session->application === 'cloud') {
             $claims['nextcloud_uid'] = $this->cloudLink($user)?->external_uid;

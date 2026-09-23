@@ -14,6 +14,7 @@ use App\Http\Controllers\Auth\CanonicalLoginController;
 use App\Http\Controllers\Auth\CityEmailController;
 use App\Http\Controllers\Auth\EmployeePasswordResetController;
 use App\Http\Controllers\Auth\MemberBootstrapOnboardingController;
+use App\Http\Controllers\Auth\MemberOnboardingInvitationController;
 use App\Http\Controllers\DepartmentUpdateController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
@@ -111,6 +112,9 @@ Route::post('/_csp-report', [\App\Http\Controllers\CspReportController::class, '
 Route::get('/login', [CanonicalLoginController::class, 'create'])->name('login');
 Route::post('/login', [CanonicalLoginController::class, 'store'])->name('login.store');
 Route::prefix('member-onboarding')->name('member-onboarding.')->group(function (): void {
+    Route::get('/invite', [MemberOnboardingInvitationController::class, 'show'])->name('invitation.show');
+    Route::post('/invite', [MemberOnboardingInvitationController::class, 'redeem'])
+        ->middleware('throttle:6,1')->name('invitation.redeem');
     Route::get('/', [MemberBootstrapOnboardingController::class, 'show'])->name('show');
     Route::post('/', [MemberBootstrapOnboardingController::class, 'store'])
         ->middleware('throttle:6,1')->name('store');

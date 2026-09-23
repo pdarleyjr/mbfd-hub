@@ -24,6 +24,7 @@ final class SensitiveEmailRedactionTest extends TestCase
             ['city_email_changed'],
             ['identity_recovery'],
             ['identity_administrative_recovery'],
+            ['member_onboarding_invitation'],
         ];
     }
 

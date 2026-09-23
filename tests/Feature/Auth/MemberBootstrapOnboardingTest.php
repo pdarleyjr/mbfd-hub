@@ -5,494 +5,306 @@ declare(strict_types=1);
 namespace Tests\Feature\Auth;
 
 use App\Enums\AccountStatus;
+use App\Models\CloudflareUsageBudget;
 use App\Models\Employee;
+use App\Models\MemberOnboardingInvitation;
+use App\Models\MemberOnboardingRosterBinding;
+use App\Models\OutboundEmail;
 use App\Models\SecurityActionEvent;
 use App\Models\User;
-use App\Services\Identity\CityEmailVerificationService;
+use App\Services\Identity\MemberBootstrapSession;
+use App\Services\Identity\MemberOnboardingInvitationService;
 use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Hashing\Hasher;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
-use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 final class MemberBootstrapOnboardingTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const BOOTSTRAP_PASSWORD = 'Test-Only-Bootstrap!7824';
-
-    private const FAILURE_MESSAGE = 'The provided credentials are invalid.';
-
-    private const TEST_SOURCE_IP = '203.0.113.25';
-
     protected function setUp(): void
     {
         parent::setUp();
 
         config()->set('identity.local_login_enabled', true);
-        config()->set(
-            'identity.canonical_login_dummy_password_hash',
-            '$2y$04$yXUP9UMe6agMm.ynDn8sZew4kgNTtoSKbwk49v4OrnqckhzwA3SRC',
-        );
-        config()->set('identity.member_bootstrap.enabled', true);
-        config()->set('identity.member_bootstrap.password_hash', Hash::make(self::BOOTSTRAP_PASSWORD));
-        config()->set('identity.member_bootstrap.session_ttl_seconds', 900);
-        config()->set('security.member_bootstrap.max_attempts', 5);
-        config()->set('security.member_bootstrap.global_max_attempts', 30);
-        config()->set('security.member_bootstrap.decay_seconds', 60);
-        RateLimiter::clear($this->bootstrapThrottleKey(self::TEST_SOURCE_IP));
+        config()->set('communications.cloudflare.account_id', str_repeat('a', 32));
+        config()->set('communications.cloudflare.api_token', 'member-onboarding-test-token');
+        $now = CarbonImmutable::now();
+        CloudflareUsageBudget::query()->create([
+            'provider_account_id' => str_repeat('a', 32),
+            'cycle_start' => $now->startOfMonth(),
+            'cycle_end' => $now->addMonth()->startOfMonth(),
+            'provider_chargeable_used' => 0,
+            'provider_daily_quota' => 100,
+            'provider_daily_used' => 0,
+            'hub_safe_ceiling' => 100,
+            'worker_request_threshold' => 9_000_000,
+            'worker_cpu_ms_threshold' => 27_000_000,
+            'reconciled_at' => $now,
+            'provider_daily_reconciled_at' => $now,
+            'worker_requests_used' => 0,
+            'worker_cpu_ms_used' => 0,
+        ]);
+        Http::fake(fn (Request $request) => Http::response([
+            'success' => true,
+            'result' => [
+                'message_id' => 'member-onboarding-test-message',
+                'delivered' => $request->data()['to'],
+                'queued' => [],
+                'permanent_bounces' => [],
+                'suppressed_recipients' => [],
+            ],
+        ]));
     }
 
-    public function test_only_explicit_bootstrap_pending_member_enters_restricted_onboarding_with_session_rotation(): void
+    public function test_an_invitation_is_bound_to_one_member_and_completes_atomic_activation(): void
     {
-        $pending = $this->linkedUser(AccountStatus::PendingActivation, true, 'PENDING-100');
-        $passwordHashBefore = $pending->getAuthPassword();
-        $session = $this->app['session.store'];
-        $session->setId('pre-bootstrap-session-id');
-        $before = $session->getId();
-
-        $this->post('/login', [
-            'employee_id' => $pending->employee_id,
-            'password' => self::BOOTSTRAP_PASSWORD,
-        ])->assertRedirect('/member-onboarding');
-
-        $this->assertGuest('web');
-        $this->assertNotSame($before, $this->app['session.store']->getId());
-        $this->assertIsArray(session('auth.member_bootstrap'));
-        $this->assertDatabaseCount('authentication_sessions', 0);
-        $this->assertSame($passwordHashBefore, $pending->fresh()->getAuthPassword());
-        $this->assertSame(0, RateLimiter::attempts($this->bootstrapThrottleKey(self::TEST_SOURCE_IP)));
-    }
-
-    public function test_distinct_established_users_from_one_source_never_consume_bootstrap_capacity(): void
-    {
-        config()->set('security.member_bootstrap.global_max_attempts', 2);
-        $users = [
-            $this->linkedUser(AccountStatus::Active, false, 'ESTABLISHED-SOURCE-100', 'private-password-100'),
-            $this->linkedUser(AccountStatus::Active, false, 'ESTABLISHED-SOURCE-200', 'private-password-200'),
-            $this->linkedUser(AccountStatus::Active, false, 'ESTABLISHED-SOURCE-300', 'private-password-300'),
-        ];
-
-        foreach ($users as $index => $user) {
-            $response = $this->withServerVariables(['REMOTE_ADDR' => self::TEST_SOURCE_IP])
-                ->from('/login')
-                ->post('/login', [
-                    'employee_id' => $user->employee_id,
-                    'password' => 'private-password-'.(($index + 1) * 100),
-                ]);
-            $this->assertSame(url('/'), $response->headers->get('Location'), $user->employee_id);
-            $this->assertAuthenticatedAs($user, 'web');
-            $this->post('/logout')->assertRedirect('/login');
-        }
-
-        $this->assertSame(0, RateLimiter::attempts($this->bootstrapThrottleKey(self::TEST_SOURCE_IP)));
-    }
-
-    public function test_successful_bootstrap_logins_do_not_consume_the_failure_bucket(): void
-    {
-        config()->set('security.member_bootstrap.global_max_attempts', 2);
-        $users = [
-            $this->linkedUser(AccountStatus::PendingActivation, true, 'BOOTSTRAP-SOURCE-100'),
-            $this->linkedUser(AccountStatus::PendingActivation, true, 'BOOTSTRAP-SOURCE-200'),
-            $this->linkedUser(AccountStatus::PendingActivation, true, 'BOOTSTRAP-SOURCE-300'),
-        ];
-
-        foreach ($users as $user) {
-            $this->bootstrapLogin($user);
-            $this->post('/member-onboarding/cancel')->assertRedirect('/login');
-        }
-
-        $this->assertSame(0, RateLimiter::attempts($this->bootstrapThrottleKey(self::TEST_SOURCE_IP)));
-    }
-
-    public function test_established_login_succeeds_after_bootstrap_source_limit_is_exhausted(): void
-    {
-        config()->set('security.member_bootstrap.global_max_attempts', 2);
-        $firstPending = $this->linkedUser(AccountStatus::PendingActivation, true, 'EXHAUST-BOOTSTRAP-100');
-        $secondPending = $this->linkedUser(AccountStatus::PendingActivation, true, 'EXHAUST-BOOTSTRAP-200');
-        $thirdPending = $this->linkedUser(AccountStatus::PendingActivation, true, 'EXHAUST-BOOTSTRAP-300');
-        $established = $this->linkedUser(
-            AccountStatus::Active,
-            false,
-            'ESTABLISHED-AFTER-EXHAUSTION',
-            'established-private-password',
-        );
-
-        foreach ([$firstPending, $secondPending] as $pending) {
-            $this->withServerVariables(['REMOTE_ADDR' => self::TEST_SOURCE_IP])
-                ->from('/login')
-                ->post('/login', [
-                    'employee_id' => $pending->employee_id,
-                    'password' => 'wrong-bootstrap-password',
-                ])->assertRedirect('/login')
-                ->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
-        }
-
-        $bootstrapKey = $this->bootstrapThrottleKey(self::TEST_SOURCE_IP);
-        $this->assertTrue(RateLimiter::tooManyAttempts($bootstrapKey, 2));
-        $this->withServerVariables(['REMOTE_ADDR' => self::TEST_SOURCE_IP])
-            ->from('/login')
-            ->post('/login', [
-                'employee_id' => $thirdPending->employee_id,
-                'password' => self::BOOTSTRAP_PASSWORD,
-            ])->assertRedirect('/login')
-            ->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
-
-        $this->withServerVariables(['REMOTE_ADDR' => self::TEST_SOURCE_IP])
-            ->post('/login', [
-                'employee_id' => $established->employee_id,
-                'password' => 'established-private-password',
-            ])->assertRedirect('/');
-        $this->assertAuthenticatedAs($established, 'web');
-    }
-
-    public function test_unknown_login_uses_dummy_verification_without_generating_a_password_hash(): void
-    {
-        $dummyHashInfo = password_get_info((string) config('identity.canonical_login_dummy_password_hash'));
-        $this->assertSame('bcrypt', $dummyHashInfo['algoName']);
-        $this->assertSame((int) env('BCRYPT_ROUNDS', 12), $dummyHashInfo['options']['cost']);
-
-        $instrumentedHasher = new class(Hash::driver()) implements Hasher
-        {
-            public int $checkCalls = 0;
-
-            public int $makeCalls = 0;
-
-            public function __construct(private readonly Hasher $inner) {}
-
-            public function info($hashedValue): array
-            {
-                return $this->inner->info($hashedValue);
-            }
-
-            public function make(#[\SensitiveParameter] $value, array $options = []): string
-            {
-                $this->makeCalls++;
-
-                return $this->inner->make($value, $options);
-            }
-
-            public function check(#[\SensitiveParameter] $value, $hashedValue, array $options = []): bool
-            {
-                $this->checkCalls++;
-
-                return $this->inner->check($value, $hashedValue, $options);
-            }
-
-            public function needsRehash($hashedValue, array $options = []): bool
-            {
-                return $this->inner->needsRehash($hashedValue, $options);
-            }
-        };
-        $this->app->instance('hash', $instrumentedHasher);
-        Hash::clearResolvedInstance('hash');
+        [$memberA, $memberB] = [$this->pending('ONBOARD-A'), $this->pending('ONBOARD-B')];
+        $token = $this->issueAndExtractToken($memberA);
 
         $this->from('/login')->post('/login', [
-            'employee_id' => 'UNKNOWN-DUMMY-HASH-100',
-            'password' => 'wrong-password',
-        ])->assertRedirect('/login')
-            ->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
+            'employee_id' => $memberB->employee_id,
+            'password' => 'Test-Only-Shared-Bootstrap!7824',
+        ])->assertRedirect('/login')->assertSessionHasErrors('employee_id');
 
-        $this->assertGuest('web');
-        $this->assertSame(0, $instrumentedHasher->makeCalls);
-        $this->assertSame(2, $instrumentedHasher->checkCalls);
-    }
-
-    public function test_wrong_unknown_ineligible_established_and_admin_attempts_share_generic_denial(): void
-    {
-        $wrong = $this->linkedUser(AccountStatus::PendingActivation, true, 'WRONG-100');
-        $ineligible = $this->linkedUser(AccountStatus::PendingActivation, false, 'INELIGIBLE-100');
-        $established = $this->linkedUser(AccountStatus::Active, false, 'ESTABLISHED-100', 'private-password');
-        $admin = $this->linkedUser(AccountStatus::Active, false, 'ADMIN-100', 'admin-private-password');
-        $admin->assignRole(Role::findOrCreate('super_admin', 'web'));
-
-        foreach ([
-            ['employee_id' => $wrong->employee_id, 'password' => 'wrong-bootstrap'],
-            ['employee_id' => 'UNKNOWN-100', 'password' => self::BOOTSTRAP_PASSWORD],
-            ['employee_id' => $ineligible->employee_id, 'password' => self::BOOTSTRAP_PASSWORD],
-            ['employee_id' => $established->employee_id, 'password' => self::BOOTSTRAP_PASSWORD],
-            ['employee_id' => $admin->employee_id, 'password' => self::BOOTSTRAP_PASSWORD],
-        ] as $credentials) {
-            $this->from('/login')->post('/login', $credentials)
-                ->assertRedirect('/login')
-                ->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
-            $this->assertGuest('web');
-        }
-
-        $this->post('/login', [
-            'employee_id' => $established->employee_id,
-            'password' => 'private-password',
+        $this->post('/member-onboarding/invite', ['token' => $token])->assertRedirect('/member-onboarding');
+        $this->get('/member-onboarding')->assertOk()->assertSee($memberA->employee_id)->assertDontSee($memberB->employee_id);
+        $this->post('/member-onboarding', [
+            'password' => 'New-Private-Password!7824',
+            'password_confirmation' => 'New-Private-Password!7824',
         ])->assertRedirect('/');
-        $this->assertAuthenticatedAs($established, 'web');
-    }
 
-    public function test_bootstrap_context_can_only_access_onboarding_and_cancel(): void
-    {
-        $pending = $this->linkedUser(AccountStatus::PendingActivation, true, 'BOUNDARY-100');
-        $this->bootstrapLogin($pending);
-        $this->assertIsArray(session('auth.member_bootstrap'));
-        $this->assertTrue($pending->fresh()->isBootstrapOnboardingPending());
-        $context = session('auth.member_bootstrap');
-
-        $this->withSession(['auth.member_bootstrap' => $context])->get('/member-onboarding')->assertOk();
-        foreach (['/', '/admin', '/employee/dashboard', '/training', '/workgroups', '/auth/bid/authorize', '/auth/media-control/authorize'] as $path) {
-            $response = $this->withSession(['auth.member_bootstrap' => $context])->get($path);
-            self::assertSame(url('/member-onboarding'), $response->headers->get('Location'), $path);
-        }
-        $this->withSession(['auth.member_bootstrap' => $context])
-            ->getJson('/api/me/context')->assertUnauthorized();
-
-        $this->withSession(['auth.member_bootstrap' => $context])
-            ->post('/member-onboarding/cancel')->assertRedirect('/login');
-        $this->assertFalse(session()->has('auth.member_bootstrap'));
-        $this->assertGuest('web');
-    }
-
-    public function test_onboarding_prefills_authoritative_city_email_without_marking_it_verified(): void
-    {
-        $pending = $this->linkedUser(AccountStatus::PendingActivation, true, 'EMAIL-100');
-        $pending->employeeProfile->forceFill(['city_email' => 'member@miamibeachfl.gov'])->save();
-        $this->bootstrapLogin($pending);
-
-        $this->get('/member-onboarding')
-            ->assertOk()
-            ->assertSee('Complete your MBFD Hub account')
-            ->assertSee('member@miamibeachfl.gov')
-            ->assertSee($pending->employee_id)
-            ->assertDontSee($pending->employeeProfile->getRawOriginal('password'));
-
-        $this->assertNull($pending->fresh()->email_verified_at);
-    }
-
-    public function test_city_email_validation_and_collision_are_safe_and_atomic(): void
-    {
-        $pending = $this->linkedUser(AccountStatus::PendingActivation, true, 'VALIDATE-100');
-        $other = $this->linkedUser(AccountStatus::Active, false, 'VALIDATE-200', 'other-password');
-        $other->employeeProfile->forceFill(['city_email' => 'taken@miamibeachfl.gov'])->save();
-        $other->forceFill(['email' => 'taken@miamibeachfl.gov'])->save();
-        $before = $pending->fresh()->getAttributes();
-        $employeeBefore = $pending->employeeProfile->fresh()->getAttributes();
-        $this->bootstrapLogin($pending);
-
-        $this->post('/member-onboarding', $this->completionPayload('member@example.com'))
-            ->assertSessionHasErrors('city_email');
-        $this->post('/member-onboarding', $this->completionPayload('TAKEN@miamibeachfl.gov'))
-            ->assertSessionHasErrors('city_email');
-
-        $this->assertSame($before, $pending->fresh()->getAttributes());
-        $this->assertSame($employeeBefore, $pending->employeeProfile->fresh()->getAttributes());
-        $this->assertGuest('web');
-    }
-
-    public function test_completion_atomically_syncs_email_activates_and_permanently_consumes_eligibility(): void
-    {
-        $pending = $this->linkedUser(AccountStatus::PendingActivation, true, 'COMPLETE-100');
-        $this->bootstrapLogin($pending);
-
-        $this->post('/member-onboarding', $this->completionPayload('Corrected@MIAMIBEACHFL.GOV'))
-            ->assertRedirect('/');
-
-        $pending->refresh();
-        $pending->employeeProfile->refresh();
-        $this->assertSame(AccountStatus::Active, $pending->account_status);
-        $this->assertFalse($pending->bootstrap_onboarding_eligible);
-        $this->assertNotNull($pending->bootstrap_onboarding_completed_at);
-        $this->assertFalse($pending->must_change_password);
-        $this->assertNotNull($pending->password_changed_at);
-        $this->assertSame('corrected@miamibeachfl.gov', $pending->email);
-        $this->assertSame('corrected@miamibeachfl.gov', $pending->employeeProfile->city_email);
-        $this->assertSame(
-            'corrected@miamibeachfl.gov',
-            app(CityEmailVerificationService::class)->connectedEmail($pending),
-        );
-        $this->assertNull($pending->email_verified_at);
-        $this->assertTrue(Hash::check('New-Private-Password!7824', $pending->getAuthPassword()));
-        $this->assertAuthenticatedAs($pending, 'web');
-        $this->assertDatabaseHas('authentication_sessions', ['user_id' => $pending->id, 'revoked_at' => null]);
-        $this->assertFalse(session()->has('auth.member_bootstrap'));
-        $audit = SecurityActionEvent::query()->where('action', 'complete_member_bootstrap')->sole();
-        $this->assertSame($pending->id, $audit->actor_user_id);
-        $this->assertSame($pending->id, $audit->target_user_id);
-        $this->assertStringNotContainsString(self::BOOTSTRAP_PASSWORD, $audit->toJson());
-        $this->assertStringNotContainsString('New-Private-Password!7824', $audit->toJson());
+        $memberA->refresh();
+        self::assertSame(AccountStatus::Active, $memberA->account_status);
+        self::assertFalse($memberA->bootstrap_onboarding_eligible);
+        self::assertNotNull($memberA->bootstrap_onboarding_completed_at);
+        self::assertNotNull($memberA->email_verified_at);
+        self::assertTrue(Hash::check('New-Private-Password!7824', $memberA->password));
+        self::assertSame(AccountStatus::PendingActivation, $memberB->fresh()->account_status);
+        self::assertDatabaseHas('member_onboarding_invitations', ['user_id' => $memberA->id, 'delivery_status' => 'consumed']);
+        self::assertDatabaseMissing('member_onboarding_invitations', ['user_id' => $memberA->id, 'token_hash' => hash('sha256', $token)]);
+        self::assertDatabaseHas('authentication_sessions', ['user_id' => $memberA->id, 'revoked_at' => null]);
+        self::assertSame('complete_member_onboarding', SecurityActionEvent::query()->latest('id')->value('action'));
+        self::assertSame('[Sensitive account-security message omitted]', OutboundEmail::query()->sole()->text_body);
 
         $this->post('/logout')->assertRedirect('/login');
-        $this->from('/login')->post('/login', [
-            'employee_id' => $pending->employee_id,
-            'password' => self::BOOTSTRAP_PASSWORD,
-        ])->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
+        $this->post('/member-onboarding/invite', ['token' => $token])->assertRedirect('/login');
+        $this->assertGuest('web');
         $this->post('/login', [
-            'employee_id' => $pending->employee_id,
+            'employee_id' => $memberA->employee_id,
             'password' => 'New-Private-Password!7824',
         ])->assertRedirect('/');
+        $this->get('/account')->assertOk();
+        $this->assertAuthenticatedAs($memberA, 'web');
     }
 
-    public function test_shared_bootstrap_credential_cannot_be_selected_as_permanent_password(): void
+    public function test_replayed_replaced_or_security_stale_invitation_fails_closed(): void
     {
-        $pending = $this->linkedUser(AccountStatus::PendingActivation, true, 'REUSE-100');
-        $this->bootstrapLogin($pending);
+        $member = $this->pending('ONBOARD-REPLAY');
+        $first = $this->issueAndExtractToken($member);
+        MemberOnboardingInvitation::query()->where('user_id', $member->id)->update(['expires_at' => now()->subSecond()]);
+        $second = $this->issueAndExtractToken($member);
 
-        $this->post('/member-onboarding', $this->completionPayload(
-            'reuse@miamibeachfl.gov',
-            self::BOOTSTRAP_PASSWORD,
-        ))->assertSessionHasErrors('password');
+        $this->post('/member-onboarding/invite', ['token' => $first])->assertRedirect('/login');
+        $member->increment('security_version');
+        $this->post('/member-onboarding/invite', ['token' => $second])->assertRedirect('/login');
 
-        $this->assertSame(AccountStatus::PendingActivation, $pending->fresh()->account_status);
-        $this->assertTrue($pending->fresh()->bootstrap_onboarding_eligible);
-        $this->assertGuest('web');
+        $member->refresh();
+        self::assertSame(AccountStatus::PendingActivation, $member->account_status);
+        self::assertNull($member->bootstrap_onboarding_completed_at);
+        $invitation = MemberOnboardingInvitation::query()->sole();
+        self::assertNull($invitation->redeemed_at);
+        self::assertNotNull($invitation->token_hash);
     }
 
-    public function test_expired_or_stale_context_cannot_overwrite_concurrent_security_changes(): void
+    public function test_expired_invitation_cannot_be_redeemed(): void
     {
-        CarbonImmutable::setTestNow('2026-09-10 12:00:00');
-        $expired = $this->linkedUser(AccountStatus::PendingActivation, true, 'EXPIRED-100');
-        $this->bootstrapLogin($expired);
-        CarbonImmutable::setTestNow('2026-09-10 12:16:00');
-        $this->get('/member-onboarding')->assertRedirect('/login');
-        $this->assertFalse(session()->has('auth.member_bootstrap'));
+        $startedAt = CarbonImmutable::now();
+        CarbonImmutable::setTestNow($startedAt);
+        try {
+            $member = $this->pending('ONBOARD-EXPIRED');
+            $token = $this->issueAndExtractToken($member);
+            CarbonImmutable::setTestNow($startedAt->addMinutes(31));
 
-        CarbonImmutable::setTestNow('2026-09-10 13:00:00');
-        $stale = $this->linkedUser(AccountStatus::PendingActivation, true, 'STALE-100');
-        $this->bootstrapLogin($stale);
-        $stale->forceFill([
-            'account_status' => AccountStatus::Disabled,
-            'security_version' => $stale->security_version + 1,
+            $this->post('/member-onboarding/invite', ['token' => $token])->assertRedirect('/login');
+            self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
+            self::assertNull(MemberOnboardingInvitation::query()->sole()->redeemed_at);
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
+    }
+
+    public function test_security_change_after_link_redemption_blocks_password_activation(): void
+    {
+        $member = $this->pending('ONBOARD-STALE');
+        $token = $this->issueAndExtractToken($member);
+        $this->post('/member-onboarding/invite', ['token' => $token])->assertRedirect('/member-onboarding');
+        $member->increment('security_version');
+
+        $this->post('/member-onboarding', [
+            'password' => 'New-Private-Password!7824',
+            'password_confirmation' => 'New-Private-Password!7824',
+        ])->assertRedirect('/login');
+
+        self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
+        self::assertNotNull(MemberOnboardingInvitation::query()->sole()->redeemed_at);
+        self::assertNull(MemberOnboardingInvitation::query()->sole()->consumed_at);
+    }
+
+    public function test_missing_authoritative_address_cannot_receive_an_invitation(): void
+    {
+        $missing = $this->pending('ONBOARD-MISSING', null);
+
+        $service = app(MemberOnboardingInvitationService::class);
+        self::assertSame('missing_authoritative_city_email', $service->assess($missing->employeeProfile)['status']);
+        self::assertDatabaseCount('member_onboarding_invitations', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_city_domain_address_without_approved_roster_binding_cannot_receive_an_invitation(): void
+    {
+        $member = $this->pending('ONBOARD-UNAPPROVED');
+        MemberOnboardingRosterBinding::query()->where('employee_profile_id', $member->employee_profile_id)->delete();
+
+        self::assertSame('unapproved_roster_binding', app(MemberOnboardingInvitationService::class)->assess($member->employeeProfile)['status']);
+        self::assertDatabaseCount('member_onboarding_invitations', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_an_outstanding_invitation_is_not_replaced_by_a_second_send(): void
+    {
+        $member = $this->pending('ONBOARD-ONCE');
+        $this->issueAndExtractToken($member);
+        $originalHash = MemberOnboardingInvitation::query()->sole()->token_hash;
+
+        self::assertSame('already_invited', app(MemberOnboardingInvitationService::class)->assess($member->employeeProfile)['status']);
+        self::assertSame('already_invited', app(MemberOnboardingInvitationService::class)->issue($member, CarbonImmutable::now()));
+        self::assertSame($originalHash, MemberOnboardingInvitation::query()->sole()->token_hash);
+        Http::assertSentCount(1);
+    }
+
+    public function test_admin_initiated_invitation_is_attributed_to_the_admin_without_exposing_its_token(): void
+    {
+        $member = $this->pending('ONBOARD-ADMIN-SEND');
+        $admin = User::factory()->create(['account_status' => AccountStatus::Active]);
+
+        self::assertSame('queued', app(MemberOnboardingInvitationService::class)->issue($member, CarbonImmutable::now(), $admin));
+        self::assertDatabaseHas('security_action_events', [
+            'actor_user_id' => $admin->id,
+            'target_user_id' => $member->id,
+            'action' => 'member_onboarding_invitation_issued',
+        ]);
+        self::assertSame($admin->id, OutboundEmail::query()->sole()->initiated_by_user_id);
+        self::assertSame('[Sensitive account-security message omitted]', OutboundEmail::query()->sole()->text_body);
+    }
+
+    public function test_departed_member_and_colliding_city_address_cannot_receive_invitations(): void
+    {
+        $departed = $this->pending('ONBOARD-DEPARTED');
+        $departed->employeeProfile->forceFill(['roster_status' => 'departed'])->save();
+        $collision = $this->pending('ONBOARD-COLLISION');
+        User::factory()->create(['email' => $collision->employeeProfile->city_email]);
+
+        $service = app(MemberOnboardingInvitationService::class);
+        self::assertSame('not_pending_onboarding', $service->assess($departed->employeeProfile)['status']);
+        self::assertSame('email_conflict', $service->assess($collision->employeeProfile)['status']);
+        self::assertDatabaseCount('member_onboarding_invitations', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_member_a_invitation_cannot_activate_member_b_from_a_restricted_session(): void
+    {
+        $memberA = $this->pending('ONBOARD-CROSS-A');
+        $memberB = $this->pending('ONBOARD-CROSS-B');
+        $token = $this->issueAndExtractToken($memberA);
+        $this->post('/member-onboarding/invite', ['token' => $token])->assertRedirect('/member-onboarding');
+        $context = session(MemberBootstrapSession::KEY);
+        $context['user_id'] = $memberB->id;
+        $context['employee_profile_id'] = $memberB->employee_profile_id;
+        session()->put(MemberBootstrapSession::KEY, $context);
+
+        $this->post('/member-onboarding', [
+            'password' => 'New-Private-Password!7824',
+            'password_confirmation' => 'New-Private-Password!7824',
+        ])->assertRedirect('/login');
+        self::assertSame(AccountStatus::PendingActivation, $memberA->fresh()->account_status);
+        self::assertSame(AccountStatus::PendingActivation, $memberB->fresh()->account_status);
+    }
+
+    public function test_new_member_recovery_requires_the_verified_authoritative_city_address(): void
+    {
+        $member = $this->pending('ONBOARD-RECOVERY');
+        $member->forceFill([
+            'account_status' => AccountStatus::Active,
+            'bootstrap_onboarding_eligible' => false,
+            'bootstrap_onboarding_completed_at' => now(),
+            'email_verified_at' => null,
         ])->save();
 
-        $this->post('/member-onboarding', $this->completionPayload('stale@miamibeachfl.gov'))
-            ->assertRedirect('/login');
-        $stale->refresh();
-        $this->assertSame(AccountStatus::Disabled, $stale->account_status);
-        $this->assertTrue($stale->bootstrap_onboarding_eligible);
-        $this->assertFalse(Hash::check('New-Private-Password!7824', $stale->getAuthPassword()));
-        $this->assertGuest('web');
+        $this->post('/forgot-password', ['employee_id' => $member->employee_id])->assertRedirect()->assertSessionHas('status');
+        Http::assertNothingSent();
+        self::assertDatabaseCount('password_reset_tokens', 0);
     }
 
-    public function test_kill_switch_and_missing_hash_fail_closed(): void
+    public function test_administrator_assisted_activation_does_not_verify_recovery_email(): void
     {
-        $pending = $this->linkedUser(AccountStatus::PendingActivation, true, 'SWITCH-100');
+        $member = $this->pending('ONBOARD-ASSISTED');
+        app(\App\Services\Identity\AccountSecurityService::class)->activateWithTemporaryPassword(
+            $member,
+            Hash::make('One-Time-Temporary!7824'),
+            hash('sha256', 'unique-assisted-test-fingerprint'),
+            now(),
+        );
 
-        foreach ([
-            ['enabled' => false, 'password_hash' => Hash::make(self::BOOTSTRAP_PASSWORD)],
-            ['enabled' => true, 'password_hash' => null],
-            ['enabled' => true, 'password_hash' => 'not-a-password-hash'],
-        ] as $configuration) {
-            config()->set('identity.member_bootstrap', $configuration + ['session_ttl_seconds' => 900]);
-            $this->from('/login')->post('/login', [
-                'employee_id' => $pending->employee_id,
-                'password' => self::BOOTSTRAP_PASSWORD,
-            ])->assertSessionHasErrors(['employee_id' => self::FAILURE_MESSAGE]);
-            $this->assertGuest('web');
-        }
+        $member->refresh();
+        self::assertNotNull($member->bootstrap_onboarding_completed_at);
+        self::assertNull($member->email_verified_at);
+        $this->post('/forgot-password', ['employee_id' => $member->employee_id])->assertRedirect()->assertSessionHas('status');
+        Http::assertNothingSent();
+        self::assertDatabaseCount('password_reset_tokens', 0);
     }
 
-    public function test_bootstrap_attempts_are_rate_limited_without_identity_disclosure(): void
+    private function pending(string $employeeId, ?string $cityEmail = 'member@miamibeachfl.gov'): User
     {
-        config()->set('security.member_bootstrap.global_max_attempts', 2);
-        $pending = $this->linkedUser(AccountStatus::PendingActivation, true, 'RATE-BOOTSTRAP-100');
-        $second = $this->linkedUser(AccountStatus::PendingActivation, true, 'RATE-BOOTSTRAP-200');
-        $third = $this->linkedUser(AccountStatus::PendingActivation, true, 'RATE-BOOTSTRAP-300');
-
-        $responses = [
-            $this->from('/login')->post('/login', ['employee_id' => $pending->employee_id, 'password' => 'wrong-bootstrap']),
-            $this->from('/login')->post('/login', ['employee_id' => $second->employee_id, 'password' => 'wrong-bootstrap']),
-            $this->from('/login')->post('/login', ['employee_id' => $third->employee_id, 'password' => self::BOOTSTRAP_PASSWORD]),
-        ];
-
-        foreach ($responses as $response) {
-            $response->assertRedirect('/login')->assertSessionHasErrors([
-                'employee_id' => self::FAILURE_MESSAGE,
-            ]);
-        }
-        $this->assertGuest('web');
-    }
-
-    public function test_onboarding_completion_retains_real_csrf_protection(): void
-    {
-        $this->app->bind(ValidateCsrfToken::class,
-            fn ($app) => new class($app, $app['encrypter']) extends ValidateCsrfToken
-            {
-                protected function runningUnitTests(): bool
-                {
-                    return false;
-                }
-            });
-        $pending = $this->linkedUser(AccountStatus::PendingActivation, true, 'CSRF-100');
-        $this->withSession(['_token' => 'login-csrf-token'])->post('/login', [
-            '_token' => 'login-csrf-token',
-            'employee_id' => $pending->employee_id,
-            'password' => self::BOOTSTRAP_PASSWORD,
-        ])->assertRedirect('/member-onboarding');
-        $context = session('auth.member_bootstrap');
-        $csrf = session()->token();
-
-        $this->withSession(['auth.member_bootstrap' => $context, '_token' => $csrf])
-            ->post('/member-onboarding', $this->completionPayload('csrf@miamibeachfl.gov'))
-            ->assertStatus(303)
-            ->assertRedirect('/login?session_expired=1');
-
-        $pending->refresh();
-        $this->assertSame(AccountStatus::PendingActivation, $pending->account_status);
-        $this->assertTrue($pending->bootstrap_onboarding_eligible);
-    }
-
-    private function linkedUser(
-        AccountStatus $status,
-        bool $eligible,
-        string $employeeId,
-        string $password = 'unrecoverable-placeholder',
-    ): User {
         $employee = Employee::query()->create([
             'employee_id' => $employeeId,
-            'name' => 'Member Bootstrap Test',
-            'rank' => 'Firefighter',
+            'name' => 'Onboarding Member '.$employeeId,
             'roster_status' => 'active',
-            'password' => Hash::make('legacy-placeholder'),
-            'must_change_password' => false,
+            'city_email' => $cityEmail === null ? null : strtolower($employeeId).'@miamibeachfl.gov',
+            'password' => Hash::make('legacy-password'),
         ]);
+
+        if ($cityEmail !== null) {
+            MemberOnboardingRosterBinding::query()->create([
+                'employee_profile_id' => $employee->id,
+                'employee_id' => $employee->employee_id,
+                'city_email' => strtolower($employeeId).'@miamibeachfl.gov',
+                'source_sha256' => str_repeat('a', 64),
+                'approved_at' => now(),
+            ]);
+        }
 
         return User::factory()->create([
             'employee_profile_id' => $employee->id,
             'employee_id' => $employee->employee_id,
-            'email' => strtolower($employeeId).'@canonical.mbfdhub.invalid',
-            'account_status' => $status,
-            'password' => Hash::make($password),
-            'must_change_password' => $status === AccountStatus::PendingActivation,
-            'bootstrap_onboarding_eligible' => $eligible,
-            'bootstrap_onboarding_completed_at' => null,
-        ])->load('employeeProfile');
+            'email' => 'pending-'.$employeeId.'@canonical.mbfdhub.invalid',
+            'account_status' => AccountStatus::PendingActivation,
+            'bootstrap_onboarding_eligible' => true,
+            'bootstrap_onboarding_eligible_at' => now(),
+            'security_version' => 1,
+        ])->fresh('employeeProfile');
     }
 
-    private function bootstrapLogin(User $user): void
+    private function issueAndExtractToken(User $member): string
     {
-        $this->withServerVariables(['REMOTE_ADDR' => self::TEST_SOURCE_IP])
-            ->post('/login', [
-                'employee_id' => $user->employee_id,
-                'password' => self::BOOTSTRAP_PASSWORD,
-            ])->assertRedirect('/member-onboarding');
-        $this->withSession([
-            'auth.member_bootstrap' => session('auth.member_bootstrap'),
-        ]);
-    }
+        self::assertSame('queued', app(MemberOnboardingInvitationService::class)->issue($member, CarbonImmutable::now()));
+        $request = Http::recorded()->last()[0];
+        preg_match('/#([a-f0-9]{64})/', (string) $request->data()['text'], $matches);
+        self::assertArrayHasKey(1, $matches);
 
-    /** @return array<string, mixed> */
-    private function completionPayload(
-        string $email,
-        string $password = 'New-Private-Password!7824',
-    ): array {
-        return [
-            'city_email' => $email,
-            'city_email_confirmed' => '1',
-            'password' => $password,
-            'password_confirmation' => $password,
-        ];
-    }
-
-    private function bootstrapThrottleKey(string $ip): string
-    {
-        return 'member-bootstrap-source:'.hash_hmac('sha256', $ip, (string) config('app.key'));
+        return $matches[1];
     }
 }

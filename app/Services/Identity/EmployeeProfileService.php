@@ -111,6 +111,7 @@ final class EmployeeProfileService
                             }
                             app(CanonicalCityEmailService::class)->sync($currentEmployee, $linkedUser, $email);
                             if ($changesEmail) {
+                                $linkedUser->forceFill(['email_verified_at' => null])->save();
                                 app(AccountSecurityService::class)->revokeAll($linkedUser->fresh(), 'city email changed', now());
                             }
                         } else {

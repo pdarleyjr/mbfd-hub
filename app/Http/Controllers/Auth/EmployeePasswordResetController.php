@@ -70,7 +70,7 @@ final class EmployeePasswordResetController extends Controller
             try {
                 if (config('identity.credential_authority') === 'authentik'
                     && $identities->enabledFor($user)) {
-                    $recipient = $emails->connectedEmail($user);
+                    $recipient = $emails->recoveryAddress($user);
                     if ($recipient === null || ! $user->isUpstreamIdentityEnabled()) {
                         return back()->with('status', self::GENERIC_STATUS);
                     }
@@ -92,7 +92,7 @@ final class EmployeePasswordResetController extends Controller
                         || $current->employee_profile_id !== $user->employee_profile_id || $current->employee_id !== $user->employee_id) {
                         return null;
                     }
-                    $recipient = $emails->connectedEmail($current);
+                    $recipient = $emails->recoveryAddress($current);
                     if ($recipient === null) {
                         return null;
                     }

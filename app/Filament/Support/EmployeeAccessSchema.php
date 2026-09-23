@@ -22,7 +22,7 @@ final class EmployeeAccessSchema
         return [
             Forms\Tabs\Tab::make('Identity & Security')->schema([
                 self::controls('login-recovery', 'Identity & security controls', [
-                    'createLoginAccount' => 'Create login account', 'issuePendingTemporaryPassword' => 'Issue temporary password', 'changeOwnPassword' => 'Change my password',
+                    'createLoginAccount' => 'Create login account', 'changeOwnPassword' => 'Change my password',
                     'changeCityEmail' => 'Change city email', 'changeRecoveryEmail' => 'Change recovery email',
                     'resetPassword' => 'Issue temporary password', 'forcePasswordChange' => 'Require password change',
                     'revokeSessions' => 'Revoke sessions', 'disableAccount' => 'Disable account', 'enableAccount' => 'Enable account',
@@ -32,7 +32,7 @@ final class EmployeeAccessSchema
                         $status = self::account($record)?->getRawOriginal('account_status');
 
                         return match ($status) {
-                            'pending_activation' => 'Awaiting activation — issue a unique temporary password when the member is ready to onboard.',
+                            'pending_activation' => 'Awaiting activation — send an invitation to the approved City email from Employees & Access.',
                             null => 'Awaiting account — personnel record retained; account provisioning is required.',
                             default => ucfirst(str_replace('_', ' ', $status)),
                         };
