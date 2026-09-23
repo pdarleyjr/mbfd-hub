@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Identity\MemberOnboardingInvitationService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -311,6 +312,78 @@ final class MemberOnboardingInvitationAdministrationTest extends TestCase
 
         self::assertDatabaseCount('member_onboarding_invitations', 0);
         Http::assertNothingSent();
+    }
+
+    public function test_batch_assessment_has_bounded_queries_for_227_pending_members(): void
+    {
+        for ($index = 1; $index <= 227; $index++) {
+            $this->member(sprintf('PERF-%04d', $index), AccountStatus::PendingActivation, true);
+        }
+
+        $queries = 0;
+        DB::listen(static function () use (&$queries): void {
+            $queries++;
+        });
+        $startedAt = hrtime(true);
+        $employees = Employee::query()
+            ->whereHas('user', fn ($query) => $query->where('account_status', AccountStatus::PendingActivation->value))
+            ->with('user')
+            ->orderBy('employee_id')
+            ->get();
+        $assessments = app(MemberOnboardingInvitationService::class)->assessMany($employees);
+        $elapsedMs = (hrtime(true) - $startedAt) / 1_000_000;
+
+        self::assertCount(227, $assessments);
+        self::assertSame(['ready'], array_values(array_unique(array_column($assessments, 'status'))));
+        self::assertLessThanOrEqual(20, $queries, sprintf('Assessment used %d queries in %.1f ms.', $queries, $elapsedMs));
+    }
+
+    public function test_batch_assessment_preserves_individual_eligibility_outcomes(): void
+    {
+        $ready = $this->member('BATCH-READY', AccountStatus::PendingActivation, true);
+        $missingEmail = $this->member('BATCH-MISSING', AccountStatus::PendingActivation, true);
+        $missingEmail->employeeProfile->forceFill(['city_email' => null])->save();
+        $unapproved = $this->member('BATCH-UNAPPROVED', AccountStatus::PendingActivation, false);
+        $active = $this->member('BATCH-ACTIVE', AccountStatus::Active, true);
+        $conflicted = $this->member('BATCH-CONFLICT', AccountStatus::PendingActivation, true);
+        User::factory()->create(['email' => $conflicted->employeeProfile->city_email]);
+        $invited = $this->member('BATCH-INVITED', AccountStatus::PendingActivation, true);
+        $expired = $this->member('BATCH-EXPIRED', AccountStatus::PendingActivation, true);
+        $failed = $this->member('BATCH-FAILED', AccountStatus::PendingActivation, true);
+        foreach ([$invited, $expired, $failed] as $member) {
+            MemberOnboardingInvitation::query()->create([
+                'user_id' => $member->id,
+                'employee_profile_id' => $member->employee_profile_id,
+                'email' => $member->employeeProfile->city_email,
+                'security_version' => $member->security_version,
+                'token_hash' => hash('sha256', $member->employee_id),
+                'expires_at' => $member->is($expired) ? now()->subMinute() : now()->addMinutes(20),
+                'delivery_status' => $member->is($failed) ? 'failed' : 'queued',
+            ]);
+        }
+        $withoutUser = Employee::query()->create([
+            'employee_id' => 'BATCH-NO-USER',
+            'name' => 'Onboarding Test Member',
+            'roster_status' => 'active',
+            'city_email' => 'batch-no-user@miamibeachfl.gov',
+        ]);
+        $employees = Employee::query()->whereIn('id', [
+            $ready->employee_profile_id,
+            $missingEmail->employee_profile_id,
+            $unapproved->employee_profile_id,
+            $active->employee_profile_id,
+            $conflicted->employee_profile_id,
+            $invited->employee_profile_id,
+            $expired->employee_profile_id,
+            $failed->employee_profile_id,
+            $withoutUser->id,
+        ])->get();
+        $service = app(MemberOnboardingInvitationService::class);
+        $assessments = $service->assessMany($employees);
+
+        foreach ($employees as $employee) {
+            self::assertSame($service->assess($employee), $assessments[$employee->id]);
+        }
     }
 
     private function admin(): User

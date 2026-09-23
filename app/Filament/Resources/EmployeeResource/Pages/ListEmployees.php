@@ -123,9 +123,10 @@ class ListEmployees extends ListRecords
             ->with('user')
             ->orderBy('employee_id')
             ->get();
+        $assessments = $invitations->assessMany($employees);
 
         foreach ($employees as $employee) {
-            $assessment = $invitations->assess($employee);
+            $assessment = $assessments[$employee->id];
             $status = $assessment['status'];
             $statuses[$status] = ($statuses[$status] ?? 0) + 1;
             if ($status !== 'ready' || $employee->user === null) {
