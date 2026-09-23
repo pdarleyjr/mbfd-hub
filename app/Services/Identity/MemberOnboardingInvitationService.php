@@ -7,6 +7,7 @@ namespace App\Services\Identity;
 use App\Enums\AccountStatus;
 use App\Models\Employee;
 use App\Models\MemberOnboardingInvitation;
+use App\Models\MemberOnboardingRosterBinding;
 use App\Models\User;
 use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Security\SecurityAuditRecorder;
@@ -30,11 +31,23 @@ final class MemberOnboardingInvitationService
             return $this->result('identity_conflict');
         }
         $user = $users->sole();
+        if (! $this->hasAuthoritativeCityEmail($employee)) {
+            return $this->result('missing_authoritative_city_email', $user, $employee);
+        }
+        if (! $this->hasApprovedRosterBinding($employee)) {
+            return $this->result('unapproved_roster_binding', $user, $employee);
+        }
+        if (Employee::query()->whereKeyNot($employee->id)->where('employee_id', $employee->employee_id)->exists()) {
+            return $this->result('duplicate_employee_id', $user, $employee);
+        }
         if (! $this->eligible($user, $employee)) {
-            return $this->result($this->hasAuthoritativeCityEmail($employee) ? 'not_pending_onboarding' : 'missing_authoritative_city_email', $user, $employee);
+            return $this->result('not_pending_onboarding', $user, $employee);
         }
         if ($this->hasEmailCollision($user, $employee)) {
             return $this->result('email_conflict', $user, $employee);
+        }
+        if ($this->hasCurrentInvitation($user, $employee, CarbonImmutable::now())) {
+            return $this->result('already_invited', $user, $employee);
         }
 
         return $this->result('ready', $user, $employee);
@@ -45,11 +58,11 @@ final class MemberOnboardingInvitationService
      * The bearer token is transmitted only to the authoritative roster address
      * and is never returned, logged, or persisted in plaintext.
      */
-    public function issue(User $user, CarbonImmutable $at): string
+    public function issue(User $user, CarbonImmutable $at, ?User $initiator = null): string
     {
         $token = bin2hex(random_bytes(32));
         $tokenHash = hash('sha256', $token);
-        $invitation = DB::transaction(function () use ($user, $at, $tokenHash): MemberOnboardingInvitation {
+        $invitation = DB::transaction(function () use ($user, $at, $tokenHash, $initiator): ?MemberOnboardingInvitation {
             $current = User::query()->lockForUpdate()->findOrFail($user->id);
             $employee = Employee::query()->lockForUpdate()->find($current->employee_profile_id);
             if (! $employee instanceof Employee || ! $this->eligible($current, $employee) || $this->hasEmailCollision($current, $employee)) {
@@ -68,17 +81,23 @@ final class MemberOnboardingInvitationService
                 'delivery_status' => 'pending',
             ];
             $invitation = MemberOnboardingInvitation::query()->where('user_id', $current->id)->lockForUpdate()->first();
+            if ($invitation instanceof MemberOnboardingInvitation && $this->invitationIsCurrent($invitation, $current, $employee, $at)) {
+                return null;
+            }
             if ($invitation instanceof MemberOnboardingInvitation) {
                 $invitation->forceFill($values)->save();
             } else {
                 $invitation = MemberOnboardingInvitation::query()->create(['user_id' => $current->id] + $values);
             }
-            $this->audit->record($current, $current, 'member_onboarding_invitation_issued', 'allowed', null, [
+            $this->audit->record($initiator ?? $current, $current, 'member_onboarding_invitation_issued', 'allowed', null, [
                 'employee_profile_id' => $employee->id,
             ]);
 
             return $invitation;
         }, 3);
+        if ($invitation === null) {
+            return 'already_invited';
+        }
 
         try {
             $delivery = $this->email->send(
@@ -88,7 +107,7 @@ final class MemberOnboardingInvitationService
                 html: null,
                 sourceType: 'member_onboarding_invitation',
                 sourceId: (string) $invitation->id,
-                actor: $user,
+                actor: $initiator ?? $user,
             );
             $failed = in_array($delivery->status, ['failed', 'blocked', 'accepted_with_delivery_issues'], true);
             $values = ['delivery_status' => $failed ? 'failed' : 'queued', 'sent_at' => $at];
@@ -158,7 +177,36 @@ final class MemberOnboardingInvitationService
             && $user->bootstrap_onboarding_eligible
             && $user->bootstrap_onboarding_completed_at === null
             && $employee->roster_status === 'active'
-            && $this->hasAuthoritativeCityEmail($employee);
+            && $this->hasAuthoritativeCityEmail($employee)
+            && $this->hasApprovedRosterBinding($employee)
+            && ! Employee::query()->whereKeyNot($employee->id)->where('employee_id', $employee->employee_id)->exists();
+    }
+
+    private function hasApprovedRosterBinding(Employee $employee): bool
+    {
+        return MemberOnboardingRosterBinding::query()
+            ->where('employee_profile_id', $employee->id)
+            ->where('employee_id', $employee->employee_id)
+            ->where('city_email', $this->authoritativeCityEmail($employee))
+            ->exists();
+    }
+
+    private function hasCurrentInvitation(User $user, Employee $employee, CarbonImmutable $at): bool
+    {
+        $invitation = MemberOnboardingInvitation::query()->where('user_id', $user->id)->first();
+
+        return $invitation instanceof MemberOnboardingInvitation && $this->invitationIsCurrent($invitation, $user, $employee, $at);
+    }
+
+    private function invitationIsCurrent(MemberOnboardingInvitation $invitation, User $user, Employee $employee, CarbonImmutable $at): bool
+    {
+        return in_array($invitation->delivery_status, ['pending', 'queued', 'redeemed'], true)
+            && $invitation->user_id === $user->id
+            && $invitation->employee_profile_id === $employee->id
+            && $invitation->security_version === $user->security_version
+            && hash_equals($this->authoritativeCityEmail($employee), $invitation->email)
+            && $invitation->token_hash !== null
+            && $invitation->expires_at?->greaterThan($at) === true;
     }
 
     private function hasEmailCollision(User $user, Employee $employee): bool

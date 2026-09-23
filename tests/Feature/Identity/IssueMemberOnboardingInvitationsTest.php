@@ -7,6 +7,7 @@ namespace Tests\Feature\Identity;
 use App\Enums\AccountStatus;
 use App\Models\CloudflareUsageBudget;
 use App\Models\Employee;
+use App\Models\MemberOnboardingRosterBinding;
 use App\Models\User;
 use App\Services\Identity\EstablishedAccountIntegritySnapshot;
 use Carbon\CarbonImmutable;
@@ -95,6 +96,13 @@ final class IssueMemberOnboardingInvitationsTest extends TestCase
         $employee = Employee::query()->create([
             'employee_id' => $employeeId, 'name' => 'Command Member', 'roster_status' => 'active',
             'city_email' => strtolower($employeeId).'@miamibeachfl.gov', 'password' => Hash::make('legacy-password'),
+        ]);
+        MemberOnboardingRosterBinding::query()->create([
+            'employee_profile_id' => $employee->id,
+            'employee_id' => $employee->employee_id,
+            'city_email' => $employee->city_email,
+            'source_sha256' => str_repeat('a', 64),
+            'approved_at' => now(),
         ]);
 
         return User::factory()->create([

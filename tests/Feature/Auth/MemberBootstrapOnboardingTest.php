@@ -8,6 +8,7 @@ use App\Enums\AccountStatus;
 use App\Models\CloudflareUsageBudget;
 use App\Models\Employee;
 use App\Models\MemberOnboardingInvitation;
+use App\Models\MemberOnboardingRosterBinding;
 use App\Models\OutboundEmail;
 use App\Models\SecurityActionEvent;
 use App\Models\User;
@@ -104,6 +105,7 @@ final class MemberBootstrapOnboardingTest extends TestCase
     {
         $member = $this->pending('ONBOARD-REPLAY');
         $first = $this->issueAndExtractToken($member);
+        MemberOnboardingInvitation::query()->where('user_id', $member->id)->update(['expires_at' => now()->subSecond()]);
         $second = $this->issueAndExtractToken($member);
 
         $this->post('/member-onboarding/invite', ['token' => $first])->assertRedirect('/login');
@@ -160,6 +162,43 @@ final class MemberBootstrapOnboardingTest extends TestCase
         self::assertSame('missing_authoritative_city_email', $service->assess($missing->employeeProfile)['status']);
         self::assertDatabaseCount('member_onboarding_invitations', 0);
         Http::assertNothingSent();
+    }
+
+    public function test_city_domain_address_without_approved_roster_binding_cannot_receive_an_invitation(): void
+    {
+        $member = $this->pending('ONBOARD-UNAPPROVED');
+        MemberOnboardingRosterBinding::query()->where('employee_profile_id', $member->employee_profile_id)->delete();
+
+        self::assertSame('unapproved_roster_binding', app(MemberOnboardingInvitationService::class)->assess($member->employeeProfile)['status']);
+        self::assertDatabaseCount('member_onboarding_invitations', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_an_outstanding_invitation_is_not_replaced_by_a_second_send(): void
+    {
+        $member = $this->pending('ONBOARD-ONCE');
+        $this->issueAndExtractToken($member);
+        $originalHash = MemberOnboardingInvitation::query()->sole()->token_hash;
+
+        self::assertSame('already_invited', app(MemberOnboardingInvitationService::class)->assess($member->employeeProfile)['status']);
+        self::assertSame('already_invited', app(MemberOnboardingInvitationService::class)->issue($member, CarbonImmutable::now()));
+        self::assertSame($originalHash, MemberOnboardingInvitation::query()->sole()->token_hash);
+        Http::assertSentCount(1);
+    }
+
+    public function test_admin_initiated_invitation_is_attributed_to_the_admin_without_exposing_its_token(): void
+    {
+        $member = $this->pending('ONBOARD-ADMIN-SEND');
+        $admin = User::factory()->create(['account_status' => AccountStatus::Active]);
+
+        self::assertSame('queued', app(MemberOnboardingInvitationService::class)->issue($member, CarbonImmutable::now(), $admin));
+        self::assertDatabaseHas('security_action_events', [
+            'actor_user_id' => $admin->id,
+            'target_user_id' => $member->id,
+            'action' => 'member_onboarding_invitation_issued',
+        ]);
+        self::assertSame($admin->id, OutboundEmail::query()->sole()->initiated_by_user_id);
+        self::assertSame('[Sensitive account-security message omitted]', OutboundEmail::query()->sole()->text_body);
     }
 
     public function test_departed_member_and_colliding_city_address_cannot_receive_invitations(): void
@@ -237,6 +276,16 @@ final class MemberBootstrapOnboardingTest extends TestCase
             'city_email' => $cityEmail === null ? null : strtolower($employeeId).'@miamibeachfl.gov',
             'password' => Hash::make('legacy-password'),
         ]);
+
+        if ($cityEmail !== null) {
+            MemberOnboardingRosterBinding::query()->create([
+                'employee_profile_id' => $employee->id,
+                'employee_id' => $employee->employee_id,
+                'city_email' => strtolower($employeeId).'@miamibeachfl.gov',
+                'source_sha256' => str_repeat('a', 64),
+                'approved_at' => now(),
+            ]);
+        }
 
         return User::factory()->create([
             'employee_profile_id' => $employee->id,
