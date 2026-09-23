@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Security\SecurityAuditRecorder;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Throwable;
@@ -51,6 +52,66 @@ final class MemberOnboardingInvitationService
         }
 
         return $this->result('ready', $user, $employee);
+    }
+
+    /**
+     * Assess an admin preview cohort with the same checks as assess(), using
+     * bounded reads rather than repeating them for every employee.
+     *
+     * @param  Collection<int, Employee>  $employees
+     * @return array<int, array{status:string,user_id:int|null,employee_profile_id:int|null}>
+     */
+    public function assessMany(Collection $employees): array
+    {
+        if ($employees->isEmpty()) {
+            return [];
+        }
+
+        $employeeIds = $employees->pluck('id')->all();
+        $canonicalUsers = User::query()->whereIn('employee_profile_id', $employeeIds)->get();
+        $users = $canonicalUsers->groupBy('employee_profile_id');
+        $bindings = MemberOnboardingRosterBinding::query()->whereIn('employee_profile_id', $employeeIds)->get()->keyBy('employee_profile_id');
+        $userIds = $canonicalUsers->pluck('id')->all();
+        $invitations = MemberOnboardingInvitation::query()->whereIn('user_id', $userIds)->get()->keyBy('user_id');
+        $emails = $employees->map(fn (Employee $employee): string => $this->authoritativeCityEmail($employee))->unique()->all();
+        $collidingEmployees = Employee::query()
+            ->whereIn('employee_id', $employees->pluck('employee_id')->all())
+            ->orWhereIn(DB::raw('LOWER(city_email)'), $emails)
+            ->get(['id', 'employee_id', 'city_email']);
+        $collidingUsers = User::query()->whereIn(DB::raw('LOWER(email)'), $emails)->get(['id', 'email']);
+        $byEmployeeId = $collidingEmployees->groupBy('employee_id');
+        $byEmployeeEmail = $collidingEmployees->groupBy(fn (Employee $employee): string => strtolower((string) $employee->city_email));
+        $byUserEmail = $collidingUsers->groupBy(fn (User $user): string => strtolower((string) $user->email));
+        $at = CarbonImmutable::now();
+        $assessments = [];
+
+        foreach ($employees as $employee) {
+            $matches = $users->get($employee->id);
+            if ($matches === null || $matches->count() !== 1) {
+                $assessments[$employee->id] = $this->result('identity_conflict');
+
+                continue;
+            }
+            $user = $matches->first();
+            $email = $this->authoritativeCityEmail($employee);
+            $binding = $bindings->get($employee->id);
+            $status = match (true) {
+                ! $this->hasAuthoritativeCityEmail($employee) => 'missing_authoritative_city_email',
+                ! ($binding instanceof MemberOnboardingRosterBinding)
+                    || $binding->employee_id !== $employee->employee_id
+                    || $binding->city_email !== $email => 'unapproved_roster_binding',
+                $byEmployeeId->get($employee->employee_id)?->contains(fn (Employee $other): bool => $other->id !== $employee->id) === true => 'duplicate_employee_id',
+                ! $this->eligibleProperties($user, $employee) => 'not_pending_onboarding',
+                $byEmployeeEmail->get($email)?->contains(fn (Employee $other): bool => $other->id !== $employee->id) === true
+                    || $byUserEmail->get($email)?->contains(fn (User $other): bool => $other->id !== $user->id) === true => 'email_conflict',
+                ($invitation = $invitations->get($user->id)) instanceof MemberOnboardingInvitation
+                    && $this->invitationIsCurrent($invitation, $user, $employee, $at) => 'already_invited',
+                default => 'ready',
+            };
+            $assessments[$employee->id] = $this->result($status, $user, $employee);
+        }
+
+        return $assessments;
     }
 
     /**
@@ -171,15 +232,20 @@ final class MemberOnboardingInvitationService
 
     private function eligible(User $user, Employee $employee): bool
     {
+        return $this->eligibleProperties($user, $employee)
+            && $this->hasAuthoritativeCityEmail($employee)
+            && $this->hasApprovedRosterBinding($employee)
+            && ! Employee::query()->whereKeyNot($employee->id)->where('employee_id', $employee->employee_id)->exists();
+    }
+
+    private function eligibleProperties(User $user, Employee $employee): bool
+    {
         return $user->employee_profile_id === $employee->id
             && $user->employee_id === $employee->employee_id
             && $user->getRawOriginal('account_status') === AccountStatus::PendingActivation->value
             && $user->bootstrap_onboarding_eligible
             && $user->bootstrap_onboarding_completed_at === null
-            && $employee->roster_status === 'active'
-            && $this->hasAuthoritativeCityEmail($employee)
-            && $this->hasApprovedRosterBinding($employee)
-            && ! Employee::query()->whereKeyNot($employee->id)->where('employee_id', $employee->employee_id)->exists();
+            && $employee->roster_status === 'active';
     }
 
     private function hasApprovedRosterBinding(Employee $employee): bool
