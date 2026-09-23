@@ -113,6 +113,9 @@ jobs:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
       - name: Report repository-wide Pint debt
+        # Keep the historical debt visible without turning this deliberately
+        # advisory job red inside callers of the reusable release workflow.
+        continue-on-error: true
         run: vendor/bin/pint --test
 
   static-analysis:
