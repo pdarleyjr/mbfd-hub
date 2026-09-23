@@ -7,13 +7,16 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Filament\Support\EmployeeAccessSchema;
+use App\Jobs\IssueMemberOnboardingInvitation;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\Identity\MemberOnboardingInvitationService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\HtmlString;
 
 class EmployeeResource extends Resource
 {
@@ -131,6 +134,33 @@ class EmployeeResource extends Resource
                         ->toArray()),
             ])
             ->actions([
+                Tables\Actions\Action::make('sendMemberInvitation')
+                    ->label(fn (Employee $record): string => $record->user?->memberOnboardingInvitation === null ? 'Send invitation' : 'Resend invitation')
+                    ->icon('heroicon-o-envelope')
+                    ->visible(fn (Employee $record): bool => Pages\ListEmployees::canIssueInvitations()
+                        && app(MemberOnboardingInvitationService::class)->assess($record)['status'] === 'ready')
+                    ->modalHeading('Invite this member')
+                    ->modalSubmitActionLabel('Queue this invitation')
+                    ->fillForm(function (Employee $record): array {
+                        $user = $record->user;
+
+                        return ['binding_hash' => $user === null ? '' : IssueMemberOnboardingInvitation::bindingHash(
+                            $user->id, $record->employee_id, (string) $record->city_email, $user->security_version,
+                        )];
+                    })
+                    ->form([
+                        Forms\Components\Placeholder::make('recipient')->label('Exact recipient')
+                            ->content(fn (Employee $record): HtmlString => new HtmlString(
+                                '<strong>'.e($record->employee_id).'</strong> — '.e(strtolower(trim((string) $record->city_email))),
+                            )),
+                        Forms\Components\Hidden::make('binding_hash')->required(),
+                        Forms\Components\Checkbox::make('confirm_member')
+                            ->label('I reviewed this Employee ID and City email and want to send one invitation.')
+                            ->rule('accepted')->required(),
+                        Forms\Components\TextInput::make('current_password')->label('Your administrator password')
+                            ->password()->autocomplete('current-password')->required(),
+                    ])
+                    ->action(fn (array $data, Employee $record, Pages\ListEmployees $livewire) => $livewire->queueMemberInvitation($record, $data)),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([])

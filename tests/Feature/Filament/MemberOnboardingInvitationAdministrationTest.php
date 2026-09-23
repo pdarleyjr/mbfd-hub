@@ -131,6 +131,188 @@ final class MemberOnboardingInvitationAdministrationTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_super_admin_can_review_and_queue_one_approved_pending_member(): void
+    {
+        $admin = $this->admin();
+        $pending = $this->member('PILOT-READY', AccountStatus::PendingActivation, true);
+        $other = $this->member('PILOT-OTHER', AccountStatus::PendingActivation, true);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(ListEmployees::class)
+            ->assertTableActionVisible('sendMemberInvitation', $pending->employeeProfile)
+            ->mountTableAction('sendMemberInvitation', $pending->employeeProfile)
+            ->assertSee($pending->employee_id)
+            ->assertSee($pending->employeeProfile->city_email)
+            ->set('mountedTableActionsData.0.confirm_member', true)
+            ->set('mountedTableActionsData.0.current_password', 'admin-password')
+            ->callMountedTableAction()
+            ->assertHasNoTableActionErrors();
+
+        Queue::assertPushed(IssueMemberOnboardingInvitation::class, 1);
+        Queue::assertPushed(IssueMemberOnboardingInvitation::class, fn (IssueMemberOnboardingInvitation $job): bool => $job->userId === $pending->id && $job->initiatorId === $admin->id);
+        Queue::assertNotPushed(IssueMemberOnboardingInvitation::class, fn (IssueMemberOnboardingInvitation $job): bool => $job->userId === $other->id);
+        self::assertDatabaseCount('member_onboarding_invitations', 0);
+        self::assertDatabaseHas('security_action_events', [
+            'actor_user_id' => $admin->id,
+            'target_user_id' => $pending->id,
+            'action' => 'member_onboarding_invitation_single_requested',
+            'result' => 'allowed',
+        ]);
+    }
+
+    public function test_single_member_action_is_hidden_for_ineligible_accounts(): void
+    {
+        $admin = $this->admin();
+        $active = $this->member('PILOT-ACTIVE', AccountStatus::Active, true);
+        $disabled = $this->member('PILOT-DISABLED', AccountStatus::Disabled, true);
+        $unapproved = $this->member('PILOT-UNAPPROVED', AccountStatus::PendingActivation, false);
+        $inactive = $this->member('PILOT-INACTIVE', AccountStatus::PendingActivation, true);
+        $inactive->employeeProfile->forceFill(['roster_status' => 'inactive'])->save();
+        $conflicted = $this->member('PILOT-CONFLICT', AccountStatus::PendingActivation, true);
+        $alreadyInvited = $this->member('PILOT-INVITED', AccountStatus::PendingActivation, true);
+        MemberOnboardingInvitation::query()->create([
+            'user_id' => $alreadyInvited->id,
+            'employee_profile_id' => $alreadyInvited->employee_profile_id,
+            'email' => $alreadyInvited->employeeProfile->city_email,
+            'security_version' => $alreadyInvited->security_version,
+            'token_hash' => hash('sha256', 'current-pilot-token'),
+            'expires_at' => now()->addMinutes(20),
+            'delivery_status' => 'queued',
+        ]);
+        User::factory()->create(['email' => $conflicted->employeeProfile->city_email]);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $page = Livewire::test(ListEmployees::class);
+        foreach ([$active, $disabled, $unapproved, $inactive, $conflicted, $alreadyInvited] as $member) {
+            $page->assertTableActionHidden('sendMemberInvitation', $member->employeeProfile);
+        }
+        Queue::assertNothingPushed();
+    }
+
+    public function test_single_member_action_requires_super_admin_password_confirmation_and_unchanged_binding(): void
+    {
+        $admin = $this->admin();
+        $pending = $this->member('PILOT-GUARDED', AccountStatus::PendingActivation, true);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(ListEmployees::class)
+            ->mountTableAction('sendMemberInvitation', $pending->employeeProfile)
+            ->set('mountedTableActionsData.0.confirm_member', true)
+            ->set('mountedTableActionsData.0.current_password', 'wrong-password')
+            ->callMountedTableAction()
+            ->assertHasTableActionErrors(['current_password']);
+        Queue::assertNothingPushed();
+
+        $page = Livewire::test(ListEmployees::class)->mountTableAction('sendMemberInvitation', $pending->employeeProfile);
+        $pending->employeeProfile->forceFill(['city_email' => 'changed@miamibeachfl.gov'])->save();
+        $page->set('mountedTableActionsData.0.confirm_member', true)
+            ->set('mountedTableActionsData.0.current_password', 'admin-password')
+            ->callMountedTableAction()
+            ->assertTableActionHidden('sendMemberInvitation', $pending->employeeProfile);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_single_member_action_is_not_available_to_a_non_super_admin(): void
+    {
+        $pending = $this->member('PILOT-NONADMIN', AccountStatus::PendingActivation, true);
+        $member = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $member->givePermissionTo(Permission::findOrCreate('admin.personnel.view', 'web'));
+        $this->actingAs($member);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(ListEmployees::class)->assertTableActionHidden('sendMemberInvitation', $pending->employeeProfile);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_repeated_single_member_submission_queues_only_one_unique_job(): void
+    {
+        $admin = $this->admin();
+        $pending = $this->member('PILOT-DOUBLE', AccountStatus::PendingActivation, true);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            Livewire::test(ListEmployees::class)
+                ->mountTableAction('sendMemberInvitation', $pending->employeeProfile)
+                ->set('mountedTableActionsData.0.confirm_member', true)
+                ->set('mountedTableActionsData.0.current_password', 'admin-password')
+                ->callMountedTableAction()
+                ->assertHasNoTableActionErrors();
+        }
+
+        Queue::assertPushed(IssueMemberOnboardingInvitation::class, 1);
+    }
+
+    public function test_single_member_action_rechecks_eligibility_and_allows_expired_or_failed_retry(): void
+    {
+        $admin = $this->admin();
+        $expired = $this->member('PILOT-EXPIRED', AccountStatus::PendingActivation, true);
+        $failed = $this->member('PILOT-FAILED', AccountStatus::PendingActivation, true);
+        $activated = $this->member('PILOT-ACTIVATED', AccountStatus::PendingActivation, true);
+        foreach ([$expired, $failed] as $member) {
+            MemberOnboardingInvitation::query()->create([
+                'user_id' => $member->id,
+                'employee_profile_id' => $member->employee_profile_id,
+                'email' => $member->employeeProfile->city_email,
+                'security_version' => $member->security_version,
+                'token_hash' => hash('sha256', $member->employee_id),
+                'expires_at' => $member->id === $expired->id ? now()->subMinute() : now()->addMinutes(20),
+                'delivery_status' => $member->id === $expired->id ? 'queued' : 'failed',
+            ]);
+        }
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(ListEmployees::class)->assertTableActionVisible('sendMemberInvitation', $expired->employeeProfile)
+            ->assertTableActionVisible('sendMemberInvitation', $failed->employeeProfile);
+
+        $page = Livewire::test(ListEmployees::class)->mountTableAction('sendMemberInvitation', $expired->employeeProfile);
+        MemberOnboardingRosterBinding::query()->where('employee_profile_id', $expired->employee_profile_id)->delete();
+        $page->set('mountedTableActionsData.0.confirm_member', true)
+            ->set('mountedTableActionsData.0.current_password', 'admin-password')
+            ->callMountedTableAction()
+            ->assertTableActionHidden('sendMemberInvitation', $expired->employeeProfile);
+
+        $page = Livewire::test(ListEmployees::class)->mountTableAction('sendMemberInvitation', $activated->employeeProfile);
+        $activated->forceFill(['account_status' => AccountStatus::Active])->save();
+        $page->set('mountedTableActionsData.0.confirm_member', true)
+            ->set('mountedTableActionsData.0.current_password', 'admin-password')
+            ->callMountedTableAction()
+            ->assertTableActionHidden('sendMemberInvitation', $activated->employeeProfile);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_queued_single_member_job_refuses_changed_account_roster_and_email(): void
+    {
+        Http::fake();
+        $admin = $this->admin();
+        $becameActive = $this->member('JOB-ACTIVE', AccountStatus::PendingActivation, true);
+        $rosterRevoked = $this->member('JOB-ROSTER', AccountStatus::PendingActivation, true);
+        $emailChanged = $this->member('JOB-EMAIL', AccountStatus::PendingActivation, true);
+        $jobs = [];
+        foreach ([$becameActive, $rosterRevoked, $emailChanged] as $member) {
+            $jobs[] = new IssueMemberOnboardingInvitation(
+                $member->id,
+                $admin->id,
+                IssueMemberOnboardingInvitation::bindingHash(
+                    $member->id, $member->employee_id, (string) $member->employeeProfile->city_email, $member->security_version,
+                ),
+            );
+        }
+
+        $becameActive->forceFill(['account_status' => AccountStatus::Active])->save();
+        MemberOnboardingRosterBinding::query()->where('employee_profile_id', $rosterRevoked->employee_profile_id)->delete();
+        $emailChanged->employeeProfile->forceFill(['city_email' => 'changed-job@miamibeachfl.gov'])->save();
+        foreach ($jobs as $job) {
+            $job->handle(app(MemberOnboardingInvitationService::class));
+        }
+
+        self::assertDatabaseCount('member_onboarding_invitations', 0);
+        Http::assertNothingSent();
+    }
+
     private function admin(): User
     {
         $admin = User::factory()->create([

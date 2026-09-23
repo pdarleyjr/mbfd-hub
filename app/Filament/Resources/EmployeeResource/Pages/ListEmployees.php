@@ -63,11 +63,53 @@ class ListEmployees extends ListRecords
         ];
     }
 
-    private function canIssueInvitations(): bool
+    public static function canIssueInvitations(): bool
     {
         $actor = auth()->user();
 
         return $actor instanceof User && $actor->isAuthenticationAllowed() && $actor->hasRole('super_admin');
+    }
+
+    /** @param array<string,mixed> $data */
+    public function queueMemberInvitation(Employee $record, array $data): void
+    {
+        abort_unless(self::canIssueInvitations(), 403);
+        $actor = auth()->user();
+        assert($actor instanceof User);
+        if (($data['confirm_member'] ?? false) !== true) {
+            $this->tableActionError('confirm_member', 'Review and confirm this member before sending.');
+        }
+        if (! Hash::check((string) ($data['current_password'] ?? ''), $actor->password)) {
+            $this->tableActionError('current_password', 'Your password is incorrect.');
+        }
+        if (config('queue.default') === 'sync') {
+            $this->tableActionError('confirm_member', 'Background delivery is unavailable. No invitation was queued.');
+        }
+
+        $employee = Employee::query()->with('user')->findOrFail($record->id);
+        $assessment = app(MemberOnboardingInvitationService::class)->assess($employee);
+        $user = $employee->user;
+        if ($assessment['status'] !== 'ready' || $user === null) {
+            $this->tableActionError('confirm_member', 'This member is no longer eligible. Reopen the action to review the current status.');
+        }
+        $bindingHash = IssueMemberOnboardingInvitation::bindingHash(
+            $user->id,
+            $employee->employee_id,
+            (string) $employee->city_email,
+            $user->security_version,
+        );
+        if (! hash_equals($bindingHash, (string) ($data['binding_hash'] ?? ''))) {
+            $this->tableActionError('confirm_member', 'This member’s account or City email changed. Reopen the action before sending.');
+        }
+
+        app(SecurityAuditRecorder::class)->record($actor, $user, 'member_onboarding_invitation_single_requested', 'allowed', null, [
+            'employee_profile_id' => $employee->id,
+        ]);
+        IssueMemberOnboardingInvitation::dispatch($user->id, $actor->id, $bindingHash);
+
+        Notification::make()->success()->title('Invitation queued')
+            ->body('Delivery for this member is recorded in Outbound Email.')
+            ->send();
     }
 
     /** @return array{ready:list<array{user_id:int,employee_id:string,email:string,binding_hash:string}>,statuses:array<string,int>,hash:string} */
@@ -176,6 +218,13 @@ class ListEmployees extends ListRecords
     {
         throw ValidationException::withMessages([
             $this->getMountedActionForm()->getStatePath().'.'.$field => $message,
+        ]);
+    }
+
+    private function tableActionError(string $field, string $message): never
+    {
+        throw ValidationException::withMessages([
+            $this->getMountedTableActionForm()->getStatePath().'.'.$field => $message,
         ]);
     }
 }
