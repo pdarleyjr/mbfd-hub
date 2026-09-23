@@ -110,7 +110,13 @@ class EmployeeResource extends Resource
                             return 'Not applicable';
                         }
 
-                        return match ($record->user->memberOnboardingInvitation?->delivery_status) {
+                        $invitation = $record->user->memberOnboardingInvitation;
+                        if (in_array($invitation?->delivery_status, ['pending', 'queued', 'redeemed'], true)
+                            && $invitation->expires_at?->lessThanOrEqualTo(now()) === true) {
+                            return 'Expired — ready to resend';
+                        }
+
+                        return match ($invitation?->delivery_status) {
                             'queued' => 'Queued — awaiting activation',
                             'pending' => 'Sending',
                             'failed' => 'Delivery failed',
