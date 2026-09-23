@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Resources\ApparatusInspectionExceptionResource;
 use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\ApparatusServiceTicketResource;
+use App\Filament\Resources\DefectResource;
+use App\Filament\Resources\HubSupportTicketResource;
 use App\Filament\Resources\InspectionResource;
 use App\Filament\Resources\StationInspectionResource;
 use App\Filament\Resources\StationRequestResource;
@@ -13,289 +16,583 @@ use App\Filament\Resources\StationResource;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
+use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusServiceTicket;
-use App\Models\EquipmentItem;
+use App\Models\HubSupportTicket;
 use App\Models\Station;
 use App\Models\StationInspection;
 use App\Models\StationInventorySubmission;
 use App\Models\StationRequest;
 use App\Models\StationSupplyRequest;
-use App\Services\DailyCheckoutComplianceService;
-use App\Services\Display\DisplayReadiness;
 use App\Services\Display\DisplaySnapshotService;
-use App\Services\StationStaffingService;
+use App\Support\OperationalDisplayWindow;
+use BackedEnum;
 use Filament\Widgets\Widget;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
-class StationOperationsHubWidget extends Widget
+final class StationOperationsHubWidget extends Widget
 {
-    /** @var list<string> */
-    private const OPERATIONAL_STATION_NUMBERS = ['1', '2', '3', '4', '6'];
-
     protected static string $view = 'filament.widgets.station-operations-hub-widget';
 
     protected static ?int $sort = 3;
 
+    protected static bool $isLazy = false;
+
     protected int|string|array $columnSpan = 'full';
 
-    protected static ?string $pollingInterval = '20s';
+    public string $lastSuccessfulRefreshAt = '';
 
-    public string $selectedStationId = 'all';
+    public bool $displayMode = false;
 
-    public function updatedSelectedStationId(): void
+    public function mount(): void
     {
-        if ($this->selectedStationId !== 'all' && ! ctype_digit($this->selectedStationId)) {
-            $this->selectedStationId = 'all';
-        }
+        $this->displayMode = request()->boolean('display');
+        $this->markSuccessfulRefresh();
+    }
+
+    public function refreshBoard(): void
+    {
+        $this->markSuccessfulRefresh();
     }
 
     /** @return array<string, mixed> */
     public function getViewData(): array
     {
+        $window = OperationalDisplayWindow::forNow();
+        $stationNumbers = array_map('strval', array_keys((array) config('station_operations.stations', [])));
+
         /** @var Collection<int, Station> $stations */
         $stations = Station::query()
-            ->with('apparatuses:id,station_id,unit_id,designation,status,daily_checkout_requirement')
+            ->select(['id', 'station_number', 'name'])
+            ->with(['apparatuses' => fn ($query) => $query->select([
+                'id', 'station_id', 'unit_id', 'designation', 'status',
+                'current_engine_hours', 'current_miles', 'last_pm_date', 'last_pm_mileage',
+                'last_pm_engine_hours', 'pm_interval_miles', 'pm_interval_hours', 'updated_at',
+            ])->orderBy('designation')->orderBy('unit_id')])
             ->where('is_active', true)
-            ->whereIn('station_number', self::OPERATIONAL_STATION_NUMBERS)
-            ->orderByRaw("CASE station_number WHEN '1' THEN 1 WHEN '2' THEN 2 WHEN '3' THEN 3 WHEN '4' THEN 4 WHEN '6' THEN 5 END")
+            ->whereIn('station_number', $stationNumbers)
+            ->orderByRaw($this->stationOrderSql($stationNumbers))
             ->get();
 
-        $stationOptions = $stations->map(fn (Station $station): array => [
-            'id' => (int) $station->id,
-            'station_number' => (int) $station->station_number,
-        ])->values()->all();
-        $validStationIds = $stations->pluck('id')->map(static fn (mixed $id): string => (string) $id)->all();
-        if ($this->selectedStationId !== 'all' && ! in_array($this->selectedStationId, $validStationIds, true)) {
-            $this->selectedStationId = 'all';
-        }
+        $stationIds = $stations->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+        $stationNumbersById = $stations->mapWithKeys(static fn (Station $station): array => [(int) $station->id => (string) $station->station_number]);
+        $apparatusById = $this->apparatusById($stations);
+        $apparatusIds = $apparatusById->keys()->map(static fn (mixed $id): int => (int) $id)->all();
 
-        $dailyCheckoutByStation = app(DailyCheckoutComplianceService::class)->summariesForStations($stations);
-        $stationData = $this->loadAllStationData($stations, $dailyCheckoutByStation);
-        $visibleStations = $this->selectedStationId === 'all'
-            ? $stations
-            : $stations->where('id', (int) $this->selectedStationId)->values();
+        $activity = $this->loadOperationalActivity($stationIds, $apparatusIds, $apparatusById, $window);
+        $attention = $this->loadPersistentAttention($stationIds, $apparatusIds, $apparatusById);
+        $fleet = $this->fleetSummary($stations);
+        $pm = $this->pmSummary($stations);
+        $attentionRows = $this->departmentAttention($attention, $fleet['attention'], $pm['records'], $stationNumbersById);
+        $stationData = $this->stationData($stations, $activity, $attention, $fleet['byStation'], $pm['byStation']);
 
         return [
-            'stations' => $visibleStations->map(fn (Station $station): array => [
+            'stations' => $stations->map(static fn (Station $station): array => [
                 'id' => (int) $station->id,
                 'station_number' => (int) $station->station_number,
+                'name' => $station->name,
             ])->values()->all(),
-            'stationOptions' => $stationOptions,
-            'selectedStationId' => $this->selectedStationId,
-            'department' => $this->departmentSummary($stations, $stationData),
+            'operationalWindow' => $window->toDisplayArray(),
+            'lastUpdated' => $this->lastSuccessfulRefreshAt,
+            'displayMode' => $this->displayMode,
+            'department' => [
+                'checkouts' => $activity['checkouts']->values()->all(),
+                'attention' => $attentionRows->values()->all(),
+                'attentionCounts' => $attentionRows->countBy('type')->all(),
+                'apparatus' => $fleet['totals'],
+                'pm' => [
+                    'approaching' => $pm['approaching'],
+                    'due' => $pm['due'],
+                    'critical' => $pm['critical'],
+                    'records' => $pm['records']->values()->all(),
+                ],
+                'openServiceTickets' => $attention['serviceTickets']->count(),
+                'openDefects' => $attention['defects']->count(),
+                'openStationRequests' => $attention['stationRequests']->count(),
+                'links' => [
+                    'apparatus' => ApparatusResource::getUrl('index'),
+                    'inspections' => InspectionResource::getUrl('index'),
+                    'serviceTickets' => ApparatusServiceTicketResource::getUrl('index'),
+                    'defects' => DefectResource::getUrl('index'),
+                    'stationRequests' => StationRequestResource::getUrl('index'),
+                    'supportTickets' => HubSupportTicketResource::getUrl('index'),
+                ],
+            ],
             'stationData' => $stationData,
         ];
     }
 
     /**
-     * @param  Collection<int, Station>  $stations
-     * @param  array<int, array<string, mixed>>  $dailyCheckoutByStation
-     * @return array<int, array<string, mixed>>
+     * @param  list<int>  $stationIds
+     * @param  list<int>  $apparatusIds
+     * @param  Collection<int, Apparatus>  $apparatusById
+     * @return array<string, Collection<int, array<string, mixed>>>
      */
-    protected function loadAllStationData(Collection $stations, array $dailyCheckoutByStation): array
+    private function loadOperationalActivity(array $stationIds, array $apparatusIds, Collection $apparatusById, OperationalDisplayWindow $window): array
     {
-        $stationIds = $stations->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
-        $apparatusToStation = [];
+        if ($stationIds === []) {
+            return collect(['checkouts', 'stationInspections', 'stationRequests', 'serviceTickets', 'inventory', 'supply'])
+                ->mapWithKeys(static fn (string $key): array => [$key => collect()])->all();
+        }
+
+        $start = $window->databaseStart();
+        $end = $window->databaseEnd();
+
+        $checkouts = $apparatusIds === [] ? collect() : ApparatusInspection::query()
+            ->select(['id', 'apparatus_id', 'client_submission_id', 'designation_at_time', 'unit_number', 'processing_status', 'review_status', 'completed_at', 'created_at'])
+            ->whereIn('apparatus_id', $apparatusIds)
+            ->whereNotNull('client_submission_id')
+            ->where(function (Builder $query) use ($start, $end): void {
+                $query->where(fn (Builder $completed) => $completed->where('completed_at', '>=', $start)->where('completed_at', '<', $end))
+                    ->orWhere(fn (Builder $created) => $created->whereNull('completed_at')->where('created_at', '>=', $start)->where('created_at', '<', $end));
+            })
+            ->orderByRaw('COALESCE(completed_at, created_at) DESC')
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (ApparatusInspection $record) use ($apparatusById): array {
+                $apparatus = $apparatusById->get((int) $record->apparatus_id);
+                $stationId = $apparatus instanceof Apparatus ? (int) $apparatus->station_id : null;
+                $label = $record->designation_at_time ?: ($apparatus instanceof Apparatus ? $this->apparatusLabel($apparatus) : null) ?: $record->unit_number ?: 'Apparatus';
+
+                return $this->activityRow(
+                    id: (int) $record->id,
+                    type: 'daily_checkout',
+                    label: (string) $label.' Checkout',
+                    status: $record->displayStatus(),
+                    timestamp: $record->completed_at ?: $record->created_at,
+                    url: InspectionResource::getUrl('view', ['record' => $record]),
+                    stationId: $stationId,
+                    apparatusId: (int) $record->apparatus_id,
+                    tone: $record->processing_status === 'accepted_with_exception' || $record->review_status === 'pending_review' ? 'warning' : 'neutral',
+                );
+            });
+
+        return [
+            'checkouts' => $checkouts,
+            'stationInspections' => StationInspection::query()
+                ->select(['id', 'station_id', 'inspection_type', 'overall_status', 'inspection_date', 'reviewed_at', 'created_at'])
+                ->whereIn('station_id', $stationIds)->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->orderByDesc('created_at')->orderByDesc('id')->get()
+                ->map(fn (StationInspection $record): array => $this->activityRow(
+                    (int) $record->id, 'station_inspection', $this->headline($record->inspection_type ?: 'Station inspection'),
+                    $this->headline((string) $record->overall_status), $record->created_at,
+                    StationInspectionResource::getUrl('view', ['record' => $record]), (int) $record->station_id,
+                    tone: $record->reviewed_at === null ? 'warning' : 'neutral',
+                )),
+            'stationRequests' => StationRequest::query()
+                ->select(['id', 'station_id', 'request_number', 'title', 'status', 'priority', 'acknowledged_at', 'created_at'])
+                ->whereIn('station_id', $stationIds)->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->orderByDesc('created_at')->orderByDesc('id')->get()
+                ->map(fn (StationRequest $record): array => $this->activityRow(
+                    (int) $record->id, 'station_request', $record->request_number ?: $record->title ?: 'Station request',
+                    $this->headline((string) $record->status), $record->created_at,
+                    StationRequestResource::getUrl('view', ['record' => $record]), (int) $record->station_id,
+                    tone: $record->acknowledged_at === null ? 'info' : 'neutral',
+                )),
+            'serviceTickets' => ApparatusServiceTicket::query()
+                ->select(['id', 'station_id', 'apparatus_id', 'ticket_number', 'title', 'status', 'priority', 'acknowledged_at', 'created_at'])
+                ->whereIn('station_id', $stationIds)->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->orderByDesc('created_at')->orderByDesc('id')->get()
+                ->map(fn (ApparatusServiceTicket $record): array => $this->activityRow(
+                    (int) $record->id, 'service_ticket', $record->ticket_number ?: $record->title ?: 'Service ticket',
+                    $this->headline((string) $record->status), $record->created_at,
+                    ApparatusServiceTicketResource::getUrl('view', ['record' => $record]), (int) $record->station_id,
+                    (int) $record->apparatus_id,
+                    $record->acknowledged_at === null ? 'info' : 'neutral',
+                )),
+            'inventory' => StationInventorySubmission::query()
+                ->select(['id', 'station_id', 'submitted_at', 'created_at'])
+                ->whereIn('station_id', $stationIds)->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->orderByDesc('created_at')->orderByDesc('id')->get()
+                ->map(fn (StationInventorySubmission $record): array => $this->activityRow(
+                    (int) $record->id, 'inventory_submission', 'Station inventory submission', 'Submitted', $record->created_at,
+                    $this->stationRelationUrl((int) $record->station_id, 'inventorySubmissions'), (int) $record->station_id,
+                )),
+            'supply' => StationSupplyRequest::query()
+                ->select(['id', 'station_id', 'status', 'created_at'])
+                ->whereIn('station_id', $stationIds)->where('created_at', '>=', $start)->where('created_at', '<', $end)
+                ->orderByDesc('created_at')->orderByDesc('id')->get()
+                ->map(fn (StationSupplyRequest $record): array => $this->activityRow(
+                    (int) $record->id, 'supply_request', 'Supply request', $this->headline((string) $record->status), $record->created_at,
+                    $this->stationRelationUrl((int) $record->station_id, 'supplyRequests'), (int) $record->station_id,
+                    tone: $record->status === 'open' ? 'info' : 'neutral',
+                )),
+        ];
+    }
+
+    /**
+     * @param  list<int>  $stationIds
+     * @param  list<int>  $apparatusIds
+     * @param  Collection<int, Apparatus>  $apparatusById
+     * @return array<string, Collection<int, mixed>>
+     */
+    private function loadPersistentAttention(array $stationIds, array $apparatusIds, Collection $apparatusById): array
+    {
+        $stationRequests = $stationIds === [] ? collect() : StationRequest::query()
+            ->select(['id', 'station_id', 'request_number', 'title', 'status', 'priority', 'acknowledged_at', 'created_at'])
+            ->whereIn('station_id', $stationIds)->open()->orderByDesc('created_at')->get();
+        $serviceTickets = $stationIds === [] ? collect() : ApparatusServiceTicket::query()
+            ->select(['id', 'station_id', 'apparatus_id', 'ticket_number', 'title', 'status', 'priority', 'acknowledged_at', 'created_at'])
+            ->whereIn('station_id', $stationIds)->open()->orderByDesc('created_at')->get();
+        $supplyRequests = $stationIds === [] ? collect() : StationSupplyRequest::query()
+            ->select(['id', 'station_id', 'status', 'created_at'])->whereIn('station_id', $stationIds)->open()->orderByDesc('created_at')->get();
+        $stationInspections = $stationIds === [] ? collect() : StationInspection::query()
+            ->select(['id', 'station_id', 'inspection_type', 'overall_status', 'inspection_date', 'reviewed_at', 'created_at'])
+            ->whereIn('station_id', $stationIds)->whereNull('reviewed_at')->orderByDesc('created_at')->get();
+        $defects = $apparatusIds === [] ? collect() : ApparatusDefect::query()
+            ->select(['id', 'apparatus_id', 'item', 'issue_type', 'status', 'operational_impact', 'created_at'])
+            ->whereIn('apparatus_id', $apparatusIds)->unresolved()->orderByDesc('created_at')->get();
+        $inspectionExceptions = $apparatusIds === [] ? collect() : ApparatusInspectionException::query()
+            ->select(['id', 'apparatus_inspection_id', 'apparatus_id', 'field', 'reason', 'status', 'created_at'])
+            ->whereIn('apparatus_id', $apparatusIds)->whereNotIn('status', ['resolved', 'dismissed'])->orderByDesc('created_at')->get();
+        $followUpInspectionIds = $inspectionExceptions->pluck('apparatus_inspection_id')->map(static fn (mixed $id): int => (int) $id)->all();
+        $checkoutFollowUps = $apparatusIds === [] ? collect() : ApparatusInspection::query()
+            ->select(['id', 'apparatus_id', 'client_submission_id', 'designation_at_time', 'unit_number', 'processing_status', 'review_status', 'completed_at', 'created_at'])
+            ->whereIn('apparatus_id', $apparatusIds)
+            ->where(function (Builder $query) use ($followUpInspectionIds): void {
+                $query->where('review_status', 'pending_review')->orWhere('processing_status', 'accepted_with_exception');
+                if ($followUpInspectionIds !== []) {
+                    $query->orWhereIn('id', $followUpInspectionIds);
+                }
+            })
+            ->orderByRaw('COALESCE(completed_at, created_at) DESC')->get();
+        $supportTickets = auth()->check() && HubSupportTicketResource::canViewAny()
+            ? HubSupportTicket::query()
+                ->select(['id', 'ticket_number', 'generated_title', 'impact', 'status', 'acknowledged_at', 'created_at'])
+                ->open()->orderByDesc('created_at')->get()
+            : collect();
+
+        return compact(
+            'stationRequests', 'serviceTickets', 'supplyRequests', 'stationInspections', 'defects',
+            'inspectionExceptions', 'checkoutFollowUps', 'supportTickets', 'apparatusById',
+        );
+    }
+
+    /**
+     * @param  Collection<int, Station>  $stations
+     * @return array{totals: array<string, int>, byStation: array<int, array<string, mixed>>, attention: Collection<int, array<string, mixed>>}
+     */
+    private function fleetSummary(Collection $stations): array
+    {
+        $display = app(DisplaySnapshotService::class);
+        $totals = ['total' => 0, 'in_service' => 0, 'out_of_service' => 0, 'maintenance' => 0, 'unclassified' => 0];
+        $byStation = [];
+        $attention = collect();
+
         foreach ($stations as $station) {
-            /** @var Collection<int, Apparatus> $stationApparatus */
-            $stationApparatus = $station->apparatuses;
-            foreach ($stationApparatus as $apparatus) {
-                $apparatusToStation[(int) $apparatus->id] = (int) $station->id;
+            $apparatuses = $this->stationApparatus($station);
+            $counts = $display->classifyApparatusCollection($apparatuses);
+            $records = $apparatuses->map(function (Apparatus $apparatus) use ($display, $station, $attention): array {
+                $statusValue = $apparatus->getAttribute('status');
+                $status = $display->classifyApparatusStatus(is_string($statusValue) ? $statusValue : null);
+                $tone = match ($status) {
+                    'out_of_service' => 'critical',
+                    'maintenance' => 'warning',
+                    default => 'neutral',
+                };
+                $record = [
+                    'id' => (int) $apparatus->id,
+                    'label' => $this->apparatusLabel($apparatus),
+                    'status' => $this->headline($status),
+                    'statusKey' => $status,
+                    'tone' => $tone,
+                    'url' => ApparatusResource::getUrl('view', ['record' => $apparatus]),
+                ];
+                if ($tone !== 'neutral') {
+                    $attention->push($this->attentionRow(
+                        (int) $apparatus->id,
+                        'apparatus_status',
+                        $record['label'].' · '.$record['status'],
+                        $record['status'],
+                        $record['url'],
+                        (int) $station->id,
+                        $tone,
+                        $apparatus->updated_at,
+                    ));
+                }
+
+                return $record;
+            })->values()->all();
+            $byStation[(int) $station->id] = $counts + ['records' => $records];
+            $totals['total'] += count($records);
+            foreach (['in_service', 'out_of_service', 'maintenance', 'unclassified'] as $key) {
+                $totals[$key] += $counts[$key];
             }
         }
-        $apparatusIds = array_keys($apparatusToStation);
 
-        $requestCounts = $this->countByStation(StationRequest::query()->whereIn('station_id', $stationIds)->open());
-        $ticketCounts = $this->countByStation(ApparatusServiceTicket::query()->whereIn('station_id', $stationIds)->open());
-        $supplyCounts = $this->countByStation(StationSupplyRequest::query()->whereIn('station_id', $stationIds)->open());
-        $equipmentCounts = $this->countByStation(StationRequest::query()
-            ->whereIn('station_id', $stationIds)->where('request_type', 'equipment')->open());
-        $criticalEquipmentCounts = $this->countByStation(StationRequest::query()
-            ->whereIn('station_id', $stationIds)->where('request_type', 'equipment')
-            ->whereIn('priority', ['critical', 'high'])->open());
+        return compact('totals', 'byStation', 'attention');
+    }
 
-        $defectCounts = $this->defectCountsByStation($apparatusToStation, false);
-        $missingDefectCounts = $this->defectCountsByStation($apparatusToStation, true);
-        $recentInspections = $this->rankedByStation(
-            StationInspection::query()->whereIn('station_id', $stationIds),
-            StationInspection::class, 'station_inspections', 'station_id', 'inspection_date', 4,
-        )->groupBy('station_id');
-        $recentRequests = $this->rankedByStation(
-            StationRequest::query()->whereIn('station_id', $stationIds),
-            StationRequest::class, 'station_requests', 'station_id', 'created_at', 3,
-        )->groupBy('station_id');
-        $recentTickets = $this->rankedByStation(
-            ApparatusServiceTicket::query()->whereIn('station_id', $stationIds),
-            ApparatusServiceTicket::class, 'apparatus_service_tickets', 'station_id', 'created_at', 3,
-        )->groupBy('station_id');
-        $recentInventory = $this->rankedByStation(
-            StationInventorySubmission::query()->whereIn('station_id', $stationIds),
-            StationInventorySubmission::class, 'station_inventory_submissions', 'station_id', 'submitted_at', 3,
-        )->groupBy('station_id');
-        $recentSupply = $this->rankedByStation(
-            StationSupplyRequest::query()->whereIn('station_id', $stationIds),
-            StationSupplyRequest::class, 'station_supply_requests', 'station_id', 'created_at', 2,
-        )->groupBy('station_id');
-        $recentApparatusInspections = $apparatusIds === [] ? collect() : $this->rankedByStation(
-            ApparatusInspection::query()
-                ->join('apparatuses', 'apparatuses.id', '=', 'apparatus_inspections.apparatus_id')
-                ->whereIn('apparatuses.station_id', $stationIds),
-            ApparatusInspection::class, 'apparatus_inspections', 'apparatuses.station_id', 'completed_at', 3, 'console_station_id',
-        )->groupBy('console_station_id');
+    /**
+     * @param  Collection<int, Station>  $stations
+     * @return array{approaching: int, due: int, critical: int, records: Collection<int, array<string, mixed>>, byStation: array<int, list<array<string, mixed>>>}
+     */
+    private function pmSummary(Collection $stations): array
+    {
+        $records = collect();
+        $byStation = [];
+        $approaching = 0;
+        $due = 0;
+        $critical = 0;
 
-        $display = app(DisplaySnapshotService::class);
-        $staffing = app(StationStaffingService::class);
+        foreach ($stations as $station) {
+            $stationRecords = [];
+            foreach ($this->stationApparatus($station) as $apparatus) {
+                $health = $apparatus->getPmHealthStatus();
+                if ($health['status'] === 'green') {
+                    continue;
+                }
+                $isCritical = $health['status'] === 'red' && $health['overdue'];
+                $status = $health['status'] === 'yellow' ? 'PM approaching' : ($isCritical ? 'PM critically overdue' : 'PM due');
+                $tone = $isCritical ? 'critical' : 'warning';
+                if ($health['status'] === 'yellow') {
+                    $approaching++;
+                } elseif ($isCritical) {
+                    $critical++;
+                    $due++;
+                } else {
+                    $due++;
+                }
+                $row = $this->attentionRow(
+                    (int) $apparatus->id,
+                    'pm',
+                    $this->apparatusLabel($apparatus).' · '.$status,
+                    $status,
+                    ApparatusResource::getUrl('view', ['record' => $apparatus]),
+                    (int) $station->id,
+                    $tone,
+                );
+                $records->push($row);
+                $stationRecords[] = $row;
+            }
+            $byStation[(int) $station->id] = $stationRecords;
+        }
+
+        return compact('approaching', 'due', 'critical', 'records', 'byStation');
+    }
+
+    /**
+     * @param  array<string, Collection<int, mixed>>  $attention
+     * @param  Collection<int, array<string, mixed>>  $fleetAttention
+     * @param  Collection<int, array<string, mixed>>  $pmRecords
+     * @param  Collection<int, string>  $stationNumbersById
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function departmentAttention(array $attention, Collection $fleetAttention, Collection $pmRecords, Collection $stationNumbersById): Collection
+    {
+        /** @var Collection<int, Apparatus> $apparatusById */
+        $apparatusById = $attention['apparatusById'];
+        $rows = collect();
+
+        foreach ($attention['supportTickets'] as $record) {
+            $impact = $this->enumValue($record->impact);
+            $rows->push($this->attentionRow(
+                (int) $record->id, 'support_ticket', $record->ticket_number.' · '.$record->generated_title,
+                $record->acknowledged_at === null ? 'New '.$this->headline($impact).' issue' : $this->headline($this->enumValue($record->status)),
+                HubSupportTicketResource::getUrl('view', ['record' => $record]), null,
+                in_array($impact, ['task_blocking', 'feature_unavailable'], true) ? 'critical' : ($record->acknowledged_at === null ? 'info' : 'neutral'),
+                $record->created_at,
+            ));
+        }
+        foreach ($attention['stationInspections'] as $record) {
+            $rows->push($this->attentionRow(
+                (int) $record->id, 'station_inspection', 'Station '.($stationNumbersById->get((int) $record->station_id) ?? '—').' inspection',
+                'Awaiting review', StationInspectionResource::getUrl('view', ['record' => $record]),
+                (int) $record->station_id, 'warning', $record->created_at,
+            ));
+        }
+        foreach ($attention['stationRequests'] as $record) {
+            $priority = (string) $record->priority;
+            $rows->push($this->attentionRow(
+                (int) $record->id, 'station_request', $record->request_number ?: $record->title ?: 'Station request',
+                $record->acknowledged_at === null ? 'New · '.$this->headline((string) $record->status) : $this->headline((string) $record->status),
+                StationRequestResource::getUrl('view', ['record' => $record]), (int) $record->station_id,
+                $priority === 'critical' ? 'critical' : (in_array($priority, ['high', 'urgent'], true) ? 'warning' : ($record->acknowledged_at === null ? 'info' : 'neutral')),
+                $record->created_at,
+            ));
+        }
+        foreach ($attention['checkoutFollowUps'] as $record) {
+            $apparatus = $apparatusById->get((int) $record->apparatus_id);
+            $rows->push($this->attentionRow(
+                (int) $record->id, 'checkout_follow_up', ($record->designation_at_time ?: $apparatus?->designation ?: $record->unit_number ?: 'Apparatus').' checkout',
+                $record->displayStatus(), InspectionResource::getUrl('view', ['record' => $record]),
+                $apparatus instanceof Apparatus ? (int) $apparatus->station_id : null, 'warning', $record->completed_at ?: $record->created_at,
+            ));
+        }
+        foreach ($attention['serviceTickets'] as $record) {
+            $priority = (string) $record->priority;
+            $rows->push($this->attentionRow(
+                (int) $record->id, 'service_ticket', $record->ticket_number ?: $record->title ?: 'Service ticket',
+                $this->headline((string) $record->status), ApparatusServiceTicketResource::getUrl('view', ['record' => $record]),
+                (int) $record->station_id,
+                $priority === 'critical' ? 'critical' : (in_array($priority, ['attention', 'urgent', 'high'], true) ? 'warning' : 'neutral'),
+                $record->created_at,
+            ));
+        }
+        foreach ($attention['defects'] as $record) {
+            $apparatus = $apparatusById->get((int) $record->apparatus_id);
+            $impact = (string) ($record->operational_impact ?: 'unclassified');
+            $rows->push($this->attentionRow(
+                (int) $record->id, 'defect', ($apparatus instanceof Apparatus ? $this->apparatusLabel($apparatus) : 'Apparatus').' · '.($record->item ?: $this->headline((string) $record->issue_type)),
+                $this->headline($impact), DefectResource::getUrl('index'),
+                $apparatus instanceof Apparatus ? (int) $apparatus->station_id : null,
+                $impact === 'out_of_service' ? 'critical' : (in_array($impact, ['needs_repair', 'needs_admin_review'], true) ? 'warning' : 'neutral'),
+                $record->created_at,
+            ));
+        }
+
+        return $rows->concat($fleetAttention)->concat($pmRecords)
+            ->sortByDesc(fn (array $row): string => ($row['tone'] === 'critical' ? '3' : ($row['tone'] === 'warning' ? '2' : '1')).($row['sortTimestamp'] ?? ''))
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, Station>  $stations
+     * @param  array<string, Collection<int, array<string, mixed>>>  $activity
+     * @param  array<string, Collection<int, mixed>>  $attention
+     * @param  array<int, array<string, mixed>>  $fleetByStation
+     * @param  array<int, list<array<string, mixed>>>  $pmByStation
+     * @return array<int, array<string, mixed>>
+     */
+    private function stationData(Collection $stations, array $activity, array $attention, array $fleetByStation, array $pmByStation): array
+    {
+        /** @var Collection<int, Apparatus> $apparatusById */
+        $apparatusById = $attention['apparatusById'];
         $data = [];
 
         foreach ($stations as $station) {
             $stationId = (int) $station->id;
-            /** @var Collection<int, Apparatus> $stationApparatus */
-            $stationApparatus = $station->apparatuses;
-            $dailyCheckout = $dailyCheckoutByStation[$stationId] ?? [];
-            $statusCounts = $display->classifyApparatusCollection($stationApparatus);
-            $latestInspection = $recentInspections->get($stationId, collect())->first();
-            $inspectionAgeDays = $latestInspection?->inspection_date === null
-                ? null
-                : (int) max(0, Carbon::now()->startOfDay()->diffInDays($latestInspection->inspection_date));
-            $readiness = DisplayReadiness::compute(
-                requiredApparatusCount: (int) ($dailyCheckout['required_total'] ?? 0),
-                checkedApparatusCount: (int) ($dailyCheckout['checked'] ?? 0),
-                attentionApparatusCount: (int) ($dailyCheckout['attention'] ?? 0),
-                reviewPendingApparatusCount: (int) ($dailyCheckout['review_pending'] ?? 0),
-                notCheckedApparatusCount: (int) ($dailyCheckout['not_checked'] ?? 0),
-                unknownApparatusCount: (int) ($dailyCheckout['classification_required'] ?? 0),
-                inServiceCount: $statusCounts['in_service'],
-                outOfServiceCount: (int) ($dailyCheckout['out_of_service'] ?? $statusCounts['out_of_service']),
-                maintenanceCount: $statusCounts['maintenance'],
-                openDefects: $defectCounts[$stationId] ?? 0,
-                criticalDefects: $missingDefectCounts[$stationId] ?? 0,
-                lastStationInspectionStatus: $latestInspection?->overall_status,
-                stationInspectionAgeDays: $inspectionAgeDays,
-                pendingEquipmentRequests: $equipmentCounts[$stationId] ?? 0,
-                criticalPendingEquipmentRequests: $criticalEquipmentCounts[$stationId] ?? 0,
-                snapshotAgeSeconds: 0,
-            );
-            $summary = $staffing->summaryFor($station);
-            $stationUrl = StationResource::getUrl('view', ['record' => $stationId]);
+            $stationActivity = collect($activity)->except('checkouts')->flatten(1)
+                ->concat($activity['checkouts'])
+                ->where('stationId', $stationId)
+                ->sortByDesc('sortTimestamp')->values();
+            $stationExceptions = collect()
+                ->concat($attention['stationRequests']->where('station_id', $stationId)->map(fn (StationRequest $record): array => $this->attentionRow(
+                    (int) $record->id, 'station_request', $record->request_number ?: $record->title ?: 'Station request',
+                    $this->headline((string) $record->status), StationRequestResource::getUrl('view', ['record' => $record]), $stationId,
+                    in_array((string) $record->priority, ['critical', 'high', 'urgent'], true) ? 'warning' : 'neutral', $record->created_at,
+                )))
+                ->concat($attention['serviceTickets']->where('station_id', $stationId)->map(fn (ApparatusServiceTicket $record): array => $this->attentionRow(
+                    (int) $record->id, 'service_ticket', $record->ticket_number ?: $record->title ?: 'Service ticket',
+                    $this->headline((string) $record->status), ApparatusServiceTicketResource::getUrl('view', ['record' => $record]), $stationId,
+                    in_array((string) $record->priority, ['critical', 'attention', 'high', 'urgent'], true) ? 'warning' : 'neutral', $record->created_at,
+                )))
+                ->concat($attention['stationInspections']->where('station_id', $stationId)->map(fn (StationInspection $record): array => $this->attentionRow(
+                    (int) $record->id, 'station_inspection', 'Station inspection', 'Awaiting review',
+                    StationInspectionResource::getUrl('view', ['record' => $record]), $stationId, 'warning', $record->created_at,
+                )))
+                ->concat($attention['checkoutFollowUps']->filter(function (ApparatusInspection $record) use ($apparatusById, $stationId): bool {
+                    $apparatus = $apparatusById->get((int) $record->apparatus_id);
+
+                    return $apparatus instanceof Apparatus && (int) $apparatus->station_id === $stationId;
+                })->map(function (ApparatusInspection $record) use ($apparatusById, $stationId): array {
+                    $apparatus = $apparatusById->get((int) $record->apparatus_id);
+
+                    return $this->attentionRow(
+                        (int) $record->id, 'checkout_follow_up',
+                        ($record->designation_at_time ?: $apparatus?->designation ?: $record->unit_number ?: 'Apparatus').' checkout',
+                        $record->displayStatus(), InspectionResource::getUrl('view', ['record' => $record]),
+                        $stationId, 'warning', $record->completed_at ?: $record->created_at,
+                    );
+                }))
+                ->concat($attention['supplyRequests']->where('station_id', $stationId)->map(fn (StationSupplyRequest $record): array => $this->attentionRow(
+                    (int) $record->id, 'supply_request', 'Supply request', $this->headline((string) $record->status),
+                    $this->stationRelationUrl($stationId, 'supplyRequests'), $stationId, 'neutral', $record->created_at,
+                )))
+                ->concat($attention['defects']->filter(function (ApparatusDefect $record) use ($apparatusById, $stationId): bool {
+                    $apparatus = $apparatusById->get((int) $record->apparatus_id);
+
+                    return $apparatus instanceof Apparatus && (int) $apparatus->station_id === $stationId;
+                })->map(function (ApparatusDefect $record) use ($apparatusById, $stationId): array {
+                    $apparatus = $apparatusById->get((int) $record->apparatus_id);
+
+                    return $this->attentionRow(
+                        (int) $record->id, 'defect', ($apparatus?->designation ?: 'Apparatus').' · '.($record->item ?: 'Finding'),
+                        $this->headline((string) ($record->operational_impact ?: 'unclassified')), DefectResource::getUrl('index'),
+                        $stationId, $record->operational_impact === 'out_of_service' ? 'critical' : 'neutral', $record->created_at,
+                    );
+                }))
+                ->concat(collect($fleetByStation[$stationId]['records'] ?? [])->filter(
+                    static fn (array $record): bool => ($record['tone'] ?? 'neutral') !== 'neutral',
+                )->map(fn (array $record): array => $this->attentionRow(
+                    (int) $record['id'], 'apparatus_status', $record['label'].' · '.$record['status'],
+                    $record['status'], $record['url'], $stationId, $record['tone'],
+                )))
+                ->concat($pmByStation[$stationId] ?? [])
+                ->sortByDesc('sortTimestamp')->values();
+            $counts = [
+                'stationRequests' => $attention['stationRequests']->where('station_id', $stationId)->count(),
+                'serviceTickets' => $attention['serviceTickets']->where('station_id', $stationId)->count(),
+                'defects' => $attention['defects']->filter(function (ApparatusDefect $record) use ($apparatusById, $stationId): bool {
+                    $apparatus = $apparatusById->get((int) $record->apparatus_id);
+
+                    return $apparatus instanceof Apparatus && (int) $apparatus->station_id === $stationId;
+                })->count(),
+                'missingDefects' => $attention['defects']->filter(function (ApparatusDefect $record) use ($apparatusById, $stationId): bool {
+                    $apparatus = $apparatusById->get((int) $record->apparatus_id);
+
+                    return $record->issue_type === 'missing' && $apparatus instanceof Apparatus && (int) $apparatus->station_id === $stationId;
+                })->count(),
+                'supplyRequests' => $attention['supplyRequests']->where('station_id', $stationId)->count(),
+            ];
 
             $data[$stationId] = [
                 'stationNumber' => (int) $station->station_number,
-                'stationUrl' => $stationUrl,
+                'stationName' => $station->name,
+                'stationUrl' => StationResource::getUrl('view', ['record' => $station]),
+                'apparatus' => $fleetByStation[$stationId] ?? ['records' => []],
+                'pm' => $pmByStation[$stationId] ?? [],
+                'activity' => $stationActivity->all(),
+                'exceptions' => $stationExceptions->all(),
+                'attentionCount' => $stationExceptions->count(),
+                'counts' => $counts,
                 'links' => [
                     'requests' => $this->stationFilterUrl(StationRequestResource::getUrl('index'), $stationId),
                     'tickets' => $this->stationFilterUrl(ApparatusServiceTicketResource::getUrl('index'), $stationId),
-                    'defects' => $this->stationFilterUrl(\App\Filament\Resources\DefectResource::getUrl('index'), $stationId),
-                    'supplies' => $stationUrl.'?activeRelationManager=supplyRequests',
-                    'inventorySubmissions' => $stationUrl.'?activeRelationManager=inventorySubmissions',
-                    'inspectionExceptions' => $this->stationFilterUrl(\App\Filament\Resources\ApparatusInspectionExceptionResource::getUrl('index'), $stationId),
+                    'defects' => $this->stationFilterUrl(DefectResource::getUrl('index'), $stationId),
+                    'supplies' => $this->stationRelationUrl($stationId, 'supplyRequests'),
+                    'inventorySubmissions' => $this->stationRelationUrl($stationId, 'inventorySubmissions'),
+                    'inspectionExceptions' => $this->stationFilterUrl(ApparatusInspectionExceptionResource::getUrl('index'), $stationId),
                 ],
-                'dailyCheckout' => $dailyCheckout,
-                'dailyCheckoutSubtitle' => ($dailyCheckout['required_total'] ?? 0) > 0 ? 'Daily Checkout completion' : 'No required apparatus — completion unavailable',
-                'readiness' => $readiness,
-                'apparatus' => [
-                    'total' => $stationApparatus->count(), 'in_service' => $statusCounts['in_service'],
-                    'out_of_service' => $statusCounts['out_of_service'], 'maintenance' => $statusCounts['maintenance'],
-                    'unclassified' => $statusCounts['unclassified'], 'configured' => $summary['assigned_apparatus_count'],
-                    'records' => $stationApparatus->map(static function (Apparatus $apparatus) use ($display): array {
-                        $designation = $apparatus->getAttribute('designation');
-                        $unitId = $apparatus->getAttribute('unit_id');
-
-                        return [
-                            'id' => (int) $apparatus->getKey(),
-                            'label' => $designation ?: $unitId ?: 'Apparatus',
-                            'status' => $display->classifyApparatusStatus(is_string($apparatus->getAttribute('status')) ? $apparatus->getAttribute('status') : null),
-                            'url' => ApparatusResource::getUrl('view', ['record' => $apparatus]),
-                        ];
-                    })->values()->all(),
-                ],
-                'counts' => [
-                    'dailyCheckoutCompleted' => (int) ($dailyCheckout['completed'] ?? 0),
-                    'stationRequests' => $requestCounts[$stationId] ?? 0, 'serviceTickets' => $ticketCounts[$stationId] ?? 0,
-                    'defects' => $defectCounts[$stationId] ?? 0, 'missingDefects' => $missingDefectCounts[$stationId] ?? 0,
-                    'supplyRequests' => $supplyCounts[$stationId] ?? 0,
-                ],
-                'recentInspections' => $recentInspections->get($stationId, collect())
-                    ->map(fn (StationInspection $inspection): array => $this->stationInspectionActivity($inspection))->values()->all(),
-                'recentActivity' => $this->recentActivity(
-                    $recentInspections->get($stationId, collect()), $recentApparatusInspections->get($stationId, collect()),
-                    $recentRequests->get($stationId, collect()), $recentTickets->get($stationId, collect()),
-                    $recentInventory->get($stationId, collect()), $recentSupply->get($stationId, collect()), $stationUrl,
-                ),
             ];
         }
 
         return $data;
     }
 
-    /** @return array<int, int> */
-    private function countByStation(Builder $query): array
+    /** @return array<string, mixed> */
+    private function activityRow(int $id, string $type, string $label, string $status, mixed $timestamp, string $url, ?int $stationId, ?int $apparatusId = null, string $tone = 'neutral'): array
     {
-        return $query->selectRaw('station_id, COUNT(*) as aggregate')->groupBy('station_id')
-            ->pluck('aggregate', 'station_id')->map(static fn (mixed $value): int => (int) $value)->all();
-    }
+        $time = $this->localTimestamp($timestamp);
 
-    /** @param array<int, int> $apparatusToStation @return array<int, int> */
-    private function defectCountsByStation(array $apparatusToStation, bool $missing): array
-    {
-        if ($apparatusToStation === []) {
-            return [];
-        }
-        $query = ApparatusDefect::query()->whereIn('apparatus_id', array_keys($apparatusToStation))->unresolved();
-        if ($missing) {
-            $query->missing();
-        }
-        $result = [];
-        foreach ($query->selectRaw('apparatus_id, COUNT(*) as aggregate')->groupBy('apparatus_id')->get() as $row) {
-            $stationId = $apparatusToStation[(int) $row->apparatus_id] ?? null;
-            if ($stationId !== null) {
-                $result[$stationId] = ($result[$stationId] ?? 0) + (int) $row->getAttribute('aggregate');
-            }
-        }
-
-        return $result;
-    }
-
-    /** @return Collection<int, mixed> */
-    private function rankedByStation(Builder $query, string $model, string $table, string $partition, string $timestamp, int $limit, ?string $outerPartition = null): Collection
-    {
-        $qualifiedTimestamp = str_contains($timestamp, '.') ? $timestamp : "{$table}.{$timestamp}";
-        $ranked = (clone $query)->select("{$table}.*");
-        if ($outerPartition !== null && $outerPartition !== $partition) {
-            $ranked->selectRaw("{$partition} AS {$outerPartition}");
-        }
-        $ranked->selectRaw("ROW_NUMBER() OVER (PARTITION BY {$partition} ORDER BY {$qualifiedTimestamp} DESC NULLS LAST, {$table}.id DESC) AS console_rank");
-
-        return $model::query()->fromSub($ranked, 'station_ranked')->where('console_rank', '<=', $limit)
-            ->orderBy($outerPartition ?? $partition)->orderByDesc($timestamp)->orderByDesc('id')->get();
-    }
-
-    /** @return list<array<string, mixed>> */
-    private function recentActivity(Collection $inspections, Collection $apparatusInspections, Collection $requests, Collection $tickets, Collection $inventory, Collection $supply, string $stationUrl): array
-    {
-        return collect()
-            ->concat($inspections->map(fn (StationInspection $record): array => $this->stationInspectionActivity($record)))
-            ->concat($apparatusInspections->map(fn (ApparatusInspection $record): array => ['id' => (int) $record->id, 'type' => 'daily_checkout', 'label' => 'Daily Checkout / apparatus inspection', 'status' => $record->processing_status ?: $record->review_status ?: 'submitted', 'timestamp' => $this->timestamp($record->completed_at ?: $record->created_at), 'url' => InspectionResource::getUrl('view', ['record' => $record])]))
-            ->concat($requests->map(fn (StationRequest $record): array => ['id' => (int) $record->id, 'type' => 'station_request', 'label' => $record->request_number ?: $record->title ?: 'Station request', 'status' => $record->status, 'timestamp' => $this->timestamp($record->created_at), 'url' => StationRequestResource::getUrl('view', ['record' => $record])]))
-            ->concat($tickets->map(fn (ApparatusServiceTicket $record): array => ['id' => (int) $record->id, 'type' => 'service_ticket', 'label' => $record->ticket_number ?: $record->title ?: 'Service ticket', 'status' => $record->status, 'timestamp' => $this->timestamp($record->created_at), 'url' => ApparatusServiceTicketResource::getUrl('view', ['record' => $record])]))
-            ->concat($inventory->map(fn (StationInventorySubmission $record): array => ['id' => (int) $record->id, 'type' => 'inventory_submission', 'label' => 'Inventory submission #'.$record->id, 'status' => 'submitted', 'timestamp' => $this->timestamp($record->submitted_at ?: $record->created_at), 'url' => $stationUrl.'?activeRelationManager=inventorySubmissions']))
-            ->concat($supply->map(fn (StationSupplyRequest $record): array => ['id' => (int) $record->id, 'type' => 'supply_request', 'label' => 'Supply request #'.$record->id, 'status' => $record->status, 'timestamp' => $this->timestamp($record->created_at), 'url' => $stationUrl.'?activeRelationManager=supplyRequests']))
-            ->sortByDesc('timestamp')->take(8)->values()->all();
+        return compact('id', 'type', 'label', 'status', 'url', 'stationId', 'apparatusId', 'tone') + [
+            'timestamp' => $time?->toIso8601String(),
+            'timeLabel' => $time?->format('g:i A') ?? 'Time unavailable',
+            'sortTimestamp' => $time?->utc()->format('Y-m-d\TH:i:s.u\Z') ?? '',
+        ];
     }
 
     /** @return array<string, mixed> */
-    private function stationInspectionActivity(StationInspection $record): array
+    private function attentionRow(int $id, string $type, string $label, string $status, string $url, ?int $stationId, string $tone, mixed $timestamp = null): array
     {
-        $inspectionType = $record->getAttribute('inspection_type');
-        $status = $record->getAttribute('overall_status');
+        $time = $this->localTimestamp($timestamp);
 
-        return ['id' => (int) $record->getKey(), 'type' => 'station_inspection', 'label' => is_string($inspectionType) && $inspectionType !== '' ? $inspectionType : 'Station inspection', 'status' => is_string($status) && $status !== '' ? $status : 'pending', 'timestamp' => $this->timestamp($record->inspection_date), 'url' => StationInspectionResource::getUrl('view', ['record' => $record])];
+        return compact('id', 'type', 'label', 'status', 'url', 'stationId', 'tone') + [
+            'timestamp' => $time?->toIso8601String(),
+            'timeLabel' => $time?->format('M j, g:i A'),
+            'sortTimestamp' => $time?->utc()->format('Y-m-d\TH:i:s.u\Z') ?? '',
+        ];
     }
 
-    private function timestamp(mixed $value): string
+    private function localTimestamp(mixed $value): ?Carbon
     {
-        return $value instanceof Carbon ? $value->toIso8601String() : (string) $value;
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return Carbon::parse($value)->timezone(OperationalDisplayWindow::TIMEZONE);
     }
 
     private function stationFilterUrl(string $url, int $stationId): string
@@ -303,34 +600,67 @@ class StationOperationsHubWidget extends Widget
         return $url.'?'.http_build_query(['tableFilters' => ['station_id' => ['value' => $stationId]]]);
     }
 
-    /** @param Collection<int, Station> $stations @param array<int, array<string, mixed>> $stationData @return array<string, mixed> */
-    private function departmentSummary(Collection $stations, array $stationData): array
+    private function stationRelationUrl(int $stationId, string $relation): string
     {
-        /** @var Collection<int, Apparatus> $allApparatus */
-        $allApparatus = new Collection;
-        foreach ($stations as $station) {
-            /** @var Collection<int, Apparatus> $stationApparatus */
-            $stationApparatus = $station->apparatuses;
-            $allApparatus = $allApparatus->concat($stationApparatus)->values();
-        }
-        $apparatus = app(DisplaySnapshotService::class)->classifyApparatusCollection($allApparatus);
-        $daily = ['completed' => 0, 'required' => 0, 'attention' => 0, 'review_pending' => 0, 'not_checked' => 0];
-        $work = ['requests' => 0, 'service_tickets' => 0, 'defects' => 0, 'missing' => 0, 'supplies' => 0];
-        $readiness = 0;
-        foreach ($stationData as $data) {
-            $checkout = $data['dailyCheckout'];
-            foreach (['completed', 'attention', 'review_pending', 'not_checked'] as $key) {
-                $daily[$key] += (int) ($checkout[$key] ?? 0);
-            }
-            $daily['required'] += (int) ($checkout['required_total'] ?? 0);
-            foreach (['stationRequests' => 'requests', 'serviceTickets' => 'service_tickets', 'defects' => 'defects', 'missingDefects' => 'missing', 'supplyRequests' => 'supplies'] as $source => $target) {
-                $work[$target] += (int) ($data['counts'][$source] ?? 0);
-            }
-            $readiness += (int) ($data['readiness']['percent'] ?? 0);
-        }
-        $lowStock = EquipmentItem::query()->where('is_active', true)->withSum('stockMutations as stock_total', 'amount')->get()
-            ->filter(static fn (EquipmentItem $item): bool => (int) ($item->stock_total ?? 0) <= (int) $item->reorder_min)->count();
+        return StationResource::getUrl('view', ['record' => $stationId]).'?'.http_build_query(['activeRelationManager' => $relation]);
+    }
 
-        return compact('apparatus', 'daily', 'work', 'lowStock') + ['readinessPercent' => $stations->isEmpty() ? 0 : (int) round($readiness / $stations->count())];
+    /**
+     * @param  Collection<int, Station>  $stations
+     * @return Collection<int, Apparatus>
+     */
+    private function apparatusById(Collection $stations): Collection
+    {
+        $records = [];
+        foreach ($stations as $station) {
+            foreach ($this->stationApparatus($station) as $apparatus) {
+                $records[(int) $apparatus->getKey()] = $apparatus;
+            }
+        }
+
+        return collect($records);
+    }
+
+    /** @return Collection<int, Apparatus> */
+    private function stationApparatus(Station $station): Collection
+    {
+        $records = [];
+        foreach ($station->apparatuses as $record) {
+            if ($record instanceof Apparatus) {
+                $records[] = $record;
+            }
+        }
+
+        return collect($records);
+    }
+
+    private function apparatusLabel(Apparatus $apparatus): string
+    {
+        return (string) ($apparatus->designation ?: $apparatus->getAttribute('unit_id') ?: 'Apparatus');
+    }
+
+    /** @param list<string> $stationNumbers */
+    private function stationOrderSql(array $stationNumbers): string
+    {
+        $clauses = collect($stationNumbers)->values()->map(
+            static fn (string $number, int $index): string => "WHEN '".str_replace("'", "''", $number)."' THEN ".($index + 1),
+        )->implode(' ');
+
+        return "CASE station_number {$clauses} ELSE ".(count($stationNumbers) + 1).' END';
+    }
+
+    private function headline(string $value): string
+    {
+        return str($value)->replace('_', ' ')->headline()->toString();
+    }
+
+    private function enumValue(mixed $value): string
+    {
+        return $value instanceof BackedEnum ? (string) $value->value : (string) $value;
+    }
+
+    private function markSuccessfulRefresh(): void
+    {
+        $this->lastSuccessfulRefreshAt = Carbon::now(OperationalDisplayWindow::TIMEZONE)->toIso8601String();
     }
 }
