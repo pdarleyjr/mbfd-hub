@@ -14,6 +14,36 @@ async function expectCollapsedNavigation(page: Page): Promise<void> {
 }
 
 test.describe('Admin UX acceptance', () => {
+  test('collapsed desktop sidebar is a compact 64px icon rail at every desktop breakpoint', async ({ page }) => {
+    for (const viewport of [
+      { width: 1366, height: 768 },
+      { width: 1920, height: 1080 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/admin');
+
+      const collapseButton = page.getByTitle('Collapse sidebar');
+      if (await collapseButton.isVisible()) {
+        await collapseButton.click();
+      }
+
+      const expandButton = page.getByTitle('Expand sidebar');
+      await expect(expandButton).toBeVisible();
+
+      const sidebarWidth = await page.locator('.fi-sidebar').evaluate((sidebar) =>
+        Math.round(sidebar.getBoundingClientRect().width),
+      );
+
+      expect(sidebarWidth).toBeLessThanOrEqual(64);
+
+      await expandButton.click();
+      await expect(collapseButton).toBeVisible();
+      await expect.poll(() => page.locator('.fi-sidebar').evaluate((sidebar) =>
+        Math.round(sidebar.getBoundingClientRect().width),
+      )).toBeGreaterThanOrEqual(280);
+    }
+  });
+
   test('navigation starts collapsed, a single group expands, and legacy state is migrated', async ({ browser, page }) => {
     await page.addInitScript(() => localStorage.setItem('collapsedGroups', '[]'));
     await page.goto('/admin');

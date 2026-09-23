@@ -79,6 +79,30 @@
     will-change: width, transform;
 }
 
+/* Keep the desktop collapsed state a true icon rail at every breakpoint. */
+@media (min-width: 1024px) and (pointer: fine) {
+    .fi-sidebar:not(.fi-sidebar-open) {
+        width: 4rem;
+        flex-basis: 4rem;
+    }
+
+    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-header,
+    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-nav {
+        padding-inline: 0.625rem;
+    }
+
+    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-nav-groups {
+        margin-inline: 0;
+    }
+
+    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-item-button {
+        width: 2.75rem;
+        min-height: 2.75rem;
+        margin-inline: auto;
+        padding: 0.625rem;
+    }
+}
+
 /* Sidebar collapse: content fade-out on collapse */
 .fi-sidebar-nav {
     transition: opacity 180ms ease-out;
