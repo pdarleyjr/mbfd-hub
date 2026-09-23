@@ -19,7 +19,7 @@ class AddBuildHeadersTest extends TestCase
         parent::setUp();
 
         $this->basePath = sys_get_temp_dir().'/mbfd-build-header-'.bin2hex(random_bytes(8));
-        mkdir($this->basePath.'/public', 0777, true);
+        mkdir($this->basePath.'/storage/app/private', 0777, true);
     }
 
     protected function tearDown(): void
@@ -32,7 +32,7 @@ class AddBuildHeadersTest extends TestCase
     public function test_it_prefers_the_runtime_deploy_marker_over_the_source_snapshot(): void
     {
         file_put_contents($this->basePath.'/.git-sha', str_repeat('a', 40));
-        file_put_contents($this->basePath.'/public/deploy-marker.json', json_encode([
+        file_put_contents($this->basePath.'/storage/app/private/deploy-marker.json', json_encode([
             'sha' => str_repeat('B', 40),
             'deployed_at' => '2026-08-16T20:26:43Z',
         ], JSON_THROW_ON_ERROR));
@@ -45,7 +45,7 @@ class AddBuildHeadersTest extends TestCase
     public function test_it_falls_back_to_the_source_snapshot_when_the_marker_is_invalid(): void
     {
         file_put_contents($this->basePath.'/.git-sha', str_repeat('c', 40));
-        file_put_contents($this->basePath.'/public/deploy-marker.json', '{partial');
+        file_put_contents($this->basePath.'/storage/app/private/deploy-marker.json', '{partial');
 
         $response = $this->responseFromMiddleware();
 
