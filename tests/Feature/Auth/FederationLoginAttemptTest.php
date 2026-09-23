@@ -108,9 +108,18 @@ final class FederationLoginAttemptTest extends TestCase
     public function test_expired_attempt_requires_explicit_restart_instead_of_home_fallback(): void
     {
         $this->member();
-        $login = $this->begin('/auth/media-control/authorize?state=expired-attempt');
+        $handoff = '/auth/bid/authorize?'.http_build_query([
+            'client_id' => 'bid',
+            'redirect_uri' => 'https://staging.bid.mbfdhub.com/api/auth/callback',
+            'state' => str_repeat('A', 43),
+        ]);
+        $login = $this->begin($handoff);
         $this->travel(301)->seconds();
-        $this->get($login)->assertStatus(409)->assertSee('Return to the application');
+        $this->get($login)
+            ->assertStatus(409)
+            ->assertSee('Return to MBFD Bid sign-in')
+            ->assertSee('href="https://staging.bid.mbfdhub.com/api/auth/start"', false)
+            ->assertDontSee('href="/login"', false);
         $this->post($login, ['_token' => session()->token(), 'employee_id' => 'ATTEMPT-TEST', 'password' => 'correct-password'])
             ->assertStatus(409);
         $this->assertGuest('web');
@@ -203,6 +212,21 @@ final class FederationLoginAttemptTest extends TestCase
         $this->withCookie((string) config('session.cookie'), session()->getId());
         $this->getJson($handoff)->assertUnprocessable();
         self::assertSame(0, $user->fresh()->permissions()->count());
+    }
+
+    public function test_expired_unvalidated_callback_never_becomes_a_restart_link(): void
+    {
+        $login = $this->begin('/auth/bid/authorize?'.http_build_query([
+            'client_id' => 'bid',
+            'redirect_uri' => 'https://attacker.invalid/api/auth/callback',
+            'state' => str_repeat('A', 43),
+        ]));
+        $this->travel(301)->seconds();
+
+        $this->get($login)
+            ->assertStatus(409)
+            ->assertDontSee('attacker.invalid')
+            ->assertDontSee('Return to MBFD Bid sign-in');
     }
 
     public function test_server_context_contains_only_navigation_expiry_and_hashed_binding(): void

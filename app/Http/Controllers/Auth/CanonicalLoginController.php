@@ -33,7 +33,7 @@ final class CanonicalLoginController extends Controller
         FederationLoginAttempt $attempts,
     ): View|Response {
         if ($attempts->requested($request) && $attempts->current($request) === null) {
-            return $attempts->unavailable();
+            return $attempts->unavailable($request);
         }
         if ($request->user('web') instanceof User) {
             return $attempts->requested($request) ? $attempts->complete($request) : redirect('/');
@@ -62,7 +62,7 @@ final class CanonicalLoginController extends Controller
         }
         $attempts = app(FederationLoginAttempt::class);
         if ($attempts->requested($request) && $attempts->current($request) === null) {
-            return $attempts->unavailable();
+            return $attempts->unavailable($request);
         }
         if ($request->user('web') instanceof User) {
             return $attempts->requested($request) ? $attempts->complete($request) : redirect('/');
