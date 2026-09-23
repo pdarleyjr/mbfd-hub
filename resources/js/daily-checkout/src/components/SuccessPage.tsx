@@ -9,8 +9,6 @@ export default function SuccessPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const isQueued = searchParams.get('queued') === 'true';
-  const isPendingReview = searchParams.get('review') === 'pending';
-  const hasException = searchParams.get('review') === 'exception';
   const queuedSubmissionId = (location.state as { queuedSubmissionId?: unknown } | null)?.queuedSubmissionId;
 
   useEffect(() => {
@@ -34,7 +32,7 @@ export default function SuccessPage() {
       // Only the mounted success page for this exact queue record changes
       // state. A different operator route is never redirected by background
       // synchronization.
-      setSearchParams(result.pendingReviewQueueIds.includes(queuedSubmissionId) ? { review: 'pending' } : result.exceptionQueueIds?.includes(queuedSubmissionId) ? { review: 'exception' } : {}, { replace: true });
+      setSearchParams({}, { replace: true });
     };
 
     window.addEventListener(DAILY_CHECKOUT_QUEUE_SYNC_EVENT, handleQueueSync);
@@ -61,19 +59,12 @@ export default function SuccessPage() {
           </svg>
         </div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          {isQueued
-            ? 'Inspection Queued!'
-            : isPendingReview
-              ? 'Inspection Submitted for Review!'
-              : hasException ? 'Inspection Recorded · Follow-up Needed' : 'Inspection Submitted!'}
+          {isQueued ? 'Inspection Queued!' : 'Inspection recorded'}
         </h1>
         <p className="text-gray-600">
           {isQueued
             ? 'Your inspection will be submitted automatically when you\'re back online.'
-            : isPendingReview
-              ? 'Your daily checkout inspection is awaiting officer review before it changes readiness, defects, or meter records.'
-              : hasException ? 'Your checkout is recorded. An authorized reviewer will reconcile the flagged findings or readings. Other valid updates have been processed.' : 'Your daily checkout inspection has been successfully recorded.'
-          }
+            : 'Your daily checkout has been recorded.'}
         </p>
       </div>
 
@@ -82,17 +73,6 @@ export default function SuccessPage() {
           <p className="text-sm text-yellow-800">
             <strong>⚠️ Offline Mode</strong><br />
             Your inspection has been saved locally and will sync when you reconnect to the network.
-          </p>
-        </div>
-      )}
-
-      {!isQueued && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <p className="text-sm text-blue-800">
-            <strong>What happens next?</strong><br />
-            {isPendingReview
-              ? <>• An authorized officer must review this submission<br />• Readiness, defects, and meter records remain unchanged until approval</>
-              : hasException ? <>Only the flagged exceptions need review. Any requested clarification will appear under your inspection follow-ups.</> : <>Your inspection is saved. Routine valid updates have been processed automatically.</>}
           </p>
         </div>
       )}

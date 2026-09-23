@@ -60,7 +60,7 @@ export default function InspectionRevisions() {
 
   if (requests.length === 0 && !error) return null;
   return <section className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4" aria-label="Inspection clarifications">
-    <h2 className="font-semibold text-slate-900">Your inspection follow-ups</h2>
+    <h2 className="font-semibold text-slate-900">Requested inspection updates</h2>
     {error && <div role="alert" className="mt-2 text-sm text-red-800">{error} <button className="min-h-11 px-3 underline" onClick={() => void load()}>Retry</button></div>}
     <div className="mt-3 space-y-3">{requests.map(request => <details key={request.id} className="rounded border border-amber-200 bg-white p-3">
       <summary className="min-h-11 cursor-pointer font-medium">{request.apparatus.name} · Vehicle {request.apparatus.vehicle_number} · {request.status === 'revision_submitted' ? 'Clarification sent' : 'Clarification requested'}</summary>

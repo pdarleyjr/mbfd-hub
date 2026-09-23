@@ -588,7 +588,7 @@ export default function InspectionWizard() {
           navigator.vibrate(200);
         }
         
-        navigate(submissionResult === 'pending_review' ? '/success?review=pending' : submissionResult === 'accepted_with_exception' ? '/success?review=exception' : '/success');
+        navigate('/success');
       }
     } catch (err) {
       setSubmissionError(err instanceof Error ? err.message : 'Failed to submit inspection');
@@ -780,7 +780,7 @@ export default function InspectionWizard() {
       <nav className="mb-4 flex flex-wrap gap-2 text-sm" aria-label="Inspection workspace">
         <button type="button" className="px-3 font-semibold" aria-current={currentStep === 'compartments' ? 'page' : undefined} onClick={() => setCurrentStep('compartments')}>Apparatus</button>
         <button type="button" className="px-3" aria-label="Member / Vehicle Info" aria-current={currentStep === 'officer' ? 'page' : undefined} onClick={() => setCurrentStep('officer')}>Member</button>
-        <button type="button" className="px-3" aria-label={isV2Checklist ? 'Checklist details' : 'Meters'} aria-current={currentStep === (isV2Checklist ? 'details' : 'meter') ? 'page' : undefined} onClick={() => setCurrentStep(isV2Checklist ? 'details' : 'meter')}>{isV2Checklist ? 'Details' : 'Meters'}</button>
+        <button type="button" className="px-3" aria-label={isV2Checklist ? 'Checklist details' : 'Readings'} aria-current={currentStep === (isV2Checklist ? 'details' : 'meter') ? 'page' : undefined} onClick={() => setCurrentStep(isV2Checklist ? 'details' : 'meter')}>{isV2Checklist ? 'Details' : 'Readings'}</button>
         {!isV2Checklist && checklist.fields.length > 0 && <button type="button" className="px-3" aria-label="Checklist details" aria-current={currentStep === 'details' ? 'page' : undefined} onClick={() => setCurrentStep('details')}>Details</button>}
       </nav>
 

@@ -250,7 +250,7 @@ test('multiple camera-sized photos survive a real offline reload and queue repla
   expect(submissions).toHaveLength(1);
   expect(submissions[0]).toEqual(queued[0].data);
   await page.evaluate(() => { window.dispatchEvent(new Event('online')); window.dispatchEvent(new Event('online')); });
-  await expect(page.getByText('Inspection Submitted!', { exact: true })).toBeVisible();
+  await expect(page.getByText('Inspection recorded', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.__pwaSubmissions.length)).toBe(1);
   await page.screenshot({ path: testInfo.outputPath('large-photo-offline-replay.png') });
 });
