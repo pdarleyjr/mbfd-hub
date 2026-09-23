@@ -144,6 +144,7 @@ class EmployeeResource extends Resource
                     ->label(fn (Employee $record): string => $record->user?->memberOnboardingInvitation === null ? 'Send invitation' : 'Resend invitation')
                     ->icon('heroicon-o-envelope')
                     ->visible(fn (Employee $record): bool => Pages\ListEmployees::canIssueInvitations()
+                        && $record->user?->getRawOriginal('account_status') === 'pending_activation'
                         && app(MemberOnboardingInvitationService::class)->assess($record)['status'] === 'ready')
                     ->modalHeading('Invite this member')
                     ->modalSubmitActionLabel('Queue this invitation')
