@@ -7,6 +7,7 @@ namespace Tests\Integration;
 use App\Enums\AccountStatus;
 use App\Models\Employee;
 use App\Models\MemberOnboardingInvitation;
+use App\Models\MemberOnboardingRosterBinding;
 use App\Models\User;
 use App\Services\Identity\AccountSecurityService;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +38,13 @@ final class MemberBootstrapOnboardingPostgresRaceTest extends TestCase
             'security_version' => 1,
             'bootstrap_onboarding_eligible' => true,
             'bootstrap_onboarding_eligible_at' => now(),
+        ]);
+        $rosterBinding = MemberOnboardingRosterBinding::query()->create([
+            'employee_profile_id' => $employee->id,
+            'employee_id' => $employee->employee_id,
+            'city_email' => $employee->city_email,
+            'source_sha256' => str_repeat('a', 64),
+            'approved_at' => now(),
         ]);
         $token = bin2hex(random_bytes(32));
         $invitation = MemberOnboardingInvitation::query()->create([
@@ -90,6 +98,7 @@ PHP;
             }
             DB::table('security_action_events')->where('target_user_id', $user->id)->delete();
             DB::table('member_onboarding_invitations')->where('id', $invitation->id)->delete();
+            DB::table('member_onboarding_roster_bindings')->where('id', $rosterBinding->id)->delete();
             DB::table('users')->where('id', $user->id)->delete();
             DB::table('employees')->where('id', $employee->id)->delete();
         }
