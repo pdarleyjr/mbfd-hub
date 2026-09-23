@@ -28,7 +28,7 @@ final class FederationLoginAttempt
         $count = count(array_filter(array_keys($request->cookies->all()),
             static fn (string $name): bool => str_starts_with($name, self::PREFIX)));
         if ($destination === null || $count >= 8) {
-            return $this->unavailable();
+            return $this->unavailable($request);
         }
         // Issuance is anonymous: omitted cookies must not allow unbounded cache
         // allocation. This budget is separate from credentials and machine SSO.
@@ -43,6 +43,10 @@ final class FederationLoginAttempt
 
         $id = bin2hex(random_bytes(32));
         $binding = bin2hex(random_bytes(32));
+        $restartUrl = $this->restartUrl($destination);
+        if ($restartUrl !== null) {
+            $request->session()->put($this->restartKey($id), $restartUrl);
+        }
         Cache::put($this->key($id), [
             'destination' => $destination,
             'binding_hash' => hash('sha256', $binding),
@@ -89,7 +93,7 @@ final class FederationLoginAttempt
     {
         $id = $this->id($request);
         if ($id === null) {
-            return $this->unavailable();
+            return $this->unavailable($request);
         }
         try {
             // Redis/array cache locks serialize single consumption across workers.
@@ -103,20 +107,27 @@ final class FederationLoginAttempt
                 return $destination;
             });
         } catch (LockTimeoutException) {
-            return $this->unavailable();
+            return $this->unavailable($request);
         }
 
         if ($destination === null) {
-            return $this->unavailable();
+            return $this->unavailable($request);
         }
+
+        $request->session()->forget($this->restartKey($id));
 
         return (new RedirectResponse($destination, 302, ['Cache-Control' => 'no-store, private']))
             ->withCookie(Cookie::forget(self::PREFIX.$id, '/', null)->withDomain(null));
     }
 
-    public function unavailable(): Response
+    public function unavailable(?Request $request = null): Response
     {
-        return response()->view('auth.federation-restart', [], 409, ['Cache-Control' => 'no-store, private']);
+        $id = $request === null ? null : $this->id($request);
+        $restartUrl = $id === null ? null : $request->session()->pull($this->restartKey($id));
+
+        return response()->view('auth.federation-restart', [
+            'restartUrl' => is_string($restartUrl) ? $restartUrl : null,
+        ], 409, ['Cache-Control' => 'no-store, private']);
     }
 
     private function id(Request $request): ?string
@@ -129,5 +140,34 @@ final class FederationLoginAttempt
     private function key(string $id): string
     {
         return 'canonical-federation-login:'.$id;
+    }
+
+    private function restartKey(string $id): string
+    {
+        return 'auth.federation_restart_urls.'.$id;
+    }
+
+    private function restartUrl(string $destination): ?string
+    {
+        if (parse_url($destination, PHP_URL_PATH) !== '/auth/bid/authorize') {
+            return null;
+        }
+        parse_str((string) parse_url($destination, PHP_URL_QUERY), $query);
+        $clientId = $query['client_id'] ?? null;
+        $callback = $query['redirect_uri'] ?? null;
+        $callbacks = is_string($clientId)
+            ? (array) config('services.bid.authorization.clients.'.$clientId.'.callbacks', [])
+            : [];
+        if ($clientId !== 'bid' || ! is_string($callback) || ! in_array($callback, $callbacks, true)) {
+            return null;
+        }
+        $scheme = parse_url($callback, PHP_URL_SCHEME);
+        $host = parse_url($callback, PHP_URL_HOST);
+        $port = parse_url($callback, PHP_URL_PORT);
+        if ($scheme !== 'https' || ! is_string($host) || $host === '') {
+            return null;
+        }
+
+        return 'https://'.$host.(is_int($port) ? ':'.$port : '').'/api/auth/start';
     }
 }

@@ -84,7 +84,7 @@ final readonly class EnsureCanonicalSessionIsCurrent
         }
         if ($request->is('login') && $attempts->requested($request)) {
             return $attempts->current($request) !== null
-                ? redirect($attempts->loginUrl($request, expired: true)) : $attempts->unavailable();
+                ? redirect($attempts->loginUrl($request, expired: true)) : $attempts->unavailable($request);
         }
 
         return redirect('/login');

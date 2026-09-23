@@ -11,7 +11,11 @@
     @endif
     <p>Return to the application and choose MBFD Sign In again. Close unused sign-in tabs; if you have opened many attempts, wait five minutes before retrying.</p>
     <p>Your password and unsaved form contents were not retained or submitted again.</p>
-    <a href="/login">MBFD Sign In</a>
+    @if ($restartUrl ?? null)
+        <a href="{{ $restartUrl }}">Return to MBFD Bid sign-in</a>
+    @else
+        <p>Use your browser Back button to return to the application.</p>
+    @endif
 </main>
 </body>
 </html>
