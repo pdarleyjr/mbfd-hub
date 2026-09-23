@@ -65,6 +65,23 @@ async function waitForControlledWorker(page: Page): Promise<void> {
   })).toBe(true);
 }
 
+async function waitForCachedDailyShell(page: Page): Promise<string[]> {
+  const emittedAssets = readdirSync('test-results/daily-checkout-e2e-build/assets')
+    .filter(file => /\.(js|css)$/.test(file))
+    .map(file => `/daily/assets/${file}`);
+  expect(emittedAssets.length).toBeGreaterThan(1);
+
+  await expect.poll(async () => page.evaluate(async expectedAssets => {
+    const cache = await caches.open('mbfd-checkout-v7');
+    const cachedPaths = (await cache.keys()).map(request => new URL(request.url).pathname);
+
+    return Boolean(await cache.match('/daily/index.html'))
+      && expectedAssets.every(asset => cachedPaths.includes(asset));
+  }, emittedAssets), { timeout: 15_000 }).toBe(true);
+
+  return emittedAssets;
+}
+
 async function addQueuedInspection(page: Page, ownerUserId = 101, ownershipState = 'owned'): Promise<void> {
   await page.evaluate(async ({ id, version, owner, state }) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -129,6 +146,7 @@ test('installed Daily worker caches the shell and an offline queue survives relo
   await installApiFixture(page);
   await page.goto('/daily/');
   await waitForControlledWorker(page);
+  const emittedAssets = await waitForCachedDailyShell(page);
 
   const cacheEvidence = await page.evaluate(async () => ({
     names: await caches.keys(),
@@ -139,8 +157,6 @@ test('installed Daily worker caches the shell and an offline queue survives relo
   expect(cacheEvidence.names).not.toContain('mbfd-checkout-v6');
   expect(cacheEvidence.names).not.toContain('mbfd-api-cache-v6');
   expect(cacheEvidence.shell).toBe(true);
-  const emittedAssets = readdirSync('test-results/daily-checkout-e2e-build/assets').filter(file => /\.(js|css)$/.test(file)).map(file => `/daily/assets/${file}`);
-  expect(emittedAssets.length).toBeGreaterThan(1);
   expect(cacheEvidence.assets).toEqual(expect.arrayContaining(emittedAssets));
   // Bypass the page-level API fixture so these requests traverse the real worker.
   await page.evaluate(async endpoints => {
@@ -172,14 +188,24 @@ test('an active worker preserves and quarantines another account owner queue wit
   await installApiFixture(page);
   await page.goto('/daily/');
   await waitForControlledWorker(page);
+  await waitForCachedDailyShell(page);
 
   await context.setOffline(true);
   await addQueuedInspection(page);
   await page.reload();
+  await expect(page.locator('#root')).not.toBeEmpty({ timeout: 15_000 });
   await page.evaluate(() => { window.__pwaIdentity = { userId: 202, securityVersion: 1 }; });
   await context.setOffline(false);
+  // Chromium can emit the synthetic reconnect before React has remounted the
+  // queue processor after an offline reload. A real operator reconnects after
+  // the page is already visible; dispatch once more to exercise that contract
+  // deterministically instead of depending on browser event timing.
+  await page.evaluate(() => { window.dispatchEvent(new Event('online')); });
 
-  await expect.poll(async () => (await queuedInspections(page))[0]?.ownershipState).toBe('identity_mismatch');
+  await expect.poll(
+    async () => (await queuedInspections(page))[0]?.ownershipState,
+    { timeout: 15_000 },
+  ).toBe('identity_mismatch');
   expect((await queuedInspections(page))[0]).toMatchObject({
     status: 'requires_attention',
     lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
@@ -191,6 +217,7 @@ test('multiple camera-sized photos survive a real offline reload and queue repla
   await installApiFixture(page);
   await page.goto('/daily/vehicle-inspections/offline-fixture');
   await waitForControlledWorker(page);
+  await waitForCachedDailyShell(page);
   await expect(page.getByRole('heading', { name: 'Offline Fixture Apparatus', exact: true })).toBeVisible();
   const photo = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
@@ -216,7 +243,10 @@ test('multiple camera-sized photos survive a real offline reload and queue repla
   expect(await page.evaluate(() => Object.values(localStorage).some(value => value.includes('data:image/')))).toBe(false);
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  // The two camera-sized IndexedDB values are intentionally several MB each.
+  // Allow a loaded CI runner enough time to hydrate them before treating the
+  // durable offline recovery contract as failed.
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible({ timeout: 15_000 });
   for (const index of [0, 1]) {
     await rows.nth(index).locator('.equipment-expand').click();
     await expect(rows.nth(index).locator('img')).toHaveAttribute('src', photo);
