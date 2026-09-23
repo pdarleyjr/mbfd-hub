@@ -256,7 +256,7 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
     public function test_defect_and_present_correction_photos_persist_as_paths_without_resolving_the_existing_defect(): void
     {
         [$payload, $existing] = $this->photoPayload();
-        $this->postJson($this->url(), $payload)->assertCreated()->assertJsonPath('processing_status', 'accepted_with_exception');
+        $this->postJson($this->url(), $payload)->assertCreated()->assertJsonPath('processing_status', 'accepted');
         $inspection = ApparatusInspection::sole();
         $observations = ApparatusDefectObservation::query()->orderBy('id')->get();
         $this->assertCount(2, $observations);
@@ -265,7 +265,7 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
         $this->assertSame([$this->member->id, $this->member->id], $observations->pluck('actor_user_id')->all());
         $this->assertFalse($existing->fresh()->resolved);
         $this->assertSame('In Service', $this->apparatus->fresh()->status);
-        $this->assertSame('operational_impact_review', ApparatusInspectionException::sole()->reason);
+        $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);
         $photos = array_column(array_slice($inspection->results[0]['items'], 0, 2), 'photo_path');
         $this->assertCount(2, $photos);
         $this->assertSame($photos, $observations->pluck('photo_path')->all());
@@ -279,6 +279,55 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
         foreach (array_slice($inspection->results[0]['items'], 0, 2) as $item) {
             $this->assertArrayNotHasKey('photo', $item);
         }
+    }
+
+    #[DataProvider('routineFindingStatuses')]
+    public function test_unclassified_routine_findings_are_accepted_and_keep_one_immutable_defect_history(string $status): void
+    {
+        $first = $this->payload();
+        $first['compartments'][0]['items'][0]['status'] = $status;
+        $first['compartments'][0]['items'][0]['notes'] = 'Observed during checkout.';
+        $first['defects'][] = [
+            'compartment' => $first['compartments'][0]['name'],
+            'item' => $first['compartments'][0]['items'][0]['name'],
+            'status' => $status,
+            'notes' => $first['compartments'][0]['items'][0]['notes'],
+        ];
+        $this->postJson($this->url(), $first)->assertCreated()->assertJsonPath('processing_status', 'accepted');
+
+        $defect = ApparatusDefect::sole();
+        $this->assertSame(strtolower($status), $defect->issue_type);
+        $this->assertSame('unclassified', $defect->operational_impact);
+        $this->assertFalse($defect->resolved);
+
+        $second = $this->payload();
+        $second['compartments'][0]['items'][0]['status'] = $status;
+        $second['compartments'][0]['items'][0]['notes'] = 'Confirmed on the next checkout.';
+        $second['defects'][] = [
+            'compartment' => $second['compartments'][0]['name'],
+            'item' => $second['compartments'][0]['items'][0]['name'],
+            'status' => $status,
+            'notes' => $second['compartments'][0]['items'][0]['notes'],
+        ];
+        $this->postJson($this->url(), $second)->assertCreated()->assertJsonPath('processing_status', 'accepted');
+
+        $present = $this->payload();
+        $present['compartments'][0]['items'][0]['notes'] = 'Item appears corrected; disposition remains authorized work.';
+        $this->postJson($this->url(), $present)->assertCreated()->assertJsonPath('processing_status', 'accepted');
+
+        $this->assertDatabaseCount('apparatus_defects', 1);
+        $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);
+        $this->assertSame('In Service', $this->apparatus->fresh()->status);
+        $this->assertFalse($defect->fresh()->resolved);
+        $this->assertSame(
+            ['first_reported', 'confirmed_again', 'appears_corrected'],
+            ApparatusDefectObservation::query()->where('apparatus_defect_id', $defect->id)->orderBy('id')->pluck('observation')->all(),
+        );
+    }
+
+    public static function routineFindingStatuses(): array
+    {
+        return [['Missing'], ['Damaged']];
     }
 
     public function test_transaction_failure_rolls_back_meters_evidence_and_every_uploaded_image(): void

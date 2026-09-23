@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readdirSync } from 'node:fs';
+import { readDrafts } from './support/daily-checkout-drafts';
 
 declare global {
   interface Window {
@@ -40,6 +41,12 @@ async function installApiFixture(page: Page): Promise<void> {
       }
       if (url.pathname === '/api/public/stations') {
         return Response.json({ stations: [] });
+      }
+      if (url.pathname === '/api/public/apparatuses') {
+        return Response.json([{ id: 101, name: 'Offline Fixture Apparatus', slug: 'offline-fixture', designation: 'TEST', type: 'rescue', vehicle_number: 'TEST-101', status: 'In Service' }]);
+      }
+      if (url.pathname === '/api/public/apparatuses/101/checklist') {
+        return Response.json({ checklist_version: 'a'.repeat(64), checklist: { officerChecklist: [], compartments: [{ id: 'cab', title: 'Cab', items: [{ id: 'radio', name: 'Test radio' }, { id: 'bag', name: 'Test bag' }] }] } });
       }
       if (url.pathname === '/api/public/apparatuses/101/inspections' && request.method === 'POST') {
         window.__pwaSubmissions.push(await request.json() as Record<string, unknown>);
@@ -178,6 +185,74 @@ test('an active worker preserves and quarantines another account owner queue wit
     lastErrorCode: 'OFFLINE_QUEUE_OWNER_MISMATCH',
   });
   expect(await page.evaluate(() => window.__pwaSubmissions.length)).toBe(0);
+});
+
+test('multiple camera-sized photos survive a real offline reload and queue replay exactly once', async ({ page, context }, testInfo) => {
+  await installApiFixture(page);
+  await page.goto('/daily/vehicle-inspections/offline-fixture');
+  await waitForControlledWorker(page);
+  await expect(page.getByRole('heading', { name: 'Offline Fixture Apparatus', exact: true })).toBeVisible();
+  const photo = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1100;
+    canvas.height = 1100;
+    const drawing = canvas.getContext('2d')!;
+    const pixels = drawing.createImageData(canvas.width, canvas.height);
+    for (let offset = 0; offset < pixels.data.length; offset += 65536) crypto.getRandomValues(pixels.data.subarray(offset, Math.min(offset + 65536, pixels.data.length)));
+    for (let offset = 3; offset < pixels.data.length; offset += 4) pixels.data[offset] = 255;
+    drawing.putImageData(pixels, 0, 0);
+    return canvas.toDataURL();
+  });
+  const buffer = Buffer.from(photo.split(',')[1], 'base64');
+  expect(buffer.length).toBeGreaterThan(3_000_000);
+  expect(buffer.length).toBeLessThan(5_000_000);
+  const rows = page.locator('.equipment-row');
+  for (const index of [0, 1]) {
+    await rows.nth(index).locator('.equipment-expand').click();
+    await rows.nth(index).getByRole('button', { name: 'Damaged', exact: true }).click();
+    await rows.nth(index).getByLabel('Photo (optional)').setInputFiles({ name: `test-evidence-${index}.png`, mimeType: 'image/png', buffer });
+  }
+  await expect.poll(async () => (await readDrafts(page))[0]?.data.compartments[0]?.items.filter(item => item.photo === photo).length).toBe(2);
+  expect(await page.evaluate(() => Object.values(localStorage).some(value => value.includes('data:image/')))).toBe(false);
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  for (const index of [0, 1]) {
+    await rows.nth(index).locator('.equipment-expand').click();
+    await expect(rows.nth(index).locator('img')).toHaveAttribute('src', photo);
+  }
+  await rows.last().getByLabel('Notes (optional)').fill('Verified offline after reload.');
+  await page.getByRole('button', { name: 'Continue: Shift', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('B');
+  await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
+  const canvas = page.locator('canvas');
+  await canvas.scrollIntoViewIfNeeded();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Signature canvas missing');
+  await page.mouse.move(box.x + 20, box.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 140, box.y + 90, { steps: 8 });
+  await page.mouse.up();
+  const close = page.getByRole('button', { name: 'Close notification' });
+  if (await close.isVisible()) await close.click();
+  await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  expect(await readDrafts(page)).toHaveLength(1);
+  const queued = await queuedInspections(page);
+  expect(queued).toHaveLength(1);
+  expect(queued[0]).toMatchObject({ ownerUserId: 101, ownerSecurityVersion: 1, data: { operator_name: 'PWA Member', employee_id: 1101, shift: 'B', unit_number: 'TEST-101' } });
+  await page.reload();
+  expect(await queuedInspections(page)).toHaveLength(1);
+  await context.setOffline(false);
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
+  await expect.poll(async () => (await readDrafts(page)).length).toBe(0);
+  const submissions = await page.evaluate(() => window.__pwaSubmissions);
+  expect(submissions).toHaveLength(1);
+  expect(submissions[0]).toEqual(queued[0].data);
+  await page.evaluate(() => { window.dispatchEvent(new Event('online')); window.dispatchEvent(new Event('online')); });
+  await expect(page.getByText('Inspection Submitted!', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.__pwaSubmissions.length)).toBe(1);
+  await page.screenshot({ path: testInfo.outputPath('large-photo-offline-replay.png') });
 });
 
 test('a worker update check does not erase unresolved legacy work', async ({ page }) => {

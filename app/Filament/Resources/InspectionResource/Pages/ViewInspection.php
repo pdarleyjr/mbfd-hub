@@ -36,7 +36,6 @@ class ViewInspection extends ViewRecord
                         && $apparatus instanceof Apparatus
                         && ApparatusResource::canView($apparatus);
                 }),
-            Actions\DeleteAction::make(),
         ];
     }
 
@@ -67,8 +66,9 @@ class ViewInspection extends ViewRecord
                         Infolists\Components\TextEntry::make('inspection_reference')
                             ->label('Inspection Reference')
                             ->copyable(),
-                        Infolists\Components\TextEntry::make('review_status')
-                            ->label('Review Status')
+                        Infolists\Components\TextEntry::make('inspection_status')
+                            ->label('Status')
+                            ->getStateUsing(fn (ApparatusInspection $record): string => $record->displayStatus())
                             ->badge(),
                         Infolists\Components\TextEntry::make('engine_hours')
                             ->label('Engine Hours')

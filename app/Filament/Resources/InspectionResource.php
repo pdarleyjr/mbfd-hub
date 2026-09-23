@@ -7,13 +7,13 @@ use App\Filament\Resources\InspectionResource\Pages;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class InspectionResource extends Resource
 {
@@ -30,39 +30,19 @@ class InspectionResource extends Resource
     // Hide from main navigation - accessed via Apparatus relation
     protected static bool $shouldRegisterNavigation = false;
 
-    public static function form(Form $form): Form
+    public static function canCreate(): bool
     {
-        return $form
-            ->schema([
-                Forms\Components\Select::make('apparatus_id')
-                    ->options(fn (): array => self::apparatusOptions())
-                    ->required()
-                    ->searchable()
-                    ->preload(),
+        return false;
+    }
 
-                Forms\Components\TextInput::make('operator_name')
-                    ->label('Operator Name')
-                    ->required()
-                    ->maxLength(255),
+    public static function canEdit(Model $record): bool
+    {
+        return false;
+    }
 
-                Forms\Components\TextInput::make('rank')
-                    ->maxLength(50),
-
-                Forms\Components\Select::make('shift')
-                    ->options([
-                        'A' => 'A Shift',
-                        'B' => 'B Shift',
-                        'C' => 'C Shift',
-                    ])
-                    ->required(),
-
-                Forms\Components\TextInput::make('unit_number')
-                    ->maxLength(50),
-
-                Forms\Components\DateTimePicker::make('completed_at')
-                    ->label('Completed At')
-                    ->default(now()),
-            ]);
+    public static function canDelete(Model $record): bool
+    {
+        return false;
     }
 
     public static function table(Table $table): Table
@@ -135,11 +115,6 @@ class InspectionResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
             ])
             ->defaultSort('completed_at', 'desc');
     }

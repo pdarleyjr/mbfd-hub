@@ -311,6 +311,7 @@ export class ApiClient {
     const checklist: ChecklistData = {
       open_findings: Array.isArray(payload?.open_findings) ? payload.open_findings : [],
       checklist_version: checklistVersion.toLowerCase(),
+      checklist_type: typeof payload?.checklist_type === 'string' ? payload.checklist_type : undefined,
       schema_version: schemaVersion,
       template_id: schemaVersion === 2 && typeof rawChecklist?.template_id === 'string' ? rawChecklist.template_id : undefined,
       template_version: schemaVersion === 2 && typeof rawChecklist?.template_version === 'string' ? rawChecklist.template_version : undefined,

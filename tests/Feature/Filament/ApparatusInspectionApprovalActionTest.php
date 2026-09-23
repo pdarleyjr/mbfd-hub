@@ -26,6 +26,32 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_automatic_processing_display_does_not_imply_a_human_approval(): void
+    {
+        $inspection = $this->pendingInspection();
+        $inspection->update(['processing_status' => 'accepted', 'review_status' => 'approved', 'pending_effects' => null]);
+        $this->actingAs($this->userWithRole('logistics_admin'));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        $this->assertSame('Accepted', $inspection->displayStatus());
+        Livewire::test(ViewStandaloneInspection::class, ['record' => $inspection->getRouteKey()])
+            ->assertSuccessful()
+            ->assertSee('Accepted')
+            ->assertDontSee('Approved')
+            ->assertDontSee('Pending Review Evidence');
+
+        $inspection->update(['processing_status' => 'accepted_with_exception']);
+        $this->assertSame('Follow-up needed', $inspection->displayStatus());
+        Livewire::test(ViewStandaloneInspection::class, ['record' => $inspection->getRouteKey()])
+            ->assertSuccessful()
+            ->assertSee('Follow-up needed')
+            ->assertDontSee('Approved');
+
+        $this->assertSame('Pending review', (new ApparatusInspection(['review_status' => 'pending_review']))->displayStatus());
+        $this->assertSame('Approved', (new ApparatusInspection(['review_status' => 'approved']))->displayStatus());
+    }
+
     public function test_authorized_reviewer_can_see_pending_evidence_and_approve_from_the_apparatus_inspection_view(): void
     {
         $inspection = $this->pendingInspection();

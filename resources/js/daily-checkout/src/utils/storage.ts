@@ -1,4 +1,5 @@
-import { InspectionData, MeterData } from '../types';
+import { InspectionData } from '../types';
+import { db } from '../lib/db';
 
 const STORAGE_KEYS = {
   AUTOSAVE: 'mbfd_autosave_inspection',
@@ -55,7 +56,7 @@ const readInspectionProgress = (key: string): InspectionData | null => {
 // Autosaves are versioned so a checklist update cannot overwrite or clear the
 // older payload. The original unversioned key is read as a legacy candidate but
 // is never rewritten by a current checklist.
-export const saveInspectionProgress = (apparatusSlug: string, data: InspectionData) => {
+export const saveInspectionProgress = async (apparatusSlug: string, data: InspectionData): Promise<boolean> => {
   try {
     const saveData = {
       ...data,
@@ -64,7 +65,9 @@ export const saveInspectionProgress = (apparatusSlug: string, data: InspectionDa
     };
     const owner = data.actorUserId !== undefined && data.actorSecurityVersion !== undefined
       ? `_actor_${data.actorUserId}_${data.actorSecurityVersion}` : '';
-    localStorage.setItem(`${autosaveKey(apparatusSlug, data.checklist_version)}${owner}`, JSON.stringify(saveData));
+    const key = `${autosaveKey(apparatusSlug, data.checklist_version)}${owner}`;
+    await db.dailyCheckoutDrafts.put({ key, apparatusSlug, timestamp: saveData.timestamp, data: saveData });
+    localStorage.removeItem(key);
     return true;
   } catch (error) {
     console.error('Failed to autosave inspection:', error);
@@ -72,38 +75,55 @@ export const saveInspectionProgress = (apparatusSlug: string, data: InspectionDa
   }
 };
 
-export const loadInspectionProgress = (
+export const loadInspectionProgress = async (
   apparatusSlug: string,
   checklistVersion: string,
   owner?: { userId: number; securityVersion: number },
-): InspectionData | null => {
+): Promise<InspectionData | null> => {
   try {
-    const exact = readInspectionProgress(`${autosaveKey(apparatusSlug, checklistVersion)}${owner ? `_actor_${owner.userId}_${owner.securityVersion}` : ''}`);
-    if (exact) return exact;
+    const key = `${autosaveKey(apparatusSlug, checklistVersion)}${owner ? `_actor_${owner.userId}_${owner.securityVersion}` : ''}`;
+    const belongsToOwner = (data: InspectionData) => !owner || (data.actorUserId === owner.userId && data.actorSecurityVersion === owner.securityVersion);
+    const drafts = (await db.dailyCheckoutDrafts.where('apparatusSlug').equals(apparatusSlug).toArray())
+      .filter(draft => belongsToOwner(draft.data) && Date.now() - draft.timestamp <= 24 * 60 * 60 * 1000)
+      .sort((left, right) => right.timestamp - left.timestamp);
+    const exact = drafts.find(draft => draft.key === key);
+    if (exact) return exact.data;
+
+    const legacyExact = readInspectionProgress(key);
+    if (legacyExact && belongsToOwner(legacyExact)) {
+      if (await saveInspectionProgress(apparatusSlug, legacyExact)) localStorage.removeItem(key);
+      return legacyExact;
+    }
+    if (drafts[0]) return drafts[0].data;
 
     const prefix = `${STORAGE_KEYS.AUTOSAVE}_${apparatusSlug}_`;
     const versioned = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
       .filter((key): key is string => key !== null && key.startsWith(prefix))
-      .map((key) => readInspectionProgress(key))
-      .filter((data): data is InspectionData => data !== null)
-      .filter(data => !owner || (data.actorUserId === owner.userId && data.actorSecurityVersion === owner.securityVersion))
+      .map((key) => ({ key, data: readInspectionProgress(key) }))
+      .filter((entry): entry is { key: string; data: InspectionData } => entry.data !== null)
+      .filter(entry => belongsToOwner(entry.data))
       .sort((left, right) => {
-        const leftTimestamp = Number((left as InspectionData & { timestamp?: unknown }).timestamp) || 0;
-        const rightTimestamp = Number((right as InspectionData & { timestamp?: unknown }).timestamp) || 0;
+        const leftTimestamp = Number((left.data as InspectionData & { timestamp?: unknown }).timestamp) || 0;
+        const rightTimestamp = Number((right.data as InspectionData & { timestamp?: unknown }).timestamp) || 0;
 
         return rightTimestamp - leftTimestamp;
       });
 
-    return versioned[0] ?? readInspectionProgress(autosaveKey(apparatusSlug));
+    const legacy = versioned[0] ?? { key: autosaveKey(apparatusSlug), data: readInspectionProgress(autosaveKey(apparatusSlug)) };
+    if (!legacy.data || !belongsToOwner(legacy.data)) return null;
+    if (await saveInspectionProgress(apparatusSlug, legacy.data)) localStorage.removeItem(legacy.key);
+    return legacy.data;
   } catch (error) {
     console.error('Failed to load autosaved inspection:', error);
-    return null;
+    throw new Error('Saved inspection data could not be read. Reload this page before continuing; existing saved work has not been replaced.');
   }
 };
 
-export const clearInspectionProgress = (apparatusSlug: string, checklistVersion: string, owner?: { userId: number; securityVersion: number } | null) => {
+export const clearInspectionProgress = async (apparatusSlug: string, checklistVersion: string, owner?: { userId: number; securityVersion: number } | null): Promise<void> => {
   try {
-    localStorage.removeItem(`${autosaveKey(apparatusSlug, checklistVersion)}${owner ? `_actor_${owner.userId}_${owner.securityVersion}` : ''}`);
+    const key = `${autosaveKey(apparatusSlug, checklistVersion)}${owner ? `_actor_${owner.userId}_${owner.securityVersion}` : ''}`;
+    await db.dailyCheckoutDrafts.delete(key);
+    localStorage.removeItem(key);
     localStorage.removeItem(sessionStartKey(apparatusSlug, checklistVersion));
   } catch (error) {
     console.error('Failed to clear autosaved inspection:', error);

@@ -98,7 +98,7 @@ final class ApparatusInspectionProcessingTest extends TestCase
         $this->assertSame('damaged', $defect->fresh()->issue_type);
     }
 
-    public function test_uncompleted_scheduled_duty_is_preserved_and_escalated_without_placing_the_unit_out_of_service(): void
+    public function test_uncompleted_scheduled_duty_is_preserved_without_manufacturing_an_exception_or_changing_readiness(): void
     {
         [$apparatus, $initial, $token] = $this->fixture(null, null);
         $inspection = $initial->replicate(['inspection_reference']);
@@ -109,9 +109,10 @@ final class ApparatusInspectionProcessingTest extends TestCase
 
         $this->process($apparatus, $inspection, $token);
 
-        $this->assertSame('accepted_with_exception', $inspection->fresh()->processing_status);
+        $this->assertSame('accepted', $inspection->fresh()->processing_status);
         $this->assertDatabaseHas('apparatus_defects', ['apparatus_id' => $apparatus->id, 'compartment' => 'Scheduled duties', 'item' => 'BOTTOM']);
         $this->assertDatabaseHas('apparatus_defect_observations', ['apparatus_inspection_id' => $inspection->id, 'reported_status' => 'Damaged', 'notes' => 'Sea chest grate requires repair']);
+        $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);
         $this->assertSame('In Service', $apparatus->fresh()->status);
     }
 

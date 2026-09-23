@@ -3,8 +3,6 @@
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
 use App\Models\ApparatusInspection;
-use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -14,35 +12,6 @@ class InspectionsRelationManager extends RelationManager
     protected static string $relationship = 'inspections';
 
     protected static ?string $title = 'Vehicle Inspections';
-
-    public function form(Form $form): Form
-    {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('operator_name')
-                    ->label('Operator Name')
-                    ->required()
-                    ->maxLength(255),
-
-                Forms\Components\TextInput::make('rank')
-                    ->maxLength(50),
-
-                Forms\Components\Select::make('shift')
-                    ->options([
-                        'A' => 'A Shift',
-                        'B' => 'B Shift',
-                        'C' => 'C Shift',
-                    ])
-                    ->required(),
-
-                Forms\Components\TextInput::make('unit_number')
-                    ->maxLength(50),
-
-                Forms\Components\DateTimePicker::make('completed_at')
-                    ->label('Completed At')
-                    ->default(now()),
-            ]);
-    }
 
     public function table(Table $table): Table
     {
@@ -80,12 +49,13 @@ class InspectionsRelationManager extends RelationManager
                         default => 'gray',
                     }),
 
-                Tables\Columns\TextColumn::make('review_status')
-                    ->label('Review')
+                Tables\Columns\TextColumn::make('inspection_status')
+                    ->label('Status')
+                    ->getStateUsing(fn (ApparatusInspection $record): string => $record->displayStatus())
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'pending_review' => 'warning',
-                        'approved' => 'success',
+                        'Pending review', 'Follow-up needed' => 'warning',
+                        'Approved', 'Accepted' => 'success',
                         default => 'gray',
                     }),
 
@@ -103,9 +73,6 @@ class InspectionsRelationManager extends RelationManager
                         'C' => 'C Shift',
                     ]),
             ])
-            ->headerActions([
-                Tables\Actions\CreateAction::make(),
-            ])
             ->actions([
                 Tables\Actions\Action::make('view_results')
                     ->label('View Results')
@@ -116,13 +83,6 @@ class InspectionsRelationManager extends RelationManager
                         'inspection' => $record->id,
                     ]))
                     ->openUrlInNewTab(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
             ])
             ->defaultSort('completed_at', 'desc');
     }

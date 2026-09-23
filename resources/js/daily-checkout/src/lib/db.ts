@@ -1,6 +1,13 @@
 import Dexie, { type Table } from 'dexie';
 import type { TrtCatalogItem } from '../types/trt-inventory';
-import type { InspectionSubmission } from '../types';
+import type { InspectionData, InspectionSubmission } from '../types';
+
+export interface DailyCheckoutDraft {
+  key: string;
+  apparatusSlug: string;
+  timestamp: number;
+  data: InspectionData;
+}
 
 export interface PendingSubmission {
   id?: number;
@@ -47,6 +54,7 @@ class MBFDDatabase extends Dexie {
   cachedData!: Table<CachedData, string>;
   trtCatalog!: Table<TrtCatalogItem, number>;
   dailyCheckoutSubmissions!: Table<DailyCheckoutQueuedSubmission, string>;
+  dailyCheckoutDrafts!: Table<DailyCheckoutDraft, string>;
 
   constructor() {
     super('mbfd-daily-checkout');
@@ -107,6 +115,10 @@ class MBFDDatabase extends Dexie {
       };
       await transaction.table('pendingSubmissions').toCollection().modify(markLegacy);
       await transaction.table('dailyCheckoutSubmissions').toCollection().modify(markLegacy);
+    });
+
+    this.version(6).stores({
+      dailyCheckoutDrafts: '&key, apparatusSlug, timestamp',
     });
   }
 }
