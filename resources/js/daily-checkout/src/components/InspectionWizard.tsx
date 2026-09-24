@@ -14,6 +14,7 @@ import SubmitStep from './SubmitStep';
 import PreviousPageButton from './PreviousPageButton';
 import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProgress';
 import { identityForQueueCapture, type OfflineIdentity } from '../lib/offlineIdentity';
+import { ClipboardList, Gauge, Truck, Users } from 'lucide-react';
 
 type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'submit';
 
@@ -689,13 +690,12 @@ export default function InspectionWizard() {
   return (
     <div className="apparatus-inspection">
       <header className="inspection-authority">
-        <div><p className="inspection-eyebrow">Daily Checkout</p><h1>{apparatus.name}</h1>
+        <div><p className="inspection-eyebrow">Daily Checkout</p><div className="inspection-unit-title"><h1>{apparatus.name}</h1><span className={isOutOfService ? 'inspection-status is-oos' : 'inspection-status'}>{apparatus.status ?? 'Status unavailable'}</span></div>
           <div className="inspection-identity"><span>Vehicle {apparatus.vehicle_number ?? 'Not recorded'}</span><span>{officerInfo.name} · {officerInfo.shift ? 'Shift ' + officerInfo.shift : 'Shift not selected'}</span></div>
         </div>
-        <div className="inspection-save"><strong>{isOffline ? 'Offline · On this device' : 'Online'}</strong><small role="status">{autosaveSucceeded === true ? 'Changes saved on this device' : autosaveSucceeded === false ? 'Not saved · Keep this page open' : 'Saving…'}</small><small>{progress.completed} / {progress.total} inspected</small></div>
+        <div className="inspection-save"><div><strong>{isOffline ? 'Offline · On this device' : 'Online'}</strong><small role="status">{autosaveSucceeded === true ? 'Changes saved on this device' : autosaveSucceeded === false ? 'Not saved · Keep this page open' : 'Saving…'}</small><small>{progress.completed} / {progress.total} inspected</small></div><div className="inspection-progress-ring" style={{ background: `conic-gradient(#11996c ${progress.total ? Math.round(progress.completed / progress.total * 100) : 0}%, #e1e6eb 0)` }} aria-label={`${progress.total ? Math.round(progress.completed / progress.total * 100) : 0}% complete`}><span><strong>{progress.total ? Math.round(progress.completed / progress.total * 100) : 0}%</strong><small>Complete</small></span></div></div>
       </header>
       <div className="inspection-readiness">
-        <span className={isOutOfService ? 'oos' : ''}>{isOutOfService ? '● OUT OF SERVICE' : apparatus.status ?? 'Status unavailable'}</span>
         <span>{apparatus.pm_health ? apparatus.pm_health.status === 'red' ? 'PM due' : apparatus.pm_health.status === 'yellow' ? 'PM due soon' : 'PM current' : 'PM baseline unavailable'}</span>
         <span>{progress.issues} reported {progress.issues === 1 ? 'issue' : 'issues'}</span>
       </div>
@@ -778,10 +778,10 @@ export default function InspectionWizard() {
       )}
 
       <nav className="mb-4 flex flex-wrap gap-2 text-sm" aria-label="Inspection workspace">
-        <button type="button" className="px-3 font-semibold" aria-current={currentStep === 'compartments' ? 'page' : undefined} onClick={() => setCurrentStep('compartments')}>Apparatus</button>
-        <button type="button" className="px-3" aria-label="Member / Vehicle Info" aria-current={currentStep === 'officer' ? 'page' : undefined} onClick={() => setCurrentStep('officer')}>Member</button>
-        <button type="button" className="px-3" aria-label={isV2Checklist ? 'Checklist details' : 'Readings'} aria-current={currentStep === (isV2Checklist ? 'details' : 'meter') ? 'page' : undefined} onClick={() => setCurrentStep(isV2Checklist ? 'details' : 'meter')}>{isV2Checklist ? 'Details' : 'Readings'}</button>
-        {!isV2Checklist && checklist.fields.length > 0 && <button type="button" className="px-3" aria-label="Checklist details" aria-current={currentStep === 'details' ? 'page' : undefined} onClick={() => setCurrentStep('details')}>Details</button>}
+        <button type="button" className="px-3 font-semibold" aria-current={currentStep === 'compartments' ? 'page' : undefined} onClick={() => setCurrentStep('compartments')}><Truck size={20} aria-hidden="true" />Apparatus</button>
+        <button type="button" className="px-3" aria-label="Member / Vehicle Info" aria-current={currentStep === 'officer' ? 'page' : undefined} onClick={() => setCurrentStep('officer')}><Users size={20} aria-hidden="true" />Member</button>
+        <button type="button" className="px-3" aria-label={isV2Checklist ? 'Checklist details' : 'Readings'} aria-current={currentStep === (isV2Checklist ? 'details' : 'meter') ? 'page' : undefined} onClick={() => setCurrentStep(isV2Checklist ? 'details' : 'meter')}><Gauge size={20} aria-hidden="true" />{isV2Checklist ? 'Details' : 'Readings'}</button>
+        {!isV2Checklist && checklist.fields.length > 0 && <button type="button" className="px-3" aria-label="Checklist details" aria-current={currentStep === 'details' ? 'page' : undefined} onClick={() => setCurrentStep('details')}><ClipboardList size={20} aria-hidden="true" />Details</button>}
       </nav>
 
       {currentStep === 'officer' && (

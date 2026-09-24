@@ -38,6 +38,7 @@ export default function CompartmentStep({ checklistType, compartments, findings 
   const unlocatedFindings = findings.filter(finding => !compartments.some(compartment => compartment.name === finding.compartment && compartment.items.some(item => item.name === finding.item)));
   const mappedIds = new Set(mappedViews.flatMap(entry => entry.zones.map(zone => zone.compartmentId)));
   const otherAreas = compartments.filter(compartment => !mappedIds.has(compartment.id));
+  const navigationIds = Array.from(new Set([...mappedViews.flatMap(entry => entry.zones.map(zone => zone.compartmentId)), ...otherAreas.map(area => area.id)]));
   const remaining = compartments.flatMap(compartment => compartment.items
     .filter(item => !itemIsComplete(item))
     .map(item => ({ compartment, item })));
@@ -99,7 +100,7 @@ export default function CompartmentStep({ checklistType, compartments, findings 
 
   return <div className={`inspection-layout ${showBlueprint ? 'with-blueprint' : 'with-area-rail'}`}>
     <aside className="inspection-navigation" aria-label="Apparatus navigation" ref={navigationRef}>
-      <div className="inspection-panel-heading"><span className="inspection-eyebrow">{showBlueprint ? 'Apparatus' : 'Inspection areas'}</span><span>{compartments.length} areas</span></div>
+      <div className="inspection-panel-heading"><h2>Vehicle Areas</h2><div className="blueprint-legend"><span><i className="remaining-dot" />Remaining</span><span><Check size={13} />Inspected</span><span><b>E</b> Existing</span><span><b>R</b> Reported</span></div></div>
       {showBlueprint && view ? <>
         <div className="blueprint-views" aria-label="Apparatus views">
           {mappedViews.map(entry => <button key={entry.id} type="button" aria-pressed={entry.id === view.id} onClick={() => { setViewId(entry.id); setActiveId(entry.zones.find(zone => compartments.some(compartment => compartment.id === zone.compartmentId))!.compartmentId); setExpandedId(null); }}>{entry.label}</button>)}
@@ -111,7 +112,6 @@ export default function CompartmentStep({ checklistType, compartments, findings 
           const known = findingsForArea(area, findings).length;
           return <button key={zone.compartmentId} type="button" aria-label={`${area.name}${known ? `, ${known} existing issues` : ''}${state.issues ? `, ${state.issues} reported issues` : ''}`} aria-pressed={current.id === zone.compartmentId} onClick={() => select(zone.compartmentId)}>{state.remaining === 0 && <Check size={13} />}{zone.label}{(known > 0 || state.issues > 0) && <TriangleAlert size={13} />}</button>;
         })}</div>
-        <div className="blueprint-legend"><span><i className="remaining-dot" />Remaining</span><span><Check size={13} />Inspected</span><span><b>E</b> Existing</span><span><b>R</b> Reported</span></div>
         <div className="blueprint-findings">{visibleZones.map(zone => {
           const area = compartments.find(compartment => compartment.id === zone.compartmentId)!;
           const existing = findingsForArea(area, findings).length;
@@ -132,7 +132,7 @@ export default function CompartmentStep({ checklistType, compartments, findings 
 
     <section className="inspection-equipment" aria-label="Compartment Inspection" ref={workspaceRef}>
       <header className="equipment-heading">
-        <div><p className="inspection-eyebrow">{showBlueprint && !mappedIds.has(current.id) ? 'Other area · Not shown on drawing' : 'Compartment Inspection'}</p><h2>{current.name}</h2><p className="inspection-muted">{compartmentProgress.completed} of {compartmentProgress.total} inspected{compartmentProgress.issues > 0 ? ` · ${compartmentProgress.issues} reported` : ''}</p></div>
+        <div><p className="inspection-eyebrow">{showBlueprint && !mappedIds.has(current.id) ? 'Other area · Not shown on vehicle image' : 'Compartment Inspection'}</p><h2>{current.name}</h2><p className="inspection-muted">{compartmentProgress.completed} of {compartmentProgress.total} inspected{compartmentProgress.issues > 0 ? ` · ${compartmentProgress.issues} reported` : ''}</p></div>
         <button type="button" className="confirm-compartment" aria-label="Mark all items in this compartment as present" onClick={() => onChange(previous => previous.map(compartment => compartment.id === current.id ? { ...compartment, items: compartment.items.map(item => (item.observed && item.status !== 'Present') || (item.inputType && item.inputType !== 'checkbox' && !itemIsComplete(item)) ? item : { ...item, status: 'Present', observed: true }) } : compartment))}>✓ Confirm all present</button>
       </header>
       {photoError && <p role="alert" className="inspection-alert">{photoError}</p>}
@@ -150,13 +150,13 @@ export default function CompartmentStep({ checklistType, compartments, findings 
               </button>
               <button type="button" className={`equipment-pass ${itemIsComplete(item) && !issue ? 'is-passed' : ''}`} aria-label={`Pass ${item.name}`} aria-pressed={itemIsComplete(item) && item.status === 'Present'} onClick={() => { if (item.inputType && item.inputType !== 'checkbox' && !itemIsComplete({ ...item, status: 'Present', observed: true })) { setExpandedId(item.id); } else { update(current.id, item.id, { status: 'Present', observed: true }); } }}>✓ <span>{item.inputType && item.inputType !== 'checkbox' ? 'Record' : 'Pass'}</span></button>
             </div>
-            {known && <p className="px-4 pb-3 text-sm text-amber-900">Known {known.issue_type} · {known.last_observation === 'appears_corrected' ? 'Reported corrected · awaiting verification' : known.operational_impact === 'unclassified' ? 'Awaiting classification' : known.operational_impact.replaceAll('_', ' ')}{known.service_status ? ` · Service: ${known.service_status.replaceAll('_', ' ')}` : ''}</p>}
+            {known && <p className="px-4 pb-3 text-sm text-amber-900">Known {known.issue_type}{known.last_observation === 'appears_corrected' ? ' · Last reported present' : ''}</p>}
             {expanded && <div className="equipment-details" id={`details-${current.id}-${item.id}`}>
               {item.instructions && <p className="mb-2 text-sm text-slate-600">{item.instructions}</p>}
               <div className="equipment-status" role="group" aria-label={`Status for ${item.name}`}>
                 {(['Present', 'Missing', 'Damaged'] as const).map(status => <button key={status} type="button" aria-pressed={item.observed === true && item.status === status} onClick={() => update(current.id, item.id, { status, observed: true })}>{status}</button>)}
               </div>
-              {issue && <p className="equipment-issue-copy">This observation stays with the apparatus. An authorized reviewer determines any operational hold.</p>}
+              {issue && <p className="equipment-issue-copy">Add a note or photo if it helps describe what you found.</p>}
               {item.inputType && item.inputType !== 'checkbox' && <label htmlFor={`value-${item.id}`}>
                 {item.name}
                 <input id={`value-${item.id}`} type={item.inputType === 'number' || item.inputType === 'percentage' ? 'number' : item.inputType === 'date' ? 'date' : 'text'}
@@ -173,12 +173,13 @@ export default function CompartmentStep({ checklistType, compartments, findings 
           </article>;
         })}
       </div>
-      <footer className="inspection-compartment-footer"><span>{compartments.findIndex(entry => entry.id === current.id) + 1} / {compartments.length} areas</span><button type="button" onClick={() => { const next = compartments[(compartments.findIndex(entry => entry.id === current.id) + 1) % compartments.length]; select(next.id); }}>Next area <span aria-hidden="true">→</span></button></footer>
+      <footer className="inspection-compartment-footer"><span>Area {navigationIds.indexOf(current.id) + 1} of {navigationIds.length}</span></footer>
     </section>
 
     <div className="inspection-action-bar">
       <button ref={quickButtonRef} type="button" className="quick-checklist-trigger" aria-expanded={quickOpen} aria-controls="quick-checklist" onClick={() => setQuickOpen(!quickOpen)}><ClipboardList size={20} aria-hidden="true" /><span>Checklist <strong>{progress.remaining > 0 ? `${progress.remaining} remaining` : 'Equipment inspected'}</strong>{attention.length > 0 && <small>{attention.length} needs attention</small>}</span></button>
-      <button type="button" className="inspection-review-button" disabled={progress.remaining > 0 || progress.total === 0} onClick={() => onSubmit(compartments)}>{actionLabel}<ArrowRight size={17} aria-hidden="true" /></button>
+      {progress.remaining > 0 ? <button type="button" className="inspection-review-button" onClick={() => select(navigationIds[(navigationIds.indexOf(current.id) + 1) % navigationIds.length])}>Next area<ArrowRight size={17} aria-hidden="true" /></button>
+        : <button type="button" className="inspection-review-button" disabled={progress.total === 0} onClick={() => onSubmit(compartments)}>{actionLabel}<ArrowRight size={17} aria-hidden="true" /></button>}
     </div>
     {quickOpen && <aside id="quick-checklist" className="quick-checklist" aria-label="Quick Checklist" onKeyDown={event => { if (event.key === 'Escape') { setQuickOpen(false); quickButtonRef.current?.focus(); } }}>
       <header><div><span className="inspection-eyebrow">Quick Checklist</span><h2>{progress.remaining === 0 ? 'Equipment inspected' : `${progress.remaining} remaining`}</h2></div><button type="button" aria-label="Close Quick Checklist" onClick={() => { setQuickOpen(false); quickButtonRef.current?.focus(); }}><X size={22} /></button></header>

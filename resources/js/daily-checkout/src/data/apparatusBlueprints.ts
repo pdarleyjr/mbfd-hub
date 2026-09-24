@@ -12,6 +12,8 @@ export interface BlueprintView {
   label: string;
   outline: string;
   details: string[];
+  image?: string;
+  canvas?: { width: number; height: number };
   wheels?: Array<{ x: number; y: number }>;
   mirror?: boolean;
   zones: BlueprintZone[];
@@ -25,57 +27,120 @@ export interface BlueprintProfile {
 }
 
 const zone = (compartmentId: string, label: string, x: number, y: number, width: number, height: number): BlueprintZone => ({ compartmentId, label, x, y, width, height });
-const sideOutline = 'M24 173V106L49 69H185V59H561V175H517M458 175H162M103 175H24Z';
-const sideDetails = ['M49 76H98V113H32', 'M186 68V169', 'M209 74V164', 'M29 181H562', 'M107 72V121H177V72', 'M226 65H554'];
-const side = (id: string, label: string, prefix: string): BlueprintView => ({
-  id, label, outline: sideOutline, details: sideDetails, mirror: id === 'right',
-  wheels: [{ x: 132, y: 174 }, { x: 487, y: 174 }],
-  zones: [zone(`comp_${prefix}1`, `${prefix.toUpperCase()}1`, 99, 76, 81, 80), zone(`comp_${prefix}2`, `${prefix.toUpperCase()}2`, 217, 77, 112, 90), zone(`comp_${prefix}3`, `${prefix.toUpperCase()}3`, 339, 77, 112, 75), zone(`comp_${prefix}4`, `${prefix.toUpperCase()}4`, 461, 77, 93, 75), ...(id === 'left' ? [zone('front_bumper', 'Bumper', 20, 144, 73, 54)] : [])],
+const apparatusImages = {
+  puc: {
+    driver: new URL('../assets/apparatus/puc/driver-side.png', import.meta.url).href,
+    officer: new URL('../assets/apparatus/puc/officer-side.png', import.meta.url).href,
+    top: new URL('../assets/apparatus/puc/top.png', import.meta.url).href,
+    rear: new URL('../assets/apparatus/puc/rear.png', import.meta.url).href,
+    front: new URL('../assets/apparatus/puc/front.png', import.meta.url).href,
+  },
+  e2: {
+    driver: new URL('../assets/apparatus/e2-puc/driver-side.png', import.meta.url).href,
+    officer: new URL('../assets/apparatus/e2-puc/officer-side.png', import.meta.url).href,
+    top: new URL('../assets/apparatus/e2-puc/top.png', import.meta.url).href,
+    rear: new URL('../assets/apparatus/e2-puc/rear.png', import.meta.url).href,
+    front: new URL('../assets/apparatus/e2-puc/front.png', import.meta.url).href,
+  },
+  ladder: {
+    driver: new URL('../assets/apparatus/ladder/driver-side.png', import.meta.url).href,
+    officer: new URL('../assets/apparatus/ladder/officer-side.png', import.meta.url).href,
+    top: new URL('../assets/apparatus/ladder/top.png', import.meta.url).href,
+    rear: new URL('../assets/apparatus/ladder/rear.png', import.meta.url).href,
+    front: new URL('../assets/apparatus/ladder/front.png', import.meta.url).href,
+  },
+  arrowxt: {
+    driver: new URL('../assets/apparatus/arrowxt/driver-side.png', import.meta.url).href,
+    officer: new URL('../assets/apparatus/arrowxt/officer-side.png', import.meta.url).href,
+    top: new URL('../assets/apparatus/arrowxt/top.png', import.meta.url).href,
+    rear: new URL('../assets/apparatus/arrowxt/rear.png', import.meta.url).href,
+    front: new URL('../assets/apparatus/arrowxt/front.png', import.meta.url).href,
+  },
+  rescue: {
+    driver: new URL('../assets/apparatus/rescue/driver-side.png', import.meta.url).href,
+    officer: new URL('../assets/apparatus/rescue/officer-side.png', import.meta.url).href,
+    interior: new URL('../assets/apparatus/rescue/interior.png', import.meta.url).href,
+  },
+};
+const photoView = (id: string, label: string, source: string, canvas: { width: number; height: number }, zones: BlueprintZone[]): BlueprintView => ({
+  id, label, image: source, canvas, outline: '', details: [], zones,
 });
-
-// Diagram-relative geometry transcribed from the labeled drawings on page 1.
-// Equipment and quantities remain exclusively in the server-issued checklist.
+const sideCanvas = { width: 600, height: 230 };
+const topCanvas = { width: 600, height: 300 };
+const endCanvas = { width: 400, height: 400 };
+const frontBumper = (source: string): BlueprintView => photoView('front', 'Front', source, endCanvas, [zone('front_bumper', 'Bumper', 35, 280, 330, 65)]);
+const engineTop = (source: string): BlueprintView => photoView('top', 'Top', source, topCanvas, [
+  zone('top_comp_1', 'Top 1', 267, 83, 81, 30), zone('top_comp_2', 'Top 2', 352, 83, 192, 30),
+  zone('top_comp_3', 'Top 3', 267, 198, 81, 26), zone('top_comp_4', 'Top 4', 417, 198, 127, 26),
+]);
+const engineRear = (source: string): BlueprintView => photoView('rear', 'Rear', source, endCanvas, [
+  zone('rear_1', 'Rear 1', 38, 82, 67, 96), zone('rear_2', 'Rear 2', 38, 183, 67, 95),
+  zone('rear_3', 'Rear 3', 295, 82, 67, 96), zone('rear_4', 'Rear 4', 295, 183, 67, 95),
+  zone('rear_5', 'Rear 5', 116, 226, 168, 80), zone('tailboard', 'Tailboard', 90, 314, 220, 42),
+]);
+const engineCab: BlueprintView = { id: 'cab', label: 'Cab', outline: 'M95 42H507V193H95L80 175V59Z', details: ['M107 51H145V183H107', 'M151 114H493'], zones: [zone('front_cab', 'Front cab', 161, 52, 328, 61), zone('rear_cab', 'Rear cab', 161, 123, 328, 60)] };
+const engineSide = (id: 'left' | 'right', source: string, prefix: 'a' | 'b' | 'l' | 'r'): BlueprintView => photoView(id, id === 'left' ? 'Driver' : 'Officer', source, sideCanvas,
+  id === 'left' ? [
+    zone(`comp_${prefix}4`, 'L1', 484, 68, 84, 99),
+    zone(`comp_${prefix}3`, 'L2', 381, 68, 101, 50),
+    zone(`comp_${prefix}2`, 'L3', 287, 68, 91, 99),
+    zone(`comp_${prefix}1`, 'L4', 174, 48, 54, 88),
+  ] : [
+    zone(`comp_${prefix}4`, 'R1', 38, 69, 80, 98),
+    zone(`comp_${prefix}3`, 'R2', 121, 69, 95, 51),
+    zone(`comp_${prefix}2`, 'R3', 219, 69, 92, 98),
+    zone(`comp_${prefix}1`, 'R4', 379, 48, 56, 88),
+  ]);
+// Photo zones identify locations only; equipment and quantities come from the issued checklist.
 export const engine2Puc: BlueprintProfile = {
   id: 'engine2-puc', label: 'PUC · Engine 2', source: 'E2 PUC CHECKOUT SHEET.pdf · page 1',
   views: [
-    side('left', 'Left side', 'l'),
-    side('right', 'Right side', 'r'),
-    { id: 'top', label: 'Top', outline: 'M29 50H560V191H29L18 175V66Z', details: ['M125 50V191', 'M145 50V191', 'M150 115H552'], zones: [zone('top_comp_1', 'Top 1', 160, 58, 170, 57), zone('top_comp_2', 'Top 2', 343, 58, 205, 57), zone('top_comp_3', 'Top 3', 160, 126, 170, 57), zone('top_comp_4', 'Top 4', 343, 126, 205, 57)] },
-    { id: 'rear', label: 'Rear', outline: 'M131 31H470V198H131Z', details: ['M143 38H458', 'M129 204H472', 'M140 181H191', 'M410 181H462'], zones: [zone('rear_1', 'Rear 1', 140, 45, 86, 62), zone('rear_2', 'Rear 2', 140, 118, 86, 62), zone('rear_3', 'Rear 3', 376, 45, 86, 62), zone('rear_4', 'Rear 4', 376, 118, 86, 62), zone('rear_5', 'Rear 5', 241, 113, 120, 67), zone('tailboard', 'Tailboard', 140, 184, 322, 44)] },
-    { id: 'cab', label: 'Cab', outline: 'M95 42H507V193H95L80 175V59Z', details: ['M107 51H145V183H107', 'M151 114H493'], zones: [zone('front_cab', 'Front cab', 161, 52, 328, 61), zone('rear_cab', 'Rear cab', 161, 123, 328, 60)] },
+    engineSide('left', apparatusImages.e2.driver, 'l'),
+    engineSide('right', apparatusImages.e2.officer, 'r'),
+    engineTop(apparatusImages.e2.top), engineRear(apparatusImages.e2.rear), frontBumper(apparatusImages.e2.front), engineCab,
   ],
 };
 
 export const enginePuc: BlueprintProfile = {
   id: 'engine-puc', label: 'PUC · Engines 1, 3 and 4', source: 'E1 / E3 / E4 PUC CHECKOUT SHEET.pdf · page 1',
   views: [
-    side('left', 'Side A', 'a'),
-    side('right', 'Side B', 'b'),
-    ...engine2Puc.views.filter(view => ['top', 'rear', 'cab'].includes(view.id)),
+    engineSide('left', apparatusImages.puc.driver, 'a'),
+    engineSide('right', apparatusImages.puc.officer, 'b'),
+    engineTop(apparatusImages.puc.top), engineRear(apparatusImages.puc.rear), frontBumper(apparatusImages.puc.front), engineCab,
   ],
 };
 
-const ladderOutline = 'M24 176V106L50 78H187V69H565V176H466M335 176H151M85 176H24Z';
-const ladderDetails = ['M26 60H557V70H26Z', 'M52 84H99V121H34', 'M107 84H173V127H107Z', 'M187 76V169', 'M30 183H566', 'M45 62L66 69L87 62L108 69L129 62L150 69L171 62L192 69L213 62L234 69L255 62L276 69L297 62L318 69L339 62L360 69L381 62L402 69L423 62L444 69L465 62L486 69L507 62L528 69'];
-const ladderWheels = [{ x: 118, y: 176 }, { x: 366, y: 176 }, { x: 425, y: 176 }];
 const ladderCab: BlueprintView = {
   id: 'cab', label: 'Cab', outline: 'M90 42H511V193H90L74 176V60Z', details: ['M105 52H142V182H105', 'M153 115H495'],
   zones: [zone('front_cab', 'Front cab', 163, 53, 330, 60), zone('rear_cab', 'Rear cab', 163, 124, 330, 59)],
 };
-const aerialView = (bucketId: string, ladderId: string): BlueprintView => ({
-  id: 'aerial', label: 'Aerial', outline: 'M22 76H123V159H22ZM124 98H566V138H124Z', details: ['M135 105H557', 'M135 132H557'],
-  zones: [zone(bucketId, 'Bucket', 28, 83, 88, 68), zone(ladderId, 'Ladder', 154, 87, 387, 62)],
-});
+const ladderTop = (source: string, compartments: BlueprintZone[]): BlueprintView => photoView('top', 'Top', source, topCanvas, compartments);
+const aerialView = (source: string, bucketId: string, ladderId: string): BlueprintView => photoView('aerial', 'Aerial', source, topCanvas, [
+  zone(bucketId, 'Bucket', 16, 88, 71, 112), zone(ladderId, 'Ladder', 91, 111, 461, 82),
+]);
+const ladderRear = (source: string, rearId: string, rearLabel: string): BlueprintView => photoView('rear', 'Rear', source, endCanvas, [
+  zone(rearId, rearLabel, 112, 199, 176, 119), zone('tailboard', 'Tailboard', 56, 322, 288, 50),
+]);
 
 // Side letters and separate compartments follow the paper's A/B drawings.
 export const ladder1: BlueprintProfile = {
   id: 'ladder1', label: 'Ladder 1', source: 'L1 CHECKOUT SHEET.pdf · page 1 (Mar 2016)',
   views: [
-    { id: 'left', label: 'Side A', outline: ladderOutline, details: ladderDetails, wheels: ladderWheels, zones: [zone('a_comp_1', 'A1', 192, 115, 64, 58), zone('a_comp_2', 'A2', 261, 85, 25, 88), zone('a_comp_3', 'A3', 292, 96, 43, 77), zone('a_comp_4', 'A4', 341, 97, 67, 40), zone('a_comp_5_6', 'A5 + A6', 413, 107, 115, 66), zone('front_bumper', 'Bumper', 20, 139, 60, 57)] },
-    { id: 'right', label: 'Side B', outline: ladderOutline, details: ladderDetails, wheels: ladderWheels, mirror: true, zones: [zone('b_comp_1', 'B1', 192, 115, 64, 58), zone('b_comp_2', 'B2', 261, 85, 25, 88), zone('b_comp_3', 'B3', 292, 96, 43, 77), zone('b_comp_4', 'B4', 341, 97, 62, 40), zone('b_comp_5', 'B5', 408, 111, 36, 34), zone('b_comp_6', 'B6', 449, 107, 79, 66)] },
-    { id: 'rear', label: 'Rear', outline: 'M132 34H468V194H132Z', details: ['M146 46H453', 'M123 204H477'], zones: [zone('rear_1', 'Rear 1', 146, 60, 307, 90), zone('tailboard', 'Tailboard', 146, 157, 307, 41)] },
-    { id: 'top', label: 'Top storage', outline: 'M32 40H563V194H32Z', details: ['M130 40V194', 'M145 110H551V123H145'], zones: [zone('top_comp_driver', 'Driver top', 154, 48, 393, 54), zone('top_comp_officer', 'Officer top', 154, 135, 393, 51)] },
-    aerialView('bucket', 'ladder'),
+    photoView('left', 'Driver', apparatusImages.ladder.driver, sideCanvas, [
+      zone('a_comp_5_6', 'L1 + L2', 461, 103, 110, 64),
+      zone('a_comp_4', 'L3', 383, 91, 75, 48), zone('a_comp_3', 'L4', 328, 90, 53, 77),
+      // Source A1/A2 overlap the photographed pump panel; keep them in Other areas.
+    ]),
+    photoView('right', 'Officer', apparatusImages.ladder.officer, sideCanvas, [
+      zone('b_comp_6', 'R1', 39, 106, 66, 62), zone('b_comp_5', 'R2', 107, 105, 41, 36),
+      zone('b_comp_4', 'R3', 150, 92, 72, 44), zone('b_comp_3', 'R4', 224, 91, 55, 76),
+      zone('b_comp_2', 'R5', 281, 82, 27, 28),
+      // B1 is near the photographed pump panel without a defensible door outline.
+    ]),
+    ladderRear(apparatusImages.ladder.rear, 'rear_1', 'Rear'),
+    ladderTop(apparatusImages.ladder.top, [zone('top_comp_driver', 'Driver top', 257, 82, 210, 27), zone('top_comp_officer', 'Officer top', 257, 181, 210, 25)]),
+    frontBumper(apparatusImages.ladder.front),
+    aerialView(apparatusImages.ladder.top, 'bucket', 'ladder'),
     ladderCab,
   ],
 };
@@ -84,12 +149,44 @@ export const ladder1: BlueprintProfile = {
 export const ladder3: BlueprintProfile = {
   id: 'ladder3', label: 'Ladder 3', source: 'L3 CHECKOUT SHEET.pdf · page 1 (revised 09/02/18)',
   views: [
-    { id: 'left', label: 'Side A', outline: ladderOutline, details: ladderDetails, wheels: ladderWheels, zones: [zone('a_comp_1', 'A1', 108, 89, 43, 76), zone('a_comp_2', 'A2', 262, 84, 35, 82), zone('a_comp_3', 'A3', 302, 103, 34, 68), zone('a_comp_4', 'A4', 341, 91, 71, 42), zone('a_comp_5', 'A5', 417, 106, 36, 32), zone('a_comp_6', 'A6', 458, 115, 61, 58), zone('front_bumper', 'Bumper', 20, 139, 60, 57)] },
-    { id: 'right', label: 'Side B', outline: ladderOutline, details: ladderDetails, wheels: ladderWheels, mirror: true, zones: [zone('b_comp_1', 'B1', 258, 79, 31, 92), zone('b_comp_2', 'B2', 294, 104, 37, 67), zone('b_comp_3', 'B3', 336, 79, 70, 48), zone('b_comp_4', 'B4', 411, 97, 38, 34), zone('b_comp_5', 'B5', 454, 106, 61, 66), zone('stokes_comp', 'Stokes', 250, 19, 121, 38)] },
-    { id: 'rear', label: 'Rear', outline: 'M132 34H468V194H132Z', details: ['M146 46H453', 'M123 204H477'], zones: [zone('rear_comp', 'Rear ladders', 146, 60, 307, 90), zone('tailboard', 'Tailboard', 146, 157, 307, 41)] },
-    { id: 'top', label: 'Top storage', outline: 'M32 40H563V194H32Z', details: ['M130 40V194', 'M151 109H547V124H151'], zones: [zone('top_comp', 'Top storage', 160, 48, 378, 138)] },
-    aerialView('aerial_bucket', 'aerial_ladder'),
+    photoView('left', 'Driver', apparatusImages.arrowxt.driver, sideCanvas, [
+      zone('a_comp_6', 'L1', 489, 108, 64, 59), zone('a_comp_5', 'L2', 453, 108, 34, 32),
+      zone('a_comp_4', 'L3', 378, 96, 73, 43), zone('a_comp_3', 'L4', 336, 95, 39, 72),
+      zone('a_comp_2', 'L5', 305, 90, 29, 77), zone('a_comp_1', 'L6', 186, 83, 57, 82),
+    ]),
+    photoView('right', 'Officer', apparatusImages.arrowxt.officer, sideCanvas, [
+      zone('b_comp_5', 'R1', 53, 120, 48, 48), zone('b_comp_4', 'R2', 103, 110, 34, 32),
+      zone('b_comp_3', 'R3', 139, 101, 82, 40), zone('b_comp_2', 'R4', 224, 105, 54, 62),
+      zone('b_comp_1', 'R5', 280, 87, 29, 79),
+      // The Stokes area is named on paper but not a discrete side door in this photo.
+    ]),
+    ladderRear(apparatusImages.arrowxt.rear, 'rear_comp', 'Rear ladders'),
+    // Top storage lacks a unique visible perimeter; it stays in Other areas.
+    frontBumper(apparatusImages.arrowxt.front),
+    aerialView(apparatusImages.arrowxt.top, 'aerial_bucket', 'aerial_ladder'),
     ladderCab,
+  ],
+};
+
+export const rescue: BlueprintProfile = {
+  id: 'rescue', label: 'Rescue', source: 'updated_rescue_inventory.pdf · page 1',
+  views: [
+    photoView('left', 'Driver', apparatusImages.rescue.driver, sideCanvas, [
+      zone('compartment_d', 'L1', 506, 68, 62, 116),
+      zone('compartment_c', 'L2', 404, 121, 79, 23),
+      zone('compartment_b', 'L3', 306, 115, 94, 68),
+      zone('compartment_a', 'L4', 251, 42, 43, 142),
+    ]),
+    photoView('right', 'Officer', apparatusImages.rescue.officer, sideCanvas, [
+      zone('officer_compartment_d', 'R1', 33, 68, 54, 116),
+      zone('officer_compartment_c', 'R2', 116, 121, 82, 23),
+      zone('officer_compartment_b', 'R3', 203, 115, 95, 68),
+      zone('officer_compartment_a', 'R4', 307, 42, 43, 142),
+    ]),
+    photoView('interior', 'Interior', apparatusImages.rescue.interior, sideCanvas, [
+      zone('patient_compartment', 'Patient', 55, 55, 175, 130),
+      zone('stretcher', 'Stretcher', 250, 78, 88, 140),
+    ]),
   ],
 };
 
@@ -122,11 +219,12 @@ const profilesByChecklistType: Record<string, BlueprintProfile> = {
   engine2: engine2Puc,
   ladder1,
   ladder3,
+  rescue,
   fireboat6,
 };
 
 export function resolveBlueprint(checklistType: string | null | undefined): BlueprintProfile | null {
   // The server-issued checklist type is authoritative. Profiles only provide
-  // schematic zones; the issued checklist remains the inventory authority.
+  // visual zones; the issued checklist remains the inventory authority.
   return checklistType ? profilesByChecklistType[checklistType] ?? null : null;
 }

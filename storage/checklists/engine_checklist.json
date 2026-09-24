@@ -111,7 +111,8 @@
     },
     {
       "id": "comp_a1",
-      "title": "Side A · Compartment 1",
+      "title": "Driver L4",
+      "legacyCompartmentNames": ["Side A · Compartment 1"],
       "items": [
         {"id":"comp_1-item-1","name":"Driver's Gear","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 1"],"legacyItemNames":["Driver's Gear"]},
         {"id":"comp_1-item-2","name":"Surf Rescue Gear","inputType":"checkbox","expectedQuantity":2,"legacyCompartmentNames":["Compartment 1"],"legacyItemNames":["Surf Rescue Gear"]},
@@ -121,7 +122,8 @@
     },
     {
       "id": "comp_a2",
-      "title": "Side A · Compartment 2",
+      "title": "Driver L3",
+      "legacyCompartmentNames": ["Side A · Compartment 2"],
       "items": [
         {"id":"comp_2-item-1","name":"Yellow Safety Tape / Duct Tape","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Yellow Safety Tape"]},
         {"id":"comp_2-item-2","name":"Plug & Dike","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Plug & Dike"]},
@@ -140,7 +142,8 @@
     },
     {
       "id": "comp_a3",
-      "title": "Side A · Compartment 3",
+      "title": "Driver L2",
+      "legacyCompartmentNames": ["Side A · Compartment 3"],
       "items": [
         {"id":"comp_a3-auto-pulse","name":"Auto Pulse","inputType":"checkbox","expectedQuantity":1},
         {"id":"comp_3-item-1","name":"1 ¾\" Fog Nozzle","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["1 ¾\" Fog Nozzle"]},
@@ -164,7 +167,8 @@
     },
     {
       "id": "comp_a4",
-      "title": "Side A · Compartment 4",
+      "title": "Driver L1",
+      "legacyCompartmentNames": ["Side A · Compartment 4"],
       "items": [
         {"id":"comp_4-item-9","name":"Cribbing Step Chocks/Wedges","inputType":"checkbox","note":"4 each","legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Cribbing Step Chocks/Wedges"]},
         {"id":"comp_a4-cribbing-crates","name":"Cribbing Crates","inputType":"checkbox","expectedQuantity":2},
@@ -188,7 +192,8 @@
     },
     {
       "id": "comp_b1",
-      "title": "Side B · Compartment 1",
+      "title": "Officer R4",
+      "legacyCompartmentNames": ["Side B · Compartment 1"],
       "items": [
         {"id":"comp_1-item-5","name":"MCI Kit","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 1"],"legacyItemNames":["MCI Kit"]},
         {"id":"comp_b1-gloves","name":"Gloves","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 1"],"legacyItemNames":["Gloves"]},
@@ -198,7 +203,8 @@
     },
     {
       "id": "comp_b2",
-      "title": "Side B · Compartment 2",
+      "title": "Officer R3",
+      "legacyCompartmentNames": ["Side B · Compartment 2"],
       "items": [
         {"id":"comp_2-item-12","name":"Lubricant and Silicone","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Lubricant and Silicone"]},
         {"id":"comp_2-item-13","name":"Bar Chain Oil","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 2"],"legacyItemNames":["Bar Chain Oil"]},
@@ -216,7 +222,8 @@
     },
     {
       "id": "comp_b3",
-      "title": "Side B · Compartment 3",
+      "title": "Officer R2",
+      "legacyCompartmentNames": ["Side B · Compartment 3"],
       "items": [
         {"id":"comp_3-item-15","name":"Sledge Hammer","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Sledge Hammer"]},
         {"id":"comp_3-item-16","name":"Pick Headed Axe","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 3"],"legacyItemNames":["Pick Headed Axe"]},
@@ -229,7 +236,8 @@
     },
     {
       "id": "comp_b4",
-      "title": "Side B · Compartment 4",
+      "title": "Officer R1",
+      "legacyCompartmentNames": ["Side B · Compartment 4"],
       "items": [
         {"id":"comp_4-item-1","name":"LifePak","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["LifePak"]},
         {"id":"comp_4-item-2","name":"Med Box","inputType":"checkbox","expectedQuantity":1,"legacyCompartmentNames":["Compartment 4"],"legacyItemNames":["Med Box"]},

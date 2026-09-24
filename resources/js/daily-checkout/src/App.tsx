@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router';
 import DailyCheckoutQueueProcessor from './components/DailyCheckoutQueueProcessor';
 import OfflineIndicator from './components/OfflineIndicator';
 import { IOSInstallPrompt } from './components/IOSInstallPrompt';
@@ -29,9 +29,9 @@ const HomeNav = () => (
   <header className="sticky top-0 z-50 bg-neutral-900 border-b border-neutral-700/50 h-16 flex items-center justify-between px-4 lg:px-6" style={{ paddingTop: 'max(0px, env(safe-area-inset-top, 0px))' }}>
     <div className="flex items-center gap-3">
       <img src="/images/mbfd_logo_new.png" alt="MBFD Logo" className="h-10 w-10 object-contain" />
-      <div className="hidden sm:block">
-        <h1 className="text-white font-bold text-base leading-tight font-heading">MBFD Support Hub</h1>
-        <p className="text-neutral-400 text-xs">Enterprise Command Portal</p>
+      <div>
+        <h1 className="text-white font-bold text-sm sm:text-base leading-tight font-heading">MBFD Support Hub</h1>
+        <p className="hidden sm:block text-neutral-400 text-xs">Enterprise Command Portal</p>
       </div>
     </div>
     <div className="flex items-center gap-2">
@@ -43,11 +43,18 @@ const HomeNav = () => (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
         </svg>
-        <span className="hidden sm:inline">Home</span>
+        <span>Home</span>
       </a>
     </div>
   </header>
 );
+
+function ContextualIssueWidget() {
+  const { pathname } = useLocation();
+  return /^\/(?:vehicle-inspections|apparatus)\/[^/]+\/?$/.test(pathname) && !pathname.endsWith('/success')
+    ? null
+    : <HubIssueWidget />;
+}
 
 function App() {
   return (
@@ -61,7 +68,7 @@ function App() {
         <OfflineIndicator />
         <DailyCheckoutQueueProcessor />
         <IOSInstallPrompt />
-        <HubIssueWidget />
+        <ContextualIssueWidget />
         <main id="main-content" data-testid="daily-workspace" className="daily-workspace mx-auto px-4 py-6 sm:px-6 md:py-8 lg:px-8 xl:px-10 2xl:px-12">
           <Suspense fallback={<PageLoading />}>
           <Routes>

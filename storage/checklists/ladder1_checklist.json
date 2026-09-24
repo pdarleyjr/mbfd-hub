@@ -49,8 +49,8 @@
     },
     {
       "id": "a_comp_1",
-      "title": "A - Compartment 1",
-      "legacyCompartmentNames": [],
+      "title": "Driver L6",
+      "legacyCompartmentNames": ["A - Compartment 1"],
       "items": [
         {"id": "comp_1-item-1", "name": "Set of Struts", "inputType": "checkbox", "expectedQuantity": 4, "snipeit_match": "Set of Struts", "legacyCompartmentNames": ["Compartment 1"], "legacyItemNames": ["Set of Struts"]},
         {"id": "comp_1-item-2", "name": "ResQ jack", "inputType": "checkbox", "expectedQuantity": 2, "snipeit_match": "ResQ Jack", "legacyCompartmentNames": ["Compartment 1"], "legacyItemNames": ["ResQ jack"]},
@@ -60,8 +60,8 @@
     },
     {
       "id": "a_comp_2",
-      "title": "A - Compartment 2",
-      "legacyCompartmentNames": [],
+      "title": "Driver L5",
+      "legacyCompartmentNames": ["A - Compartment 2"],
       "items": [
         {"id": "comp_2-item-4", "name": "Hydraulic Ram", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 2"], "legacyItemNames": ["Hydraulic Ram"]},
         {"id": "comp_2-item-5", "name": "Pneumatic Hose", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 2"], "legacyItemNames": ["Pneumatic Hose"]}
@@ -69,8 +69,8 @@
     },
     {
       "id": "a_comp_3",
-      "title": "A - Compartment 3",
-      "legacyCompartmentNames": [],
+      "title": "Driver L4",
+      "legacyCompartmentNames": ["A - Compartment 3"],
       "items": [
         {"id": "comp_3-item-13", "name": "Irons", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 3"], "legacyItemNames": ["Irons"]},
         {"id": "comp_3-item-14", "name": "Sledge Hammer", "inputType": "checkbox", "expectedQuantity": 2, "legacyCompartmentNames": ["Compartment 3"], "legacyItemNames": ["Sledge Hammer"]},
@@ -91,8 +91,8 @@
     },
     {
       "id": "a_comp_4",
-      "title": "A - Compartment 4",
-      "legacyCompartmentNames": [],
+      "title": "Driver L3",
+      "legacyCompartmentNames": ["A - Compartment 4"],
       "items": [
         {"id": "comp_4-item-9", "name": "Piercing Nozzle W/ Hose", "inputType": "checkbox", "legacyCompartmentNames": ["Compartment 4"], "legacyItemNames": ["Piercing Nozzle W/ Hose"]},
         {"id": "comp_4-item-10", "name": "Rubber Mallet", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 4"], "legacyItemNames": ["Rubber Mallet"]},
@@ -114,8 +114,8 @@
     },
     {
       "id": "a_comp_5_6",
-      "title": "A - Compartments 5 and 6",
-      "legacyCompartmentNames": [],
+      "title": "Driver L1 + L2 (combined)",
+      "legacyCompartmentNames": ["A - Compartments 5 and 6"],
       "items": [
         {"id": "comp_5_6-item-1", "name": "Hydraulic Spreaders", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Tethered Spreaders", "legacyCompartmentNames": ["Compartments 5 and 6"], "legacyItemNames": ["Hydraulic Spreaders"]},
         {"id": "comp_5_6-item-2", "name": "Hydraulic Cutters", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "Tethered Cutters", "legacyCompartmentNames": ["Compartments 5 and 6"], "legacyItemNames": ["Hydraulic Cutters"]},
@@ -134,8 +134,8 @@
     },
     {
       "id": "b_comp_6",
-      "title": "B - Compartment 6",
-      "legacyCompartmentNames": [],
+      "title": "Officer R1",
+      "legacyCompartmentNames": ["B - Compartment 6"],
       "items": [
         {"id": "comp_6-item-1", "name": "50' 5\" Hose", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 6"], "legacyItemNames": ["50' 5\" Hose"]},
         {"id": "comp_6-item-2", "name": "Electric Fan", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "PPV Fan", "legacyCompartmentNames": ["Compartment 6"], "legacyItemNames": ["Electric Fan"]},
@@ -147,8 +147,8 @@
     },
     {
       "id": "b_comp_5",
-      "title": "B - Compartment 5",
-      "legacyCompartmentNames": [],
+      "title": "Officer R2",
+      "legacyCompartmentNames": ["B - Compartment 5"],
       "items": [
         {"id": "comp_5-item-1", "name": "Sanizide", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 5"], "legacyItemNames": ["Sanizide"]},
         {"id": "comp_5-item-2", "name": "Emergency Blankets", "inputType": "checkbox", "expectedQuantity": 2, "legacyCompartmentNames": ["Compartment 5"], "legacyItemNames": ["Emergency Blankets"]},
@@ -164,8 +164,8 @@
     },
     {
       "id": "b_comp_4",
-      "title": "B - Compartment 4",
-      "legacyCompartmentNames": [],
+      "title": "Officer R3",
+      "legacyCompartmentNames": ["B - Compartment 4"],
       "items": [
         {"id": "comp_4-item-1", "name": "CO ID#", "inputType": "text", "note": "Enter ID#", "legacyCompartmentNames": ["Compartment 4"], "legacyItemNames": ["CO Monitor"]},
         {"id": "comp_4-item-2", "name": "H2S ID#", "inputType": "text", "note": "Enter ID#", "legacyCompartmentNames": ["Compartment 4"], "legacyItemNames": ["H2S Monitor"]},
@@ -179,8 +179,8 @@
     },
     {
       "id": "b_comp_3",
-      "title": "B - Compartment 3",
-      "legacyCompartmentNames": [],
+      "title": "Officer R4",
+      "legacyCompartmentNames": ["B - Compartment 3"],
       "items": [
         {"id": "comp_3-item-1", "name": "Gas Cans [Reg / Mix]", "inputType": "checkbox", "note": "Regular (1), Mix (1).", "legacyCompartmentNames": ["Compartment 3"], "legacyItemNames": ["Gas Cans [Reg / Mix]"], "expectedQuantity": 2},
         {"id": "comp_3-item-2", "name": "SawZall 20Volt / 28Volt", "inputType": "checkbox", "expectedQuantity": 2, "snipeit_match": "SawZall", "legacyCompartmentNames": ["Compartment 3"], "legacyItemNames": ["SawZall 20Volt", "SawZall 28Volt"], "note": "20Volt (1), 28Volt (1)."},
@@ -197,8 +197,8 @@
     },
     {
       "id": "b_comp_2",
-      "title": "B - Compartment 2",
-      "legacyCompartmentNames": [],
+      "title": "Officer R5",
+      "legacyCompartmentNames": ["B - Compartment 2"],
       "items": [
         {"id": "comp_2-item-1", "name": "Tarps", "inputType": "checkbox", "expectedQuantity": 5, "legacyCompartmentNames": ["Compartment 2"], "legacyItemNames": ["Tarps"]},
         {"id": "comp_2-item-2", "name": "Jumbo Stretcher", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 2"], "legacyItemNames": ["Jumbo Stretcher"]},
@@ -219,8 +219,8 @@
     },
     {
       "id": "b_comp_1",
-      "title": "B - Compartment 1",
-      "legacyCompartmentNames": [],
+      "title": "Officer R6",
+      "legacyCompartmentNames": ["B - Compartment 1"],
       "items": [
         {"id": "l1-b-comp-1-struts", "name": "Set of Struts", "inputType": "checkbox", "legacyCompartmentNames": [], "legacyItemNames": [], "expectedQuantity": 4},
         {"id": "comp_1-item-5", "name": "Stabilization Bag", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 1"], "legacyItemNames": ["Stabilization Bag"]},

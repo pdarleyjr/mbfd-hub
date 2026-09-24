@@ -9,6 +9,30 @@ const version = 'e'.repeat(64);
 const inspectionDate = '2026-09-21';
 const apparatus = { id: 102, name: 'Engine 2', designation: 'E2', type: 'engine', vehicle_number: 'TEST-102', slug: 'engine-2', status: 'In Service', current_engine_hours: 1250, current_miles: 42518, pm_health: { status: 'yellow', hours_since_pm: 270, miles_since_pm: 700, interval_hours: 300, overdue: false, last_pm_date: '2026-09-01' } };
 
+test('photo zones follow issued compartments and rear-to-cab labels without duplicating inventory', () => {
+  for (const type of ['engine', 'engine2', 'ladder1', 'ladder3', 'rescue']) {
+    const checklist = JSON.parse(readFileSync(`storage/checklists/${type}_checklist.json`, 'utf8'));
+    const profile = resolveBlueprint(type)!;
+    const issued = new Set(checklist.compartments.map((area: { id: string }) => area.id));
+    const mapped = profile.views.flatMap(view => view.zones.map(zone => zone.compartmentId));
+    expect(mapped.every(id => issued.has(id)), type).toBe(true);
+    expect(new Set(mapped).size, type).toBe(mapped.length);
+    for (const [viewId, prefix] of [['left', 'L'], ['right', 'R']] as const) {
+      const labels = profile.views.find(view => view.id === viewId)!.zones.map(zone => zone.label);
+      expect(labels[0], `${type} ${viewId} rear`).toMatch(new RegExp(`^${prefix}1(?:$| \\+)`));
+      expect(new Set(labels).size, `${type} ${viewId}`).toBe(labels.length);
+      expect(labels.every(label => label.startsWith(prefix)), `${type} ${viewId}`).toBe(true);
+    }
+  }
+  const e2 = resolveBlueprint('engine2')!;
+  const generic = resolveBlueprint('engine')!;
+  expect(e2.views[0].image).not.toBe(generic.views[0].image);
+  expect(e2.views[0].zones[0]).toMatchObject({ compartmentId: 'comp_l4', label: 'L1' });
+  expect(e2.views[0].zones.at(-1)).toMatchObject({ compartmentId: 'comp_l1', label: 'L4' });
+  expect(e2.views[1].zones[0]).toMatchObject({ compartmentId: 'comp_r4', label: 'R1' });
+  expect(e2.views[1].zones.at(-1)).toMatchObject({ compartmentId: 'comp_r1', label: 'R4' });
+});
+
 async function fixture(page: Page, options: { checklist?: typeof sourceChecklist; checklistType?: string; vehicle?: typeof apparatus; findings?: ChecklistData['open_findings']; revisions?: InspectionRevision[] } = {}) {
   const vehicle = options.vehicle ?? apparatus;
   const checklist = options.checklist ?? sourceChecklist;
@@ -57,6 +81,7 @@ for (const [designation, name, slug, file] of [
   ['E4', 'Engine 4', 'engine-4', 'engine'],
   ['L1', 'Ladder 1', 'ladder-1', 'ladder1'],
   ['L3', 'Ladder 3', 'ladder-3', 'ladder3'],
+  ['R3', 'Rescue 3', 'rescue-3', 'rescue'],
   ['FB6', 'Fire Boat 6', 'fire-boat-6', 'fireboat6'],
 ]) {
   test(`verified ${designation} blueprint views select their authoritative areas`, async ({ page }, testInfo) => {
@@ -65,11 +90,16 @@ for (const [designation, name, slug, file] of [
     const profile = resolveBlueprint(checklistType);
     if (!profile) throw new Error(`Missing verified profile for ${designation}`);
     await fixture(page, { checklist, checklistType, vehicle: { ...apparatus, name, designation, slug } });
+    await expect(page.getByRole('link', { name: 'Report an Issue' })).toHaveCount(0);
     for (const view of profile.views) {
       await page.getByRole('button', { name: view.label, exact: true }).click();
       expect(await page.locator('.blueprint-views button').evaluateAll(buttons => buttons.every(button => button.scrollWidth <= button.clientWidth))).toBe(true);
       const zone = view.zones[0];
       await page.locator(`.blueprint-zone[data-area-id="${zone.compartmentId}"]`).click();
+      if (view.image) {
+        await expect(page.locator('.apparatus-blueprint image')).toHaveCount(1);
+        expect(await page.locator('.apparatus-blueprint image').evaluate(image => new URL((image as SVGImageElement).href.baseVal).pathname.startsWith('/daily/assets/'))).toBe(true);
+      }
       await expect(page.locator(`.blueprint-zone[data-area-id="${zone.compartmentId}"]`)).toHaveAttribute('aria-pressed', 'true');
       const area = checklist.compartments.find((entry: { id: string }) => entry.id === zone.compartmentId);
       await expect(page.getByRole('heading', { name: area.title ?? area.name, exact: true })).toBeVisible();
@@ -97,7 +127,9 @@ test('remaining work, reported issues and the next required action stay distinct
     officerChecklist: sourceChecklist.officerChecklist.filter((field: { id: string }) => field.id === 'mileage'),
     compartments: [{ id: 'cab', name: 'Cab', items: [{ id: 'radio', name: 'Radio' }, { id: 'bag', name: 'Bag' }] }],
   } });
-  await expect(page.getByRole('button', { name: '2 items remaining', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Next area', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Next area', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Checklist 2 remaining' })).toBeVisible();
   await page.getByRole('button', { name: 'Pass Radio', exact: true }).click();
   await page.getByRole('button', { name: /^Bag/ }).click();
   await page.getByRole('button', { name: 'Damaged', exact: true }).click();
@@ -118,11 +150,11 @@ test('remaining work, reported issues and the next required action stay distinct
 });
 
 test('known findings are visible on mapped zones and unlocated areas remain reachable without duplicate navigation', async ({ page }) => {
-  await fixture(page, { findings: [{ id: 901, compartment: 'Compartment L-1', item: "Driver's Gear", issue_type: 'damaged', operational_impact: 'unclassified', last_observation: 'confirmed_again', last_observed_at: '2026-09-21T10:00:00Z', service_status: 'open' }] });
-  const zone = page.locator('.blueprint-zone').filter({ hasText: 'L1' });
+  await fixture(page, { findings: [{ id: 901, compartment: 'Driver L4', item: "Driver's Gear", issue_type: 'damaged', operational_impact: 'unclassified', last_observation: 'confirmed_again', last_observed_at: '2026-09-21T10:00:00Z', service_status: 'open' }] });
+  const zone = page.locator('.blueprint-zone').filter({ hasText: 'L4' });
   await expect(zone).toHaveAccessibleName(/1 existing issue/);
   await expect(zone.locator('.blueprint-warning.existing')).toBeVisible();
-  await expect(page.getByText('L1 · 1 existing issue', { exact: true })).toBeVisible();
+  await expect(page.getByText('L4 · 1 existing issue', { exact: true })).toBeVisible();
   await expect(page.getByText('0 reported issues', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Compartment', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('All inspection areas', { exact: true })).toHaveCount(0);
@@ -130,7 +162,7 @@ test('known findings are visible on mapped zones and unlocated areas remain reac
   const unlocated = sourceChecklist.compartments.find((area: { id: string }) => area.id === 'backboards_comp');
   await page.getByRole('region', { name: 'Other areas', exact: true }).getByRole('button', { name: new RegExp(unlocated.title) }).click();
   await expect(page.getByRole('heading', { name: unlocated.title, exact: true })).toBeVisible();
-  await expect(page.getByText('Other area · Not shown on drawing', { exact: true })).toBeVisible();
+  await expect(page.getByText('Other area · Not shown on vehicle image', { exact: true })).toBeVisible();
   await expect(page.locator('.blueprint-zone[aria-pressed=true]')).toHaveCount(0);
 });
 
@@ -148,40 +180,41 @@ test('an additional authorized nonvisual area does not remove the Engine 2 bluep
   await page.getByText(/^Other areas/).click();
   await page.getByRole('region', { name: 'Other areas', exact: true }).getByRole('button', { name: /Additional authorized area/ }).click();
   await expect(page.getByRole('heading', { name: 'Additional authorized area', exact: true })).toBeVisible();
-  await expect(page.getByText('Other area · Not shown on drawing', { exact: true })).toBeVisible();
+  await expect(page.getByText('Other area · Not shown on vehicle image', { exact: true })).toBeVisible();
 });
 
-test('Rescue uses authoritative named areas without a fabricated blueprint', async ({ page }, testInfo) => {
+test('Rescue keeps side-specific photo zones and central work in its issued checklist', async ({ page }, testInfo) => {
   const checklist = JSON.parse(readFileSync('storage/checklists/rescue_checklist.json', 'utf8'));
   await fixture(page, { checklist, checklistType: 'rescue', vehicle: { ...apparatus, name: 'Rescue 3', designation: 'R3', type: 'rescue', slug: 'rescue-3' } });
-  await expect(page.locator('.apparatus-blueprint')).toHaveCount(0);
-  const areas = page.getByRole('region', { name: 'Inspection areas', exact: true });
-  await expect(areas.getByRole('button')).toHaveCount(checklist.compartments.length);
+  await expect(page.locator('.apparatus-blueprint')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Officer', exact: true }).click();
+  await page.locator('.blueprint-zone[data-area-id="officer_compartment_d"]').click();
+  await expect(page.getByRole('heading', { name: 'R1 · Officer compartment' })).toBeVisible();
+  await page.getByRole('button', { name: 'Interior', exact: true }).click();
+  await page.locator('.blueprint-zone[data-area-id="patient_compartment"]').click();
+  await expect(page.getByRole('heading', { name: 'Patient Compartment' })).toBeVisible();
   await page.getByRole('button', { name: /Checklist.*remaining/ }).click();
   const quick = page.getByRole('complementary', { name: 'Quick Checklist' });
   await quick.getByRole('button').last().click();
   await expect(page.getByRole('heading', { name: checklist.compartments.at(-1).title, exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: testInfo.outputPath('rescue-named-areas.png'), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('rescue-photo-areas.png'), fullPage: true });
 });
 
 test('apparatus workspace fits the viewport and keeps actual equipment visible', async ({ page }, testInfo) => {
   await fixture(page);
-  await expect(page.getByRole('button', { name: /^\d+ items remaining$/ })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Next area', exact: true })).toBeEnabled();
+  await page.locator('.blueprint-touch-zones button').filter({ hasText: 'L4' }).click();
   await expect(page.getByRole('button', { name: "Pass Driver's Gear", exact: true })).toBeVisible();
   await expect(page.getByText('PM due soon', { exact: true })).toBeVisible();
   await expect(page.getByText('Browser Member · Shift not selected')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const home = page.getByRole('link', { name: 'Return to MBFD Hub home page', exact: true });
-  const support = page.getByRole('link', { name: 'Report an Issue', exact: true });
+  await expect(page.getByRole('link', { name: 'Report an Issue', exact: true })).toHaveCount(0);
   const homeBox = await home.boundingBox();
-  const supportBox = await support.boundingBox();
   expect(homeBox).not.toBeNull();
-  expect(supportBox).not.toBeNull();
-  if (!homeBox || !supportBox) throw new Error('Header controls must be visible');
-  expect(homeBox.x >= supportBox.x + supportBox.width || supportBox.x >= homeBox.x + homeBox.width
-    || homeBox.y >= supportBox.y + supportBox.height || supportBox.y >= homeBox.y + homeBox.height).toBe(true);
-  for (const control of [home, support]) {
+  if (!homeBox) throw new Error('Home control must be visible');
+  for (const control of [home]) {
     const geometry = await control.evaluate(element => {
       const box = element.getBoundingClientRect();
       const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
@@ -192,12 +225,6 @@ test('apparatus workspace fits the viewport and keeps actual equipment visible',
     expect(geometry.inViewport).toBe(true);
     expect(geometry.receivesClick).toBe(true);
   }
-  await support.click();
-  const supportDialog = page.getByRole('dialog', { name: 'Report an Issue', exact: true });
-  await expect(supportDialog).toBeVisible();
-  await supportDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(supportDialog).not.toBeVisible();
-  await expect(support).toBeFocused();
   await page.screenshot({ path: testInfo.outputPath('apparatus-workspace.png') });
   const homeUrl = new URL('/', page.url()).href;
   await page.route(homeUrl, route => route.fulfill({ contentType: 'text/html', body: '<h1>Test Hub home destination</h1>' }));
@@ -268,6 +295,7 @@ test('multiple large photos persist in IndexedDB and restore exactly without loc
 
 test('legacy draft migration removes only its source after durable storage', async ({ page }) => {
   await fixture(page);
+  await page.locator('.blueprint-touch-zones button').filter({ hasText: 'L4' }).click();
   await page.getByRole('button', { name: "Pass Driver's Gear", exact: true }).click();
   await expect.poll(async () => (await readDrafts(page))[0]?.data.compartments.some(area => area.items.some(item => item.observed))).toBe(true);
   const [draft] = await readDrafts(page);
@@ -284,6 +312,7 @@ test('legacy draft migration removes only its source after durable storage', asy
 
 test('a failed draft read blocks entry without replacing saved evidence', async ({ page }) => {
   await fixture(page);
+  await page.locator('.blueprint-touch-zones button').filter({ hasText: 'L4' }).click();
   await page.getByRole('button', { name: "Pass Driver's Gear", exact: true }).click();
   await expect.poll(async () => (await readDrafts(page))[0]?.data.compartments.find(area => area.id === 'comp_l1')?.items[0]?.observed).toBe(true);
   const before = await readDrafts(page);
@@ -302,10 +331,12 @@ test('a failed draft read blocks entry without replacing saved evidence', async 
 
 test('answers autosave before leaving a compartment and restore on reload', async ({ page }) => {
   await fixture(page);
+  await page.locator('.blueprint-touch-zones button').filter({ hasText: 'L4' }).click();
   await page.getByRole('button', { name: "Pass Driver's Gear", exact: true }).click();
   await expect(page.getByRole('button', { name: "Pass Driver's Gear", exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(async () => (await readDrafts(page))[0]?.data.compartments.find(area => area.id === 'comp_l1')?.items[0]?.observed).toBe(true);
   await page.reload();
+  await page.locator('.blueprint-touch-zones button').filter({ hasText: 'L4' }).click();
   await expect(page.getByRole('button', { name: "Pass Driver's Gear", exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText(/Restored from autosave/)).toBeVisible();
 });
@@ -314,9 +345,9 @@ test('Quick Checklist focuses the right item and batch confirmation preserves a 
   await fixture(page);
   await page.getByRole('button', { name: /Checklist.*remaining/ }).click();
   const quick = page.getByRole('complementary', { name: 'Quick Checklist' });
-  await quick.getByRole('button', { name: /Compartment R-2.*Sledgehammer/ }).click();
+  await quick.getByRole('button', { name: /Officer R3.*Sledgehammer/ }).click();
   await expect(quick).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'Compartment R-2', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Officer R3', exact: true })).toBeVisible();
   await expect(page.locator('[data-item-id][aria-expanded=true]')).toBeFocused();
   await page.getByRole('button', { name: 'Missing', exact: true }).click();
   await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
@@ -507,8 +538,9 @@ test('historical finding without a unique current location remains visible after
 
 test('known finding remains visible when reported corrected and keyboard actions work with reduced motion', async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await fixture(page, { findings: [{ id: 901, compartment: 'Compartment L-1', item: "Driver's Gear", issue_type: 'damaged', operational_impact: 'unclassified', last_observation: 'confirmed_again', last_observed_at: '2026-09-21T10:00:00Z', service_status: 'open' }] });
-  await expect(page.getByText('Known damaged · Awaiting classification · Service: open', { exact: true })).toBeVisible();
+  await fixture(page, { findings: [{ id: 901, compartment: 'Driver L4', item: "Driver's Gear", issue_type: 'damaged', operational_impact: 'unclassified', last_observation: 'confirmed_again', last_observed_at: '2026-09-21T10:00:00Z', service_status: 'open' }] });
+  await page.locator('.blueprint-touch-zones button').filter({ hasText: 'L4' }).click();
+  await expect(page.getByText('Known damaged', { exact: true })).toBeVisible();
   const pass = page.getByRole('button', { name: "Pass Driver's Gear", exact: true });
   await pass.focus();
   await page.keyboard.press('Enter');

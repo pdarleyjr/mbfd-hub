@@ -11,6 +11,11 @@ body {
   background-color: #FAFAF8;
 }
 
+body:has(.apparatus-inspection),
+body:has(.apparatus-inspection) #root > div {
+  background-color: #f5f9ff;
+}
+
 code {
   font-family: 'JetBrains Mono', source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
