@@ -67,12 +67,13 @@ async function waitForControlledWorker(page: Page): Promise<void> {
 
 async function waitForCachedDailyShell(page: Page): Promise<string[]> {
   const emittedAssets = readdirSync('test-results/daily-checkout-e2e-build/assets')
-    .filter(file => /\.(js|css)$/.test(file))
+    .filter(file => /\.(js|css|png)$/.test(file))
     .map(file => `/daily/assets/${file}`);
   expect(emittedAssets.length).toBeGreaterThan(1);
+  expect(emittedAssets.filter(asset => asset.endsWith('.png')).length).toBeGreaterThanOrEqual(15);
 
   await expect.poll(async () => page.evaluate(async expectedAssets => {
-    const cache = await caches.open('mbfd-checkout-v7');
+    const cache = await caches.open('mbfd-checkout-v8');
     const cachedPaths = (await cache.keys()).map(request => new URL(request.url).pathname);
 
     return Boolean(await cache.match('/daily/index.html'))
@@ -150,14 +151,21 @@ test('installed Daily worker caches the shell and an offline queue survives relo
 
   const cacheEvidence = await page.evaluate(async () => ({
     names: await caches.keys(),
-    shell: Boolean(await (await caches.open('mbfd-checkout-v7')).match('/daily/index.html')),
-    assets: (await (await caches.open('mbfd-checkout-v7')).keys()).map(request => new URL(request.url).pathname),
+    shell: Boolean(await (await caches.open('mbfd-checkout-v8')).match('/daily/index.html')),
+    assets: (await (await caches.open('mbfd-checkout-v8')).keys()).map(request => new URL(request.url).pathname),
   }));
-  expect(cacheEvidence.names).toContain('mbfd-checkout-v7');
+  expect(cacheEvidence.names).toContain('mbfd-checkout-v8');
   expect(cacheEvidence.names).not.toContain('mbfd-checkout-v6');
   expect(cacheEvidence.names).not.toContain('mbfd-api-cache-v6');
   expect(cacheEvidence.shell).toBe(true);
   expect(cacheEvidence.assets).toEqual(expect.arrayContaining(emittedAssets));
+  await context.setOffline(true);
+  const offlineImages = await page.evaluate(async assets => Promise.all(assets.filter(asset => asset.endsWith('.png')).map(async asset => {
+    const response = await fetch(asset);
+    return response.ok && response.headers.get('content-type')?.includes('image/png');
+  })), emittedAssets);
+  expect(offlineImages.every(Boolean)).toBe(true);
+  await context.setOffline(false);
   // Bypass the page-level API fixture so these requests traverse the real worker.
   await page.evaluate(async endpoints => {
     for (const endpoint of endpoints) {

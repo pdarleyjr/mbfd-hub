@@ -19,7 +19,11 @@ final class InspectionPaperFields
                 $definitions[$compartment['id']][$id] = [
                     'compartment' => $compartment['name'] ?? $compartment['title'],
                     'item' => $item['name'],
-                    'compartment_names' => array_values(array_unique([$compartment['name'] ?? $compartment['title'], ...($item['legacyCompartmentNames'] ?? [])])),
+                    'compartment_names' => array_values(array_unique([
+                        $compartment['name'] ?? $compartment['title'],
+                        ...($compartment['legacyCompartmentNames'] ?? []),
+                        ...($item['legacyCompartmentNames'] ?? []),
+                    ])),
                     'item_names' => array_values(array_unique([$item['name'], ...($item['legacyItemNames'] ?? [])])),
                 ];
             }

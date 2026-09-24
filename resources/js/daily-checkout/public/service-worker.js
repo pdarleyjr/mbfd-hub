@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mbfd-checkout-v7';
+const CACHE_NAME = 'mbfd-checkout-v8';
 const API_CACHE_NAME = 'mbfd-api-cache-v7';
 const BUILD_ASSETS = /* DAILY_BUILD_ASSETS */ [];
 const APP_SHELL_CACHE_KEYS = [

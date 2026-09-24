@@ -114,7 +114,8 @@
     },
     {
       "id": "comp_l1",
-      "title": "Compartment L-1",
+      "title": "Driver L4",
+      "legacyCompartmentNames": ["Compartment L-1"],
       "items": [
         {"id":"comp_l1-item-1","name":"Driver's Gear","inputType":"checkbox","expectedQuantity":1},
         {"id":"comp_l1-item-2","name":"HandTevy Box","inputType":"checkbox"},
@@ -124,7 +125,8 @@
     },
     {
       "id": "comp_l2",
-      "title": "Compartment L-2",
+      "title": "Driver L3",
+      "legacyCompartmentNames": ["Compartment L-2"],
       "items": [
         {"id":"comp_l2-item-1","name":"Yellow Safety Tape/Duct Tape","inputType":"checkbox","expectedQuantity":1},
         {"id":"comp_l2-item-2","name":"Flares & Emergency Triangles","inputType":"checkbox","expectedQuantity":5},
@@ -155,7 +157,8 @@
     },
     {
       "id": "comp_l3",
-      "title": "Compartment L-3",
+      "title": "Driver L2",
+      "legacyCompartmentNames": ["Compartment L-3"],
       "items": [
         {"id":"comp_l3-item-1","name":"Auto Pulse","inputType":"checkbox","expectedQuantity":1},
         {"id":"comp_l3-item-2","name":"Come-a-long Chains","inputType":"checkbox","note":"1 each"},
@@ -174,7 +177,8 @@
     },
     {
       "id": "comp_l4",
-      "title": "Compartment L-4",
+      "title": "Driver L1",
+      "legacyCompartmentNames": ["Compartment L-4"],
       "items": [
         {"id":"comp_l4-item-1","name":"TNT Spreader","inputType":"checkbox","snipeit_match":"TNT Spreader"},
         {"id":"comp_l4-item-2","name":"TNT Cutter","inputType":"checkbox","snipeit_match":"TNT Cutter"},
@@ -195,7 +199,8 @@
     },
     {
       "id": "comp_r1",
-      "title": "Compartment R-1",
+      "title": "Officer R4",
+      "legacyCompartmentNames": ["Compartment R-1"],
       "items": [
         {"id":"comp_r1-item-1","name":"Life-Pak","inputType":"checkbox","expectedQuantity":1},
         {"id":"comp_r1-item-2","name":"Med Box","inputType":"checkbox","expectedQuantity":1},
@@ -209,7 +214,8 @@
     },
     {
       "id": "comp_r2",
-      "title": "Compartment R-2",
+      "title": "Officer R3",
+      "legacyCompartmentNames": ["Compartment R-2"],
       "items": [
         {"id":"comp_r2-item-1","name":"Sledgehammer","inputType":"checkbox","expectedQuantity":1},
         {"id":"comp_r2-item-2","name":"Pick Headed Axe","inputType":"checkbox","expectedQuantity":1},
@@ -230,7 +236,8 @@
     },
     {
       "id": "comp_r3",
-      "title": "Compartment R-3",
+      "title": "Officer R2",
+      "legacyCompartmentNames": ["Compartment R-3"],
       "items": [
         {"id":"comp_r3-item-1","name":"Highrise Pack","inputType":"checkbox","expectedQuantity":2},
         {"id":"comp_r3-item-2","name":"Officer's Pack","inputType":"checkbox","expectedQuantity":1},
@@ -239,7 +246,8 @@
     },
     {
       "id": "comp_r4",
-      "title": "Compartment R-4",
+      "title": "Officer R1",
+      "legacyCompartmentNames": ["Compartment R-4"],
       "items": [
         {"id":"comp_r4-item-1","name":"Water Cooler/Cups","inputType":"checkbox"},
         {"id":"comp_r4-item-2","name":"Hydraulic Gas Squeeze Off","inputType":"checkbox","snipeit_match":"Hydraulic Gas Squeeze Off"},

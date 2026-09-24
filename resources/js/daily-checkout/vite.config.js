@@ -68,7 +68,7 @@ const serviceWorkerCopyPlugin = {
     }
     fs.mkdirSync(dailyOutDir, { recursive: true })
     const assets = fs.readdirSync(path.join(dailyOutDir, 'assets'))
-      .filter(file => /\.(js|css)$/.test(file)).sort().map(file => `/daily/assets/${file}`)
+      .filter(file => /\.(js|css|png)$/.test(file)).sort().map(file => `/daily/assets/${file}`)
     const source = fs.readFileSync(customSwPath, 'utf-8')
     if (!source.includes('/* DAILY_BUILD_ASSETS */ []')) throw new Error('Service worker asset marker is missing')
     fs.writeFileSync(outputSwPath, source.replace('/* DAILY_BUILD_ASSETS */ []', JSON.stringify(assets)))

@@ -49,8 +49,8 @@
     },
     {
       "id": "a_comp_1",
-      "title": "A - Compartment 1",
-      "legacyCompartmentNames": [],
+      "title": "Driver L6",
+      "legacyCompartmentNames": ["A - Compartment 1"],
       "items": [
         {"id": "comp_1-item-1", "name": "Driver's Gear", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 1"], "legacyItemNames": ["Driver's Gear"]},
         {"id": "comp_1-item-2", "name": "F-I Gear", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 1"], "legacyItemNames": ["F-I Gear"]}
@@ -58,8 +58,8 @@
     },
     {
       "id": "a_comp_2",
-      "title": "A - Compartment 2",
-      "legacyCompartmentNames": [],
+      "title": "Driver L5",
+      "legacyCompartmentNames": ["A - Compartment 2"],
       "items": [
         {"id": "comp_2-item-1", "name": "Air Hose/Gauge/Chuck", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 2"], "legacyItemNames": ["Air Hose/Gauge/Chuck"]},
         {"id": "comp_2-item-2", "name": "Hydraulic \"Rabbit\" Tool/KTool", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 2"], "legacyItemNames": ["Hydraulic \"Rabbit\" Tool/KTool"]}
@@ -67,8 +67,8 @@
     },
     {
       "id": "a_comp_3",
-      "title": "A - Compartment 3",
-      "legacyCompartmentNames": [],
+      "title": "Driver L4",
+      "legacyCompartmentNames": ["A - Compartment 3"],
       "items": [
         {"id": "comp_3-item-1", "name": "Flashlight", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 3"], "legacyItemNames": ["Flashlight"]},
         {"id": "comp_3-item-2", "name": "8' - 3\" Pony Line", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 3"], "legacyItemNames": ["8' - 3\" Pony Line"]},
@@ -111,8 +111,8 @@
     },
     {
       "id": "a_comp_4",
-      "title": "A - Compartment 4",
-      "legacyCompartmentNames": [],
+      "title": "Driver L3",
+      "legacyCompartmentNames": ["A - Compartment 4"],
       "items": [
         {"id": "comp_4-item-1", "name": "Res-Q Jacks", "inputType": "checkbox", "expectedQuantity": 2, "snipeit_match": "ResQ Jack", "legacyCompartmentNames": ["Compartment 4"], "legacyItemNames": ["Res-Q Jacks"]},
         {"id": "comp_4-item-4", "name": "Pry Bars", "inputType": "checkbox", "expectedQuantity": 2, "legacyCompartmentNames": ["Compartment 4"], "legacyItemNames": ["Pry Bars"]},
@@ -127,8 +127,8 @@
     },
     {
       "id": "a_comp_5",
-      "title": "A - Compartment 5",
-      "legacyCompartmentNames": [],
+      "title": "Driver L2",
+      "legacyCompartmentNames": ["A - Compartment 5"],
       "items": [
         {"id": "comp_5-item-1", "name": "Extrication Bag", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 5"], "legacyItemNames": ["Extrication Bag"]},
         {"id": "comp_5-item-2", "name": "Sawzall Bag", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "SawZall", "legacyCompartmentNames": ["Compartment 5"], "legacyItemNames": ["Sawzall Bag"]}
@@ -136,8 +136,8 @@
     },
     {
       "id": "a_comp_6",
-      "title": "A - Compartment 6",
-      "legacyCompartmentNames": [],
+      "title": "Driver L1",
+      "legacyCompartmentNames": ["A - Compartment 6"],
       "items": [
         {"id": "comp_6-item-1", "name": "TNT Power Unit", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "TNT Power Unit", "legacyCompartmentNames": ["Compartment 6"], "legacyItemNames": ["TNT Power Unit"]},
         {"id": "comp_6-item-2", "name": "TNT Spreader", "inputType": "checkbox", "expectedQuantity": 1, "snipeit_match": "TNT Spreader", "legacyCompartmentNames": ["Compartment 6"], "legacyItemNames": ["TNT Spreader"]},
@@ -154,8 +154,8 @@
     },
     {
       "id": "b_comp_5",
-      "title": "B - Compartment 5",
-      "legacyCompartmentNames": [],
+      "title": "Officer R1",
+      "legacyCompartmentNames": ["B - Compartment 5"],
       "items": [
         {"id": "officer_side_panel-item-1", "name": "Officer Gear", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Officer's Side Panel"], "legacyItemNames": ["Officer Gear"]},
         {"id": "officer_side_panel-item-2", "name": "F-1 Gear", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Officer's Side Panel"], "legacyItemNames": ["F-1 Gear"]},
@@ -164,8 +164,8 @@
     },
     {
       "id": "b_comp_4",
-      "title": "B - Compartment 4",
-      "legacyCompartmentNames": [],
+      "title": "Officer R2",
+      "legacyCompartmentNames": ["B - Compartment 4"],
       "items": [
         {"id": "comp_4-item-10", "name": "Sharps Container", "inputType": "checkbox", "legacyCompartmentNames": ["Compartment 4"], "legacyItemNames": ["Sharps Container"]},
         {"id": "comp_4-item-11", "name": "Medical Supplies", "inputType": "checkbox", "legacyCompartmentNames": ["Compartment 4"], "legacyItemNames": ["Medical Supplies"]},
@@ -175,8 +175,8 @@
     },
     {
       "id": "b_comp_3",
-      "title": "B - Compartment 3",
-      "legacyCompartmentNames": [],
+      "title": "Officer R3",
+      "legacyCompartmentNames": ["B - Compartment 3"],
       "items": [
         {"id": "officer_side_panel-item-4", "name": "LifePak", "inputType": "checkbox", "legacyCompartmentNames": ["Officer's Side Panel"], "legacyItemNames": ["LifePak"]},
         {"id": "officer_side_panel-item-5", "name": "Med Box", "inputType": "checkbox", "legacyCompartmentNames": ["Officer's Side Panel"], "legacyItemNames": ["Med Box"]},
@@ -191,8 +191,8 @@
     },
     {
       "id": "b_comp_2",
-      "title": "B - Compartment 2",
-      "legacyCompartmentNames": [],
+      "title": "Officer R4",
+      "legacyCompartmentNames": ["B - Compartment 2"],
       "items": [
         {"id": "officer_side_panel-item-11", "name": "Small Engine Bag", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Officer's Side Panel"], "legacyItemNames": ["Small Engine Bag"]},
         {"id": "officer_side_panel-item-12", "name": "Lubricant and Silicone", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Officer's Side Panel"], "legacyItemNames": ["Lubricant and Silicone"]},
@@ -219,8 +219,8 @@
     },
     {
       "id": "b_comp_1",
-      "title": "B - Compartment 1",
-      "legacyCompartmentNames": [],
+      "title": "Officer R5",
+      "legacyCompartmentNames": ["B - Compartment 1"],
       "items": [
         {"id": "comp_1-item-3", "name": "3 Prong Twist Lock Extension", "inputType": "checkbox", "expectedQuantity": 2, "legacyCompartmentNames": ["Compartment 1"], "legacyItemNames": ["3 Prong Twist Lock Extension"]},
         {"id": "comp_1-item-4", "name": "Electrical Junction Box", "inputType": "checkbox", "expectedQuantity": 1, "legacyCompartmentNames": ["Compartment 1"], "legacyItemNames": ["Electrical Junction Box"]},
