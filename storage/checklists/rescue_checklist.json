@@ -187,7 +187,9 @@
         { "id": "patient_compartment-item-10", "name": "Transport Fee Chart", "inputType": "checkbox" },
         { "id": "patient_compartment-item-16", "name": "Oral Thermometer (Wall Mounted)", "inputType": "checkbox" },
         { "id": "patient_compartment-item-21", "name": "Fire Extinguisher", "inputType": "checkbox" },
-        { "id": "compartment_d-item-16", "name": "TIC w/ Spare Battery", "inputType": "checkbox", "legacyCompartmentNames": ["Compartment D"] }
+        { "id": "compartment_d-item-16", "name": "TIC w/ Spare Battery", "inputType": "checkbox", "legacyCompartmentNames": ["Compartment D"] },
+        { "id": "compartment_d-item-11", "name": "LP CO MONITOR", "inputType": "checkbox", "legacyCompartmentNames": ["Compartment D"] },
+        { "id": "compartment_d-item-13", "name": "LP CO Monitor Serial #", "inputType": "text", "note": "Enter serial number", "legacyCompartmentNames": ["Compartment D"] }
       ]
     },
     {
@@ -209,9 +211,7 @@
       "items": [
         { "name": "Radio - R. Lt.", "inputType": "text", "valueRequired": false, "note": "Check accounted for and enter radio number if known" },
         { "name": "Radio - F1A", "inputType": "text", "valueRequired": false, "note": "Check accounted for and enter radio number if known" },
-        { "name": "Radio - F1B", "inputType": "text", "valueRequired": false, "note": "Check accounted for and enter radio number if known" },
-        { "id": "compartment_d-item-11", "name": "LP CO MONITOR", "inputType": "checkbox", "legacyCompartmentNames": ["Compartment D"] },
-        { "id": "compartment_d-item-13", "name": "LP CO Monitor Serial #", "inputType": "text", "note": "Enter serial number", "legacyCompartmentNames": ["Compartment D"] }
+        { "name": "Radio - F1B", "inputType": "text", "valueRequired": false, "note": "Check accounted for and enter radio number if known" }
       ]
     }
   ]

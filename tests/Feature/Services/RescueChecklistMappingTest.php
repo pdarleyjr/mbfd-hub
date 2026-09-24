@@ -33,9 +33,9 @@ final class RescueChecklistMappingTest extends TestCase
             'officer_compartment_c' => ['compartment_c-item-12', 'compartment_c-item-13', 'compartment_c-item-14', 'compartment_c-item-15', 'compartment_c-item-16'],
             'officer_compartment_b' => ['compartment_b-item-1', 'compartment_b-item-2', 'compartment_b-item-3', 'compartment_b-item-4', 'compartment_b-item-5', 'compartment_b-item-13'],
             'officer_compartment_a' => ['compartment_a-item-5', 'compartment_a-item-6', 'patient_compartment-item-6', 'patient_compartment-item-8', 'patient_compartment-item-11', 'patient_compartment-item-13', 'patient_compartment-item-14', 'patient_compartment-item-17', 'patient_compartment-item-19', 'patient_compartment-item-22', 'compartment_d-item-15'],
-            'patient_compartment' => ['patient_compartment-item-1', 'patient_compartment-item-2', 'patient_compartment-item-3', 'patient_compartment-item-4', 'patient_compartment-item-5', 'patient_compartment-item-7', 'patient_compartment-item-10', 'patient_compartment-item-16', 'patient_compartment-item-21', 'compartment_d-item-16'],
+            'patient_compartment' => ['patient_compartment-item-1', 'patient_compartment-item-2', 'patient_compartment-item-3', 'patient_compartment-item-4', 'patient_compartment-item-5', 'patient_compartment-item-7', 'patient_compartment-item-10', 'patient_compartment-item-16', 'patient_compartment-item-21', 'compartment_d-item-16', 'compartment_d-item-11', 'compartment_d-item-13'],
             'stretcher' => ['stretcher-item-1', 'stretcher-item-2', 'compartment_b-item-12', 'compartment_c-item-8', 'compartment_c-item-9', 'compartment_c-item-10', 'compartment_c-item-11'],
-            'radio_numbers' => ['radio_numbers-item-1', 'radio_numbers-item-2', 'radio_numbers-item-3', 'compartment_d-item-11', 'compartment_d-item-13'],
+            'radio_numbers' => ['radio_numbers-item-1', 'radio_numbers-item-2', 'radio_numbers-item-3'],
         ];
 
         $actualIds = [];
