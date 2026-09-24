@@ -120,7 +120,8 @@
         {"id":"comp_l1-item-1","name":"Driver's Gear","inputType":"checkbox","expectedQuantity":1},
         {"id":"comp_l1-item-2","name":"HandTevy Box","inputType":"checkbox"},
         {"id":"comp_l1-item-3","name":"MCI Kit","inputType":"checkbox"},
-        {"id":"comp_l1-item-4","name":"Surf Rescue Gear","inputType":"checkbox","expectedQuantity":2,"note":"Mask, Snorkel, Fins, Light"}
+        {"id":"comp_l1-item-4","name":"Surf Rescue Gear","inputType":"checkbox","expectedQuantity":2,"note":"Mask, Snorkel, Fins, Light"},
+        {"id":"comp_l1-drill-bit-set","name":"Drill bit set","inputType":"checkbox"}
       ]
     },
     {
