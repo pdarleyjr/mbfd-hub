@@ -59,7 +59,7 @@ class WorkgroupPanelProvider extends PanelProvider
                 'danger' => Color::Rose,
                 'gray' => Color::Slate,
                 'info' => Color::Blue,
-                'success' => Color::Green,
+                'success' => Color::Emerald,
                 'warning' => Color::Amber,
             ])
             ->font('Plus Jakarta Sans')
@@ -172,7 +172,7 @@ class WorkgroupPanelProvider extends PanelProvider
             <link rel="apple-touch-icon" href="'.secure_asset('images/mbfd_logo-256.png').'" sizes="180x180">
             <link rel="apple-touch-startup-image" href="'.secure_asset('images/mbfd_logo.png').'" sizes="160x290 640x1136" media="screen and (max-device-width: 414px)">
             <link rel="manifest" href="'.secure_asset('/manifest.json').'">
-            <meta name="theme-color" content="#ff0000">',
+            <meta name="theme-color" content="#102A43">',
             );
     }
 }

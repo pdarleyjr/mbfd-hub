@@ -265,6 +265,9 @@ export default function StationDetailPage() {
   const dailyCheckout = isCanonicalDailyCheckoutSummary(station.daily_checkout)
     ? station.daily_checkout
     : null;
+  const dailyCheckoutRows = new Map<number, DailyCheckoutMatrixRow>(
+    dailyCheckout?.matrix.map((row): [number, DailyCheckoutMatrixRow] => [row.apparatus_id, row]) ?? [],
+  );
   const stationNumber = Number(station.station_number);
 
   return (
@@ -287,7 +290,7 @@ export default function StationDetailPage() {
       </div>
 
       {/* ============================== */}
-      {/* FIRST CARD: Station Info + Quick Links + Canonical Daily Checkout */}
+      {/* FIRST CARD: Station Info + Quick Links */}
       {/* ============================== */}
       <div className="bg-white rounded-2xl ring-1 ring-neutral-200/80 p-6">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-6">
@@ -378,10 +381,6 @@ export default function StationDetailPage() {
           </Link>
         </div>
 
-        <DailyCheckoutPanel
-          dailyCheckout={dailyCheckout}
-          apparatuses={station.apparatuses ?? []}
-        />
       </div>
 
       {/* ============================== */}
@@ -527,40 +526,66 @@ export default function StationDetailPage() {
 
           {/* ========== ASSIGNED APPARATUS TAB ========== */}
           {activeTab === 'apparatus' && (
-            <div>
+            <div className="space-y-5">
+              <DailyCheckoutPanel dailyCheckout={dailyCheckout} />
               {station.apparatuses && station.apparatuses.length > 0 ? (
                 <div className="stagger-list grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
-                  {station.apparatuses.map((apparatus: Apparatus) => (
-                    <div
-                      key={apparatus.id}
-                      className="rounded-lg border border-neutral-200 p-4 transition-all duration-200 hover:bg-neutral-50 2xl:p-5"
-                    >
-                      <h4 className="font-semibold text-neutral-800">{apparatus.name || apparatus.unit_id}</h4>
-                      <p className="text-sm text-neutral-600">Unit: {apparatus.vehicle_number ?? apparatus.unit_id ?? apparatus.designation ?? 'Not recorded'}</p>
-                      <p className="text-sm text-neutral-500 capitalize">Type: {apparatus.type}</p>
-                      {apparatus.daily_checkout_requirement === 'required' && apparatus.slug && (
-                        <Link
-                          to={`/vehicle-inspections/${apparatus.slug}`}
-                          className="mt-2 inline-flex min-h-11 items-center text-xs font-medium text-red-600 hover:text-red-700"
-                        >
-                          Start Inspection
-                          <svg className="ml-1 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                        </Link>
-                      )}
-                      {apparatus.daily_checkout_requirement === 'unknown' && (
-                        <p className="mt-2 text-xs font-medium text-amber-700">Daily Checkout policy needs confirmation</p>
-                      )}
-                      {apparatus.daily_checkout_requirement && !['required', 'unknown'].includes(apparatus.daily_checkout_requirement) && (
-                        <p className="mt-2 text-xs font-medium text-neutral-500">Daily Checkout: {apparatus.daily_checkout_requirement.replaceAll('_', ' ')}</p>
-                      )}
-                      <a
-                        href={`/employee/apparatus-service-request?station_id=${station.id}&apparatus_id=${apparatus.id}&return_to=${encodeURIComponent(`/daily/stations/${station.id}`)}`}
-                        className="mt-2 ml-4 inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 hover:text-blue-900"
+                  {station.apparatuses.map((apparatus: Apparatus) => {
+                    const checkoutRow = dailyCheckoutRows.get(apparatus.id) ?? null;
+                    const checkoutState = checkoutRow ? dailyCheckoutStatePresentation(checkoutRow) : null;
+                    const requirement = checkoutRow?.daily_checkout_requirement ?? apparatus.daily_checkout_requirement;
+
+                    return (
+                      <article
+                        key={apparatus.id}
+                        aria-label={apparatus.name || apparatus.unit_id || `Apparatus ${apparatus.id}`}
+                        className="rounded-lg border border-neutral-200 p-4 transition-all duration-200 hover:bg-neutral-50 2xl:p-5"
                       >
-                        Report Service Need
-                      </a>
-                    </div>
-                  ))}
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <h4 className="font-semibold text-neutral-800">{apparatus.name || apparatus.unit_id}</h4>
+                            <p className="text-sm text-neutral-600">Unit: {apparatus.vehicle_number ?? apparatus.unit_id ?? apparatus.designation ?? 'Not recorded'}</p>
+                            <p className="text-sm text-neutral-500 capitalize">Type: {apparatus.type}</p>
+                          </div>
+                          {checkoutState ? (
+                            <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${checkoutState.className}`}>{checkoutState.label}</span>
+                          ) : (
+                            <span className="w-fit rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">Daily Checkout state unavailable</span>
+                          )}
+                        </div>
+                        <p className="mt-3 text-xs font-medium text-neutral-600">
+                          Daily Checkout requirement: {dailyCheckoutRequirementLabel(requirement)}
+                        </p>
+                        {checkoutRow && (
+                          <p className="mt-1 text-xs text-neutral-500">
+                            {checkoutRow.included_in_required_total
+                              ? (checkoutRow.included_in_completed ? 'Counts as completed' : 'Required inspection not complete')
+                              : 'Excluded from required total'}
+                          </p>
+                        )}
+                        {checkoutRow?.revision_requested && <p className="mt-1 text-xs font-medium text-amber-800">Your input is requested for this inspection.</p>}
+                        {checkoutRow?.return_checkout_required && <p className="mt-1 text-xs font-medium text-amber-800">Post-return checkout {checkoutRow.return_checkout_verified ? 'verified' : 'required'}.</p>}
+                        {apparatus.daily_checkout_requirement === 'required' && apparatus.slug && (
+                          <Link
+                            to={`/vehicle-inspections/${apparatus.slug}`}
+                            className="mt-2 inline-flex min-h-11 items-center text-xs font-medium text-red-600 hover:text-red-700"
+                          >
+                            Start Inspection
+                            <svg className="ml-1 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                          </Link>
+                        )}
+                        {apparatus.daily_checkout_requirement === 'unknown' && (
+                          <p className="mt-2 text-xs font-medium text-amber-700">Daily Checkout policy needs confirmation</p>
+                        )}
+                        <a
+                          href={`/employee/apparatus-service-request?station_id=${station.id}&apparatus_id=${apparatus.id}&return_to=${encodeURIComponent(`/daily/stations/${station.id}`)}`}
+                          className="mt-2 ml-4 inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 hover:text-blue-900"
+                        >
+                          Report Service Need
+                        </a>
+                      </article>
+                    );
+                  })}
                 </div>
               ) : (
                 <EmptyState icon="apparatus" title="No apparatus assigned" subtitle="Apparatus will appear here when assigned to this station." />
@@ -846,7 +871,7 @@ function isDailyCheckoutMatrixRow(value: unknown): value is DailyCheckoutMatrixR
     && typeof row.return_checkout_verified === 'boolean';
 }
 
-function DailyCheckoutPanel({ dailyCheckout, apparatuses }: { dailyCheckout: DailyCheckoutSummary | null; apparatuses: Apparatus[] }) {
+function DailyCheckoutPanel({ dailyCheckout }: { dailyCheckout: DailyCheckoutSummary | null }) {
   if (dailyCheckout === null) {
     return (
       <section aria-labelledby="daily-checkout-heading" className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
@@ -859,12 +884,6 @@ function DailyCheckoutPanel({ dailyCheckout, apparatuses }: { dailyCheckout: Dai
     );
   }
 
-  const apparatusNames = new Map(
-    apparatuses.map((apparatus) => [
-      apparatus.id,
-      apparatus.name || apparatus.designation || apparatus.unit_id || `Apparatus ${apparatus.id}`,
-    ]),
-  );
   const completionLabel = dailyCheckout.completion_available && dailyCheckout.completion_percent !== null
     ? `${dailyCheckout.completion_percent}%`
     : 'Completion unavailable';
@@ -892,37 +911,25 @@ function DailyCheckoutPanel({ dailyCheckout, apparatuses }: { dailyCheckout: Dai
         <span className="w-fit rounded-full bg-blue-50 px-3 py-1 text-sm font-bold tabular-nums text-blue-800">{completionLabel}</span>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-7">
+      <dl className="mt-4 flex flex-wrap gap-2">
         {summaryItems.map((item) => (
-          <div key={item.label} className={`rounded-lg px-3 py-2 ${item.className}`}>
+          <div key={item.label} className={`inline-flex items-baseline gap-2 rounded-full px-3 py-2 ${item.className}`}>
             <dt className="text-xs font-medium">{item.label}</dt>
-            <dd className="mt-0.5 text-lg font-bold tabular-nums">{item.value}</dd>
+            <dd className="text-sm font-bold tabular-nums">{item.value}</dd>
           </div>
         ))}
       </dl>
 
-      <ul className="mt-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
-        {dailyCheckout.matrix.map((row) => {
-          const presentation = dailyCheckoutStatePresentation(row);
-          const requirementStatus = row.included_in_required_total
-            ? (row.included_in_completed ? 'Counts as completed' : 'Required inspection not complete')
-            : 'Excluded from required total';
-
-          return (
-            <li key={row.apparatus_id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-semibold text-neutral-900">{apparatusNames.get(row.apparatus_id) ?? `Apparatus ${row.apparatus_id}`}</p>
-                <p className="text-xs text-neutral-500">{requirementStatus}</p>
-                {row.revision_requested && <p className="mt-1 text-xs font-medium text-amber-800">Your input is requested for this inspection.</p>}
-                {row.return_checkout_required && <p className="mt-1 text-xs font-medium text-amber-800">Post-return checkout {row.return_checkout_verified ? 'verified' : 'required'}.</p>}
-              </div>
-              <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${presentation.className}`}>{presentation.label}</span>
-            </li>
-          );
-        })}
-      </ul>
     </section>
   );
+}
+
+function dailyCheckoutRequirementLabel(requirement: Apparatus['daily_checkout_requirement']): string {
+  if (!requirement) return 'Unavailable';
+
+  const label = requirement.replaceAll('_', ' ');
+
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function dailyCheckoutStatePresentation(row: DailyCheckoutMatrixRow): { label: string; className: string } {

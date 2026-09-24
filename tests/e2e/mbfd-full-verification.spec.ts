@@ -26,8 +26,8 @@ test.describe('Desktop — Core Pages', () => {
     expect(response?.status()).toBe(200);
     const manifest = await response?.json();
     expect(manifest.display).toBe('standalone');
-    expect(manifest.theme_color).toBe('#B91C1C');
-    expect(manifest.background_color).toBe('#1E293B');
+    expect(manifest.theme_color).toBe('#102A43');
+    expect(manifest.background_color).toBe('#F7FAFC');
     expect(manifest.icons).toBeDefined();
     expect(manifest.icons.length).toBeGreaterThan(0);
   });
@@ -47,7 +47,7 @@ test.describe('Desktop — Core Pages', () => {
     const statusBar = await page.$eval('meta[name="apple-mobile-web-app-status-bar-style"]', (el: any) => el.content).catch(() => null);
     expect(statusBar).toBe('black-translucent');
     const themeColor = await page.$eval('meta[name="theme-color"]', (el: any) => el.content).catch(() => null);
-    expect(themeColor).toBe('#B91C1C');
+    expect(themeColor).toBe('#102A43');
   });
 
   test('T05 404 page is MBFD branded', async ({ page }) => {

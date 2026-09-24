@@ -45,9 +45,9 @@ class TrainingPanelProvider extends PanelProvider
                 'primary' => Color::Red,
                 'danger' => Color::Rose,
                 'gray' => Color::Slate,
-                'info' => Color::Sky,
+                'info' => Color::Blue,
                 'success' => Color::Emerald,
-                'warning' => Color::Orange,
+                'warning' => Color::Amber,
             ])
             ->font('Plus Jakarta Sans')
             ->viteTheme('resources/css/filament/admin/theme.css')

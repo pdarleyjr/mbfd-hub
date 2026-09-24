@@ -202,8 +202,13 @@ test('representative viewports preserve station navigation and fail closed for a
   await expect(page.getByRole('heading', { name: 'Station 1' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Apparatus' }).click();
+  await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toBeVisible();
+  await expect(page.getByText('Unclassified Unit', { exact: true })).toHaveCount(1);
   await expect(page.getByText('Daily Checkout policy needs confirmation')).toBeVisible();
-  await expect(page.getByText('Unclassified Unit').locator('..').getByRole('link', { name: 'Start Inspection' })).toHaveCount(0);
+  const unclassified = page.getByRole('article', { name: 'Unclassified Unit' });
+  await expect(unclassified.getByText('Classification required', { exact: true })).toBeVisible();
+  await expect(unclassified.getByText('Daily Checkout requirement: Unknown', { exact: true })).toBeVisible();
+  await expect(unclassified.getByRole('link', { name: 'Start Inspection' })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
   expect(quality.consoleErrors).toEqual([]);
   expect(quality.failedRequests).toEqual([]);

@@ -56,11 +56,11 @@ class EmployeePanelProvider extends PanelProvider
             ->favicon(asset('favicon.ico'))
             ->darkMode(false)
             ->colors([
-                'primary' => Color::Blue,
+                'primary' => Color::Red,
                 'danger' => Color::Rose,
                 'gray' => Color::Slate,
                 'info' => Color::Blue,
-                'success' => Color::Green,
+                'success' => Color::Emerald,
                 'warning' => Color::Amber,
             ])
             ->font('Plus Jakarta Sans')

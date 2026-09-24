@@ -1,10 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
+const authStyles = readFileSync(
+  new URL('../../resources/views/auth/partials/city-email-style.blade.php', import.meta.url),
+  'utf8',
+);
+
 const template = readFileSync(
   new URL('../../resources/views/auth/canonical-login.blade.php', import.meta.url),
   'utf8',
 )
+  .replace("@include('auth.partials.city-email-style')", authStyles)
   .replace(/{{[^}]*}}/g, '')
   .replace(/@(csrf|error\([^)]*\)|enderror)/g, '');
 
@@ -12,6 +18,7 @@ test('canonical login stays contained, named, touchable, and keyboard focusable'
   await page.setContent(template);
 
   await expect(page.getByRole('heading', { name: 'MBFD Sign In' })).toBeVisible();
+  await expect(page.getByText('Miami Beach Fire Department')).toBeVisible();
   await expect(page.getByLabel('Employee ID or email')).toBeVisible();
   await expect(page.getByLabel('Password')).toBeVisible();
 

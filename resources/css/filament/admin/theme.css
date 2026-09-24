@@ -1,7 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400..800&display=swap');
 @import '../../../../vendor/filament/filament/dist/theme.css';
+@import '../../mbfd-theme.css';
 /**
  * MBFD Hub — Unified Impeccable Enterprise Theme
- * Applied to ALL panels (Admin, Workgroup, Training) via ->viteTheme()
+ * Applied to ALL panels (Admin, Employee, Workgroup, Training) via ->viteTheme()
  * Light mode ONLY (dark mode disabled in all PanelProviders)
  * 
  * RULES:
@@ -13,24 +15,24 @@
  * - Font: Plus Jakarta Sans (Impeccable mandate)
  */
 
-/* ===== GOOGLE FONT IMPORT ===== */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
-
 /* ===== PAGE BACKGROUND ===== */
 .fi-body {
-    background-color: #FAFAF8;
+    background-color: rgb(var(--hub-canvas));
+    color: rgb(var(--hub-ink));
+    font-family: var(--hub-font-sans);
 }
 
 /* ===== LOGIN PAGE ===== */
 .fi-simple-layout {
-    background: linear-gradient(to bottom right, #FAFAF8, #ffffff, #F5F3F0);
+    background-color: rgb(var(--hub-canvas));
     min-height: 100vh;
 }
 
 /* Login card */
 .fi-simple-main-ctn {
-    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-    border: 1px solid rgba(226, 232, 240, 0.8);
+    background-color: rgb(var(--hub-surface));
+    box-shadow: var(--hub-shadow-elevated);
+    border: 1px solid rgb(var(--hub-border));
     border-radius: 1.25rem;
 }
 
@@ -43,8 +45,8 @@
 /* FIX: Login button visibility — ensure the primary button is styled */
 .fi-simple-layout .fi-btn-primary,
 .fi-simple-layout button[type="submit"].fi-btn {
-    background-color: #dc2626;
-    color: #ffffff;
+    background-color: rgb(var(--hub-red));
+    color: rgb(var(--hub-surface));
     font-weight: 600;
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     min-height: 44px;
@@ -53,27 +55,27 @@
 
 .fi-simple-layout .fi-btn-primary:hover,
 .fi-simple-layout button[type="submit"].fi-btn:hover {
-    background-color: #b91c1c;
+    background-color: rgb(var(--hub-red-strong));
 }
 
 .fi-simple-layout .fi-btn-primary:focus,
 .fi-simple-layout button[type="submit"].fi-btn:focus {
     outline: 2px solid transparent;
     outline-offset: 2px;
-    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgba(239, 68, 68, 0.5);
+    box-shadow: 0 0 0 2px rgb(var(--hub-surface)), 0 0 0 4px rgb(var(--hub-focus) / 0.5);
 }
 
 /* Login page heading */
 .fi-simple-layout .fi-simple-header-heading {
     font-size: 1.25rem;
     font-weight: 700;
-    color: #292524;
+    color: rgb(var(--hub-ink));
 }
 
 /* ===== SIDEBAR ===== */
 .fi-sidebar {
-    background-color: #ffffff;
-    border-right: 1px solid #E8E5E0;
+    background-color: rgb(var(--hub-surface));
+    border-right: 1px solid rgb(var(--hub-border));
     transition: width 280ms cubic-bezier(0.16, 1, 0.3, 1),
                 transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
     will-change: width, transform;
@@ -116,7 +118,7 @@
 
 /* Sidebar header — dark to match topbar, creating unified header bar */
 .fi-sidebar-header {
-    background-color: #1e293b !important;
+    background-color: rgb(var(--hub-header)) !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
     --tw-ring-opacity: 0 !important;
     --tw-shadow: 0 0 #0000 !important;
@@ -128,7 +130,7 @@
 .fi-sidebar-header a,
 .fi-sidebar-header span,
 .fi-sidebar-header .fi-logo {
-    color: #ffffff !important;
+    color: rgb(var(--hub-surface)) !important;
 }
 
 .fi-sidebar-header img {
@@ -144,7 +146,7 @@
 }
 
 .fi-sidebar-nav-group-label {
-    color: #b91c1c;
+    color: rgb(var(--hub-blue));
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -159,12 +161,12 @@
 }
 
 .fi-sidebar-item-active > .fi-sidebar-item-button {
-    background-color: #fef2f2;
-    border-left: 3px solid #B91C1C;
+    background-color: rgb(var(--hub-blue) / 0.08);
+    border-left: 3px solid rgb(var(--hub-blue));
 }
 
 .fi-sidebar-item-active .fi-sidebar-item-label {
-    color: #b91c1c;
+    color: rgb(var(--hub-blue));
     font-weight: 600;
 }
 
@@ -174,7 +176,7 @@
 }
 
 .fi-sidebar-item-button:hover {
-    background-color: #F5F3F0;
+    background-color: rgb(var(--hub-surface-muted));
 }
 
 /* Sidebar item labels: smooth fade on collapse */
@@ -196,16 +198,16 @@
 
 .fi-sidebar-close-button:hover,
 .fi-sidebar-open-button:hover {
-    color: #B91C1C;
+    color: rgb(var(--hub-blue));
     transform: scale(1.08);
 }
 
 /* ===== TOPBAR ===== */
 /* Filament bakes bg-white onto the inner <nav> and .fi-sidebar-header.
-   We target them directly. #1e293b = landing page slate-850 header color. */
+   We target them directly with the shared MBFD command-header token. */
 .fi-topbar,
 .fi-topbar > nav {
-    background-color: #1e293b !important;
+    background-color: rgb(var(--hub-header)) !important;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     border-bottom: none !important;
@@ -213,7 +215,7 @@
 }
 
 .fi-topbar {
-    border-bottom: 2px solid rgba(239, 68, 68, 0.3) !important;
+    border-bottom: 2px solid rgb(var(--hub-red) / 0.3) !important;
 }
 
 .fi-topbar > nav {
@@ -225,29 +227,29 @@
 /* --- Topbar text: light on dark --- */
 /* Icon buttons (hamburger, home, notifications bell) */
 .fi-topbar > nav .fi-icon-btn {
-    color: #cbd5e1 !important;
+    color: rgb(var(--hub-border)) !important;
 }
 
 .fi-topbar > nav .fi-icon-btn:hover {
-    color: #ffffff !important;
+    color: rgb(var(--hub-surface)) !important;
     background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Sidebar open/close toggle */
 .fi-topbar > nav .fi-topbar-open-sidebar-btn,
 .fi-topbar > nav .fi-topbar-close-sidebar-btn {
-    color: #cbd5e1 !important;
+    color: rgb(var(--hub-border)) !important;
 }
 
 /* Global search input */
 .fi-topbar > nav .fi-global-search-field input {
     background-color: rgba(255, 255, 255, 0.1) !important;
-    color: #ffffff !important;
+    color: rgb(var(--hub-surface)) !important;
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 
 .fi-topbar > nav .fi-global-search-field input::placeholder {
-    color: #94a3b8 !important;
+    color: rgb(var(--hub-muted-soft)) !important;
 }
 
 /* Search icon and label text */
@@ -257,55 +259,55 @@
 }
 
 .fi-topbar > nav .fi-global-search-field svg {
-    color: #94a3b8 !important;
+    color: rgb(var(--hub-muted-soft)) !important;
 }
 
 /* User menu trigger text */
 .fi-topbar > nav .fi-dropdown > button,
 .fi-topbar > nav .fi-dropdown > button span,
 .fi-topbar > nav .fi-dropdown > button svg {
-    color: #cbd5e1 !important;
+    color: rgb(var(--hub-border)) !important;
 }
 
 .fi-topbar > nav .fi-dropdown > button:hover,
 .fi-topbar > nav .fi-dropdown > button:hover span {
-    color: #ffffff !important;
+    color: rgb(var(--hub-surface)) !important;
 }
 
 /* Notification badge */
 .fi-topbar .fi-badge {
-    background-color: #dc2626 !important;
-    color: #ffffff !important;
+    background-color: rgb(var(--hub-red)) !important;
+    color: rgb(var(--hub-surface)) !important;
 }
 
 /* Breadcrumbs (visible on sub-pages) */
 .fi-topbar > nav .fi-breadcrumbs,
 .fi-topbar > nav .fi-breadcrumbs li,
 .fi-topbar > nav .fi-breadcrumbs a {
-    color: #cbd5e1 !important;
+    color: rgb(var(--hub-border)) !important;
 }
 
 .fi-topbar > nav .fi-breadcrumbs a:hover {
-    color: #ffffff !important;
+    color: rgb(var(--hub-surface)) !important;
 }
 
 /* Any injected render hook content (home icon) */
 .fi-topbar > nav a[title="Return to Home"],
 .fi-topbar > nav a[aria-label="Return to Home"] {
-    color: #cbd5e1 !important;
+    color: rgb(var(--hub-border)) !important;
 }
 
 .fi-topbar > nav a[title="Return to Home"]:hover,
 .fi-topbar > nav a[aria-label="Return to Home"]:hover {
-    color: #ffffff !important;
+    color: rgb(var(--hub-surface)) !important;
 }
 
 /* --- CRITICAL: Dropdown panels must keep DARK text on WHITE background --- */
 /* These panels (user menu, notifications) render OUTSIDE the topbar nav
    via Filament's teleport, but we protect them explicitly just in case. */
 .fi-dropdown-panel {
-    background-color: #ffffff !important;
-    color: #292524 !important;
+    background-color: rgb(var(--hub-surface)) !important;
+    color: rgb(var(--hub-ink)) !important;
 }
 
 .fi-dropdown-panel *,
@@ -315,59 +317,59 @@
 .fi-dropdown-panel button,
 .fi-dropdown-panel span,
 .fi-dropdown-panel svg {
-    color: #292524 !important;
+    color: rgb(var(--hub-ink)) !important;
 }
 
 .fi-dropdown-panel .fi-dropdown-list-item:hover {
-    background-color: #F5F3F0;
+    background-color: rgb(var(--hub-surface-muted));
 }
 
 .fi-dropdown-panel .fi-dropdown-list-item-icon {
-    color: #78716C !important;
+    color: rgb(var(--hub-muted)) !important;
 }
 
 /* Notification dropdown panel */
 .fi-modal-window,
 [x-ref="panel"] {
-    color: #292524 !important;
+    color: rgb(var(--hub-ink)) !important;
 }
 
 /* ===== PAGE HEADER ===== */
 .fi-header-heading {
     font-size: 1.5rem;
     font-weight: 700;
-    color: #292524;
+    color: rgb(var(--hub-ink));
     letter-spacing: -0.025em;
 }
 
 .fi-header-subheading {
     font-size: 0.875rem;
-    color: #78716C;
+    color: rgb(var(--hub-muted));
 }
 
 /* ===== STAT CARDS ===== */
 .fi-wi-stats-overview-stat {
     border-radius: 0.75rem;
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    border: 1px solid #E8E5E0;
+    box-shadow: var(--hub-shadow-card);
+    border: 1px solid rgb(var(--hub-border));
     transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .fi-wi-stats-overview-stat:hover {
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    box-shadow: var(--hub-shadow-elevated);
     transform: translateY(-1px);
 }
 
 /* ===== WIDGETS & SECTIONS ===== */
 .fi-wi {
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    box-shadow: var(--hub-shadow-card);
     border-radius: 0.75rem;
 }
 
 .fi-section {
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    box-shadow: var(--hub-shadow-card);
     border-radius: 0.75rem;
-    border: 1px solid #E8E5E0;
+    border: 1px solid rgb(var(--hub-border));
 }
 
 /* The Admin dashboard is an exception overview; its grid is owned by the
@@ -563,8 +565,8 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 }
 
 .fi-ta-row:hover {
-    background-color: #F5F3F0;
-    box-shadow: inset 3px 0 0 0 #B91C1C;
+    background-color: rgb(var(--hub-surface-muted));
+    box-shadow: inset 3px 0 0 0 rgb(var(--hub-blue));
 }
 
 .fi-ta-header-cell {
@@ -572,12 +574,12 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #78716C;
+    color: rgb(var(--hub-muted));
 }
 
 /* ===== BUTTONS ===== */
 .fi-btn-primary {
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    box-shadow: var(--hub-shadow-card);
 }
 
 /* ===== BADGES ===== */
@@ -603,13 +605,13 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 
 .dashboard-widget-scrollable::-webkit-scrollbar-track,
 .dashboard-widget-compact::-webkit-scrollbar-track {
-    background-color: #F5F3F0;
+    background-color: rgb(var(--hub-surface-muted));
     border-radius: 9999px;
 }
 
 .dashboard-widget-scrollable::-webkit-scrollbar-thumb,
 .dashboard-widget-compact::-webkit-scrollbar-thumb {
-    background-color: #D4D0CA;
+    background-color: rgb(var(--hub-border-strong));
     border-radius: 9999px;
 }
 
@@ -626,8 +628,8 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 
 /* ===== FORM FOCUS ENHANCEMENT ===== */
 .fi-input:focus-within {
-    box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.2);
-    border-color: #f87171;
+    box-shadow: 0 0 0 2px rgb(var(--hub-focus) / 0.2);
+    border-color: rgb(var(--hub-focus));
 }
 
 /* ===== CARD HOVER UTILITY ===== */

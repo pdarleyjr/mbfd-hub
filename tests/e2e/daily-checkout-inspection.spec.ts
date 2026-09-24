@@ -778,11 +778,19 @@ test('station Daily Checkout renders the canonical server result without estimat
 
   await page.goto('/daily/stations/1');
 
+  await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Apparatus', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toBeVisible();
   await expect(page.getByText('2 / 4 required inspections completed', { exact: true })).toBeVisible();
   await expect(page.getByText('50%', { exact: true })).toBeVisible();
   await expect(page.getByText('Submitted', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('Out of service', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Engine 1', { exact: true })).toHaveCount(1);
+  const engine = page.getByRole('article', { name: 'Engine 1' });
+  await expect(engine.getByText('Checked', { exact: true })).toBeVisible();
+  await expect(engine.getByText('Daily Checkout requirement: Required', { exact: true })).toBeVisible();
+  await expect(engine.getByRole('link', { name: 'Start Inspection' })).toBeVisible();
+  await expect(engine.getByRole('link', { name: 'Report Service Need' })).toBeVisible();
   await expect(page.getByText('Review pending', { exact: true })).toHaveCount(0);
   await expect(page.getByText('A submission is pending review.', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Inspection follow-up recorded.', { exact: false })).toHaveCount(0);
@@ -793,9 +801,14 @@ test('station Daily Checkout is explicitly unavailable when the canonical server
 
   await page.goto('/daily/stations/1');
 
+  await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Apparatus', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toBeVisible();
   await expect(page.getByText('Unavailable', { exact: true })).toBeVisible();
   await expect(page.getByText('The authoritative Daily Checkout result is unavailable. Readiness is not estimated from inspection records.', { exact: true })).toBeVisible();
+  const engine = page.getByRole('article', { name: 'Engine 1' });
+  await expect(engine.getByText('Daily Checkout state unavailable', { exact: true })).toBeVisible();
+  await expect(engine.getByRole('link', { name: 'Start Inspection' })).toBeVisible();
 });
 
 test('a string Station 1 API value renders its conference link', async ({ page }) => {
