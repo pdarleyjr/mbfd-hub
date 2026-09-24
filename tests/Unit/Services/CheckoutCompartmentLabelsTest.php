@@ -23,7 +23,7 @@ final class CheckoutCompartmentLabelsTest extends TestCase
                 'comp_b4' => ['Officer R1', 'Side B · Compartment 4', 12, 'comp_4-item-1'],
             ],
             'engine2' => [
-                'comp_l1' => ['Driver L4', 'Compartment L-1', 4, 'comp_l1-item-1'],
+                'comp_l1' => ['Driver L4', 'Compartment L-1', 5, 'comp_l1-item-1'],
                 'comp_l2' => ['Driver L3', 'Compartment L-2', 25, 'comp_l2-item-1'],
                 'comp_l3' => ['Driver L2', 'Compartment L-3', 13, 'comp_l3-item-1'],
                 'comp_l4' => ['Driver L1', 'Compartment L-4', 15, 'comp_l4-item-1'],
@@ -82,6 +82,16 @@ final class CheckoutCompartmentLabelsTest extends TestCase
         $this->assertContains('Compartment L-4', $definitions['comp_l4']['comp_l4-item-1']['compartment_names']);
         $this->assertSame('Officer R4', $definitions['comp_r1']['comp_r1-item-1']['compartment']);
         $this->assertContains('Compartment R-1', $definitions['comp_r1']['comp_r1-item-1']['compartment_names']);
+    }
+
+    public function test_engine_two_drill_bit_set_is_in_the_driver_door_nearest_the_cab_without_an_assumed_quantity(): void
+    {
+        $compartments = array_column($this->checklist('engine2')['compartments'], null, 'id');
+        $items = array_column($compartments['comp_l1']['items'], null, 'id');
+
+        $this->assertSame('Driver L4', $compartments['comp_l1']['title']);
+        $this->assertSame('Drill bit set', $items['comp_l1-drill-bit-set']['name']);
+        $this->assertArrayNotHasKey('expectedQuantity', $items['comp_l1-drill-bit-set']);
     }
 
     private function checklist(string $template): array
