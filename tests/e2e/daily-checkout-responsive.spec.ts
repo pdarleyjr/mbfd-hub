@@ -1,4 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { resolve } from 'node:path';
 
 const stations = [1, 2, 3, 4, 6].map((stationNumber) => ({
   id: stationNumber,
@@ -36,7 +37,16 @@ const unknownApparatus = {
 };
 
 async function mockDailySelectorApi(page: Page): Promise<void> {
-  await page.route('**/images/**', (route) => route.fulfill({ status: 204 }));
+  await page.route('**/images/**', (route) => {
+    if (new URL(route.request().url()).pathname === '/images/mbfd_logo_new.png') {
+      return route.fulfill({
+        path: resolve('public/images/mbfd_logo_new.png'),
+        contentType: 'image/png',
+      });
+    }
+
+    return route.fulfill({ status: 204 });
+  });
   await page.route('**/favicon*', (route) => route.fulfill({ status: 204 }));
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -210,6 +220,25 @@ test('representative viewports preserve station navigation and fail closed for a
   await expect(unclassified.getByText('Daily Checkout requirement: Unknown', { exact: true })).toBeVisible();
   await expect(unclassified.getByRole('link', { name: 'Start Inspection' })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
+
+  if (['daily-responsive-phone-390', 'daily-responsive-wide-1440'].includes(testInfo.project.name)) {
+    await page.waitForTimeout(750);
+    expect(await page.getByRole('img', { name: 'MBFD Logo' }).evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+
+    const stationScreenshot = testInfo.outputPath(`${testInfo.project.name}-station-profile.png`);
+    await page.screenshot({ path: stationScreenshot, fullPage: true });
+    await testInfo.attach(`${testInfo.project.name} station profile`, { path: stationScreenshot, contentType: 'image/png' });
+
+    await page.goto('/daily/forms-hub');
+    await expect(page.getByRole('heading', { name: 'Forms Hub' })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await page.waitForTimeout(750);
+
+    const formsScreenshot = testInfo.outputPath(`${testInfo.project.name}-forms-hub.png`);
+    await page.screenshot({ path: formsScreenshot, fullPage: true });
+    await testInfo.attach(`${testInfo.project.name} Forms Hub`, { path: formsScreenshot, contentType: 'image/png' });
+  }
+
   expect(quality.consoleErrors).toEqual([]);
   expect(quality.failedRequests).toEqual([]);
 });

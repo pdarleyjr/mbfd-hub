@@ -66,7 +66,7 @@ class AdminPanelProvider extends PanelProvider
             ->favicon(asset('favicon.ico'))
             ->darkMode(false)
             ->colors([
-                'primary' => Color::Red,
+                'primary' => Color::Blue,
                 'danger' => Color::Rose,
                 'gray' => Color::Slate,
                 'info' => Color::Blue,
