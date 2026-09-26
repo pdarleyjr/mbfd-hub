@@ -8,6 +8,7 @@ use App\Enums\AccountStatus;
 use App\Filament\Resources\EmployeeResource\Pages\ListEmployees;
 use App\Models\Employee;
 use App\Models\MemberOnboardingInvitation;
+use App\Models\OutboundEmail;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -69,15 +70,50 @@ final class MemberOnboardingInvitationStatusTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
         Livewire::test(ListEmployees::class)
-            ->assertTableColumnStateSet('invitation_status', 'Queued — awaiting activation', $queued->employeeProfile)
-            ->assertTableColumnStateSet('invitation_status', 'Sending', $sending->employeeProfile)
-            ->assertTableColumnStateSet('invitation_status', 'Opening invitation', $redeemed->employeeProfile)
+            ->assertTableColumnStateSet('invitation_delivery', 'Pending delivery', $queued->employeeProfile)
+            ->assertTableColumnStateSet('invitation_delivery', 'Preparing', $sending->employeeProfile)
+            ->assertTableColumnStateSet('invitation_status', 'Awaiting activation', $queued->employeeProfile)
+            ->assertTableColumnStateSet('invitation_status', 'Opened / redeemed', $redeemed->employeeProfile)
             ->assertTableColumnStateSet('invitation_status', 'Expired — ready to resend', $expiredSending->employeeProfile)
             ->assertTableColumnStateSet('invitation_status', 'Expired — ready to resend', $expiredQueued->employeeProfile)
             ->assertTableColumnStateSet('invitation_status', 'Expired — ready to resend', $expiredRedeemed->employeeProfile)
-            ->assertTableColumnStateSet('invitation_status', 'Delivery failed', $failed->employeeProfile)
-            ->assertTableColumnStateSet('invitation_status', 'Account active', $active->employeeProfile)
-            ->assertTableColumnStateSet('invitation_status', 'Not sent', $neverSent->employeeProfile);
+            ->assertTableColumnStateSet('invitation_delivery', 'Delivery failed', $failed->employeeProfile)
+            ->assertTableColumnStateSet('invitation_status', 'Awaiting activation', $failed->employeeProfile)
+            ->assertTableColumnStateSet('invitation_status', 'Account activated', $active->employeeProfile)
+            ->assertTableColumnStateSet('invitation_delivery', 'Invitation not sent', $neverSent->employeeProfile);
+    }
+
+    public function test_confirmed_delivery_does_not_claim_account_activation_and_survives_expiration(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $member = $this->member('INVITE-DELIVERED');
+        $invitation = MemberOnboardingInvitation::query()->create([
+            'user_id' => $member->id, 'employee_profile_id' => $member->employee_profile_id,
+            'email' => $member->employeeProfile->city_email, 'security_version' => 1,
+            'delivery_status' => 'queued', 'sent_at' => now()->subMinutes(31), 'expires_at' => now()->subMinute(),
+        ]);
+        $outbound = OutboundEmail::query()->create([
+            'source_type' => 'member_onboarding_invitation', 'source_id' => (string) $invitation->id,
+            'from_address' => 'hub@example.test', 'to_recipients' => [$invitation->email],
+            'recipient_count' => 1, 'chargeable_budget_units' => 1,
+            'subject' => 'Set up your account', 'status' => 'delivered', 'delivered_at' => now()->subMinutes(30),
+        ]);
+        $invitation->update(['outbound_email_id' => $outbound->id]);
+        // A different transactional source may have the same numeric source ID.
+        OutboundEmail::query()->create([
+            'source_type' => 'password_reset', 'source_id' => (string) $invitation->id,
+            'from_address' => 'hub@example.test', 'to_recipients' => [$invitation->email],
+            'subject' => 'Reset', 'status' => 'failed',
+            'recipient_count' => 1, 'chargeable_budget_units' => 1,
+        ]);
+        $admin = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $admin->givePermissionTo(Permission::findOrCreate('admin.personnel.view', 'web'));
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(ListEmployees::class)
+            ->assertTableColumnStateSet('invitation_delivery', 'Delivered', $member->employeeProfile)
+            ->assertTableColumnStateSet('invitation_status', 'Expired — ready to resend', $member->employeeProfile);
     }
 
     private function member(string $employeeId, AccountStatus $status = AccountStatus::PendingActivation): User

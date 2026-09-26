@@ -386,6 +386,110 @@ final class MemberOnboardingInvitationAdministrationTest extends TestCase
         }
     }
 
+    public function test_selected_group_previews_exact_eligible_and_grouped_skips_and_queues_only_selected_once(): void
+    {
+        $admin = $this->admin();
+        $ready = $this->member('SELECT-READY', AccountStatus::PendingActivation, true);
+        $second = $this->member('SELECT-SECOND', AccountStatus::PendingActivation, true);
+        $active = $this->member('SELECT-ACTIVE', AccountStatus::Active, true);
+        $unapproved = $this->member('SELECT-NOROSTER', AccountStatus::PendingActivation, false);
+        $unselected = $this->member('SELECT-OUTSIDE', AccountStatus::PendingActivation, true);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $records = collect([$ready, $second, $active, $unapproved])->map->employeeProfile;
+
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            $page = Livewire::test(ListEmployees::class)
+                ->mountTableBulkAction('sendSelectedOnboardingInvitations', $records)
+                ->assertSee('2</strong> ready to invite', false)
+                ->assertSee('Not in approved roster')
+                ->assertSee('Not eligible');
+            $cohort = $page->get('selectedInvitationCohort');
+            self::assertSame([$ready->id, $second->id], array_column($cohort['ready'], 'user_id'));
+            self::assertCount(2, $cohort['skipped']);
+            self::assertNotContains($unselected->employee_profile_id, $cohort['selected_ids']);
+            $page->set('mountedTableBulkActionData.confirm_recipients', true)
+                ->set('mountedTableBulkActionData.current_password', 'admin-password')
+                ->callMountedTableBulkAction()
+                ->assertHasNoTableBulkActionErrors();
+        }
+        Queue::assertPushed(IssueMemberOnboardingInvitation::class, 2);
+        Queue::assertNotPushed(IssueMemberOnboardingInvitation::class, fn ($job): bool => $job->userId === $unselected->id);
+        self::assertDatabaseCount('member_onboarding_invitations', 0);
+        self::assertDatabaseHas('security_action_events', ['action' => 'member_onboarding_invitation_selected_requested', 'actor_user_id' => $admin->id]);
+    }
+
+    public function test_selected_group_rejects_wrong_password_and_stale_eligibility_or_selection(): void
+    {
+        $admin = $this->admin();
+        $ready = $this->member('SELECT-GUARDED', AccountStatus::PendingActivation, true);
+        $other = $this->member('SELECT-OTHER', AccountStatus::PendingActivation, true);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(ListEmployees::class)
+            ->mountTableBulkAction('sendSelectedOnboardingInvitations', [$ready->employeeProfile])
+            ->set('mountedTableBulkActionData.confirm_recipients', true)
+            ->set('mountedTableBulkActionData.current_password', 'wrong')
+            ->callMountedTableBulkAction()
+            ->assertHasTableBulkActionErrors(['current_password']);
+
+        $page = Livewire::test(ListEmployees::class)
+            ->mountTableBulkAction('sendSelectedOnboardingInvitations', [$ready->employeeProfile]);
+        $ready->increment('security_version');
+        $page->set('mountedTableBulkActionData.confirm_recipients', true)
+            ->set('mountedTableBulkActionData.current_password', 'admin-password')
+            ->callMountedTableBulkAction()
+            ->assertHasTableBulkActionErrors(['confirm_recipients']);
+
+        Livewire::test(ListEmployees::class)
+            ->mountTableBulkAction('sendSelectedOnboardingInvitations', [$ready->employeeProfile])
+            ->set('selectedTableRecords', [(string) $other->employee_profile_id])
+            ->set('mountedTableBulkActionData.confirm_recipients', true)
+            ->set('mountedTableBulkActionData.current_password', 'admin-password')
+            ->callMountedTableBulkAction()
+            ->assertHasTableBulkActionErrors(['confirm_recipients']);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_selected_group_action_is_unavailable_to_non_super_admin(): void
+    {
+        $member = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $member->givePermissionTo(Permission::findOrCreate('admin.personnel.view', 'web'));
+        $this->actingAs($member);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(ListEmployees::class)->assertTableBulkActionHidden('sendSelectedOnboardingInvitations');
+        Queue::assertNothingPushed();
+    }
+
+    public function test_selected_cohort_snapshot_cannot_be_replaced_by_client_data(): void
+    {
+        $this->actingAs($this->admin());
+        $member = $this->member('SELECT-LOCKED', AccountStatus::PendingActivation, true);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(ListEmployees::class)
+            ->mountTableBulkAction('sendSelectedOnboardingInvitations', [$member->employeeProfile]);
+
+        $this->expectException(\Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException::class);
+        $page->set('selectedInvitationCohort.hash', str_repeat('a', 64));
+    }
+
+    public function test_selected_group_without_eligible_people_never_queues_mail(): void
+    {
+        $this->actingAs($this->admin());
+        $member = $this->member('SELECT-INELIGIBLE', AccountStatus::Active, true);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(ListEmployees::class)
+            ->mountTableBulkAction('sendSelectedOnboardingInvitations', [$member->employeeProfile])
+            ->assertSee('There are no eligible recipients')
+            ->set('mountedTableBulkActionData.confirm_recipients', true)
+            ->set('mountedTableBulkActionData.current_password', 'admin-password')
+            ->callMountedTableBulkAction()
+            ->assertHasTableBulkActionErrors(['confirm_recipients']);
+        Queue::assertNothingPushed();
+    }
+
     private function admin(): User
     {
         $admin = User::factory()->create([

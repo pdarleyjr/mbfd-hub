@@ -10,12 +10,14 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Throwable;
 
 final class CloudflareEmailDispatcher
 {
-    public function __construct(private readonly CloudflareCostGuard $costGuard) {}
+    public function __construct(private readonly CloudflareCostGuard $costGuard, private readonly OutboundDeliveryLedger $deliveryLedger) {}
 
     /**
      * @param  list<string>  $to
@@ -35,6 +37,9 @@ final class CloudflareEmailDispatcher
         array $bcc = [],
         ?string $replyTo = null,
         array $attachments = [],
+        array $headers = [],
+        ?int $parentOutboundEmailId = null,
+        ?int $parentInboundEmailId = null,
     ): OutboundEmail {
         $to = $this->normalizeAddresses($to);
         $cc = array_values(array_diff($this->normalizeAddresses($cc), $to));
@@ -63,6 +68,12 @@ final class CloudflareEmailDispatcher
             throw new InvalidArgumentException('Cloudflare Email Sending is not securely configured.');
         }
 
+        foreach ($headers as $name => $value) {
+            if (! in_array($name, ['In-Reply-To', 'References'], true) || ! is_string($value)
+                || preg_match('/[\r\n]/', $value) || strlen($value) > 2048) {
+                throw new InvalidArgumentException('Invalid email threading headers.');
+            }
+        }
         [$attachmentPayload, $attachmentMetadata] = $this->prepareAttachments($attachments);
         $payload = array_filter([
             'from' => $from,
@@ -74,6 +85,7 @@ final class CloudflareEmailDispatcher
             'text' => $text,
             'html' => $html,
             'attachments' => $attachmentPayload,
+            'headers' => $headers,
         ], fn (mixed $value): bool => $value !== null && $value !== [] && $value !== '');
         $encoded = json_encode($payload, JSON_THROW_ON_ERROR);
         if (strlen($encoded) > (int) config('communications.cloudflare.max_message_bytes', 4500000)) {
@@ -109,49 +121,86 @@ final class CloudflareEmailDispatcher
             'chargeable_budget_units' => count($recipients),
             'status' => 'pending',
             'queued_at' => $now,
+            'parent_outbound_email_id' => $parentOutboundEmailId,
+            'parent_inbound_email_id' => $parentInboundEmailId,
+            'in_reply_to' => $headers['In-Reply-To'] ?? null,
+            'references' => isset($headers['References']) ? preg_split('/\s+/', trim($headers['References'])) : null,
         ]);
 
+        $this->deliveryLedger->initialize($email);
         try {
+            if (! $sensitive && $attachmentPayload !== []) {
+                foreach ($attachmentPayload as $index => $attachment) {
+                    $path = 'outbound-email-attachments/'.$email->id.'/'.Str::uuid();
+                    if (! Storage::disk('local')->put($path, base64_decode($attachment['content'], true))) {
+                        throw new \RuntimeException('Unable to securely store an outbound attachment.');
+                    }
+                    $attachmentMetadata[$index]['disk'] = 'local';
+                    $attachmentMetadata[$index]['path'] = $path;
+                }
+                $email->forceFill(['attachment_metadata' => $attachmentMetadata])->save();
+            }
             $email = $this->costGuard->reserve($email, $now);
         } catch (EmailBudgetExhausted $exception) {
             $this->costGuard->releaseBeforeAcceptance($email, 'Email sending safety checks blocked delivery.', $now);
+            $email->recipients()->update(['status' => 'failed', 'is_terminal' => true, 'failed_at' => $now]);
+            throw $exception;
+        } catch (Throwable $exception) {
+            $this->costGuard->releaseBeforeAcceptance($email, 'Message preparation failed before provider submission.', $now);
+            $email->recipients()->update(['status' => 'failed', 'is_terminal' => true, 'failed_at' => $now]);
             throw $exception;
         }
         $endpoint = "https://api.cloudflare.com/client/v4/accounts/{$accountId}/email/sending/send";
 
         try {
             $email->forceFill(['status' => 'submitted', 'submitted_at' => $now])->save();
+            $email->recipients()->update(['status' => 'submitted']);
             $response = Http::acceptJson()
                 ->withToken($apiToken)
                 ->timeout(20)
                 ->post($endpoint, $payload)
                 ->throw();
             $providerMessageId = (string) data_get($response->json(), 'result.message_id', '');
-            if ($providerMessageId === '') {
+            if ($providerMessageId === '' || $response->json('success') !== true) {
                 throw new RequestException($response);
             }
 
             $email = $this->costGuard->markAccepted($email, $providerMessageId, CarbonImmutable::now());
-            $delivered = (array) data_get($response->json(), 'result.delivered', []);
-            $queued = (array) data_get($response->json(), 'result.queued', []);
-            $bounces = (array) data_get($response->json(), 'result.permanent_bounces', []);
-            $suppressed = (array) data_get($response->json(), 'result.suppressed_recipients', []);
-            if (count($delivered) === count($recipients)) {
-                $email->forceFill(['status' => 'delivered', 'delivered_at' => CarbonImmutable::now()])->save();
-            } elseif ($bounces !== [] || $suppressed !== []) {
-                $email->forceFill([
-                    'status' => 'accepted_with_delivery_issues',
-                    'failure_reason' => 'Cloudflare reported a permanent bounce or suppressed recipient after acceptance.',
-                ])->save();
-            } elseif ($queued !== []) {
-                $email->forceFill(['status' => 'queued'])->save();
+            if (preg_match('/^<[^<>\s@]+@[^<>\s@]+>$/', $providerMessageId) === 1) {
+                $email->forceFill(['message_id' => $providerMessageId])->save();
             }
+            $email = $this->deliveryLedger->initialResponse($email, (array) $response->json('result'), CarbonImmutable::now());
 
             return $email;
         } catch (Throwable $exception) {
             // A lost response (or a failed local save) is not evidence that the
             // provider rejected the message. Keep its budget and never retry here.
             $this->costGuard->markUncertain($email, CarbonImmutable::now());
+            if ($email->fresh()->accepted_at === null) {
+                $email->recipients()->where('is_terminal', false)->update(['status' => 'unknown']);
+                $rejection = null;
+                if ($exception instanceof RequestException) {
+                    $statusCode = $exception->response->status();
+                    if (in_array($statusCode, [401, 403], true)) {
+                        $rejection = ['failed', 'HTTP_'.$statusCode, 'Provider denied authentication or sending permission.'];
+                    } elseif (in_array($statusCode, [400, 422], true)) {
+                        $errors = collect((array) $exception->response->json('errors'));
+                        if ($errors->contains(fn (mixed $error): bool => is_array($error)
+                            && in_array('E_RECIPIENT_SUPPRESSED', [$error['code'] ?? null, $error['message'] ?? null], true))) {
+                            $rejection = ['rejected', 'E_RECIPIENT_SUPPRESSED', 'Provider rejected the request because a recipient is suppressed.'];
+                        } elseif ($errors->contains(fn (mixed $error): bool => is_array($error)
+                            && ($error['message'] ?? null) === 'email.sending.error.invalid_request_schema')) {
+                            $rejection = ['rejected', 'INVALID_REQUEST_SCHEMA', 'Provider rejected the request schema.'];
+                        }
+                    }
+                }
+                if ($rejection !== null) {
+                    foreach ($recipients as $address) {
+                        $this->deliveryLedger->record($email, $address, $rejection[0], 'send_response.rejected', CarbonImmutable::now(),
+                            $rejection[1], $rejection[2]);
+                    }
+                }
+            }
             if ($exception instanceof RequestException && $exception->response->status() === 429) {
                 $retryAfter = $exception->response->header('Retry-After');
                 $now = CarbonImmutable::now();

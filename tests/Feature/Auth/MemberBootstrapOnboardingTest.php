@@ -287,6 +287,26 @@ final class MemberBootstrapOnboardingTest extends TestCase
         self::assertDatabaseCount('password_reset_tokens', 0);
     }
 
+    public function test_multiple_invites_use_independent_private_single_recipient_messages_and_delivery_links(): void
+    {
+        $first = $this->pending('PRIVATE-FIRST');
+        $second = $this->pending('PRIVATE-SECOND');
+        $firstToken = $this->issueAndExtractToken($first);
+        $secondToken = $this->issueAndExtractToken($second);
+
+        self::assertNotSame($firstToken, $secondToken);
+        self::assertDatabaseCount('member_onboarding_invitations', 2);
+        self::assertDatabaseCount('outbound_emails', 2);
+        Http::assertSentCount(2);
+        foreach ([$first, $second] as $member) {
+            $invitation = MemberOnboardingInvitation::query()->where('user_id', $member->id)->sole();
+            self::assertNotNull($invitation->outbound_email_id);
+            self::assertSame([$member->employeeProfile->city_email], $invitation->outboundEmail->to_recipients);
+            self::assertStringNotContainsString($firstToken, (string) $invitation->outboundEmail->text_body);
+            self::assertStringNotContainsString($secondToken, (string) $invitation->outboundEmail->text_body);
+        }
+    }
+
     private function pending(string $employeeId, ?string $cityEmail = 'member@miamibeachfl.gov'): User
     {
         $employee = Employee::query()->create([
