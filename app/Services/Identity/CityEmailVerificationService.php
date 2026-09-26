@@ -179,7 +179,7 @@ final class CityEmailVerificationService
                 sourceId: (string) $row->getKey(),
                 actor: $user,
             );
-            $failed = in_array($delivery->status, ['failed', 'blocked', 'accepted_with_delivery_issues'], true);
+            $failed = in_array($delivery->status, ['failed', 'failed_pre_acceptance', 'blocked', 'bounced', 'rejected', 'complained', 'accepted_with_delivery_issues'], true);
             $values = ['delivery_status' => $failed ? 'failed' : 'queued', 'sent_at' => now()];
             if ($failed) {
                 $values += ['token_hash' => null, 'token_expires_at' => null];

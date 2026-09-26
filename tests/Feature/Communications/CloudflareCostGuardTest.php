@@ -164,11 +164,14 @@ final class CloudflareCostGuardTest extends TestCase
 
         self::assertSame('delivered', $email->status);
         self::assertSame('cloudflare-message-id', $email->provider_message_id);
-        self::assertSame([[
+        self::assertSame([
             'filename' => 'operations.txt',
             'type' => 'text/plain',
             'size' => 15,
-        ]], $email->attachment_metadata);
+        ], \Illuminate\Support\Arr::only($email->attachment_metadata[0], ['filename', 'type', 'size']));
+        self::assertSame('local', $email->attachment_metadata[0]['disk']);
+        self::assertStringStartsWith('outbound-email-attachments/'.$email->id.'/', $email->attachment_metadata[0]['path']);
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists($email->attachment_metadata[0]['path']);
         self::assertStringNotContainsString('test-token-not-persisted', json_encode($email->toArray(), JSON_THROW_ON_ERROR));
         self::assertStringNotContainsString(base64_encode('safe attachment'), json_encode($email->toArray(), JSON_THROW_ON_ERROR));
         Http::assertSent(fn ($request): bool => $request->hasHeader('Authorization', 'Bearer test-token-not-persisted')

@@ -3,6 +3,12 @@
 declare(strict_types=1);
 
 return [
+    'delivery' => [
+        'enabled' => (bool) env('CLOUDFLARE_EMAIL_DELIVERY_RECONCILIATION_ENABLED', false),
+        'zone_id' => env('CLOUDFLARE_EMAIL_ZONE_ID'),
+        'analytics_token' => env('CLOUDFLARE_EMAIL_ANALYTICS_TOKEN'),
+        'overlap_minutes' => (int) env('CLOUDFLARE_EMAIL_DELIVERY_OVERLAP_MINUTES', 1440),
+    ],
     'cloudflare' => [
         'account_id' => env('CLOUDFLARE_EMAIL_ACCOUNT_ID'),
         'api_token' => env('CLOUDFLARE_EMAIL_API_TOKEN'),

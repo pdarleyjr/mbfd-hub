@@ -15,13 +15,18 @@ use Filament\Actions;
 use Filament\Forms\Components as Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 
 class ListEmployees extends ListRecords
 {
     protected static string $resource = EmployeeResource::class;
+
+    #[Locked]
+    public ?array $selectedInvitationCohort = null;
 
     protected function getHeaderActions(): array
     {
@@ -113,13 +118,16 @@ class ListEmployees extends ListRecords
     }
 
     /** @return array{ready:list<array{user_id:int,employee_id:string,email:string,binding_hash:string}>,statuses:array<string,int>,hash:string} */
-    private function invitationCohort(): array
+    private function invitationCohort(?array $selectedIds = null): array
     {
         $invitations = app(MemberOnboardingInvitationService::class);
         $ready = [];
         $statuses = [];
+        $skipped = [];
         $employees = Employee::query()
-            ->whereHas('user', fn ($query) => $query->where('account_status', AccountStatus::PendingActivation->value))
+            ->when($selectedIds !== null,
+                fn ($query) => $query->whereKey($selectedIds),
+                fn ($query) => $query->whereHas('user', fn ($users) => $users->where('account_status', AccountStatus::PendingActivation->value)))
             ->with('user')
             ->orderBy('employee_id')
             ->get();
@@ -130,10 +138,14 @@ class ListEmployees extends ListRecords
             $status = $assessment['status'];
             $statuses[$status] = ($statuses[$status] ?? 0) + 1;
             if ($status !== 'ready' || $employee->user === null) {
+                $skipped[$status][] = ['id' => $employee->id, 'employee_id' => $employee->employee_id, 'name' => $employee->name];
+
                 continue;
             }
             $ready[] = [
                 'user_id' => $employee->user->id,
+                'id' => $employee->id,
+                'name' => $employee->name,
                 'employee_id' => $employee->employee_id,
                 'email' => strtolower(trim((string) $employee->city_email)),
                 'binding_hash' => IssueMemberOnboardingInvitation::bindingHash(
@@ -149,13 +161,38 @@ class ListEmployees extends ListRecords
         return [
             'ready' => $ready,
             'statuses' => $statuses,
-            'hash' => hash('sha256', json_encode([$ready, $statuses], JSON_THROW_ON_ERROR)),
+            'skipped' => $skipped,
+            'selected_ids' => $selectedIds,
+            'hash' => hash('sha256', json_encode([$selectedIds, $ready, $statuses, $skipped], JSON_THROW_ON_ERROR)),
         ];
     }
 
     private function invitationPreview(): HtmlString
     {
-        $cohort = $this->invitationCohort();
+        return $this->renderInvitationPreview($this->invitationCohort());
+    }
+
+    public function previewSelectedInvitations(Collection $records): array
+    {
+        abort_unless(self::canIssueInvitations(), 403);
+        $ids = $records->modelKeys();
+        sort($ids, SORT_NUMERIC);
+        $this->selectedInvitationCohort = $this->invitationCohort($ids);
+
+        return [];
+    }
+
+    public function selectedInvitationPreview(): HtmlString
+    {
+        abort_unless(self::canIssueInvitations(), 403);
+
+        return $this->selectedInvitationCohort === null
+            ? new HtmlString('Reopen the action to review selected members.')
+            : $this->renderInvitationPreview($this->selectedInvitationCohort);
+    }
+
+    private function renderInvitationPreview(array $cohort): HtmlString
+    {
         $ready = $cohort['ready'];
         $skipped = array_sum($cohort['statuses']) - count($ready);
         $summary = '<p><strong>'.count($ready).'</strong> ready to invite; <strong>'.$skipped.'</strong> skipped. No email is sent until you confirm.</p>';
@@ -170,15 +207,64 @@ class ListEmployees extends ListRecords
         ];
         foreach ($cohort['statuses'] as $status => $count) {
             if ($status !== 'ready') {
-                $summary .= '<p>'.e($labels[$status] ?? 'Other blocked').' : '.$count.'</p>';
+                $summary .= '<p><strong>'.e($labels[$status] ?? 'Other blocked').' : '.$count.'</strong></p><ul>';
+                foreach ($cohort['skipped'][$status] as $row) {
+                    $summary .= '<li>'.e($row['employee_id']).' — '.e($row['name']).'</li>';
+                }
+                $summary .= '</ul>';
             }
         }
         if ($ready === []) {
             return new HtmlString($summary.'<p>There are no eligible recipients. Check roster approval and account status before trying again.</p>');
         }
-        $rows = array_map(static fn (array $row): string => '<li>'.e($row['employee_id']).' — '.e($row['email']).'</li>', $ready);
+        $rows = array_map(static fn (array $row): string => '<li>'.e($row['employee_id']).' — '.e($row['name']).' — '.e($row['email']).'</li>', $ready);
 
         return new HtmlString($summary.'<div style="max-height:16rem;overflow:auto"><ul>'.implode('', $rows).'</ul></div>');
+    }
+
+    public function queueSelectedInvitations(Collection $records, array $data): void
+    {
+        abort_unless(self::canIssueInvitations(), 403);
+        $actor = auth()->user();
+        assert($actor instanceof User);
+        if (($data['confirm_recipients'] ?? false) !== true) {
+            $this->bulkActionError('confirm_recipients', 'Review and confirm the selected recipients before sending.');
+        }
+        if (! Hash::check((string) ($data['current_password'] ?? ''), $actor->password)) {
+            $this->bulkActionError('current_password', 'Your password is incorrect.');
+        }
+        if (config('queue.default') === 'sync') {
+            $this->bulkActionError('confirm_recipients', 'Background delivery is unavailable. No invitations were queued.');
+        }
+        $ids = $records->modelKeys();
+        sort($ids, SORT_NUMERIC);
+        $cohort = $this->invitationCohort($ids);
+        if ($cohort['ready'] === [] || $this->selectedInvitationCohort === null
+            || ! hash_equals($this->selectedInvitationCohort['hash'], $cohort['hash'])) {
+            $this->bulkActionError('confirm_recipients', 'The selected members or their eligibility changed. Reopen this action to review them again. No invitations were queued.');
+        }
+
+        app(SecurityAuditRecorder::class)->record($actor, $actor, 'member_onboarding_invitation_selected_requested', 'allowed', null, [
+            'recipient_count' => count($cohort['ready']),
+            'skipped_count' => array_sum($cohort['statuses']) - count($cohort['ready']),
+            'cohort_sha256' => $cohort['hash'],
+        ]);
+        foreach ($cohort['ready'] as $recipient) {
+            IssueMemberOnboardingInvitation::dispatch($recipient['user_id'], $actor->id, $recipient['binding_hash']);
+        }
+        $this->selectedInvitationCohort = null;
+        $this->deselectAllTableRecords();
+
+        Notification::make()->success()->title('Selected invitations queued')
+            ->body(count($cohort['ready']).' eligible selected members queued. Email delivery and account activation are tracked separately.')
+            ->send();
+    }
+
+    private function bulkActionError(string $field, string $message): never
+    {
+        throw ValidationException::withMessages([
+            $this->getMountedTableBulkActionForm()->getStatePath().'.'.$field => $message,
+        ]);
     }
 
     /** @param array<string,mixed> $data */
