@@ -86,6 +86,40 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
         $this->assertSame('0012-A', array_column($inspection->fresh()->checklist_evidence, 'value', 'id')['scba_5']);
     }
 
+    #[DataProvider('ordinaryTemplates')]
+    public function test_blank_optional_meters_are_accepted_without_changing_previous_readings(string $template, string $designation, string $type): void
+    {
+        $this->apparatus->update(['unit_id' => $designation, 'designation' => $designation, 'type' => $type, 'daily_checkout_template' => $template]);
+        $payload = $this->payload();
+        $payload['engine_hours'] = null;
+        $payload['miles'] = null;
+        $this->setField($payload, 'mileage', null);
+
+        $this->postJson($this->url(), $payload)->assertCreated()->assertJsonPath('processing_status', 'accepted');
+
+        $inspection = ApparatusInspection::sole();
+        $this->assertNull($inspection->engine_hours);
+        $this->assertNull($inspection->miles);
+        $evidence = array_column($inspection->checklist_evidence, null, 'id');
+        $this->assertArrayHasKey('mileage', $evidence);
+        $this->assertNull($evidence['mileage']['value']);
+        $this->assertSame('400.0', $this->apparatus->fresh()->current_engine_hours);
+        $this->assertSame(1000, $this->apparatus->fresh()->current_miles);
+        $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);
+
+        $this->postJson($this->url(), $payload)->assertOk()->assertJsonPath('id', $inspection->id);
+        $this->assertDatabaseCount('apparatus_inspections', 1);
+    }
+
+    public static function ordinaryTemplates(): array
+    {
+        return [
+            ['engine', 'E1', 'Engine'], ['engine2', 'E2', 'Engine'],
+            ['ladder1', 'L1', 'Ladder'], ['ladder3', 'L3', 'Ladder'],
+            ['rescue', 'R1', 'Rescue'],
+        ];
+    }
+
     #[DataProvider('disputedMeters')]
     public function test_rollback_or_stale_baseline_quarantines_only_the_disputed_meter(string $reason): void
     {
@@ -155,6 +189,22 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
                 break;
             case 'mileage mismatch': $this->setField($payload, 'mileage', 1021);
                 break;
+            case 'blank mileage mismatch': $this->setField($payload, 'mileage', null);
+                break;
+            case 'required pressure missing': $this->setField($payload, 'air_pressure_front', null);
+                break;
+            case 'negative mileage': $payload['miles'] = -1;
+                $this->setField($payload, 'mileage', -1);
+                break;
+            case 'paper mileage overflow': $payload['miles'] = 1000000000;
+                $this->setField($payload, 'mileage', 1000000000);
+                break;
+            case 'negative hours': $payload['engine_hours'] = -1;
+                break;
+            case 'invalid hours precision': $payload['engine_hours'] = 401.23;
+                break;
+            case 'missing shift': unset($payload['shift']);
+                break;
             case 'vehicle mismatch': $this->setField($payload, 'vehicle_num', 'V-OTHER');
                 break;
             case 'fractional mileage': $payload['miles'] = 1020.5;
@@ -185,6 +235,10 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
             ['duplicate field', 'field_values'], ['unknown field', 'field_values'], ['omitted field', 'field_values'],
             ['text wrong type', 'field_values'], ['text too long', 'field_values'], ['numeric string', 'field_values'],
             ['mileage mismatch', 'field_values'], ['vehicle mismatch', 'field_values'], ['fractional mileage', 'miles'],
+            ['blank mileage mismatch', 'field_values'], ['required pressure missing', 'field_values'],
+            ['negative mileage', 'miles'], ['negative hours', 'engine_hours'], ['invalid hours precision', 'engine_hours'],
+            ['paper mileage overflow', 'field_values'],
+            ['missing shift', 'shift'],
             ['unobserved', 'compartments'], ['omitted observation', 'compartments'], ['unissued item id', 'compartments'],
             ['missing signature', 'officer_signature'], ['invalid signature', 'officer_signature'],
         ];

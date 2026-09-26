@@ -27,8 +27,9 @@ export function inspectionReadiness(checklist: ChecklistData | null, compartment
   }) ?? [];
   const missingDuties = checklist?.due_tasks.filter(task => !scheduledTasks.find(answer => answer.id === task.id)?.observed) ?? [];
   const missingShift = !['A', 'B', 'C'].includes(officer.shift);
+  const maxMiles = checklist?.fields.some(field => field.id === 'mileage') ? 999999999 : 2147483647;
   const invalidMeters = (meters.engine_hours !== null && (!Number.isFinite(meters.engine_hours) || meters.engine_hours < 0 || meters.engine_hours > 9999999.9 || !/^\d+(\.\d)?$/.test(String(meters.engine_hours))))
-    || (meters.miles !== null && (!Number.isInteger(meters.miles) || meters.miles < 0 || meters.miles > 2147483647));
+    || (meters.miles !== null && (!Number.isInteger(meters.miles) || meters.miles < 0 || meters.miles > maxMiles));
   const nextStep = equipment.remaining > 0 || equipment.total === 0 ? 'compartments'
     : missingFields.length > 0 || missingDuties.length > 0 ? 'details'
     : missingShift ? 'officer' : invalidMeters ? 'meter' : 'submit';

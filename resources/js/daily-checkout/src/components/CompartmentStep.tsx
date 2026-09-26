@@ -26,11 +26,14 @@ export default function CompartmentStep({ checklistType, compartments, findings 
   const [quickOpen, setQuickOpen] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [focusItem, setFocusItem] = useState<string | null>(null);
+  const [pickerCollapsed, setPickerCollapsed] = useState(false);
+  const [focusWorkspace, setFocusWorkspace] = useState(false);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const quickButtonRef = useRef<HTMLButtonElement>(null);
   const navigationRef = useRef<HTMLElement>(null);
   const current = compartments.find(compartment => compartment.id === activeId) ?? compartments[0];
   const view = mappedViews.find(entry => entry.id === viewId) ?? mappedViews[0];
+  const selectedZone = view?.zones.find(zone => zone.compartmentId === current?.id);
   const visibleZones = view?.zones.filter(zone => compartments.some(compartment => compartment.id === zone.compartmentId)) ?? [];
   const showBlueprint = profile !== null && mappedViews.length > 0;
   const progress = inspectionProgress(compartments);
@@ -51,7 +54,7 @@ export default function CompartmentStep({ checklistType, compartments, findings 
     const existing = findingsForArea(compartment, findings).length;
     return <button key={compartment.id} data-area-id={compartment.id} type="button" aria-pressed={compartment.id === current?.id} onClick={() => select(compartment.id)}>
       <span className={`area-state ${state.remaining === 0 ? 'is-complete' : ''}`} aria-hidden="true">{state.remaining === 0 ? <Check size={18} /> : <span className="area-open" />}</span>
-      <span className="area-name">{compartment.name}{(existing > 0 || state.issues > 0) && <small className="area-warning"><TriangleAlert size={13} />{existing > 0 ? `${existing} existing` : ''}{existing > 0 && state.issues > 0 ? ' · ' : ''}{state.issues > 0 ? `${state.issues} reported` : ''}</small>}</span>
+      <span className="area-name">{compartment.name}{compartment.id === current?.id && <small className="area-selected">Selected</small>}{(existing > 0 || state.issues > 0) && <small className="area-warning"><TriangleAlert size={13} />{existing > 0 ? `${existing} existing` : ''}{existing > 0 && state.issues > 0 ? ' · ' : ''}{state.issues > 0 ? `${state.issues} reported` : ''}</small>}</span>
       <small className="area-progress">{state.completed}/{state.total}</small>
     </button>;
   };
@@ -68,13 +71,25 @@ export default function CompartmentStep({ checklistType, compartments, findings 
     setFocusItem(null);
   }, [focusItem, activeId]);
 
+  useEffect(() => {
+    if (!focusWorkspace) return;
+    // CSS determines whether this container has room for a simultaneous picker.
+    if (navigationRef.current && getComputedStyle(navigationRef.current).display === 'none') {
+      workspaceRef.current?.focus({ preventScroll: true });
+      workspaceRef.current?.querySelector('header')?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    }
+    setFocusWorkspace(false);
+  }, [focusWorkspace, pickerCollapsed, activeId]);
+
   const select = (id: string, itemId?: string) => {
     const nextView = mappedViews.find(entry => entry.zones.some(zone => zone.compartmentId === id));
     if (nextView) setViewId(nextView.id);
     setActiveId(id);
     setExpandedId(itemId ?? null);
     setQuickOpen(false);
+    setPickerCollapsed(true);
     if (itemId) setFocusItem(itemId);
+    else setFocusWorkspace(true);
   };
 
   const update = (compartmentId: string, itemId: string, patch: Partial<ChecklistItem>) => {
@@ -98,8 +113,19 @@ export default function CompartmentStep({ checklistType, compartments, findings 
 
   if (!current || !compartmentProgress) return <div role="alert">No checklist items available. <button onClick={onBack}>Member / Vehicle Info</button></div>;
 
-  return <div className={`inspection-layout ${showBlueprint ? 'with-blueprint' : 'with-area-rail'}`}>
-    <aside className="inspection-navigation" aria-label="Apparatus navigation" ref={navigationRef}>
+  return <div className={`inspection-layout ${showBlueprint ? 'with-blueprint' : 'with-area-rail'} ${pickerCollapsed ? 'picker-collapsed' : ''}`}>
+    <div className="inspection-area-summary">
+      <div><strong>{selectedZone ? `${view.label} · ${selectedZone.label}` : current.name}</strong><span>{compartmentProgress.completed}/{compartmentProgress.total} inspected{compartmentProgress.issues > 0 ? ` · ${compartmentProgress.issues} reported` : ''}</span></div>
+      <button type="button" aria-expanded={!pickerCollapsed} aria-controls="inspection-area-picker" onClick={() => {
+        setPickerCollapsed(false);
+        requestAnimationFrame(() => {
+          const selected = navigationRef.current?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
+          selected?.focus({ preventScroll: true });
+          navigationRef.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+        });
+      }}>Change area</button>
+    </div>
+    <aside id="inspection-area-picker" className="inspection-navigation" aria-label="Apparatus navigation" ref={navigationRef}>
       <div className="inspection-panel-heading"><h2>Vehicle Areas</h2><div className="blueprint-legend"><span><i className="remaining-dot" />Remaining</span><span><Check size={13} />Inspected</span><span><b>E</b> Existing</span><span><b>R</b> Reported</span></div></div>
       {showBlueprint && view ? <>
         <div className="blueprint-views" aria-label="Apparatus views">
@@ -110,7 +136,7 @@ export default function CompartmentStep({ checklistType, compartments, findings 
           const area = compartments.find(compartment => compartment.id === zone.compartmentId)!;
           const state = inspectionProgress([area]);
           const known = findingsForArea(area, findings).length;
-          return <button key={zone.compartmentId} type="button" aria-label={`${area.name}${known ? `, ${known} existing issues` : ''}${state.issues ? `, ${state.issues} reported issues` : ''}`} aria-pressed={current.id === zone.compartmentId} onClick={() => select(zone.compartmentId)}>{state.remaining === 0 && <Check size={13} />}{zone.label}{(known > 0 || state.issues > 0) && <TriangleAlert size={13} />}</button>;
+          return <button key={zone.compartmentId} data-area-id={zone.compartmentId} type="button" aria-label={`${area.name}, ${state.completed} of ${state.total} inspected${known ? `, ${known} existing issues` : ''}${state.issues ? `, ${state.issues} reported issues` : ''}`} aria-pressed={current.id === zone.compartmentId} onClick={() => select(zone.compartmentId)}><span>{state.remaining === 0 && <Check size={13} className="area-state is-complete" />}{zone.label}{(known > 0 || state.issues > 0) && <TriangleAlert size={13} className="area-warning" />}</span><small>{current.id === zone.compartmentId ? 'Selected' : state.remaining === 0 ? 'Complete' : `${state.remaining} left`}</small></button>;
         })}</div>
         <div className="blueprint-findings">{visibleZones.map(zone => {
           const area = compartments.find(compartment => compartment.id === zone.compartmentId)!;
@@ -130,7 +156,7 @@ export default function CompartmentStep({ checklistType, compartments, findings 
       </details>}
     </aside>
 
-    <section className="inspection-equipment" aria-label="Compartment Inspection" ref={workspaceRef}>
+    <section className="inspection-equipment" aria-label="Compartment Inspection" ref={workspaceRef} tabIndex={-1}>
       <header className="equipment-heading">
         <div><p className="inspection-eyebrow">{showBlueprint && !mappedIds.has(current.id) ? 'Other area · Not shown on vehicle image' : 'Compartment Inspection'}</p><h2>{current.name}</h2><p className="inspection-muted">{compartmentProgress.completed} of {compartmentProgress.total} inspected{compartmentProgress.issues > 0 ? ` · ${compartmentProgress.issues} reported` : ''}</p></div>
         <button type="button" className="confirm-compartment" aria-label="Mark all items in this compartment as present" onClick={() => onChange(previous => previous.map(compartment => compartment.id === current.id ? { ...compartment, items: compartment.items.map(item => (item.observed && item.status !== 'Present') || (item.inputType && item.inputType !== 'checkbox' && !itemIsComplete(item)) ? item : { ...item, status: 'Present', observed: true }) } : compartment))}>✓ Confirm all present</button>

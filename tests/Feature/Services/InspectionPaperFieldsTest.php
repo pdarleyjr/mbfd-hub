@@ -92,7 +92,7 @@ final class InspectionPaperFieldsTest extends TestCase
             'text is array' => ['engine2', 'scba_5', ['0012']],
             'text is number' => ['engine2', 'scba_5', 12],
             'whitespace is not a reading' => ['engine2', 'engine_temp', '   '],
-            'required value is blank' => ['engine2', 'mileage', null],
+            'required value is blank' => ['engine2', 'air_pressure_front', null],
             'numeric string is not a number' => ['engine2', 'mileage', '1200'],
             'non-finite number' => ['engine2', 'mileage', INF],
             'number exceeds limit' => ['engine2', 'mileage', 1000000000],

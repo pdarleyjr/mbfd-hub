@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type RefObject } from 'react';
 import type { PmHealthStatus } from '../types';
 
 export interface MeterData {
@@ -8,8 +8,6 @@ export interface MeterData {
 
 interface MeterStepProps {
   apparatusId: number;
-  apparatusName: string;
-  vehicleNumber: string;
   initialData: MeterData;
   pmHealth?: PmHealthStatus | null;
   previousHours: number | null;
@@ -18,12 +16,12 @@ interface MeterStepProps {
   onChange: (data: MeterData) => void;
   onBack: () => void;
   continueLabel: string;
+  maxMiles: number;
+  formRef: RefObject<HTMLFormElement | null>;
 }
 
 export default function MeterStep({
   pmHealth,
-  apparatusName,
-  vehicleNumber,
   initialData,
   previousHours,
   previousMiles,
@@ -31,6 +29,8 @@ export default function MeterStep({
   onChange,
   onBack,
   continueLabel,
+  maxMiles,
+  formRef,
 }: MeterStepProps) {
   const [engineHours, setEngineHours] = useState<string>(
     initialData.engine_hours !== null ? String(initialData.engine_hours) : ''
@@ -47,32 +47,30 @@ export default function MeterStep({
   const validateField = (field: 'engine_hours' | 'miles', value: string): string | undefined => {
     if (!value.trim()) return undefined;
 
-    const numValue = parseFloat(value);
+    const numValue = Number(value);
     if (isNaN(numValue)) return 'Please enter a valid number';
     if (numValue < 0) return 'Value cannot be negative';
 
-    if (!Number.isFinite(numValue) || numValue > (field === 'engine_hours' ? 9999999.9 : 2147483647)) return 'Reading is outside the supported range';
+    if (!Number.isFinite(numValue) || numValue > (field === 'engine_hours' ? 9999999.9 : maxMiles)) return 'Reading is outside the supported range';
     if (field === 'engine_hours' && !/^\d+(\.\d)?$/.test(value)) return 'Enter hours with at most one decimal place';
-    if (field === 'miles' && !Number.isInteger(numValue)) return 'Enter whole miles';
+    if (field === 'miles' && !/^\d+$/.test(value)) return 'Enter whole miles';
 
     return undefined;
   };
 
   const handleEngineHoursChange = (value: string) => {
-    const sanitized = value.replace(/[^0-9.]/g, '');
-    setEngineHours(sanitized);
-    if (sanitized === '' || /^\d+(\.\d*)?$/.test(sanitized)) onChange({ ...initialData, engine_hours: sanitized === '' ? null : Number(sanitized) });
+    setEngineHours(value);
+    if (!value.trim() || (/^-?\d+(\.\d*)?$/.test(value) && Number.isFinite(Number(value)))) onChange({ ...initialData, engine_hours: !value.trim() ? null : Number(value) });
     if (touched.engine_hours) {
-      setErrors(prev => ({ ...prev, engine_hours: validateField('engine_hours', sanitized) }));
+      setErrors(prev => ({ ...prev, engine_hours: validateField('engine_hours', value) }));
     }
   };
 
   const handleMilesChange = (value: string) => {
-    const sanitized = value.replace(/[^0-9]/g, '');
-    setMiles(sanitized);
-    onChange({ ...initialData, miles: sanitized === '' ? null : Number(sanitized) });
+    setMiles(value);
+    if (!value.trim() || (/^-?\d+(\.\d*)?$/.test(value) && Number.isFinite(Number(value)))) onChange({ ...initialData, miles: !value.trim() ? null : Number(value) });
     if (touched.miles) {
-      setErrors(prev => ({ ...prev, miles: validateField('miles', sanitized) }));
+      setErrors(prev => ({ ...prev, miles: validateField('miles', value) }));
     }
   };
 
@@ -103,12 +101,12 @@ export default function MeterStep({
   return (
     <div className="max-w-lg mx-auto">
       {/* Header */}
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-neutral-800 font-heading">Vehicle Readings</h2>
-        <p className="text-neutral-500 mt-1">{apparatusName} · Vehicle {vehicleNumber}</p>
+      <div className="mb-4">
+        <h2 className="text-2xl font-bold text-neutral-800 font-heading">Readings · Optional</h2>
+        <p className="text-neutral-600 mt-1">Enter current readings when available. You may continue without them.</p>
       </div>
 
-      {((engineHours !== '' && previousHours !== null && Number(engineHours) < previousHours) || (miles !== '' && previousMiles !== null && Number(miles) < previousMiles)) && <p className="mb-4 text-sm text-amber-800">This is below the previous reading. Record what the display shows; it will be saved for review.</p>}
+      {((engineHours.trim() !== '' && previousHours !== null && Number(engineHours) < previousHours) || (miles.trim() !== '' && previousMiles !== null && Number(miles) < previousMiles)) && <p className="mb-4 text-sm text-amber-800">This is below the previous reading. Record what the display shows; it will be saved for review.</p>}
 
       {/* Previous readings — compact reference strip */}
       {(previousHours !== null || previousMiles !== null) && (
@@ -159,7 +157,7 @@ export default function MeterStep({
       )}
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label htmlFor="engine_hours" className="block text-sm font-semibold text-neutral-700 mb-1.5">
             Engine Hours
@@ -168,6 +166,8 @@ export default function MeterStep({
             <input
               type="text"
               id="engine_hours"
+              ref={input => { input?.setCustomValidity(validateField('engine_hours', engineHours) ?? ''); }}
+              onInvalid={() => handleBlur('engine_hours')}
               inputMode="decimal"
               value={engineHours}
               onChange={(e) => handleEngineHoursChange(e.target.value)}
@@ -194,6 +194,8 @@ export default function MeterStep({
             <input
               type="text"
               id="miles"
+              ref={input => { input?.setCustomValidity(validateField('miles', miles) ?? ''); }}
+              onInvalid={() => handleBlur('miles')}
               inputMode="numeric"
               value={miles}
               onChange={(e) => handleMilesChange(e.target.value)}
