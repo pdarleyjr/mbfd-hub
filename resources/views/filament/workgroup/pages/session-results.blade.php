@@ -1,4 +1,16 @@
-<x-filament-panels::page>
+<x-filament-panels::page class="wg-session-results">
+    <style>
+        .wg-session-results .wg-ai-panel-header,
+        .wg-session-results .wg-saver-header { flex-wrap: wrap; }
+        .wg-session-results .wg-ai-panel-header > div:first-child { flex: 1 1 18rem; min-width: 0; }
+        .wg-session-results .wg-report-actions { flex-wrap: wrap; max-width: 100%; }
+        .wg-session-results .wg-ai-btn { min-height: 44px; }
+        .wg-session-results .wg-ai-icon,
+        .wg-session-results .wg-ai-btn--primary { background: rgb(var(--hub-action-primary)); }
+        .wg-session-results .wg-ai-btn--primary:hover { background: rgb(var(--hub-action-primary-hover)); }
+        .wg-session-results .wg-ai-btn--secondary { color: rgb(var(--hub-action-primary)); border-color: rgb(var(--hub-border)); }
+        .wg-session-results .wg-ai-btn--secondary:hover { background: rgb(var(--hub-surface-muted)); }
+    </style>
     {{-- Session Switcher Pill Navigation --}}
     @php $allSessions = $this->getAllSessions(); @endphp
     @if($allSessions->count() > 0)
@@ -57,7 +69,7 @@
                 </div>
             </div>
             @if($aiReportLoaded && $aiReport)
-            <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+            <div class="wg-report-actions" style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
                 <a href="{{ route('reports.executive.pdf', ['session_id' => $selectedSessionId]) }}" target="_blank" class="wg-ai-btn wg-ai-btn--secondary" style="text-decoration: none;">
                     <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     Export PDF
@@ -113,17 +125,17 @@
     {{-- SAVER Executive Report Generator --}}
     @if($this->canManageSelectedSession())
     <div class="wg-section" style="margin-bottom: 1.25rem;">
-        <div class="wg-section-header" style="background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%); color: #fff;">
+        <div class="wg-section-header wg-saver-header" style="background: rgb(var(--hub-header-elevated)); color: #fff;">
             <div class="wg-section-header-icon" style="background: rgba(255,255,255,0.2);">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
             </div>
-            <div style="flex: 1;">
+            <div style="flex: 1 1 16rem; min-width: 0;">
                 <h3 style="font-size: 1rem; font-weight: 700; color: #fff;">SAVER Executive Purchasing Report</h3>
                 <p style="font-size: 0.75rem; color: rgba(255,255,255,0.7);">DHS-style assessment: Capability · Usability · Affordability · Maintainability · Deployability</p>
             </div>
-            <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+            <div class="wg-report-actions" style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
                 @if($saverReportHtml)
                 <a href="{{ route('reports.saver.pdf', ['session_id' => $selectedSessionId]) }}" target="_blank" class="wg-ai-btn wg-ai-btn--secondary" style="color: #fff; border-color: rgba(255,255,255,0.3); text-decoration: none;">
                     <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -137,7 +149,7 @@
                     class="wg-ai-btn wg-ai-btn--primary"
                     style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);"
                 >
-                    <div wire:loading wire:target="generateSaverReport" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div wire:loading.flex wire:target="generateSaverReport" style="align-items: center; gap: 0.5rem;">
                         <svg style="width:1rem;height:1rem;animation:spin 1s linear infinite;" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity:0.25;"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4" stroke-linecap="round" style="opacity:0.75;"></path></svg>
                         Generating...
                     </div>
@@ -640,7 +652,7 @@
             </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: 1rem; margin-top: 0.75rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: 1rem; margin-top: 0.75rem;">
             @foreach($isolatedProducts as $iso)
             <div class="wg-isolated-product">
                 <div class="wg-isolated-label">Standalone</div>

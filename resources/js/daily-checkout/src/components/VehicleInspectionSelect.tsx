@@ -173,14 +173,9 @@ export default function VehicleInspectionSelect() {
       )}
 
       <div className="mt-8 text-center">
-        <PreviousPageButton
+        <PreviousPageButton contextual
           className="inline-flex min-h-11 items-center px-4 py-2 font-semibold text-hub-ink-secondary hover:text-hub-ink"
-        >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to previous page
-        </PreviousPageButton>
+        />
       </div>
     </div>
   );

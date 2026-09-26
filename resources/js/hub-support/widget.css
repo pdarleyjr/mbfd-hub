@@ -1,3 +1,5 @@
+@import '../../css/mbfd-theme.css';
+
 .hub-issue-widget {
     --hub-issue-ink: #17212d;
     --hub-issue-muted: #596879;
@@ -17,6 +19,36 @@
     box-shadow: 0 3px 14px #17212d1a; min-height: 44px; cursor: pointer;
 }
 .hub-issue-trigger:hover { border-color: var(--hub-issue-action); }
+/* Protected Blade / Filament support lives in document flow, so it cannot
+   cover pagination, sticky actions or keyboard focus. Daily owns its placement. */
+.hub-issue-widget--inline {
+    --hub-issue-ink: rgb(var(--hub-ink));
+    --hub-issue-muted: rgb(var(--hub-muted));
+    --hub-issue-paper: rgb(var(--hub-surface));
+    --hub-issue-inset: rgb(var(--hub-surface-muted));
+    --hub-issue-line: rgb(var(--hub-border));
+    --hub-issue-action: rgb(var(--hub-action-primary));
+    font-family: var(--hub-font-sans);
+    padding: 1rem max(1rem, env(safe-area-inset-right)) calc(3rem + env(safe-area-inset-bottom));
+    text-align: end;
+}
+.hub-issue-widget--inline .hub-issue-trigger {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    border-radius: .5rem;
+    box-shadow: none;
+    text-decoration: none;
+}
+.hub-issue-widget--inline .hub-issue-trigger:focus-visible {
+    outline: 2px solid rgb(var(--hub-focus));
+    outline-offset: 2px;
+}
+.hub-issue-widget--inline .hub-issue-dialog { text-align: start; }
+.hub-issue-widget--inline textarea::placeholder {
+    color: rgb(var(--hub-ink-secondary));
+    opacity: 1;
+}
 .hub-issue-dialog {
     margin: auto; width: min(460px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto;
     border: 1px solid var(--hub-issue-line); border-radius: 16px; background: var(--hub-issue-paper);

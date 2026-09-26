@@ -56,7 +56,7 @@
             </svg>
         </a>
         <a href="{{ \App\Filament\Employee\Pages\RequestEquipmentPage::getUrl(panel: 'employee') }}" class="ep-action-card">
-            <div class="ep-action-icon ep-action-icon-amber">
+            <div class="ep-action-icon ep-action-icon-neutral">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.5v15m7.5-7.5h-15"/>
                 </svg>
@@ -135,23 +135,23 @@
     </div>
 
     <style>
-        /* ── Employee Portal Design System ── */
+        /* Employee portal presentation uses the shared Hub semantic tokens. */
         .ep-hero {
             display: flex;
             align-items: center;
             gap: 1rem;
             padding: 1.25rem 1.5rem;
-            background: #292524;
+            background: rgb(var(--hub-header));
             border-radius: 0.875rem;
             margin-bottom: 1rem;
-            color: #ffffff;
+            color: rgb(var(--hub-surface));
         }
         .ep-hero-badge {
             width: 3rem;
             height: 3rem;
             border-radius: 50%;
-            background: rgba(220, 38, 38, 0.2);
-            border: 1.5px solid rgba(220, 38, 38, 0.4);
+            background: rgb(var(--hub-surface) / .08);
+            border: 1px solid rgb(var(--hub-surface) / .2);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -160,13 +160,13 @@
         .ep-hero-badge-icon {
             width: 1.5rem;
             height: 1.5rem;
-            color: #fca5a5;
+            color: rgb(var(--hub-border));
         }
         .ep-hero-info { flex: 1; min-width: 0; }
         .ep-hero-name {
             font-size: 1.125rem;
             font-weight: 700;
-            color: #ffffff;
+            color: rgb(var(--hub-surface));
             line-height: 1.3;
         }
         .ep-hero-meta {
@@ -177,16 +177,16 @@
         }
         .ep-hero-rank {
             font-size: 0.8125rem;
-            color: #fca5a5;
+            color: rgb(var(--hub-border));
             font-weight: 600;
         }
         .ep-hero-sep {
-            color: #78716c;
+            color: rgb(var(--hub-border));
             font-size: 0.75rem;
         }
         .ep-hero-id {
             font-size: 0.8125rem;
-            color: #a8a29e;
+            color: rgb(var(--hub-border));
             font-variant-numeric: tabular-nums;
         }
         .ep-home-btn {
@@ -200,7 +200,7 @@
             border-radius: 0.5rem;
             background: rgba(255,255,255,0.08);
             border: 1px solid rgba(255,255,255,0.15);
-            color: #d4d4d4;
+            color: rgb(var(--hub-border));
             font-size: 0.75rem;
             font-weight: 500;
             text-decoration: none;
@@ -209,15 +209,15 @@
         }
         .ep-home-btn:hover {
             background: rgba(255,255,255,0.15);
-            color: #ffffff;
+            color: rgb(var(--hub-surface));
         }
         /* Stats bar */
         .ep-stats-bar {
             display: flex;
             align-items: center;
             gap: 0;
-            background: #ffffff;
-            border: 1px solid #e8e5e0;
+            background: rgb(var(--hub-surface));
+            border: 1px solid rgb(var(--hub-border));
             border-radius: 0.75rem;
             overflow: hidden;
             margin-bottom: 1rem;
@@ -232,19 +232,19 @@
         .ep-stat-divider {
             width: 1px;
             height: 2.5rem;
-            background: #e8e5e0;
+            background: rgb(var(--hub-border));
         }
         .ep-stat-value {
             font-size: 1.875rem;
             font-weight: 800;
-            color: #292524;
+            color: rgb(var(--hub-ink));
             font-variant-numeric: tabular-nums;
             line-height: 1;
         }
-        .ep-stat-pending { color: #d97706; }
+        .ep-stat-pending { color: rgb(var(--hub-warning)); }
         .ep-stat-label {
             font-size: 0.75rem;
-            color: #78716c;
+            color: rgb(var(--hub-muted));
             font-weight: 500;
             margin-top: 0.25rem;
             text-transform: uppercase;
@@ -265,17 +265,17 @@
             align-items: center;
             gap: 0.875rem;
             padding: 1rem 1.125rem;
-            background: #ffffff;
-            border: 1px solid #e8e5e0;
+            background: rgb(var(--hub-surface));
+            border: 1px solid rgb(var(--hub-border));
             border-radius: 0.75rem;
             text-decoration: none;
             transition: border-color 150ms, box-shadow 150ms;
         }
         .ep-action-card:hover {
-            border-color: #d4d0ca;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.06);
+            border-color: rgb(var(--hub-border-strong));
+            box-shadow: var(--hub-shadow-card);
         }
-        .ep-action-primary { border-left: 3px solid #2563eb; }
+        .ep-action-primary { border-left: 3px solid rgb(var(--hub-blue)); }
         .ep-action-icon {
             width: 2.5rem;
             height: 2.5rem;
@@ -285,8 +285,8 @@
             justify-content: center;
             flex-shrink: 0;
         }
-        .ep-action-icon-blue { background: #eff6ff; color: #2563eb; }
-        .ep-action-icon-amber { background: #fffbeb; color: #d97706; }
+        .ep-action-icon-blue { background: rgb(var(--hub-blue) / .08); color: rgb(var(--hub-blue)); }
+        .ep-action-icon-neutral { background: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-action-navigation)); }
         .ep-action-body {
             flex: 1;
             display: flex;
@@ -295,17 +295,17 @@
         .ep-action-title {
             font-size: 0.9375rem;
             font-weight: 600;
-            color: #292524;
+            color: rgb(var(--hub-ink));
         }
         .ep-action-desc {
             font-size: 0.75rem;
-            color: #78716c;
+            color: rgb(var(--hub-muted));
             margin-top: 0.125rem;
         }
         .ep-action-arrow {
             width: 1rem;
             height: 1rem;
-            color: #d4d0ca;
+            color: rgb(var(--hub-border-strong));
             flex-shrink: 0;
         }
         /* Two-column panels */
@@ -318,8 +318,8 @@
             .ep-two-col { grid-template-columns: 1fr; }
         }
         .ep-panel {
-            background: #ffffff;
-            border: 1px solid #e8e5e0;
+            background: rgb(var(--hub-surface));
+            border: 1px solid rgb(var(--hub-border));
             border-radius: 0.75rem;
             overflow: hidden;
         }
@@ -328,19 +328,22 @@
             align-items: center;
             justify-content: space-between;
             padding: 0.875rem 1.125rem;
-            border-bottom: 1px solid #f0ede8;
-            background: #fafaf8;
+            border-bottom: 1px solid rgb(var(--hub-border-soft));
+            background: rgb(var(--hub-surface-muted));
         }
         .ep-panel-title {
             font-size: 0.8125rem;
             font-weight: 700;
-            color: #44403c;
+            color: rgb(var(--hub-ink-secondary));
             text-transform: uppercase;
             letter-spacing: 0.04em;
         }
         .ep-panel-link {
+            display: inline-flex;
+            align-items: center;
+            min-height: 44px;
             font-size: 0.75rem;
-            color: #b91c1c;
+            color: rgb(var(--hub-action-navigation));
             text-decoration: none;
             font-weight: 500;
         }
@@ -350,14 +353,14 @@
             flex-direction: column;
             align-items: center;
             padding: 2rem 1rem;
-            color: #a8a29e;
+            color: rgb(var(--hub-muted));
             font-size: 0.8125rem;
             gap: 0.5rem;
         }
         .ep-empty-icon {
             width: 2rem;
             height: 2rem;
-            color: #d4d0ca;
+            color: rgb(var(--hub-border-strong));
         }
         /* List items */
         .ep-list-item {
@@ -365,7 +368,7 @@
             align-items: center;
             gap: 0.75rem;
             padding: 0.75rem 1.125rem;
-            border-bottom: 1px solid #f8f6f2;
+            border-bottom: 1px solid rgb(var(--hub-border-soft));
         }
         .ep-list-item:last-child { border-bottom: none; }
         .ep-list-dot {
@@ -374,11 +377,11 @@
             border-radius: 50%;
             flex-shrink: 0;
         }
-        .ep-dot-blue { background: #2563eb; }
-        .ep-dot-green { background: #16a34a; }
-        .ep-dot-amber { background: #d97706; }
-        .ep-dot-red { background: #dc2626; }
-        .ep-dot-gray { background: #a8a29e; }
+        .ep-dot-blue { background: rgb(var(--hub-blue)); }
+        .ep-dot-green { background: rgb(var(--hub-success)); }
+        .ep-dot-amber { background: rgb(var(--hub-warning)); }
+        .ep-dot-red { background: rgb(var(--hub-danger)); }
+        .ep-dot-gray { background: rgb(var(--hub-muted)); }
         .ep-list-body {
             flex: 1;
             min-width: 0;
@@ -388,19 +391,19 @@
         .ep-list-primary {
             font-size: 0.8125rem;
             font-weight: 600;
-            color: #292524;
+            color: rgb(var(--hub-ink));
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .ep-list-secondary {
             font-size: 0.6875rem;
-            color: #a8a29e;
+            color: rgb(var(--hub-muted));
             margin-top: 0.125rem;
         }
         .ep-list-meta {
             font-size: 0.6875rem;
-            color: #a8a29e;
+            color: rgb(var(--hub-muted));
             flex-shrink: 0;
         }
         /* Status badges */
@@ -415,9 +418,9 @@
             letter-spacing: 0.04em;
             flex-shrink: 0;
         }
-        .ep-status-pending { background: #fffbeb; color: #92400e; }
-        .ep-status-approved { background: #f0fdf4; color: #166534; }
-        .ep-status-declined { background: #fef2f2; color: #991b1b; }
-        .ep-status-ordered { background: #eff6ff; color: #1e40af; }
+        .ep-status-pending { background: rgb(var(--hub-warning) / .08); color: rgb(var(--hub-warning)); }
+        .ep-status-approved { background: rgb(var(--hub-success) / .08); color: rgb(var(--hub-success)); }
+        .ep-status-declined { background: rgb(var(--hub-danger) / .08); color: rgb(var(--hub-danger)); }
+        .ep-status-ordered { background: rgb(var(--hub-blue) / .08); color: rgb(var(--hub-blue)); }
     </style>
 </x-filament-panels::page>

@@ -33,7 +33,7 @@
             @endif
         </div>
         <h3 class="mt-3 font-heading text-base font-bold leading-snug text-hub-ink sm:text-lg">
-            <a href="{{ route('updates.show', $update) }}" class="rounded-sm hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
+            <a href="{{ route('updates.show', $update) }}" class="rounded-sm hover:text-hub-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">
                 {{ $update->title }}
             </a>
         </h3>
@@ -58,7 +58,7 @@
                     </a>
                 @endif
                 @if($ctaUrl)
-                    <a href="{{ $ctaUrl }}" @if($update->hasExternalCta()) target="_blank" rel="noopener noreferrer" @endif class="inline-flex min-h-11 items-center rounded-lg bg-hub-red px-4 py-2 text-sm font-semibold text-white hover:bg-hub-red-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus focus-visible:ring-offset-2">
+                    <a href="{{ $ctaUrl }}" @if($update->hasExternalCta()) target="_blank" rel="noopener noreferrer" @endif class="inline-flex min-h-11 items-center rounded-lg bg-hub-blue px-4 py-2 text-sm font-semibold text-white hover:bg-hub-blue-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus focus-visible:ring-offset-2">
                         {{ $update->cta_label ?: 'Open' }}
                     </a>
                 @elseif($compact)

@@ -25,19 +25,19 @@ const PageLoading = () => (
   </div>
 );
 
-const HomeNav = () => (
-  <header className="sticky top-0 z-50 bg-neutral-900 border-b border-neutral-700/50 h-16 flex items-center justify-between px-4 lg:px-6" style={{ paddingTop: 'max(0px, env(safe-area-inset-top, 0px))' }}>
+const HomeNav = ({ standard }: { standard: boolean }) => (
+  <header className={`sticky top-0 z-50 border-b h-16 flex items-center justify-between px-4 lg:px-6 ${standard ? 'bg-hub-header border-hub-border-strong/30' : 'bg-neutral-900 border-neutral-700/50'}`} style={{ paddingTop: 'max(0px, env(safe-area-inset-top, 0px))' }}>
     <div className="flex items-center gap-3">
       <img src="/images/mbfd_logo_new.png" alt="MBFD Logo" className="h-10 w-10 object-contain" />
       <div>
         <h1 className="text-white font-bold text-sm sm:text-base leading-tight font-heading">MBFD Support Hub</h1>
-        <p className="hidden sm:block text-neutral-400 text-xs">Enterprise Command Portal</p>
+        <p className={`hidden sm:block text-xs ${standard ? 'text-white/80' : 'text-neutral-400'}`}>Enterprise Command Portal</p>
       </div>
     </div>
     <div className="flex items-center gap-2">
       <a
         href="/"
-        className="min-h-[44px] px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+        className={`min-h-[44px] px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors flex items-center gap-2 ${standard ? 'bg-hub-blue hover:bg-hub-blue-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white' : 'bg-red-600 hover:bg-red-700'}`}
         aria-label="Return to MBFD Hub home page"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -49,26 +49,30 @@ const HomeNav = () => (
   </header>
 );
 
+function isActiveInspectionPath(pathname: string) {
+  return /^\/(?:vehicle-inspections|apparatus)\/[^/]+\/?$/.test(pathname) && !pathname.endsWith('/success');
+}
+
 function ContextualIssueWidget() {
   const { pathname } = useLocation();
-  return /^\/(?:vehicle-inspections|apparatus)\/[^/]+\/?$/.test(pathname) && !pathname.endsWith('/success')
+  return isActiveInspectionPath(pathname)
     ? null
     : <HubIssueWidget />;
 }
 
-function App() {
+function DailyShell() {
+  const { pathname } = useLocation();
+  const standard = !isActiveInspectionPath(pathname);
   return (
-    <Router basename="/daily">
-      <div className="min-h-screen bg-neutral-50">
+      <div className={standard ? 'daily-standard min-h-screen bg-hub-canvas font-hub text-hub-ink' : 'min-h-screen bg-neutral-50'}>
         {/* Phase 8.1: Skip Navigation */}
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:bg-red-600 focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg">
           Skip to main content
         </a>
-        <HomeNav />
+        <HomeNav standard={standard} />
         <OfflineIndicator />
         <DailyCheckoutQueueProcessor />
         <IOSInstallPrompt />
-        <ContextualIssueWidget />
         <main id="main-content" data-testid="daily-workspace" className="daily-workspace mx-auto px-4 py-6 sm:px-6 md:py-8 lg:px-8 xl:px-10 2xl:px-12">
           <Suspense fallback={<PageLoading />}>
           <Routes>
@@ -97,9 +101,13 @@ function App() {
           </Routes>
           </Suspense>
         </main>
+        <ContextualIssueWidget />
       </div>
-    </Router>
   );
+}
+
+function App() {
+  return <Router basename="/daily"><DailyShell /></Router>;
 }
 
 export default App;

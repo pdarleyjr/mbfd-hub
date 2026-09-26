@@ -174,19 +174,19 @@ export default function StationInspectionWizard() {
     return (
       <div className="text-center py-16 space-y-6">
         <div className="w-20 h-20 mx-auto bg-emerald-50 rounded-full flex items-center justify-center">
-          <svg className="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-10 h-10 text-hub-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-neutral-800 font-heading">
+        <h2 className="text-2xl font-bold text-hub-ink font-heading">
           {submissionOutcome === 'submitted' ? 'Inspection Submitted' : 'Inspection Saved Offline'}
         </h2>
-        <p className="text-neutral-500 max-w-md mx-auto">
+        <p className="text-hub-muted max-w-md mx-auto">
           {submissionOutcome === 'submitted'
             ? 'Your Saturday station inspection is available on the Admin Dashboard.'
             : 'Your inspection is safely queued on this device and will sync automatically when the connection returns.'}
         </p>
-        <PreviousPageButton className="inline-flex items-center min-h-[44px] px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors" />
+        <PreviousPageButton contextual fallback="/forms-hub" className="inline-flex items-center min-h-[44px] px-6 py-3 bg-hub-blue text-white rounded-lg font-medium hover:bg-hub-blue-strong transition-colors" />
       </div>
     );
   }
@@ -197,23 +197,20 @@ export default function StationInspectionWizard() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-8">
-        <PreviousPageButton className="inline-flex items-center text-neutral-500 hover:text-neutral-700 mb-4 min-h-[44px]">
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-          Back to previous page
-        </PreviousPageButton>
-        <h1 className="text-2xl font-bold text-neutral-800 font-heading">Saturday Station Inspection</h1>
-        <p className="text-sm text-neutral-500 mt-1">Miami Beach Fire Department — Weekly Facility & Apparatus Check</p>
+        <PreviousPageButton contextual fallback="/forms-hub" className="inline-flex items-center text-hub-muted hover:text-hub-ink-secondary mb-4 min-h-[44px]"/>
+        <h1 className="text-2xl font-bold text-hub-ink font-heading">Saturday Station Inspection</h1>
+        <p className="text-sm text-hub-muted mt-1">Miami Beach Fire Department — Weekly Facility & Apparatus Check</p>
       </div>
 
       {/* Stepper */}
       <nav className="flex items-center gap-2 mb-8 overflow-x-auto" aria-label="Progress">
         {stepLabels.map((label, i) => (
           <div key={label} className="flex items-center gap-2 flex-shrink-0">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${i + 1 <= step ? 'bg-red-600 text-white' : 'bg-neutral-200 text-neutral-500'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${i + 1 <= step ? 'bg-hub-blue text-white' : 'bg-hub-border text-hub-muted'}`}>
               {i + 1}
             </div>
-            <span className="text-sm text-neutral-600 hidden sm:inline">{label}</span>
-            {i < stepLabels.length - 1 && <div className="w-6 h-px bg-neutral-300" />}
+            <span className="text-sm text-hub-ink-secondary hidden sm:inline">{label}</span>
+            {i < stepLabels.length - 1 && <div className="w-6 h-px bg-hub-border" />}
           </div>
         ))}
       </nav>
@@ -222,15 +219,15 @@ export default function StationInspectionWizard() {
       {step === 1 && (
         <div className="space-y-6">
           <div>
-            <label htmlFor="station-inspection-station" className="block text-sm font-medium text-neutral-700 mb-2">Station</label>
-            <select id="station-inspection-station" value={form.station} onChange={(e) => update({ station: e.target.value })} className="w-full min-h-[44px] px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+            <label htmlFor="station-inspection-station" className="block text-sm font-medium text-hub-ink-secondary mb-2">Station</label>
+            <select id="station-inspection-station" value={form.station} onChange={(e) => update({ station: e.target.value })} className="w-full min-h-[44px] px-4 py-3 bg-white border border-hub-border-strong rounded-lg text-hub-ink focus:outline-none focus:ring-2 focus:ring-hub-focus focus:border-transparent">
               <option value="">Select station...</option>
               {STATIONS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
-            <label htmlFor="station-inspection-date" className="block text-sm font-medium text-neutral-700 mb-2">Inspection Date</label>
-            <input id="station-inspection-date" type="date" value={form.date} onChange={(e) => update({ date: e.target.value })} className="w-full min-h-[44px] px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+            <label htmlFor="station-inspection-date" className="block text-sm font-medium text-hub-ink-secondary mb-2">Inspection Date</label>
+            <input id="station-inspection-date" type="date" value={form.date} onChange={(e) => update({ date: e.target.value })} className="w-full min-h-[44px] px-4 py-3 bg-white border border-hub-border-strong rounded-lg text-hub-ink focus:outline-none focus:ring-2 focus:ring-hub-focus focus:border-transparent" />
           </div>
         </div>
       )}
@@ -241,11 +238,11 @@ export default function StationInspectionWizard() {
           {categories.map((cat) => (
             <div key={cat}>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider">{cat}</h3>
+                <h3 className="text-sm font-semibold text-hub-muted uppercase tracking-wider">{cat}</h3>
                 <button
                   type="button"
                   onClick={() => passAllCategory(cat)}
-                  className="px-3 py-1.5 text-xs font-medium text-white bg-stone-700 rounded-lg hover:bg-stone-600 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-hub-header rounded-lg hover:bg-hub-header-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-hub-focus focus:ring-offset-2"
                 >
                   Pass All
                 </button>
@@ -253,11 +250,11 @@ export default function StationInspectionWizard() {
               <div className="space-y-2">
                 {form.checklist.filter((i) => i.category === cat).map((item) => (
                   <div key={item.id}>
-                    <div className="flex items-center justify-between bg-neutral-100 rounded-lg ring-1 ring-neutral-200/60 p-3 gap-3">
-                      <span className="text-sm text-neutral-700 flex-1">{item.label}</span>
+                    <div className="flex items-center justify-between bg-hub-surface-muted rounded-lg ring-1 ring-hub-border/60 p-3 gap-3">
+                      <span className="text-sm text-hub-ink-secondary flex-1">{item.label}</span>
                       <div className="flex gap-1 flex-shrink-0" role="group" aria-label={`${item.label} status`}>
                         {(['pass', 'fail', 'na'] as const).map((status) => (
-                          <button type="button" key={status} onClick={() => updateChecklistItem(item.id, status)} aria-pressed={item.status === status} aria-label={`${item.label}: ${status === 'na' ? 'not applicable' : status}`} className={`min-w-[44px] min-h-[44px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${item.status === status ? (status === 'pass' ? 'bg-emerald-600 text-white' : status === 'fail' ? 'bg-red-600 text-white' : 'bg-neutral-600 text-white') : 'bg-white text-neutral-600 ring-1 ring-neutral-200 hover:ring-neutral-300'}`}>
+                          <button type="button" key={status} onClick={() => updateChecklistItem(item.id, status)} aria-pressed={item.status === status} aria-label={`${item.label}: ${status === 'na' ? 'not applicable' : status}`} className={`min-w-[44px] min-h-[44px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${item.status === status ? (status === 'pass' ? 'bg-hub-success text-white' : status === 'fail' ? 'bg-red-600 text-white' : 'bg-hub-muted text-white') : 'bg-white text-hub-ink-secondary ring-1 ring-hub-border hover:ring-hub-border-strong'}`}>
                             {status === 'na' ? 'N/A' : status.charAt(0).toUpperCase() + status.slice(1)}
                           </button>
                         ))}
@@ -271,10 +268,10 @@ export default function StationInspectionWizard() {
                           onChange={(e) => updateFailNotes(item.id, e.target.value)}
                           rows={2}
                           placeholder="Describe the issue..."
-                          className="w-full px-3 py-2 bg-white border border-stone-300 rounded-lg text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 resize-none"
+                          className="w-full px-3 py-2 bg-white border border-hub-border-strong rounded-lg text-sm text-hub-ink focus:outline-none focus:ring-2 focus:ring-hub-focus focus:ring-offset-2 resize-none"
                         />
                         <div>
-                          <label htmlFor={`station-inspection-photo-${item.id}`} className="block text-xs font-medium text-neutral-500 mb-1">Photo (optional)</label>
+                          <label htmlFor={`station-inspection-photo-${item.id}`} className="block text-xs font-medium text-hub-muted mb-1">Photo (optional)</label>
                           <input
                             id={`station-inspection-photo-${item.id}`}
                             type="file"
@@ -284,10 +281,10 @@ export default function StationInspectionWizard() {
                               const file = e.target.files?.[0];
                               if (file) handleFailImage(item.id, file);
                             }}
-                            className="block w-full text-sm text-neutral-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                            className="block w-full text-sm text-hub-ink-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-hub-surface-muted file:text-hub-ink-secondary hover:file:bg-hub-border focus:outline-none focus:ring-2 focus:ring-hub-focus focus:ring-offset-2"
                           />
                           {item.failImage && (
-                            <img src={item.failImage} alt="Fail evidence" className="mt-2 h-24 rounded-lg border border-stone-200 object-cover" />
+                            <img src={item.failImage} alt="Fail evidence" className="mt-2 h-24 rounded-lg border border-hub-border object-cover" />
                           )}
                         </div>
                       </div>
@@ -295,8 +292,8 @@ export default function StationInspectionWizard() {
                     {/* Extinguishing System date input */}
                     {item.id === 'kit_ext_system' && (
                       <div className="ml-4 mt-2 mb-1">
-                        <label htmlFor="station-inspection-extinguishing-system-date" className="block text-xs font-medium text-neutral-500 mb-1">Extinguishing System Inspection Date</label>
-                        <input id="station-inspection-extinguishing-system-date" type="date" value={form.extinguishingSystemDate} onChange={(e) => update({ extinguishingSystemDate: e.target.value })} className="w-full max-w-xs min-h-[44px] px-3 py-2 bg-white border border-neutral-300 rounded-lg text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                        <label htmlFor="station-inspection-extinguishing-system-date" className="block text-xs font-medium text-hub-muted mb-1">Extinguishing System Inspection Date</label>
+                        <input id="station-inspection-extinguishing-system-date" type="date" value={form.extinguishingSystemDate} onChange={(e) => update({ extinguishingSystemDate: e.target.value })} className="w-full max-w-xs min-h-[44px] px-3 py-2 bg-white border border-hub-border-strong rounded-lg text-sm text-hub-ink focus:outline-none focus:ring-2 focus:ring-hub-focus focus:border-transparent" />
                       </div>
                     )}
                   </div>
@@ -306,8 +303,8 @@ export default function StationInspectionWizard() {
           ))}
           {/* Notes */}
           <div>
-            <label htmlFor="station-inspection-notes" className="block text-sm font-medium text-neutral-700 mb-2">Notes (optional)</label>
-            <textarea id="station-inspection-notes" value={form.notes} onChange={(e) => update({ notes: e.target.value })} rows={3} placeholder="Additional observations or deficiencies..." className="w-full px-4 py-3 bg-white border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none" />
+            <label htmlFor="station-inspection-notes" className="block text-sm font-medium text-hub-ink-secondary mb-2">Notes (optional)</label>
+            <textarea id="station-inspection-notes" value={form.notes} onChange={(e) => update({ notes: e.target.value })} rows={3} placeholder="Additional observations or deficiencies..." className="w-full px-4 py-3 bg-white border border-hub-border-strong rounded-lg text-hub-ink focus:outline-none focus:ring-2 focus:ring-hub-focus focus:border-transparent resize-none" />
           </div>
         </div>
       )}
@@ -315,11 +312,11 @@ export default function StationInspectionWizard() {
       {/* Step 3: Signature + SOG Mandate */}
       {step === 3 && (
         <div className="space-y-6">
-          <p id="station-inspection-signature-label" className="text-neutral-600">Inspector signature</p>
-          <div className="border-2 border-dashed border-neutral-300 rounded-xl bg-white overflow-hidden">
+          <p id="station-inspection-signature-label" className="text-hub-ink-secondary">Inspector signature</p>
+          <div className="border-2 border-dashed border-hub-border-strong rounded-xl bg-white overflow-hidden">
             <SignatureCanvas ref={sigRef} penColor="#1a1a1a" canvasProps={{ className: 'w-full', style: { height: 200, width: '100%' }, role: 'img', 'aria-labelledby': 'station-inspection-signature-label', 'aria-description': 'Draw your signature using a mouse, finger, or stylus.' }} onEnd={handleSaveSig} />
           </div>
-          <button onClick={handleClearSig} className="min-h-[44px] px-4 py-2 text-sm text-neutral-500 hover:text-neutral-700 underline">Clear Signature</button>
+          <button onClick={handleClearSig} className="min-h-[44px] px-4 py-2 text-sm text-hub-muted hover:text-hub-ink-secondary underline">Clear Signature</button>
 
           {/* SOG Mandate Acknowledgment */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
@@ -328,7 +325,7 @@ export default function StationInspectionWizard() {
                 type="checkbox"
                 checked={form.sogMandate}
                 onChange={(e) => update({ sogMandate: e.target.checked })}
-                className="mt-1 w-5 h-5 rounded border-amber-400 text-red-600 focus:ring-red-500"
+                className="mt-1 w-5 h-5 rounded border-amber-400 text-hub-blue focus:ring-hub-focus"
               />
               <span className="text-sm text-amber-900 font-medium leading-relaxed">
                 <strong>Saturday SOG Mandate:</strong> All equipment removed, inspected, and compartments deep cleaned per Standard Operating Guidelines.
@@ -341,26 +338,26 @@ export default function StationInspectionWizard() {
       {/* Step 4: Review */}
       {step === 4 && (
         <div className="space-y-6">
-          <div className="bg-neutral-100 rounded-xl ring-1 ring-neutral-200/60 p-6 space-y-4">
-            <div><span className="text-sm text-neutral-500">Station</span><p className="font-medium text-neutral-800">{form.station}</p></div>
-            <div><span className="text-sm text-neutral-500">Date</span><p className="font-medium text-neutral-800">{form.date}</p></div>
+          <div className="bg-hub-surface-muted rounded-xl ring-1 ring-hub-border/60 p-6 space-y-4">
+            <div><span className="text-sm text-hub-muted">Station</span><p className="font-medium text-hub-ink">{form.station}</p></div>
+            <div><span className="text-sm text-hub-muted">Date</span><p className="font-medium text-hub-ink">{form.date}</p></div>
             <div>
-              <span className="text-sm text-neutral-500">Checklist Summary</span>
+              <span className="text-sm text-hub-muted">Checklist Summary</span>
               <div className="flex gap-4 mt-1">
-                <span className="text-sm text-emerald-700 font-medium">{form.checklist.filter((i) => i.status === 'pass').length} Pass</span>
+                <span className="text-sm text-hub-success font-medium">{form.checklist.filter((i) => i.status === 'pass').length} Pass</span>
                 <span className="text-sm text-red-700 font-medium">{form.checklist.filter((i) => i.status === 'fail').length} Fail</span>
-                <span className="text-sm text-neutral-600 font-medium">{form.checklist.filter((i) => i.status === 'na').length} N/A</span>
+                <span className="text-sm text-hub-ink-secondary font-medium">{form.checklist.filter((i) => i.status === 'na').length} N/A</span>
               </div>
             </div>
             {form.extinguishingSystemDate && (
-              <div><span className="text-sm text-neutral-500">Extinguishing System Date</span><p className="font-medium text-neutral-800">{form.extinguishingSystemDate}</p></div>
+              <div><span className="text-sm text-hub-muted">Extinguishing System Date</span><p className="font-medium text-hub-ink">{form.extinguishingSystemDate}</p></div>
             )}
             <div>
-              <span className="text-sm text-neutral-500">SOG Mandate</span>
-              <p className="font-medium text-emerald-700">✓ Acknowledged</p>
+              <span className="text-sm text-hub-muted">SOG Mandate</span>
+              <p className="font-medium text-hub-success">✓ Acknowledged</p>
             </div>
-            {form.notes && <div><span className="text-sm text-neutral-500">Notes</span><p className="text-neutral-800">{form.notes}</p></div>}
-            {form.signature && <div><span className="text-sm text-neutral-500">Signature</span><img src={form.signature} alt="Signature" className="mt-2 h-16 border border-neutral-200 rounded bg-white" /></div>}
+            {form.notes && <div><span className="text-sm text-hub-muted">Notes</span><p className="text-hub-ink">{form.notes}</p></div>}
+            {form.signature && <div><span className="text-sm text-hub-muted">Signature</span><img src={form.signature} alt="Signature" className="mt-2 h-16 border border-hub-border rounded bg-white" /></div>}
           </div>
         </div>
       )}
@@ -372,15 +369,15 @@ export default function StationInspectionWizard() {
         </div>
       )}
       <div className="flex justify-between mt-8">
-        <button onClick={() => setStep((s) => s - 1)} disabled={step === 1} className="min-h-[44px] px-6 py-3 text-neutral-600 hover:text-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed">
+        <button onClick={() => setStep((s) => s - 1)} disabled={step === 1} className="min-h-[44px] px-6 py-3 text-hub-ink-secondary hover:text-hub-ink disabled:opacity-30 disabled:cursor-not-allowed">
           Previous
         </button>
         {step < 4 ? (
-          <button onClick={() => setStep((s) => s + 1)} disabled={!canNext()} className="min-h-[44px] px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={() => setStep((s) => s + 1)} disabled={!canNext()} className="min-h-[44px] px-6 py-3 bg-hub-blue text-white rounded-lg font-medium hover:bg-hub-blue-strong transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             Next
           </button>
         ) : (
-          <button onClick={handleSubmit} disabled={submitting} className="min-h-[44px] px-8 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50">
+          <button onClick={handleSubmit} disabled={submitting} className="min-h-[44px] px-8 py-3 bg-hub-blue text-white rounded-lg font-medium hover:bg-hub-blue-strong transition-colors disabled:opacity-50">
             {submitting ? 'Submitting...' : 'Submit Inspection'}
           </button>
         )}

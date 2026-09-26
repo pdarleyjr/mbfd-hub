@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\DefectResource\Pages\EditDefect;
 use App\Filament\Resources\DefectResource\Pages\ListDefects;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
@@ -24,6 +25,31 @@ use Tests\TestCase;
 final class ApparatusDefectStateIntegrityTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_edit_form_renders_an_apparatus_without_an_optional_name(): void
+    {
+        $apparatus = $this->createApparatus();
+        $apparatus->update(['name' => null]);
+        $defect = ApparatusDefect::query()->create([
+            'apparatus_id' => $apparatus->id,
+            'compartment' => 'Cab',
+            'item' => 'Portable radio',
+            'status' => 'open',
+            'issue_type' => 'missing',
+            'reported_date' => now()->toDateString(),
+        ]);
+
+        $this->actingAs($this->defectManager());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        $page = Livewire::test(EditDefect::class, ['record' => $defect->getRouteKey()])
+            ->assertSuccessful();
+        $select = $page->instance()->form->getFlatFields()['apparatus_id'];
+        $this->assertSame('E1', $select->getOptionLabel());
+        $this->assertSame('E1', $select->getOptions()[$apparatus->id]);
+        $this->assertNull($apparatus->fresh()->name);
+    }
 
     public function test_missing_defect_photo_is_reported_without_rendering_a_broken_storage_url(): void
     {

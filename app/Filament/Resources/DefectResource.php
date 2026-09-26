@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\DefectResource\Pages;
+use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -36,6 +37,7 @@ class DefectResource extends Resource
             ->schema([
                 Forms\Components\Select::make('apparatus_id')
                     ->relationship('apparatus', 'name')
+                    ->getOptionLabelFromRecordUsing(fn (Apparatus $record): string => $record->name ?: $record->designation ?: $record->vehicle_number ?: (string) $record->getKey())
                     ->required()
                     ->searchable()
                     ->preload(),

@@ -15,6 +15,7 @@ export default defineConfig({
                 'resources/js/push-notification-widget.js',
                 'resources/css/filament/admin/theme.css',
                 'resources/js/workgroup-data-dashboard.jsx',
+                'resources/js/workgroup-l1-inventory.jsx',
                 // Admin desktop-PWA bootstrap (registers /admin/ scoped SW,
                 // gates install prompt by matchMedia, prefetches lookups).
                 'resources/js/admin-pwa/main.ts',

@@ -180,7 +180,7 @@
             padding-top: 1rem;
             border-top: 1px solid #D1D5DB;
             font-size: 0.75rem;
-            color: #9CA3AF;
+            color: rgb(var(--hub-ink-secondary));
             text-align: center;
         }
 
@@ -215,14 +215,13 @@
             to { transform: rotate(360deg); }
         }
     </style>
+    @vite(['resources/css/app.css'])
 </head>
-<body>
+<body class="hub-report hub-report--saver-report">
+    <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/session-results" back-label="Back to Session Results" max-width="max-w-7xl" /></div>
     <div class="print-controls">
         <button class="print-btn print-btn--primary" onclick="window.print()">
             🖨️ Print Report
-        </button>
-        <button class="print-btn print-btn--secondary" onclick="window.close()">
-            ✕ Close
         </button>
     </div>
 
@@ -249,7 +248,7 @@
 
         {{-- AI-generated report content --}}
         @if(!empty($reportHtml))
-        <div class="saver-report-body">
+        <div class="saver-report-body hub-report-table" tabindex="0" role="region" aria-label="SAVER report content">
             {{-- SECURITY: Defense-in-depth — re-sanitize at the render boundary
                  in case a stale, pre-sanitization cache entry survives the
                  WorkgroupAIService::sanitizeReportPayload() upgrade. --}}

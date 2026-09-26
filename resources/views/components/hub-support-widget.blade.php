@@ -1,5 +1,5 @@
 @if(auth('web')->check() && ! request()->is('admin/set-password', 'employee/set-password', 'training/set-password', 'workgroups/set-password'))
-<div class="hub-issue-widget" data-hub-issue-widget data-hub-issue-route-name="{{ request()->route()?->getName() }}">
+<div class="hub-issue-widget hub-issue-widget--inline" data-hub-issue-widget data-hub-issue-route-name="{{ request()->route()?->getName() }}">
     <a class="hub-issue-trigger" data-hub-issue-trigger href="{{ route('hub-support.create') }}">Report an Issue</a>
     <dialog class="hub-issue-dialog" data-hub-issue-dialog aria-labelledby="hub-issue-title">
         <h2 id="hub-issue-title">Report an Issue</h2>

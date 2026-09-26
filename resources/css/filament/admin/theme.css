@@ -45,7 +45,7 @@
 /* FIX: Login button visibility — ensure the primary button is styled */
 .fi-simple-layout .fi-btn-primary,
 .fi-simple-layout button[type="submit"].fi-btn {
-    background-color: rgb(var(--hub-red));
+    background-color: rgb(var(--hub-action-primary));
     color: rgb(var(--hub-surface));
     font-weight: 600;
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -55,7 +55,7 @@
 
 .fi-simple-layout .fi-btn-primary:hover,
 .fi-simple-layout button[type="submit"].fi-btn:hover {
-    background-color: rgb(var(--hub-red-strong));
+    background-color: rgb(var(--hub-action-primary-hover));
 }
 
 .fi-simple-layout .fi-btn-primary:focus,
@@ -76,33 +76,17 @@
 .fi-sidebar {
     background-color: rgb(var(--hub-surface));
     border-right: 1px solid rgb(var(--hub-border));
-    transition: width 280ms cubic-bezier(0.16, 1, 0.3, 1),
-                transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: width, transform;
+    max-width: 100vw;
 }
 
-/* Keep the desktop collapsed state a true icon rail at every breakpoint. */
-@media (min-width: 1024px) and (pointer: fine) {
-    .fi-sidebar:not(.fi-sidebar-open) {
-        width: 4rem;
-        flex-basis: 4rem;
-    }
+/* Filament owns sidebar widths, desktop collapse and the mobile drawer. */
+@media (max-width: 1023px) {
+    /* Translation alone leaves the closed drawer's links in the tab order. */
+    .fi-sidebar:not(.fi-sidebar-open) { visibility: hidden; }
 
-    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-header,
-    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-nav {
-        padding-inline: 0.625rem;
-    }
-
-    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-nav-groups {
-        margin-inline: 0;
-    }
-
-    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-item-button {
-        width: 2.75rem;
-        min-height: 2.75rem;
-        margin-inline: auto;
-        padding: 0.625rem;
-    }
+    /* Expose Filament's existing close control inside the drawer at high zoom,
+       where the drawer can fill the viewport and hide its outside overlay. */
+    .fi-sidebar-header .fi-icon-btn { display: flex; }
 }
 
 /* Sidebar collapse: content fade-out on collapse */
@@ -118,11 +102,11 @@
 
 /* Sidebar header — dark to match topbar, creating unified header bar */
 .fi-sidebar-header {
-    background-color: rgb(var(--hub-header)) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-    --tw-ring-opacity: 0 !important;
-    --tw-shadow: 0 0 #0000 !important;
-    --tw-ring-shadow: 0 0 #0000 !important;
+    background-color: rgb(var(--hub-header));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    --tw-ring-opacity: 0;
+    --tw-shadow: 0 0 #0000;
+    --tw-ring-shadow: 0 0 #0000;
     transition: padding 280ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -130,7 +114,7 @@
 .fi-sidebar-header a,
 .fi-sidebar-header span,
 .fi-sidebar-header .fi-logo {
-    color: rgb(var(--hub-surface)) !important;
+    color: rgb(var(--hub-surface));
 }
 
 .fi-sidebar-header img {
@@ -207,131 +191,161 @@
    We target them directly with the shared MBFD command-header token. */
 .fi-topbar,
 .fi-topbar > nav {
-    background-color: rgb(var(--hub-header)) !important;
+    background-color: rgb(var(--hub-header));
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    border-bottom: none !important;
-    box-shadow: none !important;
+    border-bottom: none;
+    box-shadow: none;
 }
 
 .fi-topbar {
-    border-bottom: 2px solid rgb(var(--hub-red) / 0.3) !important;
+    border-bottom: 2px solid rgb(var(--hub-red) / 0.3);
 }
 
 .fi-topbar > nav {
-    --tw-ring-opacity: 0 !important;
-    --tw-shadow: 0 0 #0000 !important;
-    --tw-ring-shadow: 0 0 #0000 !important;
+    --tw-ring-opacity: 0;
+    --tw-shadow: 0 0 #0000;
+    --tw-ring-shadow: 0 0 #0000;
 }
 
 /* --- Topbar text: light on dark --- */
 /* Icon buttons (hamburger, home, notifications bell) */
 .fi-topbar > nav .fi-icon-btn {
-    color: rgb(var(--hub-border)) !important;
+    color: rgb(var(--hub-border));
 }
 
 .fi-topbar > nav .fi-icon-btn:hover {
-    color: rgb(var(--hub-surface)) !important;
-    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: rgb(var(--hub-surface));
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Sidebar open/close toggle */
 .fi-topbar > nav .fi-topbar-open-sidebar-btn,
 .fi-topbar > nav .fi-topbar-close-sidebar-btn {
-    color: rgb(var(--hub-border)) !important;
+    color: rgb(var(--hub-border));
 }
 
 /* Global search input */
 .fi-topbar > nav .fi-global-search-field input {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    color: rgb(var(--hub-surface)) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: rgb(var(--hub-surface));
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .fi-topbar > nav .fi-global-search-field input::placeholder {
-    color: rgb(var(--hub-muted-soft)) !important;
+    color: rgb(var(--hub-muted-soft));
 }
 
 /* Search icon and label text */
 .fi-topbar > nav .fi-global-search-field .fi-input-wrp {
-    background-color: rgba(255, 255, 255, 0.08) !important;
-    border-color: rgba(255, 255, 255, 0.15) !important;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
 }
 
 .fi-topbar > nav .fi-global-search-field svg {
-    color: rgb(var(--hub-muted-soft)) !important;
+    color: rgb(var(--hub-muted-soft));
 }
 
 /* User menu trigger text */
 .fi-topbar > nav .fi-dropdown > button,
 .fi-topbar > nav .fi-dropdown > button span,
 .fi-topbar > nav .fi-dropdown > button svg {
-    color: rgb(var(--hub-border)) !important;
+    color: rgb(var(--hub-border));
 }
 
 .fi-topbar > nav .fi-dropdown > button:hover,
 .fi-topbar > nav .fi-dropdown > button:hover span {
-    color: rgb(var(--hub-surface)) !important;
+    color: rgb(var(--hub-surface));
+}
+
+.fi-topbar .fi-user-menu-trigger,
+.fi-topbar .fi-user-menu-trigger :is(span, svg) {
+    color: rgb(var(--hub-border));
+}
+
+.fi-topbar .fi-user-menu-trigger:is(:hover, :focus-visible) {
+    background: rgb(var(--hub-surface) / .1);
+}
+
+.fi-topbar .fi-user-menu-trigger { min-height: 2.75rem; }
+
+/* At phone zoom widths, keep every native topbar control reachable and give
+   search its own row rather than clipping the account menu. */
+@media (max-width: 359px) {
+    .fi-topbar > nav {
+        height: auto;
+        min-height: 4rem;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: .25rem 0;
+        padding: .5rem;
+    }
+
+    .fi-topbar > nav > .ms-auto { display: contents; }
+
+    .fi-topbar .fi-global-search {
+        order: 1;
+        flex: 1 0 100%;
+        min-width: 0;
+    }
+
+    .fi-topbar .fi-global-search > div { width: 100%; min-width: 0; }
+    .fi-topbar .fi-global-search input { min-height: 2.75rem; }
+    .fi-body :is(a, button, input, select, textarea, [tabindex]):focus-visible { scroll-margin-block: 8rem; }
 }
 
 /* Notification badge */
 .fi-topbar .fi-badge {
-    background-color: rgb(var(--hub-red)) !important;
-    color: rgb(var(--hub-surface)) !important;
+    background-color: rgb(var(--hub-red));
+    color: rgb(var(--hub-surface));
 }
 
 /* Breadcrumbs (visible on sub-pages) */
 .fi-topbar > nav .fi-breadcrumbs,
 .fi-topbar > nav .fi-breadcrumbs li,
 .fi-topbar > nav .fi-breadcrumbs a {
-    color: rgb(var(--hub-border)) !important;
+    color: rgb(var(--hub-border));
 }
 
 .fi-topbar > nav .fi-breadcrumbs a:hover {
-    color: rgb(var(--hub-surface)) !important;
+    color: rgb(var(--hub-surface));
 }
 
 /* Any injected render hook content (home icon) */
 .fi-topbar > nav a[title="Return to Home"],
 .fi-topbar > nav a[aria-label="Return to Home"] {
-    color: rgb(var(--hub-border)) !important;
+    color: rgb(var(--hub-border));
+    min-width: 2.75rem;
+    min-height: 2.75rem;
 }
 
-.fi-topbar > nav a[title="Return to Home"]:hover,
-.fi-topbar > nav a[aria-label="Return to Home"]:hover {
-    color: rgb(var(--hub-surface)) !important;
+.fi-topbar > nav a[title="Return to Home"]:is(:hover, :focus-visible),
+.fi-topbar > nav a[aria-label="Return to Home"]:is(:hover, :focus-visible) {
+    color: rgb(var(--hub-surface));
+    background-color: rgb(var(--hub-surface) / .1);
 }
 
 /* --- CRITICAL: Dropdown panels must keep DARK text on WHITE background --- */
 /* These panels (user menu, notifications) render OUTSIDE the topbar nav
    via Filament's teleport, but we protect them explicitly just in case. */
 .fi-dropdown-panel {
-    background-color: rgb(var(--hub-surface)) !important;
-    color: rgb(var(--hub-ink)) !important;
+    background-color: rgb(var(--hub-surface));
+    color: rgb(var(--hub-ink));
 }
 
-.fi-dropdown-panel *,
-.fi-dropdown-panel .fi-dropdown-list-item,
-.fi-dropdown-panel .fi-dropdown-list-item-label,
-.fi-dropdown-panel a,
-.fi-dropdown-panel button,
-.fi-dropdown-panel span,
-.fi-dropdown-panel svg {
-    color: rgb(var(--hub-ink)) !important;
-}
 
 .fi-dropdown-panel .fi-dropdown-list-item:hover {
     background-color: rgb(var(--hub-surface-muted));
 }
 
 .fi-dropdown-panel .fi-dropdown-list-item-icon {
-    color: rgb(var(--hub-muted)) !important;
+    color: rgb(var(--hub-muted));
 }
 
 /* Notification dropdown panel */
 .fi-modal-window,
 [x-ref="panel"] {
-    color: rgb(var(--hub-ink)) !important;
+    color: rgb(var(--hub-ink));
 }
 
 /* ===== PAGE HEADER ===== */
@@ -345,6 +359,47 @@
 .fi-header-subheading {
     font-size: 0.875rem;
     color: rgb(var(--hub-muted));
+}
+
+/* Allow intrinsic table/widget widths to scroll inside their own region. */
+.fi-main-ctn,
+.fi-main,
+.fi-page,
+.fi-section,
+.fi-wi,
+.fi-ta-ctn {
+    min-width: 0;
+}
+
+.fi-header-heading {
+    overflow-wrap: anywhere;
+}
+
+.fi-header-actions {
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.fi-btn,
+.fi-icon-btn,
+.fi-sidebar-item-button,
+.fi-pagination-item-button {
+    min-height: 2.75rem;
+}
+
+.fi-icon-btn {
+    min-width: 2.75rem;
+}
+
+.fi-body :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid rgb(var(--hub-focus));
+    outline-offset: 2px;
+    scroll-margin-block: 5rem;
+}
+
+.fi-topbar :is(a, button, input):focus-visible,
+.fi-sidebar-header :is(a, button):focus-visible {
+    outline-color: rgb(var(--hub-surface));
 }
 
 /* ===== STAT CARDS ===== */
@@ -408,6 +463,7 @@
 .mbfd-station-overview-metrics strong { color: #292524; font-variant-numeric: tabular-nums; }
 
 .mbfd-station-command-board {
+    container: station-command / inline-size;
     --command-ink: rgb(var(--hub-ink));
     --command-muted: rgb(var(--hub-muted));
     --command-border: rgb(var(--hub-border));
@@ -418,6 +474,7 @@
     --command-amber: rgb(var(--hub-warning));
     --command-blue: rgb(var(--hub-blue));
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
     min-width: 0;
     color: var(--command-ink);
@@ -443,13 +500,13 @@
 .mbfd-command-live { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .45rem .65rem; color: rgb(var(--hub-border-soft)); font-size: .875rem; font-variant-numeric: tabular-nums; }
 .mbfd-command-live-state { padding: .3rem .55rem; color: rgb(var(--hub-surface)); background: rgb(var(--hub-success)); border-radius: 999px; font-size: .75rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
 .mbfd-command-live-state[data-state="stale"] { background: var(--command-amber); }
-.mbfd-command-actions { display: flex; align-items: center; gap: .5rem; }
+.mbfd-command-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 .mbfd-command-actions button, .mbfd-command-actions a { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: .55rem .8rem; color: rgb(var(--hub-surface)); background: transparent; border: 1px solid rgb(var(--hub-muted)); border-radius: .55rem; font-size: .875rem; font-weight: 700; text-decoration: none; }
 .mbfd-command-actions button:hover, .mbfd-command-actions a:hover, .mbfd-command-actions button:focus-visible, .mbfd-command-actions a:focus-visible { border-color: rgb(var(--hub-surface)); outline: 2px solid transparent; }
 .mbfd-command-actions button:disabled { opacity: .55; }
 
 .mbfd-command-master { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
-.mbfd-command-master-card { display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-width: 0; min-height: 19rem; padding: .95rem; background: var(--command-panel); border: 1px solid var(--command-border); border-radius: .8rem; box-shadow: var(--hub-shadow-card); }
+.mbfd-command-master-card { display: flex; flex-direction: column; min-width: 0; min-height: 19rem; padding: .95rem; background: var(--command-panel); border: 1px solid var(--command-border); border-radius: .8rem; box-shadow: var(--hub-shadow-card); }
 .mbfd-command-master-card > header { display: flex; align-items: start; justify-content: space-between; gap: .75rem; margin-bottom: .65rem; }
 .mbfd-command-master-card h2, .mbfd-command-section-heading h2 { margin: .12rem 0 0; color: var(--command-ink); font-size: 1.05rem; font-weight: 800; letter-spacing: -.01em; }
 .mbfd-command-count { display: inline-flex; min-width: 2.25rem; min-height: 2.25rem; align-items: center; justify-content: center; padding: .25rem .5rem; color: var(--command-bay); background: rgb(var(--hub-surface-muted)); border: 1px solid var(--command-border); border-radius: .55rem; font-size: 1rem; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -457,17 +514,17 @@
 .mbfd-command-card-link { display: inline-flex; min-height: 44px; align-items: center; color: var(--command-blue); font-weight: 750; text-decoration: none; }
 .mbfd-command-card-link:hover, .mbfd-command-card-link:focus-visible { text-decoration: underline; }
 
-.mbfd-command-record-list { display: grid; align-content: start; max-height: 15rem; overflow-y: auto; border-block: 1px solid rgb(var(--hub-border-soft)); scrollbar-gutter: stable; }
+.mbfd-command-record-list { display: grid; grid-auto-rows: max-content; align-content: start; min-height: 0; max-height: 15rem; overflow-y: auto; border-block: 1px solid rgb(var(--hub-border-soft)); scrollbar-gutter: stable; }
 .mbfd-command-record-list:focus-visible { outline: 2px solid var(--command-blue); outline-offset: 2px; }
-.mbfd-command-record { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .7rem; min-height: 46px; padding: .48rem .35rem .48rem .65rem; color: var(--command-ink); border-inline-start: 3px solid transparent; border-bottom: 1px solid rgb(var(--hub-border-soft)); text-decoration: none; }
+.mbfd-command-record { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: .25rem; min-height: 46px; padding: .6rem .35rem .6rem .65rem; color: var(--command-ink); border-inline-start: 3px solid transparent; border-bottom: 1px solid rgb(var(--hub-border-soft)); text-decoration: none; line-height: 1.5; overflow-wrap: anywhere; }
 .mbfd-command-record:hover, .mbfd-command-record:focus-visible { background: rgb(var(--hub-surface-muted)); outline: none; }
 .mbfd-command-record[data-tone="critical"] { border-inline-start-color: var(--command-red); }
 .mbfd-command-record[data-tone="warning"] { border-inline-start-color: var(--command-amber); }
 .mbfd-command-record[data-tone="info"] { border-inline-start-color: var(--command-blue); }
 .mbfd-command-record > span, .mbfd-command-detail-list a > span:first-child { display: grid; min-width: 0; }
-.mbfd-command-record strong, .mbfd-command-detail-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mbfd-command-record strong, .mbfd-command-detail-list strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.5; overflow-wrap: anywhere; }
 .mbfd-command-record small, .mbfd-command-detail-list small { color: var(--command-muted); font-size: .8125rem; }
-.mbfd-command-record time, .mbfd-command-detail-list time { color: var(--command-muted); font-size: .8125rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mbfd-command-record time, .mbfd-command-detail-list time { color: var(--command-muted); font-size: .8125rem; font-variant-numeric: tabular-nums; line-height: 1.5; }
 .mbfd-command-record-list-compact { max-height: 7.6rem; }
 .mbfd-command-empty { margin: 0; padding: .8rem .4rem; color: var(--command-muted); font-size: .875rem; line-height: 1.4; }
 
@@ -479,7 +536,8 @@
 .mbfd-command-fleet-counts span { color: var(--command-muted); font-size: .75rem; }
 .mbfd-command-pm-summary { margin: 0 0 .55rem; color: var(--command-muted); font-size: .875rem; font-variant-numeric: tabular-nums; }
 
-.mbfd-command-stations { display: grid; gap: .7rem; }
+.mbfd-command-stations { display: grid; grid-template-columns: minmax(0, 1fr); gap: .7rem; }
+.mbfd-station-command-board > *, .mbfd-command-stations > * { min-width: 0; }
 .mbfd-command-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
 .mbfd-command-section-heading > p { max-width: 42rem; margin: 0; color: var(--command-muted); font-size: .875rem; text-align: right; }
 .mbfd-command-station-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: .75rem; }
@@ -498,6 +556,8 @@
 .mbfd-command-station-apparatus, .mbfd-command-station-activity { display: grid; align-content: start; gap: .25rem; padding-top: .1rem; }
 .mbfd-command-station-apparatus > span, .mbfd-command-station-activity > span:not(.mbfd-command-eyebrow) { display: flex; min-height: 26px; align-items: center; justify-content: space-between; gap: .6rem; color: var(--command-muted); font-size: .8125rem; }
 .mbfd-command-station-apparatus small, .mbfd-command-station-activity time { color: var(--command-muted); font-size: .75rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mbfd-command-station-apparatus strong,
+.mbfd-command-station-activity strong { min-width: 0; overflow-wrap: anywhere; }
 .mbfd-command-station-apparatus small[data-tone="critical"] { color: var(--command-red); font-weight: 800; }
 .mbfd-command-station-apparatus small[data-tone="warning"] { color: rgb(var(--hub-warning)); font-weight: 800; }
 .mbfd-command-expand-cue { align-self: end; color: var(--command-blue); font-size: .875rem; font-weight: 800; }
@@ -517,8 +577,8 @@
 .mbfd-command-detail-panel > header { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: .7rem; }
 .mbfd-command-detail-panel h3 { margin: 0; font-size: 1rem; }
 .mbfd-command-detail-panel header a { display: inline-flex; min-height: 44px; align-items: center; color: var(--command-blue); font-weight: 750; }
-.mbfd-command-detail-list { display: grid; max-height: 22rem; overflow-y: auto; background: rgb(var(--hub-surface)); border-block: 1px solid rgb(var(--hub-border-soft)); scrollbar-gutter: stable; }
-.mbfd-command-detail-list a { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-height: 48px; align-items: center; gap: .7rem; padding: .5rem .65rem; color: var(--command-ink); border-inline-start: 3px solid transparent; border-bottom: 1px solid rgb(var(--hub-border-soft)); text-decoration: none; }
+.mbfd-command-detail-list { display: grid; grid-auto-rows: max-content; align-content: start; max-height: 22rem; overflow-y: auto; background: rgb(var(--hub-surface)); border-block: 1px solid rgb(var(--hub-border-soft)); scrollbar-gutter: stable; }
+.mbfd-command-detail-list a { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 48px; align-items: start; gap: .25rem; padding: .5rem .65rem; color: var(--command-ink); border-inline-start: 3px solid transparent; border-bottom: 1px solid rgb(var(--hub-border-soft)); text-decoration: none; line-height: 1.5; overflow-wrap: anywhere; }
 .mbfd-command-detail-list a[data-tone="critical"] { border-inline-start-color: var(--command-red); }
 .mbfd-command-detail-list a[data-tone="warning"] { border-inline-start-color: var(--command-amber); }
 .mbfd-command-detail-list a[data-tone="info"] { border-inline-start-color: var(--command-blue); }
@@ -526,32 +586,46 @@
 .mbfd-command-workflow-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .5rem; }
 .mbfd-command-workflow-links a { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: .5rem; padding: .6rem .75rem; color: var(--command-ink); background: rgb(var(--hub-surface)); border: 1px solid var(--command-border); border-radius: .55rem; text-decoration: none; }
 .mbfd-command-workflow-links a:hover, .mbfd-command-workflow-links a:focus-visible { border-color: var(--command-blue); outline: none; }
+.mbfd-command-record:focus-visible,
+.mbfd-command-detail-list a:focus-visible,
+.mbfd-command-workflow-links a:focus-visible {
+    outline: 2px solid var(--command-blue);
+    outline-offset: -2px;
+}
 
+/* Display Mode overrides native visibility utilities and the install banner's
+   inline display value so optional installation does not cover the board. */
 body.mbfd-command-display .fi-sidebar,
 body.mbfd-command-display .fi-sidebar-close-overlay,
 body.mbfd-command-display .fi-topbar,
-body.mbfd-command-display .fi-page-header,
+body.mbfd-command-display .fi-header,
+body.mbfd-command-display [data-admin-pwa-install],
 body.mbfd-command-display [data-admin-status-bar] { display: none !important; }
 body.mbfd-command-display .fi-main-ctn { margin-inline-start: 0 !important; }
 body.mbfd-command-display .fi-main { max-width: none; padding: .65rem; }
 body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 
-@media (max-width: 1100px) {
+@container station-command (max-width: 70rem) {
     .mbfd-command-master { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .mbfd-command-master-card:last-child { grid-column: 1 / -1; }
 }
 
-@media (max-width: 767px) {
+@container station-command (max-width: 46rem) {
     .mbfd-command-rail { grid-template-columns: minmax(0, 1fr); align-items: start; }
     .mbfd-command-live { justify-content: flex-start; }
     .mbfd-command-master, .mbfd-command-station-detail { grid-template-columns: minmax(0, 1fr); }
+    .mbfd-command-master-card { min-height: 0; }
     .mbfd-command-master-card:last-child, .mbfd-command-detail-panel-wide, .mbfd-command-workflow-links { grid-column: auto; }
     .mbfd-command-section-heading { align-items: start; flex-direction: column; }
     .mbfd-command-section-heading > p { text-align: start; }
 }
 
-@media (max-width: 420px) {
+@container station-command (max-width: 24rem) {
     .mbfd-command-fleet-counts, .mbfd-command-station-fleet { grid-template-columns: minmax(0, 1fr); }
+    .mbfd-command-master-card > header, .mbfd-command-station-card-header { flex-wrap: wrap; }
+    .mbfd-command-station-card { min-width: 0; }
+    .mbfd-command-station-apparatus > span,
+    .mbfd-command-station-activity > span:not(.mbfd-command-eyebrow) { flex-wrap: wrap; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -580,6 +654,17 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 /* ===== BUTTONS ===== */
 .fi-btn-primary {
     box-shadow: var(--hub-shadow-card);
+}
+
+/* Filament's channel variables use commas; Hub tokens use CSS space syntax.
+   Apply the shared fill only to native solid primary buttons, retaining its
+   outlined, semantic color, focus and disabled variants. */
+.fi-btn.fi-color-primary.bg-custom-600 {
+    background-color: rgb(var(--hub-action-primary));
+}
+
+.fi-btn.fi-color-primary.bg-custom-600:hover {
+    background-color: rgb(var(--hub-action-primary-hover));
 }
 
 /* ===== BADGES ===== */
@@ -627,6 +712,17 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 .stock-good { color: #16a34a; }
 
 /* ===== FORM FOCUS ENHANCEMENT ===== */
+.fi-wi-stats-overview-stat-description.fi-color-success { color: rgb(var(--hub-success)); }
+.filament-spatie-health > .text-gray-400 { color: rgb(var(--hub-muted)); }
+.filament-spatie-health > .text-red-500 { color: rgb(var(--hub-danger)); }
+
+.fi-fo-field-wrp input:not(:disabled)::placeholder,
+.fi-fo-field-wrp textarea:not(:disabled)::placeholder,
+.fi-fo-field-wrp .choices__placeholder {
+    color: rgb(var(--hub-muted));
+    opacity: 1;
+}
+
 .fi-input:focus-within {
     box-shadow: 0 0 0 2px rgb(var(--hub-focus) / 0.2);
     border-color: rgb(var(--hub-focus));
@@ -1353,9 +1449,6 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     .fi-ta-cell {
         padding-top: 0.5rem;
         padding-bottom: 0.5rem;
-    }
-    .fi-sidebar {
-        width: 280px;
     }
     /* Reserve breathing room at the bottom for the status bar */
     .fi-main {

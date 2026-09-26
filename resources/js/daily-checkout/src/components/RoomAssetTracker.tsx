@@ -48,7 +48,7 @@ export default function RoomAssetTracker() {
   }, [loadProfile]);
 
   if (loading) return <div className="flex min-h-64 items-center justify-center text-sm font-semibold text-hub-ink-secondary font-hub" role="status">Loading room profile…</div>;
-  if (error || !profile) return <div className="rounded-xl border border-hub-danger/30 bg-hub-danger/10 p-5 text-hub-danger font-hub"><p className="font-semibold">{error || 'Room not found.'}</p><div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={loadProfile} className="min-h-12 rounded-lg bg-hub-blue px-5 font-semibold text-white hover:bg-hub-blue-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus">Retry</button><PreviousPageButton fallback={`/stations/${stationId}`} className="inline-flex min-h-12 items-center px-2 font-semibold text-hub-blue hover:text-hub-blue-strong">← Back to previous page</PreviousPageButton></div></div>;
+  if (error || !profile) return <div className="rounded-xl border border-hub-danger/30 bg-hub-danger/10 p-5 text-hub-danger font-hub"><p className="font-semibold">{error || 'Room not found.'}</p><div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={loadProfile} className="min-h-12 rounded-lg bg-hub-blue px-5 font-semibold text-white hover:bg-hub-blue-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus">Retry</button><PreviousPageButton contextual fallback={`/stations/${stationId}`} className="inline-flex min-h-12 items-center px-2 font-semibold text-hub-blue hover:text-hub-blue-strong" /></div></div>;
 
   const room = profile.room;
   const attention = profile.current_assets.filter((asset) => ['poor', 'critical', 'damaged', 'needs_repair', 'out_of_service'].includes(asset.condition)).length;
@@ -64,7 +64,7 @@ export default function RoomAssetTracker() {
   return (
     <div className="space-y-5 font-hub">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <PreviousPageButton fallback={`/stations/${stationId}`} className="inline-flex min-h-12 items-center gap-2 px-2 text-sm font-semibold text-hub-ink-secondary hover:text-hub-ink">← Back to previous page</PreviousPageButton>
+        <PreviousPageButton contextual fallback={`/stations/${stationId}`} className="inline-flex min-h-12 items-center gap-2 px-2 text-sm font-semibold text-hub-ink-secondary hover:text-hub-ink" />
         <Link to={`/forms-hub/station-request?station_id=${stationId}&return_to=${returnTo}`} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-hub-blue px-5 font-semibold text-white hover:bg-hub-blue-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus">New room request</Link>
       </div>
 

@@ -50,9 +50,9 @@ class WorkgroupPanelProvider extends PanelProvider
             ->homeUrl('/')
             ->login(CanonicalPanelLoginRedirectController::class)
             ->brandName('Eval Feedback Hub')
-            ->brandLogo(secure_asset('images/mbfd_logo-256.png'))
+            ->brandLogo(asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
-            ->favicon(secure_asset('favicon.ico'))
+            ->favicon(asset('favicon.ico'))
             ->darkMode(false)
             ->colors([
                 'primary' => Color::Blue,
@@ -165,13 +165,12 @@ class WorkgroupPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <meta name="apple-mobile-web-app-capable" content="yes">
+                fn (): string => '<meta name="apple-mobile-web-app-capable" content="yes">
             <meta name="apple-mobile-web-app-status-bar-style" content="default">
             <meta name="apple-mobile-web-app-title" content="Eval Feedback Hub">
-            <link rel="apple-touch-icon" href="'.secure_asset('images/mbfd_logo-256.png').'" sizes="180x180">
-            <link rel="apple-touch-startup-image" href="'.secure_asset('images/mbfd_logo.png').'" sizes="160x290 640x1136" media="screen and (max-device-width: 414px)">
-            <link rel="manifest" href="'.secure_asset('/manifest.json').'">
+            <link rel="apple-touch-icon" href="'.asset('images/mbfd_logo-256.png').'" sizes="180x180">
+            <link rel="apple-touch-startup-image" href="'.asset('images/mbfd_logo.png').'" sizes="160x290 640x1136" media="screen and (max-device-width: 414px)">
+            <link rel="manifest" href="'.asset('/manifest.json').'">
             <meta name="theme-color" content="#102A43">',
             );
     }

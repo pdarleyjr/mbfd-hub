@@ -10,6 +10,7 @@
 <x-filament-panels::page>
     {{-- Scoped inline styles for items not in Tailwind purge --}}
     <style>
+        .ei-help { color: rgb(var(--hub-muted)); }
         .ei-upload-zone {
             display: flex; flex-direction: column; align-items: center;
             justify-content: center; gap: 1rem;
@@ -18,17 +19,17 @@
             background: #f9fafb; cursor: pointer;
             transition: border-color 0.15s, background 0.15s;
         }
-        .ei-upload-zone:hover { border-color: #6366f1; background: #eef2ff; }
+        .ei-upload-zone:hover { border-color: rgb(var(--hub-action-primary)); background: rgb(var(--hub-action-primary) / 0.08); }
         .ei-upload-zone svg { width: 3rem; height: 3rem; color: #9ca3af; }
         .ei-btn-primary {
             display: inline-flex; align-items: center; justify-content: center;
             gap: 0.5rem; padding: 0.875rem 1.5rem; font-size: 0.9375rem;
             font-weight: 600; border-radius: 0.5rem; border: none; cursor: pointer;
-            min-height: 48px; width: 100%; background: #4f46e5; color: #fff;
+            min-height: 48px; width: 100%; background: rgb(var(--hub-action-primary)); color: #fff;
             transition: background 0.15s; text-align: center;
         }
-        .ei-btn-primary:hover { background: #4338ca; }
-        .ei-btn-primary:active { background: #3730a3; }
+        .ei-btn-primary:hover { background: rgb(var(--hub-action-primary-hover)); }
+        .ei-btn-primary:active { background: rgb(var(--hub-header-elevated)); }
         .ei-btn-secondary {
             display: inline-flex; align-items: center; justify-content: center;
             gap: 0.5rem; padding: 0.875rem 1.5rem; font-size: 0.9375rem;
@@ -45,12 +46,14 @@
             cursor: pointer; white-space: nowrap; transition: color 0.15s, border-color 0.15s;
             min-height: 48px;
         }
-        .ei-tab-btn.active { border-bottom-color: #4f46e5; color: #4f46e5; font-weight: 600; }
+        .ei-tab-btn.active { border-bottom-color: rgb(var(--hub-action-primary)); color: rgb(var(--hub-action-primary)); font-weight: 600; }
         .ei-tab-btn svg { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
         .ei-progress-bar { height: 0.5rem; background: #e5e7eb; border-radius: 9999px; overflow: hidden; }
-        .ei-progress-fill { height: 100%; background: #4f46e5; border-radius: 9999px; transition: width 0.3s; }
+        .ei-progress-fill { height: 100%; background: rgb(var(--hub-action-primary)); border-radius: 9999px; transition: width 0.3s; }
         @media (min-width: 640px) {
             .ei-btn-primary, .ei-btn-secondary { width: auto; }
+            .ei-bulk-row { background: transparent; }
+            .ei-bulk-grid { grid-template-columns: minmax(0, 2fr) 80px minmax(0, 1fr) minmax(0, 1fr) 40px; }
         }
     </style>
 
@@ -133,7 +136,7 @@
 
                     {{-- Processing --}}
                     <template x-if="processing">
-                        <div class="mt-4 flex items-center gap-3" style="color:#4f46e5;">
+                        <div class="mt-4 flex items-center gap-3" style="color:rgb(var(--hub-action-primary));">
                             <svg class="animate-spin" style="width:24px;height:24px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle style="opacity:0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path style="opacity:0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -165,7 +168,7 @@
                             <option value="consumable">Consumable (disposable supply)</option>
                             <option value="component">Component (part of a larger asset)</option>
                         </select>
-                        <p class="mt-1 text-xs text-gray-400">Determines which Snipe-IT endpoint the item is saved to.</p>
+                        <p class="mt-1 text-xs ei-help">Determines which Snipe-IT endpoint the item is saved to.</p>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -188,13 +191,13 @@
                                 style="min-height:44px;" placeholder="e.g. SN-2024-00123" />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Item / Device Name <span class="text-gray-400 text-xs">(AI-suggested)</span></label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Item / Device Name <span class="ei-help text-xs">(AI-suggested)</span></label>
                             <input type="text" :value="aiField_item_name" @input="aiField_item_name=$event.target.value"
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
                                 style="min-height:44px;" placeholder="e.g. 18 inch chainsaw, hydraulic spreader" />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Category <span class="text-gray-400 text-xs">(AI-suggested)</span></label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Category <span class="ei-help text-xs">(AI-suggested)</span></label>
                             <input type="text" :value="aiField_category" @input="aiField_category=$event.target.value"
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
                                 style="min-height:44px;" placeholder="e.g. Saw, Rescue Tool, SCBA, Fan" />
@@ -212,7 +215,7 @@
                                         <option value="{{ $id }}">{{ $name }}</option>
                                     @endforeach
                                 </select>
-                                <button type="button" @click="showNewLoc = true" class="mt-1 text-sm" style="color:#4f46e5;">+ New location</button>
+                                <button type="button" @click="showNewLoc = true" class="mt-1 text-sm" style="color:rgb(var(--hub-action-primary));min-height:44px;">+ New location</button>
                             </div>
                             <div x-show="showNewLoc" class="space-y-2">
                                 <input type="text" wire:model="new_location_name"
@@ -275,7 +278,7 @@
                                     <option value="{{ $id }}">{{ $name }}</option>
                                 @endforeach
                             </select>
-                            <button type="button" @click="showNewLoc2 = true" class="mt-1 text-sm" style="color:#4f46e5;">+ New location</button>
+                            <button type="button" @click="showNewLoc2 = true" class="mt-1 text-sm" style="color:rgb(var(--hub-action-primary));min-height:44px;">+ New location</button>
                         </div>
                         <div x-show="showNewLoc2" class="space-y-2">
                             <input type="text" wire:model="new_location_name"
@@ -300,8 +303,8 @@
 
                     <div class="space-y-3">
                         @foreach($bulk_items as $index => $item)
-                            <div class="rounded-lg p-3 sm:p-0" style="background:#f9fafb;" class="sm:background-transparent">
-                                <div class="grid grid-cols-1 sm:gap-2 sm:items-center" style="@media(min-width:640px){grid-template-columns: 2fr 80px 1fr 1fr 40px;}">
+                            <div class="ei-bulk-row rounded-lg bg-gray-50 p-3 sm:p-0">
+                                <div class="ei-bulk-grid grid grid-cols-1 sm:gap-2 sm:items-center">
                                     <div class="mb-2 sm:mb-0">
                                         <label class="sm:hidden block text-xs font-medium text-gray-500 mb-1">Item Name</label>
                                         <input type="text" wire:model="bulk_items.{{ $index }}.name"
@@ -416,7 +419,7 @@
                                             <option value="{{ $id }}">{{ $name }}</option>
                                         @endforeach
                                     </select>
-                                    <button type="button" @click="showNewLoc3 = true" class="mt-1 text-sm" style="color:#4f46e5;">+ New location</button>
+                                    <button type="button" @click="showNewLoc3 = true" class="mt-1 text-sm" style="color:rgb(var(--hub-action-primary));min-height:44px;">+ New location</button>
                                 </div>
                                 <div x-show="showNewLoc3" class="space-y-2">
                                     <input type="text" wire:model="new_location_name"
@@ -551,6 +554,12 @@
                 imageFiles: [],
                 processing: false,
                 scanError: null,
+                aiField_brand: @js($scan_brand ?? ''),
+                aiField_model: @js($scan_model ?? ''),
+                aiField_serial: @js($scan_serial ?? ''),
+                aiField_item_name: @js($scan_item_name ?? ''),
+                aiField_category: @js($scan_category ?? ''),
+                isSaving: false,
 
                 handleCapture(event) {
                     const file = event.target.files[0];

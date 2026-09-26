@@ -242,7 +242,7 @@ export default function StationDetailPage() {
         <p className="text-hub-danger font-medium mb-2">{error || 'Station not found'}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-3">
           <button type="button" onClick={() => setStationLoadAttempt((attempt) => attempt + 1)} className="min-h-12 rounded-lg bg-hub-blue px-5 font-semibold text-white hover:bg-hub-blue-strong">Retry</button>
-          <PreviousPageButton className="inline-flex min-h-12 items-center rounded-lg bg-hub-blue px-5 font-semibold text-white transition-colors hover:bg-hub-blue-strong" />
+          <PreviousPageButton contextual className="inline-flex min-h-12 items-center rounded-lg bg-hub-blue px-5 font-semibold text-white transition-colors hover:bg-hub-blue-strong" />
         </div>
       </div>
     );
@@ -274,14 +274,9 @@ export default function StationDetailPage() {
     <div className="space-y-6 font-hub">
       {/* Back button and header */}
       <div className="flex items-center justify-between">
-        <PreviousPageButton
+        <PreviousPageButton contextual
           className="inline-flex items-center text-hub-muted hover:text-hub-ink"
-        >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to previous page
-        </PreviousPageButton>
+        />
         {station.is_active ? (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-hub-success/10 text-hub-success">Active</span>
         ) : (

@@ -18,6 +18,23 @@ body:has(.apparatus-inspection) #root > div {
   background-color: #f5f9ff;
 }
 
+/* Non-inspection Daily pages share the Hub palette without changing the frozen
+   active-inspection shell or its controls. */
+.daily-standard input:not(:disabled)::placeholder,
+.daily-standard textarea:not(:disabled)::placeholder {
+  color: rgb(var(--hub-ink-secondary));
+  opacity: 1;
+}
+
+.daily-standard :is(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid rgb(var(--hub-focus));
+  outline-offset: 2px;
+}
+
+.daily-standard > header a:focus-visible {
+  outline-color: white;
+}
+
 code {
   font-family: 'JetBrains Mono', source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
