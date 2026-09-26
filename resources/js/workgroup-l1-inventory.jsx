@@ -156,7 +156,7 @@ import { createRoot } from 'react-dom/client';
             const handleExportToExcel = () => {
                 // Initialize a new workbook
                 const wb = XLSX.utils.book_new();
-                
+
                 // Build the data array starting with headers
                 const wsData = [
                     ["Apparatus Inventory Modernization: Ladder 1 (L1)"], // A1
@@ -183,7 +183,7 @@ import { createRoot } from 'react-dom/client';
                 // Add a Grand Total row at the bottom
                 const finalRow = wsData.length + 1;
                 wsData.push([
-                    "", "", "", "", "TOTAL VALUATION:", 
+                    "", "", "", "", "TOTAL VALUATION:",
                     // Formula to sum all the extended costs
                     { t: 'n', f: `SUM(F5:F${finalRow - 1})`, z: '"$"#,##0.00' }
                 ]);
@@ -223,7 +223,7 @@ import { createRoot } from 'react-dom/client';
                                 <h1 className="text-2xl md:text-3xl font-bold tracking-tight">L1 Apparatus Modernization</h1>
                                 <p className="text-slate-400 text-sm mt-1">Professional Loadout Rebuild & Financial Dashboard</p>
                             </div>
-                            <button 
+                            <button
                                 onClick={handleExportToExcel}
                                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20 active:scale-95"
                             >
@@ -327,8 +327,8 @@ import { createRoot } from 'react-dom/client';
                                                 </td>
                                                 <td className="px-6 py-3 text-center whitespace-nowrap">
                                                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                                        isNew 
-                                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                                                        isNew
+                                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                                                         : 'bg-slate-100 text-slate-500 border border-slate-200'
                                                     }`}>
                                                         {item.status}
