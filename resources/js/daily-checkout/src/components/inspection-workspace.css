@@ -1,4 +1,4 @@
-.apparatus-inspection { --ink: #142236; --muted: #53647a; --line: #d8e2ed; --red: #cf1826; --green: #087b56; --warning: #9a5b0d; --surface: #f5f9ff; color: var(--ink); max-width: 1600px; margin: 0 auto; padding-bottom: 88px; letter-spacing: 0; }
+.apparatus-inspection { --ink: #142236; --muted: #53647a; --line: #d8e2ed; --red: #cf1826; --green: #087b56; --warning: #9a5b0d; --surface: #f5f9ff; color: var(--ink); container: inspection / inline-size; max-width: 1600px; margin: 0 auto; padding-bottom: calc(88px + env(safe-area-inset-bottom)); letter-spacing: 0; }
 .apparatus-inspection *, .apparatus-inspection *::before, .apparatus-inspection *::after { box-sizing: border-box; }
 .apparatus-inspection button, .apparatus-inspection select { touch-action: manipulation; min-height: 44px; }
 .apparatus-inspection :is(button, select, textarea, input, [role=button]):focus-visible { outline: 3px solid #276b95; outline-offset: 3px; }
@@ -15,10 +15,8 @@
 .inspection-save > div:first-child { border-left: 1px solid var(--line); padding-left: 18px; }
 .inspection-save strong { display: block; font-weight: 600; color: var(--green); }
 .inspection-save small { display: block; color: var(--muted); margin-top: 4px; }
-.inspection-progress-ring { width: 80px; height: 80px; padding: 7px; border-radius: 50%; flex-shrink: 0; }
-.inspection-progress-ring > span { display: flex; height: 100%; width: 100%; border-radius: 50%; flex-direction: column; align-items: center; justify-content: center; background: #fff; line-height: 1.1; }
-.inspection-progress-ring strong { font-size: 22px; color: var(--ink); }
-.inspection-progress-ring small { font-size: 11px; }
+.inspection-progress { min-width: 120px; }
+.inspection-progress progress { display: block; width: 100%; height: 6px; margin-top: 6px; accent-color: var(--green); }
 .inspection-readiness { display: flex; flex-wrap: wrap; gap: 7px 20px; padding: 9px 0; border-block: 1px solid var(--line); font-size: 13px; margin-bottom: 4px; }
 .inspection-readiness span { display: inline-flex; gap: 7px; align-items: center; }
 .inspection-readiness .oos { color: #a9232b; font-weight: 750; }
@@ -37,8 +35,8 @@
 .blueprint-wheel { fill: #e0e5e8; stroke: #546370; stroke-width: 5; }
 .blueprint-hub { fill: #f7f8f7; stroke: #89969e; stroke-width: 2; }
 .blueprint-zone { cursor: pointer; outline: none; }
-.blueprint-zone rect { fill: #fff4f4; fill-opacity: .87; stroke: #d2202e; stroke-width: 2; }
-.blueprint-zone text { fill: #c71824; font-weight: 700; font-size: 18px; pointer-events: none; }
+.blueprint-zone rect { fill: #f5f7fa; fill-opacity: .87; stroke: #687b8e; stroke-width: 2; }
+.blueprint-zone text { fill: #334a63; font-weight: 700; font-size: 18px; pointer-events: none; }
 .blueprint-zone .blueprint-zone-count { font-size: 14px; font-weight: 500; }
 .blueprint-zone.is-complete rect { fill: #e0f0e9; stroke: #268366; }
 .blueprint-zone.is-complete text { fill: #155b42; }
@@ -55,23 +53,23 @@
 .blueprint-legend b { font-size: 10px; width: 16px; height: 16px; display: inline-grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; color: var(--warning); }
 .blueprint-legend span { display: flex; align-items: center; gap: 5px; }
 .blueprint-legend i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
-.remaining-dot { background: #b66562; } .complete-dot { background: #398066; }
+.remaining-dot { background: #687b8e; } .complete-dot { background: #398066; }
 .inspection-field-label { display: block; font-size: 12px; font-weight: 650; margin: 8px 0 5px; }
 .inspection-navigation select { width: 100%; font-size: 14px; padding: 10px; border: 1px solid #abb8c0; background: #fff; border-radius: 5px; }
 .inspection-area-list { margin-top: 8px; }
 .inspection-area-list button { display: flex; width: 100%; min-height: 52px; align-items: center; gap: 10px; text-align: left; padding: 9px 10px; border-radius: 4px; font-size: 14px; border: 1px solid transparent; }
-.inspection-area-list button[aria-pressed=true] { background: #fff; border-color: #778780; font-weight: 650; }
+.inspection-area-list button[aria-pressed=true] { background: #eaf5ff; border-color: #1687ff; box-shadow: inset 0 0 0 1px #1687ff; font-weight: 650; }
 .inspection-area-list .area-progress { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .area-name { min-width: 0; overflow-wrap: anywhere; }
 .area-warning { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--warning); margin-top: 3px; font-weight: 500; }
 .area-state { display: flex; flex-shrink: 0; width: 18px; justify-content: center; }
-.area-open { display: block; border: 1.5px solid var(--red); width: 12px; height: 12px; border-radius: 50%; }
+.area-open { display: block; border: 1.5px solid var(--muted); width: 12px; height: 12px; border-radius: 50%; }
 .inspection-other-areas { border-top: 1px solid var(--line); margin-top: 8px; }
 .inspection-other-areas summary { min-height: 44px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; font-size: 13px; }
 .inspection-other-areas summary span { color: var(--muted); font-variant-numeric: tabular-nums; }
 .inspection-other-areas summary svg { margin-left: auto; }
 .inspection-other-areas[open] summary svg { transform: rotate(180deg); }
-.area-state { color: #a43e3e; font-size: 18px; } .area-state.is-complete { color: var(--green); }
+.area-state { color: var(--muted); font-size: 18px; } .area-state.is-complete { color: var(--green); }
 .inspection-info-link { width: 100%; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); margin-top: 12px; padding-top: 8px; font-size: 13px; font-weight: 600; }
 .inspection-equipment { min-width: 0; }
 .inspection-equipment { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; box-shadow: 0 2px 12px #193a6410; }
@@ -130,7 +128,7 @@
 .daily-workspace:has(.apparatus-inspection) { padding-top: 16px; }
 .blueprint-touch-zones { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
 .blueprint-touch-zones button { flex: 1 0 44px; min-height: 44px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px; }
-.blueprint-touch-zones button[aria-pressed=true] { background: #eaf5ff; border-color: #1687ff; font-weight: 700; }
+.blueprint-touch-zones button[aria-pressed=true] { background: #eaf5ff; border-color: #1687ff; box-shadow: inset 0 0 0 1px #1687ff; font-weight: 700; }
 .apparatus-inspection > nav { margin-block: 4px 18px; gap: 0; border-bottom: 1px solid var(--line); }
 .apparatus-inspection > nav button { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 10px 16px; border-bottom: 3px solid transparent; }
 .apparatus-inspection > nav button[aria-current=page] { border-bottom-color: var(--red); color: var(--red); font-weight: 700; }
@@ -159,8 +157,6 @@
   .inspection-signature { position: sticky; top: 84px; }
 }
 @media (max-width: 960px) {
-  .inspection-layout, .inspection-layout.with-area-rail { display: grid; grid-template-columns: minmax(0, 1fr); }
-  .inspection-navigation { position: static; max-height: none; overflow: visible; }
   .apparatus-inspection > nav { flex-wrap: nowrap; overflow-x: auto; }
   .apparatus-inspection > nav button { flex: 1 0 auto; white-space: nowrap; }
 }
@@ -168,8 +164,6 @@
   .inspection-authority { gap: 8px; padding-bottom: 13px; flex-wrap: wrap; } .inspection-authority h1 { font-size: 26px; }
   .inspection-save { font-size: 11px; margin-left: auto; } .inspection-save small { font-size: 10px; }
   .inspection-save > div:first-child { padding-left: 10px; }
-  .inspection-progress-ring { width: 68px; height: 68px; padding: 6px; }
-  .inspection-progress-ring strong { font-size: 17px; }
   .inspection-identity { font-size: 12px; gap: 2px 8px; } .inspection-readiness { font-size: 12px; margin-bottom: 14px; gap: 6px 12px; }
   .inspection-layout { display: block; } .inspection-navigation { position: static; padding: 10px; max-height: none; overflow: visible; margin-bottom: 12px; }
   .inspection-navigation h2 { font-size: 18px; margin-bottom: 8px; }
@@ -199,3 +193,55 @@
   .apparatus-inspection > nav button svg { width: 16px; height: 16px; flex-shrink: 0; }
 }
 @media (prefers-reduced-motion: no-preference) { .equipment-pass, .blueprint-zone rect { transition: background-color 120ms ease, fill 120ms ease, stroke 120ms ease; } }
+
+/* Keep the same picker mounted; available workspace width controls disclosure. */
+.inspection-area-summary { display: none; }
+.blueprint-selected { fill: none; stroke: rgb(var(--hub-blue-strong)); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.blueprint-touch-zones button > span { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.blueprint-touch-zones small, .area-selected { display: block; font-size: 10px; line-height: 1.3; }
+.area-selected { color: rgb(var(--hub-blue)); }
+.apparatus-inspection > nav button small { display: block; font-size: 10px; line-height: 1; font-weight: 400; }
+html:has(.apparatus-inspection) { scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.apparatus-inspection :is(input, textarea, button, [tabindex]) { scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom)); }
+
+@container inspection (max-width: 900px) {
+  .inspection-layout, .inspection-layout.with-area-rail { grid-template-columns: minmax(0, 1fr); }
+  .inspection-navigation { position: static; max-height: none; overflow: visible; }
+  .inspection-authority { display: block; padding-bottom: 8px; }
+  .inspection-authority > div > .inspection-eyebrow { display: none; }
+  .inspection-unit-title { gap: 8px; }
+  .inspection-authority h1 { font-family: var(--hub-font-sans); font-size: 24px; margin: 0; }
+  .inspection-status { padding: 4px 8px; font-size: 12px; gap: 5px; }
+  .inspection-status::before { width: 7px; height: 7px; }
+  .inspection-identity { margin-top: 4px; font-size: 12px; line-height: 1.4; gap: 0 8px; }
+  .inspection-save { margin-top: 6px; gap: 12px; justify-content: space-between; font-size: 12px; }
+  .inspection-save > div:first-child { border: 0; padding: 0; }
+  .inspection-save small { font-size: 11px; margin-top: 0; }
+  .inspection-progress { min-width: 100px; max-width: 40%; }
+  .inspection-progress progress { margin-top: 4px; }
+  .inspection-readiness { margin-bottom: 0; padding-block: 5px; font-size: 12px; }
+  .apparatus-inspection > nav { margin-block: 0 8px; }
+  .inspection-layout { display: grid; gap: 8px; }
+  .inspection-navigation { padding: 10px; margin-bottom: 0; }
+  .inspection-navigation h2 { margin: 0; font-size: 17px; }
+  .inspection-panel-heading { gap: 4px 12px; }
+  .blueprint-views { margin-top: 8px; }
+  .blueprint-legend { font-size: 10px; gap: 6px; }
+  .inspection-layout.picker-collapsed > .inspection-navigation { display: none; }
+  .inspection-layout.picker-collapsed > .inspection-area-summary { display: flex; }
+  .inspection-area-summary { align-items: center; justify-content: space-between; gap: 8px; border: 1px solid rgb(var(--hub-border)); background: rgb(var(--hub-surface)); border-radius: 6px; padding: 4px 10px; }
+  .inspection-area-summary > div { min-width: 0; }
+  .inspection-area-summary strong { display: block; font-size: 14px; overflow-wrap: anywhere; }
+  .inspection-area-summary span { display: block; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .inspection-area-summary button { color: rgb(var(--hub-blue)); font-size: 13px; font-weight: 650; flex-shrink: 0; padding-inline: 4px; }
+  .inspection-equipment { padding: 10px; box-shadow: none; }
+  .equipment-heading { gap: 8px; padding-bottom: 8px; }
+  .equipment-heading h2 { font-family: var(--hub-font-sans); font-size: 19px; margin: 2px 0; }
+  .equipment-summary { padding: 5px 8px; gap: 6px; }
+  .equipment-expand { gap: 6px; }
+  .equipment-expand > svg { display: none; }
+  .equipment-expand small { margin-top: 1px; }
+  .equipment-pass { width: 63px; }
+  .inspection-action-bar { padding-top: 6px; padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  .quick-checklist { bottom: calc(68px + env(safe-area-inset-bottom)); }
+}

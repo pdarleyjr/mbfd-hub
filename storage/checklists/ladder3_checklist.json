@@ -2,7 +2,7 @@
   "title": "Ladder 3 Daily Inventory",
   "officerChecklist": [
     {"id": "inspection_date", "name": "Date", "inputType": "date"},
-    {"id": "mileage", "name": "Mileage", "inputType": "number", "required": true},
+    {"id": "mileage", "name": "Mileage", "inputType": "number", "required": false},
     {"id": "vehicle_num", "name": "Vehicle #", "inputType": "text", "required": true},
     {"id": "engine_temp", "name": "Engine Temp", "inputType": "text"},
     {"id": "oil_pressure", "name": "Oil Pressure", "inputType": "text"},

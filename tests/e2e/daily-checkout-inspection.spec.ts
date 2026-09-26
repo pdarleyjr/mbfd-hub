@@ -893,6 +893,8 @@ test('non-empty checklist permits a complete inspection and sends its submission
     client_submission_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
     checklist_version: checklist.checklist_version,
     operator_name: 'Captain Browser',
+    engine_hours: null,
+    miles: null,
     compartments: [
       {
         id: 'cab',
