@@ -6,8 +6,6 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\InboundEmailResource\Pages;
 use App\Models\InboundEmail;
-use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -22,23 +20,15 @@ final class InboundEmailResource extends Resource
 
     protected static ?string $navigationLabel = 'Inbox';
 
-    public static function form(Form $form): Form
-    {
-        return $form->schema([
-            Forms\Components\TextInput::make('from_address')->disabled(),
-            Forms\Components\TextInput::make('to_address')->disabled(),
-            Forms\Components\TextInput::make('subject')->disabled()->columnSpanFull(),
-            Forms\Components\Textarea::make('text_body')->disabled()->rows(16)->columnSpanFull(),
-        ])->columns(2);
-    }
-
     public static function table(Table $table): Table
     {
         return $table->columns([
-            Tables\Columns\TextColumn::make('from_address')->label('From')->searchable(),
-            Tables\Columns\TextColumn::make('subject')->searchable()->limit(70),
-            Tables\Columns\TextColumn::make('received_at')->dateTime()->sortable(),
-            Tables\Columns\TextColumn::make('processing_status')->badge(),
+            Tables\Columns\Layout\Split::make([
+                Tables\Columns\TextColumn::make('from_address')->label('From')->searchable(),
+                Tables\Columns\TextColumn::make('subject')->searchable()->limit(70),
+                Tables\Columns\TextColumn::make('received_at')->dateTime()->sortable(),
+                Tables\Columns\TextColumn::make('processing_status')->badge(),
+            ])->from('md'),
         ])->defaultSort('received_at', 'desc')->actions([
             Tables\Actions\ViewAction::make(),
         ])->bulkActions([]);

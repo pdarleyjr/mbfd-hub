@@ -163,6 +163,12 @@ Schedule::command('mbfd:cloudflare-usage-refresh')
     ->withoutOverlapping(2)
     ->onOneServer();
 
+Schedule::command('mbfd:email-delivery-reconcile')
+    ->everyFiveMinutes()
+    ->when(fn (): bool => (bool) config('communications.delivery.enabled'))
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 Schedule::command('mbfd:nextcloud-access-sync')
     ->everyMinute()
     ->withoutOverlapping(10)

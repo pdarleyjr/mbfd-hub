@@ -86,11 +86,14 @@ final class InboundEmailAuthenticator
                     'received_at' => CarbonImmutable::parse($payload['received_at']),
                     'text_body' => is_string($payload['text'] ?? null) ? $payload['text'] : null,
                     'sanitized_html_body' => $html === null ? null : $this->sanitize($html),
-                    'safe_headers' => is_array($payload['safe_headers'] ?? null) ? $payload['safe_headers'] : null,
-                    'in_reply_to' => is_string($payload['in_reply_to'] ?? null) ? $payload['in_reply_to'] : null,
-                    'references' => is_array($payload['references'] ?? null) ? $payload['references'] : null,
+                    'safe_headers' => $this->safeHeaders($payload['safe_headers'] ?? []),
+                    'in_reply_to' => app(EmailConversation::class)->messageId($payload['in_reply_to'] ?? null),
+                    'references' => app(EmailConversation::class)->references($payload['references'] ?? []),
                     'processing_status' => 'received',
                 ]);
+                if ($email->wasRecentlyCreated) {
+                    app(EmailConversation::class)->associateInbound($email);
+                }
                 if (! $email->wasRecentlyCreated || $attachments === []) {
                     return $email;
                 }
@@ -122,6 +125,18 @@ final class InboundEmailAuthenticator
 
             throw $exception;
         }
+    }
+
+    private function safeHeaders(mixed $headers): array
+    {
+        $headers = is_array($headers) ? array_change_key_case($headers) : [];
+        $conversation = app(EmailConversation::class);
+
+        return [
+            'reply-to' => $conversation->addresses([$headers['reply-to'] ?? ''])[0] ?? null,
+            'to' => $conversation->headerAddresses($headers['to'] ?? []),
+            'cc' => $conversation->headerAddresses($headers['cc'] ?? []),
+        ];
     }
 
     private function sanitize(string $html): string

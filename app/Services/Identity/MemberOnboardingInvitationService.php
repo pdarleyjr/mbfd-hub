@@ -140,6 +140,7 @@ final class MemberOnboardingInvitationService
                 'redeemed_binding_hash' => null,
                 'consumed_at' => null,
                 'delivery_status' => 'pending',
+                'outbound_email_id' => null,
             ];
             $invitation = MemberOnboardingInvitation::query()->where('user_id', $current->id)->lockForUpdate()->first();
             if ($invitation instanceof MemberOnboardingInvitation && $this->invitationIsCurrent($invitation, $current, $employee, $at)) {
@@ -170,8 +171,8 @@ final class MemberOnboardingInvitationService
                 sourceId: (string) $invitation->id,
                 actor: $initiator ?? $user,
             );
-            $failed = in_array($delivery->status, ['failed', 'blocked', 'accepted_with_delivery_issues'], true);
-            $values = ['delivery_status' => $failed ? 'failed' : 'queued', 'sent_at' => $at];
+            $failed = in_array($delivery->status, ['failed', 'failed_pre_acceptance', 'blocked', 'bounced', 'rejected', 'complained', 'accepted_with_delivery_issues'], true);
+            $values = ['delivery_status' => $failed ? 'failed' : 'queued', 'sent_at' => $at, 'outbound_email_id' => $delivery->id];
             if ($failed) {
                 $values += ['token_hash' => null, 'expires_at' => null];
             }

@@ -16,6 +16,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\HtmlString;
 
 class EmployeeResource extends Resource
@@ -84,6 +85,8 @@ class EmployeeResource extends Resource
     public static function table(Table $table): Table
     {
         return self::applyEnterpriseDefaults($table)
+            // Avoid a deferred Livewire rerender racing the bulk-selection Alpine component.
+            ->deferLoading(false)
             ->columns([
                 Tables\Columns\TextColumn::make('employee_id')
                     ->label('Employee ID')
@@ -100,11 +103,13 @@ class EmployeeResource extends Resource
                 Tables\Columns\TextColumn::make('roster_status')->label('Employment')->badge()->placeholder('Not recorded'),
                 Tables\Columns\TextColumn::make('user.account_status')->label('Login')->badge()->placeholder('Awaiting account')
                     ->formatStateUsing(fn ($state): string => ucfirst(str_replace('_', ' ', $state instanceof \BackedEnum ? $state->value : (string) $state))),
-                Tables\Columns\TextColumn::make('invitation_status')->label('Invitation')->badge()
+                Tables\Columns\TextColumn::make('invitation_delivery')->label('Invitation email')->badge()
+                    ->state(fn (Employee $record): string => $record->user?->memberOnboardingInvitation?->emailDeliveryLabel() ?? 'Invitation not sent'),
+                Tables\Columns\TextColumn::make('invitation_status')->label('Account activation')->badge()
                     ->state(function (Employee $record): string {
                         $status = $record->user?->getRawOriginal('account_status');
                         if ($status === 'active') {
-                            return 'Account active';
+                            return 'Account activated';
                         }
                         if ($status !== 'pending_activation') {
                             return 'Not applicable';
@@ -116,13 +121,8 @@ class EmployeeResource extends Resource
                             return 'Expired — ready to resend';
                         }
 
-                        return match ($invitation?->delivery_status) {
-                            'queued' => 'Queued — awaiting activation',
-                            'pending' => 'Sending',
-                            'failed' => 'Delivery failed',
-                            'redeemed' => 'Opening invitation',
-                            default => 'Not sent',
-                        };
+                        return $invitation?->redeemed_at !== null || $invitation?->delivery_status === 'redeemed'
+                            ? 'Opened / redeemed' : 'Awaiting activation';
                     }),
                 Tables\Columns\TextColumn::make('updated_at')
                     ->label('Last Updated')
@@ -170,7 +170,27 @@ class EmployeeResource extends Resource
                     ->action(fn (array $data, Employee $record, Pages\ListEmployees $livewire) => $livewire->queueMemberInvitation($record, $data)),
                 Tables\Actions\EditAction::make(),
             ])
-            ->bulkActions([])
+            ->bulkActions([
+                Tables\Actions\BulkAction::make('sendSelectedOnboardingInvitations')
+                    ->label('Send onboarding invitations to selected members')
+                    ->extraAttributes(['style' => 'max-width: calc(100vw - 10rem); white-space: normal;'])
+                    ->icon('heroicon-o-envelope')
+                    ->visible(fn (): bool => Pages\ListEmployees::canIssueInvitations())
+                    ->modalHeading('Invite selected members')
+                    ->modalDescription('Review this exact selection. Each eligible member receives a separate private invitation that expires after 30 minutes.')
+                    ->modalSubmitActionLabel('Queue selected invitations')
+                    ->fillForm(fn (Collection $records, Pages\ListEmployees $livewire): array => $livewire->previewSelectedInvitations($records))
+                    ->form([
+                        Forms\Components\Placeholder::make('selected_invitation_preview')->label('Selected members')
+                            ->content(fn (Pages\ListEmployees $livewire): HtmlString => $livewire->selectedInvitationPreview()),
+                        Forms\Components\Checkbox::make('confirm_recipients')
+                            ->label('I reviewed the eligible recipients and skipped members in this exact selection.')
+                            ->rule('accepted')->required(),
+                        Forms\Components\TextInput::make('current_password')->label('Your administrator password')
+                            ->password()->autocomplete('current-password')->required(),
+                    ])
+                    ->action(fn (array $data, Collection $records, Pages\ListEmployees $livewire) => $livewire->queueSelectedInvitations($records, $data)),
+            ])
             ->searchPlaceholder('Search by name, ID, or rank...');
     }
 
@@ -235,6 +255,6 @@ class EmployeeResource extends Resource
 
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
-        return parent::getEloquentQuery()->with('user.memberOnboardingInvitation');
+        return parent::getEloquentQuery()->with('user.memberOnboardingInvitation.outboundEmail');
     }
 }

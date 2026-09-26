@@ -66,6 +66,8 @@ export default {
       received_at: new Date().toISOString(),
       safe_headers: {
         date: parsed.date || null,
+        to: parsed.to?.map((entry) => entry.address).filter(Boolean) || [],
+        cc: parsed.cc?.map((entry) => entry.address).filter(Boolean) || [],
         "reply-to": parsed.replyTo?.map((entry) => entry.address).join(", ") || null,
       },
       in_reply_to: parsed.inReplyTo || null,

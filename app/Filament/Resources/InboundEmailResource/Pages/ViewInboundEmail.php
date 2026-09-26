@@ -6,38 +6,45 @@ namespace App\Filament\Resources\InboundEmailResource\Pages;
 
 use App\Filament\Pages\ComposeEmail;
 use App\Filament\Resources\InboundEmailResource;
-use App\Models\InboundEmail;
-use Filament\Actions;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\ViewRecord;
-use LogicException;
 
 final class ViewInboundEmail extends ViewRecord
 {
     protected static string $resource = InboundEmailResource::class;
 
-    protected function getHeaderActions(): array
-    {
-        return [
-            Actions\Action::make('reply')
-                ->icon('heroicon-o-arrow-uturn-left')
-                ->visible(fn (): bool => ComposeEmail::canAccess())
-                ->url(fn (): string => ComposeEmail::getUrl([
-                    'to' => $this->inboundEmail()->from_address,
-                    'subject' => str_starts_with((string) $this->inboundEmail()->subject, 'Re: ')
-                        ? $this->inboundEmail()->subject
-                        : 'Re: '.$this->inboundEmail()->subject,
-                ])),
-        ];
-    }
+    protected static string $view = 'filament.communications.view-email';
 
-    private function inboundEmail(): InboundEmail
+    public function getRecord(): \App\Models\InboundEmail
     {
-        $record = $this->getRecord();
-
-        if (! $record instanceof InboundEmail) {
-            throw new LogicException('The inbound email record is unavailable.');
+        $record = parent::getRecord();
+        if (! $record instanceof \App\Models\InboundEmail) {
+            throw new \LogicException('The email record is unavailable.');
         }
 
         return $record;
+    }
+
+    public function downloadAttachment(int $index): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        abort_unless(auth()->user()?->can('admin.communications.view'), 403);
+        $service = app(\App\Services\Communications\EmailConversation::class);
+        abort_unless($service->canRespond($this->getRecord()), 403);
+        $file = $service->attachments($this->getRecord(), [$index])[0];
+
+        return response()->streamDownload(fn () => print (base64_decode($file['content'])), $file['filename'], ['Content-Type' => 'application/octet-stream', 'X-Content-Type-Options' => 'nosniff']);
+    }
+
+    protected function getHeaderActions(): array
+    {
+        $actions = [Action::make('back')->label('Back to Inbox')->icon('heroicon-o-arrow-left')->color('gray')->url(fn (): string => class_exists(\App\Support\HubNavigation::class) ? \App\Support\HubNavigation::backUrl(InboundEmailResource::getUrl('index')) : InboundEmailResource::getUrl('index'))];
+        foreach (['reply' => 'Reply', 'reply_all' => 'Reply all', 'forward' => 'Forward'] as $mode => $label) {
+            $actions[] = Action::make($mode)->label($label)->color($mode === 'reply' ? 'primary' : 'gray')
+                ->icon($mode === 'forward' ? 'heroicon-o-arrow-uturn-right' : 'heroicon-o-arrow-uturn-left')
+                ->visible(fn (): bool => ComposeEmail::canAccess())
+                ->url(fn (): string => ComposeEmail::getUrl(['source' => 'inbound', 'message' => $this->getRecord()->getKey(), 'mode' => $mode]));
+        }
+
+        return $actions;
     }
 }

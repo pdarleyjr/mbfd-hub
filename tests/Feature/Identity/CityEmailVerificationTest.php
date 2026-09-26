@@ -8,6 +8,7 @@ use App\Enums\AccountStatus;
 use App\Models\CityEmailVerification;
 use App\Models\CloudflareUsageBudget;
 use App\Models\Employee;
+use App\Models\OutboundEmail;
 use App\Models\User;
 use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
@@ -17,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -27,6 +29,8 @@ final class CityEmailVerificationTest extends TestCase
     private array $tokens = [];
 
     private bool $deliveryFails = false;
+
+    private string $deliveryOutcome = 'queued';
 
     protected function setUp(): void
     {
@@ -47,7 +51,7 @@ final class CityEmailVerificationTest extends TestCase
                 $this->tokens[] = $match[1];
             }
 
-            return Http::response(['result' => ['message_id' => 'fixture-message', 'queued' => $request['to']]]);
+            return Http::response(['success' => true, 'result' => ['message_id' => 'fixture-message', $this->deliveryOutcome => $request['to']]]);
         });
     }
 
@@ -131,6 +135,38 @@ final class CityEmailVerificationTest extends TestCase
         self::assertFalse($service->requiresReview($user));
         self::assertSame('employee-'.$employee->id.'@canonical.mbfdhub.invalid', $user->fresh()->email);
         self::assertNull($employee->fresh()->city_email);
+    }
+
+    #[DataProvider('terminalDeliveryOutcomes')]
+    public function test_terminal_provider_failure_invalidates_verification_token_and_shows_failed_delivery(string $responseField, string $outboundStatus): void
+    {
+        [$employee, $user] = $this->identity();
+        $service = app(CityEmailVerificationService::class);
+        $service->acknowledge($user, 'nick@miamibeachfl.gov');
+        $this->deliveryOutcome = $responseField;
+
+        $verification = $service->issue($user);
+
+        self::assertSame($outboundStatus, OutboundEmail::query()->sole()->status);
+        self::assertSame('failed', $verification->delivery_status);
+        self::assertNull($verification->token_hash);
+        self::assertNull($verification->token_expires_at);
+        self::assertNull($service->inspectToken($user, $this->tokens[0]));
+        self::assertFalse($service->verify($user, $this->tokens[0]));
+        self::assertSame('employee-'.$employee->id.'@canonical.mbfdhub.invalid', $user->fresh()->email);
+        self::assertNull($employee->fresh()->city_email);
+        self::assertNull($user->fresh()->email_verified_at);
+        $this->actingAs($user)->get(route('city-email.show'))->assertOk()
+            ->assertSee('The last verification email could not be sent.');
+        Http::assertSentCount(1);
+    }
+
+    public static function terminalDeliveryOutcomes(): array
+    {
+        return [
+            'permanent bounce' => ['permanent_bounces', 'bounced'],
+            'suppressed recipient' => ['suppressed_recipients', 'rejected'],
+        ];
     }
 
     public function test_existing_city_address_is_suggested_but_not_automatically_verified_and_real_edit_clears_proof(): void
