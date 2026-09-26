@@ -1,4 +1,3 @@
-import defaultTheme from 'tailwindcss/defaultTheme';
 import plugin from 'tailwindcss/plugin';
 
 /** @type {import('tailwindcss').Config} */
@@ -19,6 +18,30 @@ export default {
     theme: {
         extend: {
             colors: {
+                hub: {
+                    header: 'rgb(var(--hub-header) / <alpha-value>)',
+                    'header-elevated': 'rgb(var(--hub-header-elevated) / <alpha-value>)',
+                    blue: 'rgb(var(--hub-blue) / <alpha-value>)',
+                    'blue-strong': 'rgb(var(--hub-blue-strong) / <alpha-value>)',
+                    red: 'rgb(var(--hub-red) / <alpha-value>)',
+                    'red-strong': 'rgb(var(--hub-red-strong) / <alpha-value>)',
+                    canvas: 'rgb(var(--hub-canvas) / <alpha-value>)',
+                    surface: 'rgb(var(--hub-surface) / <alpha-value>)',
+                    'surface-muted': 'rgb(var(--hub-surface-muted) / <alpha-value>)',
+                    border: 'rgb(var(--hub-border) / <alpha-value>)',
+                    'border-soft': 'rgb(var(--hub-border-soft) / <alpha-value>)',
+                    'border-strong': 'rgb(var(--hub-border-strong) / <alpha-value>)',
+                    ink: 'rgb(var(--hub-ink) / <alpha-value>)',
+                    'ink-secondary': 'rgb(var(--hub-ink-secondary) / <alpha-value>)',
+                    muted: 'rgb(var(--hub-muted) / <alpha-value>)',
+                    'muted-soft': 'rgb(var(--hub-muted-soft) / <alpha-value>)',
+                    success: 'rgb(var(--hub-success) / <alpha-value>)',
+                    warning: 'rgb(var(--hub-warning) / <alpha-value>)',
+                    danger: 'rgb(var(--hub-danger) / <alpha-value>)',
+                    focus: 'rgb(var(--hub-focus) / <alpha-value>)',
+                    control: 'rgb(var(--hub-control) / <alpha-value>)',
+                    'control-border': 'rgb(var(--hub-control-border) / <alpha-value>)',
+                },
                 neutral: {
                     50: '#FAFAF8',
                     100: '#F5F3F0',
@@ -48,8 +71,8 @@ export default {
                 },
             },
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
-                heading: ['"Plus Jakarta Sans"', ...defaultTheme.fontFamily.sans],
+                sans: ['var(--hub-font-sans)'],
+                heading: ['var(--hub-font-sans)'],
             },
             boxShadow: {
                 card: '0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08)',

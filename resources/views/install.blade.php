@@ -3,24 +3,25 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#B91C1C">
+    <meta name="theme-color" content="#102A43">
     <link rel="manifest" href="/manifest.json">
     <title>Install MBFD Hub</title>
     <style>
-        :root { color-scheme: light; font-family: "Plus Jakarta Sans", Arial, sans-serif; --ink:#172033; --muted:#526072; --line:rgba(23,32,51,.16); --field:#f6f8fb; --brand:#b91c1c; --navy:#1e293b; }
+        :root { color-scheme: light; font-family: "Plus Jakarta Sans", Arial, sans-serif; --ink:#172033; --muted:#526072; --line:#cbd5e1; --field:#f7fafc; --brand:#dc2626; --brand-strong:#b91c1c; --navy:#102a43; --blue:#1e4e8c; }
         * { box-sizing: border-box; }
         body { min-height:100vh; margin:0; padding:24px; display:grid; place-items:center; background:var(--field); color:var(--ink); }
-        main { width:min(100%, 38rem); padding:clamp(24px, 6vw, 44px); border:1px solid var(--line); border-radius:16px; background:#fff; }
-        .eyebrow { margin:0 0 12px; color:var(--brand); font-size:.78rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+        main { width:min(100%, 38rem); padding:clamp(24px, 6vw, 44px); border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow:0 1rem 3rem rgba(16,42,67,.12); }
+        .eyebrow { margin:0 0 12px; color:var(--navy); font-size:.78rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
         h1 { margin:0; color:var(--navy); font-size:clamp(1.8rem, 5vw, 2.5rem); letter-spacing:-.04em; }
         p { color:var(--muted); line-height:1.55; }
         button { width:100%; min-height:48px; border:0; border-radius:8px; background:var(--brand); color:#fff; font:inherit; font-weight:800; cursor:pointer; }
-        button:focus-visible, a:focus-visible { outline:3px solid #93c5fd; outline-offset:3px; }
+        button:hover { background:var(--brand-strong); }
+        button:focus-visible, a:focus-visible { outline:3px solid #60a5fa; outline-offset:3px; }
         button[hidden] { display:none; }
         section { margin-top:24px; padding-top:20px; border-top:1px solid var(--line); }
         h2 { margin:0 0 8px; font-size:1rem; }
         ol { margin:8px 0 0; padding-left:1.25rem; color:var(--muted); line-height:1.65; }
-        a { color:#991b1b; font-weight:700; }
+        a { color:var(--blue); font-weight:700; }
     </style>
 </head>
 <body>

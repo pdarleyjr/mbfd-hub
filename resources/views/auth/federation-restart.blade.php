@@ -1,8 +1,9 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Restart application sign-in</title></head>
-<body style="font-family:Arial,sans-serif;background:#f1f5f9;color:#172033;padding:2rem">
-<main style="max-width:30rem;margin:auto;background:white;padding:2rem;border-radius:.75rem">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Restart application sign-in</title>@include('auth.partials.city-email-style')</head>
+<body>
+<main style="max-width: 30rem">
+    <div class="identity-strip">Miami Beach Fire Department</div>
     <h1>Restart application sign-in</h1>
     @if (isset($retryAfter))
         <p>Too many sign-in attempts from this connection. Wait {{ $retryAfter }} seconds before trying again.</p>

@@ -10,7 +10,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="manifest" href="/site.webmanifest">
     <link rel="shortcut icon" href="/favicon.ico">
-    <meta name="theme-color" content="#B91C1C">
+    <meta name="theme-color" content="#102A43">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -18,11 +18,10 @@
     <title>Security &amp; Standards | MBFD Hub</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     @vite('resources/css/app.css')
     <style>
-        body { font-family: 'Source Sans 3', system-ui, sans-serif; }
-        .font-heading { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+        body, .font-heading { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
         .sec-card { transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease; }
         .sec-card:hover { transform: translateY(-1px); }
         @media (prefers-reduced-motion: reduce) {
@@ -31,28 +30,30 @@
         }
     </style>
 </head>
-<body class="antialiased bg-neutral-50 text-neutral-800 min-h-screen flex flex-col">
+<body class="antialiased bg-hub-canvas text-hub-ink min-h-screen flex flex-col">
 
     <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium">Skip to content</a>
 
     <!-- Header (matches landing page) -->
-    <header class="sticky top-0 z-50 bg-slate-850 border-b border-slate-700/50 backdrop-blur-md h-16 flex items-center justify-between px-4 lg:px-6" style="background-color: #0f172a; padding-top: max(0px, env(safe-area-inset-top, 0px));">
+    <header class="sticky top-0 z-50 h-16 border-b border-white/10 bg-hub-header px-4 backdrop-blur-md lg:px-6" style="padding-top: max(0px, env(safe-area-inset-top, 0px));">
+        <div class="mx-auto flex h-full max-w-6xl items-center justify-between">
         <a href="{{ url('/') }}" class="flex items-center gap-3 group" aria-label="Return to MBFD Support Hub home">
             <img src="/images/mbfd_logo-256.png" alt="" class="h-10 w-10 object-contain" width="40" height="40" aria-hidden="true">
             <div class="hidden sm:block">
                 <h1 class="text-white font-semibold text-base leading-tight font-heading">MBFD Support Hub</h1>
-                <p class="text-slate-400 text-xs">Enterprise Command Portal</p>
+                <p class="text-blue-100 text-xs">Enterprise Command Portal</p>
             </div>
         </a>
         <div class="flex items-center gap-2">
-            <a href="{{ url('/') }}" class="hidden sm:inline-flex min-h-[44px] px-3 py-2 text-sm font-medium text-slate-200 hover:text-white items-center gap-2 rounded-lg hover:bg-slate-700/40 transition-colors">
+            <a href="{{ url('/') }}" class="hidden sm:inline-flex min-h-[44px] px-3 py-2 text-sm font-medium text-blue-100 hover:text-white items-center gap-2 rounded-lg hover:bg-white/10 transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 Home
             </a>
-            <a href="{{ url('/login') }}" class="min-h-[44px] px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2">
+            <a href="{{ url('/login') }}" class="min-h-[44px] px-4 py-2 text-sm font-medium bg-hub-red text-white rounded-lg hover:bg-hub-red-strong transition-colors flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
                 <span class="hidden sm:inline">Sign In</span>
             </a>
+        </div>
         </div>
     </header>
 
@@ -107,10 +108,10 @@
                 <!-- Controlled Access -->
                 <div class="sec-card bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
                     <div class="flex">
-                        <div class="w-1.5 bg-red-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="w-1.5 bg-hub-blue flex-shrink-0 rounded-l-xl"></div>
                         <div class="p-5 flex-1">
                             <div class="flex items-start gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center text-red-600 flex-shrink-0">
+                                <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-hub-blue flex-shrink-0">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
                                 </div>
                                 <div>
@@ -125,10 +126,10 @@
                 <!-- Encrypted Connections -->
                 <div class="sec-card bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
                     <div class="flex">
-                        <div class="w-1.5 bg-emerald-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="w-1.5 bg-hub-blue flex-shrink-0 rounded-l-xl"></div>
                         <div class="p-5 flex-1">
                             <div class="flex items-start gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0">
+                                <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-hub-blue flex-shrink-0">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                                 </div>
                                 <div>
@@ -143,10 +144,10 @@
                 <!-- Role-Aware Workflows -->
                 <div class="sec-card bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
                     <div class="flex">
-                        <div class="w-1.5 bg-indigo-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="w-1.5 bg-hub-blue flex-shrink-0 rounded-l-xl"></div>
                         <div class="p-5 flex-1">
                             <div class="flex items-start gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0">
+                                <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-hub-blue flex-shrink-0">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                                 </div>
                                 <div>
@@ -161,10 +162,10 @@
                 <!-- Input Validation -->
                 <div class="sec-card bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
                     <div class="flex">
-                        <div class="w-1.5 bg-amber-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="w-1.5 bg-hub-blue flex-shrink-0 rounded-l-xl"></div>
                         <div class="p-5 flex-1">
                             <div class="flex items-start gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0">
+                                <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-hub-blue flex-shrink-0">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
                                 </div>
                                 <div>
@@ -179,10 +180,10 @@
                 <!-- Audit-Friendly Records -->
                 <div class="sec-card bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
                     <div class="flex">
-                        <div class="w-1.5 bg-purple-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="w-1.5 bg-hub-blue flex-shrink-0 rounded-l-xl"></div>
                         <div class="p-5 flex-1">
                             <div class="flex items-start gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0">
+                                <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-hub-blue flex-shrink-0">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
                                 </div>
                                 <div>
@@ -197,10 +198,10 @@
                 <!-- Rate Limiting & Abuse Protection -->
                 <div class="sec-card bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
                     <div class="flex">
-                        <div class="w-1.5 bg-sky-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="w-1.5 bg-hub-blue flex-shrink-0 rounded-l-xl"></div>
                         <div class="p-5 flex-1">
                             <div class="flex items-start gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-sky-50 flex items-center justify-center text-sky-600 flex-shrink-0">
+                                <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-hub-blue flex-shrink-0">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                                 </div>
                                 <div>
@@ -215,10 +216,10 @@
                 <!-- Signed & Expiring Links -->
                 <div class="sec-card bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
                     <div class="flex">
-                        <div class="w-1.5 bg-teal-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="w-1.5 bg-hub-blue flex-shrink-0 rounded-l-xl"></div>
                         <div class="p-5 flex-1">
                             <div class="flex items-start gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600 flex-shrink-0">
+                                <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-hub-blue flex-shrink-0">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
                                 </div>
                                 <div>
@@ -233,10 +234,10 @@
                 <!-- Secure Development -->
                 <div class="sec-card bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
                     <div class="flex">
-                        <div class="w-1.5 bg-rose-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="w-1.5 bg-hub-blue flex-shrink-0 rounded-l-xl"></div>
                         <div class="p-5 flex-1">
                             <div class="flex items-start gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600 flex-shrink-0">
+                                <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-hub-blue flex-shrink-0">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
                                 </div>
                                 <div>
@@ -251,10 +252,10 @@
                 <!-- Monitoring & Review -->
                 <div class="sec-card bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
                     <div class="flex">
-                        <div class="w-1.5 bg-slate-500 flex-shrink-0 rounded-l-xl"></div>
+                        <div class="w-1.5 bg-hub-blue flex-shrink-0 rounded-l-xl"></div>
                         <div class="p-5 flex-1">
                             <div class="flex items-start gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 flex-shrink-0">
+                                <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-hub-blue flex-shrink-0">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                                 </div>
                                 <div>

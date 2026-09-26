@@ -42,12 +42,12 @@ class TrainingPanelProvider extends PanelProvider
             ->favicon(secure_asset('favicon.ico'))
             ->darkMode(false)
             ->colors([
-                'primary' => Color::Red,
+                'primary' => Color::Blue,
                 'danger' => Color::Rose,
                 'gray' => Color::Slate,
-                'info' => Color::Sky,
+                'info' => Color::Blue,
                 'success' => Color::Emerald,
-                'warning' => Color::Orange,
+                'warning' => Color::Amber,
             ])
             ->font('Plus Jakarta Sans')
             ->viteTheme('resources/css/filament/admin/theme.css')

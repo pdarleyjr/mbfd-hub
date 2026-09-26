@@ -101,6 +101,30 @@ class HomeNavigationTest extends TestCase
             ->assertDontSee('Draft notice');
     }
 
+    public function test_quick_access_uses_the_shared_mbfd_brand_surface_without_decorative_category_colors(): void
+    {
+        $this->withoutVite();
+        $user = $this->actingAsCanonicalFixture();
+        $user->assignRole(Role::findOrCreate('admin', 'web'));
+        $user->givePermissionTo([
+            Permission::findOrCreate('app.media_control.access', 'web'),
+            Permission::findOrCreate('admin.workgroups.view', 'web'),
+        ]);
+        config(['services.media_control.authorization.service_token' => 'test-media-control-token']);
+
+        $response = $this->get('/');
+
+        $response->assertOk()
+            ->assertSee('data-quick-access-card', false)
+            ->assertSee('bg-hub-surface', false)
+            ->assertSee('text-hub-blue', false)
+            ->assertDontSee('bg-purple-500', false)
+            ->assertDontSee('bg-emerald-500', false)
+            ->assertDontSee('bg-indigo-500', false)
+            ->assertDontSee('bg-cyan-500', false)
+            ->assertDontSee('bg-orange-500', false);
+    }
+
     public function test_admin_staying_user_sees_direct_admin_panel_link_without_legacy_login(): void
     {
         $this->withoutVite();

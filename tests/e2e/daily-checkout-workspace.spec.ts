@@ -233,6 +233,36 @@ test('apparatus workspace fits the viewport and keeps actual equipment visible',
   await expect(page.getByRole('heading', { name: 'Test Hub home destination' })).toBeVisible();
 });
 
+test('frozen active inspection visual baseline remains unchanged', async ({ page }, testInfo) => {
+  test.skip(process.platform !== 'win32', 'The approved inspection baselines were captured with pinned Chromium on Windows.');
+  test.skip(![
+    'daily-responsive-phone-390',
+    'daily-responsive-tablet-768',
+    'daily-responsive-wide-1440',
+  ].includes(testInfo.project.name), 'Frozen inspection snapshots run only at the approved baseline viewports.');
+
+  const { submissions } = await fixture(page);
+  await page.locator('.blueprint-touch-zones button').filter({ hasText: 'L4' }).click();
+  await expect(page.getByRole('button', { name: "Pass Driver's Gear", exact: true })).toBeVisible();
+  await expect(page.getByText('PM due soon', { exact: true })).toBeVisible();
+  await expect(page.getByText('Browser Member · Shift not selected')).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+
+  await expect(page).toHaveScreenshot('frozen-active-inspection.png', {
+    animations: 'disabled',
+    caret: 'hide',
+    fullPage: true,
+    scale: 'css',
+  });
+  expect(submissions).toEqual([]);
+
+  await page.goto('/daily/apparatus/engine-2');
+  await expect(page).toHaveURL(/\/daily\/apparatus\/engine-2$/);
+  await expect(page.getByRole('heading', { name: 'Engine 2', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Compartment Inspection' })).toBeVisible();
+  expect(submissions).toEqual([]);
+});
+
 test('multiple large photos persist in IndexedDB and restore exactly without localStorage evidence', async ({ page }) => {
   const api = await fixture(page);
   const photo = await page.evaluate(() => {

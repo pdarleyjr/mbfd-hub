@@ -1,0 +1,43 @@
+/**
+ * MBFD Hub semantic design tokens.
+ *
+ * Color channels are stored as space-separated RGB values so Tailwind and
+ * application CSS can apply opacity without introducing parallel palettes.
+ */
+:root {
+    color-scheme: light;
+
+    --hub-font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+    --hub-header: 16 42 67;
+    --hub-header-elevated: 23 58 94;
+
+    --hub-blue: 30 78 140;
+    --hub-blue-strong: 29 78 216;
+    --hub-red: 220 38 38;
+    --hub-red-strong: 185 28 28;
+
+    --hub-canvas: 247 250 252;
+    --hub-surface: 255 255 255;
+    --hub-surface-muted: 241 245 249;
+
+    --hub-border: 216 226 236;
+    --hub-border-soft: 226 232 240;
+    --hub-border-strong: 148 163 184;
+
+    --hub-ink: 15 23 42;
+    --hub-ink-secondary: 51 65 85;
+    --hub-muted: 100 116 139;
+    --hub-muted-soft: 148 163 184;
+
+    --hub-success: 4 120 87;
+    --hub-warning: 180 83 9;
+    --hub-danger: 185 28 28;
+    --hub-focus: 29 78 216;
+
+    --hub-control: 248 250 252;
+    --hub-control-border: 148 163 184;
+
+    --hub-shadow-card: 0 1px 2px rgb(15 23 42 / 0.05), 0 1px 3px rgb(15 23 42 / 0.06);
+    --hub-shadow-elevated: 0 10px 24px rgb(15 23 42 / 0.10);
+}
