@@ -1797,36 +1797,6 @@ parameters:
 			path: app/Http/Resources/Public/PublicRoomResource.php
 
 		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$created_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicStationInspectionResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicStationInspectionResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$inspection_date\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicStationInspectionResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$inspection_type\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicStationInspectionResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationInspectionResource\:\:\$overall_status\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Public/PublicStationInspectionResource.php
-
-		-
 			message: '#^Access to an undefined property App\\Http\\Resources\\Public\\PublicStationResource\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 1

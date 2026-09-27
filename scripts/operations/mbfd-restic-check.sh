@@ -64,6 +64,14 @@ if [ "$kind" != ok ]; then
   exit 2
 fi
 
+check_preflight_failed() {
+  trap - ERR
+  write_check_status repository_inaccessible || true
+  echo 'CRITICAL: repository check preflight failed'
+  exit 2
+}
+trap check_preflight_failed ERR
+
 if [ ! -r "$ENV" ]; then
   write_check_status repository_inaccessible
   echo 'CRITICAL: repository configuration unavailable'

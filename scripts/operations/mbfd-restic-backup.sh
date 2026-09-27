@@ -17,16 +17,45 @@ HOSTNAME_TAG=mbfdhub
 LIMIT_UPLOAD=${RESTIC_LIMIT_UPLOAD_KIB:-4096}
 LIMIT_DOWNLOAD=${RESTIC_LIMIT_DOWNLOAD_KIB:-4096}
 
-exec >>"$LOG" 2>&1
 log() { echo "[$(date -Is)] $*"; }
 
-exec 9>"$LOCK"
-if ! flock -n 9; then
-  log "restic backup skipped: another restic operation is already running"
-  exit 0
-fi
+write_status() {
+  local temp
+  temp=$(mktemp "${STATUS}.XXXXXX") || return 1
+  if ! printf '%s %s%s\n' "$1" "$(date -Is)" "${2:+ $2}" > "$temp" ||
+     ! chmod 600 "$temp" || ! mv -f -- "$temp" "$STATUS"; then
+    rm -f -- "$temp"
+    return 1
+  fi
+}
 
-if [ ! -r "$ENV" ]; then log "missing env: $ENV"; exit 1; fi
+fail() {
+  trap - ERR
+  if ! write_status FAIL "$1"; then
+    # A stale success is less truthful than an absent status if storage is full.
+    rm -f -- "$STATUS"
+    log "CRITICAL: unable to write backup failure status"
+  fi
+  log "restic backup FAILED: $1"
+  exit 1
+}
+
+trap 'fail preflight-error' ERR
+exec >>"$LOG" 2>&1
+
+exec 9>"$LOCK"
+flock -n -E 75 9 || {
+  code=$?
+  if [ "$code" -eq 75 ]; then
+    log "restic backup skipped: another restic operation is already running"
+    exit 0
+  fi
+  fail lock-error
+}
+
+if [ ! -r "$ENV" ]; then fail missing-env; fi
+if [ ! -r "$SOURCES_FILE" ]; then fail missing-sources-file; fi
+if [ ! -r "$EXCLUDES_FILE" ]; then fail missing-excludes-file; fi
 set -a
 . "$ENV"
 set +a
@@ -45,9 +74,7 @@ for p in "${configured_sources[@]}"; do
 done
 if [ "${#sources[@]}" -eq 0 ]; then
   log "no existing restic sources found"
-  printf 'FAIL %s no-sources\n' "$(date -Is)" > "$STATUS"
-  chmod 600 "$STATUS"
-  exit 1
+  fail no-sources
 fi
 
 log "restic backup start: ${#sources[@]} source(s), upload limit ${LIMIT_UPLOAD} KiB/s"
@@ -62,8 +89,7 @@ if restic --retry-lock 10m backup \
   --limit-download "$LIMIT_DOWNLOAD" \
   "${sources[@]}" 2>"$error_file"; then
   cat "$error_file"
-  printf 'ok %s\n' "$(date -Is)" > "$STATUS"
-  chmod 600 "$STATUS"
+  write_status ok
   log "restic backup OK"
   log "retention/prune intentionally not run automatically in this safe phase; use /opt/mbfd/restic-retention.sh for dry-run or approved apply"
 else
@@ -72,8 +98,5 @@ else
     log "restic backup deferred: another Restic operation holds the repository lock"
     exit 0
   fi
-  printf 'FAIL %s backup-error\n' "$(date -Is)" > "$STATUS"
-  chmod 600 "$STATUS"
-  log "restic backup FAILED"
-  exit 1
+  fail backup-error
 fi

@@ -31,7 +31,8 @@ return [
         'address' => env('MBFD_INBOUND_EMAIL_ADDRESS', 'info@mbfdhub.com'),
         'secret' => env('MBFD_INBOUND_EMAIL_SECRET'),
         'max_bytes' => (int) env('MBFD_INBOUND_EMAIL_MAX_BYTES', 5000000),
-        'max_attachment_bytes' => (int) env('MBFD_INBOUND_EMAIL_MAX_ATTACHMENT_BYTES', 3500000),
+        // Keep aligned with the inbound Worker's decoded-attachment ceiling.
+        'max_attachment_bytes' => (int) env('MBFD_INBOUND_EMAIL_MAX_ATTACHMENT_BYTES', 2000000),
         'max_attachments' => (int) env('MBFD_INBOUND_EMAIL_MAX_ATTACHMENTS', 5),
         'signature_tolerance_seconds' => (int) env('MBFD_INBOUND_EMAIL_SIGNATURE_TOLERANCE', 300),
         'nonce_ttl_seconds' => (int) env('MBFD_INBOUND_EMAIL_NONCE_TTL', 600),

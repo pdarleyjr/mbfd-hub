@@ -36,13 +36,13 @@
                     @if($rank <= 3)
                     <span class="wg-rank-medal" style="width: 1.5rem; height: 1.5rem; font-size: 0.625rem; {{ $medalBg }}">{{ $rank }}</span>
                     @else
-                    <span style="color: #A8A29E; font-size: 0.75rem;">{{ $rank }}</span>
+                    <span style="color: rgb(var(--hub-muted-soft)); font-size: 0.75rem;">{{ $rank }}</span>
                     @endif
                 </td>
                 <td>
-                    <div style="font-weight: 600; color: #292524;">{{ $item['product']->name }}</div>
+                    <div style="font-weight: 600; color: rgb(var(--hub-ink));">{{ $item['product']->name }}</div>
                     @if($item['brand'])
-                    <div style="font-size: 0.6875rem; color: #A8A29E;">{{ $item['brand'] }}</div>
+                    <div style="font-size: 0.6875rem; color: rgb(var(--hub-muted-soft));">{{ $item['brand'] }}</div>
                     @endif
                 </td>
                 <td style="text-align: center;">
@@ -51,7 +51,7 @@
                         {{ number_format($item['avg_score'], 1) }}
                     </span>
                     @else
-                    <span style="color: #D4D0CA;">—</span>
+                    <span style="color: rgb(var(--hub-border-strong));">—</span>
                     @endif
                 </td>
                 @foreach(['capability_avg', 'usability_avg', 'affordability_avg', 'maintainability_avg', 'deployability_avg'] as $ki => $saverKey)
@@ -59,7 +59,7 @@
                     @if($item[$saverKey] ?? null)
                     <span class="{{ ['wg-saver-s','wg-saver-a','wg-saver-v','wg-saver-e','wg-saver-r'][$ki] }}">{{ number_format($item[$saverKey], 0) }}</span>
                     @else
-                    <span style="color: #D4D0CA;">—</span>
+                    <span style="color: rgb(var(--hub-border-strong));">—</span>
                     @endif
                 </td>
                 @endforeach
@@ -75,12 +75,12 @@
                     <span style="margin-left: 0.25rem; font-size: 0.75rem; color: #DC2626;" title="{{ $item['deal_breakers'] }} deal-breaker(s)">⚠️</span>
                     @endif
                     @else
-                    <span style="color: #D4D0CA; font-size: 0.75rem;">—</span>
+                    <span style="color: rgb(var(--hub-border-strong)); font-size: 0.75rem;">—</span>
                     @endif
                 </td>
                 <td style="text-align: center;">
                     <span class="wg-score" style="font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px;
-                        {{ $item['meets_threshold'] ? 'background-color: #EFF6FF; color: #1E40AF;' : 'background-color: #F5F3F0; color: #78716C;' }}">
+                        {{ $item['meets_threshold'] ? 'background-color: #EFF6FF; color: #1E40AF;' : 'background-color: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-muted));' }}">
                         {{ $item['response_count'] }}
                     </span>
                 </td>

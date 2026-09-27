@@ -12,6 +12,14 @@ final class InboundEmailAuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_hub_attachment_ceiling_matches_inbound_worker_configuration(): void
+    {
+        $workerConfig = file_get_contents(base_path('cloudflare-email-worker/wrangler.toml'));
+        self::assertIsString($workerConfig);
+        self::assertSame(1, preg_match('/^MAX_ATTACHMENT_BYTES = "(\d+)"$/m', $workerConfig, $matches));
+        self::assertSame((int) $matches[1], (int) config('communications.inbound.max_attachment_bytes'));
+    }
+
     public function test_valid_signed_message_is_persisted_and_replay_is_blocked(): void
     {
         config()->set('communications.inbound.secret', 'test-inbound-secret');

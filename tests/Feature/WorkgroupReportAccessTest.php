@@ -202,6 +202,35 @@ class WorkgroupReportAccessTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_authorized_session_csv_export_links_resolve_as_downloads(): void
+    {
+        $member = User::factory()->create();
+        $session = $this->makeSession($member, 'A');
+
+        foreach ([
+            't1_standalone',
+            'cutoff_saws',
+            'brand_overall',
+            'spreaders',
+            'cutters',
+            'rams',
+            'category_Extrication',
+            'competitor_groups',
+            'finalists',
+        ] as $tableKey) {
+            $response = $this->actingAs($member)->get(route('workgroup.export.csv', [
+                'tableKey' => $tableKey,
+                'session_id' => $session->id,
+            ]));
+
+            $response->assertOk();
+            $this->assertStringStartsWith('text/csv', $response->headers->get('content-type', ''));
+            $this->assertStringContainsString('.csv', $response->headers->get('content-disposition', ''));
+        }
+
+        Http::assertNothingSent();
+    }
+
     private function makeSession(User $user, string $suffix): WorkgroupSession
     {
         $workgroup = Workgroup::create([

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Public;
 
+use App\Models\StationInspection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use LogicException;
 
 /**
  * Public, redacted summary of a StationInspection for the unauthenticated
@@ -18,12 +20,18 @@ class PublicStationInspectionResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $inspection = $this->resource;
+        if (! $inspection instanceof StationInspection) {
+            throw new LogicException('Expected station inspection evidence.');
+        }
+
         return [
-            'id' => $this->id,
-            'inspection_date' => $this->inspection_date,
-            'inspection_type' => $this->inspection_type,
-            'overall_status' => $this->overall_status,
-            'created_at' => $this->created_at,
+            'id' => $inspection->id,
+            'inspection_date' => $inspection->inspection_date->format('Y-m-d'),
+            'inspection_type' => $inspection->inspection_type,
+            'overall_status' => $inspection->overall_status,
+            'review_status' => $inspection->review_status ?: ($inspection->reviewed_at ? 'reviewed' : 'pending_review'),
+            'created_at' => $inspection->created_at,
         ];
     }
 }
