@@ -72,7 +72,7 @@
             ⚠ If this is an active incident, contact the duty officer directly.
         </div>
         <a href="javascript:location.reload()" class="btn-refresh">↻ Try Again</a>
-        <p class="footer-text">Moreau Beach Fire Department &bull; MBFD Hub</p>
+        <p class="footer-text">Miami Beach Fire Department &bull; MBFD Hub</p>
     </div>
 </body>
 </html>
