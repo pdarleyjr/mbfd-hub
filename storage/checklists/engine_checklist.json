@@ -32,7 +32,7 @@
   ],
   "officerChecklist": [
     {"id":"inspection_date","name":"Date","inputType":"date","required":false},
-    {"id":"mileage","name":"Mileage","inputType":"number","required":true},
+    {"id":"mileage","name":"Mileage","inputType":"number","required":false},
     {"id":"vehicle_num","name":"Vehicle #","inputType":"text","required":true},
     {"id":"engine_temp","name":"Engine Temp","inputType":"text","required":true},
     {"id":"oil_pressure","name":"Oil Pressure","inputType":"text","required":true},

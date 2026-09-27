@@ -33,7 +33,7 @@
   "officerChecklist": [
     { "id": "lock_box_key", "name": "Lock Box Key", "inputType": "checkbox" },
     { "id": "elevator_key", "name": "Elevator Key", "inputType": "checkbox" },
-    { "id": "mileage", "name": "Mileage", "inputType": "number", "required": true },
+    { "id": "mileage", "name": "Mileage", "inputType": "number", "required": false },
     { "id": "laptop_num", "name": "Dell Laptop #", "inputType": "text" },
     { "id": "toughbook_num", "name": "Toughbook #", "inputType": "text" },
     { "id": "psi_front", "name": "PSI – Front Tire #", "inputType": "number", "required": true },

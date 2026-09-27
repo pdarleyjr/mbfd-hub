@@ -74,6 +74,16 @@ async function fixture(page: Page, options: { checklist?: typeof sourceChecklist
   return { submissions, revisions, setUserId: (id: number) => { userId = id; } };
 }
 
+async function showAreaPicker(page: Page) {
+  const change = page.getByRole('button', { name: 'Change area', exact: true });
+  if (await change.isVisible()) await change.click();
+}
+
+async function showOptionalDetails(page: Page) {
+  const details = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Additional details/ }) });
+  if (await details.count() && !(await details.evaluate(element => (element as HTMLDetailsElement).open))) await details.locator('summary').click();
+}
+
 for (const [designation, name, slug, file] of [
   ['E1', 'Engine 1', 'engine-1', 'engine'],
   ['E2', 'Engine 2', 'engine-2', 'engine2'],
@@ -92,6 +102,7 @@ for (const [designation, name, slug, file] of [
     await fixture(page, { checklist, checklistType, vehicle: { ...apparatus, name, designation, slug } });
     await expect(page.getByRole('link', { name: 'Report an Issue' })).toHaveCount(0);
     for (const view of profile.views) {
+      await showAreaPicker(page);
       await page.getByRole('button', { name: view.label, exact: true }).click();
       expect(await page.locator('.blueprint-views button').evaluateAll(buttons => buttons.every(button => button.scrollWidth <= button.clientWidth))).toBe(true);
       const zone = view.zones[0];
@@ -103,6 +114,7 @@ for (const [designation, name, slug, file] of [
       await expect(page.locator(`.blueprint-zone[data-area-id="${zone.compartmentId}"]`)).toHaveAttribute('aria-pressed', 'true');
       const area = checklist.compartments.find((entry: { id: string }) => entry.id === zone.compartmentId);
       await expect(page.getByRole('heading', { name: area.title ?? area.name, exact: true })).toBeVisible();
+      await showAreaPicker(page);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       const overflowingLabels = await page.locator('.blueprint-zone').evaluateAll(zones => zones.flatMap(element => {
         const width = element.querySelector('rect')!.width.baseVal.value;
@@ -140,9 +152,6 @@ test('remaining work, reported issues and the next required action stay distinct
   await expect(quick.getByRole('button', { name: /Bag.*Damaged.*Reported/ })).toBeVisible();
   await expect(quick.getByRole('heading', { name: /Remaining/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Close Quick Checklist' }).click();
-  await page.getByRole('button', { name: 'Continue: Required details', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Checklist Details' })).toBeVisible();
-  await page.locator('#mileage').fill('42520');
   await page.getByRole('button', { name: 'Continue: Shift', exact: true }).click();
   await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('A');
   await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
@@ -190,6 +199,7 @@ test('Rescue keeps side-specific photo zones and central work in its issued chec
   await page.getByRole('button', { name: 'Officer', exact: true }).click();
   await page.locator('.blueprint-zone[data-area-id="officer_compartment_d"]').click();
   await expect(page.getByRole('heading', { name: 'R1 · Officer compartment' })).toBeVisible();
+  await showAreaPicker(page);
   await page.getByRole('button', { name: 'Interior', exact: true }).click();
   await page.locator('.blueprint-zone[data-area-id="patient_compartment"]').click();
   await expect(page.getByRole('heading', { name: 'Patient Compartment' })).toBeVisible();
@@ -233,13 +243,13 @@ test('apparatus workspace fits the viewport and keeps actual equipment visible',
   await expect(page.getByRole('heading', { name: 'Test Hub home destination' })).toBeVisible();
 });
 
-test('frozen active inspection visual baseline remains unchanged', async ({ page }, testInfo) => {
+test('refined active inspection visual baseline preserves the mobile and wide workspace', async ({ page }, testInfo) => {
   test.skip(process.platform !== 'win32', 'The approved inspection baselines were captured with pinned Chromium on Windows.');
   test.skip(![
     'daily-responsive-phone-390',
     'daily-responsive-tablet-768',
     'daily-responsive-wide-1440',
-  ].includes(testInfo.project.name), 'Frozen inspection snapshots run only at the approved baseline viewports.');
+  ].includes(testInfo.project.name), 'Inspection snapshots run at the representative baseline viewports.');
 
   const { submissions } = await fixture(page);
   await page.locator('.blueprint-touch-zones button').filter({ hasText: 'L4' }).click();
@@ -247,8 +257,9 @@ test('frozen active inspection visual baseline remains unchanged', async ({ page
   await expect(page.getByText('PM due soon', { exact: true })).toBeVisible();
   await expect(page.getByText('Browser Member · Shift not selected')).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => scrollTo(0, 0));
 
-  await expect(page).toHaveScreenshot('frozen-active-inspection.png', {
+  await expect(page).toHaveScreenshot('refined-active-inspection.png', {
     animations: 'disabled',
     caret: 'hide',
     fullPage: true,
@@ -389,6 +400,7 @@ test('Quick Checklist focuses the right item and batch confirmation preserves a 
 
 async function fillRequiredPaperFields(page: Page, checklist: typeof sourceChecklist) {
   await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Checklist details' }).click();
+  await showOptionalDetails(page);
   for (const field of checklist.officerChecklist) {
     if (!field.required || field.id === 'vehicle_num' || field.id === 'inspection_date') continue;
     await page.locator(`#${field.id}`).fill(field.id === 'mileage' ? '42520' : field.inputType === 'number' || field.inputType === 'percentage' ? '75' : 'Normal');
@@ -421,6 +433,7 @@ async function inspectActualEquipment(page: Page, checklist: typeof sourceCheckl
 }
 
 async function selectArea(page: Page, checklist: typeof sourceChecklist, areaId: string) {
+  await showAreaPicker(page);
   const profile = resolveBlueprint('engine2');
   const view = profile?.views.find(entry => entry.zones.some(zone => zone.compartmentId === areaId));
   if (view) {
@@ -484,24 +497,26 @@ test('paper text autosaves, survives refresh and offline editing, and queues the
   const damageDescription = 'Scratch below rear step.\nPaint chipped.';
   const offlineDamageDescription = `${damageDescription}\nChecked while offline.`;
   await fillRequiredPaperFields(page, sourceChecklist);
-  await page.getByLabel('SCBA #5', { exact: true }).fill('0005-SCBA');
-  await page.getByLabel('New Damages - description', { exact: true }).fill(damageDescription);
-  await page.getByLabel('New Damages - location on apparatus', { exact: true }).fill('Rear, below step');
+  await page.getByLabel('SCBA #5 · Optional', { exact: true }).fill('0005-SCBA');
+  await page.getByLabel('New Damages - description · Optional', { exact: true }).fill(damageDescription);
+  await page.getByLabel('New Damages - location on apparatus · Optional', { exact: true }).fill('Rear, below step');
   await expect.poll(async () => (await readDrafts(page))[0]?.data.fieldValues?.find(field => field.id === 'scba_5')?.value).toBe('0005-SCBA');
   await page.reload();
   await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Checklist details' }).click();
-  await expect(page.getByLabel('SCBA #5', { exact: true })).toHaveValue('0005-SCBA');
-  await expect(page.getByLabel('New Damages - description', { exact: true })).toHaveValue(damageDescription);
+  await showOptionalDetails(page);
+  await expect(page.getByLabel('SCBA #5 · Optional', { exact: true })).toHaveValue('0005-SCBA');
+  await expect(page.getByLabel('New Damages - description · Optional', { exact: true })).toHaveValue(damageDescription);
   await context.setOffline(true);
   await expect(page.getByText('Offline · On this device', { exact: true })).toBeVisible();
-  await page.getByLabel('New Damages - description', { exact: true }).fill(offlineDamageDescription);
+  await page.getByLabel('New Damages - description · Optional', { exact: true }).fill(offlineDamageDescription);
   await expect.poll(async () => (await readDrafts(page))[0]?.data.fieldValues?.find(field => field.id === 'new_damage_description')?.value).toContain('Checked while offline.');
-  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Readings', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Vehicle Readings' })).toBeVisible();
-  await expect(page.locator('#miles')).toHaveValue('42520');
+  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Readings · Optional', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Readings · Optional' })).toBeVisible();
+  await expect(page.locator('#miles')).toHaveValue('');
   await page.locator('#engine_hours').fill('1251.5');
   await page.locator('#miles').fill('42521');
   await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Checklist details' }).click();
+  await showOptionalDetails(page);
   await expect(page.locator('#mileage')).toHaveValue('42521');
   await inspectActualEquipment(page, sourceChecklist);
   const review = page.getByRole('region', { name: 'Recorded readings and paper fields' });
@@ -527,6 +542,35 @@ test('paper text autosaves, survives refresh and offline editing, and queues the
   await context.setOffline(false);
   await expect.poll(() => api.submissions.length).toBe(1);
   expect(api.submissions[0]).toEqual(rows[0].data);
+  await expect.poll(async () => (await queued(page)).length).toBe(0);
+  await expect.poll(async () => (await readDrafts(page)).length).toBe(0);
+});
+
+test('actual Engine 2 blank readings retain source IDs and queue an identical replay payload', async ({ page, context }, testInfo) => {
+  test.skip(!['daily-responsive-phone-390', 'daily-workspace-webkit-iphone'].includes(testInfo.project.name), 'Full blank-meter payload is verified on Chromium phone and WebKit iPhone.');
+  test.setTimeout(90_000);
+  const api = await fixture(page);
+  await fillRequiredPaperFields(page, sourceChecklist);
+  await inspectActualEquipment(page, sourceChecklist);
+  await sign(page);
+  await context.setOffline(true);
+  const closeNotification = page.getByRole('button', { name: 'Close notification' });
+  if (await closeNotification.isVisible()) await closeNotification.click();
+  await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  const rows = await queued(page);
+  expect(rows).toHaveLength(1);
+  const payload = rows[0].data;
+  expect(payload).toMatchObject({ processing_version: 1, checklist_version: version, engine_hours: null, miles: null, shift: 'A', employee_id: 501 });
+  expect(payload.field_values).toContainEqual({ id: 'mileage', value: null });
+  expect(payload.field_values?.map(field => field.id)).toEqual(sourceChecklist.officerChecklist.map((field: { id: string }) => field.id));
+  expect(payload.compartments.map(area => ({ id: area.id, items: area.items.map(item => item.id) }))).toEqual(sourceChecklist.compartments.map((area: { id: string; items: Array<{ id?: string }> }) => ({ id: area.id, items: area.items.map((item, index) => item.id ?? `${area.id}-item-${index + 1}`) })));
+  expect(payload.compartments.flatMap(area => area.items).every(item => item.observed === true)).toBe(true);
+  expect(payload.officer_signature).toMatch(/^data:image\/png;base64,/);
+  expect(api.submissions).toHaveLength(0);
+  await context.setOffline(false);
+  await expect.poll(() => api.submissions.length).toBe(1);
+  expect(api.submissions[0]).toEqual(payload);
   await expect.poll(async () => (await queued(page)).length).toBe(0);
   await expect.poll(async () => (await readDrafts(page)).length).toBe(0);
 });
@@ -562,6 +606,7 @@ test('historical finding without a unique current location remains visible after
   await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
   await expect(finding).toContainText('Legacy Rescue Bag');
   await selectArea(page, sourceChecklist, 'comp_r2');
+  await showAreaPicker(page);
   await expect(finding).toContainText('Old Combined Compartment');
   await page.screenshot({ path: testInfo.outputPath('historical-unlocated-finding.png'), fullPage: true });
 });

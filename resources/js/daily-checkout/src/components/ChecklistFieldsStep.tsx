@@ -57,7 +57,9 @@ export default function ChecklistFieldsStep({
       if (!field.required) return false;
 
       const value = fieldValues.find((fieldValue) => fieldValue.id === field.id)?.value;
-      return value === null || value === '';
+      return value === null || value === undefined
+        || (typeof value === 'string' && value.trim() === '')
+        || (typeof value === 'number' && !Number.isFinite(value));
     });
     if (missingRequiredField) {
       setError(`${missingRequiredField.name} is required.`);
@@ -73,75 +75,97 @@ export default function ChecklistFieldsStep({
     onSubmit(fieldValues, scheduledTasks);
   };
 
+  const knownFields = checklist.fields.filter(field => field.id === checklist.inspection_date_field_id || field.id === 'vehicle_num');
+  const editableFields = checklist.fields.filter(field => !knownFields.includes(field));
+  // Shift is separately required by the processing contract, even on Fire Boat.
+  const requiredFields = editableFields.filter(field => field.required || field.id === 'fb6-shift');
+  const optionalFields = editableFields.filter(field => !requiredFields.includes(field));
+
+  const renderField = (field: ChecklistData['fields'][number]) => {
+    const value = fieldValues.find((fieldValue) => fieldValue.id === field.id)?.value ?? null;
+
+    if (field.id === 'fb6-shift') return <div key={field.id}>
+      <label htmlFor={field.id} className="mb-1.5 block text-sm font-semibold text-neutral-700">Shift *</label>
+      <select id={field.id} value={String(value ?? '')} required onChange={event => updateFieldValue(field.id, event.target.value)} className="min-h-12 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900">
+        <option value="">Select shift</option>{['A', 'B', 'C'].map(shift => <option key={shift} value={shift}>{shift} Shift</option>)}
+      </select>
+    </div>;
+
+    if (field.inputType === 'checkbox') {
+      return (
+        <label key={field.id} className="flex min-h-12 items-center gap-3 rounded-lg border border-neutral-200 px-4 py-3 text-neutral-800">
+          <input
+            id={field.id}
+            type="checkbox"
+            checked={value === true}
+            onChange={(event) => updateFieldValue(field.id, event.target.checked)}
+            className="h-5 w-5 rounded border-neutral-400 text-red-600 focus:ring-red-500"
+          />
+          <span className="font-medium">{field.name}{!field.required && <span className="ml-1 text-sm font-normal text-neutral-500">· Optional</span>}</span>
+        </label>
+      );
+    }
+
+    const type = field.inputType === 'number' || field.inputType === 'percentage'
+      ? 'number'
+      : field.inputType === 'date'
+        ? 'date'
+        : 'text';
+
+    return (
+      <div key={field.id}>
+        <label htmlFor={field.id} className="mb-1.5 block text-sm font-semibold text-neutral-700">
+          {field.name}{field.required ? ' *' : ' · Optional'}
+        </label>
+        {field.multiline ? <textarea id={field.id} rows={3} required={field.required} maxLength={2000} value={value === null ? '' : String(value)} onChange={event => updateFieldValue(field.id, event.target.value)} className="min-h-24 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 focus:border-red-500 focus:outline-none" /> : <input
+          id={field.id}
+          type={type}
+          step={field.id === 'mileage' ? 1 : field.inputType === 'number' || field.inputType === 'percentage' ? 'any' : undefined}
+          min={field.id === 'mileage' ? 0 : undefined}
+          max={field.id === 'mileage' ? 999999999 : undefined}
+          value={value === null ? '' : String(value)}
+          required={field.required}
+          maxLength={field.inputType === 'text' ? 2000 : undefined}
+          onChange={(event) => {
+            if (field.inputType === 'number' || field.inputType === 'percentage') {
+              updateFieldValue(field.id, event.target.value === '' ? null : Number(event.target.value));
+
+              return;
+            }
+
+            updateFieldValue(field.id, event.target.value);
+          }}
+          className="min-h-12 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 focus:border-red-500 focus:outline-none"
+        />}
+      </div>
+    );
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-neutral-800 font-heading">Checklist Details</h2>
-        <p className="mt-1 text-neutral-500">Readings, equipment IDs and crew details from the apparatus checkout sheet.</p>
+    <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-xl font-bold text-neutral-800 font-heading">Checklist Details</h2>
+        <p className="mt-1 text-neutral-500">Complete required checks. Additional readings and identifiers are optional.</p>
       </div>
 
       {error && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
 
-      <section aria-label="Checklist fields" className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
-        {checklist.fields.map((field) => {
-          const value = fieldValues.find((fieldValue) => fieldValue.id === field.id)?.value ?? null;
+      {requiredFields.length > 0 && <section aria-label="Required checklist fields" className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
+        {requiredFields.map(renderField)}
+      </section>}
 
-          if (field.id === 'fb6-shift') return <div key={field.id}>
-            <label htmlFor={field.id} className="mb-1.5 block text-sm font-semibold text-neutral-700">Shift *</label>
-            <select id={field.id} value={String(value ?? '')} required onChange={event => updateFieldValue(field.id, event.target.value)} className="min-h-12 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900">
-              <option value="">Select shift</option>{['A', 'B', 'C'].map(shift => <option key={shift} value={shift}>{shift} Shift</option>)}
-            </select>
-          </div>;
+      {knownFields.length > 0 && <section aria-label="Recorded automatically" className="grid gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 sm:grid-cols-2">
+        {knownFields.map(field => <div key={field.id}>
+          <label htmlFor={field.id} className="block text-xs font-medium text-neutral-500">{field.name} · Recorded automatically</label>
+          <input id={field.id} type={field.inputType === 'date' ? 'date' : 'text'} readOnly value={String(fieldValues.find(answer => answer.id === field.id)?.value ?? '')} className="mt-1 min-h-11 w-full border-0 bg-transparent text-sm font-medium text-neutral-800" />
+        </div>)}
+      </section>}
 
-          if (field.inputType === 'checkbox') {
-            return (
-              <label key={field.id} className="flex min-h-12 items-center gap-3 rounded-lg border border-neutral-200 px-4 py-3 text-neutral-800">
-                <input
-                  id={field.id}
-                  type="checkbox"
-                  checked={value === true}
-                  onChange={(event) => updateFieldValue(field.id, event.target.checked)}
-                  className="h-5 w-5 rounded border-neutral-400 text-red-600 focus:ring-red-500"
-                />
-                <span className="font-medium">{field.name}</span>
-              </label>
-            );
-          }
-
-          const type = field.inputType === 'number' || field.inputType === 'percentage'
-            ? 'number'
-            : field.inputType === 'date'
-              ? 'date'
-              : 'text';
-
-          return (
-            <div key={field.id}>
-              <label htmlFor={field.id} className="mb-1.5 block text-sm font-semibold text-neutral-700">
-                {field.name}{field.required ? ' *' : ''}
-              </label>
-              {field.multiline ? <textarea id={field.id} rows={3} required={field.required} maxLength={2000} value={value === null ? '' : String(value)} onChange={event => updateFieldValue(field.id, event.target.value)} className="min-h-24 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 focus:border-red-500 focus:outline-none" /> : <input
-                id={field.id}
-                type={type}
-                step={field.inputType === 'number' || field.inputType === 'percentage' ? 'any' : undefined}
-                value={value === null ? '' : String(value)}
-                readOnly={field.id === checklist.inspection_date_field_id || field.id === 'vehicle_num'}
-                required={field.required}
-                maxLength={field.inputType === 'text' ? 2000 : undefined}
-                onChange={(event) => {
-                  if (field.inputType === 'number' || field.inputType === 'percentage') {
-                    updateFieldValue(field.id, event.target.value === '' ? null : Number(event.target.value));
-
-                    return;
-                  }
-
-                  updateFieldValue(field.id, event.target.value);
-                }}
-                className="min-h-12 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 focus:border-red-500 focus:outline-none"
-              />}
-            </div>
-          );
-        })}
-      </section>
+      {optionalFields.length > 0 && <details className="rounded-lg border border-neutral-200 bg-white" onInvalidCapture={event => { event.currentTarget.open = true; }}>
+        <summary className="min-h-11 cursor-pointer px-4 py-3 font-semibold text-neutral-800">Additional details · Optional</summary>
+        <p className="px-4 pb-3 text-sm text-neutral-500">Enter additional readings and identifiers when available. You may continue without them.</p>
+        <section aria-label="Optional checklist fields" className="grid gap-4 px-4 pb-4 sm:grid-cols-2">{optionalFields.map(renderField)}</section>
+      </details>}
 
       {checklist.schema_version === 2 && <section aria-labelledby="scheduled-duties-heading" className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
