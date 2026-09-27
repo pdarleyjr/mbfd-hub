@@ -203,6 +203,24 @@ test('inventory records every route and renders available protected surfaces at 
           const sidebar = page.locator('.fi-sidebar');
           if (await sidebar.count()) await expect.poll(() => sidebar.evaluate(el => el.getBoundingClientRect().right <= 1 || getComputedStyle(el).display === 'none')).toBeTruthy();
         }
+        // Full-page screenshots do not trigger below-fold native lazy images.
+        if (/^\/workgroups\/(?:analysis-report|evaluation-report|final-recommendations|workgroup-summary|l1-inventory)$/.test(entry.route)) {
+          for (const image of await page.locator('img[loading="lazy"]').all()) {
+            if (!await image.isVisible()) continue;
+            await image.scrollIntoViewIfNeeded({ timeout: 5_000 });
+            await expect.poll(() => image.evaluate(el => (el as HTMLImageElement).complete), { timeout: 10_000 }).toBeTruthy();
+          }
+          await page.evaluate(async () => { await Promise.all([...document.images].filter(img => img.complete && img.naturalWidth > 0).map(img => img.decode().catch(() => undefined))); window.scrollTo(0, 0); });
+          // Chart.js canvas animations are not returned by document.getAnimations().
+          // Require three consecutive unchanged pixel snapshots after responsive resize.
+          let previous = '', stable = 0;
+          await expect.poll(async () => {
+            const pixels = await page.locator('canvas').evaluateAll(elements => elements.map(el => (el as HTMLCanvasElement).toDataURL()).join('|'));
+            stable = pixels === previous ? stable + 1 : 0;
+            previous = pixels;
+            return stable;
+          }, { timeout: 10_000, intervals: [150] }).toBeGreaterThanOrEqual(3);
+        }
         const geometry = await page.evaluate(() => {
           const viewport = document.documentElement.clientWidth;
           const headings = [...document.querySelectorAll('h1, .fi-header-heading')].filter(el => (el as HTMLElement).offsetWidth > 0).map(el => {
@@ -216,6 +234,13 @@ test('inventory records every route and renders available protected surfaces at 
               while (surface?.parentElement && getComputedStyle(surface).backgroundColor === 'rgba(0, 0, 0, 0)') surface = surface.parentElement;
               return { color: getComputedStyle(el).color, fontSize: getComputedStyle(el).fontSize, background: surface ? getComputedStyle(surface).backgroundColor : null };
             }),
+            headerActions: [...document.querySelectorAll('.fi-header .fi-ac .fi-btn, .fi-header .fi-ac .fi-icon-btn')].filter(el => (el as HTMLElement).offsetHeight > 0).map(el => {
+              const box = el.getBoundingClientRect(), header = el.closest('.fi-header')!.getBoundingClientRect();
+              return { text: el.textContent?.trim() || el.getAttribute('aria-label'), left: box.left, right: box.right, top: box.top, bottom: box.bottom,
+                outsideHeader: box.left < header.left - 1 || box.right > header.right + 1 || box.top < header.top - 1 || box.bottom > header.bottom + 1,
+                outsideViewport: box.left < -1 || box.right > viewport + 1 };
+            }),
+            incompleteImages: [...document.images].filter(img => getComputedStyle(img).display !== 'none' && (!img.complete || img.naturalWidth === 0)).map(img => img.getAttribute('src')),
             aiDisabledStateVisible: document.body.innerText.includes('AI service not configured'),
             reportActions: [...document.querySelectorAll('.wg-report-actions .wg-ai-btn')].filter(el => (el as HTMLElement).offsetHeight > 0).map(el => {
               const box = el.getBoundingClientRect();
@@ -248,6 +273,9 @@ test('inventory records every route and renders available protected surfaces at 
             expect(action.height).toBeGreaterThanOrEqual(44);
             expect(action.text).not.toContain('Generating...');
           }
+        }
+        if ([9, 125, 127, 140].includes(index)) {
+          expect(geometry.headerActions.filter(action => action.outsideHeader || action.outsideViewport), 'Header actions remain reachable inside header and viewport').toEqual([]);
         }
         const filename = `${String(index).padStart(3, '0')}-${entry.route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'home'}-${width}.png`;
         const frames = [];

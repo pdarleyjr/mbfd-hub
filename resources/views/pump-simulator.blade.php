@@ -2,7 +2,7 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
@@ -14,19 +14,17 @@
     <title>Pump Simulator | MBFD Training</title>
     <style>
         .pump-home-btn {
-            position: fixed;
-            top: max(12px, env(safe-area-inset-top));
-            left: max(12px, env(safe-area-inset-left));
-            z-index: 9999;
+            position: relative;
+            margin: max(12px, env(safe-area-inset-top)) 12px 0;
             display: inline-flex;
             align-items: center;
             gap: 8px;
             min-height: 44px;
             padding: 10px 14px;
             border-radius: 10px;
-            background: rgba(185, 28, 28, 0.95);
+            background: rgb(var(--hub-action-primary));
             color: #ffffff;
-            font: 600 14px/1.2 Inter, system-ui, -apple-system, sans-serif;
+            font: 600 14px/1.2 var(--hub-font-sans);
             text-decoration: none;
             box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
             border: 1px solid rgba(255, 255, 255, 0.15);
@@ -34,7 +32,7 @@
         }
 
         .pump-home-btn:hover {
-            background: rgba(153, 27, 27, 0.98);
+            background: rgb(var(--hub-action-primary-hover));
         }
 
         .pump-home-btn:focus-visible {

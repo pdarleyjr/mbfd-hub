@@ -222,8 +222,8 @@
         .phase-title { font-weight: 700; color: var(--navy); margin-bottom: 0.25rem; font-size: 0.9375rem; }
         .phase-desc { font-size: 0.875rem; color: #4b5563; }
         .phase-list { list-style: none; margin-top: 0.375rem; }
-        .phase-list li { font-size: 0.875rem; color: #4b5563; padding: 0.125rem 0; display: flex; gap: 0.375rem; }
-        .phase-list li::before { content: '—'; color: var(--slate-400); flex-shrink: 0; }
+        .phase-list li { font-size: 0.875rem; color: #4b5563; padding: 0.125rem 0 0.125rem 1.25rem; position: relative; }
+        .phase-list li::before { content: '—'; color: var(--slate-400); position: absolute; left: 0; }
 
         /* ── WORKGROUP TABLE ── */
         .data-table {
@@ -280,6 +280,7 @@
         .image-caption { font-size: 0.75rem; color: var(--slate-500); text-align: center; font-style: italic; margin-top: -0.75rem; margin-bottom: 1.25rem; }
         .image-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.25rem 0; }
         .image-grid .report-image { margin: 0; }
+        .image-grid .image-caption { margin-top: .5rem; }
 
         /* ── HR ── */
         hr.section-divider { border: none; border-top: 1px solid var(--slate-200); margin: 2rem 0; }

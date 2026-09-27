@@ -323,7 +323,7 @@ export default function StationDetailPage() {
           {stationNumber === 2 && (
             <a
               href={`/employee/video-conferencing/command?return_to=${encodeURIComponent(`/daily/stations/${stationNumber}`)}`}
-              className="flex min-h-12 items-center gap-2.5 rounded-xl bg-hub-red p-3 text-sm font-bold text-white ring-1 ring-hub-red/30 transition-colors hover:bg-hub-red-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
+              className="flex min-h-12 items-center gap-2.5 rounded-xl bg-hub-blue p-3 text-sm font-bold text-white ring-1 ring-hub-blue/30 transition-colors hover:bg-hub-blue-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
             >
               <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75 11.25 15 15 9.75m6-4.5A9 9 0 1 1 3 12a9 9 0 0 1 18 0Z" />
@@ -394,16 +394,16 @@ export default function StationDetailPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`min-h-[48px] px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 scroll-snap-align-start ${
                 activeTab === tab.id
-                  ? 'text-hub-red bg-hub-red/10'
+                  ? 'text-hub-blue bg-hub-blue/10'
                   : 'text-hub-muted hover:text-hub-ink hover:bg-hub-canvas'
               }`}
             >
               <span>{tab.label}</span>
-              {typeof tab.badge === 'number' && tab.badge > 0 && <span className="ml-2 inline-flex min-w-6 items-center justify-center rounded-full bg-hub-red px-1.5 py-0.5 text-xs font-bold text-white">{tab.badge}</span>}
+              {typeof tab.badge === 'number' && tab.badge > 0 && <span className="ml-2 inline-flex min-w-6 items-center justify-center rounded-full bg-hub-blue px-1.5 py-0.5 text-xs font-bold text-white">{tab.badge}</span>}
             </button>
           ))}
           <div
-            className="absolute bottom-0 h-0.5 bg-hub-red transition-all duration-250"
+            className="absolute bottom-0 h-0.5 bg-hub-blue transition-all duration-250"
             style={{
               left: `${underlineStyle.left}px`,
               width: `${underlineStyle.width}px`,

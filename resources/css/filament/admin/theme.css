@@ -375,9 +375,30 @@
     overflow-wrap: anywhere;
 }
 
-.fi-header-actions {
+.fi-header {
+    flex-wrap: wrap;
+}
+
+.fi-header > div:first-child {
+    min-width: 0;
+}
+
+@media (min-width: 640px) {
+    .fi-header > div:first-child {
+        flex: 1 1 18rem;
+    }
+}
+
+.fi-header > div:last-child:not(:first-child),
+.fi-header .fi-ac {
     flex-wrap: wrap;
     min-width: 0;
+    max-width: 100%;
+}
+
+.fi-header .fi-ac > * {
+    min-width: 0;
+    max-width: 100%;
 }
 
 .fi-btn,

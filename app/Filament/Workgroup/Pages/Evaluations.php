@@ -238,7 +238,7 @@ class Evaluations extends Page implements HasTable
                             return 'gray';
                         }
                         if ($sub) {
-                            return 'warning';
+                            return 'primary';
                         }
 
                         return 'primary';

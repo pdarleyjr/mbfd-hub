@@ -296,17 +296,18 @@
             gap: 0.5rem;
         }
         .key-findings li {
-            display: flex;
-            gap: 0.625rem;
+            position: relative;
+            padding-left: 1.25rem;
             font-size: 0.9rem;
             color: #1e3a5f;
             line-height: 1.5;
         }
         .key-findings li::before {
+            position: absolute;
+            left: 0;
             content: '→';
             color: var(--color-blue);
             font-weight: 700;
-            flex-shrink: 0;
         }
 
         /* ── KPI CARDS ── */
@@ -448,6 +449,7 @@
             margin: 1.25rem 0;
         }
         .image-grid .report-image { margin: 0; }
+        .image-grid .image-caption { margin-top: .5rem; }
 
         /* ── CALLOUTS ── */
         .callout {
