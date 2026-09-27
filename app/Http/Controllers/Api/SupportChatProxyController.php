@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -35,13 +36,17 @@ final class SupportChatProxyController extends Controller
             'stream' => (bool) ($validated['stream'] ?? false),
         ];
 
-        $response = Http::withHeaders([
-            'x-api-secret' => $secret,
-            'Accept' => $payload['stream'] ? 'text/event-stream' : 'application/json',
-        ])
-            ->timeout(120)
-            ->withOptions(['stream' => $payload['stream']])
-            ->post("{$workerUrl}/chat", $payload);
+        try {
+            $response = Http::withHeaders([
+                'x-api-secret' => $secret,
+                'Accept' => $payload['stream'] ? 'text/event-stream' : 'application/json',
+            ])
+                ->timeout(120)
+                ->withOptions(['stream' => $payload['stream']])
+                ->post("{$workerUrl}/chat", $payload);
+        } catch (ConnectionException) {
+            return response()->json(['error' => 'Support chat is unavailable. Please try again later.'], 503);
+        }
 
         if (! $payload['stream']) {
             return response()->json(
