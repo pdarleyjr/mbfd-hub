@@ -14,12 +14,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="MBFD Hub">
     <title>MBFD Support Hub | Enterprise Command Portal</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" as="style">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    @vite('resources/css/app.css')
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    @vite(['resources/css/app.css', 'resources/js/home.js'])
     <style>
         body { font-family: var(--hub-font-sans); }
         [x-cloak] { display: none !important; }
@@ -47,11 +42,11 @@
         .incident-row:nth-child(3) { animation-delay: 100ms; }
         .incident-row:nth-child(4) { animation-delay: 150ms; }
         .incident-row:nth-child(5) { animation-delay: 200ms; }
-        .shimmer-line { position: relative; overflow: hidden; background: #e7e5e3; border-radius: 4px; }
+        .shimmer-line { position: relative; overflow: hidden; background: rgb(var(--hub-border)); border-radius: 4px; }
         .shimmer-line::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%); animation: shimmer 1.4s infinite; }
-        .feed-scroll { scrollbar-width: thin; scrollbar-color: #e7e5e3 transparent; }
+        .feed-scroll { scrollbar-width: thin; scrollbar-color: rgb(var(--hub-border)) transparent; }
         .feed-scroll::-webkit-scrollbar { width: 4px; }
-        .feed-scroll::-webkit-scrollbar-thumb { background: #e7e5e3; border-radius: 2px; }
+        .feed-scroll::-webkit-scrollbar-thumb { background: rgb(var(--hub-border)); border-radius: 2px; }
         @media (prefers-reduced-motion: reduce) {
             .shimmer-line::after { animation: none; }
             .stagger-item, .incident-row { opacity: 1; animation: none; }
@@ -259,13 +254,13 @@
             </section>
             </div>
 
-            <!-- PulsePoint Live Call Feed -->
+            <!-- Incident feed -->
             <div
                 x-data="pulsePointFeed()"
                 x-init="init()"
                 data-home-column="incidents"
                 class="min-w-0 overflow-hidden rounded-xl border border-hub-border bg-hub-surface shadow-card"
-                aria-label="MBFD Live Incident Feed"
+                aria-label="MBFD Incident Feed"
                 aria-live="polite"
                 aria-atomic="false"
             >
@@ -279,19 +274,24 @@
                             </svg>
                         </div>
                         <div>
-                            <h2 class="text-white font-semibold text-sm leading-tight font-heading">MBFD Live Incidents</h2>
-                            <p class="text-slate-400 text-xs">Miami Beach Fire — Agency X1012</p>
+                            <h2 class="text-white font-semibold text-sm leading-tight font-heading">MBFD Incidents</h2>
+                            <p class="text-slate-400 text-xs">Miami Beach Fire Department</p>
                         </div>
                     </div>
-                    <!-- Live badge + last-updated -->
+                    <!-- Feed status -->
                     <div class="flex items-center gap-2 flex-shrink-0">
-                        <span x-show="!error" class="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-red-900/40 text-red-300">
+                        <span x-cloak x-show="loading" class="inline-flex items-center gap-1.5 rounded-full bg-hub-surface/10 px-2 py-0.5 text-xs font-medium text-hub-border">Checking</span>
+                        <span x-cloak x-show="!loading && !error && !stale" class="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-red-900/40 text-red-300">
                             <span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>
                             Live
                         </span>
-                        <span x-show="error" class="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-900/30 text-amber-400">
+                        <span x-cloak x-show="!loading && stale" class="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-900/30 text-amber-400">
                             <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                            Offline
+                            Stale
+                        </span>
+                        <span x-cloak x-show="!loading && error" class="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-900/30 text-amber-400">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                            Unavailable
                         </span>
                     </div>
                 </div>
@@ -300,12 +300,12 @@
                 <div class="flex items-center justify-between border-b border-hub-border bg-hub-surface-muted px-5 py-2.5">
                     <div class="flex items-center gap-4">
                         <div class="text-center">
-                            <div class="font-heading font-bold text-xl text-red-600 leading-none" style="font-variant-numeric: tabular-nums;" x-text="loading ? '—' : activeCount"></div>
+                            <div class="font-heading font-bold text-xl text-red-600 leading-none" style="font-variant-numeric: tabular-nums;" x-text="loading || error ? '—' : activeCount"></div>
                             <div class="mt-0.5 text-xs text-hub-muted">Active</div>
                         </div>
                         <div class="h-8 w-px bg-hub-border"></div>
                         <div class="text-center">
-                            <div class="font-heading text-xl font-bold leading-none text-hub-muted-soft" style="font-variant-numeric: tabular-nums;" x-text="loading ? '—' : recentCount"></div>
+                            <div class="font-heading text-xl font-bold leading-none text-hub-muted-soft" style="font-variant-numeric: tabular-nums;" x-text="loading || error ? '—' : recentCount"></div>
                             <div class="mt-0.5 text-xs text-hub-muted">Recent</div>
                         </div>
                     </div>
@@ -400,8 +400,8 @@
                             <svg class="mb-2 h-8 w-8 text-hub-border" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
-                            <p class="text-sm font-medium text-hub-muted-soft">No Active Incidents</p>
-                            <p class="mt-1 text-xs text-hub-muted-soft">All units available</p>
+                            <p class="text-sm font-medium text-hub-muted-soft">No incidents listed</p>
+                            <p class="mt-1 text-xs text-hub-muted-soft" x-text="stale ? 'In the last confirmed feed' : 'In the current feed'"></p>
                         </div>
                     </template>
                 </div>
@@ -438,6 +438,7 @@
         return {
             loading: true,
             error: false,
+            stale: false,
             activeIncidents: [],
             recentIncidents: [],
             lastUpdated: '',
@@ -463,14 +464,20 @@
                     });
                     if (!resp.ok) throw new Error('HTTP ' + resp.status);
                     const data = await resp.json();
-                    if (data.error && !data.active) throw new Error(data.error);
-                    this.activeIncidents = data.active || [];
-                    this.recentIncidents = data.recent || [];
+                    if (data.error || !Array.isArray(data.active) || !Array.isArray(data.recent)) throw new Error('Incident feed unavailable');
+                    const staleAsOf = data.stale === true ? new Date(data.staleAsOf) : null;
+                    if (staleAsOf && (!data.staleAsOf || Number.isNaN(staleAsOf.getTime()))) throw new Error('Stale feed timestamp unavailable');
+                    this.activeIncidents = data.active;
+                    this.recentIncidents = data.recent;
                     this.error = false;
-                    this.lastUpdated = 'Updated ' + this.timeAgo(data.fetchedAt);
+                    this.stale = data.stale === true;
+                    this.lastUpdated = staleAsOf
+                        ? 'Last confirmed ' + staleAsOf.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })
+                        : (data.fetchedAt ? 'Updated ' + this.timeAgo(data.fetchedAt) : 'Current feed confirmed');
                 } catch (e) {
                     this.error = true;
-                    this.lastUpdated = 'Update failed';
+                    this.stale = false;
+                    this.lastUpdated = 'No confirmed update';
                 } finally {
                     this.loading = false;
                 }

@@ -127,17 +127,22 @@ class IncidentsController extends Controller
 
     private function degraded(Throwable $exception): JsonResponse
     {
-        $failures = Cache::increment(self::FAILURE_COUNT_KEY);
-        Cache::put('pulsepoint_incidents_last_failure_at', now()->toISOString(), self::LAST_GOOD_TTL);
-        if ($failures >= self::CIRCUIT_THRESHOLD) {
-            Cache::put(self::CIRCUIT_KEY, now()->addSeconds(self::CIRCUIT_SECONDS)->timestamp, self::CIRCUIT_SECONDS);
+        $circuitOpen = $exception instanceof RuntimeException && $exception->getMessage() === 'circuit_open';
+        $failures = $circuitOpen
+            ? (int) Cache::get(self::FAILURE_COUNT_KEY, 0)
+            : Cache::increment(self::FAILURE_COUNT_KEY);
+        if (! $circuitOpen) {
+            Cache::put('pulsepoint_incidents_last_failure_at', now()->toISOString(), self::LAST_GOOD_TTL);
+            if ($failures >= self::CIRCUIT_THRESHOLD) {
+                Cache::put(self::CIRCUIT_KEY, now()->addSeconds(self::CIRCUIT_SECONDS)->timestamp, self::CIRCUIT_SECONDS);
+            }
         }
 
         if (Cache::add('pulsepoint_incidents_failure_alert', true, 300)) {
             Log::warning('PulsePoint fetch failed.', [
                 'failure_code' => $this->failureCode($exception),
                 'consecutive_failures' => $failures,
-                'circuit_open' => $failures >= self::CIRCUIT_THRESHOLD,
+                'circuit_open' => $circuitOpen || $failures >= self::CIRCUIT_THRESHOLD,
             ]);
         }
 
@@ -155,7 +160,6 @@ class IncidentsController extends Controller
             'active' => [],
             'recent' => [],
             'stale' => false,
-            'fetchedAt' => now()->toISOString(),
         ], 503)->header('Cache-Control', 'no-store');
     }
 

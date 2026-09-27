@@ -30,7 +30,7 @@ class HomeNavigationTest extends TestCase
         $response->assertOk();
         $response->assertSee('Department Updates');
         $response->assertSee('No current department updates');
-        $response->assertSeeInOrder(['Department Updates', 'Quick Access', 'MBFD Live Incidents']);
+        $response->assertSeeInOrder(['Department Updates', 'Quick Access', 'MBFD Incidents']);
         $response->assertSee('Quick Access');
         $response->assertSeeInOrder([
             'Station / Vehicles / Equipment',

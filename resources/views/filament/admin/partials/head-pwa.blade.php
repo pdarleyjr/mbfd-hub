@@ -1,6 +1,5 @@
 {{-- PWA head wiring — only emits the admin manifest link, theme color, and bootstrap JS --}}
-<meta name="theme-color" content="#1e293b" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#FAFAF8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#102A43">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

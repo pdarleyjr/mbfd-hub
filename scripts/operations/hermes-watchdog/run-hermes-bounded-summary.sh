@@ -82,7 +82,7 @@ jq -n --rawfile evidence "$EVIDENCE" --arg model "$MODEL" --arg request_id "$REQ
     {role:"system",content:"You are a bounded MBFD operations summarizer. Use only the supplied deterministic evidence. Do not call tools, browse, delegate, or infer missing facts. Keep output under 1200 words. Label P0/P1/P2/P3, cite local evidence references, and explicitly state unavailable evidence."},
     {role:"user",content:("Request ID: " + $request_id + "\nSummarize this evidence with sections Overall Status, Immediate P0/P1, Deferred P2, Trends P3, EOC Freshness, Services and Containers, Capacity Memory OOM GPU, Backups, Cloudflare HLS Cameras, and Manual Actions.\n\n" + $evidence)}
   ],
-  options: {num_ctx:8192,num_predict:768,temperature:0.1}
+  options: {num_predict:768,temperature:0.1}
 }' >"$REQUEST"
 
 attempts=0
