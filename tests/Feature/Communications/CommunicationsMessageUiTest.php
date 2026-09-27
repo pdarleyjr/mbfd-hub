@@ -7,6 +7,7 @@ namespace Tests\Feature\Communications;
 use App\Filament\Pages\ComposeEmail;
 use App\Filament\Resources\OutboundEmailResource\Pages\ListOutboundEmails;
 use App\Filament\Resources\OutboundEmailResource\Pages\ViewOutboundEmail;
+use App\Models\InboundEmail;
 use App\Models\OutboundEmail;
 use App\Models\User;
 use App\Services\Communications\EmailConversation;
@@ -119,13 +120,7 @@ final class CommunicationsMessageUiTest extends TestCase
 
     public function test_reply_send_preserves_provider_headers_parent_and_private_recipient_classes(): void
     {
-        config(['communications.cloudflare.account_id' => str_repeat('a', 32), 'communications.cloudflare.api_token' => 'test-only-token']);
-        \App\Models\CloudflareUsageBudget::create([
-            'provider_account_id' => str_repeat('a', 32), 'cycle_start' => now()->subDay(), 'cycle_end' => now()->addDays(29),
-            'provider_chargeable_used' => 0, 'provider_daily_quota' => 100, 'provider_daily_used' => 0,
-            'hub_safe_ceiling' => 2850, 'worker_request_threshold' => 9000000, 'worker_cpu_ms_threshold' => 27000000,
-            'worker_requests_used' => 0, 'worker_cpu_ms_used' => 0, 'reconciled_at' => now(), 'provider_daily_reconciled_at' => now(),
-        ]);
+        $this->configureSending();
         $source = $this->email();
         $source->update(['message_id' => '<parent@example.test>', 'references' => ['<first@example.test>']]);
         Http::fake(['api.cloudflare.com/*' => Http::response(['success' => true, 'result' => ['message_id' => '<reply@example.test>', 'queued' => ['public@example.test', 'copy@example.test']]])]);
@@ -138,8 +133,55 @@ final class CommunicationsMessageUiTest extends TestCase
         $reply = OutboundEmail::where('id', '!=', $source->id)->sole();
         self::assertSame($source->id, $reply->parent_outbound_email_id);
         self::assertSame('admin_reply', $reply->source_type);
+        self::assertSame((string) $source->id, $reply->source_id);
         self::assertSame('queued', $reply->status);
         self::assertSame('<parent@example.test>', $reply->in_reply_to);
+    }
+
+    public function test_inbound_reply_and_forward_preserve_source_association_and_only_reply_has_rfc_threading_headers(): void
+    {
+        $this->configureSending();
+        $source = InboundEmail::create([
+            'provider_message_id' => '<incoming@example.test>', 'from_address' => 'sender@example.test',
+            'to_address' => 'info@mbfdhub.com', 'subject' => 'Operational question', 'text_body' => 'Original body',
+            'received_at' => now(), 'references' => ['<earlier@example.test>'],
+        ]);
+        Http::fake(['api.cloudflare.com/*' => Http::response(['success' => true, 'result' => [
+            'message_id' => '<sent@example.test>', 'queued' => ['sender@example.test'],
+        ]])]);
+
+        Livewire::withQueryParams(['source' => 'inbound', 'message' => $source->id, 'mode' => 'reply'])
+            ->test(ComposeEmail::class)->fillForm(['text' => 'Reply body'])->call('send')->assertHasNoFormErrors()->assertRedirect();
+        $reply = OutboundEmail::query()->sole();
+        self::assertSame('admin_reply', $reply->source_type);
+        self::assertSame((string) $source->id, $reply->source_id);
+        self::assertSame($source->id, $reply->parent_inbound_email_id);
+        self::assertSame('<incoming@example.test>', $reply->in_reply_to);
+        self::assertSame(['<earlier@example.test>', '<incoming@example.test>'], $reply->references);
+        Http::assertSent(fn ($request): bool => $request['headers']['In-Reply-To'] === '<incoming@example.test>'
+            && $request['headers']['References'] === '<earlier@example.test> <incoming@example.test>');
+
+        Livewire::withQueryParams(['source' => 'inbound', 'message' => $source->id, 'mode' => 'forward'])
+            ->test(ComposeEmail::class)->fillForm(['to' => ['sender@example.test'], 'text' => 'Forward body'])
+            ->call('send')->assertHasNoFormErrors()->assertRedirect();
+        $forward = OutboundEmail::query()->whereKeyNot($reply->id)->sole();
+        self::assertSame('admin_forward', $forward->source_type);
+        self::assertSame((string) $source->id, $forward->source_id);
+        self::assertSame($source->id, $forward->parent_inbound_email_id);
+        self::assertNull($forward->in_reply_to);
+        Http::assertSent(fn ($request): bool => $request['subject'] === 'Fwd: Operational question'
+            && ! isset($request['headers']));
+    }
+
+    private function configureSending(): void
+    {
+        config(['communications.cloudflare.account_id' => str_repeat('a', 32), 'communications.cloudflare.api_token' => 'test-only-token']);
+        \App\Models\CloudflareUsageBudget::create([
+            'provider_account_id' => str_repeat('a', 32), 'cycle_start' => now()->subDay(), 'cycle_end' => now()->addDays(29),
+            'provider_chargeable_used' => 0, 'provider_daily_quota' => 100, 'provider_daily_used' => 0,
+            'hub_safe_ceiling' => 2850, 'worker_request_threshold' => 9000000, 'worker_cpu_ms_threshold' => 27000000,
+            'worker_requests_used' => 0, 'worker_cpu_ms_used' => 0, 'reconciled_at' => now(), 'provider_daily_reconciled_at' => now(),
+        ]);
     }
 
     private function email(): OutboundEmail

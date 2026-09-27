@@ -123,6 +123,7 @@ final class ComposeEmail extends Page implements HasForms
             $email = $dispatcher->send(
                 to: $state['to'], subject: (string) $state['subject'], text: (string) $state['text'], html: null,
                 sourceType: $source ? ($this->mode === 'forward' ? 'admin_forward' : 'admin_reply') : 'admin_compose',
+                sourceId: $source ? (string) $source->getKey() : null,
                 actor: $actor, cc: $state['cc'] ?? [], bcc: $state['bcc'] ?? [],
                 replyTo: filled($state['reply_to'] ?? null) ? strtolower(trim($state['reply_to'])) : null,
                 attachments: $attachments, headers: $source ? $conversation->headers($source, $this->mode) : [],
