@@ -142,7 +142,7 @@
         <!-- Right: Utility Actions -->
         <div class="flex items-center gap-2" x-data="{ accountOpen: false }" @keydown.escape.window="accountOpen = false">
             @if($showAdminPanel)
-                <a href="{{ url('/admin') }}" data-important-target class="flex min-h-[44px] items-center gap-2 rounded-lg bg-hub-red px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-hub-red-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-hub-header sm:px-4">
+                <a href="{{ url('/admin') }}" data-important-target class="flex min-h-[44px] items-center gap-2 rounded-lg bg-hub-blue px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-hub-blue-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-hub-header sm:px-4">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065Z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"></path></svg>
                     <span>Admin Panel</span>
                 </a>
@@ -201,7 +201,7 @@
                                     @endif
                                 </div>
                                 <h3 class="mt-2 font-heading text-base font-bold leading-snug text-hub-ink">
-                                    <a href="{{ route('updates.show', $update) }}" class="rounded-sm hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600">{{ $update->title }}</a>
+                                    <a href="{{ route('updates.show', $update) }}" class="rounded-sm hover:text-hub-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">{{ $update->title }}</a>
                                 </h3>
                                 <p class="update-preview mt-1.5 text-sm leading-relaxed text-hub-muted">{{ $update->excerpt(180) }}</p>
                                 <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -209,7 +209,7 @@
                                         <time datetime="{{ $update->publish_at?->toIso8601String() }}">{{ $update->publish_at?->timezone('America/New_York')->format('M j · g:i A') }}</time>
                                         @if($update->author?->name)<span aria-hidden="true"> · </span>{{ $update->author->name }}@endif
                                     </p>
-                                    <a href="{{ route('updates.show', $update) }}" data-important-target class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600">Read update</a>
+                                    <a href="{{ route('updates.show', $update) }}" data-important-target class="inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-semibold text-hub-blue hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">Read update</a>
                                 </div>
                             </article>
                         @empty

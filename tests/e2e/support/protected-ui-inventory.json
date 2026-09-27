@@ -1,0 +1,1959 @@
+{
+  "schema_version": 1,
+  "baseline": "8d559af5ab566f840026c7bcac8afa3741efa139",
+  "source": "Reconciled source/runtime route inventory; record destinations use isolated fixture mappings or rendered local links",
+  "pages": [
+    {
+      "route": "/admin/employees/accounts",
+      "name": "ListAccountProfiles",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.employees.accounts.index"
+    },
+    {
+      "route": "/admin/employees/accounts/{record}/edit",
+      "name": "EditAccountProfile",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/employees/accounts",
+      "route_name": "filament.admin.resources.employees.accounts.edit"
+    },
+    {
+      "route": "/admin/apparatus-inspection-exceptions",
+      "name": "ListInspectionExceptions",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.apparatus-inspection-exceptions.index"
+    },
+    {
+      "route": "/admin/apparatuses",
+      "name": "ListApparatuses",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.apparatuses.index"
+    },
+    {
+      "route": "/admin/apparatuses/create",
+      "name": "CreateApparatus",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/apparatuses",
+      "route_name": "filament.admin.resources.apparatuses.create"
+    },
+    {
+      "route": "/admin/apparatuses/{record}",
+      "name": "ViewApparatus",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/apparatuses",
+      "route_name": "filament.admin.resources.apparatuses.view"
+    },
+    {
+      "route": "/admin/apparatuses/{record}/edit",
+      "name": "EditApparatus",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/apparatuses",
+      "route_name": "filament.admin.resources.apparatuses.edit"
+    },
+    {
+      "route": "/admin/apparatuses/{record}/inspections/{inspection}",
+      "name": "ViewInspection",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/apparatuses",
+      "route_name": "filament.admin.resources.apparatuses.view-inspection"
+    },
+    {
+      "route": "/admin/apparatus-service-tickets",
+      "name": "ListApparatusServiceTickets",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.apparatus-service-tickets.index"
+    },
+    {
+      "route": "/admin/apparatus-service-tickets/{record}",
+      "name": "ViewApparatusServiceTicket",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/apparatus-service-tickets",
+      "route_name": "filament.admin.resources.apparatus-service-tickets.view"
+    },
+    {
+      "route": "/admin/capital-projects",
+      "name": "ListCapitalProjects",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.capital-projects.index"
+    },
+    {
+      "route": "/admin/capital-projects/create",
+      "name": "CreateCapitalProject",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/capital-projects",
+      "route_name": "filament.admin.resources.capital-projects.create"
+    },
+    {
+      "route": "/admin/capital-projects/{record}",
+      "name": "ViewCapitalProject",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/capital-projects",
+      "route_name": "filament.admin.resources.capital-projects.view"
+    },
+    {
+      "route": "/admin/capital-projects/{record}/edit",
+      "name": "EditCapitalProject",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/capital-projects",
+      "route_name": "filament.admin.resources.capital-projects.edit"
+    },
+    {
+      "route": "/admin/defects",
+      "name": "ListDefects",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.defects.index"
+    },
+    {
+      "route": "/admin/defects/{record}/edit",
+      "name": "EditDefect",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/defects",
+      "route_name": "filament.admin.resources.defects.edit"
+    },
+    {
+      "route": "/admin/department-updates",
+      "name": "ListDepartmentUpdates",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.department-updates.index"
+    },
+    {
+      "route": "/admin/department-updates/create",
+      "name": "CreateDepartmentUpdate",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/department-updates",
+      "route_name": "filament.admin.resources.department-updates.create"
+    },
+    {
+      "route": "/admin/department-updates/{record}",
+      "name": "ViewDepartmentUpdate",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/department-updates",
+      "route_name": "filament.admin.resources.department-updates.view"
+    },
+    {
+      "route": "/admin/department-updates/{record}/edit",
+      "name": "EditDepartmentUpdate",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/department-updates",
+      "route_name": "filament.admin.resources.department-updates.edit"
+    },
+    {
+      "route": "/admin/employee-equipment-requests",
+      "name": "ListEmployeeEquipmentRequests",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.employee-equipment-requests.index"
+    },
+    {
+      "route": "/admin/employee-equipment-requests/{record}",
+      "name": "ViewEmployeeEquipmentRequest",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/employee-equipment-requests",
+      "route_name": "filament.admin.resources.employee-equipment-requests.view"
+    },
+    {
+      "route": "/admin/employees",
+      "name": "ListEmployees",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.employees.index"
+    },
+    {
+      "route": "/admin/employees/create",
+      "name": "CreateEmployee",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/employees",
+      "route_name": "filament.admin.resources.employees.create"
+    },
+    {
+      "route": "/admin/employees/{record}/edit",
+      "name": "EditEmployee",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/employees",
+      "route_name": "filament.admin.resources.employees.edit"
+    },
+    {
+      "route": "/admin/equipment-items",
+      "name": "ListEquipmentItems",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.equipment-items.index"
+    },
+    {
+      "route": "/admin/equipment-items/create",
+      "name": "CreateEquipmentItem",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/equipment-items",
+      "route_name": "filament.admin.resources.equipment-items.create"
+    },
+    {
+      "route": "/admin/equipment-items/{record}/edit",
+      "name": "EditEquipmentItem",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/equipment-items",
+      "route_name": "filament.admin.resources.equipment-items.edit"
+    },
+    {
+      "route": "/admin/fire-equipment-requests",
+      "name": "ListFireEquipmentRequests",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.fire-equipment-requests.index"
+    },
+    {
+      "route": "/admin/fire-equipment-requests/{record}",
+      "name": "ViewFireEquipmentRequest",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/fire-equipment-requests",
+      "route_name": "filament.admin.resources.fire-equipment-requests.view"
+    },
+    {
+      "route": "/admin/hub-support-tickets",
+      "name": "ListHubSupportTickets",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.hub-support-tickets.index"
+    },
+    {
+      "route": "/admin/hub-support-tickets/{record}",
+      "name": "ViewHubSupportTicket",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/hub-support-tickets",
+      "route_name": "filament.admin.resources.hub-support-tickets.view"
+    },
+    {
+      "route": "/admin/inbound-emails",
+      "name": "ListInboundEmails",
+      "panel": "admin",
+      "scope": "OTHER AGENT: Communications; shared shell/style only",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.inbound-emails.index"
+    },
+    {
+      "route": "/admin/inbound-emails/{record}",
+      "name": "ViewInboundEmail",
+      "panel": "admin",
+      "scope": "OTHER AGENT: Communications; shared shell/style only",
+      "parent": "/admin/inbound-emails",
+      "route_name": "filament.admin.resources.inbound-emails.view"
+    },
+    {
+      "route": "/admin/inspections",
+      "name": "ListInspections",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.inspections.index"
+    },
+    {
+      "route": "/admin/inspections/{record}",
+      "name": "ViewInspection",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/inspections",
+      "route_name": "filament.admin.resources.inspections.view"
+    },
+    {
+      "route": "/admin/inventory-items",
+      "name": "ListInventoryItems",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.inventory-items.index"
+    },
+    {
+      "route": "/admin/inventory-items/create",
+      "name": "CreateInventoryItem",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/inventory-items",
+      "route_name": "filament.admin.resources.inventory-items.create"
+    },
+    {
+      "route": "/admin/inventory-items/{record}/edit",
+      "name": "EditInventoryItem",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/inventory-items",
+      "route_name": "filament.admin.resources.inventory-items.edit"
+    },
+    {
+      "route": "/admin/inventory-locations",
+      "name": "ListInventoryLocations",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.inventory-locations.index"
+    },
+    {
+      "route": "/admin/inventory-locations/create",
+      "name": "CreateInventoryLocation",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/inventory-locations",
+      "route_name": "filament.admin.resources.inventory-locations.create"
+    },
+    {
+      "route": "/admin/inventory-locations/{record}/edit",
+      "name": "EditInventoryLocation",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/inventory-locations",
+      "route_name": "filament.admin.resources.inventory-locations.edit"
+    },
+    {
+      "route": "/admin/operational-forms",
+      "name": "ListOperationalFormRecords",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.operational-forms.index"
+    },
+    {
+      "route": "/admin/operational-forms/{record}",
+      "name": "ViewOperationalFormRecord",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/operational-forms",
+      "route_name": "filament.admin.resources.operational-forms.view"
+    },
+    {
+      "route": "/admin/outbound-emails",
+      "name": "ListOutboundEmails",
+      "panel": "admin",
+      "scope": "OTHER AGENT: Communications; shared shell/style only",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.outbound-emails.index"
+    },
+    {
+      "route": "/admin/outbound-emails/{record}",
+      "name": "ViewOutboundEmail",
+      "panel": "admin",
+      "scope": "OTHER AGENT: Communications; shared shell/style only",
+      "parent": "/admin/outbound-emails",
+      "route_name": "filament.admin.resources.outbound-emails.view"
+    },
+    {
+      "route": "/admin/recommendations",
+      "name": "ListRecommendations",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.recommendations.index"
+    },
+    {
+      "route": "/admin/recommendations/{record}/edit",
+      "name": "EditRecommendation",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/recommendations",
+      "route_name": "filament.admin.resources.recommendations.edit"
+    },
+    {
+      "route": "/admin/room-assets",
+      "name": "ListRoomAssets",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.room-assets.index"
+    },
+    {
+      "route": "/admin/room-assets/create",
+      "name": "CreateRoomAsset",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/room-assets",
+      "route_name": "filament.admin.resources.room-assets.create"
+    },
+    {
+      "route": "/admin/room-assets/{record}",
+      "name": "ViewRoomAsset",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/room-assets",
+      "route_name": "filament.admin.resources.room-assets.view"
+    },
+    {
+      "route": "/admin/room-assets/{record}/edit",
+      "name": "EditRoomAsset",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/room-assets",
+      "route_name": "filament.admin.resources.room-assets.edit"
+    },
+    {
+      "route": "/admin/shop-works",
+      "name": "ListShopWorks",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.shop-works.index"
+    },
+    {
+      "route": "/admin/shop-works/create",
+      "name": "CreateShopWork",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/shop-works",
+      "route_name": "filament.admin.resources.shop-works.create"
+    },
+    {
+      "route": "/admin/shop-works/{record}/edit",
+      "name": "EditShopWork",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/shop-works",
+      "route_name": "filament.admin.resources.shop-works.edit"
+    },
+    {
+      "route": "/admin/single-gas-meters",
+      "name": "ListSingleGasMeters",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.single-gas-meters.index"
+    },
+    {
+      "route": "/admin/single-gas-meters/create",
+      "name": "CreateSingleGasMeter",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/single-gas-meters",
+      "route_name": "filament.admin.resources.single-gas-meters.create"
+    },
+    {
+      "route": "/admin/single-gas-meters/{record}/edit",
+      "name": "EditSingleGasMeter",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/single-gas-meters",
+      "route_name": "filament.admin.resources.single-gas-meters.edit"
+    },
+    {
+      "route": "/admin/station-inspections",
+      "name": "ListStationInspections",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.station-inspections.index"
+    },
+    {
+      "route": "/admin/station-inspections/{record}",
+      "name": "ViewStationInspection",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/station-inspections",
+      "route_name": "filament.admin.resources.station-inspections.view"
+    },
+    {
+      "route": "/admin/station-requests",
+      "name": "ListStationRequests",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.station-requests.index"
+    },
+    {
+      "route": "/admin/station-requests/{record}",
+      "name": "ViewStationRequest",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/station-requests",
+      "route_name": "filament.admin.resources.station-requests.view"
+    },
+    {
+      "route": "/admin/stations",
+      "name": "ListStations",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.stations.index"
+    },
+    {
+      "route": "/admin/stations/create",
+      "name": "CreateStation",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/stations",
+      "route_name": "filament.admin.resources.stations.create"
+    },
+    {
+      "route": "/admin/stations/{record}",
+      "name": "ViewStation",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/stations",
+      "route_name": "filament.admin.resources.stations.view"
+    },
+    {
+      "route": "/admin/stations/{record}/edit",
+      "name": "EditStation",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/stations",
+      "route_name": "filament.admin.resources.stations.edit"
+    },
+    {
+      "route": "/admin/todos",
+      "name": "ListTodos",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.todos.index"
+    },
+    {
+      "route": "/admin/todos/create",
+      "name": "CreateTodo",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/todos",
+      "route_name": "filament.admin.resources.todos.create"
+    },
+    {
+      "route": "/admin/todos/{record}",
+      "name": "ViewTodo",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/todos",
+      "route_name": "filament.admin.resources.todos.view"
+    },
+    {
+      "route": "/admin/todos/{record}/edit",
+      "name": "EditTodo",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/todos",
+      "route_name": "filament.admin.resources.todos.edit"
+    },
+    {
+      "route": "/admin/training-management",
+      "name": "ListTrainingTodos",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.training-management.index"
+    },
+    {
+      "route": "/admin/training-management/create",
+      "name": "CreateTrainingTodo",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/training-management",
+      "route_name": "filament.admin.resources.training-management.create"
+    },
+    {
+      "route": "/admin/training-management/{record}",
+      "name": "ViewTrainingTodo",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/training-management",
+      "route_name": "filament.admin.resources.training-management.view"
+    },
+    {
+      "route": "/admin/training-management/{record}/edit",
+      "name": "EditTrainingTodo",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/training-management",
+      "route_name": "filament.admin.resources.training-management.edit"
+    },
+    {
+      "route": "/admin/under-25k",
+      "name": "ListUnder25kProjects",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.under-25k.index"
+    },
+    {
+      "route": "/admin/under-25k/create",
+      "name": "CreateUnder25kProject",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/under-25k",
+      "route_name": "filament.admin.resources.under-25k.create"
+    },
+    {
+      "route": "/admin/under-25k/{record}",
+      "name": "ViewUnder25kProject",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/under-25k",
+      "route_name": "filament.admin.resources.under-25k.view"
+    },
+    {
+      "route": "/admin/under-25k/{record}/edit",
+      "name": "EditUnder25kProject",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/under-25k",
+      "route_name": "filament.admin.resources.under-25k.edit"
+    },
+    {
+      "route": "/admin/uniforms",
+      "name": "ListUniforms",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.uniforms.index"
+    },
+    {
+      "route": "/admin/uniforms/create",
+      "name": "CreateUniform",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/uniforms",
+      "route_name": "filament.admin.resources.uniforms.create"
+    },
+    {
+      "route": "/admin/uniforms/{record}/edit",
+      "name": "EditUniform",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/uniforms",
+      "route_name": "filament.admin.resources.uniforms.edit"
+    },
+    {
+      "route": "/admin/unit-master-vehicles",
+      "name": "ListUnitMasterVehicles",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.unit-master-vehicles.index"
+    },
+    {
+      "route": "/admin/unit-master-vehicles/create",
+      "name": "CreateUnitMasterVehicle",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/unit-master-vehicles",
+      "route_name": "filament.admin.resources.unit-master-vehicles.create"
+    },
+    {
+      "route": "/admin/unit-master-vehicles/{record}/edit",
+      "name": "EditUnitMasterVehicle",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/unit-master-vehicles",
+      "route_name": "filament.admin.resources.unit-master-vehicles.edit"
+    },
+    {
+      "route": "/admin/users",
+      "name": "ListUsers",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.users.index"
+    },
+    {
+      "route": "/admin/users/create",
+      "name": "CreateUser",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/users",
+      "route_name": "filament.admin.resources.users.create"
+    },
+    {
+      "route": "/admin/users/{record}/edit",
+      "name": "EditUser",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/users",
+      "route_name": "filament.admin.resources.users.edit"
+    },
+    {
+      "route": "/admin/workgroup/candidate-products",
+      "name": "ListCandidateProducts",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.workgroup.candidate-products.index"
+    },
+    {
+      "route": "/admin/workgroup/candidate-products/create",
+      "name": "CreateCandidateProduct",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/candidate-products",
+      "route_name": "filament.admin.resources.workgroup.candidate-products.create"
+    },
+    {
+      "route": "/admin/workgroup/candidate-products/{record}",
+      "name": "ViewCandidateProduct",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/candidate-products",
+      "route_name": "filament.admin.resources.workgroup.candidate-products.view"
+    },
+    {
+      "route": "/admin/workgroup/candidate-products/{record}/edit",
+      "name": "EditCandidateProduct",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/candidate-products",
+      "route_name": "filament.admin.resources.workgroup.candidate-products.edit"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-categories",
+      "name": "ListEvaluationCategories",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.workgroup.evaluation-categories.index"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-categories/create",
+      "name": "CreateEvaluationCategory",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/evaluation-categories",
+      "route_name": "filament.admin.resources.workgroup.evaluation-categories.create"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-categories/{record}",
+      "name": "ViewEvaluationCategory",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/evaluation-categories",
+      "route_name": "filament.admin.resources.workgroup.evaluation-categories.view"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-categories/{record}/edit",
+      "name": "EditEvaluationCategory",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/evaluation-categories",
+      "route_name": "filament.admin.resources.workgroup.evaluation-categories.edit"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-criteria",
+      "name": "ListEvaluationCriteria",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.workgroup.evaluation-criteria.index"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-criteria/create",
+      "name": "CreateEvaluationCriterion",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/evaluation-criteria",
+      "route_name": "filament.admin.resources.workgroup.evaluation-criteria.create"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-criteria/{record}/edit",
+      "name": "EditEvaluationCriterion",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/evaluation-criteria",
+      "route_name": "filament.admin.resources.workgroup.evaluation-criteria.edit"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-submissions",
+      "name": "ListEvaluationSubmissions",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.workgroup.evaluation-submissions.index"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-submissions/{record}",
+      "name": "ViewEvaluationSubmission",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/evaluation-submissions",
+      "route_name": "filament.admin.resources.workgroup.evaluation-submissions.view"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-templates",
+      "name": "ListEvaluationTemplates",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.workgroup.evaluation-templates.index"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-templates/create",
+      "name": "CreateEvaluationTemplate",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/evaluation-templates",
+      "route_name": "filament.admin.resources.workgroup.evaluation-templates.create"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-templates/{record}",
+      "name": "ViewEvaluationTemplate",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/evaluation-templates",
+      "route_name": "filament.admin.resources.workgroup.evaluation-templates.view"
+    },
+    {
+      "route": "/admin/workgroup/evaluation-templates/{record}/edit",
+      "name": "EditEvaluationTemplate",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/evaluation-templates",
+      "route_name": "filament.admin.resources.workgroup.evaluation-templates.edit"
+    },
+    {
+      "route": "/admin/workgroup/surveys",
+      "name": "ListSurveys",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.workgroup.surveys.index"
+    },
+    {
+      "route": "/admin/workgroup/surveys/create",
+      "name": "CreateSurvey",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/surveys",
+      "route_name": "filament.admin.resources.workgroup.surveys.create"
+    },
+    {
+      "route": "/admin/workgroup/surveys/{record}/edit",
+      "name": "EditSurvey",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/surveys",
+      "route_name": "filament.admin.resources.workgroup.surveys.edit"
+    },
+    {
+      "route": "/admin/workgroup/workgroup-files",
+      "name": "ListWorkgroupFiles",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.workgroup.workgroup-files.index"
+    },
+    {
+      "route": "/admin/workgroup/workgroup-files/create",
+      "name": "CreateWorkgroupFile",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/workgroup-files",
+      "route_name": "filament.admin.resources.workgroup.workgroup-files.create"
+    },
+    {
+      "route": "/admin/workgroup/workgroup-files/{record}/edit",
+      "name": "EditWorkgroupFile",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/workgroup-files",
+      "route_name": "filament.admin.resources.workgroup.workgroup-files.edit"
+    },
+    {
+      "route": "/admin/workgroup/workgroup-members",
+      "name": "ListWorkgroupMembers",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.workgroup.workgroup-members.index"
+    },
+    {
+      "route": "/admin/workgroup/workgroup-members/create",
+      "name": "CreateWorkgroupMember",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/workgroup-members",
+      "route_name": "filament.admin.resources.workgroup.workgroup-members.create"
+    },
+    {
+      "route": "/admin/workgroup/workgroup-members/{record}/edit",
+      "name": "EditWorkgroupMember",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/workgroup-members",
+      "route_name": "filament.admin.resources.workgroup.workgroup-members.edit"
+    },
+    {
+      "route": "/admin/workgroup/workgroups",
+      "name": "ListWorkgroups",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.workgroup.workgroups.index"
+    },
+    {
+      "route": "/admin/workgroup/workgroups/create",
+      "name": "CreateWorkgroup",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/workgroups",
+      "route_name": "filament.admin.resources.workgroup.workgroups.create"
+    },
+    {
+      "route": "/admin/workgroup/workgroups/{record}",
+      "name": "ViewWorkgroup",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/workgroups",
+      "route_name": "filament.admin.resources.workgroup.workgroups.view"
+    },
+    {
+      "route": "/admin/workgroup/workgroups/{record}/edit",
+      "name": "EditWorkgroup",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/workgroups",
+      "route_name": "filament.admin.resources.workgroup.workgroups.edit"
+    },
+    {
+      "route": "/admin/workgroup/workgroup-sessions",
+      "name": "ListWorkgroupSessions",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.workgroup.workgroup-sessions.index"
+    },
+    {
+      "route": "/admin/workgroup/workgroup-sessions/create",
+      "name": "CreateWorkgroupSession",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/workgroup-sessions",
+      "route_name": "filament.admin.resources.workgroup.workgroup-sessions.create"
+    },
+    {
+      "route": "/admin/workgroup/workgroup-sessions/{record}",
+      "name": "ViewWorkgroupSession",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/workgroup-sessions",
+      "route_name": "filament.admin.resources.workgroup.workgroup-sessions.view"
+    },
+    {
+      "route": "/admin/workgroup/workgroup-sessions/{record}/edit",
+      "name": "EditWorkgroupSession",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/workgroup/workgroup-sessions",
+      "route_name": "filament.admin.resources.workgroup.workgroup-sessions.edit"
+    },
+    {
+      "route": "/admin/personnel-uniforms-equipment/overview",
+      "name": "PersonnelOverview",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.personnel-uniforms-equipment.pages.overview"
+    },
+    {
+      "route": "/admin/personnel-uniforms-equipment/assignments",
+      "name": "ListPersonnelAssignments",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.personnel-uniforms-equipment.resources.assignments.index"
+    },
+    {
+      "route": "/admin/personnel-uniforms-equipment/assignments/{record}/edit",
+      "name": "EditPersonnelAssignment",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/personnel-uniforms-equipment/assignments",
+      "route_name": "filament.admin.personnel-uniforms-equipment.resources.assignments.edit"
+    },
+    {
+      "route": "/admin/personnel-uniforms-equipment/employee-records",
+      "name": "ListPersonnelEmployees",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.personnel-uniforms-equipment.resources.employee-records.index"
+    },
+    {
+      "route": "/admin/personnel-uniforms-equipment/employee-records/{record}",
+      "name": "ViewPersonnelEmployee",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/personnel-uniforms-equipment/employee-records",
+      "route_name": "filament.admin.personnel-uniforms-equipment.resources.employee-records.view"
+    },
+    {
+      "route": "/admin/personnel-uniforms-equipment/personnel-requests",
+      "name": "ListPersonnelRequests",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.personnel-uniforms-equipment.resources.personnel-requests.index"
+    },
+    {
+      "route": "/admin/personnel-uniforms-equipment/personnel-requests/{record}",
+      "name": "ViewPersonnelRequest",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/personnel-uniforms-equipment/personnel-requests",
+      "route_name": "filament.admin.personnel-uniforms-equipment.resources.personnel-requests.view"
+    },
+    {
+      "route": "/admin/personnel-uniforms-equipment/uniform-inventory",
+      "name": "ListPersonnelUniforms",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.personnel-uniforms-equipment.resources.uniform-inventory.index"
+    },
+    {
+      "route": "/admin/personnel-uniforms-equipment/uniform-inventory/create",
+      "name": "CreatePersonnelUniform",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/personnel-uniforms-equipment/uniform-inventory",
+      "route_name": "filament.admin.personnel-uniforms-equipment.resources.uniform-inventory.create"
+    },
+    {
+      "route": "/admin/personnel-uniforms-equipment/uniform-inventory/{record}/edit",
+      "name": "EditPersonnelUniform",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin/personnel-uniforms-equipment/uniform-inventory",
+      "route_name": "filament.admin.personnel-uniforms-equipment.resources.uniform-inventory.edit"
+    },
+    {
+      "route": "/admin",
+      "name": "Dashboard",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.pages.dashboard"
+    },
+    {
+      "route": "/admin/communications-usage",
+      "name": "CommunicationsUsage",
+      "panel": "admin",
+      "scope": "OTHER AGENT: Communications; shared shell/style only",
+      "parent": "/admin",
+      "route_name": "filament.admin.pages.communications-usage"
+    },
+    {
+      "route": "/admin/compose-email",
+      "name": "ComposeEmail",
+      "panel": "admin",
+      "scope": "OTHER AGENT: Communications; shared shell/style only",
+      "parent": "/admin/outbound-emails",
+      "route_name": "filament.admin.pages.compose-email"
+    },
+    {
+      "route": "/admin/health-check-results",
+      "name": "HealthCheckResults",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.pages.health-check-results"
+    },
+    {
+      "route": "/admin/my-profile",
+      "name": "MyProfile",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/account",
+      "route_name": "filament.admin.pages.my-profile"
+    },
+    {
+      "route": "/admin/notification-settings",
+      "name": "NotificationSettings",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/account",
+      "route_name": "filament.admin.pages.notification-settings"
+    },
+    {
+      "route": "/admin/pulse",
+      "name": "PulseDashboard",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.pages.pulse"
+    },
+    {
+      "route": "/admin/set-password",
+      "name": "SetPasswordPage",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/account",
+      "route_name": "filament.admin.pages.set-password"
+    },
+    {
+      "route": "/admin/settings",
+      "name": "Settings",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.pages.settings"
+    },
+    {
+      "route": "/admin/workgroup-administration",
+      "name": "WorkgroupAdministration",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.pages.workgroup-administration"
+    },
+    {
+      "route": "/admin/equipment-intake",
+      "name": "EquipmentIntake",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.pages.equipment-intake"
+    },
+    {
+      "route": "/admin/trt-trailer-inventory",
+      "name": "TrtTrailerInventory",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.pages.trt-trailer-inventory"
+    },
+    {
+      "route": "/admin/bid-access-pin",
+      "name": "BidAccessPin",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.pages.bid-access-pin"
+    },
+    {
+      "route": "/admin/knowledge-base",
+      "name": "KnowledgeBase",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.pages.knowledge-base"
+    },
+    {
+      "route": "/admin/login",
+      "name": "admin login entry",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/login",
+      "route_name": "filament.admin.auth.login"
+    },
+    {
+      "route": "/employee/dashboard",
+      "name": "EmployeeDashboard",
+      "panel": "employee",
+      "scope": "IN SCOPE",
+      "parent": "/employee",
+      "route_name": "filament.employee.pages.dashboard"
+    },
+    {
+      "route": "/employee/forms",
+      "name": "OperationalForms",
+      "panel": "employee",
+      "scope": "IN SCOPE",
+      "parent": "/employee",
+      "route_name": "filament.employee.pages.forms"
+    },
+    {
+      "route": "/employee/video-conferencing",
+      "name": "VideoConferencing",
+      "panel": "employee",
+      "scope": "IN SCOPE",
+      "parent": "/employee",
+      "route_name": "filament.employee.pages.video-conferencing"
+    },
+    {
+      "route": "/employee/my-equipment-page",
+      "name": "MyEquipmentPage",
+      "panel": "employee",
+      "scope": "IN SCOPE",
+      "parent": "/employee",
+      "route_name": "filament.employee.pages.my-equipment-page"
+    },
+    {
+      "route": "/employee/my-requests",
+      "name": "MyRequestsPage",
+      "panel": "employee",
+      "scope": "IN SCOPE",
+      "parent": "/employee",
+      "route_name": "filament.employee.pages.my-requests"
+    },
+    {
+      "route": "/employee/request-equipment",
+      "name": "RequestEquipmentPage",
+      "panel": "employee",
+      "scope": "IN SCOPE",
+      "parent": "/employee/my-equipment",
+      "route_name": "filament.employee.pages.request-equipment"
+    },
+    {
+      "route": "/employee/apparatus-service-request",
+      "name": "ApparatusServiceRequestPage",
+      "panel": "employee",
+      "scope": "IN SCOPE",
+      "parent": "/employee/my-requests",
+      "route_name": "filament.employee.pages.apparatus-service-request"
+    },
+    {
+      "route": "/employee/personnel-equipment-request",
+      "name": "PersonnelEquipmentRequestPage",
+      "panel": "employee",
+      "scope": "IN SCOPE",
+      "parent": "/employee/my-requests",
+      "route_name": "filament.employee.pages.personnel-equipment-request"
+    },
+    {
+      "route": "/employee/set-password",
+      "name": "SetPasswordPage",
+      "panel": "employee",
+      "scope": "IN SCOPE",
+      "parent": "/account",
+      "route_name": "filament.employee.pages.set-password"
+    },
+    {
+      "route": "/employee/login",
+      "name": "employee login entry",
+      "panel": "employee",
+      "scope": "IN SCOPE",
+      "parent": "/login",
+      "route_name": "filament.employee.auth.login"
+    },
+    {
+      "route": "/training/training-todos",
+      "name": "ListTrainingTodos",
+      "panel": "training",
+      "scope": "IN SCOPE",
+      "parent": "/training",
+      "route_name": "filament.training.resources.training-todos.index"
+    },
+    {
+      "route": "/training/training-todos/create",
+      "name": "CreateTrainingTodo",
+      "panel": "training",
+      "scope": "IN SCOPE",
+      "parent": "/training/training-todos",
+      "route_name": "filament.training.resources.training-todos.create"
+    },
+    {
+      "route": "/training/training-todos/{record}",
+      "name": "ViewTrainingTodo",
+      "panel": "training",
+      "scope": "IN SCOPE",
+      "parent": "/training/training-todos",
+      "route_name": "filament.training.resources.training-todos.view"
+    },
+    {
+      "route": "/training/training-todos/{record}/edit",
+      "name": "EditTrainingTodo",
+      "panel": "training",
+      "scope": "IN SCOPE",
+      "parent": "/training/training-todos",
+      "route_name": "filament.training.resources.training-todos.edit"
+    },
+    {
+      "route": "/training",
+      "name": "Dashboard",
+      "panel": "training",
+      "scope": "IN SCOPE",
+      "parent": "/training",
+      "route_name": "filament.training.pages.dashboard"
+    },
+    {
+      "route": "/training/settings",
+      "name": "Settings",
+      "panel": "training",
+      "scope": "IN SCOPE",
+      "parent": "/training",
+      "route_name": "filament.training.pages.settings"
+    },
+    {
+      "route": "/training/notification-settings",
+      "name": "NotificationSettings",
+      "panel": "training",
+      "scope": "IN SCOPE",
+      "parent": "/account",
+      "route_name": "filament.training.pages.notification-settings"
+    },
+    {
+      "route": "/training/set-password",
+      "name": "SetPasswordPage",
+      "panel": "training",
+      "scope": "IN SCOPE",
+      "parent": "/account",
+      "route_name": "filament.training.pages.set-password"
+    },
+    {
+      "route": "/training/login",
+      "name": "training login entry",
+      "panel": "training",
+      "scope": "IN SCOPE",
+      "parent": "/login",
+      "route_name": "filament.training.auth.login"
+    },
+    {
+      "route": "/workgroups/workgroup/evaluation-categories",
+      "name": "ListEvaluationCategories",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "filament.workgroups.resources.workgroup.evaluation-categories.index"
+    },
+    {
+      "route": "/workgroups/workgroup/evaluation-categories/create",
+      "name": "CreateEvaluationCategory",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups/workgroup/evaluation-categories",
+      "route_name": "filament.workgroups.resources.workgroup.evaluation-categories.create"
+    },
+    {
+      "route": "/workgroups/workgroup/evaluation-categories/{record}",
+      "name": "ViewEvaluationCategory",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups/workgroup/evaluation-categories",
+      "route_name": "filament.workgroups.resources.workgroup.evaluation-categories.view"
+    },
+    {
+      "route": "/workgroups/workgroup/evaluation-categories/{record}/edit",
+      "name": "EditEvaluationCategory",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups/workgroup/evaluation-categories",
+      "route_name": "filament.workgroups.resources.workgroup.evaluation-categories.edit"
+    },
+    {
+      "route": "/workgroups/workgroup/candidate-products",
+      "name": "ListCandidateProducts",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "filament.workgroups.resources.workgroup.candidate-products.index"
+    },
+    {
+      "route": "/workgroups/workgroup/candidate-products/create",
+      "name": "CreateCandidateProduct",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups/workgroup/candidate-products",
+      "route_name": "filament.workgroups.resources.workgroup.candidate-products.create"
+    },
+    {
+      "route": "/workgroups/workgroup/candidate-products/{record}",
+      "name": "ViewCandidateProduct",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups/workgroup/candidate-products",
+      "route_name": "filament.workgroups.resources.workgroup.candidate-products.view"
+    },
+    {
+      "route": "/workgroups/workgroup/candidate-products/{record}/edit",
+      "name": "EditCandidateProduct",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups/workgroup/candidate-products",
+      "route_name": "filament.workgroups.resources.workgroup.candidate-products.edit"
+    },
+    {
+      "route": "/workgroups/workgroup/surveys",
+      "name": "ListSurveys",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "filament.workgroups.resources.workgroup.surveys.index"
+    },
+    {
+      "route": "/workgroups/workgroup/surveys/create",
+      "name": "CreateSurvey",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups/workgroup/surveys",
+      "route_name": "filament.workgroups.resources.workgroup.surveys.create"
+    },
+    {
+      "route": "/workgroups/workgroup/surveys/{record}/edit",
+      "name": "EditSurvey",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups/workgroup/surveys",
+      "route_name": "filament.workgroups.resources.workgroup.surveys.edit"
+    },
+    {
+      "route": "/workgroups",
+      "name": "Dashboard",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "filament.workgroups.pages.dashboard"
+    },
+    {
+      "route": "/workgroups/files",
+      "name": "Files",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "filament.workgroups.pages.files"
+    },
+    {
+      "route": "/workgroups/notes",
+      "name": "Notes",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "filament.workgroups.pages.notes"
+    },
+    {
+      "route": "/workgroups/evaluations",
+      "name": "Evaluations",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "filament.workgroups.pages.evaluations"
+    },
+    {
+      "route": "/workgroups/surveys",
+      "name": "Surveys",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "filament.workgroups.pages.surveys"
+    },
+    {
+      "route": "/workgroups/shared-uploads",
+      "name": "SharedUploads",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "filament.workgroups.pages.shared-uploads"
+    },
+    {
+      "route": "/workgroups/evaluation-form-page",
+      "name": "EvaluationFormPage",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups/evaluations",
+      "route_name": "filament.workgroups.pages.evaluation-form-page"
+    },
+    {
+      "route": "/workgroups/survey-form-page",
+      "name": "SurveyFormPage",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups/surveys",
+      "route_name": "filament.workgroups.pages.survey-form-page"
+    },
+    {
+      "route": "/workgroups/survey-results-page",
+      "name": "SurveyResultsPage",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups/surveys",
+      "route_name": "filament.workgroups.pages.survey-results-page"
+    },
+    {
+      "route": "/workgroups/profile",
+      "name": "Profile",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "filament.workgroups.pages.profile"
+    },
+    {
+      "route": "/workgroups/session-results",
+      "name": "SessionResultsPage",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "filament.workgroups.pages.session-results"
+    },
+    {
+      "route": "/workgroups/notification-settings",
+      "name": "NotificationSettings",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/account",
+      "route_name": "filament.workgroups.pages.notification-settings"
+    },
+    {
+      "route": "/workgroups/links",
+      "name": "Links",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "filament.workgroups.pages.links"
+    },
+    {
+      "route": "/workgroups/set-password",
+      "name": "SetPasswordPage",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/account",
+      "route_name": "filament.workgroups.pages.set-password"
+    },
+    {
+      "route": "/workgroups/login",
+      "name": "workgroups login entry",
+      "panel": "workgroups",
+      "scope": "IN SCOPE",
+      "parent": "/login",
+      "route_name": "filament.workgroups.auth.login"
+    },
+    {
+      "route": "/",
+      "name": "/",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/",
+      "route_name": null
+    },
+    {
+      "route": "/install",
+      "name": "/install",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/",
+      "route_name": "install"
+    },
+    {
+      "route": "/account",
+      "name": "/account",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/",
+      "route_name": "account.show"
+    },
+    {
+      "route": "/updates",
+      "name": "/updates",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/",
+      "route_name": "updates.index"
+    },
+    {
+      "route": "/updates/{departmentUpdate}",
+      "name": "/updates/{departmentUpdate}",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/updates",
+      "route_name": "updates.show"
+    },
+    {
+      "route": "/support/issues",
+      "name": "/support/issues",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/",
+      "route_name": "hub-support.index"
+    },
+    {
+      "route": "/support/issues/create",
+      "name": "/support/issues/create",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/support/issues",
+      "route_name": "hub-support.create"
+    },
+    {
+      "route": "/support/issues/{ticket}",
+      "name": "/support/issues/{ticket}",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/support/issues",
+      "route_name": "hub-support.show"
+    },
+    {
+      "route": "/security-standards",
+      "name": "/security-standards",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/",
+      "route_name": "security-standards"
+    },
+    {
+      "route": "/login",
+      "name": "/login",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/",
+      "route_name": "login"
+    },
+    {
+      "route": "/member-onboarding/invite",
+      "name": "/member-onboarding/invite",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/",
+      "route_name": "member-onboarding.invitation.show"
+    },
+    {
+      "route": "/member-onboarding",
+      "name": "/member-onboarding",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/",
+      "route_name": "member-onboarding.show"
+    },
+    {
+      "route": "/forgot-password",
+      "name": "/forgot-password",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/login",
+      "route_name": "password.request"
+    },
+    {
+      "route": "/reset-password/{token}",
+      "name": "/reset-password/{token}",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/login",
+      "route_name": "password.reset.form"
+    },
+    {
+      "route": "/account/city-email",
+      "name": "/account/city-email",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/account",
+      "route_name": "city-email.show"
+    },
+    {
+      "route": "/account/city-email/verify/{token}",
+      "name": "/account/city-email/verify/{token}",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/account",
+      "route_name": "city-email.verify"
+    },
+    {
+      "route": "/video-conferencing/stations/{station}",
+      "name": "/video-conferencing/stations/{station}",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/",
+      "route_name": "video-conferencing.station"
+    },
+    {
+      "route": "/employee/video-conferencing/command",
+      "name": "/employee/video-conferencing/command",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/",
+      "route_name": "employee.video-conferencing.command"
+    },
+    {
+      "route": "/employee/my-requests/{personnelRequest}",
+      "name": "/employee/my-requests/{personnelRequest}",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/employee/my-requests",
+      "route_name": "employee.personnel-requests.show"
+    },
+    {
+      "route": "/pump-simulator",
+      "name": "/pump-simulator",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/",
+      "route_name": "pump-simulator"
+    },
+    {
+      "route": "/workgroup/saver-report",
+      "name": "/workgroup/saver-report",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "workgroup.saver-report"
+    },
+    {
+      "route": "/workgroups/analysis-report",
+      "name": "/workgroups/analysis-report",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "workgroup.analysis-report"
+    },
+    {
+      "route": "/workgroups/data-dashboard",
+      "name": "/workgroups/data-dashboard",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "workgroup.data-dashboard"
+    },
+    {
+      "route": "/workgroups/l1-inventory",
+      "name": "/workgroups/l1-inventory",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "workgroup.l1-inventory"
+    },
+    {
+      "route": "/workgroups/final-presentation",
+      "name": "/workgroups/final-presentation",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "workgroup.final-presentation"
+    },
+    {
+      "route": "/workgroups/evaluation-report",
+      "name": "/workgroups/evaluation-report",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "workgroup.evaluation-report"
+    },
+    {
+      "route": "/workgroups/final-recommendations",
+      "name": "/workgroups/final-recommendations",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "workgroup.final-recommendations"
+    },
+    {
+      "route": "/workgroups/workgroup-summary",
+      "name": "/workgroups/workgroup-summary",
+      "panel": null,
+      "scope": "IN SCOPE",
+      "parent": "/workgroups",
+      "route_name": "workgroup.workgroup-summary"
+    },
+    {
+      "route": "/daily",
+      "name": "Navigate",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/vehicle-inspections",
+      "route_name": null
+    },
+    {
+      "route": "/daily/vehicle-inspections",
+      "name": "VehicleInspectionSelect",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/vehicle-inspections",
+      "route_name": null
+    },
+    {
+      "route": "/daily/vehicle-inspections/:slug",
+      "name": "InspectionWizard",
+      "panel": null,
+      "scope": "OTHER AGENT: Daily active inspection; DO NOT MODIFY",
+      "parent": "/daily/vehicle-inspections",
+      "route_name": null
+    },
+    {
+      "route": "/daily/vehicle-inspections/success",
+      "name": "SuccessPage",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/vehicle-inspections",
+      "route_name": null
+    },
+    {
+      "route": "/daily/apparatuses",
+      "name": "ApparatusList",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/vehicle-inspections",
+      "route_name": null
+    },
+    {
+      "route": "/daily/apparatus/:slug",
+      "name": "InspectionWizard",
+      "panel": null,
+      "scope": "OTHER AGENT: Daily active inspection; DO NOT MODIFY",
+      "parent": "/daily/vehicle-inspections",
+      "route_name": null
+    },
+    {
+      "route": "/daily/success",
+      "name": "SuccessPage",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/vehicle-inspections",
+      "route_name": null
+    },
+    {
+      "route": "/daily/stations",
+      "name": "StationListPage",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/vehicle-inspections",
+      "route_name": null
+    },
+    {
+      "route": "/daily/stations/:id",
+      "name": "StationDetailPage",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/stations",
+      "route_name": null
+    },
+    {
+      "route": "/daily/stations/:stationId/rooms/:roomId",
+      "name": "RoomAssetTracker",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/stations/:stationId",
+      "route_name": null
+    },
+    {
+      "route": "/daily/forms-hub",
+      "name": "FormsHub",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/vehicle-inspections",
+      "route_name": null
+    },
+    {
+      "route": "/daily/forms-hub/station-request",
+      "name": "StationRequestWizard",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/forms-hub",
+      "route_name": null
+    },
+    {
+      "route": "/daily/forms-hub/big-ticket-request",
+      "name": "LegacyStationRequestRedirect",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/forms-hub",
+      "route_name": null
+    },
+    {
+      "route": "/daily/forms-hub/station-inventory",
+      "name": "StationInventoryForm",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/forms-hub",
+      "route_name": null
+    },
+    {
+      "route": "/daily/forms-hub/equipment-request",
+      "name": "LegacyStationRequestRedirect",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/forms-hub",
+      "route_name": null
+    },
+    {
+      "route": "/daily/forms-hub/station-inspection",
+      "name": "StationInspectionWizard",
+      "panel": null,
+      "scope": "OTHER AGENT: Daily active station inspection; DO NOT MODIFY",
+      "parent": "/daily/forms-hub",
+      "route_name": null
+    },
+    {
+      "route": "/daily/forms-hub/trt-inventory",
+      "name": "TrtInventoryWizard",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/forms-hub",
+      "route_name": null
+    },
+    {
+      "route": "/daily/forms-hub/success",
+      "name": "SuccessPage",
+      "panel": null,
+      "scope": "COORDINATE: Daily non-inspection presentation",
+      "parent": "/daily/forms-hub",
+      "route_name": null
+    },
+    {
+      "route": "/admin/personnel-uniforms-equipment",
+      "name": "PersonnelUniformsEquipment",
+      "panel": "admin",
+      "scope": "IN SCOPE: shared presentation; permissions semantics excluded",
+      "parent": "/admin",
+      "route_name": "filament.admin.personnel-uniforms-equipment"
+    },
+    {
+      "route": "/admin/shield/roles",
+      "name": "ListRoles",
+      "panel": "admin",
+      "scope": "IN SCOPE: shared presentation; permissions semantics excluded",
+      "parent": "/admin",
+      "route_name": "filament.admin.resources.shield.roles.index"
+    },
+    {
+      "route": "/admin/shield/roles/create",
+      "name": "CreateRole",
+      "panel": "admin",
+      "scope": "IN SCOPE: shared presentation; permissions semantics excluded",
+      "parent": "/admin/shield/roles",
+      "route_name": "filament.admin.resources.shield.roles.create"
+    },
+    {
+      "route": "/admin/shield/roles/{record}",
+      "name": "ViewRole",
+      "panel": "admin",
+      "scope": "IN SCOPE: shared presentation; permissions semantics excluded",
+      "parent": "/admin/shield/roles",
+      "route_name": "filament.admin.resources.shield.roles.view"
+    },
+    {
+      "route": "/admin/shield/roles/{record}/edit",
+      "name": "EditRole",
+      "panel": "admin",
+      "scope": "IN SCOPE: shared presentation; permissions semantics excluded",
+      "parent": "/admin/shield/roles",
+      "route_name": "filament.admin.resources.shield.roles.edit"
+    },
+    {
+      "route": "/employee",
+      "name": "Employee panel home redirect",
+      "panel": "employee",
+      "scope": "IN SCOPE: shared presentation; permissions semantics excluded",
+      "parent": "/employee/dashboard",
+      "route_name": "filament.employee.home"
+    },
+    {
+      "route": "/pulse",
+      "name": "Laravel Pulse native monitoring dashboard",
+      "panel": null,
+      "scope": "IN SCOPE: shared presentation; permissions semantics excluded",
+      "parent": "/admin",
+      "route_name": "pulse"
+    }
+  ]
+}

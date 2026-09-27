@@ -15,6 +15,18 @@ import type { BootstrapData, EditableFormType, EmployeeSuggestion, FormDefinitio
 
 const PdfPreview = lazy(() => import('./PdfPreview').then((module) => ({ default: module.PdfPreview })));
 
+const hubFormsTheme = {
+    ...webLightTheme,
+    fontFamilyBase: 'var(--hub-font-sans)',
+    fontFamilyNumeric: 'var(--hub-font-sans)',
+    colorBrandBackground: 'rgb(var(--hub-blue))',
+    colorBrandBackgroundHover: 'rgb(var(--hub-blue-strong))',
+    colorBrandBackgroundPressed: 'rgb(var(--hub-header))',
+    colorBrandForeground1: 'rgb(var(--hub-blue))',
+    colorBrandForeground2: 'rgb(var(--hub-blue))',
+    colorBrandStroke1: 'rgb(var(--hub-blue))',
+};
+
 type SaveState = 'idle' | 'saving' | 'saved' | 'offline' | 'error';
 type Conflict = { serverRevision: number; serverData: Record<string, any>; serverSavedAt?: string };
 
@@ -241,10 +253,10 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
         const server = await api.show(current.id); currentRef.current = server; setCurrent(server); dirtyRef.current = false; setConflict(null); setSaveState('saved'); await recoveryDrafts.remove(current.id);
     };
 
-    if (busy && definitions.length === 0) return <FluentProvider theme={webLightTheme}><div className="of-loading"><Spinner size="large" label="Loading Operational Forms…" /></div></FluentProvider>;
+    if (busy && definitions.length === 0) return <FluentProvider theme={hubFormsTheme}><div className="of-loading"><Spinner size="large" label="Loading Operational Forms…" /></div></FluentProvider>;
 
     return (
-        <FluentProvider theme={{ ...webLightTheme, fontFamilyBase: 'Segoe UI, system-ui, sans-serif' }}>
+        <FluentProvider theme={hubFormsTheme}>
             <div className="of-app">
                 <header className="of-topbar">
                     <div className="of-brand"><ShieldCheck size={22} /><span>MBFD</span><span className="of-brand-divider" />Operational Forms</div>

@@ -26,7 +26,7 @@
                 <div class="bg-hub-surface p-5"><dt class="text-xs font-bold uppercase tracking-wide text-hub-muted">Account status</dt><dd class="mt-1 font-semibold">{{ ucfirst(str_replace('_', ' ', $user->getRawOriginal('account_status'))) }}</dd></div>
             </dl>
             <div class="flex flex-wrap gap-3 border-t border-hub-border px-5 py-4">
-                <a href="{{ $changePasswordUrl }}" class="inline-flex min-h-11 items-center rounded-lg bg-hub-red px-4 py-2 text-sm font-bold text-white hover:bg-hub-red-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus focus-visible:ring-offset-2">Change password</a>
+                <a href="{{ $changePasswordUrl }}" class="inline-flex min-h-11 items-center rounded-lg bg-hub-blue px-4 py-2 text-sm font-bold text-white hover:bg-hub-blue-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus focus-visible:ring-offset-2">Change password</a>
                 <a href="{{ route('city-email.show') }}" class="inline-flex min-h-11 items-center rounded-lg border border-hub-border-strong px-4 py-2 text-sm font-bold hover:bg-hub-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">City email & recovery</a>
                 <a href="/employee" class="inline-flex min-h-11 items-center rounded-lg border border-hub-border-strong px-4 py-2 text-sm font-bold hover:bg-hub-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">Employee Portal</a>
                 @if($user->hasCurrentAdminPanelEntitlement())

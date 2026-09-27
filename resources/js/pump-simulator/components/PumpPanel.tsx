@@ -11,12 +11,12 @@ const PumpPanel: React.FC = () => {
   return (
     <div className="pump-panel-bg" style={{ padding: 16 }}>
       {/* Header */}
-      <div style={{ maxWidth: 1200, margin: '0 auto 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: -0.5 }}>
             PUMP SIMULATOR
           </h1>
-          <p style={{ color: '#666', fontSize: 12, margin: '2px 0 0' }}>
+          <p style={{ color: 'var(--pump-helper)', fontSize: 12, margin: '2px 0 0' }}>
             Pierce Fire Apparatus — Pump Operations Training
           </p>
         </div>
@@ -24,6 +24,7 @@ const PumpPanel: React.FC = () => {
           onClick={store.reset}
           style={{
             padding: '8px 16px',
+            minHeight: 44,
             background: 'linear-gradient(135deg, #333, #222)',
             border: '1px solid #444',
             borderRadius: 6,
@@ -48,7 +49,7 @@ const PumpPanel: React.FC = () => {
             className={store.isCavitating ? 'cavitation-active' : ''}
           >
             <div className="metal-card" style={{ padding: 20, marginBottom: 16 }}>
-              <h2 style={{ color: '#888', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 16 }}>
+              <h2 style={{ color: 'var(--pump-helper)', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 16 }}>
                 Pressure Gauges
               </h2>
 
@@ -113,7 +114,7 @@ const PumpPanel: React.FC = () => {
 
           {/* Engine Controls */}
           <div className="metal-card" style={{ padding: 20, marginBottom: 16 }}>
-            <h2 style={{ color: '#888', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
+            <h2 style={{ color: 'var(--pump-helper)', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
               Engine Controls
             </h2>
 
@@ -173,7 +174,7 @@ const PumpPanel: React.FC = () => {
                 onChange={(e) => store.setIntakePressure(Number(e.target.value))}
                 style={{ width: '100%' }}
               />
-              <p style={{ color: '#555', fontSize: 10, marginTop: 4 }}>
+              <p style={{ color: 'var(--pump-helper)', fontSize: 12, marginTop: 4 }}>
                 Negative = vacuum. Keep above -10 PSI to prevent cavitation.
               </p>
             </div>
@@ -181,10 +182,10 @@ const PumpPanel: React.FC = () => {
 
           {/* Quick Reference Card */}
           <div className="metal-card" style={{ padding: 16 }}>
-            <h3 style={{ color: '#888', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+            <h3 style={{ color: 'var(--pump-helper)', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
               Hydraulics Reference
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 10, color: '#888' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, color: 'var(--pump-helper)' }}>
               <div>
                 <strong style={{ color: '#aaa' }}>Friction Loss Formula:</strong><br />
                 FL = C × (GPM/100)² × (L/100)
@@ -204,7 +205,7 @@ const PumpPanel: React.FC = () => {
 
           {/* System Status */}
           <div className="metal-card" style={{ padding: 16 }}>
-            <h3 style={{ color: '#888', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
+            <h3 style={{ color: 'var(--pump-helper)', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
               System Status
             </h3>
             <div style={{ fontSize: 12 }}>
@@ -216,7 +217,7 @@ const PumpPanel: React.FC = () => {
                 { label: 'Cavitation', value: store.isCavitating ? 'DANGER' : 'OK', color: store.isCavitating ? '#ef4444' : '#22c55e' },
               ].map((row) => (
                 <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
-                  <span style={{ color: '#666' }}>{row.label}</span>
+                  <span style={{ color: 'var(--pump-helper)' }}>{row.label}</span>
                   <span style={{ color: row.color, fontWeight: 600, fontFamily: 'monospace' }}>{row.value}</span>
                 </div>
               ))}
@@ -224,11 +225,11 @@ const PumpPanel: React.FC = () => {
           </div>
 
           {/* How to Use */}
-          <div className="metal-card" style={{ padding: 16, opacity: 0.8 }}>
-            <h3 style={{ color: '#888', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>
+          <div className="metal-card" style={{ padding: 16 }}>
+            <h3 style={{ color: 'var(--pump-helper)', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>
               How to Use
             </h3>
-            <ol style={{ color: '#666', fontSize: 10, paddingLeft: 16, margin: 0, lineHeight: 1.6 }}>
+            <ol style={{ color: 'var(--pump-helper)', fontSize: 12, paddingLeft: 16, margin: 0, lineHeight: 1.6 }}>
               <li>Switch to PUMP mode</li>
               <li>Open Tank to Pump valve</li>
               <li>Select and open discharge lines</li>

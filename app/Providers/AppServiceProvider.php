@@ -14,8 +14,8 @@ use App\Models\Training\TrainingTodo;
 use App\Models\User;
 use App\Models\WorkgroupSharedUpload;
 use App\Notifications\NewSubmissionNotification;
-use App\Observers\ApparatusObserver;
 use App\Observers\ApparatusDefectObserver;
+use App\Observers\ApparatusObserver;
 use App\Observers\TodoObserver;
 use App\Observers\TrainingTodoObserver;
 use App\Observers\UpstreamIdentityObserver;
@@ -145,13 +145,27 @@ class AppServiceProvider extends ServiceProvider
 
         $this->registerPushNotificationWidgetAssets();
 
+        \Filament\Support\Facades\FilamentView::registerRenderHook(
+            \Filament\View\PanelsRenderHook::HEAD_START,
+            fn (): \Illuminate\Contracts\View\View => view('filament.partials.async-components'),
+        );
+        \Filament\Support\Facades\FilamentView::registerRenderHook(
+            \Filament\View\PanelsRenderHook::HEAD_START,
+            fn (): \Illuminate\Contracts\View\View => view('filament.partials.navigation-state'),
+        );
+        \Filament\Support\Facades\FilamentView::registerRenderHook(
+            \Filament\View\PanelsRenderHook::PAGE_HEADER_ACTIONS_BEFORE,
+            fn (array $scopes): \Illuminate\Contracts\View\View => view('filament.partials.contextual-back', [
+                'destination' => \App\Filament\Support\ContextualBack::destination($scopes),
+            ]),
+        );
         // All Filament panels share one session-expiry boundary, including polls.
         \Filament\Support\Facades\FilamentView::registerRenderHook(
             \Filament\View\PanelsRenderHook::HEAD_END,
             fn (): \Illuminate\Contracts\View\View => view('filament.partials.session-expiry'),
         );
         \Filament\Support\Facades\FilamentView::registerRenderHook(
-            \Filament\View\PanelsRenderHook::BODY_END,
+            \Filament\View\PanelsRenderHook::FOOTER,
             function (): string {
                 if (! auth('web')->check()) {
                     return '';

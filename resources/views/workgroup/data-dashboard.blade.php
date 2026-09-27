@@ -7,7 +7,8 @@
     @viteReactRefresh
     @vite(['resources/js/workgroup-data-dashboard.jsx'])
 </head>
-<body>
+<body class="hub-report hub-report--data-dashboard">
+    <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
     <div id="workgroup-data-dashboard"></div>
     @include('components.hub-support-widget')
 </body>

@@ -9,10 +9,10 @@
 </head>
 <body class="min-h-screen bg-hub-canvas text-hub-ink">
     <x-hub-header back-href="{{ url('/') }}" back-label="Hub home" max-width="max-w-3xl" />
-    <main class="mx-auto max-w-3xl px-4 py-8 sm:py-12">
-        <div class="mt-6 flex items-center justify-between gap-4">
+    <main class="mx-auto max-w-3xl break-words px-4 py-8 sm:py-12">
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-4">
             <h1 class="text-2xl font-bold">My Reports</h1>
-            <a href="{{ route('hub-support.create') }}" class="inline-flex min-h-11 items-center rounded-lg bg-hub-red px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-hub-red-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus focus-visible:ring-offset-2">Report an Issue</a>
+            <a href="{{ route('hub-support.create') }}" class="inline-flex min-h-11 items-center rounded-lg bg-hub-blue px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-hub-blue-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus focus-visible:ring-offset-2">Report an Issue</a>
         </div>
         <div class="mt-6 space-y-3">
             @forelse($reports as $report)

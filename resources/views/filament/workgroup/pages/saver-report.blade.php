@@ -70,6 +70,9 @@
         }
 
         .saver-badge {
+            background: rgb(var(--hub-surface-muted));
+            color: rgb(var(--hub-ink-secondary));
+            border: 1px solid rgb(var(--hub-border));
             display: inline-flex;
             align-items: center;
             gap: 0.25rem;
@@ -81,11 +84,6 @@
             letter-spacing: 0.05em;
         }
 
-        .saver-badge--cap { background: #DBEAFE; color: #1E40AF; }
-        .saver-badge--usa { background: #D1FAE5; color: #065F46; }
-        .saver-badge--aff { background: #FEF3C7; color: #92400E; }
-        .saver-badge--mnt { background: #E0E7FF; color: #3730A3; }
-        .saver-badge--dep { background: #FCE7F3; color: #9D174D; }
 
         /* Section headings */
         h2 {
@@ -180,7 +178,7 @@
             padding-top: 1rem;
             border-top: 1px solid #D1D5DB;
             font-size: 0.75rem;
-            color: #9CA3AF;
+            color: rgb(var(--hub-ink-secondary));
             text-align: center;
         }
 
@@ -204,6 +202,9 @@
             }
 
             .saver-badge {
+            background: rgb(var(--hub-surface-muted));
+            color: rgb(var(--hub-ink-secondary));
+            border: 1px solid rgb(var(--hub-border));
                 border: 1px solid #999;
                 background: none;
                 color: #000;
@@ -215,14 +216,13 @@
             to { transform: rotate(360deg); }
         }
     </style>
+    @vite(['resources/css/app.css'])
 </head>
-<body>
+<body class="hub-report hub-report--saver-report">
+    <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/session-results" back-label="Back to Session Results" max-width="max-w-7xl" /></div>
     <div class="print-controls">
         <button class="print-btn print-btn--primary" onclick="window.print()">
             🖨️ Print Report
-        </button>
-        <button class="print-btn print-btn--secondary" onclick="window.close()">
-            ✕ Close
         </button>
     </div>
 
@@ -249,7 +249,7 @@
 
         {{-- AI-generated report content --}}
         @if(!empty($reportHtml))
-        <div class="saver-report-body">
+        <div class="saver-report-body hub-report-table" tabindex="0" role="region" aria-label="SAVER report content">
             {{-- SECURITY: Defense-in-depth — re-sanitize at the render boundary
                  in case a stale, pre-sanitization cache entry survives the
                  WorkgroupAIService::sanitizeReportPayload() upgrade. --}}

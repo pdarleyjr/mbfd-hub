@@ -97,7 +97,7 @@
             class="group flex flex-col items-center justify-center p-6 rounded-2xl bg-primary-50 dark:bg-primary-900/20 ring-1 ring-primary-200 dark:ring-primary-700/50 hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors text-center">
             <x-heroicon-o-clipboard-document-check class="w-8 h-8 text-primary-600 dark:text-primary-400 mb-2 group-hover:scale-110 transition-transform" />
             <span class="font-semibold text-primary-700 dark:text-primary-300">Evaluations</span>
-            <span class="text-xs text-primary-500 dark:text-primary-400 mt-0.5">Evaluate products</span>
+            <span class="text-xs mt-0.5" style="color: rgb(var(--hub-ink-secondary));">Evaluate products</span>
         </a>
         <a href="{{ \App\Filament\Workgroup\Pages\Files::getUrl() }}"
             class="group flex flex-col items-center justify-center p-6 rounded-2xl bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-200 dark:ring-blue-700/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors text-center">

@@ -50,7 +50,7 @@ class StationResource extends Resource
                         Forms\Components\TextInput::make('address')
                             ->required()
                             ->maxLength(255)
-                            ->columnSpan(2),
+                            ->columnSpan(['default' => 1, 'lg' => 2]),
                         Forms\Components\TextInput::make('city')
                             ->required()
                             ->maxLength(255)
