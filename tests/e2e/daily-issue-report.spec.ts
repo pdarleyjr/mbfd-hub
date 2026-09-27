@@ -20,6 +20,7 @@ test('opens in place, retains the report on failure, and confirms a retry', asyn
   const originalUrl = page.url();
   const trigger = page.getByRole('link', { name: 'Report an Issue' });
   await expect(trigger).toBeVisible();
+  await trigger.scrollIntoViewIfNeeded();
   const box = await trigger.boundingBox();
   expect(box).not.toBeNull();
   expect(box!.x).toBeGreaterThanOrEqual(0);
