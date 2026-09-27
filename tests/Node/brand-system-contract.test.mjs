@@ -199,7 +199,7 @@ test("Home controls and presentation load from the Hub build without third-party
   for (const host of ["fonts.googleapis.com", "fonts.gstatic.com", "cdn.jsdelivr.net"]) {
     assert.equal(home.includes(host), false, `Home must not load ${host}`);
   }
-  assert.equal(appCss.includes("fonts.googleapis.com"), false);
+  assert.doesNotMatch(appCss, /https?:\/\//i, "Home CSS must not reference external URLs");
   assert.match(appCss, /@import ['"]@fontsource-variable\/plus-jakarta-sans\/wght\.css['"]/);
   assert.match(home, /@vite\(\['resources\/css\/app\.css', 'resources\/js\/home\.js'\]\)/);
   assert.match(vite, /'resources\/js\/home\.js'/);
