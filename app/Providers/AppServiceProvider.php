@@ -66,6 +66,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('member-onboarding-invitations', static fn () => Limit::perMinute(4)->by('member-onboarding-global'));
+
         Gate::before(function (User $user, string $ability, array $arguments): ?bool {
             if ($user->hasRole('super_admin')) {
                 return true;

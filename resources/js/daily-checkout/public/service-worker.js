@@ -147,7 +147,10 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(request).then((cachedResponse) => {
+    // Build assets are immutable and same-origin. Their precache request has
+    // no Origin header, while module requests can carry one; Vary: Origin must
+    // not hide the already-cached asset during an offline reload.
+    caches.match(request, { ignoreVary: isSameOrigin && url.pathname.startsWith('/daily/assets/') }).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }

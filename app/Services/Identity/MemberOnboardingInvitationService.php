@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Identity;
 
 use App\Enums\AccountStatus;
+use App\Exceptions\EmailBudgetExhausted;
 use App\Models\Employee;
 use App\Models\MemberOnboardingInvitation;
 use App\Models\MemberOnboardingRosterBinding;
+use App\Models\OutboundEmail;
 use App\Models\User;
 use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Security\SecurityAuditRecorder;
@@ -50,6 +52,10 @@ final class MemberOnboardingInvitationService
         if ($this->hasCurrentInvitation($user, $employee, CarbonImmutable::now())) {
             return $this->result('already_invited', $user, $employee);
         }
+        $invitation = MemberOnboardingInvitation::query()->where('user_id', $user->id)->first();
+        if ($invitation !== null && $this->deliveryNeedsReconciliation($this->latestDelivery($invitation->id))) {
+            return $this->result('delivery_reconciliation_required', $user, $employee);
+        }
 
         return $this->result('ready', $user, $employee);
     }
@@ -73,6 +79,10 @@ final class MemberOnboardingInvitationService
         $bindings = MemberOnboardingRosterBinding::query()->whereIn('employee_profile_id', $employeeIds)->get()->keyBy('employee_profile_id');
         $userIds = $canonicalUsers->pluck('id')->all();
         $invitations = MemberOnboardingInvitation::query()->whereIn('user_id', $userIds)->get()->keyBy('user_id');
+        $latestDeliveries = OutboundEmail::query()
+            ->where('source_type', 'member_onboarding_invitation')
+            ->whereIn('source_id', $invitations->pluck('id')->map((fn ($id): string => (string) $id))->all())
+            ->orderByDesc('id')->get(['id', 'source_id', 'status'])->unique('source_id')->keyBy('source_id');
         $emails = $employees->map(fn (Employee $employee): string => $this->authoritativeCityEmail($employee))->unique()->all();
         $collidingEmployees = Employee::query()
             ->whereIn('employee_id', $employees->pluck('employee_id')->all())
@@ -106,6 +116,8 @@ final class MemberOnboardingInvitationService
                     || $byUserEmail->get($email)?->contains(fn (User $other): bool => $other->id !== $user->id) === true => 'email_conflict',
                 ($invitation = $invitations->get($user->id)) instanceof MemberOnboardingInvitation
                     && $this->invitationIsCurrent($invitation, $user, $employee, $at) => 'already_invited',
+                $invitation instanceof MemberOnboardingInvitation
+                    && $this->deliveryNeedsReconciliation($latestDeliveries->get((string) $invitation->id)) => 'delivery_reconciliation_required',
                 default => 'ready',
             };
             $assessments[$employee->id] = $this->result($status, $user, $employee);
@@ -146,6 +158,9 @@ final class MemberOnboardingInvitationService
             if ($invitation instanceof MemberOnboardingInvitation && $this->invitationIsCurrent($invitation, $current, $employee, $at)) {
                 return null;
             }
+            if ($invitation instanceof MemberOnboardingInvitation && $this->deliveryNeedsReconciliation($this->latestDelivery($invitation->id))) {
+                return null;
+            }
             if ($invitation instanceof MemberOnboardingInvitation) {
                 $invitation->forceFill($values)->save();
             } else {
@@ -176,8 +191,18 @@ final class MemberOnboardingInvitationService
             if ($failed) {
                 $values += ['token_hash' => null, 'expires_at' => null];
             }
+        } catch (EmailBudgetExhausted $exception) {
+            $delivery = $this->latestDelivery($invitation->id);
+            MemberOnboardingInvitation::query()->whereKey($invitation->id)
+                ->where('token_hash', $tokenHash)->where('delivery_status', 'pending')
+                ->update(['delivery_status' => 'failed', 'token_hash' => null, 'expires_at' => null, 'outbound_email_id' => $delivery?->id]);
+            throw $exception;
         } catch (Throwable) {
-            $values = ['delivery_status' => 'failed', 'token_hash' => null, 'expires_at' => null];
+            $delivery = $this->latestDelivery($invitation->id);
+            $mayHaveReachedProvider = $delivery !== null && ($delivery->submitted_at !== null || $delivery->accepted_at !== null);
+            $values = $mayHaveReachedProvider
+                ? ['delivery_status' => 'queued', 'sent_at' => $at, 'outbound_email_id' => $delivery->id]
+                : ['delivery_status' => 'failed', 'token_hash' => null, 'expires_at' => null, 'outbound_email_id' => $delivery?->id];
         }
         MemberOnboardingInvitation::query()->whereKey($invitation->id)
             ->where('token_hash', $tokenHash)
@@ -263,6 +288,17 @@ final class MemberOnboardingInvitationService
         $invitation = MemberOnboardingInvitation::query()->where('user_id', $user->id)->first();
 
         return $invitation instanceof MemberOnboardingInvitation && $this->invitationIsCurrent($invitation, $user, $employee, $at);
+    }
+
+    private function latestDelivery(int $invitationId): ?OutboundEmail
+    {
+        return OutboundEmail::query()->where('source_type', 'member_onboarding_invitation')
+            ->where('source_id', (string) $invitationId)->orderByDesc('id')->first();
+    }
+
+    private function deliveryNeedsReconciliation(?OutboundEmail $delivery): bool
+    {
+        return $delivery !== null && in_array($delivery->status, ['pending', 'reserved', 'submitted', 'acceptance_unknown', 'unknown'], true);
     }
 
     private function invitationIsCurrent(MemberOnboardingInvitation $invitation, User $user, Employee $employee, CarbonImmutable $at): bool

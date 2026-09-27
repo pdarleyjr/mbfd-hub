@@ -39,10 +39,12 @@ final class CloudflareCostGuard
                 || CarbonImmutable::parse($budget->provider_daily_reconciled_at)->gt($at)
                 || CarbonImmutable::parse($budget->reconciled_at)->lt($at->copy()->subSeconds($maxAge))
                 || CarbonImmutable::parse($budget->provider_daily_reconciled_at)->lt($at->copy()->subSeconds($maxAge))) {
-                throw new EmailBudgetExhausted('Cloudflare usage has not been reconciled for the active cycle.');
+                throw new EmailBudgetExhausted('Cloudflare usage has not been reconciled for the active cycle.', 300);
             }
-            if (CloudflareUsageBudget::query()->where('provider_backoff_until', '>', $at)->exists()) {
-                throw new EmailBudgetExhausted('Cloudflare requested a sending pause. Try again after the provider backoff.');
+            $backoffUntil = CloudflareUsageBudget::query()->where('provider_backoff_until', '>', $at)->max('provider_backoff_until');
+            if ($backoffUntil !== null) {
+                $retryAfter = max(60, CarbonImmutable::parse($backoffUntil)->getTimestamp() - $at->getTimestamp() + 1);
+                throw new EmailBudgetExhausted('Cloudflare requested a sending pause. Try again after the provider backoff.', $retryAfter);
             }
 
             $email = OutboundEmail::query()->lockForUpdate()->findOrFail($email->getKey());
@@ -74,12 +76,12 @@ final class CloudflareCostGuard
                 throw new EmailBudgetExhausted('The reconciled Cloudflare email safety ceiling would be exceeded.');
             }
             if ((int) $budget->provider_daily_used + $reservedSinceDailyReconciliation + (int) $email->chargeable_budget_units > (int) $budget->provider_daily_quota) {
-                throw new EmailBudgetExhausted('The reconciled Cloudflare daily quota would be exceeded.');
+                throw new EmailBudgetExhausted('The reconciled Cloudflare daily quota would be exceeded.', 3600);
             }
             $minuteLimit = min(5, (int) config('communications.cloudflare.max_recipient_units_per_minute', 5));
             $minuteUnits = $this->localReservedOrAcceptedUnits($at, true, $at->copy()->subMinute());
             if ($minuteUnits + (int) $email->chargeable_budget_units > $minuteLimit) {
-                throw new EmailBudgetExhausted('The Hub email rate limit has been reached. Try again later.');
+                throw new EmailBudgetExhausted('The Hub email rate limit has been reached. Try again later.', 61);
             }
             // Laravel sends directly to the Email REST API, not through a
             // Worker. Unrelated Worker consumption does not authorize email.
