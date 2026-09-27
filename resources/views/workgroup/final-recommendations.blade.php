@@ -222,8 +222,8 @@
         .phase-title { font-weight: 700; color: var(--navy); margin-bottom: 0.25rem; font-size: 0.9375rem; }
         .phase-desc { font-size: 0.875rem; color: #4b5563; }
         .phase-list { list-style: none; margin-top: 0.375rem; }
-        .phase-list li { font-size: 0.875rem; color: #4b5563; padding: 0.125rem 0; display: flex; gap: 0.375rem; }
-        .phase-list li::before { content: '—'; color: var(--slate-400); flex-shrink: 0; }
+        .phase-list li { font-size: 0.875rem; color: #4b5563; padding: 0.125rem 0 0.125rem 1.25rem; position: relative; }
+        .phase-list li::before { content: '—'; color: var(--slate-400); position: absolute; left: 0; }
 
         /* ── WORKGROUP TABLE ── */
         .data-table {
@@ -280,6 +280,7 @@
         .image-caption { font-size: 0.75rem; color: var(--slate-500); text-align: center; font-style: italic; margin-top: -0.75rem; margin-bottom: 1.25rem; }
         .image-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.25rem 0; }
         .image-grid .report-image { margin: 0; }
+        .image-grid .image-caption { margin-top: .5rem; }
 
         /* ── HR ── */
         hr.section-divider { border: none; border-top: 1px solid var(--slate-200); margin: 2rem 0; }
@@ -309,8 +310,10 @@
             .image-grid { grid-template-columns: 1fr; }
         }
     </style>
+    @vite(['resources/css/app.css'])
 </head>
-<body>
+<body class="hub-report hub-report--final-recommendations">
+    <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
 
     <!-- Print Bar -->
     <div class="print-bar">
@@ -360,7 +363,7 @@
             <!-- Final Selections Summary -->
             <div class="selections-summary">
                 <div class="selections-summary-title">Final Equipment Selections at a Glance</div>
-                <table class="data-table" style="margin:0; border:none;">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table" style="margin:0; border:none;">
                     <thead>
                         <tr>
                             <th>Category</th>
@@ -380,7 +383,7 @@
                         <tr><td>Heavy Extrication</td><td><strong>Hurst M40 (40")</strong> + 2 batteries + charging station</td><td>300 (Bat. Chief)</td><td><span class="selection-status status-selected">Selected</span></td></tr>
                         <tr><td>Future Addition</td><td><strong>Lifting Struts</strong> (pending evaluation)</td><td>300 / Captain 5</td><td><span class="selection-status status-pending">Pending</span></td></tr>
                     </tbody>
-                </table>
+                </table></div>
             </div>
 
             <!-- TOC -->
@@ -482,7 +485,7 @@
                     <div class="selection-card-body">
                         <img class="report-image" src="/workgroup-report/images/Holmatro Pentheon Series USA-1_p10_i1.png"
                              alt="Extrication Tool System" onerror="this.style.display='none'">
-                        <table class="data-table" style="margin-top:0.75rem;">
+                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table" style="margin-top:0.75rem;">
                             <thead><tr><th>Tool</th><th>Model</th><th>Role</th><th class="right">Score</th></tr></thead>
                             <tbody>
                                 <tr><td>Spreader</td><td><strong>SP 777 E3 Connect</strong></td><td>Primary spreading</td><td class="right"><span class="score-badge score-elite">90.99</span></td></tr>
@@ -490,7 +493,7 @@
                                 <tr><td>Ram</td><td><strong>CR 522 E3 Connect</strong></td><td>Extension / pushing</td><td class="right"><span class="score-badge score-elite">86.02</span></td></tr>
                                 <tr><td>Platform</td><td><strong>CAPTIUM</strong></td><td>Shared battery system</td><td class="right">—</td></tr>
                             </tbody>
-                        </table>
+                        </table></div>
                         <p style="margin-top:0.75rem;">IP58 watertight design rated for saltwater operations — critical for MBFD's coastal deployment environment. E3 Connect Wi-Fi integration with Captium cloud provides fleet management capabilities.</p>
                     </div>
                 </div>
@@ -509,14 +512,14 @@
                             <div class="callout-label">Trial Status</div>
                             Authorized for trial deployment as a <strong>potential replacement candidate for the Rabbit tool</strong>. Final determination pending operational trial results.
                         </div>
-                        <table class="spec-table" style="margin-top:0.75rem;">
+                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table" style="margin-top:0.75rem;">
                             <tbody>
                                 <tr><td>Composite Score</td><td>82.23</td></tr>
                                 <tr><td>Weight</td><td>17.0 lbs (7.7 kg)</td></tr>
                                 <tr><td>Functions</td><td>Cut, Wedge, Ram, Spread, Hammer, Lift (6-in-1)</td></tr>
                                 <tr><td>Power Source</td><td>Manual hydraulic — no batteries, no external pump</td></tr>
                             </tbody>
-                        </table>
+                        </table></div>
                     </div>
                 </div>
 
@@ -576,7 +579,7 @@
                         <div class="tier-badge">Primary Response</div>
                     </div>
                     <div class="tier-body">
-                        <table class="data-table" style="margin:0;">
+                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table" style="margin:0;">
                             <thead><tr><th>Equipment</th><th>Deployment Role</th></tr></thead>
                             <tbody>
                                 <tr><td><strong>Hurst SP 777 E3 Connect Spreader</strong></td><td>Primary extrication spreading</td></tr>
@@ -587,7 +590,7 @@
                                 <tr><td><strong>DeWalt 18" Chainsaw</strong></td><td>Ventilation operations</td></tr>
                                 <tr><td><strong>Holmatro T1 (trial)</strong></td><td>Multi-function access tool</td></tr>
                             </tbody>
-                        </table>
+                        </table></div>
                         <p style="margin-top:0.75rem; font-size:0.875rem; color:var(--slate-500);"><strong>Operational Priority:</strong> Rapid deployment capability, compartment-optimized, battery-independent operation.</p>
                     </div>
                 </div>
@@ -602,7 +605,7 @@
                         <div class="tier-badge">Command Augmentation</div>
                     </div>
                     <div class="tier-body">
-                        <table class="data-table" style="margin:0;">
+                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table" style="margin:0;">
                             <thead><tr><th>Equipment</th><th>Deployment Role</th></tr></thead>
                             <tbody>
                                 <tr><td><strong>Hurst M40 40" Spreader</strong></td><td>Heavy extrication capability</td></tr>
@@ -610,7 +613,7 @@
                                 <tr><td><strong>Charging Station</strong></td><td>Field recharging</td></tr>
                                 <tr><td><strong>Lifting Struts (future)</strong></td><td>Vehicle lifting operations</td></tr>
                             </tbody>
-                        </table>
+                        </table></div>
                         <p style="margin-top:0.75rem; font-size:0.875rem; color:var(--slate-500);"><strong>Operational Priority:</strong> Heavy rescue augmentation, command-level specialty capability.</p>
                     </div>
                 </div>
@@ -682,7 +685,7 @@
                     All training components must be completed <strong>before</strong> the apparatus is placed into service.
                 </div>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead><tr><th>Training Component</th><th>Requirement</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Driving Operations</strong></td><td>Full certification on mid-mount ladder configuration</td></tr>
@@ -690,13 +693,13 @@
                         <tr><td><strong>Tactical Deployment</strong></td><td>Extrication tool deployment from mid-mount compartments</td></tr>
                         <tr><td><strong>Equipment Integration</strong></td><td>Familiarization with all selected equipment as installed</td></tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <h2 class="subsection-title">Ongoing Workgroup Involvement</h2>
 
                 <p>The Mid-Mount Ladder Workgroup remains <strong>active through full implementation</strong> of the selected equipment.</p>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead><tr><th>Function</th><th>Description</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Procurement Tracking</strong></td><td>Monitor status of all equipment orders</td></tr>
@@ -705,7 +708,7 @@
                         <tr><td><strong>Dashboard Monitoring</strong></td><td>Track all status updates via Workgroup Dashboard</td></tr>
                         <tr><td><strong>Future Evaluations</strong></td><td>Lead additional evaluation sessions (lifting struts)</td></tr>
                     </tbody>
-                </table>
+                </table></div>
             </section>
 
             <!-- ══ SEC 5: Justification ══ -->
@@ -715,7 +718,7 @@
                 <h2 class="subsection-title">Evaluation Framework</h2>
                 <p>The workgroup evaluation employed a standardized scoring model across all 14 products. Four scoring dimensions were applied consistently:</p>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead><tr><th>Dimension</th><th>Description</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Capability</strong></td><td>Raw performance metrics — force output, cutting capacity, spreading distance</td></tr>
@@ -723,7 +726,7 @@
                         <tr><td><strong>Maintainability</strong></td><td>Service requirements, durability, component accessibility</td></tr>
                         <tr><td><strong>Deployability</strong></td><td>Storage footprint, activation speed, weight, cordless readiness</td></tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <h2 class="subsection-title">Brand Performance Context</h2>
 
@@ -743,7 +746,7 @@
                     </div>
                 </div>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead><tr><th>Dimension</th><th class="right">Holmatro</th><th class="right">Hurst</th><th class="right">Δ Delta</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Capability</strong></td><td class="right">89.41</td><td class="right">87.56</td><td class="right" style="color:var(--emerald)">+1.85</td></tr>
@@ -751,7 +754,7 @@
                         <tr><td><strong>Maintainability</strong></td><td class="right">89.82</td><td class="right">82.58</td><td class="right" style="color:var(--emerald)">+7.24</td></tr>
                         <tr><td><strong>Deployability</strong></td><td class="right">89.69</td><td class="right">82.74</td><td class="right" style="color:var(--emerald)">+6.95</td></tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <h2 class="subsection-title">Frontline Tool Scores — Final Selection Context</h2>
 
@@ -782,7 +785,7 @@
 
                 <h2 class="subsection-title">Final Selected Equipment — Per Category</h2>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr><th>Category</th><th>Selected Tool</th><th>Manufacturer</th><th class="right">Score</th></tr>
                     </thead>
@@ -793,7 +796,7 @@
                         <tr><td>Saws</td><td><strong>DeWalt DCPS612AG2</strong></td><td><span class="brand-pill">DeWalt</span></td><td class="right"><span class="score-badge score-elite">91.25</span></td></tr>
                         <tr><td>Stabilization</td><td><strong>Holmatro V-Strut</strong></td><td><span class="brand-pill">Holmatro</span></td><td class="right"><span class="score-badge score-elite">87.28</span></td></tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <img class="report-image" src="/workgroup-report/images/final_workgroup_results_p1_i6.png"
                      alt="Workgroup Final Selection Performance Data"
@@ -801,14 +804,14 @@
 
                 <h2 class="subsection-title">Cross-Category Insights</h2>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead><tr><th>Category</th><th>Key Differentiator</th><th class="right">Advantage</th></tr></thead>
                     <tbody>
                         <tr><td>Saws</td><td>Gear-driven instant-start + 3-second electric brake (DeWalt)</td><td class="right" style="color:var(--emerald)">+26.42 to +29.47 pts</td></tr>
                         <tr><td>Frontline Tools</td><td>On-Tool Charging + cordless auto start/stop (Holmatro)</td><td class="right" style="color:var(--emerald)">+6.95 pts Deployability</td></tr>
                         <tr><td>Stabilization</td><td>15-second auto-lock (V-Strut vs. competitors)</td><td class="right" style="color:var(--emerald)">+1.41 to +11.15 pts</td></tr>
                     </tbody>
-                </table>
+                </table></div>
             </section>
 
             <!-- ══ SEC 7: Implementation Notes ══ -->
@@ -823,14 +826,14 @@
                 <h2 class="subsection-title">T1 Tool — Rabbit Tool Trial</h2>
                 <p>The Holmatro T1 (score: <strong>82.23</strong>) is authorized on trial as a potential replacement for the traditional rabbit tool. Key comparisons:</p>
 
-                <table class="spec-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
                     <tbody>
                         <tr><td>Door Forcing</td><td>T1 hydraulic wedging (3.4 ton) vs. manual prying — single operator vs. 2-person team</td></tr>
                         <tr><td>Cutting Added</td><td>T1 adds hydraulic cutting (14.2 tons) — rabbit tool provides none</td></tr>
                         <tr><td>Tool Consolidation</td><td>Replaces halligan bar + flathead axe — 6 functions in 17 lbs</td></tr>
                         <tr><td>Limitations</td><td>Manual hydraulic; cutting opening limited to 1.1 inches; documented deal-breaker concerns on file</td></tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <h2 class="subsection-title">M40 — 300's Truck Assignment</h2>
                 <p>The Hurst M40 (score: <strong>78.80</strong>) is assigned to <strong>300's new truck</strong> (currently at Fleet for emergency lighting installation). The M40's 40-inch spread exceeds standard 32-inch parameters for heavy rescue scenarios.</p>
@@ -850,7 +853,7 @@
                     All numerical values sourced directly from <strong>Product_Data_Master.csv</strong> (14 rows, 31 columns). No values interpolated, estimated, or sourced from external references.
                 </div>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead><tr><th>Row</th><th>Product</th><th>Category</th><th>Manufacturer</th><th class="right">Score</th></tr></thead>
                     <tbody>
                         <tr><td>2</td><td>Holmatro PSP40 (32-inch Spreader)</td><td>Hydraulic Tool</td><td><span class="brand-pill">Holmatro</span></td><td class="right"><span class="score-badge score-elite">92.02</span></td></tr>
@@ -868,7 +871,7 @@
                         <tr><td>14</td><td>Holmatro T1 Forcible Entry Tool</td><td>Hydraulic Tool</td><td><span class="brand-pill">Holmatro</span></td><td class="right"><span class="score-badge score-high">82.23</span></td></tr>
                         <tr><td>15</td><td>Hurst M40 (40-inch Spreader)</td><td>Hydraulic Tool</td><td><span class="brand-pill">Hurst</span></td><td class="right"><span class="score-badge score-mid">78.80</span></td></tr>
                     </tbody>
-                </table>
+                </table></div>
             </section>
         </div>
 

@@ -1,33 +1,33 @@
 <x-filament-panels::page>
     <div class="space-y-6">
-        <section class="rounded-[1.75rem] border border-stone-200/80 bg-stone-50/90 p-6 shadow-sm ring-1 ring-white/60 sm:p-8">
+        <section class="rounded-xl border border-hub-border bg-hub-canvas p-6 shadow-sm ring-1 ring-white/60 sm:p-8">
             <div class="max-w-3xl space-y-4">
-                <div class="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-stone-600">
-                    <x-heroicon-o-bell class="h-4 w-4 text-amber-600" />
+                <div class="inline-flex items-center gap-2 rounded-full border border-hub-border bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-hub-muted">
+                    <x-heroicon-o-bell class="h-4 w-4 text-hub-blue" />
                     Alert Routing
                 </div>
 
                 <div class="space-y-2">
-                    <h2 class="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
+                    <h2 class="text-2xl font-semibold tracking-tight text-hub-ink sm:text-3xl">
                         Choose how each submission should notify you.
                     </h2>
-                    <p class="max-w-2xl text-sm leading-6 text-stone-600 sm:text-[0.95rem]">
+                    <p class="max-w-2xl text-sm leading-6 text-hub-muted sm:text-[0.95rem]">
                         Admin inbox, browser push, and city email are controlled independently for each event.
                     </p>
                 </div>
             </div>
 
-            <div class="mt-6 grid gap-4 border-t border-stone-200/80 pt-5 text-sm text-stone-600 sm:grid-cols-3 sm:gap-6">
+            <div class="mt-6 grid gap-4 border-t border-hub-border pt-5 text-sm text-hub-muted sm:grid-cols-3 sm:gap-6">
                 <div class="space-y-1">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">Default behavior</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-hub-muted">Default behavior</p>
                     <p>Email starts off. Existing in-app and push recipients were preserved during migration.</p>
                 </div>
                 <div class="space-y-1">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">Device subscriptions</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-hub-muted">Device subscriptions</p>
                     <p>{{ $this->getPushSubscriptionCount() }} browser push subscription{{ $this->getPushSubscriptionCount() === 1 ? '' : 's' }} connected to this account.</p>
                 </div>
                 <div class="space-y-1">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">Important note</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-hub-muted">Important note</p>
                     <p>Email delivery requires an authoritative city email on your canonical member record.</p>
                 </div>
             </div>
@@ -41,8 +41,8 @@
                 <div class="space-y-6">
                     {{ $this->form }}
 
-                    <div class="flex flex-col gap-3 border-t border-stone-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                        <p class="text-sm text-stone-600">
+                    <div class="flex flex-col gap-3 border-t border-hub-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+                        <p class="text-sm text-hub-muted">
                             Browser push requires a valid subscription and notification permission on each device.
                         </p>
 

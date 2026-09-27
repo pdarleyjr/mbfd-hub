@@ -119,6 +119,7 @@ export default function InspectionWizard() {
   const [queuedSubmissionBlocker, setQueuedSubmissionBlocker] = useState<DailyCheckoutQueuedSubmission | null>(null);
   const [queueRevision, setQueueRevision] = useState(0);
   const clientSubmissionIdRef = useRef<string | null>(null);
+  const meterFormRef = useRef<HTMLFormElement>(null);
   const hasQueuedInspectionRef = useRef(false);
   const initializedChecklistKeyRef = useRef<string | null>(null);
   const loadedContractRef = useRef<{ slug: string; apparatus: Apparatus; checklist: ChecklistData } | null>(null);
@@ -598,9 +599,14 @@ export default function InspectionWizard() {
     }
   };
 
+  const changeStep = (step: Step) => {
+    if (currentStep === 'meter' && meterFormRef.current && !meterFormRef.current.reportValidity()) return;
+    setCurrentStep(step);
+  };
+
   const goBack = () => {
     if (currentStep === 'meter') {
-      setCurrentStep('officer');
+      changeStep('officer');
     } else if (currentStep === 'details') {
       setCurrentStep('officer');
     } else if (currentStep === 'compartments') {
@@ -693,7 +699,7 @@ export default function InspectionWizard() {
         <div><p className="inspection-eyebrow">Daily Checkout</p><div className="inspection-unit-title"><h1>{apparatus.name}</h1><span className={isOutOfService ? 'inspection-status is-oos' : 'inspection-status'}>{apparatus.status ?? 'Status unavailable'}</span></div>
           <div className="inspection-identity"><span>Vehicle {apparatus.vehicle_number ?? 'Not recorded'}</span><span>{officerInfo.name} · {officerInfo.shift ? 'Shift ' + officerInfo.shift : 'Shift not selected'}</span></div>
         </div>
-        <div className="inspection-save"><div><strong>{isOffline ? 'Offline · On this device' : 'Online'}</strong><small role="status">{autosaveSucceeded === true ? 'Changes saved on this device' : autosaveSucceeded === false ? 'Not saved · Keep this page open' : 'Saving…'}</small><small>{progress.completed} / {progress.total} inspected</small></div><div className="inspection-progress-ring" style={{ background: `conic-gradient(#11996c ${progress.total ? Math.round(progress.completed / progress.total * 100) : 0}%, #e1e6eb 0)` }} aria-label={`${progress.total ? Math.round(progress.completed / progress.total * 100) : 0}% complete`}><span><strong>{progress.total ? Math.round(progress.completed / progress.total * 100) : 0}%</strong><small>Complete</small></span></div></div>
+        <div className="inspection-save"><div><strong>{isOffline ? 'Offline · On this device' : 'Online'}</strong><small role="status">{autosaveSucceeded === true ? 'Changes saved on this device' : autosaveSucceeded === false ? 'Not saved · Keep this page open' : 'Saving…'}</small></div><div className="inspection-progress"><small>{progress.completed} / {progress.total} inspected</small><progress value={progress.completed} max={progress.total || 1} aria-label="Inspection progress" /></div></div>
       </header>
       <div className="inspection-readiness">
         <span>{apparatus.pm_health ? apparatus.pm_health.status === 'red' ? 'PM due' : apparatus.pm_health.status === 'yellow' ? 'PM due soon' : 'PM current' : 'PM baseline unavailable'}</span>
@@ -778,10 +784,10 @@ export default function InspectionWizard() {
       )}
 
       <nav className="mb-4 flex flex-wrap gap-2 text-sm" aria-label="Inspection workspace">
-        <button type="button" className="px-3 font-semibold" aria-current={currentStep === 'compartments' ? 'page' : undefined} onClick={() => setCurrentStep('compartments')}><Truck size={20} aria-hidden="true" />Apparatus</button>
-        <button type="button" className="px-3" aria-label="Member / Vehicle Info" aria-current={currentStep === 'officer' ? 'page' : undefined} onClick={() => setCurrentStep('officer')}><Users size={20} aria-hidden="true" />Member</button>
-        <button type="button" className="px-3" aria-label={isV2Checklist ? 'Checklist details' : 'Readings'} aria-current={currentStep === (isV2Checklist ? 'details' : 'meter') ? 'page' : undefined} onClick={() => setCurrentStep(isV2Checklist ? 'details' : 'meter')}><Gauge size={20} aria-hidden="true" />{isV2Checklist ? 'Details' : 'Readings'}</button>
-        {!isV2Checklist && checklist.fields.length > 0 && <button type="button" className="px-3" aria-label="Checklist details" aria-current={currentStep === 'details' ? 'page' : undefined} onClick={() => setCurrentStep('details')}><ClipboardList size={20} aria-hidden="true" />Details</button>}
+        <button type="button" className="px-3 font-semibold" aria-current={currentStep === 'compartments' ? 'page' : undefined} onClick={() => changeStep('compartments')}><Truck size={20} aria-hidden="true" />Apparatus</button>
+        <button type="button" className="px-3" aria-label="Member / Vehicle Info" aria-current={currentStep === 'officer' ? 'page' : undefined} onClick={() => changeStep('officer')}><Users size={20} aria-hidden="true" />Member</button>
+        <button type="button" className="px-3" aria-label={isV2Checklist ? 'Checklist details' : 'Readings · Optional'} aria-current={currentStep === (isV2Checklist ? 'details' : 'meter') ? 'page' : undefined} onClick={() => changeStep(isV2Checklist ? 'details' : 'meter')}><Gauge size={20} aria-hidden="true" /><span>{isV2Checklist ? 'Details' : <>Readings <small>Optional</small></>}</span></button>
+        {!isV2Checklist && checklist.fields.length > 0 && <button type="button" className="px-3" aria-label="Checklist details" aria-current={currentStep === 'details' ? 'page' : undefined} onClick={() => changeStep('details')}><ClipboardList size={20} aria-hidden="true" />Details</button>}
       </nav>
 
       {currentStep === 'officer' && (
@@ -796,9 +802,9 @@ export default function InspectionWizard() {
       {currentStep === 'meter' && (
         <MeterStep
           continueLabel={continueLabel}
+          formRef={meterFormRef}
+          maxMiles={checklist.fields.some(field => field.id === 'mileage') ? 999999999 : 2147483647}
           apparatusId={apparatus.id}
-          apparatusName={apparatus.name}
-          vehicleNumber={apparatus.vehicle_number ?? apparatus.unit_id ?? ''}
           initialData={meterData}
           pmHealth={apparatus.pm_health}
           previousHours={apparatus.current_engine_hours ?? null}

@@ -86,7 +86,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Header */}
-      <header className="bg-slate-900 text-white pt-10 pb-6 px-8 shadow-md">
+      <header className="text-white pt-10 pb-6 px-8 shadow-md" style={{ background: 'rgb(var(--hub-header))' }}>
         <div className="max-w-6xl mx-auto">
           <div className="uppercase tracking-widest text-xs font-bold text-slate-400 mb-2">Executive Procurement Dashboard</div>
           <h1 className="text-3xl font-extrabold tracking-tight mb-2">2026 Apparatus & Extrication Tool Analysis</h1>
@@ -107,9 +107,10 @@ export default function App() {
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
+                style={activeTab === key ? { background: 'rgb(var(--hub-action-primary))' } : undefined}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   activeTab === key 
-                    ? 'bg-blue-600 text-white shadow-sm' 
+                    ? 'text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900'
                 }`}
               >
@@ -131,7 +132,7 @@ export default function App() {
         </aside>
 
         {/* Table Area */}
-        <section className="flex-1">
+        <section className="min-w-0 flex-1">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             
             {/* Table Header Section */}

@@ -35,9 +35,29 @@
     --hub-danger: 185 28 28;
     --hub-focus: 29 78 216;
 
+    /* Action aliases retain one palette across Blade, Filament and React. */
+    --hub-action-primary: var(--hub-blue);
+    --hub-action-primary-hover: var(--hub-blue-strong);
+    --hub-action-brand: var(--hub-red);
+    --hub-action-success: var(--hub-success);
+    --hub-action-warning: var(--hub-warning);
+    --hub-action-danger: var(--hub-danger);
+    --hub-action-secondary: var(--hub-surface);
+    --hub-action-navigation: var(--hub-blue);
+    --hub-action-selected: var(--hub-blue);
+    --hub-action-disabled: var(--hub-muted);
+
     --hub-control: 248 250 252;
     --hub-control-border: 148 163 184;
 
     --hub-shadow-card: 0 1px 2px rgb(15 23 42 / 0.05), 0 1px 3px rgb(15 23 42 / 0.06);
     --hub-shadow-elevated: 0 10px 24px rgb(15 23 42 / 0.10);
+}
+
+/* Shared Back labels must not depend on utility generation in separate bundles. */
+[data-hub-back] .hub-back-short { display: inline; }
+[data-hub-back] .hub-back-label { display: none; }
+@media (min-width: 640px) {
+    [data-hub-back] .hub-back-short { display: none; }
+    [data-hub-back] .hub-back-label { display: inline; }
 }

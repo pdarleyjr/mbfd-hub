@@ -9,7 +9,7 @@
 </head>
 <body class="min-h-screen bg-hub-canvas text-hub-ink">
     <x-hub-header back-href="{{ route('hub-support.index') }}" back-label="My Reports" max-width="max-w-3xl" />
-    <main class="mx-auto max-w-3xl px-4 py-8 sm:py-12">
+    <main class="mx-auto max-w-3xl break-words px-4 py-8 sm:py-12">
         @if(session('status')) <p class="rounded-lg border border-hub-success/30 bg-hub-success/10 p-4 text-hub-success" role="status">{{ session('status') }}</p> @endif
         <h1 class="mt-6 text-2xl font-bold">{{ $report->generated_title }}</h1>
         <p class="mt-2 text-sm font-semibold text-hub-muted">{{ $report->status->memberLabel() }}</p>
@@ -43,7 +43,7 @@
                 <label for="response" class="block font-semibold">Reply</label>
                 <textarea name="response" id="response" required maxlength="5000" rows="4" class="mt-2 w-full rounded-lg border border-hub-border-strong p-3 text-base focus:border-hub-blue focus:outline-none focus:ring-2 focus:ring-hub-focus"></textarea>
                 @error('response') <p role="alert" class="text-sm text-hub-danger">{{ $message }}</p> @enderror
-                <button type="submit" class="mt-3 min-h-11 rounded-lg bg-hub-red px-5 py-3 font-semibold text-white hover:bg-hub-red-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus focus-visible:ring-offset-2">Send Reply</button>
+                <button type="submit" class="mt-3 min-h-11 rounded-lg bg-hub-blue px-5 py-3 font-semibold text-white hover:bg-hub-blue-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus focus-visible:ring-offset-2">Send Reply</button>
             </form>
         @endif
     </main>

@@ -49,7 +49,7 @@ class AdminDashboard extends Page
         return [
             ExportAction::make('exportAIReport')
                 ->label('🤖 Export AI Report')
-                ->color('violet')
+                ->color('primary')
                 ->exporter(WorkgroupAIReportExporter::class)
                 ->tooltip('Export all products with AI-generated analytical summaries')
                 ->visible(fn () => $session !== null),

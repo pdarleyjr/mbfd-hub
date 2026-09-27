@@ -10,7 +10,6 @@ use App\Filament\Support\EmployeeAccessSchema;
 use App\Jobs\IssueMemberOnboardingInvitation;
 use App\Models\Employee;
 use App\Models\User;
-use App\Services\Identity\MemberOnboardingInvitationService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -87,6 +86,7 @@ class EmployeeResource extends Resource
         return self::applyEnterpriseDefaults($table)
             // Avoid a deferred Livewire rerender racing the bulk-selection Alpine component.
             ->deferLoading(false)
+            ->modifyQueryUsing(fn ($query) => $query->with('user.memberOnboardingInvitation'))
             ->columns([
                 Tables\Columns\TextColumn::make('employee_id')
                     ->label('Employee ID')
@@ -143,9 +143,7 @@ class EmployeeResource extends Resource
                 Tables\Actions\Action::make('sendMemberInvitation')
                     ->label(fn (Employee $record): string => $record->user?->memberOnboardingInvitation === null ? 'Send invitation' : 'Resend invitation')
                     ->icon('heroicon-o-envelope')
-                    ->visible(fn (Employee $record): bool => Pages\ListEmployees::canIssueInvitations()
-                        && $record->user?->getRawOriginal('account_status') === 'pending_activation'
-                        && app(MemberOnboardingInvitationService::class)->assess($record)['status'] === 'ready')
+                    ->visible(fn (Employee $record, Pages\ListEmployees $livewire): bool => $livewire->canInviteMember($record))
                     ->modalHeading('Invite this member')
                     ->modalSubmitActionLabel('Queue this invitation')
                     ->fillForm(function (Employee $record): array {

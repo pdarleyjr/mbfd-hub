@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Jobs\IssueMemberOnboardingInvitation;
 use App\Models\Employee;
-use App\Models\MemberOnboardingInvitation;
 use App\Services\Identity\EstablishedAccountIntegritySnapshot;
 use App\Services\Identity\MemberOnboardingInvitationService;
 use Carbon\CarbonImmutable;
@@ -65,37 +65,33 @@ final class IssueMemberOnboardingInvitations extends Command
         if ($this->hasBlockingStatus($records)) {
             return $this->report($summary + ['mode' => 'apply', 'reason' => 'preflight_failed_no_invitations_sent'], Command::FAILURE);
         }
+        if (config('queue.default') === 'sync') {
+            return $this->report($summary + ['mode' => 'apply', 'reason' => 'background_delivery_unavailable'], Command::FAILURE);
+        }
 
-        $now = CarbonImmutable::now();
-        $delivery = [];
+        $jobs = [];
         foreach ($records as $record) {
             $employee = Employee::query()->findOrFail($record['employee_profile_id']);
             $user = $employee->user;
             if ($user === null) {
                 return $this->report($summary + ['mode' => 'apply', 'reason' => 'identity_changed_before_issue'], Command::FAILURE);
             }
-            try {
-                $delivery[] = $invitations->issue($user, $now);
-            } catch (Throwable) {
-                return $this->report($summary + ['mode' => 'apply', 'reason' => 'identity_changed_or_delivery_failed'], Command::FAILURE);
-            }
+            $jobs[] = [$user->id, IssueMemberOnboardingInvitation::bindingHash(
+                $user->id, $employee->employee_id, (string) $employee->city_email, $user->security_version,
+            )];
         }
-        $sent = count(array_filter($delivery, static fn (string $status): bool => $status === 'queued'));
-        $postVerified = MemberOnboardingInvitation::query()
-            ->whereIn('employee_profile_id', array_filter(array_column($records, 'employee_profile_id')))
-            ->where('security_version', '>', 0)
-            ->whereNotNull('token_hash')
-            ->whereNotNull('expires_at')
-            ->where('expires_at', '>', CarbonImmutable::now())
-            ->where('delivery_status', 'queued')
-            ->count();
+        $firstSendAt = CarbonImmutable::now();
+        foreach ($jobs as $index => [$userId, $bindingHash]) {
+            IssueMemberOnboardingInvitation::dispatch($userId, null, $bindingHash)
+                ->delay($firstSendAt->addSeconds($index * IssueMemberOnboardingInvitation::SPACING_SECONDS));
+        }
         $result = $summary + [
             'mode' => 'apply',
-            'invitations_queued' => $sent,
-            'post_run_verified' => $postVerified,
+            'invitations_scheduled' => count($jobs),
+            'expected_sending_minutes' => (int) ceil(max(0, count($jobs) - 1) * IssueMemberOnboardingInvitation::SPACING_SECONDS / 60),
         ];
 
-        return $this->report($result, $sent === count($records) && $postVerified === count($records) ? Command::SUCCESS : Command::FAILURE);
+        return $this->report($result, Command::SUCCESS);
     }
 
     /** @param array<int, array{status:string,user_id?:int|null,employee_profile_id?:int|null}> $records */

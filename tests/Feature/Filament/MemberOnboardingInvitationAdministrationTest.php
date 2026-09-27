@@ -7,13 +7,17 @@ namespace Tests\Feature\Filament;
 use App\Enums\AccountStatus;
 use App\Filament\Resources\EmployeeResource\Pages\ListEmployees;
 use App\Jobs\IssueMemberOnboardingInvitation;
+use App\Models\CloudflareUsageBudget;
 use App\Models\Employee;
 use App\Models\MemberOnboardingInvitation;
 use App\Models\MemberOnboardingRosterBinding;
+use App\Models\OutboundEmail;
 use App\Models\User;
 use App\Services\Identity\MemberOnboardingInvitationService;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -85,6 +89,42 @@ final class MemberOnboardingInvitationAdministrationTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_admin_can_review_delivery_and_activation_counts_without_opening_every_member(): void
+    {
+        $admin = $this->admin();
+        $member = $this->member('STATUS-DELIVERED', AccountStatus::PendingActivation, true);
+        $delivery = OutboundEmail::query()->create([
+            'provider' => 'cloudflare',
+            'source_type' => 'member_onboarding_invitation',
+            'source_id' => '1',
+            'from_address' => 'info@mbfdhub.com',
+            'to_recipients' => [$member->employeeProfile->city_email],
+            'subject' => 'Set up your MBFD Hub account',
+            'recipient_count' => 1,
+            'chargeable_budget_units' => 1,
+            'status' => 'delivered',
+        ]);
+        MemberOnboardingInvitation::query()->create([
+            'user_id' => $member->id,
+            'employee_profile_id' => $member->employee_profile_id,
+            'email' => $member->employeeProfile->city_email,
+            'security_version' => $member->security_version,
+            'token_hash' => hash('sha256', 'delivered-token'),
+            'expires_at' => now()->addMinutes(20),
+            'sent_at' => now(),
+            'delivery_status' => 'queued',
+            'outbound_email_id' => $delivery->id,
+        ]);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(ListEmployees::class)
+            ->mountAction('onboardingStatus')
+            ->assertSee('delivered: 1')
+            ->assertSee('awaiting activation: 1')
+            ->assertSee('includes other notifications');
+    }
+
     public function test_wrong_password_or_changed_recipient_list_does_not_queue_mail(): void
     {
         $admin = $this->admin();
@@ -129,6 +169,48 @@ final class MemberOnboardingInvitationAdministrationTest extends TestCase
         $job->handle(app(MemberOnboardingInvitationService::class));
 
         self::assertDatabaseCount('member_onboarding_invitations', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_restarted_job_does_not_repeat_a_provider_submission_after_token_expiry(): void
+    {
+        Http::fake();
+        $admin = $this->admin();
+        $member = $this->member('JOB-RESTART', AccountStatus::PendingActivation, true);
+        $job = new IssueMemberOnboardingInvitation(
+            $member->id,
+            $admin->id,
+            IssueMemberOnboardingInvitation::bindingHash(
+                $member->id, $member->employee_id, (string) $member->employeeProfile->city_email, $member->security_version,
+            ),
+        );
+        $invitation = MemberOnboardingInvitation::query()->create([
+            'user_id' => $member->id,
+            'employee_profile_id' => $member->employee_profile_id,
+            'email' => $member->employeeProfile->city_email,
+            'security_version' => $member->security_version,
+            'token_hash' => hash('sha256', 'expired-unlinked-token'),
+            'expires_at' => now()->subMinute(),
+            'delivery_status' => 'pending',
+        ]);
+        $delivery = OutboundEmail::query()->create([
+            'provider' => 'cloudflare',
+            'source_type' => 'member_onboarding_invitation',
+            'source_id' => (string) $invitation->id,
+            'from_address' => 'info@mbfdhub.com',
+            'to_recipients' => [$member->employeeProfile->city_email],
+            'subject' => 'Set up your MBFD Hub account',
+            'recipient_count' => 1,
+            'chargeable_budget_units' => 1,
+            'status' => 'accepted',
+            'submitted_at' => now()->subMinutes(31),
+            'accepted_at' => now()->subMinutes(31),
+        ]);
+
+        unserialize(serialize($job))->handle(app(MemberOnboardingInvitationService::class));
+
+        self::assertDatabaseCount('outbound_emails', 1);
+        self::assertSame($delivery->id, $invitation->fresh()->outbound_email_id);
         Http::assertNothingSent();
     }
 
@@ -336,6 +418,107 @@ final class MemberOnboardingInvitationAdministrationTest extends TestCase
         self::assertCount(227, $assessments);
         self::assertSame(['ready'], array_values(array_unique(array_column($assessments, 'status'))));
         self::assertLessThanOrEqual(20, $queries, sprintf('Assessment used %d queries in %.1f ms.', $queries, $elapsedMs));
+
+        $admin = $this->admin();
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(ListEmployees::class)
+            ->mountAction('sendOnboardingInvitations')
+            ->assertSee('227</strong> ready to invite', false)
+            ->set('mountedActionsData.0.confirm_recipients', true)
+            ->set('mountedActionsData.0.current_password', 'admin-password')
+            ->callMountedAction()
+            ->assertHasNoActionErrors();
+
+        Queue::assertPushed(IssueMemberOnboardingInvitation::class, 227);
+        $jobs = Queue::pushed(IssueMemberOnboardingInvitation::class)->values();
+        $first = $jobs->first()->delay?->getTimestamp();
+        $last = $jobs->last()->delay?->getTimestamp();
+        self::assertNotNull($first);
+        self::assertSame(226 * IssueMemberOnboardingInvitation::SPACING_SECONDS, $last - $first);
+        self::assertDatabaseCount('member_onboarding_invitations', 0);
+    }
+
+    public function test_227_member_campaign_sends_once_per_recipient_without_exceeding_the_global_guard(): void
+    {
+        $startedAt = CarbonImmutable::parse('2026-09-26 12:00:00 UTC');
+        CarbonImmutable::setTestNow($startedAt);
+
+        try {
+            config()->set('communications.cloudflare.account_id', str_repeat('a', 32));
+            config()->set('communications.cloudflare.api_token', 'campaign-test-token');
+            CloudflareUsageBudget::query()->create([
+                'provider_account_id' => str_repeat('a', 32),
+                'cycle_start' => $startedAt->startOfMonth(),
+                'cycle_end' => $startedAt->addMonth()->startOfMonth(),
+                'provider_chargeable_used' => 0,
+                'provider_daily_quota' => 1000,
+                'provider_daily_used' => 0,
+                'hub_safe_ceiling' => 2850,
+                'worker_request_threshold' => 9_000_000,
+                'worker_cpu_ms_threshold' => 27_000_000,
+                'reconciled_at' => $startedAt,
+                'provider_daily_reconciled_at' => $startedAt,
+                'worker_requests_used' => 0,
+                'worker_cpu_ms_used' => 0,
+            ]);
+            Http::fake(fn (Request $request) => Http::response([
+                'success' => true,
+                'result' => [
+                    'message_id' => 'campaign-'.str_replace('@', '-', $request->data()['to'][0]),
+                    'delivered' => $request->data()['to'],
+                    'queued' => [],
+                    'permanent_bounces' => [],
+                    'suppressed_recipients' => [],
+                ],
+            ]));
+            $admin = $this->admin();
+            for ($index = 1; $index <= 227; $index++) {
+                $this->member(sprintf('CAMPAIGN-%04d', $index), AccountStatus::PendingActivation, true);
+            }
+            $this->actingAs($admin);
+            Filament::setCurrentPanel(Filament::getPanel('admin'));
+            Livewire::test(ListEmployees::class)
+                ->mountAction('sendOnboardingInvitations')
+                ->assertSee('227</strong> ready to invite', false)
+                ->set('mountedActionsData.0.confirm_recipients', true)
+                ->set('mountedActionsData.0.current_password', 'admin-password')
+                ->callMountedAction()
+                ->assertHasNoActionErrors();
+
+            $jobs = Queue::pushed(IssueMemberOnboardingInvitation::class)->values();
+            self::assertCount(227, $jobs);
+            self::assertDatabaseCount('member_onboarding_invitations', 0);
+            foreach ($jobs as $index => $job) {
+                $at = $startedAt->addSeconds($index * IssueMemberOnboardingInvitation::SPACING_SECONDS);
+                CarbonImmutable::setTestNow($at);
+                if ($index % 15 === 0) {
+                    CloudflareUsageBudget::query()->update([
+                        'reconciled_at' => $at,
+                        'provider_daily_reconciled_at' => $at,
+                    ]);
+                }
+                $job->handle(app(MemberOnboardingInvitationService::class));
+            }
+
+            Http::assertSentCount(227);
+            self::assertDatabaseCount('member_onboarding_invitations', 227);
+            self::assertDatabaseCount('outbound_emails', 227);
+            $deliveries = OutboundEmail::query()->orderBy('budget_reserved_at')->get();
+            self::assertCount(227, $deliveries->pluck('to_recipients')->flatten()->unique());
+            foreach ($deliveries as $delivery) {
+                $oneMinuteAgo = $delivery->budget_reserved_at->copy()->subMinute();
+                $rollingUnits = $deliveries->filter(fn (OutboundEmail $other): bool => $other->budget_reserved_at->greaterThan($oneMinuteAgo)
+                    && $other->budget_reserved_at->lessThanOrEqualTo($delivery->budget_reserved_at))->sum('chargeable_budget_units');
+                self::assertLessThanOrEqual(4, $rollingUnits);
+            }
+            foreach (MemberOnboardingInvitation::all() as $invitation) {
+                self::assertSame(30 * 60, (int) $invitation->sent_at->diffInSeconds($invitation->expires_at));
+            }
+            self::assertSame(226 * IssueMemberOnboardingInvitation::SPACING_SECONDS, (int) $deliveries->first()->budget_reserved_at->diffInSeconds($deliveries->last()->budget_reserved_at));
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
     }
 
     public function test_batch_assessment_preserves_individual_eligibility_outcomes(): void

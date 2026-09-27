@@ -24,23 +24,18 @@ export default function StationInventoryForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-hub-canvas">
       {/* Header - Only show before the inventory workspace. */}
       {step !== 'inventory' && (
-        <div className="bg-green-600 text-white py-4 px-4">
+        <div className="bg-hub-header text-white py-4 px-4">
           <div className="max-w-2xl mx-auto">
             {step === 'userInfo' && (
-              <PreviousPageButton
-                className="flex items-center text-green-100 hover:text-white mb-2"
-              >
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Back to previous page
-              </PreviousPageButton>
+              <PreviousPageButton contextual fallback="/forms-hub"
+                className="flex items-center text-white/90 hover:text-white mb-2"
+              />
             )}
             <h1 className="text-xl font-bold">Station Inventory</h1>
-            <p className="text-green-100 text-sm">
+            <p className="text-white/90 text-sm">
               Select the station and shift context.
             </p>
           </div>

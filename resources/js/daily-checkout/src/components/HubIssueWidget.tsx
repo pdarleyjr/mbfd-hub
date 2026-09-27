@@ -56,7 +56,7 @@ export default function HubIssueWidget() {
     setFailed(false)
   }
 
-  return <div className="hub-issue-widget hub-issue-widget--daily">
+  return <div className="hub-issue-widget hub-issue-widget--daily hub-issue-widget--inline">
     <a ref={trigger} href="/support/issues/create" className="hub-issue-trigger" onClick={(event) => {
       event.preventDefault()
       dialog.current?.showModal()

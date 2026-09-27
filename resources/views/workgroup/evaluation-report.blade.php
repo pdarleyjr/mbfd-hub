@@ -296,17 +296,18 @@
             gap: 0.5rem;
         }
         .key-findings li {
-            display: flex;
-            gap: 0.625rem;
+            position: relative;
+            padding-left: 1.25rem;
             font-size: 0.9rem;
             color: #1e3a5f;
             line-height: 1.5;
         }
         .key-findings li::before {
+            position: absolute;
+            left: 0;
             content: '→';
             color: var(--color-blue);
             font-weight: 700;
-            flex-shrink: 0;
         }
 
         /* ── KPI CARDS ── */
@@ -448,6 +449,7 @@
             margin: 1.25rem 0;
         }
         .image-grid .report-image { margin: 0; }
+        .image-grid .image-caption { margin-top: .5rem; }
 
         /* ── CALLOUTS ── */
         .callout {
@@ -620,8 +622,10 @@
             .image-grid { grid-template-columns: 1fr; }
         }
     </style>
+    @vite(['resources/css/app.css'])
 </head>
-<body>
+<body class="hub-report hub-report--evaluation-report">
+    <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
 
     <!-- Print Bar -->
     <div class="print-bar no-print">
@@ -740,7 +744,7 @@
 
                 <h2 class="subsection-title">Key Operational Constraints</h2>
 
-                <table class="spec-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
                     <tbody>
                         <tr>
                             <td>Apparatus Compartment Constraints</td>
@@ -763,7 +767,7 @@
                             <td>Cordless battery operation required — eliminates hose-management overhead of traditional hydraulic systems</td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <img class="report-image" src="/workgroup-report/images/final_workgroup_results_p2_i9.png"
                      alt="Evaluation Framework Detail"
@@ -778,7 +782,7 @@
 
                 <p>The workgroup evaluation employed a standardized scoring model applied consistently across all 14 products. Evaluators assessed each tool during hands-on testing sessions documented across multiple evaluation days.</p>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
                             <th>Dimension</th>
@@ -803,7 +807,7 @@
                             <td>Storage footprint, activation speed, weight, cordless readiness, compartment compatibility</td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <p>Each dimension was scored on a 0–100 scale. A composite <strong>Overall Score</strong> was computed as a weighted aggregate reflecting operational priorities for frontline deployment.</p>
 
@@ -817,7 +821,7 @@
                     </div>
                 </div>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
                             <th>Brand</th>
@@ -857,7 +861,7 @@
                             <td class="right"><span class="score-badge score-low">61.78</span></td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <h3 class="sub-subsection">Frontline Hydraulic Tool Dimension Comparison (Holmatro vs. Hurst)</h3>
 
@@ -868,7 +872,7 @@
                     </div>
                 </div>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
                             <th>Dimension</th>
@@ -903,7 +907,7 @@
                             <td class="right" style="color:var(--color-emerald)">+6.95</td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <p>Holmatro leads across all four dimensions, with the largest gap in <strong>Usability (+8.23 points)</strong>, attributable to the 360-degree inline control handle design and On-Tool Charging system.</p>
 
@@ -929,7 +933,7 @@
                     </div>
                 </div>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
                             <th>Product</th>
@@ -958,7 +962,7 @@
                             <td class="right">82.74</td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <p>The PSP40 achieved the highest composite score among all frontline tools at <strong>92.02</strong>, leading the Hurst SP 777 E3 by 1.03 points overall. The score gap is narrowest in Capability (Δ 1.85) and widest in Usability (Δ 8.23). The Hurst SP 777 E3 counters with a higher maximum spreading force (600 kN vs. 280 kN) and IP58 watertight rating for saltwater operations.</p>
 
@@ -969,7 +973,7 @@
 
                 <h3 class="sub-subsection">Cutters</h3>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
                             <th>Product</th>
@@ -998,7 +1002,7 @@
                             <td class="right">82.74</td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <p>The Holmatro PCU30CL leads by <strong>6.29 points</strong> — the largest gap among the three frontline tool categories. The PCU30CL's 30-degree inclined jaw design maximizes working space between tool and vehicle. The Hurst S 789 E3 offers a larger cutting opening (8.07 in vs. 6.7 in), but tracked lower in ergonomic usability under continuous load.</p>
 
@@ -1009,7 +1013,7 @@
 
                 <h3 class="sub-subsection">Rams</h3>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
                             <th>Product</th>
@@ -1038,7 +1042,7 @@
                             <td class="right">82.74</td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <p>The Holmatro PRA40 leads by <strong>5.27 points</strong>. The PRA40's integrated laser pointer and compact retracted length of only 15.2 inches make it particularly suited to mid-mount apparatus compartment constraints. At 31.1 lbs, it is 13.9 lbs lighter than the Hurst CR 522 E3. The Hurst CR 522 E3 counters with an extended length of 59.2 inches and IP58 watertight rating for saltwater deployment.</p>
 
@@ -1064,7 +1068,7 @@
                     </div>
                 </div>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
                             <th>Product</th>
@@ -1093,7 +1097,7 @@
                             <td class="right"><span class="score-badge score-low">61.78</span></td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <div class="callout note">
                     <div class="callout-label">Analysis Note</div>
@@ -1108,7 +1112,7 @@
                 <hr class="section-divider">
                 <h2 class="subsection-title">3E. Vehicle Stabilization</h2>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
                             <th>Product</th>
@@ -1141,7 +1145,7 @@
                             <td class="right"><span class="score-badge score-mid">76.13</span></td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <p>The V-Strut's auto-lock system enables setup in just <strong>15 seconds</strong> — pull out and locks automatically in one movement. At 15.87 lbs, it is the lightest option. The OmniShore provides maximum versatility (shoring range 28 cm to 5.2 m) but has a documented deal-breaker concern noted in workgroup review. The Paratech provides 6,000 lb lifting capacity but scored lowest in the category.</p>
 
@@ -1165,7 +1169,7 @@
 
                 <h3 class="sub-subsection">Holmatro T1 — Forcible Entry Tool</h3>
 
-                <table class="spec-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
                     <tbody>
                         <tr><td>Composite Score</td><td><span class="score-badge score-high">82.23</span></td></tr>
                         <tr><td>Weight</td><td>17.0 lbs (7.7 kg)</td></tr>
@@ -1175,13 +1179,13 @@
                         <tr><td>Power Source</td><td>Manual hydraulic (2-stage hand pump)</td></tr>
                         <tr><td>Functions</td><td>Cut, Wedge, Ram, Spread, Hammer, Lift (6-in-1)</td></tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <p>The T1 is a six-function-in-one tool designed for rapid entry operations. Self-contained — no batteries, no external pump, no hoses. A 30 kg manual force on the pump rod yields up to 14.2 ton hydraulic cutting force. Documented deal-breaker concerns were noted in the workgroup evaluation.</p>
 
                 <h3 class="sub-subsection">Hurst M40 — 40-inch Spreader (Supplemental)</h3>
 
-                <table class="spec-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
                     <tbody>
                         <tr><td>Composite Score</td><td><span class="score-badge score-mid">78.80</span></td></tr>
                         <tr><td>Capability Score</td><td>83.39</td></tr>
@@ -1191,7 +1195,7 @@
                         <tr><td>IP Rating</td><td>IP58 (watertight for saltwater ops)</td></tr>
                         <tr><td>Deployment Assignment</td><td>300's new truck (supplemental heavy-duty)</td></tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <div class="callout warning">
                     <div class="callout-label">Deployment Note</div>
@@ -1233,7 +1237,7 @@
 
                 <h3 class="sub-subsection">Top Tool Per Category</h3>
 
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
                             <th>Category</th>
@@ -1274,7 +1278,7 @@
                             <td class="right"><span class="score-badge score-elite">87.28</span></td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <img class="report-image" src="/workgroup-report/images/final_workgroup_results_p1_i6.png"
                      alt="Workgroup Top Performer Analysis"
@@ -1286,7 +1290,7 @@
                 <p>Across all categories, products with superior ergonomic design consistently scored higher. Holmatro's 360-degree inline control handle contributed to a <strong>93.99 Usability score</strong> — the highest dimension score in the entire dataset. The DeWalt saw's gear-driven design similarly delivered category dominance despite a smaller blade diameter.</p>
 
                 <h3 class="sub-subsection">Deployment Speed Impact</h3>
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr><th>Category</th><th>Key Deployment Differentiator</th><th class="right">Score Advantage</th></tr>
                     </thead>
@@ -1307,10 +1311,10 @@
                             <td class="right" style="color:var(--color-emerald)">+1.41 to +11.15 pts</td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <h3 class="sub-subsection">Tool Weight vs. Performance Correlation</h3>
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr><th>Product</th><th class="right">Weight (lbs)</th><th class="right">Score</th></tr>
                     </thead>
@@ -1321,7 +1325,7 @@
                         <tr><td>Paratech StrutDriver</td><td class="right">22.57</td><td class="right"><span class="score-badge score-mid">76.13</span></td></tr>
                         <tr><td>Hurst M40 (Heavy Spreader)</td><td class="right">—</td><td class="right"><span class="score-badge score-mid">78.80</span></td></tr>
                     </tbody>
-                </table>
+                </table></div>
             </section>
 
             <!-- ══ SECTION 5: Controlled Considerations ══ -->
@@ -1337,7 +1341,7 @@
 
                 <p>The Holmatro T1 Forcible Entry Tool (composite score: <strong>82.23</strong>) was evaluated specifically as a <strong>potential replacement for the traditional rabbit tool</strong> (halligan bar/flathead axe combination) in forced-entry operations.</p>
 
-                <table class="spec-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
                     <tbody>
                         <tr>
                             <td>Door Forcing</td>
@@ -1360,7 +1364,7 @@
                             <td>Manual hydraulic — no battery; limited cutting opening 1.1 inches; documented deal-breaker concerns</td>
                         </tr>
                     </tbody>
-                </table>
+                </table></div>
 
                 <h2 class="subsection-title">M40 — 300's Truck Supplemental Deployment</h2>
 
@@ -1381,7 +1385,7 @@
                 </div>
 
                 <div class="appendix-label">Complete Product Registry — 14 Evaluated Products</div>
-                <table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
                             <th>Row</th>
@@ -1407,7 +1411,7 @@
                         <tr><td>14</td><td>Holmatro T1 Forcible Entry Tool</td><td>Hydraulic Tool</td><td><span class="brand-pill">Holmatro</span></td><td class="right"><span class="score-badge score-high">82.23</span></td></tr>
                         <tr><td>15</td><td>Hurst M40 (40-inch Spreader)</td><td>Hydraulic Tool</td><td><span class="brand-pill">Hurst</span></td><td class="right"><span class="score-badge score-mid">78.80</span></td></tr>
                     </tbody>
-                </table>
+                </table></div>
             </section>
         </div>
 

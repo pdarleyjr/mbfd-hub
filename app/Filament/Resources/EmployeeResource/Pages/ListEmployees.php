@@ -8,6 +8,7 @@ use App\Enums\AccountStatus;
 use App\Filament\Resources\EmployeeResource;
 use App\Jobs\IssueMemberOnboardingInvitation;
 use App\Models\Employee;
+use App\Models\MemberOnboardingInvitation;
 use App\Models\User;
 use App\Services\Identity\MemberOnboardingInvitationService;
 use App\Services\Security\SecurityAuditRecorder;
@@ -17,6 +18,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
@@ -24,6 +26,9 @@ use Livewire\Attributes\Locked;
 class ListEmployees extends ListRecords
 {
     protected static string $resource = EmployeeResource::class;
+
+    /** @var array<int, true>|null */
+    private ?array $readyInvitationIds = null;
 
     #[Locked]
     public ?array $selectedInvitationCohort = null;
@@ -35,6 +40,12 @@ class ListEmployees extends ListRecords
             Actions\Action::make('accountExceptions')->label(fn (): string => 'Account exceptions ('.\App\Models\User::query()->whereNull('employee_profile_id')->count().')')
                 ->visible(fn (): bool => \App\Filament\Resources\AccountProfileResource::canViewAny())
                 ->url(\App\Filament\Resources\AccountProfileResource::getUrl()),
+            Actions\Action::make('onboardingStatus')
+                ->label('Onboarding status')
+                ->visible(fn (): bool => $this->canIssueInvitations())
+                ->modalHeading('Onboarding status')
+                ->modalSubmitAction(false)
+                ->form([Forms\Placeholder::make('status')->label('Current status')->content(fn (): HtmlString => $this->onboardingStatus())]),
             Actions\Action::make('sendOnboardingInvitations')
                 ->label('Send onboarding invitations')
                 ->icon('heroicon-o-envelope')
@@ -73,6 +84,17 @@ class ListEmployees extends ListRecords
         $actor = auth()->user();
 
         return $actor instanceof User && $actor->isAuthenticationAllowed() && $actor->hasRole('super_admin');
+    }
+
+    public function canInviteMember(Employee $record): bool
+    {
+        if (! self::canIssueInvitations() || $record->user?->getRawOriginal('account_status') !== 'pending_activation') {
+            return false;
+        }
+
+        $this->readyInvitationIds ??= array_fill_keys(array_column($this->invitationCohort()['ready'], 'id'), true);
+
+        return isset($this->readyInvitationIds[$record->id]);
     }
 
     /** @param array<string,mixed> $data */
@@ -172,6 +194,41 @@ class ListEmployees extends ListRecords
         return $this->renderInvitationPreview($this->invitationCohort());
     }
 
+    private function onboardingStatus(): HtmlString
+    {
+        $invitations = MemberOnboardingInvitation::query()->with('outboundEmail')->get();
+        $activeIds = User::query()->whereIn('id', $invitations->pluck('user_id'))
+            ->where('account_status', AccountStatus::Active->value)->pluck('id')->flip();
+        $delivery = array_fill_keys(['preparing', 'processing', 'delivered', 'failed', 'review'], 0);
+        $accounts = array_fill_keys(['activated', 'redeemed', 'expired', 'awaiting'], 0);
+        foreach ($invitations as $invitation) {
+            $status = $invitation->outboundEmail?->status;
+            $delivery[match (true) {
+                $status === 'delivered' => 'delivered',
+                in_array($status, ['failed', 'failed_pre_acceptance', 'bounced', 'rejected', 'complained', 'accepted_with_delivery_issues'], true)
+                    || $invitation->delivery_status === 'failed' => 'failed',
+                in_array($status, ['acceptance_unknown', 'unknown'], true) => 'review',
+                $status === null => 'preparing',
+                default => 'processing',
+            }]++;
+            $accounts[match (true) {
+                $activeIds->has($invitation->user_id) => 'activated',
+                $invitation->redeemed_at !== null => 'redeemed',
+                $invitation->expires_at?->lessThanOrEqualTo(now()) === true => 'expired',
+                default => 'awaiting',
+            }]++;
+        }
+        try {
+            $queueDepth = (string) Queue::size('notifications');
+        } catch (\Throwable) {
+            $queueDepth = 'unavailable';
+        }
+
+        return new HtmlString('<p>Notification jobs awaiting work: <strong>'.$queueDepth.'</strong> (includes other notifications). Invitation records appear as sends begin.</p>'
+            .'<p>Email delivery — preparing: '.$delivery['preparing'].'; provider processing: '.$delivery['processing'].'; delivered: '.$delivery['delivered'].'; failed: '.$delivery['failed'].'; needs review: '.$delivery['review'].'.</p>'
+            .'<p>Accounts — awaiting activation: '.$accounts['awaiting'].'; link redeemed: '.$accounts['redeemed'].'; expired: '.$accounts['expired'].'; activated: '.$accounts['activated'].'.</p>');
+    }
+
     public function previewSelectedInvitations(Collection $records): array
     {
         abort_unless(self::canIssueInvitations(), 403);
@@ -196,6 +253,10 @@ class ListEmployees extends ListRecords
         $ready = $cohort['ready'];
         $skipped = array_sum($cohort['statuses']) - count($ready);
         $summary = '<p><strong>'.count($ready).'</strong> ready to invite; <strong>'.$skipped.'</strong> skipped. No email is sent until you confirm.</p>';
+        if (count($ready) > 1) {
+            $minutes = (int) ceil((count($ready) - 1) * IssueMemberOnboardingInvitation::SPACING_SECONDS / 60);
+            $summary .= '<p>Expected sending time: about '.$minutes.' minutes. Delivery and activation are tracked separately.</p>';
+        }
         $labels = [
             'already_invited' => 'Already invited',
             'missing_authoritative_city_email' => 'Missing City email',
@@ -249,8 +310,10 @@ class ListEmployees extends ListRecords
             'skipped_count' => array_sum($cohort['statuses']) - count($cohort['ready']),
             'cohort_sha256' => $cohort['hash'],
         ]);
-        foreach ($cohort['ready'] as $recipient) {
-            IssueMemberOnboardingInvitation::dispatch($recipient['user_id'], $actor->id, $recipient['binding_hash']);
+        $firstSendAt = now();
+        foreach ($cohort['ready'] as $index => $recipient) {
+            IssueMemberOnboardingInvitation::dispatch($recipient['user_id'], $actor->id, $recipient['binding_hash'])
+                ->delay($firstSendAt->copy()->addSeconds($index * IssueMemberOnboardingInvitation::SPACING_SECONDS));
         }
         $this->selectedInvitationCohort = null;
         $this->deselectAllTableRecords();
@@ -292,8 +355,10 @@ class ListEmployees extends ListRecords
             'skipped_count' => array_sum($cohort['statuses']) - count($cohort['ready']),
             'cohort_sha256' => $cohort['hash'],
         ]);
-        foreach ($cohort['ready'] as $recipient) {
-            IssueMemberOnboardingInvitation::dispatch($recipient['user_id'], $actor->id, $recipient['binding_hash']);
+        $firstSendAt = now();
+        foreach ($cohort['ready'] as $index => $recipient) {
+            IssueMemberOnboardingInvitation::dispatch($recipient['user_id'], $actor->id, $recipient['binding_hash'])
+                ->delay($firstSendAt->copy()->addSeconds($index * IssueMemberOnboardingInvitation::SPACING_SECONDS));
         }
 
         Notification::make()->success()->title('Invitations queued')

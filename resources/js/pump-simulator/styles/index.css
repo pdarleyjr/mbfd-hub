@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400..800&display=swap');
+@import '../../../css/mbfd-theme.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,6 +11,8 @@
 
 /* Brushed metal panel background */
 .pump-panel-bg {
+  font-family: var(--hub-font-sans);
+  --pump-helper: rgb(var(--hub-border));
   min-height: 100vh;
   min-height: 100dvh;
   background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 25%, #0f0f1a 50%, #1a1a2e 75%, #0a0a0a 100%);

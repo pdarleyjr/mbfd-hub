@@ -32,6 +32,7 @@ export default function ApparatusBlueprint({ view, compartments, activeId, onSel
           onClick={() => onSelect(zone.compartmentId)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(zone.compartmentId); } }}
           className={`blueprint-zone ${complete ? 'is-complete' : 'is-incomplete'} ${activeId === zone.compartmentId ? 'is-active' : ''}`}>
           <rect x={x} y={zone.y} width={zone.width} height={zone.height} rx="3" />
+          {activeId === zone.compartmentId && <path className="blueprint-selected" aria-hidden="true" d={`M${x + 5} ${zone.y + 9} l3 3 l6 -6`} />}
           <text x={x + zone.width / 2} y={zone.y + zone.height / 2 + (zone.height < 46 ? 5 : -3)} textAnchor="middle" style={{ fontSize: Math.min(18, (zone.width - 6) / (zone.label.length * 0.68)) }}>{zone.label}</text>
           {zone.height >= 46 && <text className="blueprint-zone-count" x={x + zone.width / 2} y={zone.y + zone.height / 2 + 18} textAnchor="middle">{complete ? '✓' : `${progress.completed}/${progress.total}`}</text>}
           {existing > 0 && <g className="blueprint-warning existing" aria-hidden="true"><circle cx={x + zone.width - 3} cy={zone.y - 3} r="10" /><text x={x + zone.width - 3} y={zone.y + 1} textAnchor="middle">E</text></g>}

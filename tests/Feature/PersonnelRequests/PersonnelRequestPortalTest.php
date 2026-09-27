@@ -123,21 +123,30 @@ class PersonnelRequestPortalTest extends TestCase
     {
         $this->withoutVite();
         $employee = $this->employee('27201', 'Firefighter', 'Portal Member');
+        $backTarget = static function (string $html): ?string {
+            $document = new \DOMDocument;
+            @$document->loadHTML($html);
+
+            return (new \DOMXPath($document))->query('//div[contains(@class, "employee-global-back")]//a[@data-hub-back]')->item(0)?->getAttribute('href');
+        };
 
         $this->get('/employee/login')->assertRedirect('/login');
-        $this->actingAs($employee, 'employee')
+        $dashboard = $this->actingAs($employee, 'employee')
             ->get('/employee/dashboard?return_to=https://evil.example/steal')
             ->assertOk()
             ->assertSee('employee-global-back')
-            ->assertSee('MBFD Hub Home')
-            ->assertSee('href="/"', false)
+            ->assertSee('data-hub-back', false)
             ->assertDontSee('window.history.back()', false)
             ->assertDontSee('evil.example');
-        $this->get('/employee/request-equipment')
+        $this->assertSame('/', $backTarget($dashboard->getContent()));
+
+        $requestForm = $this->get('/employee/request-equipment')
             ->assertOk()
             ->assertSee('employee-global-back')
-            ->assertSee('MBFD Hub Home')
-            ->assertSee('href="/"', false);
+            ->assertSee('data-hub-back', false);
+        $target = $backTarget($requestForm->getContent());
+        $this->assertSame('/employee/dashboard', parse_url($target, PHP_URL_PATH));
+        $this->assertNull(parse_url($target, PHP_URL_HOST));
     }
 
     public function test_officer_livewire_form_persists_multiple_items_and_rejects_blank_signature(): void

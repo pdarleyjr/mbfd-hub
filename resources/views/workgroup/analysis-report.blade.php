@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>2026 Technical Product Comparison Analysis - Extrication & Apparatus</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Oswald:wght@500;700&display=swap');
         
         /* * PALETTE SELECTION: "Deep Tech / Analytical"
          * Navy: #0B132B | Slate: #1C2541 | Steel: #3A506B
@@ -15,14 +14,14 @@
          */
         
         body { 
-            font-family: 'Inter', sans-serif; 
+            font-family: var(--hub-font-sans);
             background-color: #0B132B; 
             color: #F8FAFC; 
             overflow-x: hidden;
         }
         
         h1, h2, h3, h4, h5 { 
-            font-family: 'Oswald', sans-serif; 
+            font-family: var(--hub-font-sans);
             text-transform: uppercase; 
         }
         
@@ -41,7 +40,7 @@
         }
 
         .metric-score {
-            font-family: 'Oswald', sans-serif;
+            font-family: var(--hub-font-sans);
             font-weight: 700;
             color: #48E5C2;
             text-shadow: 0 0 15px rgba(72, 229, 194, 0.4);
@@ -86,8 +85,10 @@
             .chart-container-large { height: 350px; } 
         }
     </style>
+    @vite(['resources/css/app.css'])
 </head>
-<body class="antialiased selection:bg-[#00B4D8] selection:text-white">
+<body class="hub-report hub-report--analysis-report antialiased selection:bg-[#00B4D8] selection:text-white">
+    <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
 
     <!-- Navigation -->
     <nav class="sticky top-0 z-50 bg-[#0B132B]/90 backdrop-blur-md border-b border-[#3A506B] px-6 py-4">
@@ -339,15 +340,16 @@
             gray: '#94A3B8'
         };
 
+        const reportFont = getComputedStyle(document.documentElement).getPropertyValue('--hub-font-sans').trim();
         Chart.defaults.color = chartColors.gray;
-        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.font.family = reportFont;
         Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(11, 19, 43, 0.95)';
         Chart.defaults.plugins.tooltip.titleColor = chartColors.white;
         Chart.defaults.plugins.tooltip.bodyColor = chartColors.mint;
         Chart.defaults.plugins.tooltip.borderColor = chartColors.cyan;
         Chart.defaults.plugins.tooltip.borderWidth = 1;
         Chart.defaults.plugins.tooltip.padding = 12;
-        Chart.defaults.plugins.tooltip.titleFont = { size: 14, family: "'Oswald', sans-serif" };
+        Chart.defaults.plugins.tooltip.titleFont = { size: 14, family: reportFont };
 
         const mandatoryTooltipConfig = {
             callbacks: {
@@ -418,7 +420,7 @@
                     },
                     y: {
                         grid: { display: false, drawBorder: false },
-                        ticks: { font: { family: "'Oswald', sans-serif", size: 16 }, color: chartColors.white }
+                        ticks: { font: { family: reportFont, size: 16 }, color: chartColors.white }
                     }
                 }
             }
@@ -467,7 +469,7 @@
                 plugins: {
                     legend: { 
                         position: 'top', 
-                        labels: { color: chartColors.white, font: { family: "'Oswald', sans-serif", size: 14 } } 
+                        labels: { color: chartColors.white, font: { family: reportFont, size: 14 } }
                     },
                     tooltip: {
                         callbacks: {
@@ -485,7 +487,7 @@
                     },
                     x: {
                         grid: { display: false },
-                        ticks: { color: chartColors.white, font: { family: "'Oswald', sans-serif", size: 14 } }
+                        ticks: { color: chartColors.white, font: { family: reportFont, size: 14 } }
                     }
                 }
             }

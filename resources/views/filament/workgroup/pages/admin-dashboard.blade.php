@@ -5,11 +5,11 @@
         @foreach($stats as $stat)
         @php
             $iconColors = [
-                'primary' => 'background-color: #FEF2F2; color: #B91C1C; border-color: #FECACA;',
+                'primary' => 'background-color: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-action-primary)); border-color: rgb(var(--hub-border));',
                 'success' => 'background-color: #ECFDF5; color: #065F46; border-color: #BBF7D0;',
                 'warning' => 'background-color: #FEF9C3; color: #854D0E; border-color: #FDE68A;',
                 'info'    => 'background-color: #EFF6FF; color: #1E40AF; border-color: #BFDBFE;',
-                'gray'    => 'background-color: #F8F6F2; color: #57534E; border-color: #E8E5E0;',
+                'gray'    => 'background-color: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-ink-secondary)); border-color: rgb(var(--hub-border));',
             ];
             $style = $iconColors[$stat['color']] ?? $iconColors['gray'];
         @endphp
@@ -21,7 +21,7 @@
                 <p class="wg-stat-label" style="text-transform: none; letter-spacing: normal;">{{ $stat['label'] }}</p>
             </div>
             <p class="wg-stat-value" style="font-size: 1.5rem;">{{ $stat['value'] }}</p>
-            <p style="font-size: 0.6875rem; color: #A8A29E; margin-top: 0.25rem;">{{ $stat['desc'] }}</p>
+            <p style="font-size: 0.6875rem; color: rgb(var(--hub-ink-secondary)); margin-top: 0.25rem;">{{ $stat['desc'] }}</p>
         </div>
         @endforeach
     </div>
@@ -31,13 +31,13 @@
     @if($progress)
     <div class="wg-section">
         <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #B91C1C, #DC2626);">
+            <div class="wg-section-header-icon" style="background: rgb(var(--hub-action-primary));">
                 <x-heroicon-o-chart-bar class="w-5 h-5"/>
             </div>
             <h3 class="wg-section-title">Active Session Progress{{ $activeSession ? ': ' . $activeSession->name : '' }}</h3>
         </div>
         <div class="wg-section-body">
-            <div class="wg-stats-row" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="wg-stats-row" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));">
                 @php
                     $progressItems = [
                         ['label' => 'Products', 'val' => $progress['total_products']],
@@ -47,7 +47,7 @@
                     ];
                 @endphp
                 @foreach($progressItems as $pi)
-                <div style="text-align: center; padding: 0.75rem; background-color: #F8F6F2; border-radius: 0.5rem; border: 1px solid #E8E5E0;">
+                <div style="text-align: center; padding: 0.75rem; background-color: rgb(var(--hub-surface-muted)); border-radius: 0.5rem; border: 1px solid rgb(var(--hub-border));">
                     <p class="wg-stat-label">{{ $pi['label'] }}</p>
                     <p class="wg-stat-value">{{ $pi['val'] }}</p>
                 </div>

@@ -2,32 +2,31 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Final Review Teams Meeting - Technical Product Comparison</title>
     
     <!-- Reveal.js CSS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reset.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/theme/black.min.css">
+    <link rel="stylesheet" href="{{ asset('vendor/reveal-4.3.1/reset.css') }}">
+    <link rel="stylesheet" href="{{ asset('vendor/reveal-4.3.1/reveal.css') }}">
+    <link rel="stylesheet" href="{{ asset('vendor/reveal-4.3.1/black.css') }}">
     
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        @@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Inter:wght@300;400;600;700&display=swap');
 
         .reveal {
-            font-family: 'Inter', sans-serif;
+            font-family: var(--hub-font-sans);
             color: #F8FAFC;
             background: #0B132B; /* Dark navy background */
             background-image: radial-gradient(circle at 50% 50%, #1C2541 0%, #0B132B 100%);
         }
 
         .reveal h1, .reveal h2, .reveal h3, .reveal h4, .reveal h5 {
-            font-family: 'Oswald', sans-serif;
+            font-family: var(--hub-font-sans);
             text-transform: uppercase;
             font-weight: 700;
             letter-spacing: 0.05em;
@@ -60,7 +59,7 @@
             border: 1px solid #00B4D8;
             padding: 0.25rem 1rem;
             border-radius: 9999px;
-            font-family: 'Oswald', sans-serif;
+            font-family: var(--hub-font-sans);
             font-size: 1.2rem;
             margin-bottom: 1.5rem;
             letter-spacing: 2px;
@@ -74,7 +73,7 @@
         }
 
         .metric-score {
-            font-family: 'Oswald', sans-serif;
+            font-family: var(--hub-font-sans);
             font-size: 3.5rem;
             line-height: 1;
             color: #48E5C2;
@@ -156,8 +155,10 @@
             gap: 1rem;
         }
     </style>
+    @vite(['resources/css/app.css'])
 </head>
-<body>
+<body class="hub-report hub-report--final-presentation">
+    <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
 
     <div class="reveal">
         <div class="slides">
@@ -169,10 +170,10 @@
                     <h4 class="text-gray-400 tracking-widest text-sm mb-2">FINAL REVIEW TEAMS MEETING</h4>
                     <h1 class="leading-tight mb-6">TECHNICAL PRODUCT<br><span class="accent-text">COMPARISON ANALYSIS</span></h1>
                     
-                    <div class="w-24 h-1 bg-[#48E5C2] mx-auto my-6"></div>
+                    <div class="w-24 h-1 bg-hub-red mx-auto my-6"></div>
                     
                     <div class="text-left max-w-2xl mx-auto mt-8">
-                        <p class="text-xl text-[#00B4D8] font-bold mb-4 uppercase tracking-wider text-center">Meeting Objective:</p>
+                        <p class="text-xl text-white font-bold mb-4 uppercase tracking-wider text-center">Meeting Objective:</p>
                         <p class="text-lg text-gray-300 italic text-center border-l-4 border-r-4 border-[#3A506B] px-6">
                             "To review the final findings, address any remaining concerns, and leave this meeting with a clear recommendation on the top equipment choices for the Mid-Mount Ladder project."
                         </p>
@@ -214,7 +215,7 @@
                 <div class="time-badge">10:15 AM - 10:30 AM</div>
                 <h2>EXECUTIVE SUMMARY OF FINDINGS</h2>
                 
-                <div class="flex justify-center gap-12 mt-8 mb-12">
+                <div class="report-summary-metrics flex justify-center gap-12 mt-8 mb-12">
                     <div class="text-center">
                         <div class="metric-score text-white">11</div>
                         <div class="text-sm tracking-widest text-gray-400 uppercase mt-2">Evaluators</div>
@@ -414,7 +415,7 @@
             <section>
                 <div class="flex justify-center gap-4 mb-4">
                     <div class="time-badge">11:40 AM Deliberation</div>
-                    <div class="time-badge" style="border-color:#48E5C2; color:#48E5C2; background:rgba(72,229,194,0.1)">12:00 PM Closing</div>
+                    <div class="time-badge">12:00 PM Closing</div>
                 </div>
                 <h2>FINAL CONSENSUS & NEXT STEPS</h2>
                 
@@ -440,26 +441,33 @@
     </div>
 
     <!-- Reveal.js Scripts -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.js"></script>
+    <script src="{{ asset('vendor/reveal-4.3.1/reveal.js') }}"></script>
     
     <script>
         // Initialize Reveal.js
+        const mobileDeck = window.matchMedia('(max-width: 640px)');
         Reveal.initialize({
             hash: true,
             transition: 'fade', 
             backgroundTransition: 'fade',
             controls: true,
             progress: true,
-            center: true,
-            disableLayout: false
+            center: !mobileDeck.matches,
+            embedded: true,
+            disableLayout: mobileDeck.matches
         });
+        mobileDeck.addEventListener('change', () => Reveal.configure({ disableLayout: mobileDeck.matches, center: !mobileDeck.matches }));
+
+        // Recalculate slide scaling when the responsive Hub header changes size.
+        new ResizeObserver(() => Reveal.layout()).observe(document.querySelector('.hub-report-navigation'));
 
         // Global Chart.js Styling
+        const reportFont = getComputedStyle(document.documentElement).getPropertyValue('--hub-font-sans').trim();
         Chart.defaults.color = '#94A3B8';
-        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.font.family = reportFont;
         Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(11, 19, 43, 0.95)';
-        Chart.defaults.plugins.tooltip.titleFont = { family: "'Oswald', sans-serif", size: 16 };
-        Chart.defaults.plugins.tooltip.bodyFont = { family: "'Inter', sans-serif", size: 14 };
+        Chart.defaults.plugins.tooltip.titleFont = { family: reportFont, size: 16 };
+        Chart.defaults.plugins.tooltip.bodyFont = { family: reportFont, size: 14 };
         Chart.defaults.plugins.tooltip.padding = 12;
         Chart.defaults.plugins.tooltip.borderColor = 'rgba(72, 229, 194, 0.5)';
         Chart.defaults.plugins.tooltip.borderWidth = 1;
@@ -493,7 +501,7 @@
                         x: {
                             min: 50, max: 100,
                             grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { font: { family: "'Oswald', sans-serif", size: 14 } }
+                            ticks: { font: { family: reportFont, size: 14 } }
                         },
                         y: {
                             grid: { display: false },
@@ -534,14 +542,14 @@
                     plugins: { 
                         legend: { 
                             position: 'top',
-                            labels: { color: '#fff', font: { family: "'Oswald', sans-serif", size: 14 } }
+                            labels: { color: '#fff', font: { family: reportFont, size: 14 } }
                         }
                     },
                     scales: {
                         y: {
                             min: 75, max: 95,
                             grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { font: { family: "'Oswald', sans-serif", size: 14 } }
+                            ticks: { font: { family: reportFont, size: 14 } }
                         },
                         x: {
                             grid: { display: false },
@@ -555,6 +563,7 @@
 
         // Render charts dynamically when slides become visible
         Reveal.on('slidechanged', event => {
+            if (mobileDeck.matches) window.scrollTo(0, 0);
             if (event.currentSlide.querySelector('#container-saws-chart')) {
                 initSawsChart();
             }

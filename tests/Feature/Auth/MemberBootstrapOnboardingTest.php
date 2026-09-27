@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Auth;
 
 use App\Enums\AccountStatus;
+use App\Exceptions\EmailBudgetExhausted;
 use App\Models\CloudflareUsageBudget;
 use App\Models\Employee;
 use App\Models\MemberOnboardingInvitation;
@@ -304,6 +305,69 @@ final class MemberBootstrapOnboardingTest extends TestCase
             self::assertSame([$member->employeeProfile->city_email], $invitation->outboundEmail->to_recipients);
             self::assertStringNotContainsString($firstToken, (string) $invitation->outboundEmail->text_body);
             self::assertStringNotContainsString($secondToken, (string) $invitation->outboundEmail->text_body);
+        }
+    }
+
+    public function test_local_rate_block_retries_only_after_pre_submission_release(): void
+    {
+        $startedAt = CarbonImmutable::now();
+        CarbonImmutable::setTestNow($startedAt);
+        try {
+            $member = $this->pending('ONBOARD-RATE-RETRY');
+            for ($index = 0; $index < 5; $index++) {
+                OutboundEmail::query()->create([
+                    'provider' => 'cloudflare',
+                    'source_type' => 'rate-fixture',
+                    'from_address' => 'info@mbfdhub.com',
+                    'to_recipients' => ['fixture@example.test'],
+                    'subject' => 'Rate fixture',
+                    'recipient_count' => 1,
+                    'chargeable_budget_units' => 1,
+                    'status' => 'accepted',
+                    'budget_reserved_at' => $startedAt,
+                    'accepted_at' => $startedAt,
+                ]);
+            }
+
+            try {
+                app(MemberOnboardingInvitationService::class)->issue($member, $startedAt);
+                self::fail('The local five-unit guard should delay this invitation.');
+            } catch (EmailBudgetExhausted $exception) {
+                self::assertSame(61, $exception->retryAfterSeconds);
+            }
+            $invitation = MemberOnboardingInvitation::query()->sole();
+            self::assertNull($invitation->token_hash);
+            self::assertNull($invitation->expires_at);
+            self::assertSame('failed_pre_acceptance', $invitation->outboundEmail->status);
+            Http::assertNothingSent();
+
+            CarbonImmutable::setTestNow($startedAt->addSeconds(61));
+            self::assertSame('queued', app(MemberOnboardingInvitationService::class)->issue($member, CarbonImmutable::now()));
+            self::assertSame(1, Http::recorded()->count());
+            self::assertSame($startedAt->addSeconds(61)->addMinutes(30)->getTimestamp(), MemberOnboardingInvitation::query()->sole()->expires_at->getTimestamp());
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
+    }
+
+    public function test_uncertain_provider_acceptance_preserves_token_and_blocks_automatic_resend(): void
+    {
+        $startedAt = CarbonImmutable::now();
+        CarbonImmutable::setTestNow($startedAt);
+        try {
+            $member = $this->pending('ONBOARD-UNKNOWN');
+            Http::fake(fn () => throw new \RuntimeException('Lost provider response'));
+            self::assertSame('queued', app(MemberOnboardingInvitationService::class)->issue($member, $startedAt));
+            $invitation = MemberOnboardingInvitation::query()->sole();
+            self::assertNotNull($invitation->token_hash);
+            self::assertSame('acceptance_unknown', $invitation->outboundEmail->status);
+
+            CarbonImmutable::setTestNow($startedAt->addMinutes(31));
+            self::assertSame('delivery_reconciliation_required', app(MemberOnboardingInvitationService::class)->assess($member->employeeProfile)['status']);
+            self::assertSame('already_invited', app(MemberOnboardingInvitationService::class)->issue($member, CarbonImmutable::now()));
+            self::assertDatabaseCount('outbound_emails', 1);
+        } finally {
+            CarbonImmutable::setTestNow();
         }
     }
 

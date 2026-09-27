@@ -6,8 +6,9 @@
     <meta name="theme-color" content="#102A43">
     <link rel="manifest" href="/manifest.json">
     <title>Install MBFD Hub</title>
+    @vite('resources/css/app.css')
     <style>
-        :root { color-scheme: light; font-family: "Plus Jakarta Sans", Arial, sans-serif; --ink:#172033; --muted:#526072; --line:#cbd5e1; --field:#f7fafc; --brand:#dc2626; --brand-strong:#b91c1c; --navy:#102a43; --blue:#1e4e8c; }
+        :root { color-scheme: light; font-family: var(--hub-font-sans); --ink:rgb(var(--hub-ink)); --muted:rgb(var(--hub-ink-secondary)); --line:rgb(var(--hub-border)); --field:rgb(var(--hub-canvas)); --brand:rgb(var(--hub-red)); --brand-strong:rgb(var(--hub-red-strong)); --navy:rgb(var(--hub-header)); --blue:rgb(var(--hub-blue)); }
         * { box-sizing: border-box; }
         body { min-height:100vh; margin:0; padding:24px; display:grid; place-items:center; background:var(--field); color:var(--ink); }
         main { width:min(100%, 38rem); padding:clamp(24px, 6vw, 44px); border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow:0 1rem 3rem rgba(16,42,67,.12); }

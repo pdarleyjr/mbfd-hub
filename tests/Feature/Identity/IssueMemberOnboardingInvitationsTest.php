@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Identity;
 
 use App\Enums\AccountStatus;
+use App\Jobs\IssueMemberOnboardingInvitation;
 use App\Models\CloudflareUsageBudget;
 use App\Models\Employee;
 use App\Models\MemberOnboardingRosterBinding;
@@ -17,6 +18,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 final class IssueMemberOnboardingInvitationsTest extends TestCase
@@ -27,6 +29,8 @@ final class IssueMemberOnboardingInvitationsTest extends TestCase
     {
         parent::setUp();
 
+        config(['queue.default' => 'database']);
+        Queue::fake();
         config(['communications.cloudflare.account_id' => str_repeat('a', 32), 'communications.cloudflare.api_token' => 'command-test-token']);
         $now = CarbonImmutable::now();
         CloudflareUsageBudget::query()->create([
@@ -65,6 +69,10 @@ final class IssueMemberOnboardingInvitationsTest extends TestCase
             unlink($backup);
             unlink($snapshot);
         }
+        Queue::assertPushed(IssueMemberOnboardingInvitation::class, 1);
+        self::assertDatabaseCount('member_onboarding_invitations', 0);
+        Http::assertNothingSent();
+        Queue::pushed(IssueMemberOnboardingInvitation::class)->first()->handle(app(\App\Services\Identity\MemberOnboardingInvitationService::class));
         self::assertDatabaseHas('member_onboarding_invitations', ['user_id' => $member->id, 'delivery_status' => 'queued']);
         Http::assertSentCount(1);
     }
@@ -88,6 +96,7 @@ final class IssueMemberOnboardingInvitationsTest extends TestCase
             unlink($snapshot);
         }
         self::assertDatabaseCount('member_onboarding_invitations', 0);
+        Queue::assertNothingPushed();
         Http::assertNothingSent();
     }
 
