@@ -220,7 +220,29 @@ final class OutboundDeliveryLedgerTest extends TestCase
         self::assertSame(31, $result['requests']);
         self::assertSame(1, $result['events_recorded']);
         self::assertSame('delivered', $email->fresh()->status);
-        Http::assertSent(fn ($request): bool => $request['variables']['start'] === $this->now->subDays(31)->toIso8601ZuluString());
+        Http::assertSent(fn ($request): bool => $request['variables']['start'] === $this->now->subDays(31)->addMinute()->toIso8601ZuluString());
+    }
+
+    public function test_backfill_queries_stay_inside_the_moving_provider_retention_boundary(): void
+    {
+        $requests = 0;
+        Http::fake(function ($request) use (&$requests) {
+            $providerNow = CarbonImmutable::now()->addSecond();
+            if (CarbonImmutable::parse($request['variables']['start'])->lt($providerNow->subDays(31))) {
+                return Http::response(['errors' => [['message' => 'Query is older than the retained provider window.']]]);
+            }
+            if (++$requests === 1) {
+                $this->travelTo($this->now->addSeconds(90));
+
+                return Http::response($this->graphql(array_fill(0, 1000, $this->event())));
+            }
+
+            return Http::response($this->graphql([]));
+        });
+
+        self::assertSame(33, app(CloudflareDeliveryReconciler::class)->reconcile(true)['requests']);
+        self::assertTrue(OutboundEmailReconciliationCheckpoint::query()->sole()->completed_through->equalTo($this->now));
+        Http::assertSent(fn ($request): bool => $request['variables']['start'] === $this->now->subDays(31)->addSeconds(150)->toIso8601ZuluString());
     }
 
     public function test_saturated_graphql_window_is_split_instead_of_silently_dropping_events(): void

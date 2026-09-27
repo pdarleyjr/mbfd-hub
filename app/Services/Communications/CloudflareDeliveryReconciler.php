@@ -64,6 +64,11 @@ final class CloudflareDeliveryReconciler
 
     private function window(string $zone, string $token, CarbonImmutable $start, CarbonImmutable $end): int
     {
+        // Cloudflare checks retention on arrival, including transport time and recursive queries.
+        $start = $start->max(CarbonImmutable::now()->utc()->subDays(31)->addMinute()->startOfSecond());
+        if ($start->gte($end)) {
+            return 0;
+        }
         if (++$this->requests > 128 || microtime(true) - $this->startedAt > 480) {
             throw new RuntimeException('Delivery analytics request bound reached.');
         }
