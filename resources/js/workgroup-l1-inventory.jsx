@@ -235,8 +235,8 @@ import { createRoot } from 'react-dom/client';
 
                     <div className="max-w-7xl mx-auto px-6 md:px-12 -mt-14">
                         {/* KPI Widgets */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                            <div className="bg-white p-6 rounded-xl table-container border border-slate-100 flex items-center gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 20rem), 1fr))" }}>
+                            <div className="bg-white p-6 rounded-xl table-container border border-slate-100 flex items-center gap-4" style={{ minWidth: 0, flexWrap: "wrap" }}>
                                 <div className="bg-emerald-100 p-3 rounded-lg text-emerald-700">
                                     <IconDollar />
                                 </div>
@@ -245,7 +245,7 @@ import { createRoot } from 'react-dom/client';
                                     <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(totalValuation)}</p>
                                 </div>
                             </div>
-                            <div className="bg-white p-6 rounded-xl table-container border border-slate-100 flex items-center gap-4">
+                            <div className="bg-white p-6 rounded-xl table-container border border-slate-100 flex items-center gap-4" style={{ minWidth: 0, flexWrap: "wrap" }}>
                                 <div className="bg-blue-100 p-3 rounded-lg text-blue-700">
                                     <IconBox />
                                 </div>
@@ -254,7 +254,7 @@ import { createRoot } from 'react-dom/client';
                                     <p className="text-2xl font-bold text-slate-800 mt-1">{totalItems}</p>
                                 </div>
                             </div>
-                            <div className="bg-white p-6 rounded-xl table-container border border-slate-100 flex items-center gap-4">
+                            <div className="bg-white p-6 rounded-xl table-container border border-slate-100 flex items-center gap-4" style={{ minWidth: 0, flexWrap: "wrap" }}>
                                 <div className="bg-purple-100 p-3 rounded-lg text-purple-700">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20"/><path d="m17 5-5-3-5 3"/><path d="m17 19-5 3-5-3"/></svg>
                                 </div>

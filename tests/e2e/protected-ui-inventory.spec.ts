@@ -211,15 +211,20 @@ test('inventory records every route and renders available protected surfaces at 
             await expect.poll(() => image.evaluate(el => (el as HTMLImageElement).complete), { timeout: 10_000 }).toBeTruthy();
           }
           await page.evaluate(async () => { await Promise.all([...document.images].filter(img => img.complete && img.naturalWidth > 0).map(img => img.decode().catch(() => undefined))); window.scrollTo(0, 0); });
-          // Chart.js canvas animations are not returned by document.getAnimations().
-          // Require three consecutive unchanged pixel snapshots after responsive resize.
-          let previous = '', stable = 0;
-          await expect.poll(async () => {
-            const pixels = await page.locator('canvas').evaluateAll(elements => elements.map(el => (el as HTMLCanvasElement).toDataURL()).join('|'));
-            stable = pixels === previous ? stable + 1 : 0;
-            previous = pixels;
-            return stable;
-          }, { timeout: 10_000, intervals: [150] }).toBeGreaterThanOrEqual(3);
+          // Bring each chart into view before checking pixels: browsers may throttle
+          // offscreen canvas animations after a responsive resize.
+          for (const canvas of await page.locator('canvas').all()) {
+            if (!await canvas.isVisible()) continue;
+            await canvas.scrollIntoViewIfNeeded({ timeout: 5_000 });
+            let previous = '', stable = 0;
+            await expect.poll(async () => {
+              const pixels = await canvas.evaluate(el => (el as HTMLCanvasElement).toDataURL());
+              stable = pixels === previous ? stable + 1 : 0;
+              previous = pixels;
+              return stable;
+            }, { timeout: 10_000, intervals: [150] }).toBeGreaterThanOrEqual(3);
+          }
+          await page.evaluate(() => window.scrollTo(0, 0));
         }
         const geometry = await page.evaluate(() => {
           const viewport = document.documentElement.clientWidth;
