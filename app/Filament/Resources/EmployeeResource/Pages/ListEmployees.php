@@ -27,6 +27,9 @@ class ListEmployees extends ListRecords
 {
     protected static string $resource = EmployeeResource::class;
 
+    /** @var array<int, true>|null */
+    private ?array $readyInvitationIds = null;
+
     #[Locked]
     public ?array $selectedInvitationCohort = null;
 
@@ -81,6 +84,17 @@ class ListEmployees extends ListRecords
         $actor = auth()->user();
 
         return $actor instanceof User && $actor->isAuthenticationAllowed() && $actor->hasRole('super_admin');
+    }
+
+    public function canInviteMember(Employee $record): bool
+    {
+        if (! self::canIssueInvitations() || $record->user?->getRawOriginal('account_status') !== 'pending_activation') {
+            return false;
+        }
+
+        $this->readyInvitationIds ??= array_fill_keys(array_column($this->invitationCohort()['ready'], 'id'), true);
+
+        return isset($this->readyInvitationIds[$record->id]);
     }
 
     /** @param array<string,mixed> $data */
