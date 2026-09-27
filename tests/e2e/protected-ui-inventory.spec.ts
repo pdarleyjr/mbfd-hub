@@ -34,6 +34,8 @@ test('inventory records every route and renders available protected surfaces at 
   expect(protectedUiInventoryEnvironment.WORKGROUP_AI_WORKER_URL).toBe('');
   expect(protectedUiInventoryEnvironment.WORKGROUP_AI_WORKER_SECRET).toBe('');
   const context = await browser.newContext({ storageState: 'test-results/protected-ui-auth/state.json', serviceWorkers });
+  const canonicalContext = await context.request.get(`${origin}/api/me/context`, { headers: { Accept: 'application/json' } });
+  expect(canonicalContext.status(), 'Inventory starts with a current canonical employee session').toBe(200);
   const fixtureFile = resolve('test-results/protected-ui-auth/fixture-routes.json');
   const fixtureRoutes: Record<string, string> = existsSync(fixtureFile) ? JSON.parse(readFileSync(fixtureFile, 'utf8')) : {};
   const guestContext = await browser.newContext({ storageState: { cookies: [], origins: [] }, serviceWorkers });
@@ -157,7 +159,15 @@ test('inventory records every route and renders available protected surfaces at 
     browserErrors = [];
     consoleMessages = [];
     resourceFailures = [];
+    const canonicalSessionChecks: { stage: string; status: number }[] = [];
+    const checkCanonicalSession = async (stage: string) => {
+      if (!['/employee/video-conferencing/command', '/employee/my-requests/{personnelRequest}', '/daily/stations/:id'].includes(entry.route)) return;
+      const response = await context.request.get(`${origin}/api/me/context`, { headers: { Accept: 'application/json' } });
+      canonicalSessionChecks.push({ stage, status: response.status() });
+      expect(response.status(), `Canonical employee session ${stage} ${entry.route}`).toBe(200);
+    };
     try {
+      await checkCanonicalSession('before');
       await page.setViewportSize({ width: 1440, height: 1000 });
       const response = await page.goto(new URL(target, origin).href, { waitUntil: 'domcontentloaded', timeout: 15_000 });
       await page.locator('body').waitFor({ timeout: 3_000 });
@@ -295,14 +305,15 @@ test('inventory records every route and renders available protected surfaces at 
         captures.push({ width, screenshot: filename, geometry, frames });
       }
       await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => undefined);
+      await checkCanonicalSession('after');
       outcomes.push({ index, ...entry, requested: target, finalPath: final.pathname, httpStatus, status: redirected ? 'NOT_RENDERED' : 'RENDERED',
         reason: redirected ? 'Requested route redirects; screenshots prove its destination only, not a distinct page at this route.' : undefined,
         evidence: redirected ? 'REDIRECT TARGET ONLY' : /^\/daily\/.*success$/.test(entry.route) ? 'Success-page layout opened directly without submission context; no successful operational submission is claimed.' : /saver-report/.test(entry.route) ? 'Template/layout fixture only: cached synthetic report content; operational report generation is not verified.' : /video-conferencing|pump-simulator/.test(entry.route) ? 'Local entry shell only; no conference, external integration, or simulator operation verified.' : 'Authorized page shell rendered; content may be an empty fixture.', captures,
-        blockedRequests: [...blockedRequests], browserErrors: [...browserErrors], consoleMessages: [...consoleMessages], resourceFailures: [...resourceFailures] });
+        canonicalSessionChecks, blockedRequests: [...blockedRequests], browserErrors: [...browserErrors], consoleMessages: [...consoleMessages], resourceFailures: [...resourceFailures] });
     } catch (error) {
       const message = String(error);
       serverUnavailable = /ERR_CONNECTION_REFUSED|ECONNREFUSED/.test(message);
-      outcomes.push({ index, ...entry, requested: target, status: 'BLOCKED', reason: message.slice(0, 1000), captures: [], blockedRequests: [...blockedRequests], browserErrors: [...browserErrors], consoleMessages: [...consoleMessages], resourceFailures: [...resourceFailures] });
+      outcomes.push({ index, ...entry, requested: target, status: 'BLOCKED', reason: message.slice(0, 1000), captures: [], canonicalSessionChecks, blockedRequests: [...blockedRequests], browserErrors: [...browserErrors], consoleMessages: [...consoleMessages], resourceFailures: [...resourceFailures] });
     }
     persist();
     console.log(`Inventory ${outcomes.length}/${catalog.pages.length}: ${entry.route} ${outcomes.at(-1)?.status}`);

@@ -304,12 +304,18 @@
         }
 
         .hub-report--final-presentation .reveal .controls {
-            position: fixed;
-            right: 0.5rem;
-            bottom: 0.5rem;
+            position: relative;
+            right: auto;
+            bottom: auto;
+            width: 112px;
+            height: 56px;
+            margin: 0.75rem 1rem 1rem auto;
             background: rgb(var(--hub-header));
             border-radius: 0.5rem;
         }
+
+        .hub-report--final-presentation .reveal .controls .navigate-left { right: 56px; bottom: 6px; }
+        .hub-report--final-presentation .reveal .controls .navigate-right { right: 6px; bottom: 6px; }
 
         .hub-report--final-presentation .reveal .controls button {
             min-width: 44px;
