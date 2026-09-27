@@ -190,7 +190,6 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'canonical.api', 'throttle:6
         Route::post('stations/{station}/rooms/{room}/audits', [\App\Http\Controllers\Api\StationController::class, 'storeRoomAudit']);
         Route::post('stations/{station}/rooms/{room}/audits/{audit}/complete', [\App\Http\Controllers\Api\StationController::class, 'completeAudit']);
         Route::apiResource('fire-equipment-requests', FireEquipmentRequestController::class)->only(['store', 'update', 'destroy']);
-        Route::apiResource('station-inspections', StationInspectionController::class)->only(['store', 'update', 'destroy']);
     });
     Route::middleware('admin.capability:admin.equipment.manage')->group(function (): void {
         Route::post('ai/inventory-chat', [InventoryChatController::class, 'chat']);

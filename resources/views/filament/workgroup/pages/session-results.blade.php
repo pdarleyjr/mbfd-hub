@@ -95,7 +95,7 @@
                     <span class="wg-shimmer" style="width: 0.5rem; height: 0.5rem; border-radius: 9999px; display: inline-block;"></span>
                     <span class="wg-shimmer" style="width: 0.5rem; height: 0.5rem; border-radius: 9999px; display: inline-block;"></span>
                 </div>
-                <p style="font-size: 0.8125rem; color: #78716C;">Generating AI executive report...</p>
+                <p style="font-size: 0.8125rem; color: rgb(var(--hub-muted));">Generating AI executive report...</p>
             </div>
             <div class="wg-shimmer" style="height: 0.875rem; width: 100%; margin-bottom: 0.5rem;"></div>
             <div class="wg-shimmer" style="height: 0.875rem; width: 85%; margin-bottom: 0.5rem;"></div>
@@ -112,7 +112,7 @@
         <div class="wg-ai-body">{{ $aiReport }}</div>
         @else
         <div style="text-align: center; padding: 1.5rem 0;">
-            <p style="font-size: 0.8125rem; color: #78716C; max-width: 28rem; margin: 0 auto;">Click "Generate Report" for a comprehensive executive summary.</p>
+            <p style="font-size: 0.8125rem; color: rgb(var(--hub-muted)); max-width: 28rem; margin: 0 auto;">Click "Generate Report" for a comprehensive executive summary.</p>
             <button wire:click="loadAiReport" class="wg-ai-btn wg-ai-btn--primary" style="margin-top: 0.75rem;">
                 <svg style="width:1rem;height:1rem;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                 Generate Report
@@ -165,10 +165,10 @@
         @if($saverReportLoading)
         <div style="padding: 2rem; text-align: center;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-bottom: 1rem;">
-                <svg style="width:1.5rem;height:1.5rem;animation:spin 1s linear infinite;color:#2563EB;" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity:0.25;"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4" stroke-linecap="round" style="opacity:0.75;"></path></svg>
-                <p style="font-size: 0.875rem; color: #57534E; font-weight: 500;">Analyzing evaluation data and generating SAVER report...</p>
+                <svg style="width:1.5rem;height:1.5rem;animation:spin 1s linear infinite;color:rgb(var(--hub-action-primary));" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity:0.25;"></circle><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4" stroke-linecap="round" style="opacity:0.75;"></path></svg>
+                <p style="font-size: 0.875rem; color: rgb(var(--hub-ink-secondary)); font-weight: 500;">Analyzing evaluation data and generating SAVER report...</p>
             </div>
-            <p style="font-size: 0.75rem; color: #A8A29E;">This may take 30-60 seconds depending on the amount of data.</p>
+            <p style="font-size: 0.75rem; color: rgb(var(--hub-muted-soft));">This may take 30-60 seconds depending on the amount of data.</p>
         </div>
         @endif
 
@@ -182,7 +182,7 @@
 
         {{-- SAVER Report Content --}}
         @if($saverReportHtml && !$saverReportLoading)
-        <div style="padding: 1.25rem; font-size: 0.875rem; line-height: 1.6; color: #292524;">
+        <div style="padding: 1.25rem; font-size: 0.875rem; line-height: 1.6; color: rgb(var(--hub-ink));">
             <div class="wg-saver-content">
                 {{-- SECURITY: render-boundary sanitization in addition to
                      WorkgroupAIService::sanitizeReportPayload(). --}}
@@ -203,26 +203,26 @@
     {{-- ── T1 Standalone Table ── --}}
     @if($gtg['t1_standalone'])
     <div class="wg-section" style="margin-bottom: 1.25rem;">
-        <div class="wg-section-header" style="background-color: #FEF9C3;">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #D97706, #F59E0B);">
+        <div class="wg-section-header">
+            <div class="wg-section-header-icon">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
             </div>
             <div style="flex: 1;">
                 <h3 class="wg-section-title">T1 — Forcible Entry Tool</h3>
-                <p class="wg-section-subtitle" style="color: #92400E; font-weight: 500;">For consideration in replacing the <strong>Rabbit Tool</strong> (Forcible entry tool currently in use)</p>
+                <p class="wg-section-subtitle" style="font-weight: 500;">For consideration in replacing the <strong>Rabbit Tool</strong> (Forcible entry tool currently in use)</p>
             </div>
-            <a href="/workgroup-export/t1_standalone{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/t1_standalone{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="wg-export-link" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
-            </button>
+            </a>
         </div>
         <div class="wg-section-body">
             @php $t1 = $gtg['t1_standalone']; @endphp
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background-color: #FFFBEB; border: 1px solid #FDE68A; border-radius: 0.625rem;">
                 <div>
-                    <h4 style="font-weight: 700; color: #292524; font-size: 1rem;">{{ $t1['name'] }}</h4>
+                    <h4 style="font-weight: 700; color: rgb(var(--hub-ink)); font-size: 1rem;">{{ $t1['name'] }}</h4>
                     @if($t1['brand'])
-                    <p style="font-size: 0.75rem; color: #78716C;">{{ $t1['brand'] }}</p>
+                    <p style="font-size: 0.75rem; color: rgb(var(--hub-muted));">{{ $t1['brand'] }}</p>
                     @endif
                 </div>
                 <div style="text-align: right;">
@@ -231,15 +231,15 @@
                         {{ number_format($t1['avg_score'], 1) }}
                     </span>
                     @endif
-                    <p style="font-size: 0.6875rem; color: #78716C; margin-top: 0.25rem;">{{ $t1['response_count'] }} responses</p>
+                    <p style="font-size: 0.6875rem; color: rgb(var(--hub-muted)); margin-top: 0.25rem;">{{ $t1['response_count'] }} responses</p>
                 </div>
             </div>
             @if($t1['saver_breakdown']['capability'] !== null)
             <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap;">
                 @foreach(['capability' => 'Capability', 'usability' => 'Usability', 'affordability' => 'Afford.', 'maintainability' => 'Maintain.', 'deployability' => 'Deploy.'] as $key => $label)
-                <div style="flex: 1; min-width: 5rem; text-align: center; padding: 0.5rem; background-color: #F8F6F2; border-radius: 0.375rem;">
-                    <p style="font-size: 0.625rem; font-weight: 600; color: #78716C; text-transform: uppercase; letter-spacing: 0.04em;">{{ $label }}</p>
-                    <p class="wg-score" style="font-size: 1rem; color: #292524; margin-top: 0.125rem;">
+                <div style="flex: 1; min-width: 5rem; text-align: center; padding: 0.5rem; background-color: rgb(var(--hub-surface-muted)); border-radius: 0.375rem;">
+                    <p style="font-size: 0.625rem; font-weight: 600; color: rgb(var(--hub-muted)); text-transform: uppercase; letter-spacing: 0.04em;">{{ $label }}</p>
+                    <p class="wg-score" style="font-size: 1rem; color: rgb(var(--hub-ink)); margin-top: 0.125rem;">
                         {{ $t1['saver_breakdown'][$key] !== null ? number_format($t1['saver_breakdown'][$key], 1) : '—' }}
                     </p>
                 </div>
@@ -261,10 +261,10 @@
                 <h3 class="wg-section-title">Forcible Entry — Cut-off Saws</h3>
                 <p class="wg-section-subtitle">{{ count($gtg['cutoff_saws']) }} products ranked by overall score</p>
             </div>
-            <a href="/workgroup-export/cutoff_saws{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/cutoff_saws{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="wg-export-link" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
-            </button>
+            </a>
         </div>
         @include('filament.workgroup.pages.partials.granular-tool-table', ['items' => $gtg['cutoff_saws']])
     </div>
@@ -281,10 +281,10 @@
                 <h3 class="wg-section-title">Battery-Operated Extrication Tools — Brand Rankings</h3>
                 <p class="wg-section-subtitle">Overall average score combining all tools per brand · Ranked #1 to #{{ count($gtg['brand_overall']) }}</p>
             </div>
-            <a href="/workgroup-export/brand_overall{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/brand_overall{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="wg-export-link" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
-            </button>
+            </a>
         </div>
         <div style="padding: 0;">
             @foreach($gtg['brand_overall'] as $brandRank)
@@ -299,7 +299,7 @@
                     1 => 'background-color: #C5A55A; color: #fff;',
                     2 => 'background-color: #A8A8A8; color: #fff;',
                     3 => 'background-color: #CD7F32; color: #fff;',
-                    default => 'background-color: #E8E5E0; color: #78716C;',
+                    default => 'background-color: rgb(var(--hub-border)); color: rgb(var(--hub-muted));',
                 };
             @endphp
             <div class="wg-brand-rank {{ $brandMedalClass }}">
@@ -310,7 +310,7 @@
                         @if($brandRank['overall_avg'] !== null)
                         <span class="wg-brand-composite">{{ number_format($brandRank['overall_avg'], 1) }}</span>
                         @endif
-                        <span style="font-size: 0.75rem; color: #78716C; padding: 0.125rem 0.5rem; background-color: #F0EDE8; border-radius: 9999px;">{{ $brandRank['tool_count'] }} tools</span>
+                        <span style="font-size: 0.75rem; color: rgb(var(--hub-muted)); padding: 0.125rem 0.5rem; background-color: rgb(var(--hub-surface-muted)); border-radius: 9999px;">{{ $brandRank['tool_count'] }} tools</span>
                         @if($brandRank['rank'] === 1 && $brandRank['overall_avg'] !== null)
                         <span class="wg-best-package">🥇 Top Brand</span>
                         @endif
@@ -338,10 +338,10 @@
                 <h3 class="wg-section-title">Extrication — Spreaders</h3>
                 <p class="wg-section-subtitle">{{ count($gtg['spreaders']) }} spreaders ranked independently</p>
             </div>
-            <a href="/workgroup-export/spreaders{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/spreaders{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="wg-export-link" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
-            </button>
+            </a>
         </div>
         @include('filament.workgroup.pages.partials.granular-tool-table', ['items' => $gtg['spreaders']])
     </div>
@@ -358,10 +358,10 @@
                 <h3 class="wg-section-title">Extrication — Cutters</h3>
                 <p class="wg-section-subtitle">{{ count($gtg['cutters']) }} cutters ranked independently</p>
             </div>
-            <a href="/workgroup-export/cutters{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/cutters{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="wg-export-link" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
-            </button>
+            </a>
         </div>
         @include('filament.workgroup.pages.partials.granular-tool-table', ['items' => $gtg['cutters']])
     </div>
@@ -378,10 +378,10 @@
                 <h3 class="wg-section-title">Extrication — Rams</h3>
                 <p class="wg-section-subtitle">{{ count($gtg['rams']) }} rams ranked independently</p>
             </div>
-            <a href="/workgroup-export/rams{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/rams{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="wg-export-link" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
-            </button>
+            </a>
         </div>
         @include('filament.workgroup.pages.partials.granular-tool-table', ['items' => $gtg['rams']])
     </div>
@@ -395,21 +395,21 @@
         @foreach($categoryResults as $cat)
         <div class="wg-section">
             <div class="wg-section-header">
-                <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #B91C1C, #DC2626);">
+                <div class="wg-section-header-icon">
                     <x-heroicon-o-squares-2x2 class="w-5 h-5"/>
                 </div>
                 <div style="flex: 1;">
                     <h3 class="wg-section-title">{{ $cat['category_name'] }}</h3>
                     <p class="wg-section-subtitle">{{ $cat['total_products'] }} products · {{ $cat['eligible_products'] }} meet threshold</p>
                 </div>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <div class="wg-header-actions">
                     @if($cat['top_products']->isNotEmpty())
                     <span style="display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; background-color: #FEF9C3; color: #854D0E; border: 1px solid #FDE68A;">
                         <x-heroicon-o-trophy class="w-3.5 h-3.5"/>
                         Top: {{ $cat['top_products']->first()['product']->name ?? 'N/A' }}
                     </span>
                     @endif
-                    <a href="/workgroup-export/category_{{ urlencode($cat['category_name']) }}{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+                    <a href="/workgroup-export/category_{{ urlencode($cat['category_name']) }}{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="wg-export-link" title="Export CSV">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                         CSV
                     </a>
@@ -456,13 +456,13 @@
                                 @if($rank <= 3 && $isFinalist)
                                     <span class="wg-rank-medal {{ $medalClass }}" style="width: 1.5rem; height: 1.5rem; font-size: 0.625rem; {{ $medalBg }}">{{ $rank }}</span>
                                 @else
-                                    <span style="color: #A8A29E; font-size: 0.75rem;">{{ $rank }}</span>
+                                    <span style="color: rgb(var(--hub-muted-soft)); font-size: 0.75rem;">{{ $rank }}</span>
                                 @endif
                             </td>
                             <td>
-                                <div style="font-weight: 600; color: #292524;">{{ $item['product']->name }}</div>
+                                <div style="font-weight: 600; color: rgb(var(--hub-ink));">{{ $item['product']->name }}</div>
                                 @if($item['product']->manufacturer)
-                                <div style="font-size: 0.6875rem; color: #A8A29E;">{{ $item['product']->manufacturer }} {{ $item['product']->model ? '· '.$item['product']->model : '' }}</div>
+                                <div style="font-size: 0.6875rem; color: rgb(var(--hub-muted-soft));">{{ $item['product']->manufacturer }} {{ $item['product']->model ? '· '.$item['product']->model : '' }}</div>
                                 @endif
                             </td>
                             <td style="text-align: center;">
@@ -471,7 +471,7 @@
                                     {{ number_format($score, 1) }}
                                 </span>
                                 @else
-                                <span style="color: #D4D0CA;">—</span>
+                                <span style="color: rgb(var(--hub-border-strong));">—</span>
                                 @endif
                             </td>
                             @foreach(['capability_avg', 'usability_avg', 'affordability_avg', 'maintainability_avg', 'deployability_avg'] as $ki => $saverKey)
@@ -479,7 +479,7 @@
                                 @if($item[$saverKey])
                                     <span class="{{ ['wg-saver-s','wg-saver-a','wg-saver-v','wg-saver-e','wg-saver-r'][$ki] }}">{{ number_format($item[$saverKey], 0) }}</span>
                                 @else
-                                    <span style="color: #D4D0CA;">—</span>
+                                    <span style="color: rgb(var(--hub-border-strong));">—</span>
                                 @endif
                             </td>
                             @endforeach
@@ -495,12 +495,12 @@
                                 <span style="margin-left: 0.25rem; font-size: 0.75rem; color: #DC2626;" title="{{ $item['deal_breakers'] }} deal-breaker(s)">⚠️</span>
                                 @endif
                                 @else
-                                <span style="color: #D4D0CA; font-size: 0.75rem;">—</span>
+                                <span style="color: rgb(var(--hub-border-strong)); font-size: 0.75rem;">—</span>
                                 @endif
                             </td>
                             <td style="text-align: center;">
                                 <span class="wg-score" style="font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px;
-                                    {{ $item['meets_threshold'] ? 'background-color: #EFF6FF; color: #1E40AF;' : 'background-color: #F5F3F0; color: #78716C;' }}">
+                                    {{ $item['meets_threshold'] ? 'background-color: #EFF6FF; color: #1E40AF;' : 'background-color: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-muted));' }}">
                                     {{ $item['response_count'] }}
                                 </span>
                             </td>
@@ -518,22 +518,22 @@
     @if(!empty($competitorGroupRankings))
     <div class="wg-section">
         <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #2563EB, #0891B2);">
+            <div class="wg-section-header-icon">
                 <x-heroicon-o-scale class="w-5 h-5"/>
             </div>
             <div style="flex: 1;">
                 <h2 class="wg-section-title">Competitor Group Rankings</h2>
                 <p class="wg-section-subtitle">Products ranked against direct competitors within the same group</p>
             </div>
-            <a href="/workgroup-export/competitor_groups{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/competitor_groups{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="wg-export-link" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
-            </button>
+            </a>
         </div>
 
         @foreach($competitorGroupRankings as $cgCategory)
-        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid #E8E5E0;">
-            <h3 style="font-size: 0.875rem; font-weight: 700; color: #292524; margin-bottom: 0.75rem;">{{ $cgCategory['category_name'] }}</h3>
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid rgb(var(--hub-border));">
+            <h3 style="font-size: 0.875rem; font-weight: 700; color: rgb(var(--hub-ink)); margin-bottom: 0.75rem;">{{ $cgCategory['category_name'] }}</h3>
 
             @foreach($cgCategory['groups'] as $group)
             <div class="wg-competitor-group">
@@ -551,9 +551,9 @@
                     <div class="wg-group-item {{ $rIdx === 0 ? 'wg-group-item--leader' : '' }}">
                         <span class="wg-rank-medal" style="width: 1.5rem; height: 1.5rem; font-size: 0.625rem; {{ $groupMedalBg }}">{{ $rIdx + 1 }}</span>
                         <div style="flex: 1; min-width: 0;">
-                            <span style="font-size: 0.8125rem; font-weight: 600; color: #292524;">{{ $ranking['name'] }}</span>
+                            <span style="font-size: 0.8125rem; font-weight: 600; color: rgb(var(--hub-ink));">{{ $ranking['name'] }}</span>
                             @if($ranking['brand'])
-                            <span style="font-size: 0.6875rem; color: #A8A29E; margin-left: 0.25rem;">({{ $ranking['brand'] }})</span>
+                            <span style="font-size: 0.6875rem; color: rgb(var(--hub-muted-soft)); margin-left: 0.25rem;">({{ $ranking['brand'] }})</span>
                             @endif
                         </div>
                         @if($ranking['avg_score'] !== null)
@@ -561,9 +561,9 @@
                             {{ number_format($ranking['avg_score'], 1) }}
                         </span>
                         @else
-                        <span style="font-size: 0.75rem; color: #D4D0CA;">—</span>
+                        <span style="font-size: 0.75rem; color: rgb(var(--hub-border-strong));">—</span>
                         @endif
-                        <span style="font-size: 0.6875rem; color: #A8A29E;">{{ $ranking['response_count'] }} resp.</span>
+                        <span style="font-size: 0.6875rem; color: rgb(var(--hub-muted-soft));">{{ $ranking['response_count'] }} resp.</span>
                     </div>
                     @endforeach
                 </div>
@@ -578,20 +578,20 @@
     @if(!empty($brandGroupedAnalysis) && $session)
     <div class="wg-section">
         <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #D97706, #EA580C);">
+            <div class="wg-section-header-icon">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
             </div>
             <div>
                 <h2 class="wg-section-title">Package Purchase Recommendation</h2>
-                <p style="color: #78716C; font-size: 0.875rem; margin-bottom: 0.5rem;">Brand rankings by composite score — best value for complete tool set</p>
+                <p style="color: rgb(var(--hub-muted)); font-size: 0.875rem; margin-bottom: 0.5rem;">Brand rankings by composite score — best value for complete tool set</p>
             </div>
         </div>
 
         @foreach($brandGroupedAnalysis as $group)
-        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid #E8E5E0;">
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid rgb(var(--hub-border));">
             <div style="margin-bottom: 0.75rem;">
-                <h3 style="font-size: 0.9375rem; font-weight: 700; color: #292524;">{{ $group['category_name'] }}</h3>
-                <p style="font-size: 0.6875rem; color: #A8A29E;">{{ $group['brand_count'] }} brands · {{ $group['total_products'] }} products compared</p>
+                <h3 style="font-size: 0.9375rem; font-weight: 700; color: rgb(var(--hub-ink));">{{ $group['category_name'] }}</h3>
+                <p style="font-size: 0.6875rem; color: rgb(var(--hub-muted-soft));">{{ $group['brand_count'] }} brands · {{ $group['total_products'] }} products compared</p>
             </div>
 
             @foreach($group['brand_rankings'] as $rank => $brandData)
@@ -618,15 +618,15 @@
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.375rem; margin-top: 0.5rem;">
                         @foreach($brandData['product_scores'] as $ps)
-                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.375rem 0.625rem; background-color: #F8F6F2; border-radius: 0.375rem; font-size: 0.75rem;">
-                            <span style="color: #78716C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 0.5rem;">{{ $ps['product']->name }}</span>
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.375rem 0.625rem; background-color: rgb(var(--hub-surface-muted)); border-radius: 0.375rem; font-size: 0.75rem;">
+                            <span style="color: rgb(var(--hub-muted)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 0.5rem;">{{ $ps['product']->name }}</span>
                             @if($ps['avg_score'] !== null)
                             <span class="wg-score" style="flex-shrink: 0;
                                 {{ $ps['avg_score'] >= 70 ? 'color: #059669;' : ($ps['avg_score'] >= 50 ? 'color: #D97706;' : 'color: #DC2626;') }}">
                                 {{ number_format($ps['avg_score'], 1) }}
                             </span>
                             @else
-                            <span style="color: #D4D0CA; flex-shrink: 0;">—</span>
+                            <span style="color: rgb(var(--hub-border-strong)); flex-shrink: 0;">—</span>
                             @endif
                         </div>
                         @endforeach
@@ -658,8 +658,8 @@
                 <div class="wg-isolated-label">Standalone</div>
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.5rem;">
                     <div>
-                        <h4 style="font-weight: 600; color: #292524; font-size: 0.875rem;">{{ $iso['name'] }}</h4>
-                        <p style="font-size: 0.6875rem; color: #A8A29E;">
+                        <h4 style="font-weight: 600; color: rgb(var(--hub-ink)); font-size: 0.875rem;">{{ $iso['name'] }}</h4>
+                        <p style="font-size: 0.6875rem; color: rgb(var(--hub-muted-soft));">
                             {{ $iso['brand'] ? $iso['brand'] . ' · ' : '' }}{{ $iso['category_name'] }}
                         </p>
                     </div>
@@ -669,8 +669,8 @@
                     </span>
                     @endif
                 </div>
-                <p style="font-size: 0.75rem; color: #A8A29E; font-style: italic; margin-bottom: 0.5rem;">{{ $iso['note'] }}</p>
-                <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.6875rem; color: #78716C;">
+                <p style="font-size: 0.75rem; color: rgb(var(--hub-muted-soft)); font-style: italic; margin-bottom: 0.5rem;">{{ $iso['note'] }}</p>
+                <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.6875rem; color: rgb(var(--hub-muted));">
                     <span>{{ $iso['response_count'] }} responses</span>
                     @if($iso['meets_threshold'])
                     <span style="color: #059669;">✓ Meets threshold</span>
@@ -681,7 +681,7 @@
                 @if(!empty($iso['saver_breakdown']) && $iso['saver_breakdown']['capability'] !== null)
                 <div style="margin-top: 0.5rem; display: flex; gap: 0.375rem; font-size: 0.6875rem;">
                     @foreach(['capability' => 'S', 'usability' => 'A', 'affordability' => 'V', 'maintainability' => 'E', 'deployability' => 'R'] as $key => $label)
-                    <span style="padding: 0.125rem 0.375rem; border-radius: 0.25rem; background-color: #F0EDE8; color: #57534E; font-variant-numeric: tabular-nums;" title="{{ ucfirst($key) }}">
+                    <span style="padding: 0.125rem 0.375rem; border-radius: 0.25rem; background-color: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-ink-secondary)); font-variant-numeric: tabular-nums;" title="{{ ucfirst($key) }}">
                         {{ $label }}: {{ $iso['saver_breakdown'][$key] !== null ? number_format($iso['saver_breakdown'][$key], 0) : '—' }}
                     </span>
                     @endforeach
@@ -698,7 +698,7 @@
     <div style="margin-top: 1.5rem;">
         @foreach($nonRankableFeedback as $nrCat)
         <div class="wg-section">
-            <div class="wg-section-header" style="background-color: #F0FAF4;">
+            <div class="wg-section-header">
                 <div class="wg-section-header-icon" style="background: rgb(var(--hub-action-primary));">
                     <x-heroicon-o-chat-bubble-left-right class="w-5 h-5"/>
                 </div>
@@ -717,7 +717,7 @@
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                             @if($fb['score'] !== null)
-                            <span class="wg-score" style="font-size: 0.75rem; color: #44403C;">{{ number_format($fb['score'], 1) }}</span>
+                            <span class="wg-score" style="font-size: 0.75rem; color: rgb(var(--hub-ink-secondary));">{{ number_format($fb['score'], 1) }}</span>
                             @endif
                             <span class="wg-feedback-evaluator">{{ $fb['evaluator'] ?? 'Unknown' }}</span>
                         </div>
@@ -758,16 +758,16 @@
     @if($finalists->isNotEmpty())
     <div class="wg-section" style="margin-top: 1.5rem;">
         <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #C5A55A, #D97706);">
+            <div class="wg-section-header-icon">
                 <x-heroicon-o-trophy class="w-5 h-5"/>
             </div>
             <div style="flex: 1;">
                 <h3 class="wg-section-title">Top Finalists</h3>
             </div>
-            <a href="/workgroup-export/finalists{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="text-sm text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-50 ring-1 ring-neutral-200/60 rounded-lg px-3 py-1.5 transition-all inline-flex items-center gap-1.5 shadow-sm" title="Export CSV">
+            <a href="/workgroup-export/finalists{{ $selectedSessionId ? '?session_id='.$selectedSessionId : '' }}" class="wg-export-link" title="Export CSV">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                 CSV
-            </button>
+            </a>
         </div>
         <div style="overflow-x: auto;">
             <table class="wg-table">
@@ -792,15 +792,15 @@
                         <td style="text-align: center;">
                             <span class="wg-rank-medal" style="width: 1.75rem; height: 1.75rem; font-size: 0.6875rem; {{ $finalistMedalBg }}">{{ $finalist['rank'] }}</span>
                         </td>
-                        <td style="font-size: 0.75rem; color: #78716C;">{{ $finalist['category'] }}</td>
-                        <td style="font-weight: 600; color: #292524;">{{ $finalist['product']->name }}</td>
-                        <td style="color: #78716C;">{{ $finalist['product']->manufacturer ?? '—' }}</td>
+                        <td style="font-size: 0.75rem; color: rgb(var(--hub-muted));">{{ $finalist['category'] }}</td>
+                        <td style="font-weight: 600; color: rgb(var(--hub-ink));">{{ $finalist['product']->name }}</td>
+                        <td style="color: rgb(var(--hub-muted));">{{ $finalist['product']->manufacturer ?? '—' }}</td>
                         <td style="text-align: center;">
                             <span class="wg-score-badge {{ $finalist['rank'] === 1 ? 'wg-score-badge--high' : 'wg-score-badge--mid' }}">
                                 {{ number_format($finalist['score'], 1) }}
                             </span>
                         </td>
-                        <td style="text-align: center; color: #78716C;" class="wg-score">{{ $finalist['responses'] }}</td>
+                        <td style="text-align: center; color: rgb(var(--hub-muted));" class="wg-score">{{ $finalist['responses'] }}</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -812,11 +812,11 @@
     {{-- No Session State --}}
     @if($allSessions->isEmpty())
     <div style="text-align: center; padding: 4rem 0;">
-        <div style="width: 4rem; height: 4rem; margin: 0 auto 1rem; border-radius: 9999px; background-color: #F0EDE8; display: flex; align-items: center; justify-content: center;">
-            <x-heroicon-o-calendar class="w-8 h-8" style="color: #A8A29E;"/>
+        <div style="width: 4rem; height: 4rem; margin: 0 auto 1rem; border-radius: 9999px; background-color: rgb(var(--hub-surface-muted)); display: flex; align-items: center; justify-content: center;">
+            <x-heroicon-o-calendar class="w-8 h-8" style="color: rgb(var(--hub-muted-soft));"/>
         </div>
-        <h3 style="font-size: 1.125rem; font-weight: 700; color: #292524; margin-bottom: 0.5rem;">No Active Session</h3>
-        <p style="font-size: 0.875rem; color: #78716C; max-width: 28rem; margin: 0 auto;">There are no evaluation sessions available. Use the "Switch Session" button above to select a session, or ask an admin to create one.</p>
+        <h3 style="font-size: 1.125rem; font-weight: 700; color: rgb(var(--hub-ink)); margin-bottom: 0.5rem;">No Active Session</h3>
+        <p style="font-size: 0.875rem; color: rgb(var(--hub-muted)); max-width: 28rem; margin: 0 auto;">There are no evaluation sessions available. Use the "Switch Session" button above to select a session, or ask an admin to create one.</p>
     </div>
     @endif
 

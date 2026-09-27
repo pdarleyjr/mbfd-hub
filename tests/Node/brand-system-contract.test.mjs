@@ -230,9 +230,42 @@ test("Admin browser chrome and installed PWA use Hub header and canvas colors", 
   assert.equal(manifest.background_color, "#F7FAFC");
 });
 
-test("live Workgroup rankings use the shared action color instead of decorative violet", () => {
-  const source = read("resources/views/filament/workgroup/pages/session-results.blade.php");
+test("Workgroup views keep links and buttons structurally balanced without nested controls", () => {
+  const pages = [
+    "admin-dashboard.blade.php",
+    "links.blade.php",
+    "session-results.blade.php",
+    "saver-report.blade.php",
+    "saver-report-pdf.blade.php",
+    "partials/granular-tool-table.blade.php",
+  ];
 
-  assert.match(source, /wg-section-header-icon" style="background: rgb\(var\(--hub-action-primary\)\);"/);
-  assert.doesNotMatch(source, /#(?:7C3AED|8B5CF6)\b/i);
+  for (const page of pages) {
+    const source = read(`resources/views/filament/workgroup/pages/${page}`);
+    const stack = [];
+    for (const [tag] of source.matchAll(/<\/?(?:a|button)\b[^>]*>/gi)) {
+      const kind = /^<\//.test(tag) ? "close" : "open";
+      const name = /^<\/?(a|button)\b/i.exec(tag)[1].toLowerCase();
+      if (kind === "open") {
+        assert.equal(stack.length, 0, `${page}: nested interactive control ${tag}`);
+        stack.push(name);
+      } else {
+        assert.equal(stack.pop(), name, `${page}: mismatched closing tag ${tag}`);
+      }
+    }
+    assert.deepEqual(stack, [], `${page}: unclosed interactive control`);
+  }
+});
+
+test("Workgroup export links use the shared tokens and keyboard focus treatment", () => {
+  const source = read("resources/views/filament/workgroup/pages/session-results.blade.php");
+  const theme = read("resources/css/filament/admin/theme.css");
+  const exports = [...source.matchAll(/<a href="(\/workgroup-export\/[^"]+)" class="wg-export-link" title="Export CSV">/g)];
+
+  assert.equal(exports.length, 9);
+  assert.match(theme, /\.wg-export-link\s*\{[^}]*min-height:\s*44px;[^}]*color:\s*rgb\(var\(--hub-action-primary\)\)/);
+  assert.match(theme, /\.wg-session-results \.wg-export-link:focus-visible,/);
+  assert.ok(/\.wg-session-results \.wg-session-pill:focus-visible\s*\{[^}]*outline:\s*2px solid rgb\(var\(--hub-focus\)\)/.test(theme), "Workgroup controls need a visible token-based keyboard outline");
+  assert.doesNotMatch(source, /<div class="wg-section-header-icon" style="background:\s*linear-gradient/);
+  assert.doesNotMatch(source, /<a href="\/workgroup-export\/[^>]*text-neutral-/);
 });

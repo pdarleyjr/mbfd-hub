@@ -4,6 +4,7 @@ interface Env {
   HUB_INBOUND_URL: string;
   HUB_INBOUND_SECRET: string;
   MAX_RAW_BYTES: string;
+  MAX_ATTACHMENT_BYTES: string;
 }
 
 function bytesToHex(bytes: ArrayBuffer): string {
@@ -44,7 +45,7 @@ export default {
       return;
     }
 
-    const maxRawBytes = Number(env.MAX_RAW_BYTES || "4500000");
+    const maxRawBytes = Number(env.MAX_RAW_BYTES || "3000000");
     if (message.rawSize > maxRawBytes) {
       message.setReject("Message too large");
       return;
@@ -55,6 +56,16 @@ export default {
       return;
     }
     const parsed = await new PostalMime().parse(raw);
+    const maxAttachmentBytes = Number(env.MAX_ATTACHMENT_BYTES || "2000000");
+    const attachmentBytes = parsed.attachments.reduce((total, attachment) => total + (
+      typeof attachment.content === "string"
+        ? new TextEncoder().encode(attachment.content).byteLength
+        : attachment.content.byteLength
+    ), 0);
+    if (attachmentBytes > maxAttachmentBytes) {
+      message.setReject("Attachments exceed the 2 MB total limit");
+      return;
+    }
     const body = JSON.stringify({
       message_id: parsed.messageId || crypto.randomUUID(),
       from: parsed.from?.address || message.from,

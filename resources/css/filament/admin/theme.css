@@ -953,6 +953,7 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 .wg-section-header-icon {
@@ -963,6 +964,7 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    background-color: rgb(var(--hub-action-primary));
 }
 
 .wg-section-header-icon svg,
@@ -1181,7 +1183,7 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 .wg-ai-icon {
     width: 2.5rem;
     height: 2.5rem;
-    background: linear-gradient(135deg, #6D28D9, #4338CA);
+    background-color: rgb(var(--hub-action-primary));
     border-radius: 0.625rem;
     display: flex;
     align-items: center;
@@ -1232,22 +1234,70 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 }
 
 .wg-ai-btn--primary {
-    background-color: #6D28D9;
+    background-color: rgb(var(--hub-action-primary));
     color: #ffffff;
 }
 
 .wg-ai-btn--primary:hover {
-    background-color: #5B21B6;
+    background-color: rgb(var(--hub-action-primary-hover));
 }
 
 .wg-ai-btn--secondary {
     background-color: rgb(var(--hub-surface));
-    color: #6D28D9;
+    color: rgb(var(--hub-action-primary));
     border: 1px solid rgb(var(--hub-border));
 }
 
 .wg-ai-btn--secondary:hover {
     background-color: rgb(var(--hub-surface-muted));
+}
+
+.wg-session-results .wg-section-header > div:nth-child(2) {
+    min-width: 0;
+    flex: 1 1 12rem;
+}
+
+.wg-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.wg-header-actions > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.wg-export-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid rgb(var(--hub-border));
+    border-radius: 0.5rem;
+    background-color: rgb(var(--hub-surface));
+    color: rgb(var(--hub-action-primary));
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-decoration: none;
+    flex-shrink: 0;
+    margin-left: auto;
+    transition: background-color 150ms ease-out;
+}
+
+.wg-export-link:hover {
+    background-color: rgb(var(--hub-surface-muted));
+}
+
+.wg-session-results .wg-export-link:focus-visible,
+.wg-session-results .wg-ai-btn:focus-visible,
+.wg-session-results .wg-session-pill:focus-visible {
+    outline: 2px solid rgb(var(--hub-focus));
+    outline-offset: 2px;
 }
 
 /* Feedback Quotes */
