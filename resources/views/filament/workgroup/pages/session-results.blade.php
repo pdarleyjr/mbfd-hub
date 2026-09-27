@@ -254,7 +254,7 @@
     @if(!empty($gtg['cutoff_saws']))
     <div class="wg-section" style="margin-bottom: 1.25rem;">
         <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #DC2626, #EF4444);">
+            <div class="wg-section-header-icon" style="background: rgb(var(--hub-action-primary));">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l4 4m4-4l4-4m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             </div>
             <div style="flex: 1;">
@@ -274,7 +274,7 @@
     @if(!empty($gtg['brand_overall']))
     <div class="wg-section" style="margin-bottom: 1.25rem;">
         <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #7C3AED, #8B5CF6);">
+            <div class="wg-section-header-icon" style="background: rgb(var(--hub-action-primary));">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
             </div>
             <div style="flex: 1;">
@@ -331,7 +331,7 @@
     @if(!empty($gtg['spreaders']))
     <div class="wg-section" style="margin-bottom: 1.25rem;">
         <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #059669, #10B981);">
+            <div class="wg-section-header-icon" style="background: rgb(var(--hub-action-primary));">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
             </div>
             <div style="flex: 1;">
@@ -351,7 +351,7 @@
     @if(!empty($gtg['cutters']))
     <div class="wg-section" style="margin-bottom: 1.25rem;">
         <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #2563EB, #3B82F6);">
+            <div class="wg-section-header-icon" style="background: rgb(var(--hub-action-primary));">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243z"/></svg>
             </div>
             <div style="flex: 1;">
@@ -371,7 +371,7 @@
     @if(!empty($gtg['rams']))
     <div class="wg-section" style="margin-bottom: 1.25rem;">
         <div class="wg-section-header">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #EA580C, #F97316);">
+            <div class="wg-section-header-icon" style="background: rgb(var(--hub-action-primary));">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
             </div>
             <div style="flex: 1;">
@@ -643,7 +643,7 @@
     @if(!empty($isolatedProducts))
     <div style="margin-top: 1.5rem;">
         <div class="wg-section-header" style="background: none; border: none; padding-left: 0;">
-            <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #78716C, #57534E);">
+            <div class="wg-section-header-icon" style="background: rgb(var(--hub-action-primary));">
                 <x-heroicon-o-cube class="w-5 h-5"/>
             </div>
             <div>
@@ -699,7 +699,7 @@
         @foreach($nonRankableFeedback as $nrCat)
         <div class="wg-section">
             <div class="wg-section-header" style="background-color: #F0FAF4;">
-                <div class="wg-section-header-icon" style="background: linear-gradient(135deg, #059669, #10B981);">
+                <div class="wg-section-header-icon" style="background: rgb(var(--hub-action-primary));">
                     <x-heroicon-o-chat-bubble-left-right class="w-5 h-5"/>
                 </div>
                 <div>

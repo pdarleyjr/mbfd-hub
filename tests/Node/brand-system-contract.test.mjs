@@ -189,3 +189,48 @@ test("live Filament command-center and workgroup structural colors resolve throu
     );
   }
 });
+
+test("Home controls and presentation load from the Hub build without third-party CDNs", () => {
+  const home = read("resources/views/welcome.blade.php");
+  const appCss = read("resources/css/app.css");
+  const homeJs = read("resources/js/home.js");
+  const vite = read("vite.config.js");
+
+  assert.doesNotMatch(home, /fonts\.(?:googleapis|gstatic)\.com|cdn\.jsdelivr\.net/);
+  assert.doesNotMatch(appCss, /fonts\.googleapis\.com/);
+  assert.match(appCss, /@import ['"]@fontsource-variable\/plus-jakarta-sans\/wght\.css['"]/);
+  assert.match(home, /@vite\(\['resources\/css\/app\.css', 'resources\/js\/home\.js'\]\)/);
+  assert.match(vite, /'resources\/js\/home\.js'/);
+  assert.match(homeJs, /import Alpine from 'alpinejs'/);
+  assert.match(homeJs, /Alpine\.start\(\)/);
+  assert.match(home, /\.shimmer-line\s*\{[^}]*background:\s*rgb\(var\(--hub-border\)\)/);
+});
+
+test("Home incident status labels only confirmed current data as Live", () => {
+  const home = read("resources/views/welcome.blade.php");
+
+  assert.match(home, />MBFD Incidents<\/h2>/);
+  assert.doesNotMatch(home, /MBFD Live Incidents|Agency X1012|All units available/);
+  assert.match(home, /x-show="!loading && !error && !stale"/);
+  assert.match(home, /x-show="!loading && stale"/);
+  assert.match(home, /x-show="!loading && error"/);
+  assert.match(home, /data\.staleAsOf/);
+  assert.match(home, /loading \|\| error \? '—' : activeCount/);
+});
+
+test("Admin browser chrome and installed PWA use Hub header and canvas colors", () => {
+  const head = read("resources/views/filament/admin/partials/head-pwa.blade.php");
+  const manifest = JSON.parse(read("public/admin-pwa/manifest.webmanifest"));
+
+  assert.match(head, /<meta name="theme-color" content="#102A43">/);
+  assert.doesNotMatch(head, /#FAFAF8/i);
+  assert.equal(manifest.theme_color, "#102A43");
+  assert.equal(manifest.background_color, "#F7FAFC");
+});
+
+test("live Workgroup rankings use the shared action color instead of decorative violet", () => {
+  const source = read("resources/views/filament/workgroup/pages/session-results.blade.php");
+
+  assert.match(source, /wg-section-header-icon" style="background: rgb\(var\(--hub-action-primary\)\);"/);
+  assert.doesNotMatch(source, /#(?:7C3AED|8B5CF6)\b/i);
+});

@@ -163,6 +163,12 @@ Schedule::command('mbfd:cloudflare-usage-refresh')
     ->withoutOverlapping(2)
     ->onOneServer();
 
+Schedule::command('health:check')
+    ->everyFiveMinutes()
+    ->when(fn (): bool => app()->environment('production'))
+    ->withoutOverlapping(2)
+    ->onOneServer();
+
 Schedule::command('mbfd:email-delivery-reconcile')
     ->everyFiveMinutes()
     ->when(fn (): bool => (bool) config('communications.delivery.enabled'))

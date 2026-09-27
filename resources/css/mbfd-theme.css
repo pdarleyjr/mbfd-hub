@@ -7,7 +7,7 @@
 :root {
     color-scheme: light;
 
-    --hub-font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --hub-font-sans: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
     --hub-header: 16 42 67;
     --hub-header-elevated: 23 58 94;

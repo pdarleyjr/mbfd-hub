@@ -8,6 +8,7 @@ use Spatie\Health\Checks\Checks\DatabaseCheck;
 use Spatie\Health\Checks\Checks\UsedDiskSpaceCheck;
 use Spatie\Health\Checks\Checks\CacheCheck;
 use Spatie\Health\Checks\Checks\EnvironmentCheck;
+use Spatie\Health\Checks\Checks\PingCheck;
 
 class HealthServiceProvider extends ServiceProvider
 {
@@ -26,6 +27,11 @@ class HealthServiceProvider extends ServiceProvider
             CacheCheck::new(),
             EnvironmentCheck::new()
                 ->expectEnvironment('production'),
+            PingCheck::new()
+                ->name('Incident feed')
+                ->url((string) config('services.pulsepoint.worker_url'))
+                ->timeout(5)
+                ->failureMessage('Incident feed unavailable'),
         ]);
     }
 }

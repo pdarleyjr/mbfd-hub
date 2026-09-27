@@ -7,6 +7,9 @@ namespace Tests\Feature;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Spatie\Health\Checks\Check;
+use Spatie\Health\Enums\Status;
+use Spatie\Health\Health;
 use Tests\TestCase;
 
 class IncidentsControllerTest extends TestCase
@@ -65,17 +68,55 @@ class IncidentsControllerTest extends TestCase
 
     public function test_it_opens_the_circuit_after_sustained_failures(): void
     {
-        Http::fake(fn () => Http::response([], 503));
+        $workerAvailable = false;
+        Http::fake(function () use (&$workerAvailable) {
+            return $workerAvailable
+                ? Http::response(['active' => [], 'recent' => [], 'fetchedAt' => now()->toISOString()])
+                : Http::response([], 503);
+        });
 
         for ($attempt = 0; $attempt < 3; $attempt++) {
             $this->getJson('/api/incidents')->assertServiceUnavailable();
             Cache::forget('pulsepoint_incidents_failure_alert');
         }
 
+        $circuitUntil = (int) Cache::get('pulsepoint_incidents_circuit_until');
         $requestsBeforeCircuitProbe = count(Http::recorded());
+        $this->travel(30)->seconds();
         $this->getJson('/api/incidents')->assertServiceUnavailable();
 
         $this->assertSame($requestsBeforeCircuitProbe, count(Http::recorded()));
-        $this->assertGreaterThan(0, (int) Cache::get('pulsepoint_incidents_circuit_until'));
+        $this->assertSame($circuitUntil, (int) Cache::get('pulsepoint_incidents_circuit_until'));
+        $this->assertSame(3, (int) Cache::get('pulsepoint_incidents_failures'));
+
+        $this->travel(91)->seconds();
+        $workerAvailable = true;
+        $this->getJson('/api/incidents')->assertOk()->assertHeader('X-Data-Stale', 'false');
+        $this->assertSame(0, (int) Cache::get('pulsepoint_incidents_failures', 0));
+        $this->assertNull(Cache::get('pulsepoint_incidents_circuit_until'));
+    }
+
+    public function test_unavailable_feed_has_no_fresh_timestamp(): void
+    {
+        Http::fake(fn () => Http::response([], 503));
+
+        $this->getJson('/api/incidents')
+            ->assertServiceUnavailable()
+            ->assertJsonPath('stale', false)
+            ->assertJsonMissingPath('fetchedAt');
+    }
+
+    public function test_health_check_detects_worker_failure_without_provider_details(): void
+    {
+        Http::fake(fn () => Http::response([], 503));
+
+        $check = app(Health::class)->registeredChecks()
+            ->first(fn (Check $check): bool => $check->getName() === 'Incident feed');
+
+        $this->assertNotNull($check);
+        $result = $check->run();
+
+        $this->assertEquals(Status::failed(), $result->status);
+        $this->assertSame('Incident feed unavailable', $result->getNotificationMessage());
     }
 }
