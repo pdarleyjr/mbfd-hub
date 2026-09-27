@@ -56,6 +56,12 @@ jobs:
           npm ci --ignore-scripts
           npm audit --audit-level=high
 
+      - name: Support AI Worker security audit
+        working-directory: cloudflare-worker
+        run: |
+          npm ci --ignore-scripts
+          npm audit --audit-level=high
+
       - name: Vacation app security audit
         working-directory: vacation-app
         run: |
