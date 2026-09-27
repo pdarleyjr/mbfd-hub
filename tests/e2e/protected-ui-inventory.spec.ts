@@ -34,7 +34,7 @@ test('inventory records every route and renders available protected surfaces at 
   expect(protectedUiInventoryEnvironment.WORKGROUP_AI_WORKER_URL).toBe('');
   expect(protectedUiInventoryEnvironment.WORKGROUP_AI_WORKER_SECRET).toBe('');
   const context = await browser.newContext({ storageState: 'test-results/protected-ui-auth/state.json', serviceWorkers });
-  const canonicalContext = await context.request.get(`${origin}/api/me/context`, { headers: { Accept: 'application/json' } });
+  const canonicalContext = await context.request.get(`${origin}/api/me/context`, { headers: { Accept: 'application/json', Origin: origin, Referer: origin + '/admin' } });
   expect(canonicalContext.status(), 'Inventory starts with a current canonical employee session').toBe(200);
   const fixtureFile = resolve('test-results/protected-ui-auth/fixture-routes.json');
   const fixtureRoutes: Record<string, string> = existsSync(fixtureFile) ? JSON.parse(readFileSync(fixtureFile, 'utf8')) : {};
@@ -162,7 +162,7 @@ test('inventory records every route and renders available protected surfaces at 
     const canonicalSessionChecks: { stage: string; status: number }[] = [];
     const checkCanonicalSession = async (stage: string) => {
       if (!['/employee/video-conferencing/command', '/employee/my-requests/{personnelRequest}', '/daily/stations/:id'].includes(entry.route)) return;
-      const response = await context.request.get(`${origin}/api/me/context`, { headers: { Accept: 'application/json' } });
+      const response = await context.request.get(`${origin}/api/me/context`, { headers: { Accept: 'application/json', Origin: origin, Referer: origin + '/admin' } });
       canonicalSessionChecks.push({ stage, status: response.status() });
       expect(response.status(), `Canonical employee session ${stage} ${entry.route}`).toBe(200);
     };
@@ -171,6 +171,9 @@ test('inventory records every route and renders available protected surfaces at 
       await page.setViewportSize({ width: 1440, height: 1000 });
       const response = await page.goto(new URL(target, origin).href, { waitUntil: 'domcontentloaded', timeout: 15_000 });
       await page.locator('body').waitFor({ timeout: 3_000 });
+      if (entry.route === '/daily/stations/:id') {
+        await expect(page.getByRole('heading', { name: /^Station \d/ }).first()).toBeVisible({ timeout: 10_000 });
+      }
       await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => undefined);
       for (const frame of page.frames().filter(frame => frame.url().startsWith(origin + '/'))) {
         const lazyWidgets = await frame.locator('[wire\\:snapshot]').all();
@@ -226,6 +229,7 @@ test('inventory records every route and renders available protected surfaces at 
           for (const canvas of await page.locator('canvas').all()) {
             if (!await canvas.isVisible()) continue;
             await canvas.scrollIntoViewIfNeeded({ timeout: 5_000 });
+            await expect.poll(() => canvas.evaluate(el => el.getBoundingClientRect().width <= (el.parentElement?.clientWidth ?? 0) + 1), { timeout: 10_000 }).toBeTruthy();
             let previous = '', stable = 0;
             await expect.poll(async () => {
               const pixels = await canvas.evaluate(el => (el as HTMLCanvasElement).toDataURL());
@@ -235,6 +239,7 @@ test('inventory records every route and renders available protected surfaces at 
             }, { timeout: 10_000, intervals: [150] }).toBeGreaterThanOrEqual(3);
           }
           await page.evaluate(() => window.scrollTo(0, 0));
+          await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1), { timeout: 10_000 }).toBeTruthy();
         }
         const geometry = await page.evaluate(() => {
           const viewport = document.documentElement.clientWidth;
