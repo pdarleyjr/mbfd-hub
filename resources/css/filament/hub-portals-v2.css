@@ -226,10 +226,42 @@
     [data-hub-portal="report"] :is(.section-title, .subsection-title, .section-heading, .subsection-heading, .sub-subsection-heading) { break-after: avoid; }
     [data-hub-portal="report"] tr { break-inside: avoid; }
     [data-hub-portal="report"] .section { page-break-inside: auto; break-inside: auto; }
-    [data-hub-portal="report"] :is(.hub-report-table, .report-table-wrap, .hub-chart-data) { overflow: visible; }
+    [data-hub-portal="report"] :is(.hub-report-table, .report-table-wrap, .hub-chart-data, [role="region"]) { overflow: visible; }
     [data-hub-portal="report"] table { min-width: 0; max-width: 100%; page-break-inside: auto; break-inside: auto; }
     [data-hub-portal="report"] thead { display: table-header-group; }
-    [data-hub-portal="report"] :is(th, td) { white-space: normal; overflow-wrap: anywhere; }
+    [data-hub-portal="report"] :is(th, td) { white-space: normal; overflow-wrap: normal; word-break: normal; }
+    [data-hub-portal="report"] :is(.selection-status, .score-badge, .brand-pill, td > .rounded-full, .right) { white-space: nowrap; }
+    [data-hub-portal="report"] :focus-visible { outline: none; }
+    [data-hub-portal="report"] :is(.chart-container, .chart-container-large) { height: auto; max-height: none; break-inside: avoid; }
+    [data-hub-portal="report"] canvas { display: block; max-width: 100% !important; height: auto !important; }
+
+    [data-hub-portal="report"].hub-report--analysis-report { background: rgb(var(--hub-header)); color: rgb(var(--hub-surface)); print-color-adjust: exact; }
+    [data-hub-portal="report"].hub-report--analysis-report > nav { display: none; }
+    [data-hub-portal="report"].hub-report--analysis-report > main { padding: 1rem; }
+    [data-hub-portal="report"].hub-report--analysis-report #executive { padding: 1.5rem; }
+    [data-hub-portal="report"].hub-report--analysis-report .glass-panel { box-shadow: none; }
+    [data-hub-portal="report"].hub-report--analysis-report caption { color: rgb(var(--hub-surface)); }
+
+    [data-hub-portal="report"].hub-report--data-dashboard main { display: block; padding: .75rem .5rem; }
+    [data-hub-portal="report"].hub-report--data-dashboard aside { width: auto; margin-bottom: .75rem; }
+    [data-hub-portal="report"].hub-report--data-dashboard aside > nav { display: none; }
+    [data-hub-portal="report"].hub-report--data-dashboard aside > div { margin-top: 0; padding: .75rem; }
+    [data-hub-portal="report"].hub-report--data-dashboard aside ul { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
+    [data-hub-portal="report"].hub-report--data-dashboard main section > div { overflow: visible; }
+    [data-hub-portal="report"].hub-report--data-dashboard :is(th, td),
+    [data-hub-portal="report"].hub-report--l1-inventory :is(th, td) { padding: .5rem .4rem; font-size: .75rem; }
+    [data-hub-portal="report"].hub-report--data-dashboard td:nth-child(n+3),
+    [data-hub-portal="report"].hub-report--data-dashboard td:first-child > div,
+    [data-hub-portal="report"].hub-report--l1-inventory td:nth-child(n+4),
+    [data-hub-portal="report"].hub-report--l1-inventory tfoot td:last-child { white-space: nowrap; }
+    [data-hub-portal="report"].hub-report--l1-inventory .table-container { overflow: visible; }
+    [data-hub-portal="report"].hub-report--l1-inventory tfoot { display: table-row-group; }
+
+    [data-hub-portal="report"].hub-report--final-recommendations :is(.section-title, .subsection-title) { break-inside: avoid; }
+    [data-hub-portal="report"].hub-report--final-recommendations .tier-header { break-after: avoid; }
+    [data-hub-portal="report"].hub-report--final-recommendations .report-body { padding-bottom: .5rem; }
+    [data-hub-portal="report"].hub-report--final-recommendations .section:last-child { margin-bottom: 0; }
+    [data-hub-portal="report"].hub-report--final-recommendations .report-footer { flex-wrap: wrap; gap: .5rem; padding: .75rem 1rem; break-inside: avoid; }
 }
 @media (max-width: 1279px) {
     [data-hub-portal="employee"] .pr-page-grid { grid-template-columns: 1fr; }
