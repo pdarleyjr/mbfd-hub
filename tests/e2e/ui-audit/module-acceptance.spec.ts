@@ -83,7 +83,7 @@ for (const surface of surfaces.filter(entry => selected.length === 0 || selected
       const overlay = page.locator('.fi-sidebar-close-overlay');
       if (await overlay.isVisible()) {
         await page.screenshot({ path: resolve(artifactDir, `${slug}-native-drawer.png`), fullPage: true });
-        await overlay.click();
+        await overlay.click({ position: { x: width - 8, y: 100 }, timeout: 5_000 });
         await expect(overlay).toBeHidden();
       }
       let renderingReadinessError: string | null = null;
